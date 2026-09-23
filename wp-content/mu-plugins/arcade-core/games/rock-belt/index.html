@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Rock Belt</title></head>
+<body><script src="../_lib/kit.js?v=6"></script><script>
+const k = Kit({ w: 640, h: 480, title: 'Rock Belt', bg: '#07080f' }), c = k.ctx, W = 640, H = 480;
+let ship, rocks, shots, score, lives, wave, inv, cool;
+const wrap = (o) => { o.x = (o.x + W) % W; o.y = (o.y + H) % H; };
+function rock(x, y, r) { const a = k.rnd(0, 6.28), s = k.rnd(30, 90) * (50 / r); const pts = []; for (let i = 0; i < 10; i++) pts.push(r * k.rnd(0.75, 1.1)); return { x, y, r, vx: Math.cos(a) * s, vy: Math.sin(a) * s, pts, rot: k.rnd(-1, 1), ang: 0 }; }
+function spawnWave() { wave++; for (let i = 0; i < 3 + wave; i++) { let x, y; do { x = k.rnd(0, W); y = k.rnd(0, H); } while (Math.hypot(x - ship.x, y - ship.y) < 150); rocks.push(rock(x, y, 44)); } }
+function reset() { ship = { x: 320, y: 240, vx: 0, vy: 0, a: -Math.PI / 2 }; rocks = []; shots = []; score = 0; lives = 3; wave = 0; inv = 2; cool = 0; spawnWave(); }
+reset(); k.show('Rock Belt', '← → girar · ↑ propulsar · A disparar. Toca o pulsa A para empezar');
+k.run((dt) => {
+  if (!k.gate(reset)) return;
+  if (k.held.has('left')) ship.a -= 4.2 * dt; if (k.held.has('right')) ship.a += 4.2 * dt;
+  if (k.held.has('up')) { ship.vx += Math.cos(ship.a) * 260 * dt; ship.vy += Math.sin(ship.a) * 260 * dt; }
+  ship.vx *= 0.992; ship.vy *= 0.992; ship.x += ship.vx * dt; ship.y += ship.vy * dt; wrap(ship);
+  cool -= dt; inv -= dt;
+  if (k.held.has('a') && cool <= 0 && shots.length < 6) { cool = 0.22; shots.push({ x: ship.x + Math.cos(ship.a) * 14, y: ship.y + Math.sin(ship.a) * 14, vx: Math.cos(ship.a) * 480 + ship.vx, vy: Math.sin(ship.a) * 480 + ship.vy, t: 1 }); }
+  for (const s of shots) { s.x += s.vx * dt; s.y += s.vy * dt; s.t -= dt; wrap(s); }
+  for (const r of rocks) { r.x += r.vx * dt; r.y += r.vy * dt; r.ang += r.rot * dt; wrap(r); }
+  for (const s of shots) for (const r of rocks) if (!r.dead && s.t > 0 && Math.hypot(s.x - r.x, s.y - r.y) < r.r) {
+    s.t = 0; r.dead = true; k.burst(r.x, r.y, '#cfd3ff', r.r > 40 ? 20 : 10); k.sfx('explode'); score += r.r > 40 ? 20 : r.r > 20 ? 50 : 100;
+    if (r.r > 15) { rocks.push(rock(r.x, r.y, r.r / 2), rock(r.x, r.y, r.r / 2)); }
+  }
+  rocks = rocks.filter((r) => !r.dead); shots = shots.filter((s) => s.t > 0);
+  if (inv <= 0) for (const r of rocks) if (Math.hypot(ship.x - r.x, ship.y - r.y) < r.r + 9) {
+    lives--; navigator.vibrate && navigator.vibrate(120);
+    if (lives <= 0) { k.st = 'over'; k.show('Fin', `Puntos: ${score} · Récord ${k.best('rock-belt', score)} · Toca para repetir`); return; }
+    ship = { x: 320, y: 240, vx: 0, vy: 0, a: -Math.PI / 2 }; inv = 2.5; break;
+  }
+  if (!rocks.length) spawnWave();
+}, () => {
+  c.fillStyle = '#07080f'; c.fillRect(0, 0, W, H); c.strokeStyle = '#e8e6ff'; c.lineWidth = 2;
+  for (const r of rocks) { c.beginPath(); r.pts.forEach((d, i) => { const a = r.ang + i / r.pts.length * 6.283; c.lineTo(r.x + Math.cos(a) * d, r.y + Math.sin(a) * d); }); c.closePath(); c.stroke(); }
+  if (k.st === 'play' && !(inv > 0 && Math.floor(inv * 10) % 2)) {
+    c.save(); c.translate(ship.x, ship.y); c.rotate(ship.a); c.strokeStyle = '#7cf7c4';
+    c.beginPath(); c.moveTo(14, 0); c.lineTo(-10, -9); c.lineTo(-6, 0); c.lineTo(-10, 9); c.closePath(); c.stroke();
+    if (k.held.has('up')) { c.strokeStyle = '#ffb347'; c.beginPath(); c.moveTo(-7, -4); c.lineTo(-16, 0); c.lineTo(-7, 4); c.stroke(); }
+    c.restore();
+  }
+  c.fillStyle = '#fff'; for (const s of shots) c.fillRect(s.x - 2, s.y - 2, 4, 4);
+  k.text(`${score}`, 12, 10, 20); k.text('▲'.repeat(Math.max(0, lives)), 628, 10, 18, '#7cf7c4', 'right');
+});
+</script></body></html>

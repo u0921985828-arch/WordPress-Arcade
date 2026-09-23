@@ -1,0 +1,5 @@
+dist/
+shots/
+smoke_*.json
+audit_*.json
+__pycache__/
