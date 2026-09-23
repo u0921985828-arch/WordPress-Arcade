@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Genera games/<slug>/index.html para los 100 juegos a partir de motores compartidos.
 Cada página carga ../_lib/kit.js + ../_lib/<motor>.js con su window.CFG."""
-import json, shutil, sys
+import hashlib, json, shutil, sys
 from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'scripts'))
@@ -27,7 +27,7 @@ G = {
  'lunar-lander': ('lander', dict(help='')),
  'tank-duel': ('topdown', dict(mode='tank', help='Mueve el tanque (flechas o arrastra); la torreta apunta sola y dispara con A, tocando o al acercarte. Las balas rebotan una vez y algunos sacos se rompen.')),
  'neon-trails': ('gridmover', dict(mode='trails', help=f'{SW} para girar tu moto. No choques con ninguna estela. Sé el último en pie.')),
- 'tunnel-digger': ('maze', dict(mode='digger', bg='#1a120b', help=f'{SW} para excavar. Recoge todas las gemas y evita a los bichos de los túneles.')),
+ 'tunnel-digger': ('maze', dict(mode='digger', bg='#1a120b', help=f'{SW} para excavar. Recoge todas las gemas, evita a los bichos y tira rocas para aplastarlos.')),
  'cave-flyer': ('runner', dict(mode='cave', pal=['#5ce1e6', '#ff5fa2', '#3b2a55'], help='Mantén pulsado (o A) para subir y suelta para bajar. Disparas solo: dos impactos por mina. Recoge los cristales.')),
  'territory': ('gridmover', dict(mode='territory', help=f'{SW} para salir de tu zona y cerrar áreas. Si una chispa toca tu estela, pierdes. Conquista el 75 %.')),
  'barrel-climb': ('platform', dict(mode='barrels', help='← → moverse, ↑/A saltar (atraviesas las vigas desde abajo). Esquiva los barriles y llega arriba.')),
@@ -85,7 +85,7 @@ G = {
  'mini-golf-3d': ('golf', dict(mode='walls')), 'putt-island': ('golf', dict(mode='island')),
  'iso-maze': ('maze', dict(mode='iso', help='Desliza, arrastra o usa las flechas para moverte. Recoge las 3 llaves y sal por la baldosa verde.')),
  'crystal-labyrinth': ('raycast', dict()),
- 'iso-dungeon-explorer': ('maze', dict(mode='dungeon', iso=['#2b2233', '#b07a55', '#7a4f35', '#5f3c28'], help='Flechas para moverte, A para atacar a los monstruos vecinos. Recoge las llaves y sal.')),
+ 'iso-dungeon-explorer': ('maze', dict(mode='dungeon', iso=['#2b2233', '#b07a55', '#7a4f35', '#5f3c28'], help='Flechas o arrastra para moverte; A o toca para dar un tajo a los monstruos vecinos. Recoge las 3 llaves y sal.')),
  'voxel-runner': ('road', dict(mode='lanes', theme='voxel', help='Desliza a los lados para cambiar de carril y hacia arriba (o toca) para saltar las barras.')),
  'stack-tower-3d': ('stack', dict()), 'marble-roll': ('marble', dict()), 'drone-flight': ('drone', dict()), 'cube-roller': ('cube', dict()),
  'low-poly-skater': ('road', dict(mode='lanes', theme='skate', help='← → cambiar de carril, ↑/A saltar. Las rampas te lanzan por los aires para más puntos.')),
@@ -98,7 +98,7 @@ G = {
 
 TPL = '''<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{title}</title></head>
-<body><script>window.CFG={cfg};</script><script src="../_lib/kit.js?v=6"></script>{deps}<script src="../_lib/{eng}.js?v=7"></script></body></html>
+<body><script>window.CFG={cfg};</script><script src="../_lib/kit.js?v=6"></script>{deps}<script src="../_lib/{eng}.js?v={ev}"></script></body></html>
 '''
 
 def main():
@@ -112,7 +112,7 @@ def main():
     for slug, (eng, cfg) in G.items():
         cfg = dict(cfg); cfg.setdefault('help', ''); cfg['title'] = titles[slug]; cfg['id'] = slug
         d = GAMES_DIR / slug; d.mkdir(parents=True, exist_ok=True)
-        (d / 'index.html').write_text(TPL.format(title=titles[slug], cfg=json.dumps(cfg, ensure_ascii=False), eng=eng, deps=''.join(f'<script src="../_lib/{d}.js?v=7"></script>' for d in deps_of(eng))), encoding='utf-8')
+        (d / 'index.html').write_text(TPL.format(title=titles[slug], cfg=json.dumps(cfg, ensure_ascii=False), eng=eng, ev=hashlib.md5((ENG_DIR / f'{eng}.js').read_bytes()).hexdigest()[:8], deps=''.join(f'<script src="../_lib/{d}.js?v=7"></script>' for d in deps_of(eng))), encoding='utf-8')
     total = len([p for p in GAMES_DIR.iterdir() if (p / 'index.html').exists()])
     print(f'{len(G)} juegos generados + {len(STANDALONE)} independientes = {total} carpetas; {len(engines)} motores')
 
