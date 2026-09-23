@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **100 juegos propios** (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Subdominio temporal: **falta dominio propio** y cambiar el título "My Blog".
-- Versión actual del plugin: **1.11.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.12.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -66,11 +66,11 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
 - `topdown.js` (dungeon-micro, crypt-crawler, slime-arena, zombie-siege, hero-brawl, tank-duel): suelo cacheado por sala, obstáculos 3/4, aparición anunciada, botín (monedas/corazones), jefe cada 5 salas, elección de 1 mejora entre 3 tras cada sala (en dungeon/crypt se sale por la puerta). Tanques con torreta independiente y sacos rompibles.
 - `maze.js` (maze-muncher con fantasmas con IA propia y dispersión, casa central, fruta; tunnel-digger con estratos, rocas que caen y aplastan; iso-maze / iso-dungeon-explorer con bloques isométricos cacheados, brújula, antorchas y tajo con espada). Lienzo 480×520 con franja de HUD.
 - `raycast.js` (crystal-labyrinth: texturas, cristales con z-buffer, portal, minimapa; farol con aceite como límite), `frog.js` (tortugas que bucean, mosca bonus, 4 vehículos), `gridmover.js` (neon-trails con estelas neón cacheadas; territory con chispas destruibles al encerrarlas). Gridmover 480×520.
+- Puzzles y cartas (fase 4): `cards.js` (cartas cacheadas con figuras dibujadas, vuelo interpolado, arrastre, pista, autocompletar; Pyramid/TriPeaks terminan sin jugadas), `mahjong.js` (fichas en relieve con símbolos dibujados, 3 disposiciones, barajado con colocación inversa), `dice.js`, `board.js` (damas/reversi animados), `g2048`, `match3` (gemas con forma por color), `colorsort` (bolas), `flow`, `lasers`, `nonogram`, `sokoban` (hielo con mínimo BFS), `logic` (buscaminas con acorde), `poly` (tangram), `rope` (niveles verificados por simulador), `drawphys`, `td` (4 torres, panel lateral, hex real), `tactics` (unidades animadas, IA visible), `battle` (radar, IA que sigue impactos).
 - Caché de motores: `?v=` = hash md5 del motor (automático en build_games.py); `kit.js` y `art.js` siguen con `?v=N` manual.
 - Todos los motores cargan `art.js` (`deps_of` en build_games.py).
 
 **Pendientes de rehacer (funcionan y están auditados, pero con gráficos simples)**, en este orden acordado:
-4. Puzzles y cartas (g2048, match3, nonogram, sokoban, logic, flow, colorsort, lasers, poly, rope, drawphys, cards, mahjong, td, tactics, board, battle, dice): mejor acabado visual (fichas, cartas y tableros con relieve, animaciones de movimiento)
 5. Deportes y 3D (road, drone, stack, marble, cube, golf, planet, penalty, bowling, hoop, darts, pool, rhythm, homerun, whack, paddle) y breakout, lander, missile
 6. `platform.js` sigue usándose para barrel-climb, ninja-ascent, cloud-hopper, lava-escape (portarlos a arte ART)
 

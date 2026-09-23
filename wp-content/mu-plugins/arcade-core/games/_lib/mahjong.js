@@ -1,42 +1,122 @@
-/* Mahjong Solitaire: empareja fichas libres iguales (disposición generada para ser resoluble) */
-const k = Kit({ w: 640, h: 480, title: CFG.title, bg: '#123524' }), c = k.ctx;
-const TW = 40, TH = 52, SYM = ['🀇', '🀈', '🀉', '🀊', '🀋', '🀌', '🀍', '🀎', '🀏', '🀙', '🀚', '🀛', '🀜', '🀝', '🀞', '🀐', '🀑', '🀒', '🀓', '🀔', '🀀', '🀁', '🀂', '🀃', '🀄', '🀅', '🀆'];
-const GLY = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '①', '②', '③', '④', '⑤', '⑥', 'I', 'II', 'III', 'IV', 'V', 'E', 'S', 'O', 'N', '中', '發', '白'];
-const HUE = (i) => `hsl(${(i * 47) % 360} 70% 38%)`;
-let tiles, sel, score, level, done, hints, t;
-function layout() { const L = []; for (let y = 0; y < 6; y++) for (let x = 0; x < 12; x++) if (!(y === 0 || y === 5) || (x > 1 && x < 10)) L.push([x, y, 0]); for (let y = 1; y < 5; y++) for (let x = 3; x < 9; x++) L.push([x, y, 1]); for (let y = 2; y < 4; y++) for (let x = 4; x < 8; x++) L.push([x, y, 2]); L.push([5.5, 2.5, 3]); return L; }
+/* Mahjong Solitaire: empareja fichas libres iguales. Disposiciones por nivel generadas por colocación inversa (siempre resolubles).
+ * Fichas gruesas con cara y lateral cacheadas, símbolos dibujados, pistas, combos y barajado resoluble cuando no quedan parejas. */
+const W = 640, H = 480, OUT = ART.OUT, k = Kit({ w: W, h: H, title: CFG.title, bg: '#0f3a33' }), c = k.ctx;
+const TW = 44, TH = 56, DX = 6, DY = 7, OX = (W - 12 * TW) / 2, OY = 76, NT = 27;
+/* 0-8 caracteres 1-9 · 9-14 círculos 1-6 · 15-19 bambúes 1-5 · 20-23 vientos E S O N · 24-26 dragones rojo, verde y blanco */
+const SUITC = (t) => (t < 9 ? '#d5303e' : t < 15 ? '#2d6fd0' : t < 20 ? '#2a9a5a' : t < 24 ? '#22306e' : ['#d5303e', '#2a9a5a', '#2d6fd0'][t - 24]);
+const NAMES = ['Tortuga', 'Pirámide', 'Puentes'];
+let tiles, sel, score, level, done, hints, t, hint, shuf, combo, comboT, fly, dirty, cur, kbd, boardCv;
+function layout() {
+  const L = [], v = (level - 1) % 3;
+  if (v === 0) { for (let y = 0; y < 6; y++) for (let x = 0; x < 12; x++) if (!(y === 0 || y === 5) || (x > 1 && x < 10)) L.push([x, y, 0]); for (let y = 1; y < 5; y++) for (let x = 3; x < 9; x++) L.push([x, y, 1]); for (let y = 2; y < 4; y++) for (let x = 4; x < 8; x++) L.push([x, y, 2]); L.push([5.5, 2.5, 3]); }
+  if (v === 1) { for (let y = 0; y < 6; y++) for (let x = 0; x < 12; x++) if (!((x === 0 || x === 11) && (y === 0 || y === 5))) L.push([x, y, 0]); for (let y = 1; y < 5; y++) for (let x = 2; x < 10; x++) L.push([x, y, 1]); for (let y = 1.5; y < 4; y++) for (let x = 3.5; x < 8; x++) L.push([x, y, 2]); for (let x = 4.5; x < 7; x++) L.push([x, 2.5, 3]); }
+  if (v === 2) { for (let y = 0; y < 6; y++) for (let x = 0; x < 12; x++) if (!((x === 5 || x === 6) && (y === 0 || y === 5))) L.push([x, y, 0]); for (const bx of [1, 7]) { for (let y = 1; y < 5; y++) for (let x = bx; x < bx + 4; x++) L.push([x, y, 1]); for (let y = 2; y < 4; y++) for (let x = bx + 1; x < bx + 3; x++) L.push([x, y, 2]); L.push([bx + 1.5, 2.5, 3]); } for (let x = 5; x < 7; x++) L.push([x, 2.5, 1]); }
+  return L;
+}
 const blocks = (a, b) => b.z === a.z + 1 && Math.abs(b.x - a.x) < 1 && Math.abs(b.y - a.y) < 1;
 function free(tl, set) { if (set.some((o) => o !== tl && blocks(tl, o))) return false; const side = (dx) => set.some((o) => o !== tl && o.z === tl.z && Math.abs(o.y - tl.y) < 1 && Math.abs(o.x - (tl.x + dx)) < 0.5); return !side(-1) || !side(1); }
+/* Colocación inversa: se retiran parejas libres del tablero lleno y se les asigna tipo → ese orden es una solución */
+function assign(pos, types) {
+  for (let tries = 0; tries < 60; tries++) { const rem = pos.map((p) => ({ x: p.x, y: p.y, z: p.z })), placed = []; let ok = true; const ts = k.shuffle(types.slice());
+    for (const ty of ts) { const fr = rem.filter((p) => free(p, rem)); if (fr.length < 2) { ok = false; break; } k.shuffle(fr); const a = fr[0], b = fr[1]; a.t = ty; b.t = ty; placed.push(a, b); rem.splice(rem.indexOf(a), 1); rem.splice(rem.indexOf(b), 1); }
+    if (ok) return placed; }
+  return null;
+}
 function build() {
-  tiles = null; const L = layout(); let pos = L.map(([x, y, z]) => ({ x, y, z })); if (pos.length % 2) pos.pop();
-  for (let tries = 0; tries < 50; tries++) { const rem = pos.map((p) => ({ ...p })), placed = []; let ok = true; const types = k.shuffle([...Array(pos.length / 2).keys()].map((i) => i % SYM.length));
-    for (const ty of types) { const fr = rem.filter((p) => free(p, rem)); if (fr.length < 2) { ok = false; break; } k.shuffle(fr); const a = fr[0], b = fr[1]; a.t = ty; b.t = ty; placed.push(a, b); rem.splice(rem.indexOf(a), 1); rem.splice(rem.indexOf(b), 1); }
-    if (ok) { tiles = placed; break; } }
-  if (!tiles || !tiles.length) return build();
-  sel = null; done = false; hints = 3; t = 0;
+  tiles = null; let pos = layout().map(([x, y, z]) => ({ x, y, z })); if (pos.length % 2) pos.pop();
+  tiles = assign(pos, [...Array(pos.length / 2).keys()].map((i) => i % NT)); if (!tiles || !tiles.length) return build();
+  sel = null; done = false; hints = 3; shuf = 2; t = 0; hint = null; combo = 0; comboT = 0; fly = []; dirty = true;
 }
 function moves() { const fr = tiles.filter((q) => free(q, tiles)); for (let i = 0; i < fr.length; i++) for (let j = i + 1; j < fr.length; j++) if (fr[i].t === fr[j].t) return [fr[i], fr[j]]; return null; }
-function reset() { if (!level || k.st === 'over' && !done) { level = 1; score = 0; } build(); }
-reset(); k.show(CFG.title, 'Toca dos fichas iguales que estén libres (sin nada encima y con un lado libre). B o el botón = pista.');
-let hint = null, shuf = false;
+/* Barajado que conserva la garantía: se reasignan los tipos restantes con colocación inversa */
+function reshuffle() { const types = []; const cnt = {}; tiles.forEach((q) => (cnt[q.t] = (cnt[q.t] || 0) + 1)); for (const ty in cnt) for (let i = 0; i < cnt[ty] / 2; i++) types.push(+ty);
+  const nt = assign(tiles, types); if (nt) { tiles = nt; sel = null; hint = null; dirty = true; } }
+function reset() { if (!level || (k.st === 'over' && !done)) { level = 1; score = 0; } build(); }
+const sx = (q) => OX + q.x * TW - q.z * DX, sy = (q) => OY + q.y * TH - q.z * DY;
+function pick(px, py) { const order = [...tiles].sort((a, b) => b.z - a.z || b.y - a.y || b.x - a.x); return order.find((q) => px > sx(q) && px < sx(q) + TW - 2 && py > sy(q) && py < sy(q) + TH - 2); }
+function tap(tl) {
+  if (!tl || !free(tl, tiles)) { if (tl) { k.sfx('hit'); k.shake(2); } sel = null; return; }
+  if (sel && sel !== tl && sel.t === tl.t) {
+    tiles = tiles.filter((q) => q !== sel && q !== tl); dirty = true; combo = comboT > 0 ? combo + 1 : 1; comboT = 4; const pts = 20 * Math.min(combo, 5); score += pts;
+    const mx = (sx(sel) + sx(tl)) / 2 + TW / 2, my = (sy(sel) + sy(tl)) / 2 + TH / 2; for (const q of [sel, tl]) fly.push({ q, x: sx(q), y: sy(q), mx: mx - TW / 2, my: my - TH / 2, a: 0 });
+    k.float(combo > 1 ? `Combo x${combo} +${pts}` : `+${pts}`, mx, my - 30, combo > 1 ? '#ffb0e0' : '#ffe27a'); k.sfx(combo > 2 ? 'coin' : 'pop'); sel = null; hint = null;
+    if (!tiles.length) { done = true; const bonus = Math.max(100, 1000 - Math.floor(t) * 2); score += bonus; setTimeout(() => { k.st = 'over'; k.show('¡Tablero limpio!', `Nivel ${level} (${NAMES[(level - 1) % 3]}) · Bonus de tiempo ${bonus} · ${score} puntos · Récord ${k.best(CFG.id, score)}<br>Toca para el siguiente tablero`); level++; }, 700); }
+    else if (!moves()) { if (shuf > 0) { shuf--; setTimeout(() => { reshuffle(); k.float('Sin parejas: barajando', W / 2, H / 2, '#fff'); k.sfx('shoot'); }, 450); } else setTimeout(() => k.lose(CFG.id, score, 'Sin parejas libres', `Nivel ${level}`), 450); }
+  } else if (sel && sel !== tl) { sel = tl; k.sfx('click'); }
+  else { sel = sel === tl ? null : tl; k.sfx('click'); }
+}
+function useHint() { if (hints > 0 && !hint) { hint = moves(); if (hint) { hints--; k.sfx('coin'); } } }
+function nav(dir) { const fr = tiles.filter((q) => free(q, tiles)); if (!fr.length) return; if (!kbd || !cur || !tiles.includes(cur)) { kbd = true; cur = sel && tiles.includes(sel) ? sel : fr[0]; return; }
+  const cx = sx(cur), cy = sy(cur); let best = null, bd = 1e9; for (const q of fr) { if (q === cur) continue; const dx = sx(q) - cx, dy = sy(q) - cy, al = dir === 'left' ? -dx : dir === 'right' ? dx : dir === 'up' ? -dy : dy, pe = dir === 'left' || dir === 'right' ? Math.abs(dy) : Math.abs(dx); if (al < 5) continue; const s = al + pe * 2; if (s < bd) { bd = s; best = q; } }
+  if (best) { cur = best; k.sfx('click'); } }
+reset(); k.show(CFG.title, 'Toca dos fichas iguales que estén libres (sin nada encima y con un lado libre). Encadena parejas rápido para hacer combos. B o el botón = pista.');
 k.run((dt) => {
-  if (!k.gate(reset) || done) return; t += dt;
-  const ox = 320 - 6 * TW, oy = 70;
-  if (k.ptr.hit) {
-    if (k.ptr.y > 440 && k.ptr.x > 250 && k.ptr.x < 390) { if (hints > 0) { hint = moves(); hints--; } return; }
-    const order = [...tiles].sort((a, b) => b.z - a.z || b.y - a.y || b.x - a.x);
-    const tl = order.find((q) => { const x = ox + q.x * TW - q.z * 5, y = oy + q.y * TH - q.z * 6; return k.ptr.x > x && k.ptr.x < x + TW && k.ptr.y > y && k.ptr.y < y + TH; });
-    if (tl && free(tl, tiles)) { if (sel && sel !== tl && sel.t === tl.t) { tiles = tiles.filter((q) => q !== sel && q !== tl); score += 20; { const ox2 = 320 - 6 * TW, oy2 = 70; for (const q of [sel, tl]) k.burst(ox2 + q.x * TW - q.z * 5 + TW / 2, oy2 + q.y * TH - q.z * 6 + TH / 2, HUE(q.t), 8, 100); } sel = null; hint = null; navigator.vibrate && navigator.vibrate(15);
-        if (!tiles.length) { done = true; score += Math.max(100, 1000 - Math.floor(t) * 2); setTimeout(() => { k.st = 'over'; k.show('¡Tablero limpio!', `${score} puntos<br>Toca para otra partida`); level++; }, 300); }
-        else if (!moves()) { k.lose(CFG.id, score, 'Sin parejas libres'); } }
-      else sel = sel === tl ? null : tl; } else sel = null;
-  }
-  if (k.hit.has('b') && hints > 0) { hint = moves(); hints--; }
-}, () => {
-  k.clear(); const ox = 320 - 6 * TW, oy = 70; k.text(CFG.title, 12, 12, 20, '#f2d15c'); k.text(`${score} · Fichas ${tiles.length}`, 628, 14, 15, '#fff', 'right');
-  for (const q of [...tiles].sort((a, b) => a.z - b.z || a.x - b.x || a.y - b.y)) { const x = ox + q.x * TW - q.z * 5, y = oy + q.y * TH - q.z * 6, fr = free(q, tiles);
-    k.rrect(x + 4, y + 4, TW, TH, 5, '#8a7a5a'); k.rrect(x, y, TW, TH, 5, q === sel ? '#ffe98a' : hint && hint.includes(q) ? '#b8f7c8' : '#f6efdc');
-    k.text(GLY[q.t], x + TW / 2, y + 14, q.t >= 24 ? 22 : 18, HUE(q.t), 'center'); k.text(q.t < 9 ? '萬' : q.t < 15 ? '●' : q.t < 20 ? '竹' : '', x + TW / 2, y + 36, 11, HUE(q.t), 'center');
-    if (!fr) { c.fillStyle = 'rgba(0,0,0,.18)'; c.fillRect(x, y, TW, TH); } }
-  k.rrect(250, 444, 140, 30, 15, 'rgba(0,0,0,.35)'); k.text(`💡 Pista (${hints})`, 320, 451, 14, '#fff', 'center');
-});
+  for (const f of fly) f.a += dt * 3.2; fly = fly.filter((f) => { if (f.a >= 1 && !f.b) { f.b = 1; k.burst(f.mx + TW / 2, f.my + TH / 2, SUITC(f.q.t), 10, 130); } return f.a < 1.25; });
+  if (!k.gate(reset) || done) return; t += dt; comboT = Math.max(0, comboT - dt); if (comboT <= 0) combo = 0;
+  for (const d of ['left', 'right', 'up', 'down']) if (k.hit.has(d)) nav(d);
+  if (k.hit.has('a')) { if (kbd && cur && tiles.includes(cur)) tap(cur); else nav('right'); }
+  if (k.hit.has('b')) useHint();
+  if (k.ptr.hit) { kbd = false; if (k.ptr.y > 432 && Math.abs(k.ptr.x - W / 2) < 80) return useHint(); tap(pick(k.ptr.x, k.ptr.y)); }
+}, draw);
+
+/* ================= Arte ================= */
+function rrp(g, x, y, w, h, r) { ART.rr(g, x, y, w, h, r); }
+function dotC(g, x, y, r, col) { g.beginPath(); g.arc(x, y, r, 0, 6.283); g.fillStyle = col; g.fill(); g.lineWidth = 1; g.strokeStyle = OUT; g.stroke(); g.beginPath(); g.arc(x, y, r * 0.62, 0, 6.283); g.fillStyle = '#fffaf0'; g.fill(); g.beginPath(); g.arc(x, y, r * 0.36, 0, 6.283); g.fillStyle = col; g.fill(); }
+function stick(g, x, y, h, col) { rrp(g, x - 3, y - h / 2, 6, h, 3); g.fillStyle = col; g.fill(); g.lineWidth = 1; g.strokeStyle = OUT; g.stroke(); g.beginPath(); g.moveTo(x - 3, y); g.lineTo(x + 3, y); g.stroke(); g.fillStyle = 'rgba(255,255,255,.45)'; g.fillRect(x - 1.5, y - h / 2 + 2, 1.3, h - 4); }
+function symbol(g, ty, cx, cy) {
+  const col = SUITC(ty); g.lineJoin = 'round';
+  if (ty < 9) { const n = ty + 1; g.font = '900 22px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 3; g.strokeStyle = '#fffaf0'; g.strokeText(n, cx, cy - 9); g.fillStyle = '#22306e'; g.fillText(n, cx, cy - 9);
+    rrp(g, cx - 10, cy + 5, 20, 15, 3); g.fillStyle = col; g.fill(); g.lineWidth = 1; g.strokeStyle = OUT; g.stroke(); g.strokeStyle = '#fffaf0'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(cx - 6, cy + 9); g.lineTo(cx + 6, cy + 9); g.moveTo(cx, cy + 8); g.lineTo(cx, cy + 17); g.moveTo(cx - 6, cy + 16); g.quadraticCurveTo(cx, cy + 11, cx + 6, cy + 16); g.stroke(); return; }
+  if (ty < 15) { const n = ty - 8, cols = ['#2d6fd0', '#2a9a5a', '#d5303e'];
+    const P = { 1: [[0, 0]], 2: [[0, -10], [0, 10]], 3: [[-8, -12], [0, 0], [8, 12]], 4: [[-8, -9], [8, -9], [-8, 9], [8, 9]], 5: [[-8, -11], [8, -11], [0, 0], [-8, 11], [8, 11]], 6: [[-8, -13], [8, -13], [-8, 0], [8, 0], [-8, 13], [8, 13]] }[n];
+    P.forEach(([dx, dy], i) => dotC(g, cx + dx, cy + dy, n === 1 ? 14 : n < 4 ? 7.5 : 6.5, n === 1 ? '#d5303e' : cols[(i + n) % 3])); if (n === 1) { g.beginPath(); g.arc(cx, cy, 18, 0, 6.283); g.strokeStyle = '#2a9a5a'; g.lineWidth = 2; g.stroke(); } return; }
+  if (ty < 20) { const n = ty - 14, gr = '#2a9a5a', rd = '#d5303e';
+    if (n === 1) { stick(g, cx, cy + 2, 34, gr); g.beginPath(); g.moveTo(cx + 2, cy - 8); g.quadraticCurveTo(cx + 14, cy - 18, cx + 13, cy - 4); g.quadraticCurveTo(cx + 8, cy - 8, cx + 2, cy - 8); g.fillStyle = gr; g.fill(); g.stroke(); g.beginPath(); g.arc(cx, cy - 16, 4, 0, 6.283); g.fillStyle = rd; g.fill(); g.stroke(); return; }
+    const P = { 2: [[0, -10], [0, 10]], 3: [[0, -10], [-7, 10], [7, 10]], 4: [[-7, -10], [7, -10], [-7, 10], [7, 10]], 5: [[-10, -10], [10, -10], [0, 0], [-10, 10], [10, 10]] }[n];
+    P.forEach(([dx, dy], i) => stick(g, cx + dx, cy + dy, 17, n === 5 && i === 2 ? rd : i === 0 && n === 3 ? rd : gr)); return; }
+  if (ty < 24) { const d = ty - 20, L = ['E', 'S', 'O', 'N'][d], ang = [0, Math.PI / 2, Math.PI, -Math.PI / 2][d];
+    g.beginPath(); g.arc(cx, cy + 8, 11, 0, 6.283); g.fillStyle = '#e9e2cf'; g.fill(); g.lineWidth = 1.2; g.strokeStyle = OUT; g.stroke();
+    g.save(); g.translate(cx, cy + 8); g.rotate(ang); g.beginPath(); g.moveTo(10, 0); g.lineTo(-3, -4.5); g.lineTo(-3, 4.5); g.closePath(); g.fillStyle = '#d5303e'; g.fill(); g.stroke(); g.beginPath(); g.moveTo(-9, 0); g.lineTo(-3, -3); g.lineTo(-3, 3); g.closePath(); g.fillStyle = '#22306e'; g.fill(); g.restore();
+    g.font = '900 17px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#22306e'; g.fillText(L, cx, cy - 13); return; }
+  if (ty === 24) { g.beginPath(); g.moveTo(cx, cy - 20); g.bezierCurveTo(cx + 16, cy - 6, cx + 12, cy + 16, cx, cy + 20); g.bezierCurveTo(cx - 12, cy + 16, cx - 16, cy - 6, cx, cy - 20); g.fillStyle = '#d5303e'; g.fill(); g.lineWidth = 1.2; g.strokeStyle = OUT; g.stroke();
+    g.beginPath(); g.moveTo(cx, cy - 6); g.bezierCurveTo(cx + 7, cy + 2, cx + 5, cy + 12, cx, cy + 14); g.bezierCurveTo(cx - 5, cy + 12, cx - 7, cy + 2, cx, cy - 6); g.fillStyle = '#ffd05a'; g.fill(); return; }
+  if (ty === 25) { for (let i = 0; i < 3; i++) { const a = -Math.PI / 2 + i * 2.094; g.save(); g.translate(cx + Math.cos(a) * 8, cy + Math.sin(a) * 8); g.rotate(a + Math.PI / 2); g.beginPath(); g.ellipse(0, 0, 6, 11, 0, 0, 6.283); g.fillStyle = '#2a9a5a'; g.fill(); g.lineWidth = 1.1; g.strokeStyle = OUT; g.stroke(); g.restore(); }
+    g.beginPath(); g.arc(cx, cy, 4.5, 0, 6.283); g.fillStyle = '#ffd05a'; g.fill(); g.stroke(); return; }
+  rrp(g, cx - 13, cy - 18, 26, 36, 3); g.lineWidth = 3; g.strokeStyle = '#2d6fd0'; g.stroke(); rrp(g, cx - 8, cy - 13, 16, 26, 2); g.lineWidth = 1.5; g.stroke();
+}
+function mkTile(ty) { const cv = document.createElement('canvas'); cv.width = (TW + 10) * 2; cv.height = (TH + 12) * 2; const g = cv.getContext('2d'); g.scale(2, 2); g.translate(1, 1);
+  const fw = TW - 2, fh = TH - 2; g.fillStyle = 'rgba(0,0,0,.28)'; rrp(g, DX + 1, DY + 3, fw, fh, 7); g.fill();
+  rrp(g, DX, DY, fw, fh, 7); ART.fillOut(g, '#1f7a5a', 1.4); rrp(g, DX * 0.45, DY * 0.45, fw, fh, 7); ART.fillOut(g, '#e3d3b0', 1.2);
+  rrp(g, 0, 0, fw, fh, 7); const gr = g.createLinearGradient(0, 0, fw, fh); gr.addColorStop(0, '#fffdf6'); gr.addColorStop(1, '#efe3c6'); g.fillStyle = gr; g.fill(); g.lineWidth = 1.4; g.strokeStyle = OUT; g.stroke();
+  g.fillStyle = 'rgba(255,255,255,.8)'; rrp(g, 3, 2.5, fw - 6, 3, 1.5); g.fill(); symbol(g, ty, fw / 2, fh / 2); return cv; }
+const SPR = []; const spr = (ty) => SPR[ty] || (SPR[ty] = mkTile(ty));
+const BG = (() => { const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2; const g = cv.getContext('2d'); g.scale(2, 2);
+  let gr = g.createRadialGradient(W / 2, H * 0.45, 40, W / 2, H / 2, W * 0.7); gr.addColorStop(0, '#1d6b58'); gr.addColorStop(1, '#0b302a'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  g.strokeStyle = 'rgba(255,255,255,.035)'; g.lineWidth = 1.5; for (let y = -20; y < H + 40; y += 40) for (let x = -20; x < W + 40; x += 40) { g.beginPath(); g.arc(x, y, 20, 0, Math.PI); g.stroke(); g.beginPath(); g.arc(x + 20, y + 20, 20, 0, Math.PI); g.stroke(); }
+  for (let i = 0; i < 4000; i++) { g.fillStyle = Math.random() < 0.5 ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.06)'; g.fillRect(Math.random() * W, Math.random() * H, 1, 1); }
+  gr = g.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.62); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,.5)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  gr = g.createLinearGradient(0, 0, 0, 50); gr.addColorStop(0, 'rgba(0,0,0,.35)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, 50); return cv; })();
+function order(a, b) { return a.z - b.z || a.y - b.y || a.x - b.x; }
+function renderBoard() { if (!boardCv) { boardCv = document.createElement('canvas'); boardCv.width = W * 2; boardCv.height = H * 2; } const g = boardCv.getContext('2d'); g.setTransform(2, 0, 0, 2, 0, 0); g.clearRect(0, 0, W, H);
+  for (const q of [...tiles].sort(order)) { const x = sx(q), y = sy(q); g.drawImage(spr(q.t), x - 1, y - 1, TW + 10, TH + 12); if (!free(q, tiles)) { g.fillStyle = 'rgba(20,45,38,.3)'; rrp(g, x, y, TW - 2, TH - 2, 7); g.fill(); } }
+  dirty = false; }
+function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
+function ring(q, col, lw, lift) { const x = sx(q), y = sy(q) - (lift || 0); c.strokeStyle = col; c.lineWidth = lw; rrp(c, x - 2, y - 2, TW + 2, TH + 2, 9); c.stroke(); }
+function draw() {
+  const now = performance.now() / 1000; c.drawImage(BG, 0, 0, W, H); if (dirty) renderBoard(); c.drawImage(boardCv, 0, 0, W, H);
+  // ficha bajo el puntero / seleccionada: se eleva
+  const hov = !kbd && k.st === 'play' && !k.ptr.down ? pick(k.ptr.x, k.ptr.y) : null;
+  for (const q of [hov, kbd ? cur : null, sel]) if (q && tiles.includes(q) && free(q, tiles)) { const l = q === sel ? 4 : 2; c.drawImage(spr(q.t), sx(q) - 1, sy(q) - 1 - l, TW + 10, TH + 12); if (q === sel) { c.fillStyle = 'rgba(255,226,122,.28)'; rrp(c, sx(q), sy(q) - l, TW - 2, TH - 2, 7); c.fill(); ring(q, '#ffd84a', 3.5, l); } else if (q === cur && kbd) ring(q, '#5ce1e6', 3, l); else ring(q, 'rgba(255,255,255,.7)', 2, l); }
+  if (hint) for (const q of hint) if (tiles.includes(q)) ring(q, `rgba(124,247,160,${0.6 + 0.4 * Math.sin(now * 8)})`, 4);
+  // parejas que vuelan al centro y desaparecen
+  for (const f of fly) { const e = Math.min(1, f.a), ee = e * e * (3 - 2 * e), x = f.x + (f.mx - f.x) * ee, y = f.y + (f.my - f.y) * ee - Math.sin(e * Math.PI) * 30, s = f.a > 1 ? 1 + (f.a - 1) * 2 : 1 + e * 0.15;
+    c.save(); c.globalAlpha = f.a > 1 ? Math.max(0, 1 - (f.a - 1) * 4) : 1; c.translate(x + TW / 2, y + TH / 2); c.scale(s, s); c.drawImage(spr(f.q.t), -TW / 2 - 1, -TH / 2 - 1, TW + 10, TH + 12); c.restore(); }
+  // HUD
+  label(CFG.title, 12, 10, 18, '#ffe27a'); label(`Nivel ${level} · ${NAMES[(level - 1) % 3]}`, 12, 32, 12, '#bfe6d6');
+  label(`${score}`, W - 12, 8, 20, '#fff', 'right'); label(`Fichas ${tiles.length} · ${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`, W - 12, 32, 12, '#bfe6d6', 'right');
+  if (combo > 1) { const s = 1 + 0.06 * Math.sin(now * 12); c.save(); c.translate(90, 452); c.scale(s, s); label(`Combo x${combo}`, 0, -10, 18, '#ffb0e0', 'center'); c.globalAlpha = 0.8; c.fillStyle = '#ffb0e0'; c.fillRect(-40, 12, 80 * comboT / 4, 4); c.restore(); }
+  label(`Barajados ${shuf}`, W - 16, 448, 12, '#bfe6d6', 'right');
+  const bx = W / 2 - 75, by = 436, on = hints > 0; rrp(c, bx, by + 3, 150, 34, 14); c.fillStyle = OUT; c.fill(); rrp(c, bx, by, 150, 34, 14); ART.fillOut(c, on ? '#f4e6c4' : '#8d8a97', 2); c.fillStyle = 'rgba(255,255,255,.5)'; rrp(c, bx + 6, by + 3, 138, 7, 4); c.fill();
+  c.beginPath(); c.arc(bx + 24, by + 14, 7, 0, 6.283); c.fillStyle = '#ffd84a'; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke(); c.fillStyle = OUT; c.fillRect(bx + 20, by + 22, 8, 4);
+  c.font = '800 15px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(`Pista (${hints})`, bx + 86, by + 18);
+}
