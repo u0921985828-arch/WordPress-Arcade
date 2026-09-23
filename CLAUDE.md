@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **100 juegos propios** (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Subdominio temporal: **falta dominio propio** y cambiar el título "My Blog".
-- Versión actual del plugin: **1.12.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.13.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -67,11 +67,11 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
 - `maze.js` (maze-muncher con fantasmas con IA propia y dispersión, casa central, fruta; tunnel-digger con estratos, rocas que caen y aplastan; iso-maze / iso-dungeon-explorer con bloques isométricos cacheados, brújula, antorchas y tajo con espada). Lienzo 480×520 con franja de HUD.
 - `raycast.js` (crystal-labyrinth: texturas, cristales con z-buffer, portal, minimapa; farol con aceite como límite), `frog.js` (tortugas que bucean, mosca bonus, 4 vehículos), `gridmover.js` (neon-trails con estelas neón cacheadas; territory con chispas destruibles al encerrarlas). Gridmover 480×520.
 - Puzzles y cartas (fase 4): `cards.js` (cartas cacheadas con figuras dibujadas, vuelo interpolado, arrastre, pista, autocompletar; Pyramid/TriPeaks terminan sin jugadas), `mahjong.js` (fichas en relieve con símbolos dibujados, 3 disposiciones, barajado con colocación inversa), `dice.js`, `board.js` (damas/reversi animados), `g2048`, `match3` (gemas con forma por color), `colorsort` (bolas), `flow`, `lasers`, `nonogram`, `sokoban` (hielo con mínimo BFS), `logic` (buscaminas con acorde), `poly` (tangram), `rope` (niveles verificados por simulador), `drawphys`, `td` (4 torres, panel lateral, hex real), `tactics` (unidades animadas, IA visible), `battle` (radar, IA que sigue impactos).
+- Deportes, 3D y arcade (fase 5): `road` (carretera pintada de lejos a cerca con niebla, semáforo, rivales que esquivan; lanes con filas regeneradas y carril libre garantizado), `stack`, `marble` (agujeros solo si el BFS mantiene la meta alcanzable, 3 canicas), `cube` (bloque 3D real; generador sin salida de emergencia, verificado con 5000 niveles), `drone`, `planet`, `golf` (vista previa, búnkeres, tarjeta de 9 hoyos), `penalty` (efecto y portero con alcance limitado), `bowling` (física bola/bolos, marcador oficial), `hoop` (red con muelles, aro móvil en racha), `darts` (sugerencia de cierre), `pool` (bola fantasma, bandeja), `rhythm` (multitoque, valoraciones), `homerun`, `whack`, `paddle` (saque alterno en ping pong), `breakout` (4 diseños, subpasos), `lander` (plataforma plana completa, x3), `missile` (MIRV desde oleada 3).
 - Caché de motores: `?v=` = hash md5 del motor (automático en build_games.py); `kit.js` y `art.js` siguen con `?v=N` manual.
 - Todos los motores cargan `art.js` (`deps_of` en build_games.py).
 
 **Pendientes de rehacer (funcionan y están auditados, pero con gráficos simples)**, en este orden acordado:
-5. Deportes y 3D (road, drone, stack, marble, cube, golf, planet, penalty, bowling, hoop, darts, pool, rhythm, homerun, whack, paddle) y breakout, lander, missile
 6. `platform.js` sigue usándose para barrel-climb, ninja-ascent, cloud-hopper, lava-escape (portarlos a arte ART)
 
 ## Reglas ya aplicadas (no romper)
