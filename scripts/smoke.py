@@ -35,5 +35,5 @@ with sync_playwright() as p:
         pg.close()
     b.close()
 out = json.dumps(bad, indent=1, ensure_ascii=False)
-BASE / f'smoke_{PORT}.json'.write_text(out)
+(BASE / f'smoke_{PORT}.json').write_text(out)
 print(out); print(f'{len(slugs)} probados, {len(bad)} con errores')

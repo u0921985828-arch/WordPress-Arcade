@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **100 juegos propios** (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Subdominio temporal: **falta dominio propio** y cambiar el título "My Blog".
-- Versión actual del plugin: **1.9.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.10.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -62,10 +62,11 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
 **Rehechos con arte y mecánicas completas:**
 - `platformer.js` (8 juegos laterales: pixel-dash, wall-jumper, blade-leap, castle-knight, robo-rescue, shadow-dash, grapple-hook, rope-swing): T=32 px, física escalada, coyote time, buffer de salto, cámara vertical, punto de control, 8 temas.
 - `shooter.js` (pixel-invaders con búnkeres y OVNI; starfall-defender con mejoras, escudo y jefe cada 3 oleadas; bug-garden ciempiés que se divide y araña; bullet-rain jefe de 3 fases).
+- `runner.js` (wing-tap troncos y monedas; spike-run pinchos, cajas, fosos y slimes pisables; neon-runner doble salto y fantasmas; gravity-flip suelo/techo; cave-flyer cueva con minas de 2 impactos y cristales). Mundo en coordenadas absolutas (`cam`), coyote time y buffer de salto, animación de muerte antes de `k.lose`.
+- `topdown.js` (dungeon-micro, crypt-crawler, slime-arena, zombie-siege, hero-brawl, tank-duel): suelo cacheado por sala, obstáculos 3/4, aparición anunciada, botín (monedas/corazones), jefe cada 5 salas, elección de 1 mejora entre 3 tras cada sala (en dungeon/crypt se sale por la puerta). Tanques con torreta independiente y sacos rompibles.
+- Todos los motores cargan `art.js` (`deps_of` en build_games.py).
 
 **Pendientes de rehacer (funcionan y están auditados, pero con gráficos simples)**, en este orden acordado:
-1. `runner.js` (wing-tap, spike-run, neon-runner, gravity-flip, cave-flyer)
-2. `topdown.js` (dungeon-micro, crypt-crawler, slime-arena, zombie-siege, hero-brawl, tank-duel)
 3. `maze.js` (maze-muncher, tunnel-digger, iso-maze, iso-dungeon-explorer), `raycast.js`, `frog.js`, `gridmover.js`
 4. Puzzles y cartas (g2048, match3, nonogram, sokoban, logic, flow, colorsort, lasers, poly, rope, drawphys, cards, mahjong, td, tactics, board, battle, dice): mejor acabado visual (fichas, cartas y tableros con relieve, animaciones de movimiento)
 5. Deportes y 3D (road, drone, stack, marble, cube, golf, planet, penalty, bowling, hoop, darts, pool, rhythm, homerun, whack, paddle) y breakout, lander, missile

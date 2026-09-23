@@ -9,7 +9,9 @@ import generate_wxr as wx
 
 GAMES_DIR = ROOT / 'wp-content/mu-plugins/arcade-core/games'
 ENG_DIR = ROOT / 'src/eng'
-DEPS = {'platformer': ['art']}
+# Todos los motores cargan antes la librería de arte común (ART, src/eng/art.js)
+DEPS = {}
+deps_of = lambda e: DEPS.get(e, ['art'])
 STANDALONE = {'serpent-grid', 'neon-paddle', 'rock-belt', 'tetra-drop', 'tetra-drop-marathon'}
 
 SW = 'Desliza o usa las flechas'
@@ -23,13 +25,13 @@ G = {
  'missile-guard': ('missile', dict(help='')),
  'bug-garden': ('shooter', dict(mode='centipede', bg='#0f1a12', help='Arrastra para moverte; disparas solo. Destruye el ciempiés antes de que baje.')),
  'lunar-lander': ('lander', dict(help='')),
- 'tank-duel': ('topdown', dict(mode='tank', bg='#23261a', help='Mueve el tanque (flechas o arrastra) y dispara con A o tocando. Las balas rebotan una vez.')),
+ 'tank-duel': ('topdown', dict(mode='tank', help='Mueve el tanque (flechas o arrastra); la torreta apunta sola y dispara con A, tocando o al acercarte. Las balas rebotan una vez y algunos sacos se rompen.')),
  'neon-trails': ('gridmover', dict(mode='trails', help=f'{SW} para girar tu moto. No choques con ninguna estela. Sé el último en pie.')),
  'tunnel-digger': ('maze', dict(mode='digger', bg='#1a120b', help=f'{SW} para excavar. Recoge todas las gemas y evita a los bichos de los túneles.')),
- 'cave-flyer': ('runner', dict(mode='cave', pal=['#5ce1e6', '#ff5fa2', '#3b2a55'], help='Mantén pulsado (o A) para subir, suelta para bajar. Disparas solo a las minas.')),
+ 'cave-flyer': ('runner', dict(mode='cave', pal=['#5ce1e6', '#ff5fa2', '#3b2a55'], help='Mantén pulsado (o A) para subir y suelta para bajar. Disparas solo: dos impactos por mina. Recoge los cristales.')),
  'territory': ('gridmover', dict(mode='territory', help=f'{SW} para salir de tu zona y cerrar áreas. Si una chispa toca tu estela, pierdes. Conquista el 75 %.')),
  'barrel-climb': ('platform', dict(mode='barrels', help='← → moverse, ↑/A saltar (atraviesas las vigas desde abajo). Esquiva los barriles y llega arriba.')),
- 'wing-tap': ('runner', dict(mode='flap', bg='#6ec6ff', help='Toca para aletear y pasa entre las tuberías.')),
+ 'wing-tap': ('runner', dict(mode='flap', theme='meadow', help='Toca para aletear y pasa entre los troncos. Las monedas suman un punto extra.')),
  # ---------- Puzzle ----------
  '2048-classic': ('g2048', dict()), '2048-hex': ('g2048', dict(hex=True)),
  'jewel-swap': ('match3', dict(mode='moves')), 'jewel-tide': ('match3', dict(mode='time')),
@@ -47,24 +49,24 @@ G = {
  # ---------- Plataformas ----------
  'pixel-dash': ('platformer', dict(theme='meadow', spikes=0.2, enemies=0.35, help='← → correr, ↑/A saltar (mantén para saltar más). Pisa a los enemigos, esquiva los pinchos y llega a la bandera.')),
  'wall-jumper': ('platformer', dict(theme='snow', abil=dict(wall=True), spikes=0.08, enemies=0.25, help='← → correr, ↑/A saltar. Salta contra una pared en el aire para rebotar y subir por las chimeneas de hielo.')),
- 'spike-run': ('runner', dict(mode='jump', help='Toca para saltar los pinchos. Mantén para saltar más alto.')),
- 'neon-runner': ('runner', dict(mode='double', bg='#0b0620', pal=['#2bf0ff', '#ff2bd6', '#1b1040'], help='Toca para saltar; toca otra vez en el aire para el doble salto.')),
- 'dungeon-micro': ('topdown', dict(mode='dungeon', help='Muévete con flechas o arrastrando; disparas solo al enemigo más cercano. Limpia salas y mejora.')),
- 'crypt-crawler': ('topdown', dict(mode='crypt', bg='#15121c', help='Muévete y acércate: tu espada golpea sola (o con A). Sobrevive sala tras sala.')),
- 'slime-arena': ('topdown', dict(mode='arena', land=False, bg='#16261c', help='Arrastra para moverte, disparas solo. Los slimes grandes se dividen.')),
+ 'spike-run': ('runner', dict(mode='jump', theme='jungle', help='Toca para saltar pinchos, cajas y fosos; mantén para saltar más alto. Cae sobre los slimes para eliminarlos.')),
+ 'neon-runner': ('runner', dict(mode='double', theme='night', help='Toca para saltar y otra vez en el aire para el doble salto. Pisa a los fantasmas para eliminarlos.')),
+ 'dungeon-micro': ('topdown', dict(mode='dungeon', help='Muévete con flechas o arrastrando; disparas solo al enemigo más cercano. Limpia la sala, sal por la puerta y elige una mejora. Jefe cada 5 salas.')),
+ 'crypt-crawler': ('topdown', dict(mode='crypt', help='Muévete y acércate: tu espada golpea sola (o con A). Limpia la sala, sal por la puerta y elige una mejora. Jefe cada 5 salas.')),
+ 'slime-arena': ('topdown', dict(mode='arena', land=False, help='Arrastra para moverte; disparas solo. Los slimes grandes se dividen. Tras cada oleada eliges una mejora.')),
  'blade-leap': ('platformer', dict(theme='night', abil=dict(sword=True), enemies=0.6, spikes=0.08, help='← → correr, ↑/A saltar, B o toque: espada. Corta a los espectros o salta sobre ellos.')),
  'ninja-ascent': ('platform', dict(mode='ninja', help='Toca para saltar a la pared contraria. Evita los pinchos y sube lo más alto que puedas.')),
  'rope-swing': ('platformer', dict(theme='sky', abil=dict(swing=True), enemies=0.25, help='Corres solo entre islas flotantes. Mantén pulsado para engancharte a la anilla y suelta para salir disparado.')),
- 'gravity-flip': ('runner', dict(mode='gravity', help='Toca para invertir la gravedad y esquivar los obstáculos del suelo y del techo.')),
+ 'gravity-flip': ('runner', dict(mode='gravity', theme='factory', help='Toca para invertir la gravedad (desde el suelo o el techo) y esquiva los pinchos.')),
  'cloud-hopper': ('platform', dict(mode='hopper', bg='#7ec8ff', pal=dict(sky='#7ec8ff', ground='#fff', top='#ffffff', p='#ff5fa2', spike='#f00', enemy='#fa0', coin='#f2d15c'), help='Rebotas solo. Mantén el lado izquierdo o derecho de la pantalla para moverte.')),
  'castle-knight': ('platformer', dict(theme='castle', abil=dict(sword=True), enemies=0.55, spikes=0.06, help='← → andar, ↑/A saltar, B o toque: espada. Cruza el castillo y derrota a los guardias.')),
  'robo-rescue': ('platformer', dict(theme='factory', enemies=0.55, spikes=0.12, help='← → moverse, ↑/A saltar. Pisa a los robots, recoge monedas y llega a la salida de la fábrica.')),
  'shadow-dash': ('platformer', dict(theme='dusk', abil=dict(dash=True), enemies=0.45, spikes=0.1, help='← → correr, ↑/A saltar, B: sprint en sombra (cruza huecos largos y atraviesa enemigos).')),
  'bullet-rain': ('shooter', dict(mode='bullethell', bg='#12061c', help='Mueve la nave con el ratón, el dedo o las flechas. Tu punto de impacto es el centro. Derrota al jefe.')),
- 'zombie-siege': ('topdown', dict(mode='zombie', bg='#1d1a14', help='Muévete con flechas o arrastrando el ratón/dedo; disparas solo. Aguanta las oleadas.')),
+ 'zombie-siege': ('topdown', dict(mode='zombie', help='Muévete con flechas o arrastrando; disparas solo. Rompe cajas, aguanta las oleadas y elige una mejora tras cada una.')),
  'grapple-hook': ('platformer', dict(theme='jungle', abil=dict(grapple=True), spikes=0.06, enemies=0.3, help='← → moverse, ↑/A saltar. Mantén B (o pulsa la pantalla) cerca de una anilla para colgarte y balancearte.')),
  'lava-escape': ('platform', dict(mode='lava', bg='#2a0f0a', pal=dict(sky='#2a0f0a', ground='#5a2a1a', top='#c9a27a', p='#5ce1e6', spike='#f00', enemy='#fa0', coin='#f2d15c'), help='Toca el lado izquierdo o derecho para saltar hacia ese lado. ¡La lava sube!')),
- 'hero-brawl': ('topdown', dict(mode='brawl', bg='#2a1f2e', help='Muévete y golpea con A o tocando; también golpeas solo al acercarte. Aguanta las oleadas.')),
+ 'hero-brawl': ('topdown', dict(mode='brawl', help='Muévete y golpea con A o tocando; también golpeas solo al acercarte. Aguanta las oleadas y elige mejoras. Jefe cada 5 oleadas.')),
  # ---------- Estrategia y cartas ----------
  'klondike-solitaire': ('cards', dict(mode='klondike', help='Toca una carta para moverla sola al mejor sitio. Toca el mazo para robar. Sube todo a las bases.')),
  'spider-solitaire': ('cards', dict(mode='spider', help='Spider de 2 palos (♠ ♥). Toca una carta para moverla; las escaleras del mismo palo se mueven juntas. Completa de K a A del mismo palo para retirarla. Toca el mazo para repartir una carta a cada columna.')),
@@ -96,7 +98,7 @@ G = {
 
 TPL = '''<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{title}</title></head>
-<body><script>window.CFG={cfg};</script><script src="../_lib/kit.js?v=6"></script>{deps}<script src="../_lib/{eng}.js?v=6"></script></body></html>
+<body><script>window.CFG={cfg};</script><script src="../_lib/kit.js?v=6"></script>{deps}<script src="../_lib/{eng}.js?v=7"></script></body></html>
 '''
 
 def main():
@@ -105,12 +107,12 @@ def main():
     extra = [s for s in G if s not in titles]
     if missing or extra: sys.exit(f'Faltan: {missing}  Sobran: {extra}')
     lib = GAMES_DIR / '_lib'; lib.mkdir(parents=True, exist_ok=True)
-    engines = sorted({e for e, _ in G.values()} | {d for e, _ in G.values() for d in DEPS.get(e, [])})
+    engines = sorted({e for e, _ in G.values()} | {d for e, _ in G.values() for d in deps_of(e)})
     for e in engines: shutil.copy(ENG_DIR / f'{e}.js', lib / f'{e}.js')
     for slug, (eng, cfg) in G.items():
         cfg = dict(cfg); cfg.setdefault('help', ''); cfg['title'] = titles[slug]; cfg['id'] = slug
         d = GAMES_DIR / slug; d.mkdir(parents=True, exist_ok=True)
-        (d / 'index.html').write_text(TPL.format(title=titles[slug], cfg=json.dumps(cfg, ensure_ascii=False), eng=eng, deps=''.join(f'<script src="../_lib/{d}.js?v=5"></script>' for d in DEPS.get(eng, []))), encoding='utf-8')
+        (d / 'index.html').write_text(TPL.format(title=titles[slug], cfg=json.dumps(cfg, ensure_ascii=False), eng=eng, deps=''.join(f'<script src="../_lib/{d}.js?v=7"></script>' for d in deps_of(eng))), encoding='utf-8')
     total = len([p for p in GAMES_DIR.iterdir() if (p / 'index.html').exists()])
     print(f'{len(G)} juegos generados + {len(STANDALONE)} independientes = {total} carpetas; {len(engines)} motores')
 

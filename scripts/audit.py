@@ -37,5 +37,5 @@ with sync_playwright() as p:
         res[s] = dict(start=s0, idle=s1, after=s2, anim=round(diff(a, b), 2), react=round(diff(b, c), 2), err=errs[:2])
         pg.close()
     br.close()
-BASE / f'audit_{PORT}.json'.write_text(json.dumps(res, ensure_ascii=False))
+(BASE / f'audit_{PORT}.json').write_text(json.dumps(res, ensure_ascii=False))
 print('ok', len(res))

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Arcade Core
  * Description: CPT "game", taxonomías, meta de juego y reproductor lazy para el portal arcade.
- * Version:     1.9.0
+ * Version:     1.10.0
  * Author:      Arcade Team
  *
  * Instalar: copiar este archivo + la carpeta /arcade-core/ en wp-content/mu-plugins/.
@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
 
 final class Arcade_Core {
 
-	const VERSION      = '1.9.0';
+	const VERSION      = '1.10.0';
 	const ORIENTATIONS = array( 'portrait', 'landscape', 'auto' );
 	const RATIOS       = array( '16:9', '4:3', '1:1', 'fill' );
 	const ENGINES      = array( 'canvas', 'phaser', 'threejs', 'godot_web', 'construct' );
@@ -346,7 +346,7 @@ final class Arcade_Core {
 			return $remote;
 		}
 		$rel = self::sub() . 'games/' . get_post_field( 'post_name', $post_id ) . '/thumb.webp';
-		return file_exists( __DIR__ . '/' . $rel ) ? plugins_url( $rel, __FILE__ ) : '';
+		return file_exists( __DIR__ . '/' . $rel ) ? add_query_arg( 'v', self::VERSION, plugins_url( $rel, __FILE__ ) ) : '';
 	}
 
 	public static function player_html( $post_id ) {
