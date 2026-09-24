@@ -77,10 +77,10 @@ function reset() {
 /* ---------- Modo tele (fiesta): 2–4 tanques humanos, todos contra todos; gana quien gane 3 rondas.
    Si alguien se va, la CPU lleva su tanque hasta que vuelva; quien llega nuevo entra en la ronda siguiente. ---------- */
 const inParty = (pl) => !!(k.party && k.party.some((x) => x.p === pl));
-let vsCd = false, VS = null, vsR = 0, vsBetween = 0, vsFreeze = 0, vsLast = null;
+let vsCd = false, vsT = 0, vsZ = 0, VS = null, vsR = 0, vsBetween = 0, vsFreeze = 0, vsLast = null;
 const VSWIN = 3, VSHP = 3;
 function vsRound(first) {
-  vsR = first ? 1 : vsR + 1; room = vsR; vsBetween = 0; vsFreeze = 1.3; vsLast = null;
+  vsR = first ? 1 : vsR + 1; room = vsR; vsBetween = 0; vsFreeze = 1.3; vsLast = null; vsT = 0; vsZ = 0;
   walls = []; foes = []; shots = []; eshots = []; pend = []; drops = []; bossF = null; floorCv = null; quota = 0; cleared = true; door = false; choice = null;
   /* 2: esquinas opuestas; 3: arriba a los lados y abajo en el centro (misma distancia entre todos); 4: esquinas */
   const SP = VS.length === 3 ? [[X0 + 46, Y0 + 40], [X1 - 46, Y0 + 40], [W / 2, Y1 - 40]] : [[X0 + 46, Y0 + 40], [X1 - 46, Y1 - 40], [X1 - 46, Y0 + 40], [X0 + 46, Y1 - 40]];
@@ -108,11 +108,15 @@ function vsCpu(q, dt) {
   if (los && d < 330 && off > 0.3 && st.mode !== 'back') a = ang;
   return [Math.cos(a), Math.sin(a), los && off < 0.2 && d < 380 && Math.random() < 0.6];
 }
+const vsZone = () => { const R0 = Math.hypot((X1 - X0) / 2, (Y1 - Y0) / 2); return vsT <= 30 ? R0 : Math.max(60, R0 - (R0 - 60) * Math.min(1, (vsT - 30) / 25)); };
 function vsUpdate(dt) {
   for (const w of walls) w.fl -= dt;
   if (vsBetween) { vsBetween -= dt; if (vsBetween <= 0) vsRound(); }
   if (vsCd) { vsCd = false; k.count(3); }
   vsFreeze = k.counting() ? 1 : 0;
+  /* zona que se cierra: a los 30 s de ronda el círculo seguro encoge; fuera de él se pierde un corazón cada 1,5 s (evita rondas eternas con tanques escondidos) */
+  if (!vsFreeze && !vsBetween) { vsT += dt; if (vsT > 30 && vsT - dt <= 30) { msg = '¡La zona se cierra!'; msgT = 2; k.sfx('lose'); }
+    if (vsT > 30) { const zr = vsZone(); for (const q of VS) if (q.alive && Math.hypot(q.x - (X0 + X1) / 2, q.y - (Y0 + Y1) / 2) > zr) { q.zt = (q.zt || 0) + dt; if (q.zt > 1.5) { q.zt = 0; q.hp--; k.sfx('hurt'); k.burst(q.x, q.y, '#ff5f7a', 10, 120); if (q.hp <= 0) { q.alive = false; k.burst(q.x, q.y, q.col, 36, 260); k.sfx('explode'); k.shake(9); } } } else if (q.alive) q.zt = 0; } }
   VS.forEach((q, i) => {
     if (!q.alive) return;
     q.inv -= dt; q.cool -= dt; q.recoil = Math.max(0, q.recoil - dt);
@@ -155,6 +159,8 @@ function vsDraw() {
   for (const w of [...walls].sort((a, b) => a.y + a.h - b.y - b.h)) block(w);
   for (const q of [...VS].sort((a, b) => a.y - b.y)) { if (!q.alive || (q.inv > 0 && !vsFreeze && Math.floor(q.inv * 14) % 2)) continue; shadow(q.x, q.y + 10, 10); tankSprite(q.x, q.y, q.body, q.aim, q.col, q.recoil, q.mv); label(q.cpu ? 'CPU' : q.name, q.x, q.y - 34, 14, q.cpu ? '#e8e4f4' : q.col, 'center'); }
   for (const s of shots) { c.save(); c.translate(s.x, s.y); c.rotate(Math.atan2(s.vy, s.vx)); ART.rr(c, -6, -3, 12, 6, 3); ART.fillOut(c, s.col, 1.5); c.restore(); }
+  if (vsT > 30) { const zr = vsZone(), zx = (X0 + X1) / 2, zy = (Y0 + Y1) / 2; c.save(); c.beginPath(); c.rect(0, 0, W, H); c.arc(zx, zy, zr, 0, R2, true); c.fillStyle = 'rgba(200,30,60,.28)'; c.fill();
+    c.beginPath(); c.arc(zx, zy, zr, 0, R2); c.lineWidth = 4; c.setLineDash([14, 10]); c.lineDashOffset = -vsT * 30; c.strokeStyle = '#ff5f7a'; c.stroke(); c.restore(); }
   c.drawImage(vigCv, 0, 0, W, H);
   const pw = Math.min(150, (W - 20) / VS.length - 6);
   VS.forEach((q, i) => { const x = 10 + i * (pw + 6); ART.rr(c, x, 5, pw, 26, 9); c.fillStyle = q.alive ? 'rgba(26,21,48,.85)' : 'rgba(26,21,48,.45)'; c.fill(); c.lineWidth = 2; c.strokeStyle = q.col; c.stroke();

@@ -183,3 +183,11 @@ body.pt-pad{position:fixed;top:0;right:0;bottom:0;left:0;overscroll-behavior:non
   .pt-thumb img{position:absolute;top:0;left:0}
   .pt-join>*+*{margin-top:1em}
 }
+/* QA 1.20 · legible a 3 m: nada por debajo de ~1,8 % del alto (≈20 px a 1080p), nombres ≈2,4 % */
+.pt-tv{font-size:2.2vh;font-size:clamp(12px,2.2vh,32px)}
+.pt-tv .pt-badge{font-size:.82em}
+.pt-tv .pt-name{font-size:1.08em}
+.pt-tv .pt-sec h2 small,.pt-tv .pt-kick,.pt-tv .ax-ad span{font-size:.84em}
+.pt-tv .pt-brand em{font-size:.68em}
+.pt-tv .pt-ghud{font-size:.92em}
+.pt-tv .pt-grid{grid-template-columns:repeat(auto-fill,minmax(11.6em,1fr))} /* 4 columnas en 16:9 con la letra mayor */
