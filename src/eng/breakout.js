@@ -96,7 +96,7 @@ k.run((dt) => {
       else if (balls[0]) { const b = balls[0]; balls.push({ ...b, tr: [], vx: -b.vx || 150, vy: b.vy || -300, stuck: false }, { ...b, tr: [], vx: b.vx * 0.5 + 90, vy: b.vy || -300, stuck: false }); } }
     if (d.y > 370) d.dead = true; }
   drops = drops.filter((d) => !d.dead);
-  if (!balls.length) { k.shake(6); k.sfx('hurt'); if (--lives <= 0) return k.lose(CFG.id, score, 'Sin bolas', NREC(score) + `Nivel ${level}`); balls = [{ x: pad, y: 330, stuck: true, tr: [] }]; wide = 0; }
+  if (!balls.length) { k.shake(6); k.sfx('hurt'); if (--lives <= 0) return k.lose(CFG.id, score, 'Sin bolas', `Nivel ${level}`); balls = [{ x: pad, y: 330, stuck: true, tr: [] }]; wide = 0; }
   if (!bricks.length) { level++; score += 100 * level; k.sfx('win'); k.confetti(); build(); }
 }, () => {
   c.drawImage(BG, 0, 0, 480, 360);
@@ -114,6 +114,3 @@ k.run((dt) => {
   if (banner > 0) { const p = 1.6 - banner, s = p < 0.2 ? 0.4 + p * 3.5 : 1.1; c.save(); c.translate(240, 200); c.scale(s, s); c.globalAlpha = Math.min(1, banner / 0.3); label(`Nivel ${level}`, 0, 0, 34, '#fff27a', 'center', 'middle'); c.restore(); c.globalAlpha = 1; }
   if (k.st === 'play' && balls.some((b) => b.stuck) && banner <= 0 && Math.sin(tm * 5) > -0.3) label('Toca o pulsa A para lanzar', 240, 262, 14, '#e6e2ff', 'center', 'middle');
 });
-
-/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.lose/k.end lo actualicen) */
-function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }

@@ -163,7 +163,7 @@ k.run((dt) => {
     const my = (lap - 1) * len + pos + PLZ; place = 1 + cars.filter((cr) => cr.dist > my).length;
     skyX += pSeg.curve * pct * dt * 60;
     const oldPos = pos; pos = (pos + adv) % len; if (pos < oldPos) { lap++; if (lap <= 3) { k.sfx('coin'); k.float(lap === 3 ? '¡Última vuelta!' : `Vuelta ${lap}`, W / 2, H * 0.35, '#f2d15c'); }
-      else { over = true; const pts = Math.max(0, 7 - place) * 300 + Math.max(0, 180 - Math.floor(time)) * 10; k.st = 'over'; k.end(CFG.id, pts, place === 1 ? '¡Victoria!' : `Llegaste ${place}º`, NREC(pts) + `Tiempo ${time.toFixed(1)} s`); if (place > 1) k.sfx('lose'); } }
+      else { over = true; const pts = Math.max(0, 7 - place) * 300 + Math.max(0, 180 - Math.floor(time)) * 10; k.st = 'over'; k.end(CFG.id, pts, place === 1 ? '¡Victoria!' : `Llegaste ${place}º`, `Tiempo ${time.toFixed(1)} s`); if (place > 1) k.sfx('lose'); } }
   } else {
     time += dt; vmax = Math.min(maxSpeed * 2.2, vmax + 60 * dt); speed = Math.min(vmax, speed + 2500 * dt); const adv = speed * dt, z0 = dist + PLZ;
     const sw = k.swipe || (k.hit.has('left') ? 'left' : k.hit.has('right') ? 'right' : k.hit.has('up') || k.hit.has('a') ? 'up' : k.hit.has('down') ? 'down' : null);
@@ -176,7 +176,7 @@ k.run((dt) => {
       if (it.t === 'coin') { if (py > 260) continue; it.hit = true; coins++; score += 25; k.sfx('coin'); k.burst(W / 2, PLY - 50 - py * 0.16, '#ffd23f', 8, 120); }
       else if (it.t === 'ramp') { it.hit = true; pvy = 2400; score += 50; k.sfx('jump'); k.float('+50', W / 2, PLY - 110, '#f2d15c'); }
       else if (inv <= 0 && ((it.t === 'block' && py < 380) || (it.t === 'bar' && py < 110))) { it.hit = true; inv = 1.4; lives--; speed *= 0.5; lastHit = { t: it.t, py, x: it.x, px }; hitT = 0.3; k.sfx('hurt'); k.shake(8); k.flash('rgba(255,60,80,.35)'); k.burst(W / 2, PLY - 40, '#fff', 14, 200);
-        if (lives <= 0) return k.lose(CFG.id, Math.floor(score), 'Chocaste', NREC(Math.floor(score)) + `${Math.floor(score)} m · ${coins} monedas`); }
+        if (lives <= 0) return k.lose(CFG.id, Math.floor(score), 'Chocaste', `${Math.floor(score)} m · ${coins} monedas`); }
       else if (it.t === 'bar' && !it.hit) { it.hit = true; score += 10; } } });
     if (k.st !== 'play') return;
     eachSeg(z0 - SEG * 8, z0 - SEG * 5, (s) => { s.items = s.items.filter((q) => q.t === 'deco'); });
@@ -276,6 +276,3 @@ function hud() {
     if (time < 3 && k.st === 'play') { c.globalAlpha = Math.min(1, 3 - time); label('Desliza para cambiar de carril', W / 2, H * 0.3, 17, '#fff', 'center'); label('Toca para saltar', W / 2, H * 0.3 + 26, 17, '#fff', 'center'); c.globalAlpha = 1; }
   }
 }
-
-/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.lose/k.end lo actualicen) */
-function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }

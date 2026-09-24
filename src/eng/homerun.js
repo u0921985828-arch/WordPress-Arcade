@@ -97,7 +97,7 @@ k.run((dt) => {
   for (const f of fw) f.t -= dt; fw = fw.filter((f) => f.t > 0);
   if (!k.gate(reset)) return;
   if (swing > 0) swing -= dt;
-  if (outs >= 10 && !ball && msgT < 0.2) return k.lose(CFG.id, hrs, 'Fin del Derby', NREC(hrs) + `${hrs} jonrones · ${total} m`);
+  if (outs >= 10 && !ball && msgT < 0.2) return k.lose(CFG.id, hrs, 'Fin del Derby', `${hrs} jonrones · ${total} m`);
   if (!ball) { wait -= dt; if (wait <= 0) pitch(); return; }
   if (hit) { hit.t += dt; const [x, y] = hitPos(hit); trail.push([x, y]); if (trail.length > 14) trail.shift();
     if (hit.hr && hit.t > 1 && !hit.boom) { hit.boom = 1; for (let i = 0; i < 3; i++) fw.push({ x: k.rnd(60, 300), y: k.rnd(40, 120), t: 0.9 + i * 0.25, d: i * 0.25, col: k.pick(['#f2d15c', '#ff5fa2', '#5ce1e6', '#7cf7a0']) }); }
@@ -134,6 +134,3 @@ k.run((dt) => {
   label('OUTS', 346, 58, 11, '#dfe6ff', 'right');
   if (msgT > 0) { const p = (msgD - msgT) / 0.18, s = p < 1 ? 0.6 + p * 0.55 : Math.max(1, 1.15 - (p - 1) * 0.3); c.save(); c.translate(180, 400); c.scale(s, s); c.globalAlpha = Math.min(1, msgT / 0.25); label(msg, 0, 0, msg.startsWith('¡J') ? 34 : 24, msgC, 'center', 'middle'); c.restore(); c.globalAlpha = 1; }
 });
-
-/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.lose/k.end lo actualicen) */
-function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }

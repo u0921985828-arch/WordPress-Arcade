@@ -36,7 +36,7 @@ k.show(CFG.title, 'Arrastra hacia atrás y suelta para lanzar (o ← → ángulo
 function throwBall(a, p) { ball.vx = Math.cos(a) * p * 950; ball.vy = Math.sin(a) * p * 950; ball.sp = -ball.vx / 60; ball.fly = true; k.sfx('jump'); }
 const rimL = () => [hoop.x - RIM, hoop.y], rimR = () => [hoop.x + RIM, hoop.y], BB = () => ({ x0: hoop.x + RIM + 8, x1: hoop.x + RIM + 20, y0: hoop.y - 92, y1: hoop.y + 14 });
 k.run((dt) => {
-  t += dt; msgT -= dt; clankT -= dt; if (!k.gate(reset)) return; time -= dt; if (time <= 0) { time = 0; return k.lose(CFG.id, score, '¡Tiempo!', NREC(score) + `Mejor racha x${best}`); }
+  t += dt; msgT -= dt; clankT -= dt; if (!k.gate(reset)) return; time -= dt; if (time <= 0) { time = 0; return k.lose(CFG.id, score, '¡Tiempo!', `Mejor racha x${best}`); }
   if (streak >= 3) { if (!hoop.vx) hoop.vx = 45 + streak * 5; hoop.x += hoop.vx * dt; if (hoop.x > 300) { hoop.x = 300; hoop.vx = -Math.abs(hoop.vx); } if (hoop.x < 205) { hoop.x = 205; hoop.vx = Math.abs(hoop.vx); } } else { hoop.vx = 0; hoop.x += (280 - hoop.x) * Math.min(1, dt * 2); }
   stepNet(dt);
   ball.pop = Math.min(1, ball.pop + dt * 5);
@@ -112,6 +112,3 @@ function draw() {
 }
 function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
 function panel(x, y, w, h) { ART.rr(c, x, y, w, h, 10); c.fillStyle = 'rgba(26,21,48,.72)'; c.fill(); c.lineWidth = 2; c.strokeStyle = 'rgba(255,255,255,.14)'; c.stroke(); }
-
-/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.lose/k.end lo actualicen) */
-function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }

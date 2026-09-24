@@ -26,7 +26,7 @@ k.run((dt) => {
   for (const r of rings) if (!r.done && r.z < z) { r.done = true; r.pt = 0.5; const dist = Math.hypot(d.x - r.x, d.y - r.y), [sx, sy] = P(r.x, r.y, r.z);
     if (dist < r.r) { combo++; passed++; const center = dist < r.r * 0.35, pts = Math.round((center ? 100 : 50) * (1 + combo * 0.1)); score += pts; r.ok = true; k.sfx(center ? 'win' : 'coin');
       k.burst(sx, sy, center ? '#f2d15c' : '#5ce1e6', center ? 24 : 12, 220); k.float(center ? `¡Centro! +${pts}` : `+${pts}`, sx, sy - 40, center ? '#f2d15c' : '#fff'); }
-    else { combo = 0; lives--; r.miss = true; navigator.vibrate && navigator.vibrate(110); k.float('¡Fallo!', 320, 120, '#ff5f7a'); if (lives <= 0) return k.lose(CFG.id, score, 'Sin batería', NREC(score) + `${passed} anillos`); } }
+    else { combo = 0; lives--; r.miss = true; navigator.vibrate && navigator.vibrate(110); k.float('¡Fallo!', 320, 120, '#ff5f7a'); if (lives <= 0) return k.lose(CFG.id, score, 'Sin batería', `${passed} anillos`); } }
   for (const r of rings) if (r.pt) r.pt = Math.max(0, r.pt - dt);
   rings = rings.filter((r) => r.z > z - 240); while (rings.length < 12) { const l = rings[rings.length - 1]; rings.push({ x: k.clamp(l.x + k.rnd(-300, 300), -520, 520), y: k.clamp(l.y + k.rnd(-180, 180), -270, 270), z: l.z + Math.max(600, 900 - t * 3), r: Math.max(90, 140 - t * 0.6) }); }
   if (Math.random() < dt * 20) { const a = Math.random() * 6.283; streaks.push({ a, r: 120 + Math.random() * 200, l: 0.25 }); }
@@ -72,6 +72,3 @@ function drawDrone(x, y, s, roll, pitch) {
   c.beginPath(); c.arc(0, 12, 6, 0, 6.283); ART.fillOut(c, '#2a2248', 2); c.fillStyle = '#5ce1e6'; c.beginPath(); c.arc(1, 11, 2, 0, 6.283); c.fill();
   c.fillStyle = Math.sin(t * 10) > 0 ? '#ff4d6d' : '#7a2436'; c.beginPath(); c.arc(-18, 2, 2.5, 0, 6.283); c.fill(); c.fillStyle = Math.sin(t * 10) > 0 ? '#3a8a55' : '#7cf7a0'; c.beginPath(); c.arc(18, 2, 2.5, 0, 6.283); c.fill();
   c.restore(); }
-
-/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.lose/k.end lo actualicen) */
-function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }

@@ -75,7 +75,7 @@ k.run((dt) => {
   else if (state === 'after') { const b = ball; b.rot += dt * 6;
     if (b.res === 'goal') { b.inNet = Math.min(1, b.inNet + dt * 3); if (b.inNet >= 1) { b.y = Math.min(GL - 12 - 3, b.y + 240 * dt); } else { b.x += (VP[0] - b.x) * dt * 0.8; b.y += (VP[1] - b.y) * dt * 0.8; b.s = Math.max(0.3, b.s - dt * 0.25); } }
     else { b.x += b.vx * dt; b.y += b.vy * dt - b.vh * dt; b.vh -= 400 * dt; b.s = b.res === 'miss' ? Math.max(0.2, b.s - dt * 0.3) : Math.min(1.1, b.s + dt * 0.25); if (b.res === 'miss') b.a = Math.max(0, b.a - dt * 1.2); }
-    b.wait -= dt; if (b.wait <= 0) { if (misses >= 3) return k.lose(CFG.id, pts, 'Fin de la tanda', NREC(pts) + `${goals} goles de ${shots}`); setup(); } }
+    b.wait -= dt; if (b.wait <= 0) { if (misses >= 3) return k.lose(CFG.id, pts, 'Fin de la tanda', `${goals} goles de ${shots}`); setup(); } }
 }, () => {
   c.drawImage(bgCv, 0, cheer > 0 ? -Math.abs(Math.sin(t * 16)) * 3 : 0, W, H);
   drawGoalBack();
@@ -151,6 +151,3 @@ function drawBall() {
 }
 function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
 function panel(x, y, w, h) { ART.rr(c, x, y, w, h, 10); c.fillStyle = 'rgba(26,21,48,.72)'; c.fill(); c.lineWidth = 2; c.strokeStyle = 'rgba(255,255,255,.14)'; c.stroke(); }
-
-/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.lose/k.end lo actualicen) */
-function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }

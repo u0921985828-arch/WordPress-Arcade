@@ -33,7 +33,7 @@ k.run((dt) => {
       if (perfect >= 3) { const g = Math.min(12, 120 - cur[size]); cur[size] += g; cur[key] -= g / 2; }
       k.float(perfect > 1 ? `¡Perfecto! x${perfect}` : '¡Perfecto!', 180, by - 40, '#f2d15c'); navigator.vibrate && navigator.vibrate(15); }
     else { perfect = 0; const overlap = cur[size] - Math.abs(delta);
-      if (overlap <= 0) { falling.push({ ...cur, vy: 0, vx: dir * speed * 0.6, ax: key, a: 1.6 }); cur = null; k.shake(6); return k.lose(CFG.id, score, 'Se cayó la torre', NREC(score) + `${blocks.length - 1} pisos`); }
+      if (overlap <= 0) { falling.push({ ...cur, vy: 0, vx: dir * speed * 0.6, ax: key, a: 1.6 }); cur = null; k.shake(6); return k.lose(CFG.id, score, 'Se cayó la torre', `${blocks.length - 1} pisos`); }
       const cut = { ...cur }; if (delta > 0) { cut[key] = cur[key] + overlap; cut[size] = delta; cur[size] = overlap; } else { cut[size] = -delta; cur[key] = top[key]; cur[size] = overlap; }
       falling.push({ ...cut, vy: 0, vx: Math.sign(delta) * 40, ax: key, a: 1.4 }); score += 1; k.sfx('pop'); k.shake(2); }
     blocks.push({ ...cur }); flashB = { b: blocks[blocks.length - 1], g: 0.7 }; speed = Math.min(360, speed + 6); spawn();
@@ -57,6 +57,3 @@ k.run((dt) => {
   if (perfect > 1) label(`Perfecto x${perfect}`, 346, 14, 15, '#f2d15c', 'right');
   if (k.st === 'play' && blocks.length === 1) { c.globalAlpha = 0.6 + 0.4 * Math.sin(t * 5); label('Toca para soltar', 180, 540, 20, '#fff', 'center'); c.globalAlpha = 1; }
 });
-
-/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.lose/k.end lo actualicen) */
-function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }

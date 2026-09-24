@@ -142,5 +142,5 @@ k.run((dt) => {
   label(HK ? 'A 7 goles' : 'A 11 puntos', 12, 13, 12, HK ? '#cfd8ff' : '#cfe3ff');
 });
 
-/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.best lo actualice) */
-function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }
+/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.best lo actualice; mismo aviso que k.end) */
+function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && b > 0) { k.confetti(); k.sfx('win'); return '<b style="color:#ffd166">¡Nuevo récord!</b><br>'; } return ''; }
