@@ -23,6 +23,10 @@ const BG = mk(W, H, (q) => {
 });
 const glowCv = (col, r) => mk(r * 2, r * 2, (q) => { const gr = q.createRadialGradient(r, r, 0, r, r, r); gr.addColorStop(0, col + 'ff'); gr.addColorStop(0.25, col + '99'); gr.addColorStop(1, col + '00'); q.fillStyle = gr; q.fillRect(0, 0, r * 2, r * 2); });
 const GLOW = { spark: glowCv('#ffa94d', 22), me: glowCv('#f2d15c', 18) }; Object.entries(COL).forEach(([i, col]) => (GLOW[i] = glowCv(col, 20)));
+const glowOf = (b) => GLOW[b.gk] || (GLOW[b.gk] = glowCv(b.col, 20));
+/* Modo tele (fiesta, 2–4 humanos): 4 motos, las que faltan las lleva la CPU; gana el partido quien gane 3 rondas. */
+const WIN = 3, CPUC = ['#b98cff', '#9aa3c7', '#ff9f5a', '#e0e4ff'];
+let MP = null, wins = [], lastW = null;
 const trailCv = mk(480, 480), tc = trailCv.getContext('2d'), haloCv = mk(480, 480), hc = haloCv.getContext('2d');
 const ownCv = mk(480, 480), oc = ownCv.getContext('2d'), freshCv = mk(480, 480), fc = freshCv.getContext('2d');
 const PAT = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 16; const q = cv.getContext('2d'); q.fillStyle = '#23307e'; q.fillRect(0, 0, 16, 16); q.strokeStyle = '#2f3fa0'; q.lineWidth = 3; q.beginPath(); q.moveTo(-4, 20); q.lineTo(20, -4); q.moveTo(-4, 4); q.lineTo(4, -4); q.moveTo(12, 20); q.lineTo(20, 12); q.stroke(); return oc.createPattern(cv, 'repeat'); })();
@@ -52,7 +56,9 @@ const STEP = () => TRAILS ? lerp(0.11, 0.05, DF()) : 0.065;
 function newRound() {
   g = Array.from({ length: N }, () => Array(N).fill(0)); acc = 0; count = 2.4; between = 0; dying = 0; booms = []; freshT = 0; respawn = 0; tc.clearRect(0, 0, 480, 480); hc.clearRect(0, 0, 480, 480);
   if (TRAILS) {
-    bikes = [{ x: 10, y: 36, d: 'right', col: COL[1], id: 1, alive: true, me: true }, { x: 50, y: 24, d: 'left', col: COL[2], id: 2, alive: true }, { x: 30, y: 8, d: 'down', col: COL[3], id: 3, alive: true }, { x: 30, y: 52, d: 'up', col: COL[4], id: 4, alive: true }].slice(0, 2 + Math.min(2, round - 1));
+    bikes = [{ x: 10, y: 36, d: 'right', col: COL[1], id: 1, alive: true, me: true }, { x: 50, y: 24, d: 'left', col: COL[2], id: 2, alive: true }, { x: 30, y: 8, d: 'down', col: COL[3], id: 3, alive: true }, { x: 30, y: 52, d: 'up', col: COL[4], id: 4, alive: true }].slice(0, MP ? 4 : 2 + Math.min(2, round - 1));
+    bikes.forEach((b) => { b.gk = b.id; });
+    if (MP) bikes.forEach((b, i) => { const q = MP[i]; b.me = false; if (q) { b.pl = q.p; b.col = k.pcol(q.p); b.gk = 'p' + b.col; b.name = 'J' + (q.p + 1); } else { b.col = CPUC[i]; b.gk = 'c' + i; b.name = 'CPU'; } });
     bikes.forEach((b) => { g[b.y][b.x] = b.id; b.px = b.x; b.py = b.y; stamp(b.x, b.y, b.x, b.y, b.col); });
   } else {
     for (let y = 21; y < 27; y++) for (let x = 21; x < 27; x++) g[y][x] = 1;
@@ -61,7 +67,8 @@ function newRound() {
   }
 }
 function newSpark() { const me = bikes && bikes[0]; for (let i = 0; i < 60; i++) { const x = k.rnd(2, N - 2), y = k.rnd(2, N - 2); if (g[Math.floor(y)][Math.floor(x)]) continue; if (me && Math.hypot(x - me.x, y - me.y) < 14) continue; const v = lerp(5, 11, DF()); return { x, y, vx: k.pick([-1, 1]) * k.rnd(0.7, 1.2) * v, vy: k.pick([-1, 1]) * k.rnd(0.7, 1.2) * v, tail: [] }; } return { x: 2, y: 2, vx: 6, vy: 6, tail: [] }; }
-function reset() { score = 0; round = 1; newRound(); }
+function reset() { MP = TRAILS && k.party && k.party.length >= 2 ? k.party.slice(0, 4) : null; wins = [0, 0, 0, 0]; lastW = null; score = 0; round = 1; newRound(); }
+k.onParty = () => { if (k.st !== 'play') reset(); };
 reset(); k.show(CFG.title, CFG.help);
 
 const free = (x, y) => x >= 0 && y >= 0 && x < N && y < N && !g[y][x];
@@ -87,11 +94,14 @@ k.run((dt) => {
   t += dt; freshT = Math.max(0, freshT - dt); for (const b of booms) b.t += dt;
   if (dying) { dying -= dt; if (dying <= 0) { dying = 0; k.lose(CFG.id, score, k._head[0], k._head[1]); } return; }
   if (between) { between -= dt; if (between <= 0) newRound(); return; }
-  const me = bikes[0], want = k.swipe || ['up', 'down', 'left', 'right'].find((d) => k.hit.has(d));
+  const me = bikes[0], want = MP ? null : k.swipe || ['up', 'down', 'left', 'right'].find((d) => k.hit.has(d));
+  if (MP) bikes.forEach((b, i) => { if (b.pl === undefined || !b.alive) return; const h = k.pad(b.pl).hit; let w = ['up', 'down', 'left', 'right'].find((d) => h.has(d));
+    if (!w && i === 0) w = k.swipe || ['up', 'down', 'left', 'right'].find((d) => k.hit.has(d)); /* J1 también con teclado o deslizando */
+    if (w && w !== OPP[b.nd || b.d]) b.nd = w; });
   if (want) { const back = TRAILS ? OPP[me.nd || me.d] : me.trail.length ? OPP[me.nd || me.ld] : null; if (want !== back) me.nd = want; }
   goT = Math.max(0, goT - dt);
   if (count > 0) { const c0 = Math.ceil(count / 0.8); count -= dt; const c1 = Math.ceil(count / 0.8); if (c1 !== c0) k.sfx(c1 > 0 ? 'click' : 'start'); if (count > 0) return; acc = 0; goT = 0.6; }
-  const step = STEP(), look = Math.round(lerp(60, 300, DF())), noise = lerp(10, 4, DF());
+  const step = MP ? 0.085 : STEP(), look = Math.round(lerp(60, 300, DF())), noise = lerp(10, 4, DF());
   if (!TRAILS) {
     for (const s of sparks) {
       s.tail.unshift([s.x, s.y]); if (s.tail.length > 7) s.tail.pop();
@@ -108,12 +118,20 @@ k.run((dt) => {
   while (acc >= step) { acc -= step;
     if (TRAILS) {
       for (const b of bikes) { if (!b.alive) continue; b.px = b.x; b.py = b.y;
-        if (b.me) { if (b.nd) { b.d = b.nd; b.nd = null; } }
+        if (b.me || b.pl !== undefined) { if (b.nd) { b.d = b.nd; b.nd = null; } }
         else { const opts = Object.keys(D).filter((d) => d !== OPP[b.d]).map((d) => { const nx = b.x + D[d][0], ny = b.y + D[d][1]; return [d, free(nx, ny) ? space(nx, ny, look) + (d === b.d ? 3 : 0) + Math.random() * noise : -1]; }); opts.sort((a, z) => z[1] - a[1]); b.d = opts[0][0]; }
         b.nx = b.x + D[b.d][0]; b.ny = b.y + D[b.d][1]; }
       for (const b of bikes) if (b.alive) { if (!free(b.nx, b.ny) || bikes.some((o) => o !== b && o.alive && o.nx === b.nx && o.ny === b.ny)) b.alive = false; }
       for (const b of bikes) if (b.alive) { b.x = b.nx; b.y = b.ny; g[b.y][b.x] = b.id; stamp(b.px, b.py, b.x, b.y, b.col); }
-      for (const b of bikes) if (!b.alive && !b.boom) { b.boom = true; b.px = b.x; b.py = b.y; boom(b.x * S + S / 2, TOP + b.y * S + S / 2, b.col); if (!b.me) { score += 50; k.float('+50', b.x * S, TOP + b.y * S - 12, b.col); } }
+      for (const b of bikes) if (!b.alive && !b.boom) { b.boom = true; b.px = b.x; b.py = b.y; boom(b.x * S + S / 2, TOP + b.y * S + S / 2, b.col); if (!b.me && !MP) { score += 50; k.float('+50', b.x * S, TOP + b.y * S - 12, b.col); } }
+      if (MP) { const al = bikes.filter((b) => b.alive), hum = al.filter((b) => b.pl !== undefined);
+        if (al.length <= 1 || !hum.length) { const wb = al.length === 1 ? al[0] : null; lastW = wb; if (wb) { wins[bikes.indexOf(wb)]++; k.sfx('win'); k.float('+1', wb.x * S, TOP + wb.y * S - 14, wb.col); }
+          const champ = bikes.findIndex((b, i) => wins[i] >= WIN);
+          if (champ >= 0) { const cb = bikes[champ]; between = 0; dying = 0; k.st = 'over'; k.confetti(); k.sfx('win');
+            try { if (parent !== window) parent.postMessage({ type: 'arcade:over', score: wins[champ] }, '*'); } catch (e) { /* sin portal */ }
+            k.show(cb.name === 'CPU' ? 'Gana la CPU' : `¡Gana ${cb.name}!`, bikes.map((b, i) => `<b style="color:${b.col}">${b.name} ${wins[i]}</b>`).join(' · ') + '<br>Toca para la revancha'); return; }
+          round++; between = 1.6; return; }
+        continue; }
       if (!bikes[0].alive) return lose('Choque', `Ronda ${round}`);
       if (bikes.filter((b) => b.alive).length === 1) { score += 100 * round; k.sfx('win'); k.float(`+${100 * round}`, me.x * S, TOP + me.y * S - 14, '#7cf7a0'); round++; between = 1.4; return; }
       score += 1;
@@ -132,15 +150,20 @@ k.run((dt) => {
 /* ---------- Dibujo ---------- */
 function bike(b, fr) {
   const x = (b.px + (b.x - b.px) * fr) * S + S / 2, y = TOP + (b.py + (b.y - b.py) * fr) * S + S / 2, a = ANG[b.d] || 0;
-  c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.8; c.drawImage(GLOW[b.id], x - 20, y - 20, 40, 40); c.restore();
+  c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.8; c.drawImage(glowOf(b), x - 20, y - 20, 40, 40); c.restore();
   c.save(); c.translate(x, y); c.rotate(a); c.scale(1.25, 1.25); c.lineJoin = 'round';
   ART.rr(c, -11, -4.5, 17, 9, 4); ART.fillOut(c, b.col, 2); // carenado
   c.beginPath(); c.moveTo(-3, -3); c.lineTo(5, -2); c.quadraticCurveTo(9, 0, 5, 2); c.lineTo(-3, 3); c.closePath(); ART.fillOut(c, '#1b2040', 1.5);
   c.fillStyle = 'rgba(255,255,255,.55)'; c.fillRect(-9, -3, 6, 1.5);
   c.beginPath(); c.arc(7, 0, 3.2, 0, R2); ART.fillOut(c, '#fff', 1.5); c.fillStyle = OUT; c.fillRect(-12, -1.5, 3, 3);
   c.restore();
+  if (MP && b.pl !== undefined) label(b.name, x, y - 26, 12, b.col, 'center');
 }
 function hudTop() {
+  if (MP) { label(`Ronda ${round} · a ${WIN}`, W - 12, 11, 14, '#b8b6e0', 'right');
+    bikes.forEach((b, i) => { const x = 12 + i * 78; ART.rr(c, x, 8, 70, 24, 8); c.fillStyle = b.alive ? 'rgba(26,21,48,.85)' : 'rgba(26,21,48,.45)'; c.fill(); c.lineWidth = 2; c.strokeStyle = b.col; c.stroke();
+      label(b.name, x + 8, 13, 13, b.alive ? b.col : '#55587a'); label(`${wins[i]}`, x + 62, 11, 16, '#fff', 'right'); });
+    return; }
   label(`${score}`, 12, 8, 22, '#fff');
   if (TRAILS) { label(`Ronda ${round}`, W - 12, 5, 15, '#b8b6e0', 'right');
     bikes.forEach((b, i) => { const x = W - 20 - (bikes.length - 1 - i) * 20, y = 30; c.beginPath(); c.arc(x, y, 6, 0, R2); ART.fillOut(c, b.alive ? b.col : '#2a2d4a', 2); if (!b.alive) { c.strokeStyle = '#ff5f7a'; c.lineWidth = 2; c.beginPath(); c.moveTo(x - 4, y - 4); c.lineTo(x + 4, y + 4); c.moveTo(x + 4, y - 4); c.lineTo(x - 4, y + 4); c.stroke(); } if (b.me) { c.fillStyle = OUT; c.beginPath(); c.arc(x, y, 2, 0, R2); c.fill(); } }); }
@@ -175,5 +198,6 @@ function draw() {
   if (count > 0 && k.st === 'play') { const n = Math.ceil(count / 0.8), p = 1 - (count % 0.8) / 0.8, s = 1 + (1 - Math.min(1, p * 3)) * 0.6; c.save(); c.translate(W / 2, TOP + 200); c.scale(s, s); c.globalAlpha = Math.min(1, (1 - p) * 3 + 0.2); label(`${n}`, 0, -30, 60, '#fff', 'center'); c.restore();
     if (TRAILS) label('Desliza o usa las flechas para girar', W / 2, TOP + 290, 14, '#b8b6e0', 'center'); else label('Sal de tu zona y vuelve para conquistar', W / 2, TOP + 290, 14, '#b8b6e0', 'center'); }
   if (goT > 0) { c.globalAlpha = goT / 0.6; label('¡Ya!', W / 2, TOP + 170 - (0.6 - goT) * 40, 56, '#7cf7a0', 'center'); c.globalAlpha = 1; }
-  if (between) label(TRAILS ? '¡Ronda superada!' : '¡Zona conquistada!', W / 2, TOP + 200, 30, '#7cf7a0', 'center');
+  if (between && MP) label(lastW ? `¡Ronda para ${lastW.name}!` : 'Ronda nula', W / 2, TOP + 200, 30, lastW ? lastW.col : '#b8b6e0', 'center');
+  else if (between) label(TRAILS ? '¡Ronda superada!' : '¡Zona conquistada!', W / 2, TOP + 200, 30, '#7cf7a0', 'center');
 }

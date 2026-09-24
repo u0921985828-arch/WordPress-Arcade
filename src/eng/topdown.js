@@ -70,9 +70,82 @@ function buildRoom() {
   msg = `${TH.label} ${room}${isBoss ? ' · Jefe' : ''}`; msgT = 1.8;
 }
 function reset() {
+  VS = tankM && k.party && k.party.length >= 2 ? k.party.slice(0, 4).map((q) => ({ pl: q.p, col: k.pcol(q.p), name: 'J' + (q.p + 1), r: 11, wins: 0 })) : null;
   p = { x: TH.door ? X0 + 40 : W / 2, y: H / 2, r: 11, hp: 5, max: 5, a: 0, aim: 0, inv: 0, kx: 0, ky: 0, mv: false, face: 1, body: 0, recoil: 0 };
-  room = 0; score = 0; t = 0; cool = 0; swing = 0; kills = 0; choice = null; upg = { rate: 1, dmg: 1, speed: 1, multi: 1, pierce: 0, reach: 1 }; buildRoom();
+  room = 0; score = 0; t = 0; cool = 0; swing = 0; kills = 0; choice = null; upg = { rate: 1, dmg: 1, speed: 1, multi: 1, pierce: 0, reach: 1 }; if (VS) vsRound(true); else buildRoom();
 }
+/* ---------- Modo tele (fiesta): 2–4 tanques humanos, todos contra todos, sin CPU; gana quien gane 3 rondas ---------- */
+let VS = null, vsR = 0, vsBetween = 0, vsFreeze = 0, vsLast = null;
+const VSWIN = 3, VSHP = 3;
+function vsRound(first) {
+  vsR = first ? 1 : vsR + 1; room = vsR; vsBetween = 0; vsFreeze = 1.3; vsLast = null;
+  walls = []; foes = []; shots = []; eshots = []; pend = []; drops = []; bossF = null; floorCv = null; quota = 0; cleared = true; door = false; choice = null;
+  const SP = [[X0 + 46, Y0 + 40, 0.5], [X1 - 46, Y1 - 40, Math.PI + 0.5], [X1 - 46, Y0 + 40, Math.PI - 0.5], [X0 + 46, Y1 - 40, -0.5]];
+  VS.forEach((q, i) => { const sp = SP[i]; Object.assign(q, { x: sp[0], y: sp[1], body: sp[2], a: sp[2], aim: sp[2], hp: VSHP, inv: 1.3, alive: true, kx: 0, ky: 0, cool: 0.4, recoil: 0, mv: false }); });
+  for (let i = 0, tries = 0; i < 6 && tries < 200; tries++) {
+    const w = k.pick([30, 60, 90]), h = k.pick([30, 40, 60]);
+    const x = Math.round(k.rnd(X0 + 50, X1 - 50 - w) / 10) * 10, y = Math.round(k.rnd(Y0 + 30, Y1 - 30 - h) / 10) * 10;
+    if (walls.some((q) => x < q.x + q.w + 44 && x + w + 44 > q.x && y < q.y + q.h + 44 && y + h + 44 > q.y)) continue;
+    if (SP.some((sp) => x < sp[0] + 70 && x + w > sp[0] - 70 && y < sp[1] + 70 && y + h > sp[1] - 70)) continue;
+    walls.push({ x, y, w, h, hp: Math.random() < 0.5 ? 4 : 0, fl: 0, seed: Math.random() }); i++;
+  }
+  msg = `Ronda ${vsR}`; msgT = 1.6;
+}
+function vsUpdate(dt) {
+  for (const w of walls) w.fl -= dt;
+  if (vsBetween) { vsBetween -= dt; if (vsBetween <= 0) vsRound(); }
+  vsFreeze = Math.max(0, vsFreeze - dt);
+  VS.forEach((q, i) => {
+    if (!q.alive) return;
+    q.inv -= dt; q.cool -= dt; q.recoil = Math.max(0, q.recoil - dt);
+    const pd = k.pad(q.pl), HS = new Set(pd.held); if (i === 0) for (const x of k.held) HS.add(x); /* J1 también con teclado */
+    let mx = 0, my = 0; if (HS.has('left')) mx--; if (HS.has('right')) mx++; if (HS.has('up')) my--; if (HS.has('down')) my++;
+    const ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
+    if (vsFreeze > 0) { mx = my = 0; }
+    q.mv = ml > 0.1 && !vsFreeze; if (q.mv) { q.a = Math.atan2(my, mx); q.body += k.clamp(((q.a - q.body + 3 * Math.PI) % R2) - Math.PI, -8 * dt, 8 * dt); }
+    q.aim += k.clamp(((q.a - q.aim + 3 * Math.PI) % R2) - Math.PI, -10 * dt, 10 * dt); /* la torreta apunta hacia donde te mueves */
+    move(q, (mx * 130 + q.kx) * dt, (my * 130 + q.ky) * dt); const dec = Math.pow(0.002, dt); q.kx *= dec; q.ky *= dec;
+    for (const o of VS) if (o !== q && o.alive) { const ex = q.x - o.x, ey = q.y - o.y, e = Math.hypot(ex, ey); if (e > 0 && e < q.r + o.r + 4) move(q, ex / e * 60 * dt, ey / e * 60 * dt); }
+    if ((pd.hit.has('a') || pd.held.has('a') || (i === 0 && k.held.has('a'))) && q.cool <= 0 && !vsFreeze && !vsBetween) {
+      q.cool = 0.55; q.recoil = 0.1; k.sfx('shoot');
+      shots.push({ x: q.x + Math.cos(q.aim) * 18, y: q.y + Math.sin(q.aim) * 18, vx: Math.cos(q.aim) * 380, vy: Math.sin(q.aim) * 380, life: 1.6, b: 1, own: i, col: q.col });
+    }
+  });
+  const bounce = (s) => { s.x -= s.vx * dt; s.y -= s.vy * dt; if (rectHit(s.x + s.vx * dt, s.y, 2)) s.vx *= -1; else s.vy *= -1; };
+  for (const s of shots) {
+    s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; if (s.life <= 0) s.dead = true;
+    VS.forEach((q, i) => { if (s.dead || !q.alive || (i === s.own && s.b > 0) || Math.hypot(s.x - q.x, s.y - q.y) > q.r + 4) return; s.dead = true; if (q.inv > 0) return;
+      q.hp--; q.inv = 0.6; const a = Math.atan2(s.vy, s.vx); q.kx = Math.cos(a) * 200; q.ky = Math.sin(a) * 200; k.sfx('hit'); k.shake(4); k.burst(q.x, q.y, q.col, 10, 150);
+      if (q.hp <= 0) { q.alive = false; k.burst(q.x, q.y, q.col, 36, 260); k.burst(q.x, q.y, '#fff', 12, 160); k.sfx('explode'); k.shake(9); if (i !== s.own) k.float('¡Tanque destruido!', q.x, q.y - 26, VS[s.own].col); } });
+    if (s.dead) continue;
+    const w = wallAt(s.x, s.y, 3);
+    if (w && w.hp) { s.dead = true; w.hp--; w.fl = 0.1; k.sfx('hit'); if (w.hp <= 0) { w.dead = true; k.burst(w.x + w.w / 2, w.y + w.h / 2, TH.top, 20, 200); k.sfx('explode'); } }
+    else if (rectHit(s.x, s.y, 3)) { if (s.b > 0) { s.b--; bounce(s); } else { s.dead = true; k.burst(s.x, s.y, '#fff', 3, 60); } }
+  }
+  shots = shots.filter((s) => !s.dead); walls = walls.filter((w) => !w.dead);
+  const al = VS.filter((q) => q.alive);
+  if (!vsBetween && al.length <= 1) {
+    vsLast = al[0] || null; if (vsLast) { vsLast.wins++; k.sfx('win'); }
+    const champ = VS.find((q) => q.wins >= VSWIN);
+    if (champ) { k.st = 'over'; k.confetti(); k.sfx('win'); try { if (parent !== window) parent.postMessage({ type: 'arcade:over', score: champ.wins }, '*'); } catch (e) { /* sin portal */ }
+      k.show(`¡Gana ${champ.name}!`, VS.map((q) => `<b style="color:${q.col}">${q.name} ${q.wins}</b>`).join(' · ') + '<br>Toca para la revancha'); return; }
+    vsBetween = 2; msg = vsLast ? `Ronda para ${vsLast.name}` : 'Ronda nula'; msgT = 1.8;
+  }
+}
+function vsDraw() {
+  if (!floorCv) floorCv = renderFloor(); if (!vigCv) vigCv = renderVig();
+  c.drawImage(floorCv, 0, 0, W, H); lights();
+  for (const w of [...walls].sort((a, b) => a.y + a.h - b.y - b.h)) block(w);
+  for (const q of [...VS].sort((a, b) => a.y - b.y)) { if (!q.alive || (q.inv > 0 && !vsFreeze && Math.floor(q.inv * 14) % 2)) continue; shadow(q.x, q.y + 10, 10); tankSprite(q.x, q.y, q.body, q.aim, q.col, q.recoil, q.mv); label(q.name, q.x, q.y - 30, 11, q.col, 'center'); }
+  for (const s of shots) { c.save(); c.translate(s.x, s.y); c.rotate(Math.atan2(s.vy, s.vx)); ART.rr(c, -6, -3, 12, 6, 3); ART.fillOut(c, s.col, 1.5); c.restore(); }
+  c.drawImage(vigCv, 0, 0, W, H);
+  const pw = Math.min(150, (W - 20) / VS.length - 6);
+  VS.forEach((q, i) => { const x = 10 + i * (pw + 6); ART.rr(c, x, 5, pw, 26, 9); c.fillStyle = q.alive ? 'rgba(26,21,48,.85)' : 'rgba(26,21,48,.45)'; c.fill(); c.lineWidth = 2; c.strokeStyle = q.col; c.stroke();
+    label(q.name, x + 8, 10, 14, q.alive ? q.col : '#77708f'); for (let h = 0; h < VSHP; h++) ART.heart(c, x + 44 + h * 17, 18, 0.85, h < q.hp && q.alive); label(`${q.wins}`, x + pw - 8, 9, 16, '#ffc928', 'right'); });
+  label(`A ${VSWIN} rondas`, W - 14, Y1 + 1, 11, 'rgba(255,255,255,.85)', 'right');
+  if (msgT > 0) { c.globalAlpha = Math.min(1, msgT * 2); c.font = '800 22px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const mw = c.measureText(msg).width + 36; ART.rr(c, W / 2 - mw / 2, H / 2 - 64, mw, 40, 12); c.fillStyle = 'rgba(26,21,48,.82)'; c.fill(); label(msg, W / 2, H / 2 - 55, 22, vsLast ? vsLast.col : '#ffc928', 'center'); c.globalAlpha = 1; }
+}
+k.onParty = () => { if (k.st !== 'play') reset(); };
 reset(); k.show(CFG.title, CFG.help);
 function hurt(n, sx, sy) {
   if (p.inv > 0 || k.st !== 'play') return;
@@ -107,6 +180,7 @@ function apply(i) {
 k.run((dt) => {
   if (!k.gate(reset)) return;
   t += dt; msgT -= dt;
+  if (VS) return vsUpdate(dt);
   if (choice) {
     choice.t += dt; if (choice.t < 0.35) return;
     if (k.hit.has('left')) choice.sel = Math.max(0, choice.sel - 1); if (k.hit.has('right')) choice.sel = Math.min(2, choice.sel + 1);
@@ -380,6 +454,7 @@ function wrap(s, x, y, maxW, size, col) {
   let line = '', yy = y; for (const w of s.split(' ')) { const tl = line ? line + ' ' + w : w; if (c.measureText(tl).width > maxW && line) { c.fillText(line, x, yy); line = w; yy += size + 4; } else line = tl; } c.fillText(line, x, yy);
 }
 function draw() {
+  if (VS) return vsDraw();
   if (!floorCv) floorCv = renderFloor(); if (!vigCv) vigCv = renderVig();
   c.drawImage(floorCv, 0, 0, W, H); lights(); drawDoor();
   for (const w of [...walls].sort((a, b) => a.y + a.h - b.y - b.h)) block(w);

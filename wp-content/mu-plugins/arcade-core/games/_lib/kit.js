@@ -54,6 +54,25 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-acti
     addEventListener('keyup', (e) => onKey(e, false));
     addEventListener('message', (e) => { const d = e.data; if (d && d.type === 'arcade:key') onKey({ code: d.code }, d.event === 'keydown'); });
     addEventListener('blur', () => k.held.clear());
+    /* Modo tele (fiesta): la tele envía 'arcade:party' {players:[{p,color,name}]} y 'arcade:pkey' {p,key,down} por jugador.
+       k.party = jugadores (o null), k.pad(p) = {held,hit} de ese jugador (hit se limpia cada frame). J1 (p=0) también mueve k.held/k.hit. */
+    const PADS = [];
+    k.party = null;
+    k.pad = (p) => PADS[p] || (PADS[p] = { held: new Set(), hit: new Set() });
+    k.pcol = (p) => { const q = k.party && k.party.find((x) => x.p === p); return (q && q.color) || ['#ff5a5f', '#3fb6ea', '#ffd166', '#5fbf45'][p % 4]; };
+    const PK = { up: 1, down: 1, left: 1, right: 1, a: 1, b: 1 };
+    addEventListener('message', (e) => { const d = e.data; if (!d || e.source !== parent || parent === window) return;
+      if (d.type === 'arcade:party') {
+        const pl = Array.isArray(d.players) ? d.players.filter((x) => x && x.p >= 0 && x.p < 4).map((x) => ({ p: x.p | 0, color: String(x.color || ''), name: String(x.name || '').slice(0, 16) })).sort((a, b) => a.p - b.p) : [];
+        const was = k.party ? k.party.map((x) => x.p).join() : '';
+        k.party = pl.length ? pl : null;
+        hud.classList.toggle('ext', !!k.party || !!k.extHud); /* en la tele la pausa va en el menú del mando */
+        if ((k.party ? k.party.map((x) => x.p).join() : '') !== was && k.onParty) k.onParty(k.party);
+      } else if (d.type === 'arcade:pkey' && PK[d.key] && d.p >= 0 && d.p < 4) {
+        const pd = k.pad(d.p | 0), down = !!d.down;
+        if (down) { if (!pd.held.has(d.key)) pd.hit.add(d.key); pd.held.add(d.key); } else pd.held.delete(d.key);
+        if ((d.p | 0) === 0) press(d.key, down);
+      } });
 
     const loc = (e) => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / k.scale, (e.clientY - r.top) / k.scale]; };
     addEventListener('pointerdown', (e) => {
@@ -85,7 +104,7 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-acti
       gpPrev = now;
     }
 
-    k.go = () => k.hit.has('a') || k.ptr.hit;
+    k.go = () => k.hit.has('a') || k.ptr.hit || (!!k.party && PADS.some((q) => q && q.hit.has('a')));
     const CFGID = (window.CFG && window.CFG.id) || o.id || o.title;
     k.show = (t, s) => {
       let body = s || '', go = 'Toca para jugar';
@@ -159,6 +178,7 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-acti
        (pausa, sonido, pantalla completa) y el mando fuera del lienzo y responde con 'arcade:hud'. */
     { const C = window.CFG || {}, hi = { w, h, bg, ac: acc, hud: C.hud || '', muted, title: C.title || o.title || '', help: C.help || '' };
       if ('pad' in C) hi.pad = C.pad;
+      if (C.mp) hi.mp = C.mp;
       tell('arcade:hello', hi); }
     k.hide = () => ov.classList.add('hide');
     k.best = (id, score) => {
@@ -182,7 +202,7 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-acti
     k.clear = (col) => { ctx.fillStyle = col || bg; ctx.fillRect(0, 0, w, h); };
     /* Máquina de estados estándar: 'ready' → 'play' → 'over'. Devuelve true si el juego está activo. */
     k.st = 'ready'; window.__k = k;
-    k.gate = (reset) => { if (k.st === 'play') return true; if (k.go()) { const was = k.st; if (was === 'over') reset(); k.st = 'play'; tell(was === 'over' ? 'arcade:restart' : 'arcade:start'); k.sfx('start'); k.hide(); k.hit.clear(); k.ptr.hit = false; k.tap = false; if (k.ptr.down) k._skipUp = true; } return false; };
+    k.gate = (reset) => { if (k.st === 'play') return true; if (k.go()) { const was = k.st; if (was === 'over') reset(); k.st = 'play'; tell(was === 'over' ? 'arcade:restart' : 'arcade:start'); k.sfx('start'); k.hide(); k.hit.clear(); for (const q of PADS) if (q) q.hit.clear(); k.ptr.hit = false; k.tap = false; if (k.ptr.down) k._skipUp = true; } return false; };
     k.lose = (id, score, head, extra) => { k.st = 'over'; k._losing = true; k.end(id, score, head, extra); k._losing = false; k.sfx('lose'); k.shake(7); try { rawVib && rawVib(90); } catch (e) {} };
     k.clamp = (v, a, b) => Math.max(a, Math.min(b, v));
     k.text = (s, x, y, size, color, align) => {
@@ -198,7 +218,7 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-acti
         else { if (k.hit.has('pause') && k.st === 'play') setPause(true); else update(dt); }
         const sx = shakeA ? (Math.random() - 0.5) * shakeA * 2 : 0, sy = shakeA ? (Math.random() - 0.5) * shakeA * 2 : 0; shakeA = Math.max(0, shakeA - dt * 30);
         ctx.save(); ctx.translate(sx, sy); draw(); ctx.restore(); fx(k.paused ? 0 : dt);
-        k.hit.clear(); k.ptr.hit = false; k.ptr.up = false; k.swipe = null; k.tap = false;
+        k.hit.clear(); for (const q of PADS) if (q) q.hit.clear(); k.ptr.hit = false; k.ptr.up = false; k.swipe = null; k.tap = false;
         requestAnimationFrame(frame);
       }
       requestAnimationFrame(frame);

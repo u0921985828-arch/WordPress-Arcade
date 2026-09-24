@@ -114,21 +114,23 @@ PAD = {
     'pixel-dash': dict(d='h', a='Saltar'), 'wall-jumper': dict(d='h', a='Saltar'), 'robo-rescue': dict(d='h', a='Saltar'),
     'blade-leap': dict(d='h', a='Saltar', b='Espada'), 'castle-knight': dict(d='h', a='Saltar', b='Espada'),
     'shadow-dash': dict(d='h', a='Saltar', b='Sprint'), 'grapple-hook': dict(d='h', a='Saltar', b='Gancho'),
+    'air-hockey': D8, 'ping-pong-reflex': dict(d='h', a='Saque'),  # sin t: en el portal siguen sin mando (táctiles)
     'canyon-kart': D8, 'low-poly-skater': dict(d='h', a='Saltar'), 'drone-flight': D8,
 }
 
 # Modo tele (fiesta): juegos multijugador con mandos del móvil → (mínimo, máximo) de jugadores. Genera games/party.json.
-MP = {}
+MP = {'neon-trails': (1, 4), 'tank-duel': (1, 4), 'air-hockey': (1, 2), 'ping-pong-reflex': (1, 2)}
 
 TPL = '''<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{title}</title></head>
-<body><script>window.CFG={cfg};</script><script src="../_lib/kit.js?v=9"></script>{deps}<script src="../_lib/{eng}.js?v={ev}"></script></body></html>
+<body><script>window.CFG={cfg};</script><script src="../_lib/kit.js?v=10"></script>{deps}<script src="../_lib/{eng}.js?v={ev}"></script></body></html>
 '''
 
 def main():
     titles = {wx.slugify(it[0]): it[0] for items in wx.CATALOG.values() for it in items}
     missing = [s for s in titles if s not in G and s not in STANDALONE]
     extra = [s for s in G if s not in titles]
+    if set(MP) - set(PAD): sys.exit(f'MP sin PAD: {set(MP) - set(PAD)}')
     if set(PAD) - set(G): sys.exit(f'PAD sin juego: {set(PAD) - set(G)}')
     if missing or extra: sys.exit(f'Faltan: {missing}  Sobran: {extra}')
     lib = GAMES_DIR / '_lib'; lib.mkdir(parents=True, exist_ok=True)
@@ -137,10 +139,11 @@ def main():
     for slug, (eng, cfg) in G.items():
         cfg = dict(cfg); cfg.setdefault('help', ''); cfg['title'] = titles[slug]; cfg['id'] = slug
         if slug in PAD: cfg['pad'] = PAD[slug]
+        if slug in MP: cfg['mp'] = list(MP[slug])
         d = GAMES_DIR / slug; d.mkdir(parents=True, exist_ok=True)
         (d / 'index.html').write_text(TPL.format(title=titles[slug], cfg=json.dumps(cfg, ensure_ascii=False), eng=eng, ev=hashlib.md5((ENG_DIR / f'{eng}.js').read_bytes()).hexdigest()[:8], deps=''.join(f'<script src="../_lib/{d}.js?v=9"></script>' for d in deps_of(eng))), encoding='utf-8')
     inp = {wx.slugify(it[0]): (it[3], it[5]) for items in wx.CATALOG.values() for it in items}
-    party = [dict(slug=s, title=titles[s], orient=inp[s][0], keys=any(c in inp[s][1] for c in 'KG'), mp=list(MP[s]) if s in MP else None, pad=PAD.get(s))
+    party = [dict(slug=s, title=titles[s], orient=inp[s][0], keys=any(c in inp[s][1] for c in 'KG') or s in MP, mp=list(MP[s]) if s in MP else None, pad=PAD.get(s))
              for s in sorted(titles, key=lambda x: titles[x].lower())]
     (GAMES_DIR / 'party.json').write_text(json.dumps(dict(games=party), ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     total = len([p for p in GAMES_DIR.iterdir() if (p / 'index.html').exists()])
