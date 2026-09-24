@@ -117,6 +117,9 @@ PAD = {
     'canyon-kart': D8, 'low-poly-skater': dict(d='h', a='Saltar'), 'drone-flight': D8,
 }
 
+# Modo tele (fiesta): juegos multijugador con mandos del móvil → (mínimo, máximo) de jugadores. Genera games/party.json.
+MP = {}
+
 TPL = '''<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{title}</title></head>
 <body><script>window.CFG={cfg};</script><script src="../_lib/kit.js?v=9"></script>{deps}<script src="../_lib/{eng}.js?v={ev}"></script></body></html>
@@ -136,6 +139,10 @@ def main():
         if slug in PAD: cfg['pad'] = PAD[slug]
         d = GAMES_DIR / slug; d.mkdir(parents=True, exist_ok=True)
         (d / 'index.html').write_text(TPL.format(title=titles[slug], cfg=json.dumps(cfg, ensure_ascii=False), eng=eng, ev=hashlib.md5((ENG_DIR / f'{eng}.js').read_bytes()).hexdigest()[:8], deps=''.join(f'<script src="../_lib/{d}.js?v=9"></script>' for d in deps_of(eng))), encoding='utf-8')
+    inp = {wx.slugify(it[0]): (it[3], it[5]) for items in wx.CATALOG.values() for it in items}
+    party = [dict(slug=s, title=titles[s], orient=inp[s][0], keys=any(c in inp[s][1] for c in 'KG'), mp=list(MP[s]) if s in MP else None, pad=PAD.get(s))
+             for s in sorted(titles, key=lambda x: titles[x].lower())]
+    (GAMES_DIR / 'party.json').write_text(json.dumps(dict(games=party), ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     total = len([p for p in GAMES_DIR.iterdir() if (p / 'index.html').exists()])
     print(f'{len(G)} juegos generados + {len(STANDALONE)} independientes = {total} carpetas; {len(engines)} motores')
 
