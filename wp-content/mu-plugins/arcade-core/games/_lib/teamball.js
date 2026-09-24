@@ -579,10 +579,17 @@ function sideArt() {
       const sand = g.createLinearGradient(0, GROUND - 10, 0, H); sand.addColorStop(0, '#f6dfa4'); sand.addColorStop(1, '#e0bd72'); g.fillStyle = sand; g.beginPath(); g.moveTo(0, GROUND - 6); g.quadraticCurveTo(W / 2, GROUND - 16, W, GROUND - 6); g.lineTo(W, H); g.lineTo(0, H); g.fill(); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke();
       for (let i = 0; i < 80; i++) { g.fillStyle = 'rgba(160,110,50,.3)'; g.fillRect(rnd(i + 20) * W, GROUND + rnd(i + 30) * 44, 2, 2); }
       g.strokeStyle = 'rgba(255,255,255,.8)'; g.lineWidth = 3; g.beginPath(); g.moveTo(8, GROUND + 4); g.lineTo(W - 8, GROUND + 4); g.stroke();
-      // red
-      g.fillStyle = '#5a4a3a'; ART.rr(g, NET - 4, NET_TOP - 10, 8, GROUND - NET_TOP + 14, 3); g.fill(); g.lineWidth = 2; g.strokeStyle = OUT; g.stroke();
-      g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 1; for (let y = NET_TOP; y < NET_TOP + 70; y += 7) { g.beginPath(); g.moveTo(NET - 6, y); g.lineTo(NET + 6, y); g.stroke(); }
-      g.fillStyle = '#fff'; g.fillRect(NET - 7, NET_TOP - 4, 14, 6); g.strokeStyle = OUT; g.lineWidth = 1.5; g.strokeRect(NET - 7, NET_TOP - 4, 14, 6);
+      // red: poste + malla en ligera perspectiva
+      g.fillStyle = 'rgba(0,0,0,.18)'; g.beginPath(); g.ellipse(NET + 10, GROUND + 3, 26, 5, 0, 0, TAU); g.fill();
+      const pole = g.createLinearGradient(NET - 5, 0, NET + 5, 0); pole.addColorStop(0, '#8a6a4a'); pole.addColorStop(1, '#4a3626');
+      g.fillStyle = pole; ART.rr(g, NET - 5, NET_TOP - 14, 10, GROUND - NET_TOP + 18, 4); g.fill(); g.lineWidth = 2.2; g.strokeStyle = OUT; g.stroke();
+      const NW = 16, ND = 74; g.save(); g.beginPath(); g.moveTo(NET - NW / 2, NET_TOP); g.lineTo(NET + NW / 2, NET_TOP - 6); g.lineTo(NET + NW / 2, NET_TOP + ND - 6); g.lineTo(NET - NW / 2, NET_TOP + ND); g.closePath();
+      g.fillStyle = 'rgba(20,20,40,.28)'; g.fill(); g.clip(); g.strokeStyle = 'rgba(255,255,255,.8)'; g.lineWidth = 1;
+      for (let y = NET_TOP - 8; y < NET_TOP + ND + 8; y += 7) { g.beginPath(); g.moveTo(NET - NW / 2, y); g.lineTo(NET + NW / 2, y - 6); g.stroke(); }
+      for (let x = NET - NW / 2; x <= NET + NW / 2; x += 4) { g.beginPath(); g.moveTo(x, NET_TOP - 10); g.lineTo(x, NET_TOP + ND + 4); g.stroke(); }
+      g.restore(); g.lineWidth = 1.6; g.strokeStyle = OUT; g.beginPath(); g.moveTo(NET - NW / 2, NET_TOP); g.lineTo(NET + NW / 2, NET_TOP - 6); g.lineTo(NET + NW / 2, NET_TOP + ND - 6); g.lineTo(NET - NW / 2, NET_TOP + ND); g.closePath(); g.stroke();
+      g.fillStyle = '#fff'; g.beginPath(); g.moveTo(NET - NW / 2 - 2, NET_TOP - 3); g.lineTo(NET + NW / 2 + 2, NET_TOP - 10); g.lineTo(NET + NW / 2 + 2, NET_TOP - 3); g.lineTo(NET - NW / 2 - 2, NET_TOP + 4); g.closePath(); g.fill(); g.lineWidth = 1.8; g.stroke();
+      g.fillStyle = '#ff6b4a'; g.beginPath(); g.arc(NET, NET_TOP - 16, 4, 0, TAU); g.fill(); g.lineWidth = 1.5; g.stroke();
     } else {
       const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#20194a'); sky.addColorStop(1, '#5a3f8a'); g.fillStyle = sky; g.fillRect(0, 0, W, H);
       // grada con público
