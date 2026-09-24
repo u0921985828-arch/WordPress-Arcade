@@ -10,6 +10,7 @@ Requisitos en destino: MU plugin arcade-core.php activo (registra CPT/taxonomía
 y el plugin oficial "WordPress Importer".
 """
 import argparse
+import unicodedata
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
@@ -22,6 +23,9 @@ GENRES = {
     "strategy-cards": "Strategy/Cards",
     "3d-webgl": "3D/WebGL",
     "sports-casual": "Sports/Casual",
+    "party": "Fiesta",
+    "racing": "Carreras",
+    "trivia": "Trivia y palabras",
 }
 PROFILES = {
     "touch-only": "Touch only",
@@ -156,6 +160,8 @@ EXPECTED = {"arcade": 20, "puzzle": 20, "platformer": 20, "strategy-cards": 15, 
 
 
 def slugify(s):
+    # ASCII: «Parchís de la Plaza» → parchis-de-la-plaza (los 100 títulos originales no cambian)
+    s = unicodedata.normalize("NFKD", s.replace("×", "x")).encode("ascii", "ignore").decode()
     out, prev = [], False
     for ch in s.lower().replace("&", "and"):
         if ch.isalnum():

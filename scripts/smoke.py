@@ -1,4 +1,4 @@
-import sys, threading, http.server, functools, json
+import os, sys, threading, http.server, functools, json
 from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent
 from playwright.sync_api import sync_playwright
@@ -10,6 +10,7 @@ if len(sys.argv) > 1 and sys.argv[1].startswith('batch'):
 elif len(sys.argv) > 1: slugs = [s for s in slugs if s in sys.argv[1:]]
 class Q(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a): pass
+PORT = int(os.environ.get('ARCADE_PORT', PORT))
 srv = http.server.ThreadingHTTPServer(('127.0.0.1', PORT), functools.partial(Q, directory=str(ROOT)))
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 shots = BASE / 'shots'; shots.mkdir(exist_ok=True)

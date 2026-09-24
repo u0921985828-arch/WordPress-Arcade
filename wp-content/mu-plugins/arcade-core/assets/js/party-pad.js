@@ -47,9 +47,10 @@
       '<header class="pd-top"><span class="pd-me" data-me>··</span><span class="pd-title" data-title></span>' +
         '<button type="button" class="pd-menu" data-menu>Menú</button></header>' +
       '<div class="pd-zones"><div class="pd-l" data-l></div><div class="pd-r" data-r></div></div>' +
+      '<div class="pd-priv" data-priv></div>' +
       '<div class="pd-over" data-over></div>' +
     '</div>';
-  var ui = { me: $('[data-me]'), title: $('[data-title]'), l: $('[data-l]'), r: $('[data-r]'), over: $('[data-over]'), menu: $('[data-menu]') };
+  var ui = { priv: $('[data-priv]'), me: $('[data-me]'), title: $('[data-title]'), l: $('[data-l]'), r: $('[data-r]'), over: $('[data-over]'), menu: $('[data-menu]') };
 
   function overlay(html) {
     ui.over.innerHTML = html ? '<div class="pd-card">' + html + '</div>' : '';
@@ -92,6 +93,29 @@
     send({ t: 'k', k: k, d: down ? 1 : 0, s: ++S.seq, ts: Date.now() });
   }
   function releaseAll() { Object.keys(S.held).forEach(function (k) { if (S.held[k]) key(k, false); }); }
+
+  /* Información privada de este jugador (mano de cartas, rol, dados…): solo en su móvil.
+     d = {title, text, items:[{v, label, sub, img, col, off}], bar} · bar: aviso pequeño sin tapar los controles. */
+  function priv(d) {
+    var p = ui.priv;
+    if (!d) { p.innerHTML = ''; p.className = 'pd-priv'; return; }
+    var items = Array.isArray(d.items) ? d.items.slice(0, 24) : [];
+    p.className = 'pd-priv show' + (d.bar || !items.length ? ' bar' : '');
+    p.innerHTML = (d.title ? '<h2>' + esc(d.title) + '</h2>' : '') + (d.text ? '<p>' + esc(d.text) + '</p>' : '') +
+      (items.length ? '<div class="pd-items">' + items.map(function (it, i) {
+        var img = typeof it.img === 'string' && /^data:image\/(png|webp|jpeg);base64,/.test(it.img) ? '<img src="' + it.img + '" alt="">' : '';
+        return '<button type="button" class="pd-it' + (img ? ' pic' : '') + '" data-i="' + i + '"' + (it.off ? ' disabled' : '') +
+          (it.col ? ' style="--ic:' + esc(String(it.col).slice(0, 24)) + '"' : '') + '>' + img +
+          (it.label != null ? '<b>' + esc(String(it.label).slice(0, 40)) + '</b>' : '') + (it.sub ? '<small>' + esc(String(it.sub).slice(0, 60)) + '</small>' : '') + '</button>';
+      }).join('') + '</div>' : '');
+    Array.prototype.forEach.call(p.querySelectorAll('.pd-it'), function (b) {
+      b.addEventListener('click', function () {
+        var it = items[+b.dataset.i]; if (!it || it.off) return;
+        send({ t: 'pick', v: it.v != null ? it.v : +b.dataset.i }); buzz(15);
+        b.classList.add('hit'); setTimeout(function () { b.classList.remove('hit'); }, 180);
+      });
+    });
+  }
 
   var zoneAc = [];
   function build(spec) {
@@ -300,6 +324,7 @@
         S.spec = d.pad || LOBBY; S.title = d.title || ''; build(S.spec); setMe();
       }
       else if (d.t === 'buzz') buzz(Math.min(400, d.ms | 0));
+      else if (d.t === 'priv') priv(d.d);
     };
     dc.onclose = function () { if (gen === S.gen) { S.open = false; releaseAll(); retry(gen); } };
     var dead = function () { if (gen === S.gen && S.pc === pc) { S.open = false; releaseAll(); retry(gen); } };

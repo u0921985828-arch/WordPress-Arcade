@@ -191,3 +191,17 @@ body.pt-pad{position:fixed;top:0;right:0;bottom:0;left:0;overscroll-behavior:non
 .pt-tv .pt-brand em{font-size:.68em}
 .pt-tv .pt-ghud{font-size:.92em}
 .pt-tv .pt-grid{grid-template-columns:repeat(auto-fill,minmax(11.6em,1fr))} /* 4 columnas en 16:9 con la letra mayor */
+
+/* Información privada en el móvil (cartas, rol secreto) */
+.pd-priv{display:none;position:absolute;left:0;right:0;bottom:0;top:52px;z-index:4;overflow:auto;padding:10px 12px 14px;background:rgba(10,12,20,.96);touch-action:pan-x pan-y;-webkit-overflow-scrolling:touch}
+.pd-priv.show{display:block}
+.pd-priv.bar{top:auto;bottom:auto;top:52px;max-height:30%;background:rgba(10,12,20,.88);border-bottom:2px solid var(--pc,#6e62f5)}
+.pd-priv h2{margin:0 0 4px;font:800 1.05rem/1.2 system-ui,sans-serif;color:var(--pc,#fff)}
+.pd-priv p{margin:0 0 8px;font:600 .95rem/1.35 system-ui,sans-serif;color:#e9e6f5}
+.pd-items{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.pd-it{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:64px;min-height:56px;padding:8px 10px;border:3px solid #1a1530;border-radius:12px;background:var(--ic,#2a2f55);color:#fff;font:800 1rem/1.1 system-ui,sans-serif;box-shadow:0 4px 0 #1a1530;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pd-it.pic{padding:4px;background:transparent;border:0;box-shadow:none}
+.pd-it img{display:block;height:min(34vh,150px);width:auto;border-radius:8px;box-shadow:0 4px 0 #1a1530}
+.pd-it small{font:600 .75rem/1.2 system-ui,sans-serif;opacity:.8}
+.pd-it[disabled]{opacity:.35}
+.pd-it.hit{transform:translateY(3px);box-shadow:0 1px 0 #1a1530}

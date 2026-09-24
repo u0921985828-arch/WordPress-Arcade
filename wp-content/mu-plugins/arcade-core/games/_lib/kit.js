@@ -71,6 +71,26 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
     k.party = null;
     k.pad = (p) => PADS[p] || (PADS[p] = { held: new Set(), hit: new Set() });
     k.pcol = (p) => { const q = k.party && k.party.find((x) => x.p === p); return (q && q.color) || ['#ff5a5f', '#3fb6ea', '#ffd166', '#5fbf45'][p % 4]; };
+    /* Multijugador común (oleada 1+). Sin tele: J1 = teclado/mando/táctil local y la CPU rellena el resto.
+       k.mpMax = plazas máximas (CFG.mp[1]); k.players(n) = [{p,color,name,cpu}] con n plazas (CPU donde no hay humano);
+       k.pheld(p,key)/k.phit(p,key) = tecla del jugador p; k.pdir(p) = {x,y} en -1..1 (8 direcciones);
+       k.podium(filas) = pantalla final con clasificación [{p,score,name?}] (ordena de mayor a menor salvo o.asc);
+       k.priv(p,data) = información privada en el móvil del jugador p (solo en la tele: k.privOK); k.onPick(p,v) = lo que elige. */
+    k.mpMax = (window.CFG && Array.isArray(CFG.mp) && CFG.mp[1]) || 1;
+    k.privOK = false; k.onPick = null;
+    k.human = (p) => (k.party ? k.party.some((x) => x.p === p) : p === 0);
+    k.players = (n) => { const out = []; for (let p = 0; p < (n || k.mpMax); p++) { const q = k.party && k.party.find((x) => x.p === p), hu = k.human(p); out.push({ p, color: k.pcol(p), name: hu ? (q && q.name) || (k.party ? 'J' + (p + 1) : 'Tú') : 'CPU', cpu: !hu }); } return out; };
+    k.pheld = (p, key) => (k.party ? k.pad(p).held.has(key) : p === 0 && k.held.has(key));
+    k.phit = (p, key) => (k.party ? k.pad(p).hit.has(key) : p === 0 && k.hit.has(key));
+    k.pdir = (p) => ({ x: (k.pheld(p, 'right') ? 1 : 0) - (k.pheld(p, 'left') ? 1 : 0), y: (k.pheld(p, 'down') ? 1 : 0) - (k.pheld(p, 'up') ? 1 : 0) });
+    k.priv = (p, data) => { if (k.privOK) tell('arcade:priv', { p, data: data || null }); };
+    k.podium = (rows, o) => {
+      o = o || {}; const r = rows.slice().sort((a, b) => (o.asc ? a.score - b.score : b.score - a.score)), top = r[0], pl = k.players(Math.max(k.mpMax, r.length));
+      const nm = (x) => x.name || (pl[x.p] && pl[x.p].name) || 'J' + (x.p + 1);
+      const tie = r.length > 1 && r[1].score === top.score && !o.noTie;
+      const body = r.map((x, i) => `<span style="display:inline-block;min-width:1.4em;color:${k.pcol(x.p)}">${i + 1}.</span><b style="color:${k.pcol(x.p)}">${nm(x)}</b> · ${o.fmt ? o.fmt(x.score) : x.score}`).join('<br>');
+      k.win(o.head || (tie ? '¡Empate!' : `¡Gana ${nm(top)}!`), tie ? '#ffd166' : k.pcol(top.p), `${body}<br>${o.go || 'Toca para la revancha'}`, top.score);
+    };
     const PK = { up: 1, down: 1, left: 1, right: 1, a: 1, b: 1 };
     addEventListener('message', (e) => { const d = e.data; if (!d || e.source !== parent || parent === window) return;
       if (d.type === 'arcade:party') {
@@ -80,7 +100,9 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
         document.body.classList.toggle('party', !!k.party); if (k.party) ov.querySelectorAll('.go').forEach((g) => { if (!g.querySelector('.ka')) g.insertAdjacentHTML('afterbegin', '<span class="ka">A</span>'); });
         PADS.forEach((q, i) => { if (q && !(k.party && k.party.some((x) => x.p === i))) { if (i === 0) for (const n of q.held) press(n, false); q.held.clear(); q.hit.clear(); } }); /* quien se va suelta sus teclas */
         hud.classList.toggle('ext', !!k.party || !!k.extHud); /* en la tele la pausa va en el menú del mando */
+        k.privOK = !!(k.party && d.priv);
         if ((k.party ? k.party.map((x) => x.p).join() : '') !== was && k.onParty) k.onParty(k.party);
+      } else if (d.type === 'arcade:ppick' && d.p >= 0 && d.p < 4) { if (k.onPick && !k.paused) k.onPick(d.p | 0, d.v);
       } else if (d.type === 'arcade:pkey' && PK[d.key] && d.p >= 0 && d.p < 4) {
         const pd = k.pad(d.p | 0), down = !!d.down;
         if (down) { if (!pd.held.has(d.key)) pd.hit.add(d.key); pd.held.add(d.key); } else pd.held.delete(d.key);

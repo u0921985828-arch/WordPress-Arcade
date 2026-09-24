@@ -25,6 +25,9 @@ final class Arcade_Core {
 		'strategy-cards'=> 'Strategy/Cards',
 		'3d-webgl'      => '3D/WebGL',
 		'sports-casual' => 'Sports/Casual',
+		'party'         => 'Fiesta',
+		'racing'        => 'Carreras',
+		'trivia'        => 'Trivia y palabras',
 	);
 
 	const PROFILES = array(
@@ -186,9 +189,95 @@ final class Arcade_Core {
 		}
 		self::ensure_home_page();
 		self::adaptive_games();
+		self::sync_catalog();
 		delete_transient( 'arcade_index' );
 		flush_rewrite_rules( false );
 		update_option( 'arcade_core_version', self::VERSION, false );
+	}
+
+	/**
+	 * Juegos nuevos del plugin (games/catalog.json, generado por build_games.py): se crean solos al actualizar,
+	 * sin importar XML. Publicación escalonada para el SEO (filtro arcade_publish_pace): unos cuantos al momento
+	 * y el resto programados. Nunca toca juegos que ya existen (ni los editados a mano).
+	 */
+	public static function sync_catalog() {
+		$f = __DIR__ . '/' . self::sub() . 'games/catalog.json';
+		if ( ! file_exists( $f ) ) {
+			return;
+		}
+		$data = json_decode( (string) file_get_contents( $f ), true ); // phpcs:ignore
+		if ( empty( $data['games'] ) ) {
+			return;
+		}
+		$pace  = apply_filters( 'arcade_publish_pace', array( 'now' => 15, 'every_days' => 2, 'per' => 5 ) );
+		$count = 0;
+		$base  = time();
+		foreach ( $data['games'] as $g ) {
+			$slug = sanitize_title( $g['slug'] ?? '' );
+			if ( '' === $slug || get_page_by_path( $slug, OBJECT, 'game' ) ) {
+				continue;
+			}
+			$when = $count < $pace['now'] ? $base : $base + ( 1 + intdiv( $count - $pace['now'], max( 1, $pace['per'] ) ) ) * $pace['every_days'] * DAY_IN_SECONDS;
+			$html = self::catalog_html( $g );
+			$args = array(
+				'post_type'     => 'game',
+				'post_status'   => $when > $base ? 'future' : 'publish',
+				'post_title'    => sanitize_text_field( $g['title'] ),
+				'post_name'     => $slug,
+				'post_content'  => $html,
+				'post_excerpt'  => wp_trim_words( wp_strip_all_tags( $g['desc'][0] ?? '' ), 30, '…' ),
+				'post_date'     => get_date_from_gmt( gmdate( 'Y-m-d H:i:s', $when ) ),
+				'post_date_gmt' => gmdate( 'Y-m-d H:i:s', $when ),
+			);
+			$pid = wp_insert_post( wp_slash( $args ), true );
+			if ( is_wp_error( $pid ) ) {
+				continue;
+			}
+			++$count;
+			$inputs = array_values( array_intersect( self::INPUTS, (array) ( $g['inputs'] ?? array() ) ) );
+			update_post_meta( $pid, '_game_embed_url', '/wp-content/plugins/arcade-core/games/' . $slug . '/index.html' );
+			update_post_meta( $pid, '_game_orientation', in_array( $g['orient'] ?? '', self::ORIENTATIONS, true ) ? $g['orient'] : 'auto' );
+			update_post_meta( $pid, '_game_aspect_ratio', in_array( $g['aspect'] ?? '', self::RATIOS, true ) ? $g['aspect'] : 'fill' );
+			update_post_meta( $pid, '_game_tech_engine', 'canvas' );
+			update_post_meta( $pid, '_game_input_methods', implode( ',', $inputs ) );
+			update_post_meta( $pid, '_game_desc', $html );
+			if ( ! empty( $g['players'] ) ) {
+				update_post_meta( $pid, '_game_players', sanitize_text_field( $g['players'] ) );
+			}
+			wp_set_object_terms( $pid, isset( self::GENRES[ $g['genre'] ] ) ? $g['genre'] : 'arcade', 'game_genre' );
+			wp_set_object_terms( $pid, array_map( 'sanitize_title', (array) ( $g['tags'] ?? array() ) ), 'game_tag' );
+			$prof = array();
+			if ( array( 'touch' ) === $inputs ) {
+				$prof[] = 'touch-only';
+			} elseif ( in_array( 'touch', $inputs, true ) ) {
+				$prof[] = 'hybrid';
+			} elseif ( array_intersect( array( 'keyboard', 'mouse' ), $inputs ) ) {
+				$prof[] = 'keyboard-mouse';
+			}
+			if ( in_array( 'gamepad', $inputs, true ) ) {
+				$prof[] = 'gamepad-ready';
+			}
+			wp_set_object_terms( $pid, $prof ?: array( 'touch-only' ), 'control_profile' );
+		}
+	}
+
+	/** Descripción propia del catálogo en HTML: párrafos, jugadores y consejos. */
+	public static function catalog_html( $g ) {
+		$out = '';
+		foreach ( (array) ( $g['desc'] ?? array() ) as $p ) {
+			$out .= '<p>' . esc_html( $p ) . '</p>';
+		}
+		if ( ! empty( $g['players'] ) ) {
+			$out .= '<p><strong>Jugadores:</strong> ' . esc_html( $g['players'] ) . ( ! empty( $g['mp'] ) ? '. Se puede jugar en la tele con los móviles como mandos (modo fiesta); las plazas libres las ocupa la CPU.' : '.' ) . '</p>';
+		}
+		if ( ! empty( $g['tips'] ) ) {
+			$out .= '<h3>Consejos</h3><ul>';
+			foreach ( (array) $g['tips'] as $t ) {
+				$out .= '<li>' . esc_html( $t ) . '</li>';
+			}
+			$out .= '</ul>';
+		}
+		return $out;
 	}
 
 	/** Juegos que ya eligen lienzo vertical u horizontal según la pantalla: sin forzar orientación. */

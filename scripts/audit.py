@@ -1,4 +1,4 @@
-import sys, threading, http.server, functools, io, json, random
+import os, sys, threading, http.server, functools, io, json, random
 from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent
 from playwright.sync_api import sync_playwright
@@ -9,6 +9,7 @@ i, n = map(int, sys.argv[1].split('/')); slugs = slugs[i::n]; PORT = 8850 + i
 if len(sys.argv) > 2: slugs = sys.argv[2:]
 class Q(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a): pass
+PORT = int(os.environ.get('ARCADE_PORT', PORT))
 srv = http.server.ThreadingHTTPServer(('127.0.0.1', PORT), functools.partial(Q, directory=str(ROOT)))
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 def diff(a, b): return sum(ImageStat.Stat(ImageChops.difference(a, b)).mean)

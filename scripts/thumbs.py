@@ -1,4 +1,4 @@
-import sys, threading, http.server, functools, io
+import os, sys, threading, http.server, functools, io
 from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent
 from playwright.sync_api import sync_playwright
@@ -9,6 +9,7 @@ if len(sys.argv) > 2: slugs = sys.argv[2:]
 i, n = map(int, sys.argv[1].split('/')); slugs = slugs[i::n]; PORT = 8800 + i
 class Q(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a): pass
+PORT = int(os.environ.get('ARCADE_PORT', PORT))
 srv = http.server.ThreadingHTTPServer(('127.0.0.1', PORT), functools.partial(Q, directory=str(ROOT)))
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 with sync_playwright() as p:

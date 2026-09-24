@@ -162,7 +162,7 @@
   };
 
   /* ================================================================ Estado */
-  var S = {
+  var S = { priv: {},
     code: '', k: '', games: [], sections: [], cells: [], cur: 0,
     peers: {},        // p → {pc, dc, oid, sid, open, held:{}}
     game: null,       // juego en curso (objeto del catálogo) o null (lobby)
@@ -303,7 +303,7 @@
     if (!g || S.ad) return;
     closeMenu();
     stopRepeat();
-    S.game = g; S.ready = false; S.gameT0 = Date.now();
+    clearPriv(); S.game = g; S.ready = false; S.gameT0 = Date.now();
     store('arcade:tv:last', g.slug);
     var f = document.createElement('iframe');
     f.className = 'pt-frame';
@@ -328,6 +328,7 @@
 
   function toLobby() {
     releaseAll(null, true);
+    clearPriv();
     closeMenu();
     if (S.frame) { S.frame.remove(); S.frame = null; }
     var played = S.game ? Date.now() - S.gameT0 : 0;
@@ -347,7 +348,7 @@
     var list = [];
     Object.keys(S.peers).forEach(function (p) { if (active(p)) list.push({ p: +p, color: COLORS[p], name: S.peers[p].name || 'J' + (+p + 1) }); });
     list.sort(function (a, b) { return a.p - b.p; });
-    return { type: 'arcade:party', players: list };
+    return { type: 'arcade:party', players: list, priv: true };
   }
 
   // Suelta las teclas del jugador p (o de todos). Con `all` envía down:false de las 6 teclas aunque
@@ -365,7 +366,10 @@
     var d = e.data;
     if (!d || !S.frame || e.source !== S.frame.contentWindow) return;
     if (d.type === 'arcade:hello') { S.ready = true; post(playersMsg()); }
+    // Mensaje privado a un solo móvil (mano de cartas, rol secreto…): nunca se pinta en la tele.
+    else if (d.type === 'arcade:priv' && d.p >= 0 && d.p < 4) { S.priv[d.p] = d.data ? 1 : 0; send(d.p | 0, { t: 'priv', d: d.data || null }); }
   });
+  function clearPriv() { Object.keys(S.priv).forEach(function (p) { if (S.priv[p]) send(+p, { t: 'priv', d: null }); }); S.priv = {}; }
 
   /* ============================================================ Publicidad */
   function pushAds() {
@@ -654,6 +658,7 @@
           padKey(p, d.k, !!d.d, d.ts);
         } else if (d.t === 'p') send(p, { t: 'P', ts: d.ts });
         else if (d.t === 'hi' && d.name) { peer.name = String(d.name).slice(0, 16); post(playersMsg()); }
+        else if (d.t === 'pick' && S.game && !S.menu && !S.ad) post({ type: 'arcade:ppick', p: p, v: d.v });
       };
       dc.onclose = gone;
     };

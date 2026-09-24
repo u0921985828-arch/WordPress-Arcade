@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'scripts'))
 import generate_wxr as wx
+import catalog as cat
 
 GAMES_DIR = ROOT / 'wp-content/mu-plugins/arcade-core/games'
 ENG_DIR = ROOT / 'src/eng'
@@ -128,6 +129,19 @@ TPL = '''<!doctype html>
 
 def main():
     titles = {wx.slugify(it[0]): it[0] for items in wx.CATALOG.values() for it in items}
+    inp = {wx.slugify(it[0]): (it[3], it[5]) for items in wx.CATALOG.values() for it in items}
+    # Catálogo ampliado (scripts/catalog/o*.py): se funde con G/PAD/MP y genera games/catalog.json para el plugin.
+    new = cat.load(); cat.check(new, titles, wx.slugify); newcat = []
+    for g in new:
+        s = wx.slugify(g['title']); titles[s] = g['title']; inp[s] = (g['orient'], g['inputs'])
+        G[s] = (g['engine'], g['cfg'])
+        if g.get('pad'): PAD[s] = g['pad']
+        if g.get('mp'): MP[s] = tuple(g['mp'])
+        tags = list(g['tags']) + (['multijugador', 'modo-tele'] if g.get('mp') else [])
+        newcat.append(dict(slug=s, title=g['title'], genre=g['genre'], tags=tags, orient=g['orient'], aspect=g['aspect'],
+                           inputs=[x for x, c in (('touch', 'T'), ('keyboard', 'K'), ('mouse', 'M'), ('gamepad', 'G')) if c in g['inputs']],
+                           help=g['cfg']['help'], desc=g['desc'], tips=g.get('tips', []), players=g.get('players', ''),
+                           mp=list(g['mp']) if g.get('mp') else None, wave=g['wave']))
     missing = [s for s in titles if s not in G and s not in STANDALONE]
     extra = [s for s in G if s not in titles]
     if set(MP) - set(PAD): sys.exit(f'MP sin PAD: {set(MP) - set(PAD)}')
@@ -142,11 +156,11 @@ def main():
         if slug in MP: cfg['mp'] = list(MP[slug])
         d = GAMES_DIR / slug; d.mkdir(parents=True, exist_ok=True)
         (d / 'index.html').write_text(TPL.format(title=titles[slug], cfg=json.dumps(cfg, ensure_ascii=False), eng=eng, ev=hashlib.md5((ENG_DIR / f'{eng}.js').read_bytes()).hexdigest()[:8], deps=''.join(f'<script src="../_lib/{d}.js?v=9"></script>' for d in deps_of(eng))), encoding='utf-8')
-    inp = {wx.slugify(it[0]): (it[3], it[5]) for items in wx.CATALOG.values() for it in items}
     party = [dict(slug=s, title=titles[s], orient=inp[s][0], keys=any(c in inp[s][1] for c in 'KG') or s in MP, mp=list(MP[s]) if s in MP else None, pad=PAD.get(s))
              for s in sorted(titles, key=lambda x: titles[x].lower())]
     (GAMES_DIR / 'party.json').write_text(json.dumps(dict(games=party), ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+    (GAMES_DIR / 'catalog.json').write_text(json.dumps(dict(games=newcat), ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     total = len([p for p in GAMES_DIR.iterdir() if (p / 'index.html').exists()])
-    print(f'{len(G)} juegos generados + {len(STANDALONE)} independientes = {total} carpetas; {len(engines)} motores')
+    print(f'{len(new)} nuevos del catálogo ampliado; {len(G)} juegos generados + {len(STANDALONE)} independientes = {total} carpetas; {len(engines)} motores')
 
 if __name__ == '__main__': main()

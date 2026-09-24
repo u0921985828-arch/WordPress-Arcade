@@ -14,6 +14,9 @@ final class Arcade_Portal {
 		'strategy-cards' => array( 'Estrategia y cartas', '#4cc38a', '' ),
 		'3d-webgl'       => array( '3D', '#9b8afb', '' ),
 		'sports-casual'  => array( 'Deportes y casual', '#f08c4a', '' ),
+		'party'          => array( 'Fiesta', '#ff6fb5', '' ),
+		'racing'         => array( 'Carreras', '#5b8cff', '' ),
+		'trivia'         => array( 'Trivia y palabras', '#b5d94a', '' ),
 	);
 
 	public static function boot() {
@@ -33,6 +36,9 @@ final class Arcade_Portal {
 		'strategy-cards' => 'Solitarios con las reglas de siempre, mahjong, damas, reversi, defensa de torres y tácticas por turnos.',
 		'3d-webgl'       => 'Carreras, minigolf, laberintos isométricos y cubos en perspectiva que funcionan en cualquier navegador.',
 		'sports-casual'  => 'Penaltis, bolos, billar, dardos, baloncesto y ritmo: deportes de un toque para partidas cortas.',
+		'party'          => 'Juegos para jugar en grupo: minijuegos, empujones, bombas y deportes a cuatro. En la tele con los móviles como mandos o contra la CPU.',
+		'racing'         => 'Karts, rallies y circuitos vistos desde arriba: derrapa, adelanta y gana la carrera, solo o con hasta tres amigos.',
+		'trivia'         => 'Preguntas, palabras y letras en español: trivia de sobremesa, palabra del día, sopas de letras y ahorcado.',
 	);
 
 	/* ------------------------------------------------------------ PWA */
@@ -244,8 +250,12 @@ final class Arcade_Portal {
 
 	/** Descripción en español para los juegos propios (el texto importado es genérico). */
 	public static function own_desc( $post_id ) {
+		$own = (string) get_post_meta( $post_id, '_game_desc', true ); // juegos del catálogo ampliado: texto propio
+		if ( '' !== $own ) {
+			return wp_kses_post( $own );
+		}
 		$g     = self::genre_of( $post_id );
-		$kind  = array( 'arcade' => 'arcade', 'puzzle' => 'de puzzle', 'platformer' => 'de plataformas', 'strategy-cards' => 'de estrategia y cartas', '3d-webgl' => 'en 3D', 'sports-casual' => 'de deportes y habilidad' )[ $g ];
+		$kind  = array( 'arcade' => 'arcade', 'puzzle' => 'de puzzle', 'platformer' => 'de plataformas', 'strategy-cards' => 'de estrategia y cartas', '3d-webgl' => 'en 3D', 'sports-casual' => 'de deportes y habilidad', 'party' => 'de fiesta', 'racing' => 'de carreras', 'trivia' => 'de preguntas y palabras' )[ $g ];
 		$title = get_the_title( $post_id );
 		$o     = get_post_meta( $post_id, '_game_orientation', true );
 		$ori   = 'portrait' === $o ? ' Se juega mejor con el móvil en vertical.' : ( 'landscape' === $o ? ' Se juega mejor con el móvil en horizontal.' : '' );
@@ -256,6 +266,9 @@ final class Arcade_Portal {
 			'strategy-cards' => array( 'Antes de mover, mira todas las opciones disponibles: una jugada paciente suele abrir varias más.', 'Las reglas siguen las del juego clásico, así que la estrategia tradicional funciona también aquí.' ),
 			'3d-webgl'       => array( 'La perspectiva engaña al principio: céntrate en la trayectoria y no en los detalles del fondo.', 'Juega en pantalla completa y con el móvil en horizontal para tener mejor visión.' ),
 			'sports-casual'  => array( 'La precisión importa más que la fuerza: ajusta el gesto con calma antes de soltar.', 'Cada partida es corta, ideal para mejorar tu récord en pocos minutos.' ),
+			'party'          => array( 'Las rondas son cortas: si pierdes una, en la siguiente todo vuelve a empezar.', 'Con amigos es mejor en la tele: cada uno usa su móvil como mando.' ),
+			'racing'         => array( 'Frena antes de la curva y acelera al salir: derrapar a tiempo gana más que ir siempre a fondo.', 'Aprende el circuito en la primera vuelta y arriesga en la segunda.' ),
+			'trivia'         => array( 'Si dudas entre dos respuestas, descarta primero la que seguro que no es.', 'Vuelve cada día: hay retos nuevos con la misma dificultad para todos.' ),
 		)[ $g ];
 		$tip = $tips[ crc32( get_post_field( 'post_name', $post_id ) ) % 2 ];
 		$how = self::howto( $post_id );
