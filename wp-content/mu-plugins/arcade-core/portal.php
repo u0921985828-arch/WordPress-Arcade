@@ -164,7 +164,7 @@ final class Arcade_Portal {
 		$thumb = Arcade_Core::thumb( $post->ID );
 		$ok    = '' !== Arcade_Core::resolve_embed( $post->ID );
 		return sprintf(
-			'<a class="ax-card%1$s%2$s" href="%3$s" style="--c:%4$s" data-t="%11$s" data-p="%12$d" data-d="%13$d">%10$s<span class="ax-img">%5$s%9$s</span><span class="ax-meta"><b>%6$s</b><i><span class="ax-dot"></span>%8$s</i></span></a>',
+			'<a class="ax-card%1$s%2$s" href="%3$s" style="--c:%4$s" data-t="%11$s" data-p="%12$d" data-d="%13$d">%10$s<span class="ax-img">%5$s%9$s%14$s</span><span class="ax-meta"><b>%6$s</b><i><span class="ax-dot"></span>%8$s</i></span></a>',
 			$big ? ' big' : '',
 			$ok ? '' : ' soon',
 			esc_url( get_permalink( $post ) ),
@@ -177,16 +177,24 @@ final class Arcade_Portal {
 			self::is_own( $post->ID ) && self::has_imports() ? '<span class="ax-excl">Exclusivo</span>' : '',
 			esc_attr( remove_accents( strtolower( get_the_title( $post ) ) ) ),
 			(int) get_post_meta( $post->ID, '_game_plays', true ),
-			(int) get_post_time( 'U', true, $post )
+			(int) get_post_time( 'U', true, $post ),
+			self::mp( $post ) ? '<span class="ax-mpb">' . self::MP_ICO . 'Multijugador</span>' : ''
 		);
+	}
+
+	const MP_ICO = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><circle cx="9" cy="8" r="3.2" fill="currentColor"/><path d="M2.8 19c.5-3.4 3-5.4 6.2-5.4s5.7 2 6.2 5.4z" fill="currentColor"/><circle cx="16.8" cy="9" r="2.6" fill="currentColor" opacity=".7"/><path d="M16.6 13.4c2.7.1 4.3 2 4.7 5.1h-4.5c-.2-1.9-.9-3.6-2.1-4.7.6-.3 1.2-.4 1.9-.4z" fill="currentColor" opacity=".7"/></svg>';
+
+	/** Etiqueta de jugadores si el juego es multijugador en el modo tele ('' si no). */
+	public static function mp( $post ) {
+		return class_exists( 'Arcade_Party' ) ? Arcade_Party::players_label( $post->post_name ) : '';
 	}
 
 	/** Tarjeta compacta (lista lateral de similares). */
 	public static function mini( $post ) {
 		$l = self::LABELS[ self::genre_of( $post->ID ) ];
 		$t = Arcade_Core::thumb( $post->ID );
-		return sprintf( '<a class="ax-mini" href="%1$s" style="--c:%2$s"><span class="ax-mini-img">%3$s</span><span><b>%4$s</b><i><span class="ax-dot"></span>%5$s</i></span></a>',
-			esc_url( get_permalink( $post ) ), esc_attr( $l[1] ), $t ? '<img src="' . esc_url( $t ) . '" alt="" loading="lazy" decoding="async">' : '', esc_html( get_the_title( $post ) ), esc_html( $l[0] ) );
+		return sprintf( '<a class="ax-mini" href="%1$s" style="--c:%2$s"><span class="ax-mini-img">%3$s</span><span><b>%4$s</b><i><span class="ax-dot"></span>%5$s%6$s</i></span></a>',
+			esc_url( get_permalink( $post ) ), esc_attr( $l[1] ), $t ? '<img src="' . esc_url( $t ) . '" alt="" loading="lazy" decoding="async">' : '', esc_html( get_the_title( $post ) ), esc_html( $l[0] ), self::mp( $post ) ? '<span class="ax-mpb sm">' . self::MP_ICO . 'Multijugador</span>' : '' );
 	}
 
 	/** Texto corto para destacados: la ayuda del juego o el extracto. */

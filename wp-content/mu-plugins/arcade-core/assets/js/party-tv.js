@@ -735,14 +735,15 @@
     }).catch(function () { S.polling = false; schedulePoll(5000); });
   }
 
-  // 1 s en el lobby o con mandos conectándose; más lento en partida o tras mucho rato sin cambios.
+  // 1 s con mandos conectándose o sin señal; más lento en el lobby, en partida o tras mucho rato sin cambios.
   function schedulePoll(ms) {
     clearTimeout(S.pollT);
     if (ms == null) {
       // Con alguien «sin señal» se sondea rápido: su móvil volverá a llamar con un offer nuevo.
       var pending = Object.keys(S.peers).some(function (p) { return !S.peers[p].open || S.peers[p].lost; });
       var idle = Date.now() - S.lastChange > 5 * 60000;
-      ms = pending ? 1000 : S.game ? 6000 : idle ? 3000 : 1000;
+      // Lobby 2 s (un móvil nuevo espera ≤ 2 s; la negociación ICE ya tarda más), 4 s tras 5 min sin cambios.
+      ms = pending ? 1000 : S.game ? 6000 : idle ? 4000 : 2000;
       if (document.hidden) ms = Math.max(ms, 10000);
     }
     S.pollT = setTimeout(poll, ms);

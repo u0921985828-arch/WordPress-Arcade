@@ -28,7 +28,7 @@ const glowOf = (b) => GLOW[b.gk] || (GLOW[b.gk] = glowCv(b.col, 20));
 const WIN = 3, CPUC = ['#b98cff', '#9aa3c7', '#ff9f5a', '#e0e4ff'];
 /* Salida en molinete (giro de 90° alrededor del centro): todas las motos tienen el mismo espacio y el mismo rival de frente. */
 const PIN = [[8, 38, 'right'], [21, 8, 'down'], [51, 21, 'left'], [38, 51, 'up']];
-let cdPend = false, MP = null, SLOTS = null, wins = [], lastW = null;
+let cdPend = false, rT = 0, MP = null, SLOTS = null, wins = [], lastW = null;
 const inParty = (p) => !!(k.party && k.party.some((q) => q.p === p));
 const trailCv = mk(480, 480), tc = trailCv.getContext('2d'), haloCv = mk(480, 480), hc = haloCv.getContext('2d');
 const ownCv = mk(480, 480), oc = ownCv.getContext('2d'), freshCv = mk(480, 480), fc = freshCv.getContext('2d');
@@ -57,7 +57,7 @@ function paintOwn() {
 const DF = () => Math.min(1, (round - 1) / 8), lerp = (a, b, q) => a + (b - a) * q;
 const STEP = () => TRAILS ? lerp(0.11, 0.05, DF()) : 0.065;
 function newRound() {
-  g = Array.from({ length: N }, () => Array(N).fill(0)); acc = 0; count = MP ? 0 : 2.4; cdPend = !!MP; between = 0; dying = 0; booms = []; freshT = 0; respawn = 0; tc.clearRect(0, 0, 480, 480); hc.clearRect(0, 0, 480, 480);
+  g = Array.from({ length: N }, () => Array(N).fill(0)); acc = 0; count = MP ? 0 : 2.4; cdPend = !!MP; rT = 0; between = 0; dying = 0; booms = []; freshT = 0; respawn = 0; tc.clearRect(0, 0, 480, 480); hc.clearRect(0, 0, 480, 480);
   if (TRAILS) {
     bikes = [{ x: 10, y: 36, d: 'right', col: COL[1], id: 1, alive: true, me: true }, { x: 50, y: 24, d: 'left', col: COL[2], id: 2, alive: true }, { x: 30, y: 8, d: 'down', col: COL[3], id: 3, alive: true }, { x: 30, y: 52, d: 'up', col: COL[4], id: 4, alive: true }].slice(0, MP ? 4 : 2 + Math.min(2, round - 1));
     bikes.forEach((b) => { b.gk = b.id; });
@@ -115,7 +115,8 @@ k.run((dt) => {
   if (cdPend) { cdPend = false; k.count(3); }
   if (k.counting()) { acc = 0; return; }
   if (count > 0) { const c0 = Math.ceil(count / 0.8); count -= dt; const c1 = Math.ceil(count / 0.8); if (c1 !== c0) k.sfx(c1 > 0 ? 'click' : 'start'); if (count > 0) return; acc = 0; goT = 0.6; }
-  const step = MP ? 0.09 : STEP(), look = Math.round(lerp(60, 300, DF())), noise = lerp(10, 4, DF());
+  if (MP) rT += dt;
+  const step = MP ? Math.max(0.06, 0.09 - rT * 0.001) : STEP(), /* fiesta: la ronda acelera poco a poco (0,09 → 0,06 s por casilla en 30 s) */ look = Math.round(lerp(60, 300, DF())), noise = lerp(10, 4, DF());
   if (!TRAILS) {
     for (const s of sparks) {
       s.tail.unshift([s.x, s.y]); if (s.tail.length > 7) s.tail.pop();
@@ -138,8 +139,9 @@ k.run((dt) => {
       for (const b of bikes) if (b.alive) { if (!free(b.nx, b.ny) || bikes.some((o) => o !== b && o.alive && o.nx === b.nx && o.ny === b.ny)) b.alive = false; }
       for (const b of bikes) if (b.alive) { b.x = b.nx; b.y = b.ny; g[b.y][b.x] = b.id; stamp(b.px, b.py, b.x, b.y, b.col); }
       for (const b of bikes) if (!b.alive && !b.boom) { b.boom = true; b.px = b.x; b.py = b.y; boom(b.x * S + S / 2, TOP + b.y * S + S / 2, b.col); if (!b.me && !MP) { score += 50; k.float('+50', b.x * S, TOP + b.y * S - 12, b.col); } }
-      if (MP) { const al = bikes.filter((b) => b.alive), hum = al.filter((b) => b.pl !== undefined);
-        if (al.length <= 1 || (!hum.length && bikes.some((b) => b.pl !== undefined))) { const wb = al.length === 1 ? al[0] : null; lastW = wb; if (wb) { wins[bikes.indexOf(wb)]++; k.sfx('win'); k.float('+1', wb.x * S, TOP + wb.y * S - 14, wb.col); }
+      if (MP) { const al = bikes.filter((b) => b.alive), hum = al.filter((b) => b.pl !== undefined), vsH = bikes.filter((b) => b.pl !== undefined).length >= 2;
+        /* con 2+ personas las motos de la CPU son obstáculo: gana la ronda el último humano en pie (antes la CPU podía llevarse la partida entre amigos) */
+        if (vsH ? hum.length <= 1 : (al.length <= 1 || (!hum.length && bikes.some((b) => b.pl !== undefined)))) { const wb = vsH ? hum[0] || null : al.length === 1 ? al[0] : null; lastW = wb; if (wb) { wins[bikes.indexOf(wb)]++; k.sfx('win'); k.float('+1', wb.x * S, TOP + wb.y * S - 14, wb.col); }
           const champ = bikes.findIndex((b, i) => wins[i] >= WIN);
           if (champ >= 0) { const cb = bikes[champ]; between = 0; dying = 0;
             k.win(cb.name === 'CPU' ? 'Gana la CPU' : `¡Gana ${cb.name}!`, cb.col, bikes.map((b, i) => `<b style="color:${b.col}">${b.name} ${wins[i]}</b>`).join(' · ') + '<br>Toca para la revancha', wins[champ]); return; }
@@ -188,7 +190,7 @@ function hudTop() {
 }
 function draw() {
   c.drawImage(BG, 0, 0, W, H);
-  const fr = count > 0 || between || dying || k.counting() ? 1 : Math.min(1, acc / (MP ? 0.09 : STEP()));
+  const fr = count > 0 || between || dying || k.counting() ? 1 : Math.min(1, acc / (MP ? Math.max(0.06, 0.09 - rT * 0.001) : STEP()));
   if (TRAILS) {
     c.drawImage(haloCv, 0, TOP, 480, 480); c.drawImage(trailCv, 0, TOP, 480, 480);
     for (const b of bikes) if (b.alive) bike(b, fr);

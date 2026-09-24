@@ -58,6 +58,18 @@ final class Arcade_Party {
 		return isset( self::catalog()[ $slug ] );
 	}
 
+	/** Jugadores [mín, máx] si el juego es multijugador en la tele; null si no. */
+	public static function players( $slug ) {
+		$g = self::catalog()[ $slug ] ?? null;
+		return ( $g && ! empty( $g['mp'] ) && (int) $g['mp'][1] > 1 ) ? array( (int) $g['mp'][0], (int) $g['mp'][1] ) : null;
+	}
+
+	/** «Hasta 4 jugadores» / «2 jugadores». */
+	public static function players_label( $slug ) {
+		$mp = self::players( $slug );
+		return $mp ? ( $mp[1] > 2 ? 'Hasta ' . $mp[1] . ' jugadores' : $mp[1] . ' jugadores' ) : '';
+	}
+
 	public static function tv_url( $slug = '' ) {
 		$u = home_url( '/tele/' );
 		return $slug ? add_query_arg( 'g', rawurlencode( $slug ), $u ) : $u;
