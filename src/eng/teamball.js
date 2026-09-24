@@ -139,6 +139,10 @@ function steal(from, by) {
 }
 
 /* ---------- IA fútbol / hockey ---------- */
+function lineClear(b, gx) { // ¿hay hueco? ningún rival cerca de la línea de tiro hacia alguno de los palos
+  return [GY0 + 14, FH / 2, GY1 - 14].some((gy) => { const dx = gx - b.x, dy = gy - b.y, L = dx * dx + dy * dy || 1;
+    return B.every((o) => { if (o.team === b.team) return true; const q = clamp(((o.x - b.x) * dx + (o.y - b.y) * dy) / L, 0, 1); return hyp(b.x + dx * q - o.x, b.y + dy * q - o.y) > M.r + 16; }); });
+}
 function aiField(b, dt) {
   const own = ball.own, mate = nearestMate(b), sp = M.spd * (0.8 + 0.2 * skill), gx = goalX(b.team), s = atk(b.team);
   let tx = b.x, ty = b.y, run = 1;
@@ -148,7 +152,7 @@ function aiField(b, dt) {
     const foeAhead = foe && hyp(foe.x - b.x, foe.y - b.y) < 70 && (foe.x - b.x) * s > -5;
     if (b.chg >= 0) { b.chg += dt; if (b.chg >= b.chgT) { doShot(b, null, clamp(b.chg / 0.8, 0.35, 1)); b.chg = -1; } }
     else if (b.passReq > 0 && mate) { doPass(b, mate); b.passReq = 0; }
-    else if (dg < (MODE === 'hockey' ? 240 : 200) && Math.abs(b.y - FH / 2) < 150 && b.think <= 0) { b.chg = 0; b.chgT = lerp(0.2, 0.55, dg / 260) + k.rnd(0, 0.15); b.a = Math.atan2(FH / 2 - b.y, gx - b.x); }
+    else if (dg < (MODE === 'hockey' ? 240 : 200) && Math.abs(b.y - FH / 2) < 150 && b.think <= 0 && (lineClear(b, gx) || dg < 70 || Math.random() < 0.25)) { b.chg = 0; b.chgT = lerp(0.2, 0.55, dg / 260) + k.rnd(0, 0.15); b.a = Math.atan2(FH / 2 - b.y, gx - b.x); }
     else if (foeAhead && mate && b.think <= 0 && (mate.x - b.x) * s > -40 && !B.some((o) => o.team !== b.team && hyp(o.x - mate.x, o.y - mate.y) < 45) && Math.random() < 0.5 + skill * 0.4) { doPass(b, mate); }
     else { tx = gx; ty = FH / 2 + (b.y < FH / 2 ? -30 : 30); if (foeAhead) ty = b.y + (foe.y > b.y ? -90 : 90); }
     if (b.think <= 0) b.think = lerp(0.5, 0.15, skill);

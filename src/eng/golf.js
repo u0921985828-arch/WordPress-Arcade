@@ -369,7 +369,7 @@ function partyMain() {
     label(`Hoyo ${holeN}/9 · Par ${PAR}`, 10, 10, 18, '#b8f0a8');
     if (q) { const cx = 262; c.fillStyle = k.pcol(q.p); c.beginPath(); c.arc(cx - 12, 20, 8, 0, R2); c.fill(); c.lineWidth = 2; c.strokeStyle = '#fff'; c.stroke(); label(`${nm(cur)} · golpe ${Math.min(MAXS, q.n + (pst === 'aim' || pst === 'intro' ? 1 : 0))}`, cx, 10, 18, '#fff'); }
     PL.forEach((pq, i) => { const w = 50, x = W - 8 - (PL.length - i) * (w + 4); ART.rr(c, x, 6, w, 28, 7); c.fillStyle = i === cur ? k.pcol(pq.p) : 'rgba(255,255,255,.1)'; c.fill(); c.lineWidth = 2; c.strokeStyle = k.pcol(pq.p); c.stroke();
-      label(String(pq.tot + (pq.done ? 0 : pq.n)), x + w / 2, 10, 18, i === cur ? OUT : '#fff', 'center'); });
+      label(String(pq.tot + (pq.done ? 0 : pq.n)), x + w / 2, 10, 18, '#fff', 'center'); });
     if (pst === 'intro' && q) { const e = Math.min(1, (1 - stT) / 0.2); c.save(); c.globalAlpha = Math.min(1, stT / 0.25 + 0.2); c.translate(W / 2, H / 2 - 10); c.scale(0.7 + 0.3 * e, 0.7 + 0.3 * e);
       label(q.n === 0 && PL.every((x) => x.n === 0) ? `Hoyo ${holeN}` : 'Turno', 0, -44, 22, '#fff', 'center'); label(seats[cur].cpu ? 'CPU' : nm(cur), 0, -18, 34, k.pcol(q.p), 'center'); c.restore(); }
     if (pst === 'aim' && q && !seats[cur].cpu && holeN <= 2 && aimT < 6) { const s = k.party ? '← → apuntar · mantén A y suelta para golpear' : 'Arrastra hacia atrás · o ← → y mantén A'; ART.rr(c, W / 2 - 230, H - 38, 460, 30, 10); c.fillStyle = 'rgba(26,21,48,.8)'; c.fill(); label(s, W / 2, H - 33, 18, '#fff', 'center'); }
