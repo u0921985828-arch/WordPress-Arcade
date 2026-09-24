@@ -9,18 +9,22 @@
     const w = o.w || 480, h = o.h || 640, bg = o.bg || '#101326';
     document.title = o.title || 'Game';
     const st = document.createElement('style');
-    st.textContent = `html,body{margin:0;height:100%;background:${bg};overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;font-family:ui-rounded,"Trebuchet MS",system-ui,sans-serif;color:#f5f1e6}
+    const AC_T = { meadow: '#5fbf45', snow: '#3fb6ea', night: '#8f6cff', castle: '#e09a2e', factory: '#f0842a', dusk: '#ff6f8a', jungle: '#34b574', sky: '#3a9ef0', canyon: '#e36d34', neon: '#ff3fb4', rally: '#e8b02e', skate: '#ff5a5f', voxel: '#4fc39a' };
+    const acc = (window.CFG && (window.CFG.accent || AC_T[window.CFG.theme])) || '#6e62f5';
+    st.textContent = `:root{--bg:${bg};--ac:${acc}}
+html,body{margin:0;height:100%;background:${bg};overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;font-family:ui-rounded,"Trebuchet MS",system-ui,sans-serif;color:#f5f1e6}
 canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-action:none}
-#ov{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:16px;background:rgba(0,0,0,.5);pointer-events:none}
-#ov{background:rgba(8,10,14,.72);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
-#ov .card{display:flex;flex-direction:column;align-items:center;gap:10px;padding:26px 24px 22px;min-width:min(300px,84vw);max-width:420px;border-radius:18px;background:#12151c;border:1px solid rgba(255,255,255,.09);box-shadow:0 20px 50px rgba(0,0,0,.5);animation:pop .28s cubic-bezier(.2,1.2,.4,1)}
-#ov h1{margin:0;font:700 clamp(24px,6.5vmin,38px)/1.1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;letter-spacing:-.02em;color:#fff}
-#ov p{margin:0;font:400 clamp(13px,3.4vmin,16px)/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#aab0bf;max-width:36ch}#ov.hide{display:none}
-#ov .go{margin-top:8px;padding:12px 26px;border-radius:10px;background:#6e62f5;color:#fff;font:600 clamp(14px,3.8vmin,17px)/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;box-shadow:0 6px 18px rgba(110,98,245,.35)}
-#ov .rec{font:500 12.5px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#8b91a1;padding:5px 10px;border:1px solid rgba(255,255,255,.08);border-radius:8px}
-@keyframes pop{from{transform:scale(.94);opacity:0}}
+#ov{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:16px;pointer-events:none;background:color-mix(in srgb,var(--bg) 70%,rgba(4,4,10,.6));backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+#ov .card{display:flex;flex-direction:column;align-items:center;gap:10px;padding:24px 22px 22px;min-width:min(300px,84vw);max-width:420px;border-radius:20px;background:linear-gradient(180deg,color-mix(in srgb,var(--bg) 82%,#fff 12%),color-mix(in srgb,var(--bg) 92%,#000));border:3px solid #1a1530;box-shadow:inset 0 2px 0 rgba(255,255,255,.14),0 7px 0 #1a1530,0 18px 40px rgba(0,0,0,.45);animation:pop .28s cubic-bezier(.2,1.2,.4,1)}
+#ov h1{margin:0;font:900 clamp(26px,7vmin,40px)/1.05 ui-rounded,"Trebuchet MS",system-ui,sans-serif;letter-spacing:-.01em;color:#fff;text-shadow:0 3px 0 #1a1530,0 0 18px color-mix(in srgb,var(--ac) 45%,transparent)}
+#ov p{margin:0;font:600 clamp(13px,3.4vmin,16px)/1.45 ui-rounded,"Trebuchet MS",system-ui,sans-serif;color:color-mix(in srgb,#fff 78%,var(--ac));max-width:36ch}#ov.hide{display:none}
+#ov .go{margin-top:8px;padding:13px 30px;border-radius:14px;background:var(--ac);color:#fff;font:800 clamp(15px,4vmin,18px)/1 ui-rounded,"Trebuchet MS",system-ui,sans-serif;border:3px solid #1a1530;box-shadow:inset 0 2px 0 rgba(255,255,255,.3),0 5px 0 #1a1530;text-shadow:0 2px 0 rgba(26,21,48,.5);animation:bob 1.6s ease-in-out infinite}
+#ov .rec{font:700 12.5px/1 ui-rounded,"Trebuchet MS",system-ui,sans-serif;color:#ffd166;padding:6px 11px;border:2px solid #1a1530;border-radius:10px;background:rgba(0,0,0,.25)}
+@keyframes pop{from{transform:scale(.9);opacity:0}}@keyframes bob{50%{transform:translateY(-2px)}}
+@media (prefers-reduced-motion:reduce){#ov .go{animation:none}}
 #hud{position:fixed;top:max(6px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:5}
-#hud button{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(10,12,16,.45);color:#fff;padding:0;opacity:.7;cursor:pointer;backdrop-filter:blur(6px)}
+#hud.ext{display:none}
+#hud button{width:36px;height:36px;display:grid;place-items:center;border-radius:11px;border:2px solid #1a1530;background:color-mix(in srgb,var(--bg) 70%,#fff 14%);color:#fff;padding:0;opacity:.8;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 3px 0 #1a1530}
 #hud button:hover{opacity:.9}`;
     document.head.append(st);
     const cv = document.createElement('canvas'), ov = document.createElement('div');
@@ -115,7 +119,8 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-acti
     let lastSfx = {};
     k.sfx = (n) => { if (muted || !SFX[n] || !ac()) return; const now = performance.now(); if (now - (lastSfx[n] || 0) < 40) return; lastSfx[n] = now; try { SFX[n](); } catch (e) {} };
     k.muted = () => muted;
-    bm.addEventListener('pointerdown', (e) => { e.stopPropagation(); muted = !muted; bm.innerHTML = muted ? IC.off : IC.on; try { localStorage.setItem('arcade:mute', muted ? '1' : '0'); } catch (er) {} if (!muted) k.sfx('click'); });
+    const setMute = (v) => { muted = !!v; bm.innerHTML = muted ? IC.off : IC.on; try { localStorage.setItem('arcade:mute', muted ? '1' : '0'); } catch (er) {} if (!muted) k.sfx('click'); };
+    bm.addEventListener('pointerdown', (e) => { e.stopPropagation(); setMute(!muted); });
     /* Las vibraciones de los juegos también suenan y sacuden la pantalla */
     const rawVib = navigator.vibrate ? navigator.vibrate.bind(navigator) : null;
     const vib = (ms) => { const d = Array.isArray(ms) ? ms[0] : ms; if (d <= 20) k.sfx('pop'); else if (d <= 45) k.sfx('coin'); else if (d <= 90) { k.sfx('hit'); k.shake(4); } else { k.sfx('hurt'); k.shake(8); k.flash('rgba(255,60,80,.35)'); } try { rawVib && rawVib(ms); } catch (e) {} return true; };
@@ -145,9 +150,16 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-acti
     const tell = (type, x) => { try { if (parent !== window) parent.postMessage(Object.assign({ type }, x || {}), '*'); } catch (e) {} };
     addEventListener('message', (e) => { const d = e.data; if (!d || e.source !== parent) return;
       if (d.type === 'arcade:pause') { setPause(true); if (AC) AC.suspend(); }
-      else if (d.type === 'arcade:resume') { if (AC) AC.resume(); } });
+      else if (d.type === 'arcade:resume') { if (AC) AC.resume(); }
+      else if (d.type === 'arcade:unpause') { if (k.paused) setPause(false); }
+      else if (d.type === 'arcade:mute') setMute(d.on);
+      else if (d.type === 'arcade:hud') { hud.classList.add('ext'); k.extHud = true; } });
     /* Mando del portal: el juego describe qué controles necesita (se colocan fuera del lienzo). */
-    if (window.CFG && 'pad' in window.CFG) tell('arcade:pad', { pad: window.CFG.pad, w, h });
+    /* Saludo al reproductor del portal: tamaño, colores y ayuda del juego. El portal coloca el menú
+       (pausa, sonido, pantalla completa) y el mando fuera del lienzo y responde con 'arcade:hud'. */
+    { const C = window.CFG || {}, hi = { w, h, bg, ac: acc, hud: C.hud || '', muted, title: C.title || o.title || '', help: C.help || '' };
+      if ('pad' in C) hi.pad = C.pad;
+      tell('arcade:hello', hi); }
     k.hide = () => ov.classList.add('hide');
     k.best = (id, score) => {
       let b = 0; try { b = +localStorage.getItem('best:' + id) || 0; if (score > b) { b = score; localStorage.setItem('best:' + id, b); } } catch (e) { b = Math.max(b, score); }

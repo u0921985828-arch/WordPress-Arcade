@@ -119,7 +119,7 @@ PAD = {
 
 TPL = '''<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{title}</title></head>
-<body><script>window.CFG={cfg};</script><script src="../_lib/kit.js?v=8"></script>{deps}<script src="../_lib/{eng}.js?v={ev}"></script></body></html>
+<body><script>window.CFG={cfg};</script><script src="../_lib/kit.js?v=9"></script>{deps}<script src="../_lib/{eng}.js?v={ev}"></script></body></html>
 '''
 
 def main():
