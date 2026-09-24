@@ -63,7 +63,7 @@ function beginQ() {
 }
 function onAsk() {
   phase = 'ask'; pt = 0; const q = curQ();
-  const base = TF ? [0, 0.64, 0.55, 0.47][q.d] : [0, 0.52, 0.38, 0.26][q.d]; // 1.23: CPU acierta menos (antes 0.74/0.62/0.5 y 0.72/0.52/0.36)
+  const base = TF ? [0, 0.66, 0.6, 0.55][q.d] : [0, 0.52, 0.38, 0.26][q.d]; // 1.23: CPU acierta menos (antes 0.74/0.62/0.5 y 0.72/0.52/0.36; en V/F nunca bajo 0.55)
   for (const s of seat) {
     if (hum(s.p)) continue;
     const pc = Math.min(0.85, base + CPU * 0.015 + k.rnd(-0.05, 0.05));
