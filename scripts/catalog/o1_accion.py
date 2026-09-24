@@ -6,7 +6,7 @@ GAMES = [
         genre='arcade', tags=['tanques', 'rebote', 'arena', 'rondas', 'vector'],
         orient='landscape', aspect='16:9', inputs='TKG',
         engine='topdown',
-        cfg=dict(mode='bounce', help='Mueve el tanque con la cruceta y dispara con A. Mantén B para quedarte quieto y girar solo la torreta: verás la trayectoria con sus rebotes. Cada bala rebota tres veces y, tras el primer rebote, también te alcanza a ti. Un impacto y fuera; gana quien llegue a 4 rondas.'),
+        cfg=dict(mode='bounce', hud='bl', help='Mueve el tanque con la cruceta y dispara con A. Mantén B para quedarte quieto y girar solo la torreta: verás la trayectoria con sus rebotes. Cada bala rebota tres veces y, tras el primer rebote, también te alcanza a ti. Un impacto y fuera; gana quien llegue a 4 rondas.'),
         pad=dict(d='8', a='Fuego', b='Apuntar'),
         mp=(1, 4),
         desc=[
@@ -25,7 +25,7 @@ GAMES = [
         genre='arcade', tags=['mazmorra', 'cooperativo', 'clases', 'jefes', 'vector'],
         orient='landscape', aspect='16:9', inputs='TKG',
         engine='topdown',
-        cfg=dict(mode='coop', help='Elige clase (← →) y pulsa A para estar listo. Te mueves con la cruceta y atacas solo al enemigo más cercano; A lanza la habilidad de tu clase y B hace una voltereta. Si un compañero cae, quédate a su lado para levantarlo. Limpiad la sala, salid por la puerta y elegid una mejora para todo el equipo.'),
+        cfg=dict(mode='coop', hud='bl', help='Elige clase (← →) y pulsa A para estar listo. Te mueves con la cruceta y atacas solo al enemigo más cercano; A lanza la habilidad de tu clase y B hace una voltereta. Si un compañero cae, quédate a su lado para levantarlo. Limpiad la sala, salid por la puerta y elegid una mejora para todo el equipo.'),
         pad=dict(d='8', a='Habilidad', b='Rodar'),
         mp=(1, 4),
         desc=[
@@ -44,7 +44,7 @@ GAMES = [
         genre='platformer', tags=['carrera', 'plataformas', 'rondas', 'versus', 'vector'],
         orient='landscape', aspect='16:9', inputs='TKG',
         engine='platformer',
-        cfg=dict(mode='race', theme='meadow', spikes=0.15, enemies=0.3, help='Corre con ← → y salta con A (mantén para saltar más alto); B da un empujón. La cámara sigue al primero: si te quedas fuera por la izquierda, caes a un foso o tocas pinchos o enemigos, pierdes la ronda. Pisa la cabeza de un rival para aturdirlo. Gana la ronda quien toque la bandera o el último en pie; a 3 rondas.'),
+        cfg=dict(mode='race', hud='bl', theme='meadow', spikes=0.15, enemies=0.3, help='Corre con ← → y salta con A (mantén para saltar más alto); B da un empujón. La cámara sigue al primero: si te quedas fuera por la izquierda, caes a un foso o tocas pinchos o enemigos, pierdes la ronda. Pisa la cabeza de un rival para aturdirlo. Gana la ronda quien toque la bandera o el último en pie; a 3 rondas.'),
         pad=dict(d='h', a='Saltar', b='Empujón'),
         mp=(1, 4),
         desc=[

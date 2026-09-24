@@ -2,6 +2,19 @@
 
 GAMES = [
     dict(
+        title='Penaltis Cara a Cara',
+        genre='sports-casual',
+        tags=['futbol', 'penaltis', 'versus', 'vector'],
+        orient='landscape', aspect='16:9', inputs='TKG',
+        engine='penalty',
+        cfg=dict(mode='versus', help='Tanda de 5 penaltis por cabeza y muerte súbita. Chutas: mantén una dirección y deja A pulsado para cargar; suelta en la franja verde. Paras: mantén hacia dónde te lanzas cuando el rival golpea.'),
+        pad=dict(d='8', a='Chutar'),
+        mp=(1, 2),
+        desc=['x '*150],
+        tips=['a', 'b'],
+        players='1–2 jugadores',
+    ),
+    dict(
         title='Cuatro en Línea',
         genre='strategy-cards',
         tags=['tablero', 'estrategia', 'clasico', 'vector'],

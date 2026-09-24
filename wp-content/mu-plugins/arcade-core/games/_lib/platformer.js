@@ -17,7 +17,7 @@ function gen() {
   const lv = RACE ? Math.min(1, (level - 1) / 5) : Math.min(1, (level - 1) / 8); MW = RACE ? 120 + Math.min(level, 6) * 8 : 62 + Math.min(level, 12) * 16; map = Array.from({ length: MH }, () => Array(MW).fill(0)); enemies = []; coins = []; anchors = []; decos = [];
   const col = (x, h) => { for (let y = MH - h; y < MH; y++) if (x >= 0 && x < MW) map[y][x] = 1; };
   const spare = []; // tramos aptos sin enemigo: garantizan un mínimo por nivel
-  let x = 0, h = 3; for (; x < 7; x++) col(x, h);
+  let x = 0, h = 3; for (; x < (RACE ? 20 : 7); x++) col(x, h); /* en la carrera, recta inicial de ~2 s sin peligros */
   for (let i = 3; i < 7; i++) coins.push({ x: (i + 0.5) * T, y: (MH - h - 1) * T - 6 - Math.sin((i - 3) / 3 * Math.PI) * 26 }); // arranque con algo que recoger
   if (!A.swing) decos.push({ x: 1.5 * T, y: (MH - h) * T });
   while (x < MW - 10) {
@@ -240,12 +240,12 @@ function raceDraw() {
     label(r.cpu ? 'CPU' : r.name, r.x + 11, r.y - 26, 14, r.cpu ? '#e8e4f4' : r.col, 'center'); }
   c.restore();
   /* borde que elimina */
-  const gr = c.createLinearGradient(0, 0, 36, 0); gr.addColorStop(0, 'rgba(255,60,90,.55)'); gr.addColorStop(1, 'rgba(255,60,90,0)'); c.fillStyle = gr; c.fillRect(0, 0, 36, H);
+  const gr = c.createLinearGradient(0, 0, 28, 0); gr.addColorStop(0, `rgba(255,60,90,${0.3 + Math.sin(t * 6) * 0.08})`); gr.addColorStop(1, 'rgba(255,60,90,0)'); c.fillStyle = gr; c.fillRect(0, 0, 28, H);
   /* marcador: rondas ganadas y barra de progreso con la posición de cada uno */
   const pw = Math.min(140, (W - 20) / R.rs.length - 6);
   R.rs.forEach((r, i) => { const x = 10 + i * (pw + 6); ART.rr(c, x, 5, pw, 26, 9); c.fillStyle = r.out ? 'rgba(26,21,48,.45)' : 'rgba(26,21,48,.85)'; c.fill(); c.lineWidth = 2; c.strokeStyle = r.col; c.stroke();
     label(r.cpu ? 'CPU' : r.name, x + 8, 10, 14, r.out ? '#77708f' : r.col); for (let j = 0; j < RWIN; j++) { const sx = x + pw - 14 - (RWIN - 1 - j) * 16; c.beginPath(); for (let q = 0; q < 10; q++) { const a = -Math.PI / 2 + q * Math.PI / 5, rr = q % 2 ? 3 : 7; c.lineTo(sx + Math.cos(a) * rr, 18 + Math.sin(a) * rr); } c.closePath(); ART.fillOut(c, j < r.wins ? '#ffc928' : '#3a3552', 1.5); } });
-  const bx = 60, bw = W - 120, by = H - 14; ART.rr(c, bx, by - 3, bw, 6, 3); c.fillStyle = 'rgba(26,21,48,.7)'; c.fill();
+  const bx = 110, bw = W - 150, by = H - 14; ART.rr(c, bx, by - 3, bw, 6, 3); c.fillStyle = 'rgba(26,21,48,.7)'; c.fill();
   c.fillStyle = '#ffc928'; c.fillRect(bx + bw - 3, by - 8, 3, 12);
   for (const r of R.rs) if (!r.out) { c.beginPath(); c.arc(bx + bw * k.clamp(r.x / flag.x, 0, 1), by, 6, 0, 6.283); ART.fillOut(c, r.col, 2); }
   if (R.msgT > 0) { c.globalAlpha = Math.min(1, R.msgT * 2); c.font = '800 24px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const mw = c.measureText(R.msg).width + 40; ART.rr(c, W / 2 - mw / 2, 46, mw, 42, 12); c.fillStyle = 'rgba(26,21,48,.82)'; c.fill(); label(R.msg, W / 2, 54, 24, R.win ? R.win.col : '#ffc928', 'center'); c.globalAlpha = 1; }
