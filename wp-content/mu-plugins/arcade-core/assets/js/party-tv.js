@@ -8,6 +8,7 @@
   var KEYS = ['up', 'down', 'left', 'right', 'a', 'b'];
   var LOBBY_PAD = { d: '8', a: 'Elegir', b: 'Atrás' };
   var DEFAULT_PAD = { d: '8', a: 'A', b: 'B' };
+  var MENU_PAD = { d: '8', a: 'OK', b: 'Seguir' };
 
   /* =============================================================== QR (byte, M) */
   // Generador propio: modo byte, corrección M, versiones 1–10 (hasta 213 bytes), máscara con menor penalización.
@@ -141,6 +142,8 @@
     var init = { method: opt.method || 'GET', headers: {}, cache: 'no-store', credentials: 'omit' };
     if (opt.body) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(opt.body); }
     if (opt.keepalive) init.keepalive = true;
+    // Con enlaces permanentes simples la API es ?rest_route=…: la consulta se añade con &.
+    if (C.api.indexOf('?') >= 0) path = path.replace('?', '&');
     return fetch(C.api + path, init).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) { j = j || {}; j._status = r.status; return j; });
     });
@@ -270,14 +273,16 @@
   function move(dir) {
     var cells = ui.grid.querySelectorAll('.pt-cell');
     if (!cells.length) return;
-    var a = cells[S.cur].getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2, best = -1, bd = Infinity;
+    // Posiciones de maquetación (offset*), sin la escala de la celda enfocada.
+    var box = function (c) { var x = 0, y = 0, e = c; while (e && e !== document.body) { x += e.offsetLeft; y += e.offsetTop; e = e.offsetParent; } return { x: x + c.offsetWidth / 2, y: y + c.offsetHeight / 2, w: c.offsetWidth, h: c.offsetHeight }; };
+    var a = box(cells[S.cur]), best = -1, bd = Infinity;
     for (var i = 0; i < cells.length; i++) {
       if (i === S.cur) continue;
-      var r = cells[i].getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2, dx = x - ax, dy = y - ay, d;
-      if (dir === 'left' && (dx > -4 || Math.abs(dy) > a.height / 2)) continue;
-      if (dir === 'right' && (dx < 4 || Math.abs(dy) > a.height / 2)) continue;
-      if (dir === 'up' && dy > -4) continue;
-      if (dir === 'down' && dy < 4) continue;
+      var r = box(cells[i]), dx = r.x - a.x, dy = r.y - a.y, d;
+      if (dir === 'left' && (dx > -a.w / 2 || Math.abs(dy) > a.h / 2)) continue;
+      if (dir === 'right' && (dx < a.w / 2 || Math.abs(dy) > a.h / 2)) continue;
+      if (dir === 'up' && dy > -a.h / 2) continue;
+      if (dir === 'down' && dy < a.h / 2) continue;
       d = dir === 'left' || dir === 'right' ? Math.abs(dx) : Math.abs(dy) * 1000 + Math.abs(dx);
       if (d < bd) { bd = d; best = i; }
     }
@@ -358,6 +363,7 @@
       S.menu.map(function (m, i) { return '<button type="button" data-m="' + i + '">' + esc(m[0]) + '</button>'; }).join('') +
       '<p>Mando: ↑ ↓ y A · Tele: flechas y OK</p></div>';
     ui.menu.hidden = false;
+    broadcastPad();
     ui.menu.onclick = function (e) { var b = e.target.closest ? e.target.closest('[data-m]') : null; if (b) S.menu[+b.dataset.m][1](); };
     menuSel(0);
   }
@@ -369,12 +375,13 @@
   function closeMenu() {
     if (!S.menu) return;
     S.menu = null; ui.menu.hidden = true;
+    broadcastPad();
     post({ type: 'arcade:resume' }); post({ type: 'arcade:unpause' });
     try { if (S.frame) S.frame.contentWindow.focus(); } catch (e) { /* nada */ }
   }
   function menuKey(k) {
-    if (k === 'up') menuSel(S.menuSel - 1);
-    else if (k === 'down') menuSel(S.menuSel + 1);
+    if (k === 'up' || k === 'left') menuSel(S.menuSel - 1);
+    else if (k === 'down' || k === 'right') menuSel(S.menuSel + 1);
     else if (k === 'a') S.menu[S.menuSel][1]();
     else if (k === 'b' || k === 'menu') closeMenu();
   }
@@ -470,11 +477,12 @@
 
   function send(p, msg) { var peer = S.peers[p]; if (peer && peer.dc && peer.dc.readyState === 'open') { try { peer.dc.send(JSON.stringify(msg)); } catch (e) { /* nada */ } } }
   function padSpec() {
+    if (S.menu) return MENU_PAD;
     if (!S.game) return null;
     return S.game.pad && typeof S.game.pad === 'object' ? S.game.pad : DEFAULT_PAD;
   }
   function broadcastPad() {
-    var m = { t: 'pad', pad: padSpec(), title: S.game ? S.game.title : 'Elige un juego' };
+    var m = { t: 'pad', pad: padSpec(), title: S.menu ? 'Pausa' : S.game ? S.game.title : 'Elige un juego' };
     Object.keys(S.peers).forEach(function (p) { send(+p, m); });
   }
 
@@ -504,7 +512,7 @@
         if (S.peers[p] !== peer) return;
         peer.open = true;
         send(p, { t: 'you', p: p, color: COLORS[p] });
-        send(p, { t: 'pad', pad: padSpec(), title: S.game ? S.game.title : 'Elige un juego' });
+        send(p, { t: 'pad', pad: padSpec(), title: S.menu ? 'Pausa' : S.game ? S.game.title : 'Elige un juego' });
         send(p, { t: 'buzz', ms: 40 });
         renderPlayers();
         post(playersMsg());

@@ -18,6 +18,8 @@
     opt = opt || {};
     var init = { method: opt.method || 'GET', headers: {}, cache: 'no-store', credentials: 'omit' };
     if (opt.body) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(opt.body); }
+    // Con enlaces permanentes simples la API es ?rest_route=…: la consulta se añade con &.
+    if (C.api.indexOf('?') >= 0) path = path.replace('?', '&');
     return fetch(C.api + path, init).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) { j = j || {}; j._status = r.status; return j; });
     });

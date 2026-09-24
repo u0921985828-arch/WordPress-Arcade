@@ -80,7 +80,7 @@ if ( is_singular( 'game' ) ) :
 						<button type="button" class="ax-act" data-ax-like aria-label="Me gusta"><?php echo $ico['heart']; // phpcs:ignore ?><b data-n="<?php echo (int) $likes; ?>">Me gusta</b></button>
 						<button type="button" class="ax-act" data-ax-fav aria-label="Añadir a favoritos"><?php echo $ico['fav']; // phpcs:ignore ?><b>Favorito</b></button>
 						<button type="button" class="ax-act" data-ax-share aria-label="Compartir"><?php echo $ico['share']; // phpcs:ignore ?><b>Compartir</b></button>
-						<?php if ( class_exists( 'Arcade_Party' ) && Arcade_Party::playable( get_post_field( 'post_name', $pid ) ) ) : ?><a class="ax-act" href="<?php echo esc_url( Arcade_Party::tv_url( get_post_field( 'post_name', $pid ) ) ); ?>" title="Juega en la tele con el móvil como mando"><?php echo $ico['tv']; // phpcs:ignore ?><b>En la tele</b></a><?php endif; ?>
+						<?php if ( class_exists( 'Arcade_Party' ) && Arcade_Party::playable( get_post_field( 'post_name', $pid ) ) ) : ?><a class="ax-act ax-tv" aria-label="Jugar en la tele" href="<?php echo esc_url( Arcade_Party::tv_url( get_post_field( 'post_name', $pid ) ) ); ?>" title="Juega en la tele con el móvil como mando"><?php echo $ico['tv']; // phpcs:ignore ?><b>En la tele</b></a><?php endif; ?>
 					</div>
 				</div>
 				<?php $how = Arcade_Portal::howto( $pid ); ?>
