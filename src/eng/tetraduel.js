@@ -23,7 +23,7 @@ function mulberry(a) { return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = 
 
 /* ---------- Disposición ---------- */
 const LAY = PORT ? [
-  { bx: 12, by: 92, S: 24, meter: { x: 254, y: 92, w: 8, h: 480 }, next: { x: 268, y: 92, w: 82, h: 150, n: 3 }, hold: { x: 268, y: 250, w: 82, h: 70 }, name: { x: 12, y: 12 }, stats: { x: 268, y: 330 } },
+  { bx: 12, by: 92, S: 24, meter: { x: 254, y: 92, w: 8, h: 480 }, next: { x: 268, y: 92, w: 82, h: 150, n: 3 }, hold: { x: 268, y: 250, w: 82, h: 70 }, name: { x: 12, y: 12 } },
   { bx: 276, by: 432, S: 7, mini: true, meter: { x: 264, y: 432, w: 6, h: 140 }, name: { x: 312, y: 398 } },
 ] : [
   { bx: 92, by: 40, S: 15, meter: { x: 245, y: 40, w: 6, h: 300 }, next: { x: 256, y: 40, w: 44, h: 132, n: 3 }, hold: { x: 32, y: 40, w: 52, h: 50 }, name: { x: 167, y: 8 }, stats: { x: 32, y: 104 } },
@@ -158,12 +158,11 @@ function evalBoard(b, lines) {
 }
 function bestPlacements(q, t) {
   const out = [];
-  for (let r = 0; r < 4; r++) for (let x = -2; x < COLS; x++) {
+  for (let r = 0; r < (t === 'O' ? 1 : 4); r++) for (let x = -2; x < COLS; x++) {
     if (!fits(q, t, r, x, 0)) continue; let y = 0; while (fits(q, t, r, x, y + 1)) y++;
     const b = q.board.map((row) => row.slice()); for (const [cx, cy] of ROT[t][r]) if (y + cy >= 0) b[y + cy][x + cx] = t;
     let lines = 0; const nb = b.filter((row) => { if (row.every(Boolean)) { lines++; return false; } return true; }); while (nb.length < R) nb.unshift(Array(COLS).fill(null));
     out.push({ r, x, s: evalBoard(nb, lines) });
-    if (t === 'O') r = 4;
   }
   return out.sort((a, b) => b.s - a.s);
 }
@@ -361,7 +360,7 @@ function drawPlayer(q, l) {
   if (l.hold && q.hold) mini(q.hold, l.hold.x + l.hold.w / 2, l.hold.y + l.hold.h / 2 + 6, PORT ? 16 : 10, q.holdUsed ? 0.3 : 1, 1 + (q.holdPop || 0) * 0.25);
   // nombre, rondas y estadísticas
   const nm = q.cpu ? 'CPU' : q.name, nx = l.name.x, ny = l.name.y;
-  if (PORT && !l.mini) { label(nm, nx, ny, 22, q.col); for (let i = 0; i < WINS; i++) { c.beginPath(); c.arc(nx + 8 + i * 20, ny + 44, 7, 0, 6.283); ART.fillOut(c, i < q.wins ? '#ffd166' : 'rgba(255,255,255,.15)', 2); } label(`Enviadas ${q.sent}`, W - 12, ny + 2, 14, '#fff', 'right'); label(`Ronda ${round}`, W - 12, ny + 24, 13, '#c9c3ff', 'right'); }
+  if (PORT && !l.mini) { label(nm, nx, ny, 22, q.col); for (let i = 0; i < WINS; i++) { c.beginPath(); c.arc(nx + 8 + i * 20, ny + 44, 7, 0, 6.283); ART.fillOut(c, i < q.wins ? '#ffd166' : 'rgba(255,255,255,.15)', 2); } label(`Enviadas ${q.sent}`, W - 12, ny + 2, 14, '#fff', 'right'); label(`Líneas ${q.lines} · Ronda ${round}`, W - 12, ny + 24, 13, '#c9c3ff', 'right'); }
   else if (l.mini) { label(nm, nx, ny - 20, 14, q.col, 'center'); for (let i = 0; i < WINS; i++) { c.beginPath(); c.arc(nx - 10 + i * 20, ny + 14, 5.5, 0, 6.283); ART.fillOut(c, i < q.wins ? '#ffd166' : 'rgba(255,255,255,.15)', 1.8); } }
   else { label(nm, nx, ny, 18, q.col, 'center'); for (let i = 0; i < WINS; i++) { c.beginPath(); c.arc(nx + BW / 2 - 30 + i * 18, ny + 11, 6, 0, 6.283); ART.fillOut(c, i < q.wins ? '#ffd166' : 'rgba(255,255,255,.15)', 1.8); } }
   if (l.stats) {

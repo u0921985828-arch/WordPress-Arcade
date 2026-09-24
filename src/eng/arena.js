@@ -191,7 +191,7 @@ function sheep(sh) {
 }
 
 /* ---------------------------------------------------------------- Jugadores y rondas */
-function mkPlayers() { P = k.players(4).map((q, i) => ({ i, p: q.p, col: q.color, name: q.name, cpu: q.cpu, pts: 0 })); }
+function mkPlayers() { P = k.players(4).map((q, i) => ({ i, p: q.p, col: q.color, name: q.name, cpu: q.cpu, pts: 0, wins: 0 })); }
 function syncPlayers() { const pl = k.players(4); P.forEach((x, i) => { x.cpu = pl[i].cpu; x.name = pl[i].name; x.col = pl[i].color; }); }
 k.onParty = () => { if (k.st !== 'play') { reset(); return; } syncPlayers(); };
 function newRound() {
@@ -271,15 +271,16 @@ function rankKey(pl) { const md = MODES[M]; if (MD.elim) return pl.alive ? 1000 
 function endRound() {
   const keys = new Map(P.map((pl) => [pl, rankKey(pl)])), order = P.slice().sort((a, b) => keys.get(b) - keys.get(a)), PT = [3, 2, 1, 0];
   order.forEach((pl, j) => { pl.gain = j && Math.abs(keys.get(pl) - keys.get(order[j - 1])) < 1e-6 ? order[j - 1].gain : PT[j]; });
-  order.forEach((pl) => (pl.pts += pl.gain));
+  order.forEach((pl) => { pl.pts += pl.gain; if (pl.gain === 3) pl.wins++; });
   phase = 'between'; btw = 3.4; banner = { order, tie: order.length > 1 && order[1].gain === order[0].gain };
   const w = order[0]; k.sfx(w.cpu && !k.party ? 'lose' : 'win'); if (!banner.tie) { k.burst(W2(w.x), H2(w.y), w.col, 30, 220); k.float('¡Ronda!', W2(w.x), H2(w.y) - 30, w.col); }
   if (MODES[M].stop) MODES[M].stop();
 }
 function finish() {
-  const best = Math.max(...P.map((pl) => pl.pts)), win = P.filter((pl) => pl.pts === best);
+  /* desempate: más rondas ganadas y, después, mejor puesto en la última ronda (el podio solo muestra los puntos) */
+  const sc = (pl) => pl.pts * 100 + pl.wins * 10 + pl.gain, best = Math.max(...P.map(sc)), win = P.filter((pl) => sc(pl) === best);
   if (win.length === 1) { CPU = win[0].cpu ? Math.max(0, CPU - 1) : Math.min(6, CPU + 1); try { localStorage.setItem('cpu:' + CFG.id, CPU); } catch (e) { /* sin almacenamiento */ } }
-  k.podium(P.map((pl) => ({ p: pl.p, score: pl.pts })), { fmt: (v) => v + ' pts', head: !k.party && win.length === 1 && !win[0].cpu ? '¡Has ganado!' : undefined });
+  k.podium(P.map((pl) => ({ p: pl.p, score: sc(pl) })), { fmt: (v) => Math.floor(v / 100) + ' pts', head: !k.party && win.length === 1 && !win[0].cpu ? '¡Has ganado!' : undefined });
 }
 
 /* ---------------------------------------------------------------- Modos */

@@ -61,4 +61,16 @@ GAMES = [
         ],
         tips=['Lee la ayuda de cada ronda: aparece durante la cuenta atrás.', 'En Cuenta Globos fíjate solo en tu color; los blancos y lilas son para despistar.', 'Los puntos por segundo y tercer puesto suman mucho: no abandones ninguna ronda.'],
     ),
+    dict(
+        title='Almohadazo Arena', genre='arcade', tags=['lucha', 'plataformas', 'multijugador', 'vector'],
+        orient='landscape', aspect='16:9', inputs='TKG', engine='brawl',
+        cfg=dict(mode='pillow', hud='tr', help='Joystick para moverte, B salta (dos veces en el aire), A golpea con la almohada y, si lo mantienes, carga un almohadazo fuerte. Arriba y A: molinete que te devuelve al escenario. Abajo y B: esquiva. Cuanto más porcentaje, más lejos vuelas: saca a los demás de la pantalla. Tres vidas.'),
+        pad=dict(d='8', a='Golpe', b='Salto', t=1), mp=(1, 4), players='1–4 jugadores',
+        desc=[
+            'Almohadazo Arena es una pelea de almohadas entre cuatro muñecos sobre un islote flotante con tablones de madera. Nadie sale herido: cada golpe hace volar plumas y suma porcentaje en el marcador del rival, y cuanto más alto está ese número, más lejos sale despedido con el siguiente almohadazo. Quien acaba fuera de la pantalla pierde una de sus tres vidas y reaparece sobre una nube, con un momento de protección para volver a la carga.',
+            'Los controles caben en un joystick y dos botones. B salta y permite un segundo salto en el aire; A da un golpe rápido y, si lo mantienes pulsado en el suelo, cargas un almohadazo que brilla y lanza mucho más lejos. Arriba con A hace un molinete que sube y sirve para volver al islote cuando te han echado; abajo con B es una esquiva que te deja intocable un instante, y mantener abajo sobre un tablón te deja caer. En el móvil se usa el mando virtual, con teclado las flechas, espacio y X, y en la tele cada invitado juega con su móvil.',
+            'Cada cierto tiempo baja un regalo con paracaídas: un almohadón gigante que golpea más fuerte, una pelota de playa para lanzar a distancia o una bomba de plumas que estalla y empuja a todos los que pille cerca. Además el escenario cambia cada medio minuto: el viento del atardecer empuja a todos hacia un lado, la pista helada resbala y de noche los tablones viajan de un extremo a otro. Los rivales de la CPU saltan, esquivan, recogen objetos y vuelven al escenario con cabeza, y se vuelven más listos cuanto más les ganas.',
+        ],
+        tips=['Guarda el almohadazo cargado para cuando el rival pase del 60 %: a esas alturas un golpe fuerte lo saca de la pantalla.', 'Si te lanzan lejos, no gastes el doble salto enseguida: acércate cayendo y usa el molinete al final.', 'Con viento, colócate de espaldas al borde del lado hacia el que no sopla.'],
+    ),
 ]

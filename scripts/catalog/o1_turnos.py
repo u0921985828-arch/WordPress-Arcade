@@ -2,6 +2,19 @@
 
 GAMES = [
     dict(
+        title='Minigolf Party',
+        genre='sports-casual',
+        tags=['golf', 'turnos', 'fisica', 'vector'],
+        orient='landscape', aspect='16:9', inputs='TKMG',
+        engine='golf',
+        cfg=dict(mode='party', hud='bl', help='Minigolf por turnos para 1–4. ← → gira la flecha (↑ ↓ ajuste fino), mantén A y suelta cuando la fuerza sea la justa. En el móvil, arrastra hacia atrás. Si caes al agua, +1 golpe.'),
+        pad=dict(d='8', a='Golpe'),
+        mp=(1, 4),
+        desc=['x ' * 150],
+        tips=['a', 'b'],
+        players='1–4 jugadores',
+    ),
+    dict(
         title='Bolera del Barrio',
         genre='sports-casual',
         tags=['bolos', 'turnos', 'fisica', 'vector'],

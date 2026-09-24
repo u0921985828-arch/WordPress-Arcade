@@ -564,7 +564,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
   const PL = PORT ? { b: [CX, H - CH / 2 - 14], r: [W - 52, H * 0.4], t: [CX, 118], l: [52, H * 0.4] } : { b: [CX, H - CH / 2 - 12], r: [W - 66, CY - 18], t: [CX, 64], l: [66, CY - 18] };
   const seatOf = (p) => (nP() === 2 ? ['b', 't'] : nP() === 3 ? ['b', 'r', 'l'] : ['b', 'r', 't', 'l'])[p];
   const DIR = { b: [0, 1], r: [1, 0], t: [0, -1], l: [-1, 0] };
-  const DECK = PORT ? [CX - 172, CY + 176] : [CX - 250, CY + 4], DISC = PORT ? [CX + 172, CY + 176] : [CX + 250, CY + 4];
+  const DECK = PORT ? [CX - 172, CY + 176] : [CX - (MODE === 'mus' ? 336 : 250), CY + 4], DISC = PORT ? [CX + 172, CY + 176] : [CX + (MODE === 'mus' ? 336 : 250), CY + 4];
   const STOCK = [CX - 58, CY], PILE = [CX + 58, CY];
   const handY = H - CH / 2 - 12, handTop = handY - CH / 2;
 
@@ -601,12 +601,12 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     let lv = lvlGet(); try { if (humWin) localStorage.setItem(LVKEY, String(Math.min(8, (+localStorage.getItem(LVKEY) || 0) + 1))); } catch (e) { /* nada */ }
     if (humWin) k.best(CFG.id, lv + 1);
     if (MODE === 'chinchon') {
-      const rows = S.score.map((v, p) => ({ p, score: p === S.winner ? Math.min(v, -1000 + v) : v }));
+      const rows = S.score.map((v, p) => ({ p, name: label(p), score: p === S.winner ? Math.min(v, -1000 + v) : v }));
       k.podium(rows, { asc: true, head: S.chinchon ? `¡Chinchón de ${label(S.winner)}!` : `¡Gana ${label(S.winner)}!`, fmt: (v) => (v < -500 ? `${v + 1000} pts · gana` : `${v} pts${v > S.target ? ' · eliminado' : ''}`) });
     } else if (teamed()) {
       const sc = MODE === 'mus' ? S.score : S.games;
-      k.podium([0, 1, 2, 3].map((p) => ({ p, score: sc[p % 2] + (p % 2 === S.winner ? 0.001 : 0) })), { head: `¡Gana ${tname(S.winner)}!`, fmt: (v) => `${Math.floor(v)} ${MODE === 'mus' ? 'piedras' : 'juegos'}`, noTie: true });
-    } else k.podium([0, 1].map((p) => ({ p, score: S.games[p] })), { head: `¡Gana ${label(S.winner)}!`, fmt: (v) => `${v} juego${v === 1 ? '' : 's'}` });
+      k.podium([0, 1, 2, 3].map((p) => ({ p, name: label(p), score: sc[p % 2] + (p % 2 === S.winner ? 0.001 : 0) })), { head: `¡Gana ${tname(S.winner)}!`, fmt: (v) => { const f = Math.floor(v); return `${f} ${MODE === 'mus' ? (f === 1 ? 'piedra' : 'piedras') : f === 1 ? 'juego' : 'juegos'}`; }, noTie: true });
+    } else k.podium([0, 1].map((p) => ({ p, name: label(p), score: S.games[p] })), { head: `¡Gana ${label(S.winner)}!`, fmt: (v) => `${v} juego${v === 1 ? '' : 's'}` });
   }
   const seatXY = (p) => PL[seatOf(p)];
   const teamXY = (tm) => (teamed() ? seatXY(tm) : seatXY(tm));
@@ -817,7 +817,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
   }
   function drawTable() {
     if (MODE === 'brisca') { if (!S.deck.length) { c.globalAlpha = 0.4; label2('Mazo vacío', DECK[0], DECK[1], 15, '#fff'); c.globalAlpha = 1; } else label2(String(S.deck.length), DECK[0], DECK[1] - 72, 16, '#fff3c4');
-      label2('Triunfo', DECK[0] + 34, DECK[1] + 60, 14, '#fff3c4'); sym(c, S.ts, DECK[0] + 34, DECK[1] + 82, 9); }
+      const tx = DECK[0] + (PORT ? 112 : 34), ty = DECK[1] + (PORT ? -10 : 60); label2('Triunfo', tx, ty, 14, '#fff3c4'); sym(c, S.ts, tx, ty + 22, 9); }
     if (MODE === 'chinchon') { label2('Mazo', STOCK[0], STOCK[1] + 72, 14, '#fff3c4'); label2('Descarte', PILE[0], PILE[1] + 72, 14, '#fff3c4'); }
     if (MODE === 'mus') {
       const L = S.phase === 'lance' || S.phase === 'reveal' ? S.L : -1, names = ['Grande', 'Chica', 'Pares', S.punto ? 'Punto' : 'Juego'], bw = PORT ? 108 : 118, x0 = CX - (bw * 4 + 18) / 2, y0 = CY - 44;
@@ -831,11 +831,16 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       label2(S.phase === 'mus' || S.phase === 'discard' ? (S.rounds ? `Mus · descartes: ${S.rounds}` : 'Mus') : '', CX, y0 - 22, 16, '#fff3c4');
     }
   }
+  function badgeXY(p) {
+    const st = seatOf(p), [ax, ay] = PL[st]; let bx, by;
+    if (st === 'b') { bx = PORT ? 70 : 90; by = viewer() === p && S.phase !== 'reveal' ? handTop - 26 : ay - 70; } else if (st === 't') { bx = ax - (PORT ? 150 : 196); by = ay; } else { bx = ax; by = ay - (PORT ? 86 : 80); }
+    if (st === 'b' && PORT && viewer() === p) { bx = 64; by = handTop - 118; }
+    return [Math.max(63, Math.min(W - 63, bx)), by];
+  }
   function drawSeats() {
     for (let p = 0; p < S.n; p++) {
       const st = seatOf(p), [ax, ay] = PL[st], col = k.pcol(p), hum = isHum(p), nd = BJ.need(S), turn = nd && nd.p === p;
-      let bx, by; if (st === 'b') { bx = PORT ? 70 : 90; by = viewer() === p && S.phase !== 'reveal' ? handTop - 26 : ay - 70; } else if (st === 't') { bx = ax - (PORT ? 150 : 170); by = ay; } else { bx = ax; by = ay - (PORT ? 86 : 80); }
-      if (st === 'b' && PORT && viewer() === p) { bx = 64; by = handTop - 118; }
+      const [bx, by] = badgeXY(p);
       const w = 118, h = 42; if (turn) { c.globalAlpha = 0.35 + 0.25 * Math.sin(t * 6); ART.rr(c, bx - w / 2 - 5, by - h / 2 - 5, w + 10, h + 10, 16); c.fillStyle = col; c.fill(); c.globalAlpha = 1; }
       ART.rr(c, bx - w / 2, by - h / 2 + 3, w, h, 13); c.fillStyle = OUT; c.fill(); ART.rr(c, bx - w / 2, by - h / 2, w, h, 13); ART.fillOut(c, 'rgba(20,24,44,.92)', 2.5);
       circ(c, bx - w / 2 + 20, by, 13, col, 2.5); label2(hum ? (k.party ? 'J' + (p + 1) : '★') : 'IA', bx - w / 2 + 20, by + 1, 11, '#fff');
@@ -865,7 +870,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     if (v >= 0) { const o = options(v); txt = o.text; btns = o.btns; }
     else if (nd) { txt = nd.p >= 0 ? (isHum(nd.p) ? `${label(nd.p)}: elige en tu móvil` : `Turno de ${label(nd.p)}`) : ''; if (nd.kind === 'next') { txt = k.party ? 'Pulsa A para seguir' : ''; btns = [{ v: 'next', l: S.over ? 'Ver resultado' : 'Siguiente mano', col: '#7cf7a0' }]; } }
     if (nd && nd.p === -1 && nd.kind === 'next' && v >= 0) btns = [{ v: 'next', l: S.over ? 'Ver resultado' : 'Siguiente mano', col: '#7cf7a0' }];
-    if (teamed() && S.senas !== false && v >= 0 && S.phase !== 'reveal' && !isHum((v + 2) % 4)) { const mate = (v + 2) % 4, sn = MODE === 'mus' ? (S.phase === 'lance' ? BJ.mSena(S.hands[mate]) : null) : BJ.bSena(S, mate); if (sn) { const [mx, my] = PL[seatOf(mate)]; pill(mx - 80, my + (PORT ? 52 : 44), 160, 28, '#b98cff', `Seña: ${sn}`, 13, '#fff'); } }
+    if (teamed() && S.senas !== false && v >= 0 && S.phase !== 'reveal' && !isHum((v + 2) % 4)) { const mate = (v + 2) % 4, sn = MODE === 'mus' ? (S.phase === 'lance' ? BJ.mSena(S.hands[mate]) : null) : BJ.bSena(S, mate); if (sn) { const [mx, my] = badgeXY(mate), tw = Math.max(118, sn.length * 7.4 + 56); pill(mx - tw / 2, my + 26, tw, 24, '#b98cff', `Seña: ${sn}`, 12.5, '#fff'); } }
     const by = S.phase === 'reveal' || S.phase === 'hand' ? (PORT ? H * 0.72 : H * 0.8) : v >= 0 ? handTop - 58 : H - 70;
     if (txt) { c.font = `800 16px ${FONT}`; const tw = c.measureText(txt).width + 36; ART.rr(c, CX - tw / 2, (PORT ? 178 : 112) - 17, tw, 34, 17); c.fillStyle = 'rgba(8,14,26,.8)'; c.fill(); label2(txt, CX, PORT ? 178 : 112, 16, '#fff'); }
     if (btns.length) {

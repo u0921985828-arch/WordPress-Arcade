@@ -48,8 +48,8 @@ const atk = (tm) => (tm === 0 ? 1 : -1); // sentido de ataque en x
 
 /* ---------------- Configuración por modo ---------------- */
 const M = {
-  futbol: { r: 11, br: 7, spd: 150, acc: 11, fr: 1.05, rest: 0.72, gw: 116, cut: 36, shot: [300, 700], pass: true },
-  hockey: { r: 11, br: 6, spd: 190, acc: 3.2, fr: 0.4, rest: 0.9, gw: 96, cut: 64, shot: [340, 780], pass: true, skate: true },
+  futbol: { r: 11, br: 7, spd: 150, acc: 11, fr: 1.05, rest: 0.72, gw: 100, cut: 36, shot: [280, 620], pass: true },
+  hockey: { r: 11, br: 6, spd: 190, acc: 3.2, fr: 0.4, rest: 0.9, gw: 88, cut: 64, shot: [320, 700], pass: true, skate: true },
   coches: { r: 16, br: 20, spd: 230, acc: 2, fr: 0.45, rest: 0.82, gw: 150, cut: 60, car: true },
   prisionero: { r: 11, br: 7, spd: 150, acc: 11, fr: 1.4, rest: 0.6, gw: 0, cut: 0 },
 }[MODE] || {};
@@ -148,7 +148,7 @@ function aiField(b, dt) {
     const foeAhead = foe && hyp(foe.x - b.x, foe.y - b.y) < 70 && (foe.x - b.x) * s > -5;
     if (b.chg >= 0) { b.chg += dt; if (b.chg >= b.chgT) { doShot(b, null, clamp(b.chg / 0.8, 0.35, 1)); b.chg = -1; } }
     else if (b.passReq > 0 && mate) { doPass(b, mate); b.passReq = 0; }
-    else if (dg < (MODE === 'hockey' ? 270 : 230) && Math.abs(b.y - FH / 2) < 150 && b.think <= 0) { b.chg = 0; b.chgT = lerp(0.2, 0.55, dg / 260) + k.rnd(0, 0.15); b.a = Math.atan2(FH / 2 - b.y, gx - b.x); }
+    else if (dg < (MODE === 'hockey' ? 240 : 200) && Math.abs(b.y - FH / 2) < 150 && b.think <= 0) { b.chg = 0; b.chgT = lerp(0.2, 0.55, dg / 260) + k.rnd(0, 0.15); b.a = Math.atan2(FH / 2 - b.y, gx - b.x); }
     else if (foeAhead && mate && b.think <= 0 && (mate.x - b.x) * s > -40 && !B.some((o) => o.team !== b.team && hyp(o.x - mate.x, o.y - mate.y) < 45) && Math.random() < 0.5 + skill * 0.4) { doPass(b, mate); }
     else { tx = gx; ty = FH / 2 + (b.y < FH / 2 ? -30 : 30); if (foeAhead) ty = b.y + (foe.y > b.y ? -90 : 90); }
     if (b.think <= 0) b.think = lerp(0.5, 0.15, skill);
@@ -160,7 +160,7 @@ function aiField(b, dt) {
       const lead = own ? 0.15 : clamp(hyp(ball.vx, ball.vy) / 600, 0, 0.5); tx = ball.x + ball.vx * lead; ty = ball.y + ball.vy * lead;
       if (own && own.team !== b.team && hyp(own.x - b.x, own.y - b.y) < 42 && b.cd <= 0 && Math.random() < dt * (2 + skill * 6)) { b.a = Math.atan2(own.y - b.y, own.x - b.x); tackle(b); }
       if (!own) { tx -= s * 6; } // se coloca un poco por detrás para empujar hacia delante
-    } else { const og = goalX(1 - b.team); tx = lerp(og, ball.x, 0.4) + s * 20; ty = lerp(FH / 2, ball.y, 0.5); run = 0.9; }
+    } else { const og = goalX(1 - b.team); tx = og + s * (26 + 0.14 * Math.abs(ball.x - og)); ty = clamp(lerp(FH / 2, ball.y + ball.vy * 0.2, 0.65), GY0 - 12, GY1 + 12); run = 1; } // portero: entre balón y portería
   }
   const dx = tx - b.x, dy = ty - b.y, d = hyp(dx, dy);
   return d > 6 ? { x: dx / d * Math.min(1, d / 30) * run, y: dy / d * Math.min(1, d / 30) * run, sp } : null;
@@ -221,10 +221,12 @@ function stepField(dt) {
     if (walls(ball, ball.r, M.rest) && hyp(ball.vx, ball.vy) > 120) { k.sfx('click'); }
     const v = hyp(ball.vx, ball.vy);
     for (const q of B) { if (q === ball.nt || q.st > 0) continue; const dx = ball.x - q.x, dy = ball.y - q.y, d = hyp(dx, dy);
-      if (d < M.r + ball.r + 3) {
+      const keeper = Math.abs(q.x - goalX(1 - q.team)) < 90 && q.y > GY0 - 30 && q.y < GY1 + 30, reach = M.r + ball.r + 3 + (keeper ? 9 + (q.ctl < 0 ? 5 * skill : 5) : 0); // el que guarda la portería llega más lejos (estirada)
+      if (d < reach) {
         const rel = hyp(ball.vx - q.vx, ball.vy - q.vy);
-        if (rel < (MODE === 'hockey' ? 330 : 280) || q.slide > 0) { ball.own = q; q.chg = -1; lastTouch = q; if (q.recv > 0) q.recv = 0; k.sfx('click'); break; }
-        const nx = dx / (d || 1), ny = dy / (d || 1), vn = ball.vx * nx + ball.vy * ny; if (vn < 0) { ball.vx -= 1.6 * vn * nx; ball.vy -= 1.6 * vn * ny; ball.vx *= 0.6; ball.vy *= 0.6; } ball.x = q.x + nx * (M.r + ball.r + 3); ball.y = q.y + ny * (M.r + ball.r + 3); lastTouch = q; k.sfx('hit');
+        if (keeper && d > M.r + ball.r + 3) { const [sx, sy] = V(q.x, q.y); k.float('¡Parada!', sx, sy - 20, TEAM[q.team].col); }
+        if (rel < (MODE === 'hockey' ? 330 : 280) * (keeper ? 1.6 : 1) || q.slide > 0) { ball.own = q; q.chg = -1; lastTouch = q; if (q.recv > 0) q.recv = 0; k.sfx('click'); break; }
+        const nx = dx / (d || 1), ny = dy / (d || 1), vn = ball.vx * nx + ball.vy * ny; if (vn < 0) { ball.vx -= 1.6 * vn * nx; ball.vy -= 1.6 * vn * ny; ball.vx *= 0.6; ball.vy *= 0.6; } ball.x = q.x + nx * reach; ball.y = q.y + ny * reach; lastTouch = q; k.sfx('hit');
       } }
     if (v < 0.5) { ball.vx = ball.vy = 0; }
   }
