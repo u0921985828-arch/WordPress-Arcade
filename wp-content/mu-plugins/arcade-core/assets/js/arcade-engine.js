@@ -127,16 +127,43 @@ const CSS = `
 .arcade-rotate i{width:44px;height:76px;border:4px solid currentColor;border-radius:10px;animation:arcade-rot 1.8s ease-in-out infinite}
 .arcade-rotate[data-want="portrait"] i{animation-direction:reverse}
 @keyframes arcade-rot{0%,25%{transform:rotate(0)}65%,100%{transform:rotate(-90deg)}}
-.arcade-pad{position:absolute;inset:auto 0 0 0;z-index:6;display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none;
-  padding:0 calc(14px + env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) calc(14px + env(safe-area-inset-left,0px))}
-.arcade-dpad{position:relative;width:clamp(116px,30vmin,168px);aspect-ratio:1;border-radius:50%;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.3);pointer-events:auto;touch-action:none}
-.arcade-dpad span{position:absolute;width:32%;height:32%;border-radius:6px;background:rgba(255,255,255,.18)}
-.arcade-dpad [data-dir=up]{top:4%;left:34%}.arcade-dpad [data-dir=down]{bottom:4%;left:34%}
-.arcade-dpad [data-dir=left]{left:4%;top:34%}.arcade-dpad [data-dir=right]{right:4%;top:34%}
+/* Mando virtual en su propia franja, fuera del juego: abajo en vertical, a los lados en horizontal.
+   El iframe se encoge y el juego se reescala dentro (sin tapar nada con los pulgares). */
+.arcade-player.has-pad{--pad-h:clamp(150px,25vh,220px);--pad-w:clamp(132px,20vw,200px);--dpad:clamp(118px,30vmin,164px);--abtn:clamp(58px,15vmin,76px);background:#0b0d12}
+.arcade-player.has-pad:not(.pad-side) iframe{height:calc(100% - var(--pad-h))}
+.arcade-player.has-pad:not(.pad-side) .arcade-bar{top:calc(100% - var(--pad-h) + 10px);right:50%;transform:translateX(50%)}
+.arcade-player.has-pad:not(.pad-side) .arcade-bar button{background:#1d2230;border-color:rgba(255,255,255,.1)}
+.arcade-player.has-pad.pad-side iframe{left:var(--pad-w);width:calc(100% - 2 * var(--pad-w))}
+.arcade-player.has-pad.pad-side{--dpad:min(calc(var(--pad-w) - 18px),42vh);--abtn:clamp(54px,15vh,70px)}
+.arcade-pad{position:absolute;inset:auto 0 0 0;height:var(--pad-h);z-index:6;display:flex;justify-content:space-between;align-items:center;pointer-events:none;box-sizing:border-box;
+  padding:0 calc(18px + env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) calc(18px + env(safe-area-inset-left,0px));
+  background:linear-gradient(180deg,#151924,#0b0d12);border-top:1px solid rgba(255,255,255,.07)}
+.pad-side .arcade-pad{inset:0;height:auto;padding:0;background:none;border:0}
+.pad-side .arcade-pad>*{width:var(--pad-w);display:flex;align-items:center;justify-content:center}
+.pad-side .arcade-pad::before,.pad-side .arcade-pad::after{content:"";position:absolute;top:0;bottom:0;width:var(--pad-w);background:linear-gradient(90deg,#151924,#0b0d12);z-index:-1}
+.pad-side .arcade-pad::before{left:0;border-right:1px solid rgba(255,255,255,.07)}
+.pad-side .arcade-pad::after{right:0;transform:scaleX(-1);border-right:1px solid rgba(255,255,255,.07)}
+.arcade-dpad{position:relative;width:var(--dpad);aspect-ratio:1;flex:none;border-radius:50%;background:radial-gradient(circle,#1d2230 0 30%,#171b26 31%);border:1px solid rgba(255,255,255,.12);box-shadow:0 6px 16px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.06);pointer-events:auto;touch-action:none}
+.pad-side .arcade-dpad{width:var(--dpad);flex:none}
+.arcade-dpad span{position:absolute;width:30%;height:30%;border-radius:8px;background:#2a3040;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.arcade-dpad span::after{content:"";position:absolute;inset:0;margin:auto;width:0;height:0;border:7px solid transparent}
+.arcade-dpad [data-dir=up]{top:6%;left:35%}.arcade-dpad [data-dir=down]{bottom:6%;left:35%}
+.arcade-dpad [data-dir=left]{left:6%;top:35%}.arcade-dpad [data-dir=right]{right:6%;top:35%}
+.arcade-dpad [data-dir=up]::after{border-bottom-color:#aab0bf;margin-top:18%}.arcade-dpad [data-dir=down]::after{border-top-color:#aab0bf;margin-bottom:18%}
+.arcade-dpad [data-dir=left]::after{border-right-color:#aab0bf;margin-left:18%}.arcade-dpad [data-dir=right]::after{border-left-color:#aab0bf;margin-right:18%}
+.arcade-dpad.h{aspect-ratio:auto;width:calc(var(--dpad) * 1.3);height:calc(var(--dpad) * .58);border-radius:999px;background:#171b26}
+.pad-side .arcade-dpad.h{width:var(--dpad);height:calc(var(--dpad) * .62)}
+.arcade-dpad.h [data-dir]{top:10%;height:80%;width:44%;border-radius:999px}
+.arcade-dpad.h [data-dir=left]{left:4%}.arcade-dpad.h [data-dir=right]{right:4%;left:auto}
+.arcade-dpad.h [data-dir=up],.arcade-dpad.h [data-dir=down]{display:none}
 .arcade-btns{display:flex;gap:14px;align-items:flex-end;pointer-events:auto}
-.arcade-btn{width:clamp(56px,15vmin,78px);aspect-ratio:1;border-radius:50%;border:2px solid rgba(255,255,255,.5);background:rgba(255,255,255,.14);color:#fff;font:800 1.15rem system-ui,sans-serif;touch-action:none}
-.arcade-btn[data-btn=a]{margin-bottom:30px}
-.arcade-dpad span.on,.arcade-btn.on{background:rgba(255,255,255,.5)}
+.pad-side .arcade-btns{flex-direction:column-reverse;align-items:center;gap:16px}
+.arcade-btn{width:var(--abtn);aspect-ratio:1;flex:none;border-radius:50%;border:1px solid rgba(255,255,255,.14);background:#2a3040;color:#e6e8ef;font:800 1.1rem system-ui,sans-serif;box-shadow:0 6px 14px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.1);touch-action:none;padding:0}
+.arcade-btn.lbl{font:700 .72rem/1.1 system-ui,sans-serif}
+.arcade-btn[data-btn=a]{background:#6e62f5;border-color:rgba(255,255,255,.2);color:#fff;box-shadow:0 6px 16px rgba(110,98,245,.35),inset 0 1px 0 rgba(255,255,255,.2)}
+.arcade-btns.two .arcade-btn[data-btn=a]{margin-bottom:30px}
+.pad-side .arcade-btns.two .arcade-btn[data-btn=a]{margin:0 0 0 22px}.pad-side .arcade-btns.two .arcade-btn[data-btn=b]{margin-right:22px}
+.arcade-dpad span.on{background:#6e62f5}.arcade-btn.on{filter:brightness(1.35);transform:scale(.94)}
 @media (prefers-reduced-motion:reduce){.arcade-rotate i{animation:none;transform:rotate(-90deg)}}
 `;
 
@@ -236,7 +263,10 @@ export class ArcadePlayer {
     addEventListener('message', (e) => {
       if (!this.iframe || e.source !== this.iframe.contentWindow || !e.data) return;
       if (e.data.type === 'arcade:restart') this._adBreak('next');
+      else if (e.data.type === 'arcade:pad') { this.padSpec = e.data.pad || false; this.gameAR = e.data.w / e.data.h || 0; this._dropPad(); this._syncPad(); }
     }, sig);
+    // Franja del mando: abajo si el reproductor es vertical, a los lados si es horizontal.
+    if (window.ResizeObserver) { this._ro = new ResizeObserver(() => this._padLayout()); this._ro.observe(this.root); }
     this._adBreak('start');
 
     this._syncPad();
@@ -250,6 +280,10 @@ export class ArcadePlayer {
     if (!this.mounted) return;
     this._releaseAll();
     this._ac?.abort();
+    this._ro?.disconnect();
+    this._dropPad();
+    this.padSpec = undefined;
+    this.gameAR = 0;
     if (this._isFs()) this.exitFullscreen();
     this._pseudoFs(false);
     if (this.iframe) {
@@ -376,37 +410,68 @@ export class ArcadePlayer {
 
   /* -------------------------------------------------------- Virtual pad */
 
+  /* El juego puede describir su mando con postMessage({type:'arcade:pad', pad}):
+     pad = false → sin mando (tiene sus propios controles táctiles);
+     pad = { d: '8'|'h'|'', a: 'Saltar', b: 'Espada', t: 1 } → cruceta de 8 vías, solo ← →, o ninguna;
+     botones A/B con su rótulo (sin clave = sin botón); t = mostrarlo aunque el juego sea táctil. */
   _needsPad() {
+    const s = this.padSpec;
+    if (s === false || (s && !s.d && !s.a && !s.b)) return false;
+    if (!inputMonitor.strictlyTouch) return false;
+    if (s?.t) return true;
     const i = this.cfg.inputs;
-    const needsKeys = !i.includes('touch') && (i.includes('keyboard') || i.includes('gamepad'));
-    return needsKeys && inputMonitor.strictlyTouch;
+    return !i.includes('touch') && (i.includes('keyboard') || i.includes('gamepad'));
   }
 
   _syncPad() {
     if (!this.mounted) return;
     const need = this._needsPad();
     if (need && !this.pad) this._buildPad();
-    else if (!need && this.pad) {
-      this._releaseAll();
-      this._padAc?.abort();
-      this.pad.remove();
-      this.pad = null;
-    }
+    else if (!need && this.pad) this._dropPad();
+  }
+
+  _dropPad() {
+    if (!this.pad) return;
+    this._releaseAll();
+    this._padAc?.abort();
+    this.pad.remove();
+    this.pad = null;
+    this.root.classList.remove('has-pad', 'pad-side');
+    this.root.style.removeProperty('--pad-w');
+    this.root.style.removeProperty('--pad-h');
+  }
+
+  _padLayout() {
+    if (!this.pad) return;
+    const r = this.root.getBoundingClientRect(), side = r.width > r.height * 1.05, ar = this.gameAR;
+    this.root.classList.toggle('pad-side', side);
+    // Si el juego avisa de su proporción, la franja aprovecha justo el margen que le sobra (con un mínimo cómodo).
+    const cl = (v, a, b) => Math.round(Math.max(a, Math.min(b, v)));
+    this.root.style.setProperty('--pad-w', ar && side ? cl((r.width - r.height * ar) / 2, 124, 200) + 'px' : '');
+    this.root.style.setProperty('--pad-h', ar && !side ? cl(r.height - r.width / ar, 150, 280) + 'px' : '');
   }
 
   _buildPad() {
     this._padAc = new AbortController();
     const opt = { passive: false, signal: this._padAc.signal };
+    const spec = this.padSpec || { d: '8', a: 'A', b: 'B' };
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+    const btn = (n) => spec[n] ? `<button type="button" class="arcade-btn${String(spec[n]).length > 1 ? ' lbl' : ''}" data-btn="${n}">${esc(spec[n])}</button>` : '';
+    const two = spec.a && spec.b;
     const pad = (this.pad = document.createElement('div'));
     pad.className = 'arcade-pad';
     pad.setAttribute('aria-hidden', 'true');
     pad.innerHTML =
-      '<div class="arcade-dpad"><span data-dir="up"></span><span data-dir="down"></span><span data-dir="left"></span><span data-dir="right"></span></div>' +
-      '<div class="arcade-btns"><button type="button" class="arcade-btn" data-btn="b">B</button><button type="button" class="arcade-btn" data-btn="a">A</button></div>';
+      '<div class="arcade-padl">' + (spec.d ? `<div class="arcade-dpad${spec.d === 'h' ? ' h' : ''}"><span data-dir="up"></span><span data-dir="down"></span><span data-dir="left"></span><span data-dir="right"></span></div>` : '') + '</div>' +
+      `<div class="arcade-padr"><div class="arcade-btns${two ? ' two' : ''}">${btn('b')}${btn('a')}</div></div>`;
     this.root.append(pad);
+    this.root.classList.add('has-pad');
+    this._padLayout();
 
     // D-pad: un único dedo, 8 direcciones, zona muerta central.
     const dpad = pad.querySelector('.arcade-dpad');
+    const onlyH = spec.d === 'h';
+    if (dpad) {
     const arms = Object.fromEntries([...dpad.children].map((s) => [s.dataset.dir, s]));
     let tid = null;
     let dirs = new Set();
@@ -419,6 +484,7 @@ export class ArcadePlayer {
       const r = dpad.getBoundingClientRect();
       const dx = t.clientX - (r.left + r.width / 2);
       const dy = t.clientY - (r.top + r.height / 2);
+      if (onlyH) return apply(new Set(Math.abs(dx) < r.width * 0.08 ? [] : [dx < 0 ? 'left' : 'right']));
       if (Math.hypot(dx, dy) < r.width * 0.14) return apply(new Set());
       apply(new Set(OCTANTS[Math.round(Math.atan2(dy, dx) / (Math.PI / 4))]));
     };
@@ -435,6 +501,7 @@ export class ArcadePlayer {
     const endD = (e) => { e.preventDefault(); if (find(e)) { tid = null; apply(new Set()); } };
     dpad.addEventListener('touchend', endD, opt);
     dpad.addEventListener('touchcancel', endD, opt);
+    }
 
     // Botones A/B: multitáctil, se liberan cuando se levanta el último dedo.
     for (const btn of pad.querySelectorAll('.arcade-btn')) {

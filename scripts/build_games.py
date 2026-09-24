@@ -99,21 +99,41 @@ G = {
  'home-run-derby': ('homerun', dict()), 'reflex-grid': ('whack', dict()),
 }
 
+# Mando del portal en pantallas táctiles (se coloca fuera del lienzo). d: '8' cruceta, 'h' solo ← →, '' sin cruceta;
+# a/b: rótulo del botón (sin clave = sin botón); t: 1 = mostrarlo aunque el juego también se maneje tocando.
+D8 = dict(d='8')
+PAD = {
+    'rock-belt': dict(d='8', a='Fuego', b='Salto'), 'starfall-defender': D8, 'bullet-rain': D8,
+    'pixel-invaders': dict(d='h', a='Fuego'), 'lunar-lander': dict(d='h', a='Motor'),
+    'tank-duel': dict(d='8', a='Fuego'), 'dungeon-micro': D8, 'zombie-siege': D8,
+    'crypt-crawler': dict(d='8', a='Golpe'), 'hero-brawl': dict(d='8', a='Golpe'),
+    'slime-arena': dict(d='8', t=1), 'maze-muncher': dict(d='8', t=1), 'iso-maze': dict(d='8', t=1),
+    'frog-crossing': dict(d='8', t=1), 'crystal-labyrinth': dict(d='8', t=1),
+    'neon-trails': D8, 'territory': D8, 'tunnel-digger': D8, 'iso-dungeon-explorer': dict(d='8', a='Tajo'),
+    'cave-flyer': dict(d='', a='Subir'), 'barrel-climb': dict(d='8', a='Saltar'),
+    'pixel-dash': dict(d='h', a='Saltar'), 'wall-jumper': dict(d='h', a='Saltar'), 'robo-rescue': dict(d='h', a='Saltar'),
+    'blade-leap': dict(d='h', a='Saltar', b='Espada'), 'castle-knight': dict(d='h', a='Saltar', b='Espada'),
+    'shadow-dash': dict(d='h', a='Saltar', b='Sprint'), 'grapple-hook': dict(d='h', a='Saltar', b='Gancho'),
+    'canyon-kart': D8, 'low-poly-skater': dict(d='h', a='Saltar'), 'drone-flight': D8,
+}
+
 TPL = '''<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{title}</title></head>
-<body><script>window.CFG={cfg};</script><script src="../_lib/kit.js?v=7"></script>{deps}<script src="../_lib/{eng}.js?v={ev}"></script></body></html>
+<body><script>window.CFG={cfg};</script><script src="../_lib/kit.js?v=8"></script>{deps}<script src="../_lib/{eng}.js?v={ev}"></script></body></html>
 '''
 
 def main():
     titles = {wx.slugify(it[0]): it[0] for items in wx.CATALOG.values() for it in items}
     missing = [s for s in titles if s not in G and s not in STANDALONE]
     extra = [s for s in G if s not in titles]
+    if set(PAD) - set(G): sys.exit(f'PAD sin juego: {set(PAD) - set(G)}')
     if missing or extra: sys.exit(f'Faltan: {missing}  Sobran: {extra}')
     lib = GAMES_DIR / '_lib'; lib.mkdir(parents=True, exist_ok=True)
     engines = sorted({e for e, _ in G.values()} | {d for e, _ in G.values() for d in deps_of(e)})
     for e in engines: shutil.copy(ENG_DIR / f'{e}.js', lib / f'{e}.js')
     for slug, (eng, cfg) in G.items():
         cfg = dict(cfg); cfg.setdefault('help', ''); cfg['title'] = titles[slug]; cfg['id'] = slug
+        if slug in PAD: cfg['pad'] = PAD[slug]
         d = GAMES_DIR / slug; d.mkdir(parents=True, exist_ok=True)
         (d / 'index.html').write_text(TPL.format(title=titles[slug], cfg=json.dumps(cfg, ensure_ascii=False), eng=eng, ev=hashlib.md5((ENG_DIR / f'{eng}.js').read_bytes()).hexdigest()[:8], deps=''.join(f'<script src="../_lib/{d}.js?v=7"></script>' for d in deps_of(eng))), encoding='utf-8')
     total = len([p for p in GAMES_DIR.iterdir() if (p / 'index.html').exists()])

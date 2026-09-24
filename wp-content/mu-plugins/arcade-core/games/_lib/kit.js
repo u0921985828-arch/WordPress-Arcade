@@ -146,6 +146,8 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-acti
     addEventListener('message', (e) => { const d = e.data; if (!d || e.source !== parent) return;
       if (d.type === 'arcade:pause') { setPause(true); if (AC) AC.suspend(); }
       else if (d.type === 'arcade:resume') { if (AC) AC.resume(); } });
+    /* Mando del portal: el juego describe qué controles necesita (se colocan fuera del lienzo). */
+    if (window.CFG && 'pad' in window.CFG) tell('arcade:pad', { pad: window.CFG.pad, w, h });
     k.hide = () => ov.classList.add('hide');
     k.best = (id, score) => {
       let b = 0; try { b = +localStorage.getItem('best:' + id) || 0; if (score > b) { b = score; localStorage.setItem('best:' + id, b); } } catch (e) { b = Math.max(b, score); }

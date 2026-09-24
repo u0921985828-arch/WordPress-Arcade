@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **100 juegos propios** (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Subdominio temporal: **falta dominio propio** y cambiar el título "My Blog".
-- Versión actual del plugin: **1.15.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.16.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -72,8 +72,9 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
 - Deportes, 3D y arcade (fase 5): `road` (carretera pintada de lejos a cerca con niebla, semáforo, rivales que esquivan; lanes con filas regeneradas y carril libre garantizado), `stack`, `marble` (agujeros solo si el BFS mantiene la meta alcanzable, 3 canicas), `cube` (bloque 3D real; generador sin salida de emergencia, verificado con 5000 niveles), `drone`, `planet`, `golf` (vista previa, búnkeres, tarjeta de 9 hoyos), `penalty` (efecto y portero con alcance limitado), `bowling` (física bola/bolos, marcador oficial), `hoop` (red con muelles, aro móvil en racha), `darts` (sugerencia de cierre), `pool` (bola fantasma, bandeja), `rhythm` (multitoque, valoraciones), `homerun`, `whack`, `paddle` (saque alterno en ping pong), `breakout` (4 diseños, subpasos), `lander` (plataforma plana completa, x3), `missile` (MIRV desde oleada 3).
 - `platform.js` (barrel-climb vigas, escaleras ↑↓ y barriles con aros; ninja-ascent con doble salto y pinchos sobre ruta garantizada; cloud-hopper y lava-escape con generación infinita, nubes/salientes especiales y lava animada).
 - Lienzo adaptable: `td`, `tactics` y `lander` eligen disposición vertical si `innerHeight > innerWidth` (recargan al girar fuera de partida); en el catálogo van con orientación `auto` y `fill` (`adaptive_games()` migra las entradas ya publicadas). `golf` reserva franja superior (`TOPR`) y `paddle` deja 40 px libres arriba para pausa/sonido.
-- Caché de motores: `?v=` = hash md5 del motor (automático en build_games.py); `kit.js` (v=7) y `art.js` (v=7) siguen con `?v=N` manual.
+- Caché de motores: `?v=` = hash md5 del motor (automático en build_games.py); `kit.js` (v=8) y `art.js` (v=7) siguen con `?v=N` manual.
 - kit.js ↔ reproductor (postMessage): el juego envía `arcade:start|restart|over`; el reproductor envía `arcade:pause|resume` (anuncios). `arcade:restart` lanza `adBreak('next')` y montar el juego `adBreak('start')` si H5 Games Ads está activo.
+- **Mando fuera del lienzo (1.16)**: el mando virtual del reproductor (`arcade-engine.js`, solo en pantallas táctiles puras) va en su propia franja: abajo en vertical, columnas a los lados en horizontal (`.has-pad`, `.pad-side`); el iframe se encoge y el juego se reescala. Cada juego describe su mando con `CFG.pad` (mapa `PAD` en build_games.py): `d` '8'|'h'|'' (cruceta, solo ← →, ninguna), `a`/`b` rótulo del botón, `t:1` mostrarlo aunque el juego sea táctil; `pad:false` lo quita (tetra maratón, que tiene botones propios). kit.js lo envía con `arcade:pad {pad,w,h}` y el reproductor ajusta el ancho/alto de la franja al margen sobrante.
 - Todos los motores cargan `art.js` (`deps_of` en build_games.py).
 
 Todos los motores generados están rehechos con arte ART.
