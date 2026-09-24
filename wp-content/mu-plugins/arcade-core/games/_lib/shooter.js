@@ -85,7 +85,7 @@ function diff() { return M === 'vertical' ? Math.min(1, pt / 315) : ease(Math.mi
 function msg(txt) { banner = txt; bannerT = 1.8; }
 function spawnWave() {
   wave++; foes = []; calm = wave === 1 ? 5 : 2;
-  if (M === 'invaders') { const rows = 5, cols = 9; for (let r = 0; r < rows; r++) for (let i = 0; i < cols; i++) foes.push({ x: 50 + i * 42, y: 60 + r * 30, r: 12, hp: 1, pts: [30, 20, 20, 10, 10][r], kind: r < 1 ? 1 : r < 3 ? 0 : 2 }); dirX = 1; if (wave === 1) makeBunkers(); msg(`Oleada ${wave}`); }
+  if (M === 'invaders') { const rows = 5, cols = 9; for (let r = 0; r < rows; r++) for (let i = 0; i < cols; i++) foes.push({ x: 50 + i * 42, y: 60 + r * 30, r: 12, hp: 1, pts: [30, 20, 20, 10, 10][r], kind: r < 1 ? 1 : r < 3 ? 0 : 2, fr: 0 }); dirX = 1; if (wave === 1) makeBunkers(); msg(`Oleada ${wave}`); }
   if (M === 'centipede') { if (wave === 1) { mush = []; for (let i = 0; i < 34; i++) mush.push({ x: k.ri(1, 16) * 20 + 10, y: k.ri(3, 25) * 20 + 10, hp: 3 }); } for (let i = 0; i < Math.min(25, 9 + wave * 2); i++) foes.push({ x: 10 - i * 20, y: 30, r: 9, hp: 1, pts: i === 0 ? 100 : 20, dir: 1, seg: true, head: i === 0 }); msg(`Oleada ${wave}`); }
   if (M === 'bullethell' || (M === 'vertical' && wave % 3 === 0)) { const hp = M === 'bullethell' ? 112 + wave * 40 : 32 + wave * 10; foes.push({ x: W / 2, y: -60, ty: 110, r: 30, hp, max: hp, pts: 500 * wave, boss: true, a: 0, phase: 1 }); msg(M === 'bullethell' ? `Jefe ${wave}` : '¡Jefe!'); }
   else if (M === 'vertical') msg(`Oleada ${wave}`);
@@ -121,8 +121,8 @@ k.run((dt) => {
     if (!ufo && Math.random() < dt * 0.06) ufo = { x: -30, y: 34, vx: 90, pts: k.pick([50, 100, 150, 300]) };
     if (ufo) { ufo.x += ufo.vx * dt; if (ufo.x > W + 40) ufo = null; }
     for (const s of shots) { if (ufo && !s.dead && Math.abs(s.x - ufo.x) < 18 && Math.abs(s.y - ufo.y) < 10) { s.dead = true; score += ufo.pts; k.float(`+${ufo.pts}`, ufo.x, ufo.y, '#e9b949'); k.burst(ufo.x, ufo.y, '#f0647e', 24); k.sfx('coin'); ufo = null; }
-      for (const b of bunkers) if (!b.dead && !s.dead && s.x > b.x - 1 && s.x < b.x + 6 && s.y > b.y && s.y < b.y + 6) { b.dead = true; s.dead = true; } }
-    for (const e of eb) for (const b of bunkers) if (!b.dead && !e.dead && e.x > b.x - 2 && e.x < b.x + 7 && e.y > b.y && e.y < b.y + 6) { b.dead = true; e.dead = true; k.burst(e.x, e.y, '#4cc38a', 3, 60); }
+      for (const b of bunkers) if (!b.dead && !s.dead && s.x > b.x - 1 && s.x < b.x + 6 && s.y < b.y + 6 && s.y + 560 * dt > b.y) { b.dead = true; s.dead = true; } } /* barrido: a 560 px/s la bala avanza más que una celda por fotograma */
+    for (const e of eb) for (const b of bunkers) if (!b.dead && !e.dead && e.x > b.x - 2 && e.x < b.x + 7 && e.y > b.y && e.y - e.vy * dt < b.y + 6) { b.dead = true; e.dead = true; k.burst(e.x, e.y, '#4cc38a', 3, 60); }
     for (const f of foes) for (const b of bunkers) if (!b.dead && Math.abs(f.x - b.x) < 14 && Math.abs(f.y - b.y) < 10) b.dead = true;
     bunkers = bunkers.filter((b) => !b.dead);
   } else if (M === 'vertical') {
