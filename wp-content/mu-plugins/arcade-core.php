@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Arcade Core
  * Description: CPT "game", taxonomías, meta de juego y reproductor lazy para el portal arcade.
- * Version:     1.14.0
+ * Version:     1.15.0
  * Author:      Arcade Team
  *
  * Instalar: copiar este archivo + la carpeta /arcade-core/ en wp-content/mu-plugins/.
@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
 
 final class Arcade_Core {
 
-	const VERSION      = '1.14.0';
+	const VERSION      = '1.15.0';
 	const ORIENTATIONS = array( 'portrait', 'landscape', 'auto' );
 	const RATIOS       = array( '16:9', '4:3', '1:1', 'fill' );
 	const ENGINES      = array( 'canvas', 'phaser', 'threejs', 'godot_web', 'construct' );
@@ -181,15 +181,16 @@ final class Arcade_Core {
 		}
 		self::ensure_home_page();
 		self::adaptive_games();
+		delete_transient( 'arcade_index' );
 		flush_rewrite_rules( false );
 		update_option( 'arcade_core_version', self::VERSION, false );
 	}
 
 	/** Juegos que ya eligen lienzo vertical u horizontal según la pantalla: sin forzar orientación. */
 	private static function adaptive_games() {
-		foreach ( array( 'lunar-lander', 'tower-guard', 'maze-defense', 'hex-defense', 'micro-tactics', 'hex-skirmish' ) as $slug ) {
+		foreach ( array( 'lunar-lander', 'tower-guard', 'maze-defense', 'hex-defense', 'micro-tactics', 'hex-skirmish', 'serpent-grid', 'neon-paddle', 'rock-belt' ) as $slug ) {
 			$p = get_page_by_path( $slug, OBJECT, 'game' );
-			if ( $p && 'landscape' === get_post_meta( $p->ID, '_game_orientation', true ) ) {
+			if ( $p && 'fill' !== get_post_meta( $p->ID, '_game_aspect_ratio', true ) ) {
 				update_post_meta( $p->ID, '_game_orientation', 'auto' );
 				update_post_meta( $p->ID, '_game_aspect_ratio', 'fill' );
 			}
@@ -380,7 +381,7 @@ final class Arcade_Core {
 			esc_attr( get_post_meta( $post_id, '_game_input_methods', true ) ),
 			esc_attr( get_the_title( $post_id ) ),
 			$style,
-			esc_html__( 'Jugar', 'arcade' )
+			'<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>' . esc_html__( 'Jugar', 'arcade' )
 		);
 	}
 

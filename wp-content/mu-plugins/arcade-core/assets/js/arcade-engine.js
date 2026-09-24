@@ -32,6 +32,13 @@ const OCTANTS = {
   4: ['left'], '-4': ['left'], '-3': ['left', 'up'], '-2': ['up'], '-1': ['up', 'right'],
 };
 
+const svg = (d) => `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">${d}</svg>`;
+const PLAY_ICON = svg('<path d="M8 5v14l11-7z" fill="currentColor"/>');
+const ICONS = {
+  fs: svg('<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'),
+  close: svg('<path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>'),
+};
+
 const mq = (q) => window.matchMedia ? window.matchMedia(q) : { matches: false, addEventListener() {} };
 const isEditable = (el) => !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
 
@@ -107,11 +114,11 @@ const CSS = `
 .arcade-player{--arcade-ratio:16/9;position:relative;width:100%;max-width:1280px;margin:0 auto 1.5rem;background:#000 center/cover no-repeat;aspect-ratio:var(--arcade-ratio);overflow:hidden;border-radius:10px;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 .arcade-player[data-aspect="fill"]{aspect-ratio:auto;height:100vh;height:100dvh}
 .arcade-player iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:#000}
-.arcade-play{position:absolute;inset:0;margin:auto;width:fit-content;height:fit-content;padding:.85em 1.7em;font:700 1.1rem/1 system-ui,sans-serif;color:#fff;background:rgba(0,0,0,.7);border:2px solid #fff;border-radius:999px;cursor:pointer}
+.arcade-play{position:absolute;inset:0;margin:auto;width:fit-content;height:fit-content;display:inline-flex;align-items:center;gap:.5em;padding:.85em 1.7em;font:700 1.1rem/1 system-ui,sans-serif;color:#fff;background:rgba(0,0,0,.7);border:2px solid #fff;border-radius:999px;cursor:pointer}
 .arcade-play:focus-visible,.arcade-bar button:focus-visible{outline:3px solid #ffd400;outline-offset:3px}
 .arcade-player.is-mounted .arcade-play{display:none}
 .arcade-bar{position:absolute;z-index:7;top:calc(8px + env(safe-area-inset-top,0px));right:calc(8px + env(safe-area-inset-right,0px));display:flex;gap:6px}
-.arcade-bar button{min-width:40px;height:40px;padding:0 10px;font:600 .85rem system-ui,sans-serif;color:#fff;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.35);border-radius:8px;cursor:pointer}
+.arcade-bar button{display:grid;place-items:center;min-width:40px;height:40px;padding:0 10px;font:600 .85rem system-ui,sans-serif;color:#fff;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.35);border-radius:8px;cursor:pointer}
 .arcade-player.is-pseudo-fs{position:fixed;inset:0;z-index:2147483000;width:100vw;height:100vh;height:100dvh;max-width:none;margin:0;border-radius:0;aspect-ratio:auto}
 .arcade-player:fullscreen{width:100%;height:100%;max-width:none;border-radius:0;aspect-ratio:auto}
 .arcade-player:-webkit-full-screen{width:100%;height:100%;max-width:none;border-radius:0;aspect-ratio:auto}
@@ -175,7 +182,7 @@ export class ArcadePlayer {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'arcade-play';
-    b.textContent = 'Play / Jugar';
+    b.innerHTML = PLAY_ICON + 'Jugar';
     this.root.append(b);
     return b;
   }
@@ -225,6 +232,13 @@ export class ArcadePlayer {
     document.addEventListener('visibilitychange', () => { if (document.hidden) this._releaseAll(); }, sig);
     addEventListener('pagehide', () => this.unmount(), sig);
 
+    // Pausas publicitarias (Ad Placement API de AdSense, si el portal la activa).
+    addEventListener('message', (e) => {
+      if (!this.iframe || e.source !== this.iframe.contentWindow || !e.data) return;
+      if (e.data.type === 'arcade:restart') this._adBreak('next');
+    }, sig);
+    this._adBreak('start');
+
     this._syncPad();
     this._checkOrientation();
 
@@ -260,14 +274,14 @@ export class ArcadePlayer {
     const mk = (label, aria, fn) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.textContent = label;
+      b.innerHTML = label;
       b.setAttribute('aria-label', aria);
       b.addEventListener('click', fn, { signal: this._ac.signal });
       bar.append(b);
       return b;
     };
-    this.fsBtn = mk('⛶', 'Pantalla completa', () => (this._isFs() ? this.exitFullscreen() : this.enterFullscreen()));
-    mk('✕', 'Cerrar juego', () => this.unmount());
+    this.fsBtn = mk(ICONS.fs, 'Pantalla completa', () => (this._isFs() ? this.exitFullscreen() : this.enterFullscreen()));
+    mk(ICONS.close, 'Cerrar juego', () => this.unmount());
     this.root.append(bar);
   }
 
@@ -277,8 +291,8 @@ export class ArcadePlayer {
     r.setAttribute('role', 'status');
     r.dataset.want = this.cfg.orientation;
     const txt = this.cfg.orientation === 'portrait'
-      ? 'Gira el dispositivo a vertical / Rotate to portrait'
-      : 'Gira el dispositivo a horizontal / Rotate to landscape';
+      ? 'Gira el móvil a vertical'
+      : 'Gira el móvil a horizontal';
     r.innerHTML = `<i aria-hidden="true"></i><p>${txt}</p>`;
     this.root.append(r);
   }
@@ -297,25 +311,27 @@ export class ArcadePlayer {
   /* ---------------------------------------------------------- Fullscreen */
 
   _isFs() {
-    return !!(document.fullscreenElement || document.webkitFullscreenElement) || this.root.classList.contains('is-pseudo-fs');
+    return this.root.classList.contains('is-pseudo-fs');
   }
 
+  /* La pantalla completa real se pide sobre <html> y el reproductor ocupa la ventana:
+     así los anuncios intersticiales (que se pintan en el documento) siguen siendo visibles. */
   async enterFullscreen() {
-    const el = this.root;
-    const req = el.requestFullscreen || el.webkitRequestFullscreen || el.webkitRequestFullScreen;
-    if (req) {
-      try {
-        await req.call(el, { navigationUI: 'hide' });
-        await this._lockOrientation();
-        return;
-      } catch { /* iOS iPhone o rechazo → pseudo-fullscreen */ }
-    }
     this._pseudoFs(true);
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen || el.webkitRequestFullScreen;
+    if (!req) return; // iPhone: se queda en pseudo-pantalla completa
+    try {
+      await req.call(el, { navigationUI: 'hide' });
+      this._realFs = true;
+      await this._lockOrientation();
+    } catch { /* rechazo → pseudo-pantalla completa */ }
   }
 
   async exitFullscreen() {
     try { screen.orientation?.unlock?.(); } catch { /* noop */ }
-    if (this.root.classList.contains('is-pseudo-fs')) return this._pseudoFs(false);
+    this._realFs = false;
+    this._pseudoFs(false);
     const exit = document.exitFullscreen || document.webkitExitFullscreen || document.webkitCancelFullScreen;
     if (exit && (document.fullscreenElement || document.webkitFullscreenElement)) {
       try { await exit.call(document); } catch { /* noop */ }
@@ -331,12 +347,31 @@ export class ArcadePlayer {
   _pseudoFs(on) {
     this.root.classList.toggle('is-pseudo-fs', on);
     document.documentElement.style.overflow = on ? 'hidden' : '';
-    this._onFsChange();
+    if (this.fsBtn) this.fsBtn.setAttribute('aria-pressed', String(on));
+    this._checkOrientation();
   }
 
   _onFsChange() {
+    // Salida con Esc / gesto del sistema: se quita también el modo ventana.
+    if (this._realFs && !(document.fullscreenElement || document.webkitFullscreenElement)) { this._realFs = false; this._pseudoFs(false); return; }
     if (this.fsBtn) this.fsBtn.setAttribute('aria-pressed', String(this._isFs()));
     this._checkOrientation();
+  }
+
+  /* ------------------------------------------------------ Publicidad */
+
+  /** Pide una pausa publicitaria; AdSense decide si la muestra (frecuencia, relleno). */
+  _adBreak(type) {
+    if (typeof window.adBreak !== 'function') return;
+    const say = (t) => { try { this.iframe?.contentWindow?.postMessage({ type: t }, this.targetOrigin); } catch { /* noop */ } };
+    try {
+      window.adBreak({
+        type,
+        name: 'arcade-' + type,
+        beforeAd: () => { this._releaseAll(); say('arcade:pause'); },
+        afterAd: () => { say('arcade:resume'); try { this.iframe?.contentWindow?.focus(); } catch { /* noop */ } },
+      });
+    } catch { /* noop */ }
   }
 
   /* -------------------------------------------------------- Virtual pad */

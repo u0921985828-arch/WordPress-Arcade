@@ -7,7 +7,23 @@ if ( is_tax( 'game_genre' ) ) {
 } elseif ( is_singular( 'game' ) ) {
 	$current = Arcade_Portal::genre_of( get_queried_object_id() );
 }
-$all_url = get_post_type_archive_link( 'game' );
+$all_url  = get_post_type_archive_link( 'game' );
+$mine_url = add_query_arg( 'mis', 1, $all_url );
+$ad       = static function ( $where ) { return class_exists( 'Arcade_SEO' ) ? Arcade_SEO::ad_block( $where ) : ''; };
+$ico      = array(
+	'play'   => '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>',
+	'home'   => '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V20h-5v-5H9v5H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>',
+	'grid'   => '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>',
+	'search' => '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+	'star'   => '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>',
+	'heart'  => '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 21s-7.5-4.6-10-9.2C.3 8.4 2.2 4.5 6 4.5c2.2 0 3.6 1.3 4.3 2.4h1.4c.7-1.1 2.1-2.4 4.3-2.4 3.8 0 5.7 3.9 4 7.3C19.5 16.4 12 21 12 21z" fill="currentColor"/></svg>',
+	'fav'    => '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="m12 3 2.8 5.8 6.2.9-4.5 4.4 1 6.3L12 17.5 6.5 20.4l1-6.3L3 9.7l6.2-.9z" fill="currentColor"/></svg>',
+	'share'  => '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M18 8a3 3 0 1 0-2.8-4l-7 4a3 3 0 1 0 0 4.2l7 4A3 3 0 1 0 16 14l-7-4a3 3 0 0 0 0-.2l7-4A3 3 0 0 0 18 8z" fill="currentColor"/></svg>',
+	'arrow'  => '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+);
+$sec_head = static function ( $title, $url = '', $count = 0 ) use ( $ico ) {
+	printf( '<div class="ax-sec-h"><h2><span class="ax-dot"></span>%s%s</h2>%s</div>', esc_html( $title ), $count ? ' <small>' . (int) $count . '</small>' : '', $url ? '<a href="' . esc_url( $url ) . '">Ver todos' . $ico['arrow'] . '</a>' : '' ); // phpcs:ignore
+};
 ?><!doctype html>
 <html <?php language_attributes(); ?>>
 <head>
@@ -18,69 +34,105 @@ $all_url = get_post_type_archive_link( 'game' );
 </head>
 <body <?php body_class( 'ax' ); ?>>
 <?php wp_body_open(); ?>
+<a class="ax-skip" href="#ax-main">Saltar al contenido</a>
 <header class="ax-top">
 	<div class="ax-wrap ax-bar">
 		<a class="ax-logo" href="<?php echo esc_url( home_url( '/' ) ); ?>"><svg class="ax-mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="8" fill="var(--acc)"/><path d="M12 10.5v11l9-5.5z" fill="#fff"/></svg><span><?php echo esc_html( $brand ); ?></span></a>
-		<form class="ax-search" role="search" action="<?php echo esc_url( home_url( '/' ) ); ?>">
-			<input type="search" name="s" placeholder="Buscar juegos…" value="<?php echo esc_attr( get_search_query() ); ?>" aria-label="Buscar juegos">
+		<form class="ax-search" role="search" action="<?php echo esc_url( home_url( '/' ) ); ?>" data-ax-search>
+			<input type="search" name="s" placeholder="Buscar entre <?php echo (int) wp_count_posts( 'game' )->publish; ?> juegos…" value="<?php echo esc_attr( get_search_query() ); ?>" aria-label="Buscar juegos" autocomplete="off" enterkeyhint="search">
 			<input type="hidden" name="post_type" value="game">
+			<div class="ax-sugg" role="listbox" hidden></div>
 		</form>
+		<a class="ax-mine" href="<?php echo esc_url( $mine_url ); ?>"><?php echo $ico['star']; // phpcs:ignore ?><span>Mis juegos</span></a>
 	</div>
-	<nav class="ax-wrap ax-chips" aria-label="Géneros">
+	<nav class="ax-wrap ax-chips" aria-label="Categorías">
 		<a class="<?php echo ( ! $current && is_front_page() ) ? 'on' : ''; ?>" href="<?php echo esc_url( home_url( '/' ) ); ?>">Inicio</a>
 		<?php foreach ( Arcade_Portal::LABELS as $slug => $l ) : $u = Arcade_Portal::genre_url( $slug ); if ( ! $u ) { continue; } ?>
 			<a class="<?php echo $current === $slug ? 'on' : ''; ?>" style="--c:<?php echo esc_attr( $l[1] ); ?>" href="<?php echo esc_url( $u ); ?>"><span class="ax-dot"></span><?php echo esc_html( $l[0] ); ?></a>
 		<?php endforeach; ?>
 	</nav>
 </header>
-<main class="ax-wrap ax-main">
+<main id="ax-main" class="ax-wrap ax-main">
 <?php
 /* ------------------------------------------------------------ Ficha de juego */
 if ( is_singular( 'game' ) ) :
 	the_post();
-	$pid = get_the_ID();
-	$g   = Arcade_Portal::genre_of( $pid );
-	$l   = Arcade_Portal::LABELS[ $g ];
-	?>
-	<article class="ax-game">
-		<a class="ax-crumb" style="--c:<?php echo esc_attr( $l[1] ); ?>" href="<?php echo esc_url( Arcade_Portal::genre_url( $g ) ); ?>"><span class="ax-dot"></span><?php echo esc_html( $l[0] ); ?></a>
-		<h1><?php the_title(); ?></h1>
-		<div class="ax-game-g"><div class="ax-stage"><?php echo Arcade_Core::player_html( $pid ); // phpcs:ignore ?></div>
-		<aside class="ax-side">
-		<div class="ax-stats"><div><strong data-ax-plays><?php echo esc_html( Arcade_Social::fmt( get_post_meta( $pid, '_game_plays', true ) ) ); ?></strong><span>partidas</span></div><div><strong><?php echo esc_html( Arcade_Social::fmt( get_post_meta( $pid, '_game_likes', true ) ) ); ?></strong><span>me gusta</span></div></div>
-		<div class="ax-actions"><button type="button" class="ax-act" data-ax-like><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 21s-7.5-4.6-10-9.2C.3 8.4 2.2 4.5 6 4.5c2.2 0 3.6 1.3 4.3 2.4h1.4c.7-1.1 2.1-2.4 4.3-2.4 3.8 0 5.7 3.9 4 7.3C19.5 16.4 12 21 12 21z" fill="currentColor"/></svg><b data-n="<?php echo (int) get_post_meta( $pid, '_game_likes', true ); ?>">Me gusta</b></button><button type="button" class="ax-act" data-ax-fav><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="m12 3 2.8 5.8 6.2.9-4.5 4.4 1 6.3L12 17.5 6.5 20.4l1-6.3L3 9.7l6.2-.9z" fill="currentColor"/></svg><b>Favorito</b></button><button type="button" class="ax-act" data-ax-share><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M18 8a3 3 0 1 0-2.8-4l-7 4a3 3 0 1 0 0 4.2l7 4A3 3 0 1 0 16 14l-7-4a3 3 0 0 0 0-.2l7-4A3 3 0 0 0 18 8z" fill="currentColor"/></svg><b>Compartir</b></button></div>
-		<div class="ax-chiprow"><?php echo Arcade_Portal::inputs_chips( $pid ); // phpcs:ignore ?></div>
-		<?php $how = Arcade_Portal::howto( $pid ); if ( $how ) : ?>
-			<div class="ax-how"><h2>Cómo se juega</h2><p><?php echo esc_html( $how ); ?></p></div>
-		<?php endif; ?>
-		<div class="ax-desc">
-			<?php
-			if ( Arcade_Portal::is_own( $pid ) ) {
-				echo Arcade_Portal::own_desc( $pid ); // phpcs:ignore
-			} else {
-				$GLOBALS['arcade_no_inject'] = true;
-				echo apply_filters( 'the_content', get_the_content() ); // phpcs:ignore
-				$GLOBALS['arcade_no_inject'] = false;
-			}
-			?>
-		</div></aside></div>
-	</article>
-	<?php echo class_exists( 'Arcade_SEO' ) ? Arcade_SEO::ad_block( 'game' ) : ''; // phpcs:ignore ?>
-	<?php
-	$rel = Arcade_Portal::games( array( 'post__not_in' => array( $pid ), 'numberposts' => 12, 'orderby' => 'rand', 'tax_query' => array( array( 'taxonomy' => 'game_genre', 'field' => 'slug', 'terms' => $g ) ) ) );
+	$pid   = get_the_ID();
+	$g     = Arcade_Portal::genre_of( $pid );
+	$l     = Arcade_Portal::LABELS[ $g ];
+	$plays = (int) get_post_meta( $pid, '_game_plays', true );
+	$likes = (int) get_post_meta( $pid, '_game_likes', true );
+	$rel   = Arcade_Portal::games( array( 'post__not_in' => array( $pid ), 'numberposts' => 12, 'orderby' => 'rand', 'tax_query' => array( array( 'taxonomy' => 'game_genre', 'field' => 'slug', 'terms' => $g ) ) ) );
 	usort( $rel, static function ( $a, $b ) { return (int) Arcade_Portal::is_own( $a->ID ) - (int) Arcade_Portal::is_own( $b->ID ); } );
-	if ( $rel ) :
-		?>
-		<section class="ax-sec"><div class="ax-sec-h"><h2>Más de <?php echo esc_html( $l[0] ); ?></h2><a href="<?php echo esc_url( Arcade_Portal::genre_url( $g ) ); ?>">Ver todos →</a></div>
-		<div class="ax-grid"><?php foreach ( $rel as $p ) { echo Arcade_Portal::card( $p ); } // phpcs:ignore ?></div></section>
+	?>
+	<article class="ax-game" style="--c:<?php echo esc_attr( $l[1] ); ?>">
+		<div class="ax-game-g">
+			<div class="ax-game-main">
+				<div class="ax-stage"><?php echo Arcade_Core::player_html( $pid ); // phpcs:ignore ?></div>
+				<div class="ax-gbar">
+					<div class="ax-gtitle">
+						<a class="ax-crumb" href="<?php echo esc_url( Arcade_Portal::genre_url( $g ) ); ?>"><span class="ax-dot"></span><?php echo esc_html( $l[0] ); ?></a>
+						<h1><?php the_title(); ?></h1>
+						<p class="ax-gmeta"><span data-ax-plays-wrap<?php echo $plays < 10 ? ' hidden' : ''; ?>><b data-ax-plays><?php echo esc_html( Arcade_Social::fmt( $plays ) ); ?></b> partidas</span><?php if ( $likes > 0 ) : ?><span><b><?php echo esc_html( Arcade_Social::fmt( $likes ) ); ?></b> me gusta</span><?php endif; ?><span>Gratis · sin descargas</span></p>
+					</div>
+					<div class="ax-actions">
+						<button type="button" class="ax-act" data-ax-like aria-label="Me gusta"><?php echo $ico['heart']; // phpcs:ignore ?><b data-n="<?php echo (int) $likes; ?>">Me gusta</b></button>
+						<button type="button" class="ax-act" data-ax-fav aria-label="Añadir a favoritos"><?php echo $ico['fav']; // phpcs:ignore ?><b>Favorito</b></button>
+						<button type="button" class="ax-act" data-ax-share aria-label="Compartir"><?php echo $ico['share']; // phpcs:ignore ?><b>Compartir</b></button>
+					</div>
+				</div>
+				<?php $how = Arcade_Portal::howto( $pid ); ?>
+				<section class="ax-how">
+					<h2>Cómo se juega</h2>
+					<?php if ( $how ) : ?><p><?php echo esc_html( $how ); ?></p><?php endif; ?>
+					<div class="ax-chiprow"><?php echo Arcade_Portal::inputs_chips( $pid ); // phpcs:ignore ?></div>
+				</section>
+				<?php echo $ad( 'game' ); // phpcs:ignore ?>
+				<section class="ax-desc">
+					<h2>Sobre el juego</h2>
+					<?php
+					if ( Arcade_Portal::is_own( $pid ) ) {
+						echo Arcade_Portal::own_desc( $pid ); // phpcs:ignore
+					} else {
+						$GLOBALS['arcade_no_inject'] = true;
+						echo apply_filters( 'the_content', get_the_content() ); // phpcs:ignore
+						$GLOBALS['arcade_no_inject'] = false;
+					}
+					?>
+				</section>
+			</div>
+			<aside class="ax-side">
+				<?php echo $ad( 'side' ); // phpcs:ignore ?>
+				<?php if ( $rel ) : ?>
+					<div class="ax-side-list"><h2>Similares</h2><?php foreach ( array_slice( $rel, 0, 6 ) as $p ) { echo Arcade_Portal::mini( $p ); } // phpcs:ignore ?></div>
+				<?php endif; ?>
+			</aside>
+		</div>
+	</article>
+	<?php if ( count( $rel ) > 6 ) : ?>
+		<section class="ax-sec" style="--c:<?php echo esc_attr( $l[1] ); ?>"><?php $sec_head( 'Más de ' . $l[0], Arcade_Portal::genre_url( $g ) ); ?>
+		<div class="ax-row"><?php foreach ( array_slice( $rel, 6 ) as $p ) { echo Arcade_Portal::card( $p ); } // phpcs:ignore ?></div></section>
 	<?php endif; ?>
 	<?php
-	$other = Arcade_Portal::games( array( 'post__not_in' => array( $pid ), 'numberposts' => 8, 'orderby' => 'rand', 'tax_query' => array( array( 'taxonomy' => 'game_genre', 'field' => 'slug', 'terms' => $g, 'operator' => 'NOT IN' ) ) ) );
+	$other = Arcade_Portal::games( array( 'post__not_in' => array( $pid ), 'numberposts' => 10, 'orderby' => 'rand', 'tax_query' => array( array( 'taxonomy' => 'game_genre', 'field' => 'slug', 'terms' => $g, 'operator' => 'NOT IN' ) ) ) );
 	if ( $other ) :
 		?>
-		<section class="ax-sec"><div class="ax-sec-h"><h2>También te puede gustar</h2></div>
+		<section class="ax-sec"><?php $sec_head( 'También te puede gustar' ); ?>
 		<div class="ax-grid"><?php foreach ( $other as $p ) { echo Arcade_Portal::card( $p ); } // phpcs:ignore ?></div></section>
 	<?php endif; ?>
+
+<?php
+/* ------------------------------------------------------- 404 */
+elseif ( is_404() ) :
+	$sug = Arcade_Portal::picks( Arcade_Portal::games(), 10 );
+	?>
+	<section class="ax-404">
+		<span class="ax-kicker">Error 404</span>
+		<h1>Esta página no existe</h1>
+		<p>Puede que el enlace haya cambiado. Busca un juego o prueba uno de estos.</p>
+		<div class="ax-cta"><a class="ax-btn" href="<?php echo esc_url( home_url( '/' ) ); ?>">Ir al inicio</a><a class="ax-btn ghost" href="<?php echo esc_url( $all_url ); ?>">Ver todos los juegos</a></div>
+	</section>
+	<div class="ax-grid"><?php foreach ( $sug as $p ) { echo Arcade_Portal::card( $p ); } // phpcs:ignore ?></div>
 
 <?php
 /* ------------------------------------------------------ Páginas de texto */
@@ -88,34 +140,68 @@ elseif ( is_page() && ! has_shortcode( (string) get_post_field( 'post_content', 
 	the_post();
 	?>
 	<article class="ax-page"><h1><?php the_title(); ?></h1><div class="ax-prose"><?php the_content(); ?></div></article>
+
+<?php
+/* ------------------------------------------------------ Mis juegos (en el navegador) */
+elseif ( is_post_type_archive( 'game' ) && ! empty( $_GET['mis'] ) ) : // phpcs:ignore
+	?>
+	<header class="ax-head" style="--c:#e9b949"><div><span class="ax-kicker">Guardado en este dispositivo</span><h1>Mis juegos</h1><p>Tus favoritos y los últimos juegos que has abierto. No hace falta registrarse.</p></div></header>
+	<section class="ax-sec" data-ax-favs data-grid hidden><?php $sec_head( 'Favoritos' ); ?><div class="ax-grid"></div></section>
+	<section class="ax-sec" data-ax-recent data-grid hidden><?php $sec_head( 'Jugados recientemente' ); ?><div class="ax-grid"></div></section>
+	<p class="ax-empty" data-ax-none>Aún no tienes juegos guardados. Pulsa <b>Favorito</b> en la ficha de un juego para tenerlo siempre a mano.<br><a href="<?php echo esc_url( $all_url ); ?>">Explorar juegos</a></p>
+
 <?php
 /* ------------------------------------------------------------- Listados */
 elseif ( is_tax() || is_post_type_archive( 'game' ) || is_search() ) :
+	$desc = '';
+	$kick = 'Catálogo';
 	if ( is_search() ) {
-		$h = 'Resultados para «' . get_search_query() . '»';
-		$c = '';
+		$h    = 'Resultados para «' . get_search_query() . '»';
+		$c    = '';
+		$kick = 'Búsqueda';
 	} elseif ( is_tax( 'game_genre' ) ) {
 		$slug = get_queried_object()->slug;
-		$l    = Arcade_Portal::LABELS[ $slug ] ?? array( single_term_title( '', false ), '#5ce1e6', '🎮' );
-		$h    = $l[0];
+		$l    = Arcade_Portal::LABELS[ $slug ] ?? array( single_term_title( '', false ), '#6e62f5', '' );
+		$h    = 'Juegos de ' . ( '3D' === $l[0] ? '3D' : strtolower( $l[0] ) );
 		$c    = $l[1];
+		$desc = Arcade_Portal::GENRE_DESC[ $slug ] ?? '';
+		$kick = 'Categoría';
 	} elseif ( is_tax() ) {
 		$h = single_term_title( '', false );
 		$c = '';
 	} elseif ( ! empty( $_GET['exclusivos'] ) ) { // phpcs:ignore
-		$h = 'Exclusivos';
-		$c = '#6e62f5';
+		$h    = 'Exclusivos';
+		$c    = '#6e62f5';
+		$desc = 'Juegos desarrollados desde cero para este portal, con arte y sonido propios.';
 	} else {
-		$h = 'Todos los juegos';
-		$c = '';
+		$h    = 'Todos los juegos';
+		$c    = '';
+		$desc = 'Arcade, puzzle, plataformas, cartas, 3D y deportes. Todos gratis, sin descargas ni registro, en móvil y ordenador.';
 	}
 	global $wp_query;
 	?>
-	<div class="ax-head" style="--c:<?php echo esc_attr( $c ?: '#6e62f5' ); ?>"><h1><?php echo $c ? '<span class="ax-dot"></span>' : ''; echo esc_html( $h ); ?></h1><p><?php echo (int) $wp_query->post_count; ?> juegos</p></div>
+	<header class="ax-head" style="--c:<?php echo esc_attr( $c ?: '#6e62f5' ); ?>">
+		<div><span class="ax-kicker"><?php echo esc_html( $kick ); ?></span><h1><?php echo esc_html( $h ); ?></h1><p><?php echo $desc ? esc_html( $desc ) . ' ' : ''; ?><b><?php echo (int) $wp_query->post_count; ?> juegos</b></p></div>
+		<?php if ( $wp_query->post_count > 6 && ! is_search() ) : ?>
+			<div class="ax-sort" role="group" aria-label="Ordenar"><button type="button" class="on" data-sort="pop">Populares</button><button type="button" data-sort="az">A-Z</button><button type="button" data-sort="new">Nuevos</button></div>
+		<?php endif; ?>
+	</header>
 	<?php if ( have_posts() ) : ?>
-		<div class="ax-grid"><?php while ( have_posts() ) { the_post(); echo Arcade_Portal::card( get_post() ); } // phpcs:ignore ?></div>
+		<div class="ax-grid" data-ax-sortable>
+			<?php
+			$i = 0;
+			while ( have_posts() ) {
+				the_post();
+				echo Arcade_Portal::card( get_post() ); // phpcs:ignore
+				if ( 0 === ++$i % 15 && $i < $wp_query->post_count ) {
+					echo $ad( 'feed' ); // phpcs:ignore
+				}
+			}
+			?>
+		</div>
 	<?php else : ?>
-		<p class="ax-empty">No hay juegos que coincidan. <a href="<?php echo esc_url( $all_url ); ?>">Ver todos</a></p>
+		<div class="ax-empty"><p>No hay juegos que coincidan.</p><a class="ax-btn ghost" href="<?php echo esc_url( $all_url ); ?>">Ver todos los juegos</a></div>
+		<div class="ax-grid"><?php foreach ( Arcade_Portal::picks( Arcade_Portal::games(), 10 ) as $p ) { echo Arcade_Portal::card( $p ); } // phpcs:ignore ?></div>
 	<?php endif; ?>
 
 <?php
@@ -125,40 +211,81 @@ else :
 	if ( ! $all ) {
 		echo '<p class="ax-empty">Todavía no hay juegos. Importa arcade_pilot_100.xml en Herramientas → Importar → WordPress.</p>';
 	} else {
-		$playable = array_values( array_filter( $all, static function ( $p ) { return '' !== Arcade_Core::resolve_embed( $p->ID ); } ) );
-		$pro      = array_values( array_filter( $playable, static function ( $p ) { return ! Arcade_Portal::is_own( $p->ID ); } ) );
-		$pool     = $pro ?: ( $playable ?: $all );
-		$feat     = $pool[ ( (int) gmdate( 'z' ) ) % count( $pool ) ]; // juego destacado del día
-		$fg       = Arcade_Portal::LABELS[ Arcade_Portal::genre_of( $feat->ID ) ];
+		$picks = Arcade_Portal::picks( $all, 5 );
+		$pick_ids = wp_list_pluck( $picks, 'ID' );
 		?>
-		<section class="ax-hero" style="--c:<?php echo esc_attr( $fg[1] ); ?>">
-			<a class="ax-hero-img" href="<?php echo esc_url( get_permalink( $feat ) ); ?>"><img src="<?php echo esc_url( Arcade_Core::thumb( $feat->ID, 'large' ) ); ?>" alt=""></a>
-			<div class="ax-hero-txt">
-				<span class="ax-kicker">Juego del día</span>
-				<h1><?php echo esc_html( get_the_title( $feat ) ); ?></h1>
-				<p><?php echo esc_html( get_the_excerpt( $feat ) ?: ( count( $all ) . ' juegos gratis, sin descargas, en móvil y PC.' ) ); ?></p>
-				<div class="ax-cta"><a class="ax-btn" href="<?php echo esc_url( get_permalink( $feat ) ); ?>"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>Jugar ahora</a><a class="ax-btn ghost" href="<?php echo esc_url( get_post_type_archive_link( 'game' ) ); ?>">Ver catálogo</a></div>
+		<h1 class="ax-sr"><?php echo esc_html( $brand ); ?>: juegos gratis online</h1>
+		<?php if ( $picks ) : ?>
+		<section class="ax-hero" data-ax-carousel aria-roledescription="carrusel" aria-label="Destacados de hoy">
+			<div class="ax-slides">
+				<?php foreach ( $picks as $i => $p ) : $pl = Arcade_Portal::LABELS[ Arcade_Portal::genre_of( $p->ID ) ]; $th = Arcade_Core::thumb( $p->ID, 'large' ); ?>
+				<article class="ax-slide" style="--c:<?php echo esc_attr( $pl[1] ); ?>" aria-label="<?php echo (int) ( $i + 1 ) . ' de ' . count( $picks ); ?>">
+					<img class="ax-slide-bg" src="<?php echo esc_url( $th ); ?>" alt="" aria-hidden="true"<?php echo $i ? ' loading="lazy"' : ' fetchpriority="high"'; ?>>
+					<a class="ax-slide-img" href="<?php echo esc_url( get_permalink( $p ) ); ?>" tabindex="-1"><img src="<?php echo esc_url( $th ); ?>" alt="<?php echo esc_attr( get_the_title( $p ) ); ?>"<?php echo $i ? ' loading="lazy"' : ''; ?>></a>
+					<div class="ax-slide-txt">
+						<span class="ax-kicker"><?php echo $i ? 'Destacado' : 'Juego del día'; ?> · <?php echo esc_html( $pl[0] ); ?></span>
+						<h2><?php echo esc_html( get_the_title( $p ) ); ?></h2>
+						<p><?php echo esc_html( Arcade_Portal::blurb( $p->ID ) ); ?></p>
+						<div class="ax-cta"><a class="ax-btn" href="<?php echo esc_url( get_permalink( $p ) ); ?>"><?php echo $ico['play']; // phpcs:ignore ?>Jugar ahora</a></div>
+					</div>
+				</article>
+				<?php endforeach; ?>
+			</div>
+			<div class="ax-dots" role="tablist"><?php foreach ( $picks as $i => $p ) { printf( '<button type="button" role="tab" aria-label="Destacado %1$d"%2$s></button>', (int) $i + 1, $i ? '' : ' aria-selected="true"' ); } ?></div>
+		</section>
+		<?php endif; ?>
+
+		<section class="ax-sec ax-cats" aria-label="Categorías">
+			<div class="ax-tiles">
+			<?php
+			$groups = array_fill_keys( array_keys( Arcade_Portal::LABELS ), array() );
+			$own    = array();
+			foreach ( $all as $p ) {
+				$groups[ Arcade_Portal::genre_of( $p->ID ) ][] = $p;
+				if ( Arcade_Portal::is_own( $p->ID ) ) {
+					$own[] = $p;
+				}
+			}
+			foreach ( $groups as $slug => $items ) :
+				$u = Arcade_Portal::genre_url( $slug );
+				if ( ! $items || ! $u ) {
+					continue;
+				}
+				$l    = Arcade_Portal::LABELS[ $slug ];
+				$imgs = array();
+				foreach ( $items as $p ) {
+					$t = Arcade_Core::thumb( $p->ID );
+					if ( $t ) {
+						$imgs[] = $t;
+					}
+					if ( count( $imgs ) >= 3 ) {
+						break;
+					}
+				}
+				?>
+				<a class="ax-tile" href="<?php echo esc_url( $u ); ?>" style="--c:<?php echo esc_attr( $l[1] ); ?>">
+					<span class="ax-tile-imgs" aria-hidden="true"><?php foreach ( $imgs as $t ) { echo '<img src="' . esc_url( $t ) . '" alt="" loading="lazy" decoding="async">'; } ?></span>
+					<b><?php echo esc_html( $l[0] ); ?></b><small><?php echo count( $items ); ?> juegos</small>
+				</a>
+			<?php endforeach; ?>
 			</div>
 		</section>
-		<?php
-		?>
-		<section class="ax-sec" data-ax-recent hidden><div class="ax-sec-h"><h2>Seguir jugando</h2></div><div class="ax-row"></div></section>
-		<section class="ax-sec" data-ax-favs hidden><div class="ax-sec-h"><h2>Tus favoritos</h2></div><div class="ax-row"></div></section>
+
+		<section class="ax-sec" data-ax-recent hidden><?php $sec_head( 'Seguir jugando', $mine_url ); ?><div class="ax-row"></div></section>
+		<section class="ax-sec" data-ax-favs hidden style="--c:#e9b949"><?php $sec_head( 'Tus favoritos', $mine_url ); ?><div class="ax-row"></div></section>
 		<?php
 		$top = get_posts( array( 'post_type' => 'game', 'numberposts' => 12, 'meta_key' => '_game_plays', 'orderby' => 'meta_value_num', 'order' => 'DESC', 'meta_query' => array( array( 'key' => '_game_plays', 'value' => 0, 'compare' => '>', 'type' => 'NUMERIC' ) ) ) );
-		if ( count( $top ) >= 4 ) :
+		if ( count( $top ) >= 6 ) :
 			?>
-			<section class="ax-sec"><div class="ax-sec-h"><h2>Más jugados</h2></div><div class="ax-row ax-rank"><?php foreach ( $top as $i => $p ) { echo '<div class="ax-rk"><span>' . ( $i + 1 ) . '</span>' . Arcade_Portal::card( $p ) . '</div>'; } // phpcs:ignore ?></div></section>
+			<section class="ax-sec"><?php $sec_head( 'Los más jugados' ); ?><div class="ax-row ax-rank"><?php foreach ( $top as $i => $p ) { echo '<div class="ax-rk"><span>' . ( $i + 1 ) . '</span>' . Arcade_Portal::card( $p ) . '</div>'; } // phpcs:ignore ?></div></section>
+			<?php
+		else :
+			$rec = array_values( array_filter( $all, static function ( $p ) use ( $pick_ids ) { return ! in_array( $p->ID, $pick_ids, true ); } ) );
+			usort( $rec, static function ( $a, $b ) { $d = gmdate( 'Y-m-d' ) . 'r'; return crc32( $d . $a->post_name ) <=> crc32( $d . $b->post_name ); } );
+			?>
+			<section class="ax-sec"><?php $sec_head( 'Recomendados hoy' ); ?><div class="ax-row"><?php foreach ( array_slice( $rec, 0, 12 ) as $p ) { echo Arcade_Portal::card( $p ); } // phpcs:ignore ?></div></section>
 			<?php
 		endif;
-		$groups = array_fill_keys( array_keys( Arcade_Portal::LABELS ), array() );
-		$own    = array();
-		foreach ( $all as $p ) {
-			$groups[ Arcade_Portal::genre_of( $p->ID ) ][] = $p;
-			if ( Arcade_Portal::is_own( $p->ID ) ) {
-				$own[] = $p;
-			}
-		}
 		// Primero los juegos de redes profesionales (mejor acabado); los propios tienen su fila "Exclusivos".
 		$mixed = count( $own ) < count( $all );
 		foreach ( $groups as &$items ) {
@@ -168,25 +295,33 @@ else :
 		if ( $mixed && $own ) :
 			shuffle( $own );
 			?>
-			<section class="ax-sec" style="--c:#f2d15c">
-				<div class="ax-sec-h"><h2><span class="ax-dot"></span>Exclusivos <small><?php echo count( $own ); ?></small></h2><a href="<?php echo esc_url( add_query_arg( 'exclusivos', 1, get_post_type_archive_link( 'game' ) ) ); ?>">Ver todos →</a></div>
+			<section class="ax-sec" style="--c:#6e62f5"><?php $sec_head( 'Exclusivos', add_query_arg( 'exclusivos', 1, $all_url ), count( $own ) ); ?>
 				<div class="ax-row"><?php foreach ( array_slice( $own, 0, 12 ) as $p ) { echo Arcade_Portal::card( $p ); } // phpcs:ignore ?></div>
 			</section>
 			<?php
 		endif;
+		$n = 0;
 		foreach ( $groups as $slug => $items ) :
 			if ( ! $items ) {
 				continue;
 			}
 			$l = Arcade_Portal::LABELS[ $slug ];
+			if ( in_array( ++$n, array( 3, 6 ), true ) ) {
+				echo $ad( 'home' ); // phpcs:ignore
+			}
 			?>
-			<?php if ( 2 === ( $sec_i = ( $sec_i ?? 0 ) + 1 ) && class_exists( 'Arcade_SEO' ) ) { echo Arcade_SEO::ad_block( 'home' ); } // phpcs:ignore ?>
-			<section class="ax-sec" style="--c:<?php echo esc_attr( $l[1] ); ?>">
-				<div class="ax-sec-h"><h2><span class="ax-dot"></span><?php echo esc_html( $l[0] ); ?> <small><?php echo count( $items ); ?></small></h2><a href="<?php echo esc_url( Arcade_Portal::genre_url( $slug ) ); ?>">Ver todos →</a></div>
+			<section class="ax-sec" style="--c:<?php echo esc_attr( $l[1] ); ?>"><?php $sec_head( $l[0], Arcade_Portal::genre_url( $slug ), count( $items ) ); ?>
 				<div class="ax-row"><?php foreach ( array_slice( $items, 0, 12 ) as $p ) { echo Arcade_Portal::card( $p ); } // phpcs:ignore ?></div>
 			</section>
 			<?php
 		endforeach;
+		?>
+		<section class="ax-about">
+			<h2>Juegos gratis online, sin descargas</h2>
+			<p><?php echo esc_html( $brand ); ?> reúne <?php echo count( $all ); ?> juegos HTML5 que se abren al instante en el navegador del móvil, la tablet o el ordenador. No hay que instalar nada ni crear una cuenta: eliges un juego y a jugar.</p>
+			<p>Cada juego exclusivo está hecho desde cero con arte, música y efectos propios, y lo probamos en móvil y en escritorio. Los puzles tienen niveles con solución garantizada y los clásicos de cartas y tablero siguen sus reglas de siempre. Tus récords y favoritos se guardan en tu dispositivo.</p>
+		</section>
+		<?php
 	}
 endif;
 ?>
@@ -195,8 +330,14 @@ endif;
 	<div><a class="ax-logo" href="<?php echo esc_url( home_url( '/' ) ); ?>"><svg class="ax-mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="8" fill="var(--acc)"/><path d="M12 10.5v11l9-5.5z" fill="#fff"/></svg><span><?php echo esc_html( $brand ); ?></span></a>
 	<p>Juegos HTML5 gratuitos para móvil, tablet y ordenador. Sin descargas ni registro.</p></div>
 	<div><h3>Categorías</h3><ul><?php foreach ( Arcade_Portal::LABELS as $slug => $l ) { $u = Arcade_Portal::genre_url( $slug ); if ( $u ) { printf( '<li><a href="%s">%s</a></li>', esc_url( $u ), esc_html( $l[0] ) ); } } ?></ul></div>
-	<div><h3>Portal</h3><ul><li><a href="<?php echo esc_url( get_post_type_archive_link( 'game' ) ); ?>">Todos los juegos</a></li><?php if ( class_exists( 'Arcade_SEO' ) ) { foreach ( Arcade_SEO::legal_links() as $lk ) { printf( '<li><a href="%s">%s</a></li>', esc_url( $lk[1] ), esc_html( $lk[0] ) ); } } ?></ul></div>
+	<div><h3>Portal</h3><ul><li><a href="<?php echo esc_url( $all_url ); ?>">Todos los juegos</a></li><li><a href="<?php echo esc_url( $mine_url ); ?>">Mis juegos</a></li><?php if ( class_exists( 'Arcade_SEO' ) ) { foreach ( Arcade_SEO::legal_links() as $lk ) { printf( '<li><a href="%s">%s</a></li>', esc_url( $lk[1] ), esc_html( $lk[0] ) ); } } ?><li><button type="button" class="ax-linkbtn" data-ax-consent hidden>Preferencias de privacidad</button></li></ul></div>
 </div><div class="ax-wrap ax-copy">© <?php echo esc_html( gmdate( 'Y' ) . ' ' . $brand ); ?>. Todos los derechos reservados.</div></footer>
+<nav class="ax-tabbar" aria-label="Navegación principal">
+	<a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="<?php echo is_front_page() ? 'on' : ''; ?>"><?php echo $ico['home']; // phpcs:ignore ?><span>Inicio</span></a>
+	<a href="<?php echo esc_url( $all_url ); ?>" class="<?php echo ( is_post_type_archive( 'game' ) && empty( $_GET['mis'] ) ) || is_tax() ? 'on' : ''; // phpcs:ignore ?>"><?php echo $ico['grid']; // phpcs:ignore ?><span>Explorar</span></a>
+	<button type="button" data-ax-find><?php echo $ico['search']; // phpcs:ignore ?><span>Buscar</span></button>
+	<a href="<?php echo esc_url( $mine_url ); ?>" class="<?php echo ! empty( $_GET['mis'] ) ? 'on' : ''; // phpcs:ignore ?>"><?php echo $ico['star']; // phpcs:ignore ?><span>Mis juegos</span></a>
+</nav>
 <?php wp_footer(); ?>
 </body>
 </html>

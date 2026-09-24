@@ -21,11 +21,67 @@ final class Arcade_Portal {
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ), 20 );
 		add_action( 'pre_get_posts', array( __CLASS__, 'query' ) );
 		add_filter( 'document_title_parts', array( __CLASS__, 'title' ) );
+		add_action( 'init', array( __CLASS__, 'manifest' ), 1 );
+		add_action( 'wp_head', array( __CLASS__, 'head_icons' ), 3 );
+	}
+
+	/** Descripción de cada categoría (cabecera del listado y SEO). */
+	const GENRE_DESC = array(
+		'arcade'         => 'Clásicos de reflejos y puntuación: naves, laberintos, serpientes y bloques. Partidas rápidas para batir tu récord.',
+		'puzzle'         => 'Rompecabezas de lógica con niveles que siempre tienen solución: 2048, gemas, tuberías, sudoku, nonogramas y más.',
+		'platformer'     => 'Salta, esquiva y corre por niveles dibujados a mano: plataformas laterales, torres verticales y mazmorras.',
+		'strategy-cards' => 'Solitarios con las reglas de siempre, mahjong, damas, reversi, defensa de torres y tácticas por turnos.',
+		'3d-webgl'       => 'Carreras, minigolf, laberintos isométricos y cubos en perspectiva que funcionan en cualquier navegador.',
+		'sports-casual'  => 'Penaltis, bolos, billar, dardos, baloncesto y ritmo: deportes de un toque para partidas cortas.',
+	);
+
+	/* ------------------------------------------------------------ PWA */
+
+	/** /manifest.webmanifest: el portal se puede instalar como app en el móvil. */
+	public static function manifest() {
+		$path = wp_parse_url( isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '', PHP_URL_PATH ); // phpcs:ignore
+		if ( '/manifest.webmanifest' !== $path ) {
+			return;
+		}
+		$img = plugins_url( 'assets/img/', __FILE__ );
+		header( 'Content-Type: application/manifest+json; charset=utf-8' );
+		header( 'Cache-Control: public, max-age=86400' );
+		echo wp_json_encode( array(
+			'name'             => self::brand() . ' — Juegos gratis',
+			'short_name'       => self::brand(),
+			'description'      => 'Juegos HTML5 gratis para móvil y PC, sin descargas.',
+			'lang'             => 'es',
+			'start_url'        => home_url( '/?pwa=1' ),
+			'scope'            => home_url( '/' ),
+			'display'          => 'standalone',
+			'background_color' => '#0b0d12',
+			'theme_color'      => '#0b0d12',
+			'icons'            => array(
+				array( 'src' => $img . 'icon-192.png', 'sizes' => '192x192', 'type' => 'image/png' ),
+				array( 'src' => $img . 'icon-512.png', 'sizes' => '512x512', 'type' => 'image/png' ),
+				array( 'src' => $img . 'icon-maskable.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'maskable' ),
+			),
+		), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+		exit;
+	}
+
+	public static function head_icons() {
+		if ( ! self::is_portal() ) {
+			return;
+		}
+		echo '<link rel="manifest" href="' . esc_url( home_url( '/manifest.webmanifest' ) ) . '">' . "\n";
+		if ( ! has_site_icon() ) {
+			$img = plugins_url( 'assets/img/', __FILE__ );
+			printf( '<link rel="icon" href="%1$sicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="%1$sicon-192.png">' . "\n", esc_url( $img ) );
+		}
 	}
 
 	public static function is_portal() {
 		if ( is_admin() ) {
 			return false;
+		}
+		if ( is_404() ) {
+			return true;
 		}
 		if ( is_singular( 'game' ) || is_post_type_archive( 'game' ) || is_tax( array( 'game_genre', 'game_tag', 'control_profile' ) ) ) {
 			return true;
@@ -71,6 +127,10 @@ final class Arcade_Portal {
 		if ( $q->is_search() && 'game' === $q->get( 'post_type' ) ) {
 			$q->set( 'posts_per_page', 60 );
 		}
+		// Búsqueda desde la cabecera sin tipo: solo juegos.
+		if ( $q->is_search() && ! $q->get( 'post_type' ) ) {
+			$q->set( 'post_type', 'game' );
+		}
 	}
 
 	public static function title( $parts ) {
@@ -104,7 +164,7 @@ final class Arcade_Portal {
 		$thumb = Arcade_Core::thumb( $post->ID );
 		$ok    = '' !== Arcade_Core::resolve_embed( $post->ID );
 		return sprintf(
-			'<a class="ax-card%1$s%2$s" href="%3$s" style="--c:%4$s">%10$s<span class="ax-img">%5$s%9$s</span><span class="ax-meta"><b>%6$s</b><i><span class="ax-dot"></span>%8$s</i></span></a>',
+			'<a class="ax-card%1$s%2$s" href="%3$s" style="--c:%4$s" data-t="%11$s" data-p="%12$d" data-d="%13$d">%10$s<span class="ax-img">%5$s%9$s</span><span class="ax-meta"><b>%6$s</b><i><span class="ax-dot"></span>%8$s</i></span></a>',
 			$big ? ' big' : '',
 			$ok ? '' : ' soon',
 			esc_url( get_permalink( $post ) ),
@@ -114,8 +174,55 @@ final class Arcade_Portal {
 			esc_html( $l[2] ),
 			esc_html( $l[0] ),
 			$ok ? '<span class="ax-play" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></span>' : '<span class="ax-soon">Próximamente</span>',
-			self::is_own( $post->ID ) && self::has_imports() ? '<span class="ax-excl">Exclusivo</span>' : ''
+			self::is_own( $post->ID ) && self::has_imports() ? '<span class="ax-excl">Exclusivo</span>' : '',
+			esc_attr( remove_accents( strtolower( get_the_title( $post ) ) ) ),
+			(int) get_post_meta( $post->ID, '_game_plays', true ),
+			(int) get_post_time( 'U', true, $post )
 		);
+	}
+
+	/** Tarjeta compacta (lista lateral de similares). */
+	public static function mini( $post ) {
+		$l = self::LABELS[ self::genre_of( $post->ID ) ];
+		$t = Arcade_Core::thumb( $post->ID );
+		return sprintf( '<a class="ax-mini" href="%1$s" style="--c:%2$s"><span class="ax-mini-img">%3$s</span><span><b>%4$s</b><i><span class="ax-dot"></span>%5$s</i></span></a>',
+			esc_url( get_permalink( $post ) ), esc_attr( $l[1] ), $t ? '<img src="' . esc_url( $t ) . '" alt="" loading="lazy" decoding="async">' : '', esc_html( get_the_title( $post ) ), esc_html( $l[0] ) );
+	}
+
+	/** Texto corto para destacados: la ayuda del juego o el extracto. */
+	public static function blurb( $post_id ) {
+		$t = self::howto( $post_id ) ?: wp_strip_all_tags( get_the_excerpt( $post_id ) );
+		return wp_trim_words( $t, 26, '…' );
+	}
+
+	/** Selección del día (estable durante el día, rota cada día), un juego por categoría. */
+	public static function picks( $all, $n = 5 ) {
+		$day  = gmdate( 'Y-m-d' );
+		$pool = array_values( array_filter( $all, static function ( $p ) { return '' !== Arcade_Core::resolve_embed( $p->ID ) && Arcade_Core::thumb( $p->ID ); } ) );
+		usort( $pool, static function ( $a, $b ) use ( $day ) { return crc32( $day . $a->post_name ) <=> crc32( $day . $b->post_name ); } );
+		$out  = array();
+		$seen = array();
+		foreach ( $pool as $p ) {
+			$g = self::genre_of( $p->ID );
+			if ( isset( $seen[ $g ] ) ) {
+				continue;
+			}
+			$seen[ $g ] = 1;
+			$out[]      = $p;
+			if ( count( $out ) >= $n ) {
+				break;
+			}
+		}
+		// Si hay menos categorías que huecos, se completa con el resto del orden del día.
+		foreach ( $pool as $p ) {
+			if ( count( $out ) >= $n ) {
+				break;
+			}
+			if ( ! in_array( $p, $out, true ) ) {
+				$out[] = $p;
+			}
+		}
+		return $out;
 	}
 
 	public static function has_imports() {
@@ -176,14 +283,11 @@ final class Arcade_Portal {
 				return (string) $cfg['help'];
 			}
 		}
-		$fallback = array(
-			'serpent-grid' => 'Desliza o usa las flechas para girar la serpiente. Come la comida para crecer y no choques contigo mismo.',
-			'neon-paddle'  => 'Arrastra o usa ↑ ↓ para mover tu pala. Gana el primero en llegar a 7 puntos.',
-			'rock-belt'    => 'Gira y acelera la nave, dispara a los asteroides y esquiva los fragmentos.',
-			'tetra-drop'   => 'Mueve y gira las piezas para completar líneas. Desliza abajo para dejarlas caer.',
-			'tetra-drop-marathon' => 'Modo maratón: empiezas más rápido. Completa líneas sin llegar arriba.',
-		);
-		return $fallback[ get_post_field( 'post_name', $post_id ) ] ?? '';
+		static $texts = null;
+		if ( null === $texts ) {
+			$texts = (array) include dirname( __FILE__ ) . '/howto-texts.php';
+		}
+		return $texts[ get_post_field( 'post_name', $post_id ) ] ?? '';
 	}
 
 	public static function inputs_chips( $post_id ) {

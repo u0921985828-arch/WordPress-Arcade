@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **100 juegos propios** (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Subdominio temporal: **falta dominio propio** y cambiar el título "My Blog".
-- Versión actual del plugin: **1.14.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.15.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -14,14 +14,16 @@ Portal de juegos mobile-first en WordPress con **100 juegos propios** (canvas 2D
 wp-content/mu-plugins/
   arcade-core.php              # Plugin principal (funciona como MU-plugin o plugin normal; sub() detecta la carpeta)
   arcade-core/
-    portal.php                 # Arcade_Portal: plantillas propias (portada, ficha, listados, búsqueda, páginas legales), tarjetas, textos
-    templates/portal.php       # Plantilla HTML completa (ignora el tema). Diseño oscuro, 1 acento índigo #6e62f5
+    portal.php                 # Arcade_Portal: plantillas propias, tarjetas (card/mini), picks() del día, blurb(), /manifest.webmanifest (PWA), textos
+    howto-texts.php            # «Cómo se juega» de respaldo si el CFG no trae help
+    templates/portal.php       # Plantilla HTML completa (ignora el tema): carrusel «Juego del día», mosaico de categorías, ficha con lateral, Mis juegos (?mis=1), 404, barra inferior móvil
     importer.php               # Arcade_Importer: Games → Importar catálogo (GamePix/GameDistribution, sin duplicados)
-    seo-ads.php                # Arcade_SEO: Ajustes → Arcade (titular LSSI, ID AdSense), páginas legales, /ads.txt, meta/OG/JSON-LD, bloques de anuncio
-    social.php                 # Arcade_Social: REST arcade/v1 (play, like, cards), contador de partidas, me gusta
+    seo-ads.php                # Arcade_SEO: Ajustes → Arcade (titular LSSI, AdSense: pub, slot, slot_side, h5, freq, adtest), páginas legales, /ads.txt, meta/OG/JSON-LD, ad_block(), ?adpreview=1
+    social.php                 # Arcade_Social: REST arcade/v1 (play, like, cards, index=buscador; transient arcade_index)
     assets/css/portal.css      # Estilos del portal
     assets/js/arcade-engine.js # Reproductor: iframe perezoso, pantalla completa, orientación, mando virtual, puente de teclas
-    assets/js/portal.js        # Favoritos / seguir jugando (localStorage), me gusta, compartir, contador
+    assets/js/portal.js        # Favoritos / seguir jugando (localStorage), me gusta, compartir, contador, carrusel, sugerencias de búsqueda, ordenar, anuncios perezosos (IntersectionObserver), botón CMP
+    assets/img/                # Iconos PWA
     games/
       _lib/kit.js              # RUNTIME COMÚN de todos los juegos (fuente de verdad, se edita aquí)
       _lib/tetra.js            # Motor de Tetra Drop (se edita aquí)
@@ -38,7 +40,7 @@ scripts/
   test-wp.sh                   # WordPress local con SQLite en http://127.0.0.1:8900 (admin/admin)
 arcade_pilot_100.xml           # WXR con los 100 juegos (URLs apuntan a /wp-content/plugins/arcade-core/games/)
 ```
-Juegos **independientes** (no generados, se editan en su propio `index.html` o `_lib/tetra.js`): `serpent-grid` (no usa kit), `neon-paddle`, `rock-belt`, `tetra-drop`, `tetra-drop-marathon`.
+Juegos **independientes** (no generados): `tetra-drop` y `tetra-drop-marathon` (`_lib/tetra.js`: SRS, reserva, T-giro, B2B, 360×640 o 640×360). `serpent-grid`, `neon-paddle` y `rock-belt` ya son generados (motores `snake`, `neonpong`, `rocks`, adaptables vertical/horizontal).
 
 ## Datos del juego en WordPress
 CPT `game`; taxonomías `game_genre` (arcade, puzzle, platformer, strategy-cards, 3d-webgl, sports-casual), `game_tag`, `control_profile`. Metas: `_game_embed_url`, `_game_orientation` (portrait|landscape|auto), `_game_aspect_ratio` (16:9|4:3|1:1|fill), `_game_tech_engine`, `_game_input_methods` (touch,keyboard,mouse,gamepad), `_game_plays`, `_game_likes`, y en importados `_game_source`, `_game_source_id`, `_game_thumb_url`, `_game_howto`. Un juego es "propio/exclusivo" si no tiene `_game_source`. `resolve_embed()` prioriza `games/<slug>/index.html` del plugin.
@@ -70,7 +72,8 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
 - Deportes, 3D y arcade (fase 5): `road` (carretera pintada de lejos a cerca con niebla, semáforo, rivales que esquivan; lanes con filas regeneradas y carril libre garantizado), `stack`, `marble` (agujeros solo si el BFS mantiene la meta alcanzable, 3 canicas), `cube` (bloque 3D real; generador sin salida de emergencia, verificado con 5000 niveles), `drone`, `planet`, `golf` (vista previa, búnkeres, tarjeta de 9 hoyos), `penalty` (efecto y portero con alcance limitado), `bowling` (física bola/bolos, marcador oficial), `hoop` (red con muelles, aro móvil en racha), `darts` (sugerencia de cierre), `pool` (bola fantasma, bandeja), `rhythm` (multitoque, valoraciones), `homerun`, `whack`, `paddle` (saque alterno en ping pong), `breakout` (4 diseños, subpasos), `lander` (plataforma plana completa, x3), `missile` (MIRV desde oleada 3).
 - `platform.js` (barrel-climb vigas, escaleras ↑↓ y barriles con aros; ninja-ascent con doble salto y pinchos sobre ruta garantizada; cloud-hopper y lava-escape con generación infinita, nubes/salientes especiales y lava animada).
 - Lienzo adaptable: `td`, `tactics` y `lander` eligen disposición vertical si `innerHeight > innerWidth` (recargan al girar fuera de partida); en el catálogo van con orientación `auto` y `fill` (`adaptive_games()` migra las entradas ya publicadas). `golf` reserva franja superior (`TOPR`) y `paddle` deja 40 px libres arriba para pausa/sonido.
-- Caché de motores: `?v=` = hash md5 del motor (automático en build_games.py); `kit.js` y `art.js` siguen con `?v=N` manual.
+- Caché de motores: `?v=` = hash md5 del motor (automático en build_games.py); `kit.js` (v=7) y `art.js` (v=7) siguen con `?v=N` manual.
+- kit.js ↔ reproductor (postMessage): el juego envía `arcade:start|restart|over`; el reproductor envía `arcade:pause|resume` (anuncios). `arcade:restart` lanza `adBreak('next')` y montar el juego `adBreak('start')` si H5 Games Ads está activo.
 - Todos los motores cargan `art.js` (`deps_of` en build_games.py).
 
 Todos los motores generados están rehechos con arte ART.
@@ -85,7 +88,7 @@ python3 scripts/build_games.py        # tras editar src/eng o CFG en build_games
 python3 scripts/smoke.py batch0/6     # (x6 en paralelo: batch0..5) errores JS; cada tanda < 5 min
 python3 scripts/audit.py 0/1 <slug…>  # arranque / muere sin tocar / animación / respuesta
 python3 scripts/thumbs.py 0/1 <slug…> # regenerar miniaturas tras cambios visuales
-bash scripts/test-wp.sh               # WordPress local para probar el portal
+bash scripts/test-wp.sh               # WordPress local para probar el portal (clona WordPress desde GitHub: wordpress.org da 403 en este entorno)
 bash scripts/package.sh               # zip instalable en dist/
 ```
 - Tras cambiar `kit.js` o `art.js`, **sube la versión de caché** `?v=N` en la plantilla `TPL` de `build_games.py` (y en los 5 independientes); los motores se versionan solos por hash. Sube siempre la `VERSION` del plugin (cabecera y constante).
@@ -94,7 +97,7 @@ bash scripts/package.sh               # zip instalable en dist/
 - En este entorno las peticiones HTTPS desde PHP pueden fallar por certificados; en el WP de pruebas se desactiva con un mu-plugin (`https_ssl_verify` false). No hace falta en producción.
 
 ## AdSense / legal (pendiente del usuario)
-Plugin ya aporta: páginas legales (borradores en Ajustes → Arcade), `/ads.txt`, código de anuncios, bloques "Publicidad" separados del juego, meta/OG/JSON-LD `VideoGame`, textos únicos por juego. Falta por parte del usuario: dominio propio, título del sitio, datos del titular (LSSI), publicar páginas legales, activar el mensaje RGPD (CMP) en AdSense, y solicitar la revisión.
+Guía para el usuario: `docs/ADSENSE.md`. Huecos: `game` (bajo el juego), `side` (lateral, solo ≥1024 px), `home` (entre filas), `feed` (cada 15 tarjetas). Se empujan perezosamente desde portal.js (`[data-ax-ad]`). Plugin ya aporta: páginas legales (borradores en Ajustes → Arcade), `/ads.txt`, código de anuncios, bloques "Publicidad" separados del juego, meta/OG/JSON-LD `VideoGame`, textos únicos por juego. Falta por parte del usuario: dominio propio, título del sitio, datos del titular (LSSI), publicar páginas legales, activar el mensaje RGPD (CMP) en AdSense, y solicitar la revisión.
 
 ## Ideas futuras de web
 Valoraciones, logros entre juegos, "juego del día" rotatorio, listas por etiquetas, página de categorías con destacados, modo oscuro/claro, PWA instalable, traducción de descripciones importadas.

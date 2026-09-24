@@ -40,10 +40,10 @@ INPUT_ES = {"touch": "táctil", "keyboard": "teclado", "mouse": "ratón", "gamep
 # (título, tags [mecánica..., estilo], motor, orientación, aspecto, inputs)
 CATALOG = {
     "arcade": [
-        ("Serpent Grid", ["snake", "high-score", "pixel-art"], "canvas", "auto", "1:1", "TKG"),
-        ("Neon Paddle", ["pong", "versus", "vector"], "canvas", "landscape", "16:9", "TKM"),
+        ("Serpent Grid", ["snake", "high-score", "pixel-art"], "canvas", "auto", "fill", "TKG"),
+        ("Neon Paddle", ["pong", "versus", "vector"], "canvas", "auto", "fill", "TKM"),
         ("Starfall Defender", ["shoot-em-up", "vertical-scroller", "pixel-art"], "phaser", "portrait", "fill", "KG"),
-        ("Rock Belt", ["asteroids", "inertia", "vector"], "canvas", "landscape", "4:3", "KG"),
+        ("Rock Belt", ["asteroids", "inertia", "vector"], "canvas", "auto", "fill", "KG"),
         ("Maze Muncher", ["maze-chase", "swipe", "pixel-art"], "phaser", "portrait", "1:1", "TKG"),
         ("Tetra Drop", ["falling-blocks", "high-score", "pixel-art"], "canvas", "portrait", "fill", "TKG"),
         ("Tetra Drop Marathon", ["falling-blocks", "endless", "pixel-art"], "canvas", "portrait", "fill", "KG"),

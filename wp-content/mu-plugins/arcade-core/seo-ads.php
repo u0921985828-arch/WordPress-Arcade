@@ -21,7 +21,7 @@ final class Arcade_SEO {
 	}
 
 	public static function opt( $k = null ) {
-		$o = wp_parse_args( (array) get_option( self::OPT, array() ), array( 'pub' => '', 'owner' => '', 'nif' => '', 'address' => '', 'email' => get_option( 'admin_email' ), 'slot' => '' ) );
+		$o = wp_parse_args( (array) get_option( self::OPT, array() ), array( 'pub' => '', 'owner' => '', 'nif' => '', 'address' => '', 'email' => get_option( 'admin_email' ), 'slot' => '', 'slot_side' => '', 'h5' => '', 'adtest' => '', 'freq' => '120' ) );
 		return $k ? $o[ $k ] : $o;
 	}
 
@@ -42,7 +42,10 @@ final class Arcade_SEO {
 		<?php $f( 'owner', 'Nombre o razón social', 'Nombre Apellidos / Empresa S.L.' ); $f( 'nif', 'NIF / CIF', '12345678Z' ); $f( 'address', 'Domicilio', 'Calle, nº, CP, Bilbao, Bizkaia' ); $f( 'email', 'Correo de contacto', 'contacto@tudominio.com' ); ?>
 		</table>
 		<h2>Google AdSense</h2><table class="form-table">
-		<?php $f( 'pub', 'ID de editor', 'pub-1234567890123456', 'Lo encuentras en AdSense → Cuenta → Información de la cuenta. Activa /ads.txt y el código de anuncios.' ); $f( 'slot', 'ID de bloque de anuncio (opcional)', '1234567890', 'Bloque adaptable que se muestra debajo del juego y entre secciones, nunca junto a los controles.' ); ?>
+		<?php $f( 'pub', 'ID de editor', 'pub-1234567890123456', 'Lo encuentras en AdSense → Cuenta → Información de la cuenta. Activa /ads.txt y el código de anuncios.' ); $f( 'slot', 'Bloque adaptable (display)', '1234567890', 'Anuncios → Por bloque de anuncios → Display → Adaptable. Se muestra bajo el juego, entre secciones y en los listados; nunca junto a los controles.' ); $f( 'slot_side', 'Bloque vertical (opcional)', '1234567890', 'Columna lateral de la ficha en ordenador. Si lo dejas vacío se usa el adaptable.' ); ?>
+		<tr><th>Anuncios dentro de los juegos</th><td><label><input type="checkbox" name="h5" value="1"<?php checked( $o['h5'], '1' ); ?>> Activar H5 Games Ads (anuncio al empezar y al reiniciar partida)</label><p class="description">Solicítalo antes en AdSense (programa «AdSense para juegos»). Se muestra como mucho uno cada:</p>
+		<select name="freq"><?php foreach ( array( '60' => '1 minuto', '120' => '2 minutos', '180' => '3 minutos', '300' => '5 minutos' ) as $v => $t ) { printf( '<option value="%s"%s>%s</option>', esc_attr( $v ), selected( $o['freq'], $v, false ), esc_html( $t ) ); } ?></select></td></tr>
+		<tr><th>Modo de prueba</th><td><label><input type="checkbox" name="adtest" value="1"<?php checked( $o['adtest'], '1' ); ?>> Anuncios de prueba (no cuentan impresiones). Desactívalo al publicar.</label><p class="description">Para ver dónde irán los anuncios sin tener AdSense aprobado, abre cualquier página con <code>?adpreview=1</code> estando identificado como administrador.</p></td></tr>
 		</table>
 		<p><label><input type="checkbox" name="make_pages" value="1"> Crear/actualizar los borradores de páginas legales (Aviso legal, Privacidad, Cookies, Contacto, Sobre nosotros)</label></p>
 		<?php submit_button( 'Guardar' ); ?></form>
@@ -72,12 +75,16 @@ final class Arcade_SEO {
 			wp_die( 'No autorizado' );
 		}
 		$o = self::opt();
-		foreach ( array( 'owner', 'nif', 'address', 'email', 'slot' ) as $k ) {
+		foreach ( array( 'owner', 'nif', 'address', 'email', 'slot', 'slot_side' ) as $k ) {
 			$o[ $k ] = sanitize_text_field( wp_unslash( $_POST[ $k ] ?? '' ) );
 		}
 		$o['pub']   = preg_replace( '/[^0-9]/', '', (string) wp_unslash( $_POST['pub'] ?? '' ) ) ? 'pub-' . preg_replace( '/[^0-9]/', '', (string) wp_unslash( $_POST['pub'] ?? '' ) ) : '';
 		$o['email'] = sanitize_email( $o['email'] );
-		$o['slot']  = preg_replace( '/[^0-9]/', '', $o['slot'] );
+		$o['slot']      = preg_replace( '/[^0-9]/', '', $o['slot'] );
+		$o['slot_side'] = preg_replace( '/[^0-9]/', '', $o['slot_side'] );
+		$o['h5']        = empty( $_POST['h5'] ) ? '' : '1';
+		$o['adtest']    = empty( $_POST['adtest'] ) ? '' : '1';
+		$o['freq']      = in_array( $_POST['freq'] ?? '', array( '60', '120', '180', '300' ), true ) ? $_POST['freq'] : '120'; // phpcs:ignore
 		update_option( self::OPT, $o, false );
 		$msg = 'Guardado.';
 		if ( ! empty( $_POST['make_pages'] ) ) {
@@ -163,7 +170,16 @@ final class Arcade_SEO {
 			return;
 		}
 		if ( self::opt( 'pub' ) ) {
-			printf( '<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-%s" crossorigin="anonymous"></script>' . "\n", esc_attr( self::opt( 'pub' ) ) );
+			$h5 = self::opt( 'h5' ) && class_exists( 'Arcade_Portal' ) && Arcade_Portal::is_portal();
+			$ex = $h5 ? sprintf( ' data-ad-frequency-hint="%ds"', (int) self::opt( 'freq' ) ) : '';
+			if ( self::opt( 'adtest' ) ) {
+				$ex .= ' data-adbreak-test="on" data-adtest="on"';
+			}
+			printf( '<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-%s" crossorigin="anonymous"%s></script>' . "\n", esc_attr( self::opt( 'pub' ) ), $ex ); // phpcs:ignore
+			if ( $h5 ) {
+				// API de anuncios para juegos (Ad Placement API): el reproductor llama a adBreak() al empezar y al reiniciar.
+				echo "<script>window.adsbygoogle=window.adsbygoogle||[];var adBreak=adConfig=function(o){adsbygoogle.push(o);};adConfig({preloadAdBreaks:'on',sound:'on'});</script>\n";
+			}
 		}
 		if ( ! class_exists( 'Arcade_Portal' ) || ! Arcade_Portal::is_portal() ) {
 			return;
@@ -189,11 +205,25 @@ final class Arcade_SEO {
 		}
 	}
 
-	/** Bloque de anuncio adaptable, separado del juego. */
+	/** Vista previa de los huecos de anuncio para administradores (?adpreview=1). */
+	public static function preview() {
+		return ! empty( $_GET['adpreview'] ) && current_user_can( 'manage_options' ); // phpcs:ignore
+	}
+
+	/**
+	 * Bloque de anuncio separado del juego. Se rellena de forma perezosa desde portal.js
+	 * (solo cuando se acerca a la pantalla y es visible), así no hay huecos de ancho 0.
+	 */
 	public static function ad_block( $where ) {
-		if ( ! self::opt( 'pub' ) || ! self::opt( 'slot' ) ) {
+		$names = array( 'game' => 'bajo el juego', 'side' => 'lateral 300×600', 'feed' => 'entre juegos', 'home' => 'entre secciones' );
+		if ( self::preview() ) {
+			return sprintf( '<div class="ax-ad ax-ad-%1$s"><span>Publicidad</span><div class="ax-ad-ph">Anuncio %2$s</div></div>', esc_attr( $where ), esc_html( $names[ $where ] ?? $where ) );
+		}
+		$slot = 'side' === $where && self::opt( 'slot_side' ) ? self::opt( 'slot_side' ) : self::opt( 'slot' );
+		if ( ! self::opt( 'pub' ) || ! $slot ) {
 			return '';
 		}
-		return sprintf( '<div class="ax-ad ax-ad-%1$s"><span>Publicidad</span><ins class="adsbygoogle" style="display:block" data-ad-client="ca-%2$s" data-ad-slot="%3$s" data-ad-format="auto" data-full-width-responsive="true"></ins><script>(adsbygoogle=window.adsbygoogle||[]).push({});</script></div>', esc_attr( $where ), esc_attr( self::opt( 'pub' ) ), esc_attr( self::opt( 'slot' ) ) );
+		$fmt = 'side' === $where ? 'data-ad-format="vertical"' : 'data-ad-format="auto" data-full-width-responsive="true"';
+		return sprintf( '<div class="ax-ad ax-ad-%1$s" data-ax-ad><span>Publicidad</span><ins class="adsbygoogle" style="display:block" data-ad-client="ca-%2$s" data-ad-slot="%3$s" %4$s%5$s></ins></div>', esc_attr( $where ), esc_attr( self::opt( 'pub' ) ), esc_attr( $slot ), $fmt, self::opt( 'adtest' ) ? ' data-adtest="on"' : '' );
 	}
 }

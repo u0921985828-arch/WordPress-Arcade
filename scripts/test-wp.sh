@@ -5,13 +5,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; WP=/tmp/wp
 if [ ! -f "$WP/wp-config.php" ]; then
   mkdir -p $WP && cd $WP
-  curl -sSL https://wordpress.org/latest.tar.gz | tar xz --strip-components=1
-  curl -sSL -o sq.zip https://downloads.wordpress.org/plugin/sqlite-database-integration.latest-stable.zip && unzip -q sq.zip -d wp-content/plugins
+  # GitHub en vez de wordpress.org (en algunos entornos wordpress.org está bloqueado)
+  [ -f index.php ] || git clone -q --depth 1 https://github.com/WordPress/WordPress .
+  [ -d wp-content/plugins/sqlite-database-integration ] || git clone -q --depth 1 --branch v2.2.9 https://github.com/WordPress/sqlite-database-integration wp-content/plugins/sqlite-database-integration
   cp wp-content/plugins/sqlite-database-integration/db.copy wp-content/db.php
   sed -i "s#{SQLITE_IMPLEMENTATION_FOLDER_PATH}#$WP/wp-content/plugins/sqlite-database-integration#; s#{SQLITE_PLUGIN}#sqlite-database-integration/load.php#" wp-content/db.php
   cp wp-config-sample.php wp-config.php
   wp core install --url=http://127.0.0.1:8900 --title="My Blog" --admin_user=admin --admin_password=admin --admin_email=admin@example.com --skip-email --allow-root
-  curl -sSL -o imp.zip https://downloads.wordpress.org/plugin/wordpress-importer.latest-stable.zip && unzip -qo imp.zip -d wp-content/plugins
+  [ -d wp-content/plugins/wordpress-importer ] || git clone -q --depth 1 https://github.com/WordPress/wordpress-importer wp-content/plugins/wordpress-importer
   wp plugin activate wordpress-importer --allow-root
   echo '<?php $f = __DIR__ . parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH); if (is_file($f)) return false; require __DIR__ . "/index.php";' > router.php
 fi

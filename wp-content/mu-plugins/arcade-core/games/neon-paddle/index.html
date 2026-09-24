@@ -1,29 +1,3 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Neon Paddle</title></head>
-<body><script src="../_lib/kit.js?v=6"></script><script>
-const k = Kit({ w: 640, h: 360, title: 'Neon Paddle', bg: '#0f1030' }), c = k.ctx;
-let p, ai, ball, sp, sa;
-function serve(d) { ball = { x: 320, y: 180, vx: 280 * d, vy: k.rnd(-150, 150) }; }
-function reset() { p = ai = 150; sp = sa = 0; serve(1); }
-reset(); k.show('Neon Paddle', 'Arrastra el dedo o usa ↑ ↓. Gana el primero a 7. Toca para empezar');
-k.run((dt) => {
-  if (!k.gate(reset)) return;
-  if (k.ptr.down) p += (k.ptr.y - 30 - p) * Math.min(1, dt * 18);
-  if (k.held.has('up')) p -= 380 * dt; if (k.held.has('down')) p += 380 * dt;
-  p = k.clamp(p, 0, 300);
-  ai = k.clamp(ai + k.clamp(ball.y - 30 - ai, -240 * dt, 240 * dt), 0, 300);
-  ball.x += ball.vx * dt; ball.y += ball.vy * dt;
-  if (ball.y < 6) { ball.y = 6; ball.vy *= -1; } if (ball.y > 354) { ball.y = 354; ball.vy *= -1; }
-  if (ball.vx < 0 && ball.x < 32 && ball.x > 10 && ball.y > p - 6 && ball.y < p + 66) { ball.vx = Math.min(900, -ball.vx * 1.06); ball.vy += (ball.y - p - 30) * 7; ball.x = 32; k.sfx('click'); k.burst(32, ball.y, '#5ce1e6', 6, 90); }
-  if (ball.vx > 0 && ball.x > 608 && ball.x < 630 && ball.y > ai - 6 && ball.y < ai + 66) { ball.vx = Math.max(-900, -ball.vx * 1.06); ball.vy += (ball.y - ai - 30) * 7; ball.x = 608; k.sfx('click'); k.burst(608, ball.y, '#ff5fa2', 6, 90); }
-  if (ball.x < -10) { k.sfx('hurt'); sa++; serve(1); } if (ball.x > 650) { k.sfx('coin'); k.confetti(); sp++; serve(-1); }
-  if (sp >= 7 || sa >= 7) { k.st = 'over'; k.show(sp >= 7 ? '¡Ganaste!' : 'Perdiste', `${sp} – ${sa} · Toca para repetir`); }
-}, () => {
-  c.fillStyle = '#0f1030'; c.fillRect(0, 0, 640, 360);
-  c.fillStyle = '#2a2d66'; for (let y = 8; y < 360; y += 24) c.fillRect(318, y, 4, 12);
-  c.fillStyle = '#5ce1e6'; c.fillRect(16, p, 10, 60);
-  c.fillStyle = '#ff5fa2'; c.fillRect(614, ai, 10, 60);
-  c.fillStyle = '#fff'; c.fillRect(ball.x - 6, ball.y - 6, 12, 12);
-  k.text(sp, 270, 16, 40, '#5ce1e6', 'center'); k.text(sa, 370, 16, 40, '#ff5fa2', 'center');
-});
-</script></body></html>
+<body><script>window.CFG={"help": "Arrastra o usa las flechas para mover tu pala. Mueve la pala al golpear para dar efecto. Gana a 7 y pasa al siguiente rival.", "title": "Neon Paddle", "id": "neon-paddle"};</script><script src="../_lib/kit.js?v=7"></script><script src="../_lib/art.js?v=7"></script><script src="../_lib/neonpong.js?v=6f5e8ba0"></script></body></html>

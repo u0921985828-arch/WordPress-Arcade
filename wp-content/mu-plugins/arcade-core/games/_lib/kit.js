@@ -20,13 +20,14 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-acti
 #ov .rec{font:500 12.5px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#8b91a1;padding:5px 10px;border:1px solid rgba(255,255,255,.08);border-radius:8px}
 @keyframes pop{from{transform:scale(.94);opacity:0}}
 #hud{position:fixed;top:max(6px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:5}
-#hud button{width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(10,12,16,.45);color:#fff;font-size:14px;line-height:32px;padding:0;opacity:.7;cursor:pointer;backdrop-filter:blur(6px)}
+#hud button{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(10,12,16,.45);color:#fff;padding:0;opacity:.7;cursor:pointer;backdrop-filter:blur(6px)}
 #hud button:hover{opacity:.9}`;
     document.head.append(st);
     const cv = document.createElement('canvas'), ov = document.createElement('div');
     ov.id = 'ov'; document.body.append(cv, ov);
     const hud = document.createElement('div'); hud.id = 'hud';
-    hud.innerHTML = '<button id="bp" aria-label="Pausa">❚❚</button><button id="bm" aria-label="Sonido">🔊</button>';
+    const IC = { p: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor"/></svg>', r: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>', on: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>', off: '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="m16 9 6 6m0-6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' };
+    hud.innerHTML = '<button id="bp" aria-label="Pausa">' + IC.p + '</button><button id="bm" aria-label="Sonido">' + IC.on + '</button>';
     document.body.append(hud);
     const hp = (window.CFG && window.CFG.hud) || '';
     if (hp) { hud.style.transform = 'none'; hud.style.left = hp.includes('l') ? '8px' : 'auto'; hud.style.right = hp.includes('r') ? '8px' : 'auto'; if (hp.includes('b')) { hud.style.top = 'auto'; hud.style.bottom = 'max(8px,env(safe-area-inset-bottom))'; } }
@@ -92,7 +93,7 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-acti
     };
     /* ---------- Audio (WebAudio, sin archivos) ---------- */
     let AC = null, muted = false; try { muted = localStorage.getItem('arcade:mute') === '1'; } catch (e) {}
-    const bm = hud.querySelector('#bm'), bp = hud.querySelector('#bp'); bm.textContent = muted ? '🔇' : '🔊';
+    const bm = hud.querySelector('#bm'), bp = hud.querySelector('#bp'); bm.innerHTML = muted ? IC.off : IC.on;
     const ac = () => { if (!AC) try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } if (AC.state === 'suspended') AC.resume(); return AC; };
     addEventListener('pointerdown', ac, true); addEventListener('keydown', ac, true);
     let noiseBuf = null;
@@ -114,7 +115,7 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-acti
     let lastSfx = {};
     k.sfx = (n) => { if (muted || !SFX[n] || !ac()) return; const now = performance.now(); if (now - (lastSfx[n] || 0) < 40) return; lastSfx[n] = now; try { SFX[n](); } catch (e) {} };
     k.muted = () => muted;
-    bm.addEventListener('pointerdown', (e) => { e.stopPropagation(); muted = !muted; bm.textContent = muted ? '🔇' : '🔊'; try { localStorage.setItem('arcade:mute', muted ? '1' : '0'); } catch (er) {} if (!muted) k.sfx('click'); });
+    bm.addEventListener('pointerdown', (e) => { e.stopPropagation(); muted = !muted; bm.innerHTML = muted ? IC.off : IC.on; try { localStorage.setItem('arcade:mute', muted ? '1' : '0'); } catch (er) {} if (!muted) k.sfx('click'); });
     /* Las vibraciones de los juegos también suenan y sacuden la pantalla */
     const rawVib = navigator.vibrate ? navigator.vibrate.bind(navigator) : null;
     const vib = (ms) => { const d = Array.isArray(ms) ? ms[0] : ms; if (d <= 20) k.sfx('pop'); else if (d <= 45) k.sfx('coin'); else if (d <= 90) { k.sfx('hit'); k.shake(4); } else { k.sfx('hurt'); k.shake(8); k.flash('rgba(255,60,80,.35)'); } try { rawVib && rawVib(ms); } catch (e) {} return true; };
@@ -137,9 +138,14 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-acti
     }
     /* ---------- Pausa ---------- */
     k.paused = false;
-    const setPause = (on) => { if (on && k.st !== 'play') return; k.paused = on; bp.textContent = on ? '▶' : '❚❚'; if (on) { k.sfx('click'); ov.innerHTML = '<div class="card"><h1>Pausa</h1><div class="go">Continuar</div></div>'; ov.classList.remove('hide'); } else { ov.classList.add('hide'); k.held.clear(); } };
+    const setPause = (on) => { if (on && k.st !== 'play') return; k.paused = on; bp.innerHTML = on ? IC.r : IC.p; if (on) { k.sfx('click'); ov.innerHTML = '<div class="card"><h1>Pausa</h1><div class="go">Continuar</div></div>'; ov.classList.remove('hide'); } else { ov.classList.add('hide'); k.held.clear(); } };
     bp.addEventListener('pointerdown', (e) => { e.stopPropagation(); setPause(!k.paused); });
     document.addEventListener('visibilitychange', () => { if (document.hidden) setPause(true); });
+    /* Puente con el portal: avisa de inicio/fin de partida (pausas publicitarias) y obedece pausa/reanudar. */
+    const tell = (type, x) => { try { if (parent !== window) parent.postMessage(Object.assign({ type }, x || {}), '*'); } catch (e) {} };
+    addEventListener('message', (e) => { const d = e.data; if (!d || e.source !== parent) return;
+      if (d.type === 'arcade:pause') { setPause(true); if (AC) AC.suspend(); }
+      else if (d.type === 'arcade:resume') { if (AC) AC.resume(); } });
     k.hide = () => ov.classList.add('hide');
     k.best = (id, score) => {
       let b = 0; try { b = +localStorage.getItem('best:' + id) || 0; if (score > b) { b = score; localStorage.setItem('best:' + id, b); } } catch (e) { b = Math.max(b, score); }
@@ -149,14 +155,14 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-acti
     k.ri = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
     k.pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
     k.shuffle = (arr) => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
-    k.end = (id, score, head, extra) => k.show(head || 'Fin', `${extra ? extra + ' · ' : ''}Puntos: ${score} · Récord ${k.best(id, score)}<br>Toca para jugar otra vez`);
+    k.end = (id, score, head, extra) => (tell('arcade:over', { score }), k.show(head || 'Fin', `${extra ? extra + ' · ' : ''}Puntos: ${score} · Récord ${k.best(id, score)}<br>Toca para jugar otra vez`));
     k.rect = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); };
     k.circle = (x, y, r, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill(); };
     k.rrect = (x, y, w, h, r, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); ctx.fill(); };
     k.clear = (col) => { ctx.fillStyle = col || bg; ctx.fillRect(0, 0, w, h); };
     /* Máquina de estados estándar: 'ready' → 'play' → 'over'. Devuelve true si el juego está activo. */
     k.st = 'ready'; window.__k = k;
-    k.gate = (reset) => { if (k.st === 'play') return true; if (k.go()) { if (k.st === 'over') reset(); k.st = 'play'; k.sfx('start'); k.hide(); k.hit.clear(); k.ptr.hit = false; k.tap = false; if (k.ptr.down) k._skipUp = true; } return false; };
+    k.gate = (reset) => { if (k.st === 'play') return true; if (k.go()) { const was = k.st; if (was === 'over') reset(); k.st = 'play'; tell(was === 'over' ? 'arcade:restart' : 'arcade:start'); k.sfx('start'); k.hide(); k.hit.clear(); k.ptr.hit = false; k.tap = false; if (k.ptr.down) k._skipUp = true; } return false; };
     k.lose = (id, score, head, extra) => { k.st = 'over'; k._losing = true; k.end(id, score, head, extra); k._losing = false; k.sfx('lose'); k.shake(7); try { rawVib && rawVib(90); } catch (e) {} };
     k.clamp = (v, a, b) => Math.max(a, Math.min(b, v));
     k.text = (s, x, y, size, color, align) => {
