@@ -24,7 +24,7 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-acti
 @media (prefers-reduced-motion:reduce){#ov .go{animation:none}}
 #hud{position:fixed;top:max(6px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:5}
 #hud.ext{display:none}
-#hud button{width:36px;height:36px;display:grid;place-items:center;border-radius:11px;border:2px solid #1a1530;background:color-mix(in srgb,var(--bg) 70%,#fff 14%);color:#fff;padding:0;opacity:.8;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 3px 0 #1a1530}
+#hud button{width:36px;height:36px;display:grid;place-items:center;border-radius:11px;border:2px solid #1a1530;background:color-mix(in srgb,var(--bg) 35%,rgba(26,21,48,.8));color:#fff;padding:0;opacity:.8;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 3px 0 #1a1530}
 #hud button:hover{opacity:.9}
 body.party #ov .card{max-width:min(980px,90vw);min-width:min(560px,86vw);padding:4.5vmin 5vmin 4vmin;gap:2.2vmin;border-width:4px}
 body.party #ov h1{font-size:clamp(34px,10vmin,120px)}
