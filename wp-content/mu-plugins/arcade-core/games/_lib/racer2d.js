@@ -301,7 +301,7 @@ function cpuInput(car, dt) {
 }
 function vmax(car) {
   let v = 255 * pace();
-  if (car.cpu) { v *= ((GAR ? 0.9 : 0.82) + CUP * 0.0125 + (GAR ? 0 : race * 0.012)) * car.spd; // 1.23: antes 0,9/0,86 + 0,025·copa + 0,02·carrera (garaje mantiene 0,9: el líder gana la ronda)
+  if (car.cpu) { v *= ((GAR ? 0.88 : 0.85) + CUP * 0.0125 + (GAR ? 0 : race * 0.012)) * car.spd; // 1.23: antes 0,9/0,86 + 0,025·copa + 0,02·carrera (0,88/0,85: con 0,86/0,82 un bot con teclas ganaba siempre; con 0,9/0,86, nunca)
     const hs = cars.filter((q) => !q.cpu && q.alive); /* goma elástica suave: la CPU se acerca o afloja según el humano */
     if (hs.length && !GAR) { const h = hs.reduce((a, b) => (b.prog > a.prog ? b : a)); v *= 1 + clamp((h.prog - car.prog) / 2500, -0.1, 0.06); } }
   return v;
