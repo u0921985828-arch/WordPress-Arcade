@@ -42,7 +42,7 @@ $sec_head = static function ( $title, $url = '', $count = 0 ) use ( $ico ) {
 <a class="ax-skip" href="#ax-main">Saltar al contenido</a>
 <header class="ax-top">
 	<div class="ax-wrap ax-bar">
-		<a class="ax-logo" href="<?php echo esc_url( home_url( '/' ) ); ?>"><svg class="ax-mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="8" fill="var(--acc)"/><path d="M12 10.5v11l9-5.5z" fill="#fff"/></svg><span><?php echo esc_html( $brand ); ?></span></a>
+		<a class="ax-logo" href="<?php echo esc_url( home_url( '/' ) ); ?>"><img class="ax-wm" src="<?php echo esc_url( plugins_url( 'assets/img/kuboplay-logo.svg', dirname( __FILE__ ) ) ); ?>" width="119" height="29" alt="<?php echo esc_attr( $brand ); ?>"></a>
 		<form class="ax-search" role="search" action="<?php echo esc_url( home_url( '/' ) ); ?>" data-ax-search>
 			<input type="search" name="s" placeholder="Buscar entre <?php echo (int) wp_count_posts( 'game' )->publish; ?> juegos…" value="<?php echo esc_attr( get_search_query() ); ?>" aria-label="Buscar juegos" autocomplete="off" enterkeyhint="search">
 			<input type="hidden" name="post_type" value="game">
@@ -371,7 +371,7 @@ endif;
 ?>
 </main>
 <footer class="ax-foot"><div class="ax-wrap ax-foot-g">
-	<div><a class="ax-logo" href="<?php echo esc_url( home_url( '/' ) ); ?>"><svg class="ax-mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="8" fill="var(--acc)"/><path d="M12 10.5v11l9-5.5z" fill="#fff"/></svg><span><?php echo esc_html( $brand ); ?></span></a>
+	<div><a class="ax-logo" href="<?php echo esc_url( home_url( '/' ) ); ?>"><img class="ax-wm" src="<?php echo esc_url( plugins_url( 'assets/img/kuboplay-logo.svg', dirname( __FILE__ ) ) ); ?>" width="119" height="29" alt="<?php echo esc_attr( $brand ); ?>"></a>
 	<p>Juegos HTML5 gratuitos para móvil, tablet y ordenador. Sin descargas ni registro.</p></div>
 	<div><h3>Categorías</h3><ul><?php foreach ( Arcade_Portal::LABELS as $slug => $l ) { $u = Arcade_Portal::genre_url( $slug ); if ( $u ) { printf( '<li><a href="%s">%s</a></li>', esc_url( $u ), esc_html( $l[0] ) ); } } ?></ul></div>
 	<div><h3>Portal</h3><ul><li><a href="<?php echo esc_url( $all_url ); ?>">Todos los juegos</a></li><li><a href="<?php echo esc_url( $mine_url ); ?>">Mis juegos</a></li><?php if ( $party ) : ?><li><a href="<?php echo esc_url( $tv_url ); ?>">Jugar en la tele</a></li><?php endif; ?><?php if ( class_exists( 'Arcade_SEO' ) ) { foreach ( Arcade_SEO::legal_links() as $lk ) { printf( '<li><a href="%s">%s</a></li>', esc_url( $lk[1] ), esc_html( $lk[0] ) ); } } ?><li><button type="button" class="ax-linkbtn" data-ax-consent hidden>Preferencias de privacidad</button></li></ul></div>

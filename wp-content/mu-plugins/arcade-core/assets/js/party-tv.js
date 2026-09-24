@@ -183,7 +183,7 @@
     app.innerHTML =
       '<div class="pt-lobby">' +
         '<aside class="pt-join">' +
-          '<a class="pt-brand" href="' + esc(C.home) + '"><svg class="pt-mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="8" fill="#6e62f5"/><path d="M12 10.5v11l9-5.5z" fill="#fff"/></svg><span>' + esc(C.brand || 'Arcade') + '</span><em>' + ICO.tv + 'Modo tele</em></a>' +
+          '<a class="pt-brand" href="' + esc(C.home) + '">' + (C.logo ? '<img class="pt-wm" src="' + esc(C.logo) + '" alt="' + esc(C.brand || 'Kuboplay') + '">' : '<span>' + esc(C.brand || 'Kuboplay') + '</span>') + '<em>' + ICO.tv + 'Modo tele</em></a>' +
           '<div class="pt-card pt-qrbox">' +
             '<p class="pt-step">Escanea con el móvil para usarlo como mando</p>' +
             '<div class="pt-qr" data-qr><span class="pt-spin"></span></div>' +

@@ -102,6 +102,7 @@ final class Arcade_Party {
 			'tv'     => home_url( '/tele/' ),
 			'home'   => home_url( '/' ),
 			'brand'  => $brand,
+			'logo'   => $asset( 'assets/img/kuboplay-logo.svg' ),
 			'colors' => self::COLORS,
 			'ice'    => array( array( 'urls' => 'stun:stun.l.google.com:19302' ) ),
 			'v'      => $v,

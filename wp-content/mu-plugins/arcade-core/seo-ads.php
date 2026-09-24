@@ -202,6 +202,9 @@ final class Arcade_SEO {
 		} else {
 			$title = $brand . ' — Juegos gratis online'; $desc = sprintf( '%s: juegos HTML5 gratis para móvil y PC. Arcade, puzzle, plataformas, cartas, 3D y deportes, sin descargas ni registro.', $brand ); $img = '';
 		}
+		if ( ! $img ) {
+			$img = plugins_url( 'assets/img/og-kuboplay.png', __FILE__ );
+		}
 		$desc = wp_trim_words( $desc, 32, '…' );
 		printf( '<meta name="description" content="%s">' . "\n", esc_attr( $desc ) );
 		printf( '<meta property="og:type" content="website"><meta property="og:site_name" content="%s"><meta property="og:title" content="%s"><meta property="og:description" content="%s">%s<meta name="twitter:card" content="summary_large_image">' . "\n", esc_attr( $brand ), esc_attr( $title ), esc_attr( $desc ), $img ? '<meta property="og:image" content="' . esc_url( $img ) . '">' : '' );

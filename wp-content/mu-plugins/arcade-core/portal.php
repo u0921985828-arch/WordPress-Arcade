@@ -150,7 +150,7 @@ final class Arcade_Portal {
 
 	public static function brand() {
 		$n = trim( get_bloginfo( 'name' ) );
-		return ( '' === $n || in_array( strtolower( $n ), array( 'my blog', 'mi blog', 'my wordpress', 'wordpress' ), true ) ) ? 'Arcade' : $n;
+		return ( '' === $n || in_array( strtolower( $n ), array( 'my blog', 'mi blog', 'my wordpress', 'wordpress' ), true ) ) ? 'Kuboplay' : $n;
 	}
 
 	public static function genre_of( $post_id ) {

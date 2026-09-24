@@ -23,7 +23,8 @@ body{-webkit-tap-highlight-color:transparent}
 .pt-join{display:flex;flex-direction:column;gap:1.2em;min-height:0}
 .pt-brand{display:flex;align-items:center;gap:.55em;color:#fff;text-decoration:none;font:800 1.35em var(--fr)}
 .pt-mark{width:1.7em;height:1.7em}
-.pt-brand em{display:inline-flex;align-items:center;gap:.35em;margin-left:auto;padding:.3em .7em;border-radius:99px;background:rgba(110,98,245,.18);color:#c9c3ff;font:700 .62em var(--ff);font-style:normal;letter-spacing:.04em;text-transform:uppercase}
+.pt-wm{display:block;height:1.9em;width:auto;image-rendering:pixelated}
+.pt-brand em{display:inline-flex;white-space:nowrap;align-items:center;gap:.35em;margin-left:auto;padding:.3em .7em;border-radius:99px;background:rgba(110,98,245,.18);color:#c9c3ff;font:700 .62em var(--ff);font-style:normal;letter-spacing:.04em;text-transform:uppercase}
 .pt-brand em svg{width:1.3em;height:1.3em}
 .pt-qrbox{display:flex;flex-direction:column;align-items:center;gap:.7em;padding:1.3em 1.3em 1.5em;text-align:center}
 .pt-step{margin:0;font:700 1.05em/1.3 var(--fr)}

@@ -13,6 +13,7 @@ body.ax :focus-visible{outline:2px solid var(--acc2);outline-offset:2px}
 .ax-bar{display:flex;align-items:center;gap:16px;height:60px}
 .ax-logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;letter-spacing:-.02em;color:#fff!important;white-space:nowrap}
 .ax-mark{width:28px;height:28px;flex:none}
+.ax-wm{display:block;width:119px;height:29px;image-rendering:pixelated;flex:none}
 .ax-search{flex:1;display:flex;justify-content:flex-end}
 .ax-search input[type=search]{width:100%;max-width:360px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--s1) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%238b91a1' stroke-width='2'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='m11 11 4 4'/%3E%3C/svg%3E") 12px center no-repeat;padding:0 12px 0 36px;color:var(--tx);font:inherit;font-size:14px;outline:0;transition:border-color .15s}
 .ax-search input:focus{border-color:var(--acc)}
