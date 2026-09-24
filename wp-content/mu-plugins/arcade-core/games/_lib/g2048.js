@@ -72,7 +72,7 @@ function slide(d) {
 }
 function canMove() { if (cells.some((cl) => !tiles[key(cl)])) return true; const dirs = HEX ? HX_D : Object.values(SQ_D); return cells.some((cl) => dirs.some(([dx, dy]) => { const o = tiles[key([cl[0] + dx, cl[1] + dy])]; return o && o.v === tiles[key(cl)].v; })); }
 function reset() { build(); tiles = {}; score = 0; anim = 0; ghosts = []; overT = 0; nudge = [0, 0]; moves = 0; bestV = k.best(CFG.id, 0); add(); add(); if (!bgCv) bgCv = makeBg(); }
-reset(); k.show(CFG.title, HEX ? 'Desliza en 6 direcciones (teclado: flechas + Q E Z C) para unir fichas iguales.' : 'Desliza o usa las flechas para unir fichas iguales. Llega a 2048.');
+reset(); k.show(CFG.title, HEX ? 'Desliza en 6 direcciones (teclado: flechas + Q E Z C; mando: flechas, A arriba-derecha y B abajo-izquierda) para unir fichas iguales.' : 'Desliza o usa las flechas para unir fichas iguales. Llega a 2048.');
 const HEXKEY = { KeyQ: 2, KeyE: 1, KeyZ: 4, KeyC: 5 };
 addEventListener('keydown', (e) => { if (HEX && k.st === 'play' && !k.paused && HEXKEY[e.code] !== undefined) slide(HX_D[HEXKEY[e.code]]); });
 const easeBack = (t) => { const s = 1.9; t -= 1; return t * t * ((s + 1) * t + s) + 1; };
@@ -91,7 +91,8 @@ k.run((dt) => {
     if (HEX) { const a = Math.atan2(-dy, dx); const i = ((Math.round(a / (Math.PI / 3)) % 6) + 6) % 6; /* 0=E,1=NE,2=NW,3=W,4=SW,5=SE */ slide(HX_D[i]); }
     else slide(SQ_D[Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up')]); } }
   if (!HEX) { for (const d of ['up', 'down', 'left', 'right']) if (k.hit.has(d)) slide(SQ_D[d]); }
-  else { if (k.hit.has('left')) slide([-1, 0]); if (k.hit.has('right')) slide([1, 0]); if (k.hit.has('up')) slide([0, -1]); if (k.hit.has('down')) slide([0, 1]); }
+  else { if (k.hit.has('left')) slide([-1, 0]); if (k.hit.has('right')) slide([1, 0]); if (k.hit.has('up')) slide(k.held.has('right') ? [1, -1] : [0, -1]); if (k.hit.has('down')) slide(k.held.has('left') ? [-1, 1] : [0, 1]);
+    if (k.party && k.hit.has('a')) slide([1, -1]); if (k.party && k.hit.has('b')) slide([-1, 1]); } /* mando: ↑ arriba-izq., ↓ abajo-der., A arriba-der., B abajo-izq. */
 }, () => {
   c.drawImage(bgCv, 0, 0, W, H);
   // HUD: título a la izquierda y marcadores a la derecha (el centro es del kit)

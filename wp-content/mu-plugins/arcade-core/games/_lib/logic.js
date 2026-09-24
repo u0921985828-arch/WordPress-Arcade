@@ -100,6 +100,8 @@ k.run((dt) => {
     if (k.ptr.hit && k.ptr.y > OY + 9 * S + 12) { const n = Math.floor((k.ptr.x - 24) / 43.2) + 1; if (n >= 1 && n <= 10) { padHit = n; setNum(n === 10 ? 0 : n); } }
     if (kd) { if (sel === null) sel = 40; else { const dd = { up: -9, down: 9, left: -1, right: 1 }[kd]; sel = k.clamp(sel + dd, 0, 80); } }
     if (keyNum !== null) { setNum(keyNum); keyNum = null; }
+    if (k.hit.has('a')) { if (sel === null) sel = 40; else if (!given[sel]) setNum((g[sel] + 1) % 10); } /* mando: A cambia el número (1→9→vacío), B borra */
+    if (k.hit.has('b') && sel !== null) setNum(0);
   }
   if (M === 'mines') {
     if (k.ptr.hit) { pressT = 0; longDone = false; downIn = true; }

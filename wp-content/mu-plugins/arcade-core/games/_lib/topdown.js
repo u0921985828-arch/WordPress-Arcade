@@ -74,14 +74,18 @@ function reset() {
   p = { x: TH.door ? X0 + 40 : W / 2, y: H / 2, r: 11, hp: 5, max: 5, a: 0, aim: 0, inv: 0, kx: 0, ky: 0, mv: false, face: 1, body: 0, recoil: 0 };
   room = 0; score = 0; t = 0; cool = 0; swing = 0; kills = 0; choice = null; upg = { rate: 1, dmg: 1, speed: 1, multi: 1, pierce: 0, reach: 1 }; if (VS) vsRound(true); else buildRoom();
 }
-/* ---------- Modo tele (fiesta): 2–4 tanques humanos, todos contra todos, sin CPU; gana quien gane 3 rondas ---------- */
-let VS = null, vsR = 0, vsBetween = 0, vsFreeze = 0, vsLast = null;
+/* ---------- Modo tele (fiesta): 2–4 tanques humanos, todos contra todos; gana quien gane 3 rondas.
+   Si alguien se va, la CPU lleva su tanque hasta que vuelva; quien llega nuevo entra en la ronda siguiente. ---------- */
+const inParty = (pl) => !!(k.party && k.party.some((x) => x.p === pl));
+let vsCd = false, VS = null, vsR = 0, vsBetween = 0, vsFreeze = 0, vsLast = null;
 const VSWIN = 3, VSHP = 3;
 function vsRound(first) {
   vsR = first ? 1 : vsR + 1; room = vsR; vsBetween = 0; vsFreeze = 1.3; vsLast = null;
   walls = []; foes = []; shots = []; eshots = []; pend = []; drops = []; bossF = null; floorCv = null; quota = 0; cleared = true; door = false; choice = null;
-  const SP = [[X0 + 46, Y0 + 40, 0.5], [X1 - 46, Y1 - 40, Math.PI + 0.5], [X1 - 46, Y0 + 40, Math.PI - 0.5], [X0 + 46, Y1 - 40, -0.5]];
-  VS.forEach((q, i) => { const sp = SP[i]; Object.assign(q, { x: sp[0], y: sp[1], body: sp[2], a: sp[2], aim: sp[2], hp: VSHP, inv: 1.3, alive: true, kx: 0, ky: 0, cool: 0.4, recoil: 0, mv: false }); });
+  /* 2: esquinas opuestas; 3: arriba a los lados y abajo en el centro (misma distancia entre todos); 4: esquinas */
+  const SP = VS.length === 3 ? [[X0 + 46, Y0 + 40], [X1 - 46, Y0 + 40], [W / 2, Y1 - 40]] : [[X0 + 46, Y0 + 40], [X1 - 46, Y1 - 40], [X1 - 46, Y0 + 40], [X0 + 46, Y1 - 40]];
+  SP.forEach((sp) => sp.push(Math.atan2(H / 2 + 10 - sp[1], W / 2 - sp[0])));
+  VS.forEach((q, i) => { const sp = SP[i]; q.cpu = !inParty(q.pl); q.ai = null; Object.assign(q, { x: sp[0], y: sp[1], body: sp[2], a: sp[2], aim: sp[2], hp: VSHP, inv: 1.3, alive: true, kx: 0, ky: 0, cool: 0.4, recoil: 0, mv: false }); });
   for (let i = 0, tries = 0; i < 6 && tries < 200; tries++) {
     const w = k.pick([30, 60, 90]), h = k.pick([30, 40, 60]);
     const x = Math.round(k.rnd(X0 + 50, X1 - 50 - w) / 10) * 10, y = Math.round(k.rnd(Y0 + 30, Y1 - 30 - h) / 10) * 10;
@@ -89,24 +93,38 @@ function vsRound(first) {
     if (SP.some((sp) => x < sp[0] + 70 && x + w > sp[0] - 70 && y < sp[1] + 70 && y + h > sp[1] - 70)) continue;
     walls.push({ x, y, w, h, hp: Math.random() < 0.5 ? 4 : 0, fl: 0, seed: Math.random() }); i++;
   }
-  msg = `Ronda ${vsR}`; msgT = 1.6;
+  msg = `Ronda ${vsR}`; msgT = 2.2; vsCd = true;
+}
+/* CPU del modo tele: persigue al rival más cercano, lo encara para disparar, se aparta si está muy cerca y rodea los muros */
+function vsCpu(q, dt) {
+  const st = q.ai || (q.ai = { mode: 'chase', t: 0, side: 1, px: q.x, py: q.y, stuck: 0 });
+  const foes2 = VS.filter((o) => o !== q && o.alive); if (!foes2.length) return [0, 0, false];
+  const tg = foes2.reduce((a, b) => (Math.hypot(a.x - q.x, a.y - q.y) < Math.hypot(b.x - q.x, b.y - q.y) ? a : b));
+  const dx = tg.x - q.x, dy = tg.y - q.y, d = Math.hypot(dx, dy), ang = Math.atan2(dy, dx);
+  let los = true; for (let s2 = 0.1; s2 < 1; s2 += 0.06) if (wallAt(q.x + dx * s2, q.y + dy * s2, 3)) { los = false; break; }
+  st.t -= dt; st.stuck = Math.hypot(q.x - st.px, q.y - st.py) < 20 * dt ? st.stuck + dt : 0; st.px = q.x; st.py = q.y;
+  if (st.t <= 0 || st.stuck > 0.3) { st.t = 0.6 + Math.random() * 1.1; st.stuck = 0; st.side = Math.random() < 0.5 ? 1 : -1; st.mode = !los ? (Math.random() < 0.5 ? 'side' : 'chase') : d < 100 ? 'back' : Math.random() < 0.3 ? 'side' : 'chase'; }
+  const off = angDiff(q.aim, ang); let a = st.mode === 'side' ? ang + st.side * 1.4 : st.mode === 'back' ? ang + Math.PI : ang;
+  if (los && d < 330 && off > 0.3 && st.mode !== 'back') a = ang;
+  return [Math.cos(a), Math.sin(a), los && off < 0.2 && d < 380 && Math.random() < 0.6];
 }
 function vsUpdate(dt) {
   for (const w of walls) w.fl -= dt;
   if (vsBetween) { vsBetween -= dt; if (vsBetween <= 0) vsRound(); }
-  vsFreeze = Math.max(0, vsFreeze - dt);
+  if (vsCd) { vsCd = false; k.count(3); }
+  vsFreeze = k.counting() ? 1 : 0;
   VS.forEach((q, i) => {
     if (!q.alive) return;
     q.inv -= dt; q.cool -= dt; q.recoil = Math.max(0, q.recoil - dt);
-    const pd = k.pad(q.pl), HS = new Set(pd.held); if (i === 0) for (const x of k.held) HS.add(x); /* J1 también con teclado */
-    let mx = 0, my = 0; if (HS.has('left')) mx--; if (HS.has('right')) mx++; if (HS.has('up')) my--; if (HS.has('down')) my++;
+    const pd = k.pad(q.pl), HS = new Set(pd.held); if (q.pl === 0 && !q.cpu) for (const x of k.held) HS.add(x); /* J1 también con teclado */
+    let mx = 0, my = 0, cf = false; if (q.cpu) { if (!vsBetween) [mx, my, cf] = vsCpu(q, dt); } else { if (HS.has('left')) mx--; if (HS.has('right')) mx++; if (HS.has('up')) my--; if (HS.has('down')) my++; }
     const ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
     if (vsFreeze > 0) { mx = my = 0; }
     q.mv = ml > 0.1 && !vsFreeze; if (q.mv) { q.a = Math.atan2(my, mx); q.body += k.clamp(((q.a - q.body + 3 * Math.PI) % R2) - Math.PI, -8 * dt, 8 * dt); }
     q.aim += k.clamp(((q.a - q.aim + 3 * Math.PI) % R2) - Math.PI, -10 * dt, 10 * dt); /* la torreta apunta hacia donde te mueves */
     move(q, (mx * 130 + q.kx) * dt, (my * 130 + q.ky) * dt); const dec = Math.pow(0.002, dt); q.kx *= dec; q.ky *= dec;
     for (const o of VS) if (o !== q && o.alive) { const ex = q.x - o.x, ey = q.y - o.y, e = Math.hypot(ex, ey); if (e > 0 && e < q.r + o.r + 4) move(q, ex / e * 60 * dt, ey / e * 60 * dt); }
-    if ((pd.hit.has('a') || pd.held.has('a') || (i === 0 && k.held.has('a'))) && q.cool <= 0 && !vsFreeze && !vsBetween) {
+    if ((q.cpu ? cf : HS.has('a') || pd.hit.has('a')) && q.cool <= 0 && !vsFreeze && !vsBetween) {
       q.cool = 0.55; q.recoil = 0.1; k.sfx('shoot');
       shots.push({ x: q.x + Math.cos(q.aim) * 18, y: q.y + Math.sin(q.aim) * 18, vx: Math.cos(q.aim) * 380, vy: Math.sin(q.aim) * 380, life: 1.6, b: 1, own: i, col: q.col });
     }
@@ -127,8 +145,7 @@ function vsUpdate(dt) {
   if (!vsBetween && al.length <= 1) {
     vsLast = al[0] || null; if (vsLast) { vsLast.wins++; k.sfx('win'); }
     const champ = VS.find((q) => q.wins >= VSWIN);
-    if (champ) { k.st = 'over'; k.confetti(); k.sfx('win'); try { if (parent !== window) parent.postMessage({ type: 'arcade:over', score: champ.wins }, '*'); } catch (e) { /* sin portal */ }
-      k.show(`¡Gana ${champ.name}!`, VS.map((q) => `<b style="color:${q.col}">${q.name} ${q.wins}</b>`).join(' · ') + '<br>Toca para la revancha'); return; }
+    if (champ) { k.win(champ.cpu ? 'Gana la CPU' : `¡Gana ${champ.name}!`, champ.col, VS.map((q) => `<b style="color:${q.col}">${q.name} ${q.wins}</b>`).join(' · ') + '<br>Toca para la revancha', champ.wins); return; }
     vsBetween = 2; msg = vsLast ? `Ronda para ${vsLast.name}` : 'Ronda nula'; msgT = 1.8;
   }
 }
@@ -136,16 +153,20 @@ function vsDraw() {
   if (!floorCv) floorCv = renderFloor(); if (!vigCv) vigCv = renderVig();
   c.drawImage(floorCv, 0, 0, W, H); lights();
   for (const w of [...walls].sort((a, b) => a.y + a.h - b.y - b.h)) block(w);
-  for (const q of [...VS].sort((a, b) => a.y - b.y)) { if (!q.alive || (q.inv > 0 && !vsFreeze && Math.floor(q.inv * 14) % 2)) continue; shadow(q.x, q.y + 10, 10); tankSprite(q.x, q.y, q.body, q.aim, q.col, q.recoil, q.mv); label(q.name, q.x, q.y - 30, 11, q.col, 'center'); }
+  for (const q of [...VS].sort((a, b) => a.y - b.y)) { if (!q.alive || (q.inv > 0 && !vsFreeze && Math.floor(q.inv * 14) % 2)) continue; shadow(q.x, q.y + 10, 10); tankSprite(q.x, q.y, q.body, q.aim, q.col, q.recoil, q.mv); label(q.cpu ? 'CPU' : q.name, q.x, q.y - 34, 14, q.cpu ? '#e8e4f4' : q.col, 'center'); }
   for (const s of shots) { c.save(); c.translate(s.x, s.y); c.rotate(Math.atan2(s.vy, s.vx)); ART.rr(c, -6, -3, 12, 6, 3); ART.fillOut(c, s.col, 1.5); c.restore(); }
   c.drawImage(vigCv, 0, 0, W, H);
   const pw = Math.min(150, (W - 20) / VS.length - 6);
   VS.forEach((q, i) => { const x = 10 + i * (pw + 6); ART.rr(c, x, 5, pw, 26, 9); c.fillStyle = q.alive ? 'rgba(26,21,48,.85)' : 'rgba(26,21,48,.45)'; c.fill(); c.lineWidth = 2; c.strokeStyle = q.col; c.stroke();
-    label(q.name, x + 8, 10, 14, q.alive ? q.col : '#77708f'); for (let h = 0; h < VSHP; h++) ART.heart(c, x + 44 + h * 17, 18, 0.85, h < q.hp && q.alive); label(`${q.wins}`, x + pw - 8, 9, 16, '#ffc928', 'right'); });
+    label(q.cpu ? 'CPU' : q.name, x + 8, 10, 14, q.alive ? q.col : '#77708f'); for (let h = 0; h < VSHP; h++) ART.heart(c, x + 44 + h * 17, 18, 0.85, h < q.hp && q.alive); label(`${q.wins}`, x + pw - 8, 9, 16, '#ffc928', 'right'); });
   label(`A ${VSWIN} rondas`, W - 14, Y1 + 1, 11, 'rgba(255,255,255,.85)', 'right');
-  if (msgT > 0) { c.globalAlpha = Math.min(1, msgT * 2); c.font = '800 22px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const mw = c.measureText(msg).width + 36; ART.rr(c, W / 2 - mw / 2, H / 2 - 64, mw, 40, 12); c.fillStyle = 'rgba(26,21,48,.82)'; c.fill(); label(msg, W / 2, H / 2 - 55, 22, vsLast ? vsLast.col : '#ffc928', 'center'); c.globalAlpha = 1; }
+  if (msgT > 0) { c.globalAlpha = Math.min(1, msgT * 2); c.font = '800 22px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const mw = c.measureText(msg).width + 36, my = vsFreeze ? 44 : H / 2 - 64; ART.rr(c, W / 2 - mw / 2, my, mw, 40, 12); c.fillStyle = 'rgba(26,21,48,.82)'; c.fill(); label(msg, W / 2, my + 9, 22, vsLast ? vsLast.col : '#ffc928', 'center'); c.globalAlpha = 1; }
 }
-k.onParty = () => { if (k.st !== 'play') reset(); };
+k.onParty = () => {
+  if (k.st !== 'play' || !VS) { if (k.st !== 'play') reset(); return; }
+  for (const q of VS) { q.cpu = !inParty(q.pl); if (q.cpu) q.ai = null; }
+  for (const x of k.party || []) if (VS.length < 4 && !VS.some((q) => q.pl === x.p)) VS.push({ pl: x.p, col: k.pcol(x.p), name: 'J' + (x.p + 1), r: 11, wins: 0, alive: false, hp: 0, cpu: false, x: -99, y: -99, body: 0, aim: 0 });
+};
 reset(); k.show(CFG.title, CFG.help);
 function hurt(n, sx, sy) {
   if (p.inv > 0 || k.st !== 'play') return;

@@ -26,7 +26,10 @@ const GLOW = { spark: glowCv('#ffa94d', 22), me: glowCv('#f2d15c', 18) }; Object
 const glowOf = (b) => GLOW[b.gk] || (GLOW[b.gk] = glowCv(b.col, 20));
 /* Modo tele (fiesta, 2–4 humanos): 4 motos, las que faltan las lleva la CPU; gana el partido quien gane 3 rondas. */
 const WIN = 3, CPUC = ['#b98cff', '#9aa3c7', '#ff9f5a', '#e0e4ff'];
-let MP = null, wins = [], lastW = null;
+/* Salida en molinete (giro de 90° alrededor del centro): todas las motos tienen el mismo espacio y el mismo rival de frente. */
+const PIN = [[8, 38, 'right'], [21, 8, 'down'], [51, 21, 'left'], [38, 51, 'up']];
+let cdPend = false, MP = null, SLOTS = null, wins = [], lastW = null;
+const inParty = (p) => !!(k.party && k.party.some((q) => q.p === p));
 const trailCv = mk(480, 480), tc = trailCv.getContext('2d'), haloCv = mk(480, 480), hc = haloCv.getContext('2d');
 const ownCv = mk(480, 480), oc = ownCv.getContext('2d'), freshCv = mk(480, 480), fc = freshCv.getContext('2d');
 const PAT = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 16; const q = cv.getContext('2d'); q.fillStyle = '#23307e'; q.fillRect(0, 0, 16, 16); q.strokeStyle = '#2f3fa0'; q.lineWidth = 3; q.beginPath(); q.moveTo(-4, 20); q.lineTo(20, -4); q.moveTo(-4, 4); q.lineTo(4, -4); q.moveTo(12, 20); q.lineTo(20, 12); q.stroke(); return oc.createPattern(cv, 'repeat'); })();
@@ -54,11 +57,12 @@ function paintOwn() {
 const DF = () => Math.min(1, (round - 1) / 8), lerp = (a, b, q) => a + (b - a) * q;
 const STEP = () => TRAILS ? lerp(0.11, 0.05, DF()) : 0.065;
 function newRound() {
-  g = Array.from({ length: N }, () => Array(N).fill(0)); acc = 0; count = 2.4; between = 0; dying = 0; booms = []; freshT = 0; respawn = 0; tc.clearRect(0, 0, 480, 480); hc.clearRect(0, 0, 480, 480);
+  g = Array.from({ length: N }, () => Array(N).fill(0)); acc = 0; count = MP ? 0 : 2.4; cdPend = !!MP; between = 0; dying = 0; booms = []; freshT = 0; respawn = 0; tc.clearRect(0, 0, 480, 480); hc.clearRect(0, 0, 480, 480);
   if (TRAILS) {
     bikes = [{ x: 10, y: 36, d: 'right', col: COL[1], id: 1, alive: true, me: true }, { x: 50, y: 24, d: 'left', col: COL[2], id: 2, alive: true }, { x: 30, y: 8, d: 'down', col: COL[3], id: 3, alive: true }, { x: 30, y: 52, d: 'up', col: COL[4], id: 4, alive: true }].slice(0, MP ? 4 : 2 + Math.min(2, round - 1));
     bikes.forEach((b) => { b.gk = b.id; });
-    if (MP) bikes.forEach((b, i) => { const q = MP[i]; b.me = false; if (q) { b.pl = q.p; b.col = k.pcol(q.p); b.gk = 'p' + b.col; b.name = 'J' + (q.p + 1); } else { b.col = CPUC[i]; b.gk = 'c' + i; b.name = 'CPU'; } });
+    if (MP) bikes.forEach((b, i) => { const p = SLOTS[i]; Object.assign(b, { x: PIN[i][0], y: PIN[i][1], d: PIN[i][2], me: false });
+      if (p !== null) { b.orig = p; b.col = k.pcol(p); b.gk = 'p' + b.col; if (inParty(p)) { b.pl = p; b.name = 'J' + (p + 1); } else b.name = 'CPU'; } else { b.col = CPUC[i]; b.gk = 'c' + i; b.name = 'CPU'; } });
     bikes.forEach((b) => { g[b.y][b.x] = b.id; b.px = b.x; b.py = b.y; stamp(b.x, b.y, b.x, b.y, b.col); });
   } else {
     for (let y = 21; y < 27; y++) for (let x = 21; x < 27; x++) g[y][x] = 1;
@@ -67,8 +71,16 @@ function newRound() {
   }
 }
 function newSpark() { const me = bikes && bikes[0]; for (let i = 0; i < 60; i++) { const x = k.rnd(2, N - 2), y = k.rnd(2, N - 2); if (g[Math.floor(y)][Math.floor(x)]) continue; if (me && Math.hypot(x - me.x, y - me.y) < 14) continue; const v = lerp(5, 11, DF()); return { x, y, vx: k.pick([-1, 1]) * k.rnd(0.7, 1.2) * v, vy: k.pick([-1, 1]) * k.rnd(0.7, 1.2) * v, tail: [] }; } return { x: 2, y: 2, vx: 6, vy: 6, tail: [] }; }
-function reset() { MP = TRAILS && k.party && k.party.length >= 2 ? k.party.slice(0, 4) : null; wins = [0, 0, 0, 0]; lastW = null; score = 0; round = 1; newRound(); }
-k.onParty = () => { if (k.st !== 'play') reset(); };
+function reset() { MP = TRAILS && k.party && k.party.length >= 2 ? k.party.slice(0, 4) : null;
+  /* con 2 jugadores, en esquinas opuestas del molinete */
+  SLOTS = MP ? (MP.length === 2 ? [MP[0].p, null, MP[1].p, null] : [0, 1, 2, 3].map((i) => (MP[i] ? MP[i].p : null))) : null;
+  wins = [0, 0, 0, 0]; lastW = null; score = 0; round = 1; newRound(); }
+/* Si alguien se va a mitad de partido, la CPU lleva su moto (con su color) hasta que vuelva; quien llega nuevo ocupa una moto de la CPU en la ronda siguiente. */
+k.onParty = () => {
+  if (k.st !== 'play' || !MP) { if (k.st !== 'play') reset(); return; }
+  for (const b of bikes) if (b.orig !== undefined) { if (inParty(b.orig)) { b.pl = b.orig; b.name = 'J' + (b.orig + 1); } else { b.pl = undefined; b.nd = null; b.name = 'CPU'; } }
+  for (const q of k.party || []) if (!SLOTS.includes(q.p)) { const i = SLOTS.indexOf(null); if (i >= 0) SLOTS[i] = q.p; }
+};
 reset(); k.show(CFG.title, CFG.help);
 
 const free = (x, y) => x >= 0 && y >= 0 && x < N && y < N && !g[y][x];
@@ -100,8 +112,10 @@ k.run((dt) => {
     if (w && w !== OPP[b.nd || b.d]) b.nd = w; });
   if (want) { const back = TRAILS ? OPP[me.nd || me.d] : me.trail.length ? OPP[me.nd || me.ld] : null; if (want !== back) me.nd = want; }
   goT = Math.max(0, goT - dt);
+  if (cdPend) { cdPend = false; k.count(3); }
+  if (k.counting()) { acc = 0; return; }
   if (count > 0) { const c0 = Math.ceil(count / 0.8); count -= dt; const c1 = Math.ceil(count / 0.8); if (c1 !== c0) k.sfx(c1 > 0 ? 'click' : 'start'); if (count > 0) return; acc = 0; goT = 0.6; }
-  const step = MP ? 0.085 : STEP(), look = Math.round(lerp(60, 300, DF())), noise = lerp(10, 4, DF());
+  const step = MP ? 0.09 : STEP(), look = Math.round(lerp(60, 300, DF())), noise = lerp(10, 4, DF());
   if (!TRAILS) {
     for (const s of sparks) {
       s.tail.unshift([s.x, s.y]); if (s.tail.length > 7) s.tail.pop();
@@ -125,11 +139,10 @@ k.run((dt) => {
       for (const b of bikes) if (b.alive) { b.x = b.nx; b.y = b.ny; g[b.y][b.x] = b.id; stamp(b.px, b.py, b.x, b.y, b.col); }
       for (const b of bikes) if (!b.alive && !b.boom) { b.boom = true; b.px = b.x; b.py = b.y; boom(b.x * S + S / 2, TOP + b.y * S + S / 2, b.col); if (!b.me && !MP) { score += 50; k.float('+50', b.x * S, TOP + b.y * S - 12, b.col); } }
       if (MP) { const al = bikes.filter((b) => b.alive), hum = al.filter((b) => b.pl !== undefined);
-        if (al.length <= 1 || !hum.length) { const wb = al.length === 1 ? al[0] : null; lastW = wb; if (wb) { wins[bikes.indexOf(wb)]++; k.sfx('win'); k.float('+1', wb.x * S, TOP + wb.y * S - 14, wb.col); }
+        if (al.length <= 1 || (!hum.length && bikes.some((b) => b.pl !== undefined))) { const wb = al.length === 1 ? al[0] : null; lastW = wb; if (wb) { wins[bikes.indexOf(wb)]++; k.sfx('win'); k.float('+1', wb.x * S, TOP + wb.y * S - 14, wb.col); }
           const champ = bikes.findIndex((b, i) => wins[i] >= WIN);
-          if (champ >= 0) { const cb = bikes[champ]; between = 0; dying = 0; k.st = 'over'; k.confetti(); k.sfx('win');
-            try { if (parent !== window) parent.postMessage({ type: 'arcade:over', score: wins[champ] }, '*'); } catch (e) { /* sin portal */ }
-            k.show(cb.name === 'CPU' ? 'Gana la CPU' : `¡Gana ${cb.name}!`, bikes.map((b, i) => `<b style="color:${b.col}">${b.name} ${wins[i]}</b>`).join(' · ') + '<br>Toca para la revancha'); return; }
+          if (champ >= 0) { const cb = bikes[champ]; between = 0; dying = 0;
+            k.win(cb.name === 'CPU' ? 'Gana la CPU' : `¡Gana ${cb.name}!`, cb.col, bikes.map((b, i) => `<b style="color:${b.col}">${b.name} ${wins[i]}</b>`).join(' · ') + '<br>Toca para la revancha', wins[champ]); return; }
           round++; between = 1.6; return; }
         continue; }
       if (!bikes[0].alive) return lose('Choque', `Ronda ${round}`);
@@ -157,12 +170,13 @@ function bike(b, fr) {
   c.fillStyle = 'rgba(255,255,255,.55)'; c.fillRect(-9, -3, 6, 1.5);
   c.beginPath(); c.arc(7, 0, 3.2, 0, R2); ART.fillOut(c, '#fff', 1.5); c.fillStyle = OUT; c.fillRect(-12, -1.5, 3, 3);
   c.restore();
-  if (MP && b.pl !== undefined) label(b.name, x, y - 26, 12, b.col, 'center');
+  if (MP) label(b.name, k.clamp(x, 22, W - 22), y < TOP + 40 ? y + 34 : y - 34, 17, b.pl !== undefined ? b.col : '#c9cbe0', 'center');
 }
 function hudTop() {
-  if (MP) { label(`Ronda ${round} · a ${WIN}`, W - 12, 11, 14, '#b8b6e0', 'right');
-    bikes.forEach((b, i) => { const x = 12 + i * 78; ART.rr(c, x, 8, 70, 24, 8); c.fillStyle = b.alive ? 'rgba(26,21,48,.85)' : 'rgba(26,21,48,.45)'; c.fill(); c.lineWidth = 2; c.strokeStyle = b.col; c.stroke();
-      label(b.name, x + 8, 13, 13, b.alive ? b.col : '#55587a'); label(`${wins[i]}`, x + 62, 11, 16, '#fff', 'right'); });
+  if (MP) { label(`R${round}`, W - 8, 9, 18, '#b8b6e0', 'right');
+    bikes.forEach((b, i) => { const x = 6 + i * 102; ART.rr(c, x, 4, 96, 32, 9); c.fillStyle = b.alive ? 'rgba(26,21,48,.9)' : 'rgba(26,21,48,.45)'; c.fill(); c.lineWidth = 3; c.strokeStyle = b.alive ? b.col : '#3a3d5c'; c.stroke();
+      label(b.name, x + 8, 9, 18, b.alive ? b.col : '#55587a');
+      for (let j = 0; j < WIN; j++) { c.beginPath(); c.arc(x + 62 + j * 11, 20, 4.5, 0, R2); c.fillStyle = j < wins[i] ? '#ffd166' : 'rgba(255,255,255,.15)'; c.fill(); c.lineWidth = 1.5; c.strokeStyle = OUT; c.stroke(); } });
     return; }
   label(`${score}`, 12, 8, 22, '#fff');
   if (TRAILS) { label(`Ronda ${round}`, W - 12, 5, 15, '#b8b6e0', 'right');
@@ -174,7 +188,7 @@ function hudTop() {
 }
 function draw() {
   c.drawImage(BG, 0, 0, W, H);
-  const fr = count > 0 || between || dying ? 1 : Math.min(1, acc / STEP());
+  const fr = count > 0 || between || dying || k.counting() ? 1 : Math.min(1, acc / (MP ? 0.09 : STEP()));
   if (TRAILS) {
     c.drawImage(haloCv, 0, TOP, 480, 480); c.drawImage(trailCv, 0, TOP, 480, 480);
     for (const b of bikes) if (b.alive) bike(b, fr);
@@ -198,6 +212,6 @@ function draw() {
   if (count > 0 && k.st === 'play') { const n = Math.ceil(count / 0.8), p = 1 - (count % 0.8) / 0.8, s = 1 + (1 - Math.min(1, p * 3)) * 0.6; c.save(); c.translate(W / 2, TOP + 200); c.scale(s, s); c.globalAlpha = Math.min(1, (1 - p) * 3 + 0.2); label(`${n}`, 0, -30, 60, '#fff', 'center'); c.restore();
     if (TRAILS) label('Desliza o usa las flechas para girar', W / 2, TOP + 290, 14, '#b8b6e0', 'center'); else label('Sal de tu zona y vuelve para conquistar', W / 2, TOP + 290, 14, '#b8b6e0', 'center'); }
   if (goT > 0) { c.globalAlpha = goT / 0.6; label('¡Ya!', W / 2, TOP + 170 - (0.6 - goT) * 40, 56, '#7cf7a0', 'center'); c.globalAlpha = 1; }
-  if (between && MP) label(lastW ? `¡Ronda para ${lastW.name}!` : 'Ronda nula', W / 2, TOP + 200, 30, lastW ? lastW.col : '#b8b6e0', 'center');
+  if (between && MP) label(lastW ? `¡Ronda para ${lastW.name}!` : 'Ronda nula', W / 2, TOP + 200, 36, lastW ? lastW.col : '#b8b6e0', 'center');
   else if (between) label(TRAILS ? '¡Ronda superada!' : '¡Zona conquistada!', W / 2, TOP + 200, 30, '#7cf7a0', 'center');
 }

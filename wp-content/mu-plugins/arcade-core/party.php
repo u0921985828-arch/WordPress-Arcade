@@ -94,6 +94,11 @@ final class Arcade_Party {
 			'ice'    => array( array( 'urls' => 'stun:stun.l.google.com:19302' ) ),
 			'v'      => $v,
 		);
+		$ads = 'tv' === $kind ? self::ads() : array( 'head' => '' );
+		if ( 'tv' === $kind ) {
+			$cfg['ad'] = $ads['block'];
+			$cfg['h5'] = $ads['h5'];
+		}
 		nocache_headers();
 		header( 'Content-Type: text/html; charset=utf-8' );
 		header( 'X-Robots-Tag: noindex' );
@@ -108,9 +113,12 @@ final class Arcade_Party {
 <meta name="robots" content="noindex">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
 <title><?php echo esc_html( $title ); ?></title>
 <link rel="icon" href="<?php echo esc_url( $asset( 'assets/img/icon.svg' ) ); ?>" type="image/svg+xml">
 <link rel="stylesheet" href="<?php echo esc_url( add_query_arg( 'v', $v, $asset( 'assets/css/party.css' ) ) ); ?>">
+<?php echo $ads['head']; // phpcs:ignore -- HTML generado aquí con valores escapados ?>
 </head>
 <body class="<?php echo $tv ? 'pt-tv' : 'pt-pad'; ?>">
 <noscript><p class="pt-noscript">Activa JavaScript para usar el modo tele.</p></noscript>
@@ -121,6 +129,40 @@ final class Arcade_Party {
 </html>
 		<?php
 		exit;
+	}
+
+	/**
+	 * Publicidad de la tele (solo en el lobby; nunca en el mando del móvil ni durante la partida):
+	 * un bloque «Publicidad» entre secciones de la rejilla y, con H5 Games Ads, una pausa publicitaria
+	 * al volver de un juego al lobby. Con ?adpreview=1 (administrador) se ven los huecos simulados.
+	 */
+	private static function ads() {
+		$r = array( 'head' => '', 'block' => '', 'h5' => null );
+		if ( ! class_exists( 'Arcade_SEO' ) ) {
+			return $r;
+		}
+		$preview  = Arcade_SEO::preview();
+		$pub      = Arcade_SEO::opt( 'pub' );
+		$h5       = $pub && Arcade_SEO::opt( 'h5' );
+		$freq     = max( 60, (int) Arcade_SEO::opt( 'freq' ) );
+		$r['block'] = Arcade_SEO::ad_block( 'tv' );
+		if ( $preview ) {
+			$r['h5'] = array( 'freq' => 60, 'preview' => true );
+			return $r;
+		}
+		if ( ! $pub ) {
+			return $r;
+		}
+		$ex = $h5 ? sprintf( ' data-ad-frequency-hint="%ds"', $freq ) : '';
+		if ( Arcade_SEO::opt( 'adtest' ) ) {
+			$ex .= $h5 ? ' data-adbreak-test="on" data-adtest="on"' : ' data-adtest="on"';
+		}
+		$r['head'] = sprintf( '<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-%s" crossorigin="anonymous"%s></script>' . "\n", esc_attr( $pub ), $ex );
+		if ( $h5 ) {
+			$r['head'] .= "<script>window.adsbygoogle=window.adsbygoogle||[];var adBreak=adConfig=function(o){adsbygoogle.push(o);};adConfig({preloadAdBreaks:'on',sound:'on'});</script>\n";
+			$r['h5']    = array( 'freq' => $freq, 'preview' => false );
+		}
+		return $r;
 	}
 
 	/* ------------------------------------------------------------------ REST */
@@ -267,7 +309,7 @@ final class Arcade_Party {
 			delete_transient( 'arcade_pslot_' . $code . '_' . $p );
 			delete_transient( 'arcade_pans_' . $code . '_' . $p );
 		}
-		$room = array( 'k' => self::token(), 't' => time(), 'w' => time(), 'live' => array_fill( 0, self::PADS, 0 ) );
+		$room = array( 'k' => self::token(), 't' => time(), 'w' => time(), 'live' => array_fill( 0, self::PADS, 0 ), 'gone' => array_fill( 0, self::PADS, 0 ) );
 		self::save_room( $code, $room );
 		return self::out( array( 'code' => $code, 'k' => $room['k'], 'ttl' => self::ttl(), 'max' => self::PADS ), 201 );
 	}
@@ -292,12 +334,24 @@ final class Arcade_Party {
 		if ( '' === (string) $req->get_param( 'live' ) ) {
 			$live = array();
 		}
+		$gone = isset( $room['gone'] ) ? $room['gone'] : array_fill( 0, self::PADS, 0 );
 		foreach ( $live as $p ) {
-			if ( $now - $room['live'][ $p ] > 15 ) {
+			if ( $now - $room['live'][ $p ] > 15 || $gone[ $p ] ) {
 				$room['live'][ $p ] = $now;
+				$gone[ $p ]         = 0;
 				$dirty              = true;
 			}
 		}
+		// `gone`: mandos cuyo canal se cerró. Su plaza queda libre enseguida (sin esperar STALE) para que
+		// el mismo móvil en una pestaña nueva, sin su token, recupere su número. Con token vuelve igual.
+		foreach ( array_map( 'intval', array_filter( explode( ',', (string) $req->get_param( 'gone' ) ), 'strlen' ) ) as $p ) {
+			if ( $p >= 0 && $p < self::PADS && ! in_array( $p, $live, true ) && ! $gone[ $p ] ) {
+				$gone[ $p ]         = microtime( true );
+				$room['live'][ $p ] = 0;
+				$dirty              = true;
+			}
+		}
+		$room['gone'] = $gone;
 		if ( $dirty ) {
 			$room['w'] = $now;
 			self::save_room( $code, $room );
@@ -339,6 +393,10 @@ final class Arcade_Party {
 			return self::err( 'arcade_party_stale', 'El mando ya no espera esta respuesta.', 409 );
 		}
 		set_transient( 'arcade_pans_' . $code . '_' . $p, array( 'oid' => (int) $s['oid'], 'sdp' => $sdp ), self::ttl() );
+		$chk = self::fresh( 'arcade_pans_' . $code . '_' . $p );
+		if ( ! is_array( $chk ) || (int) $chk['oid'] !== (int) $s['oid'] ) {
+			return self::err( 'arcade_party_busy', 'No se pudo guardar la respuesta.', 503 );
+		}
 		return self::out( array( 'ok' => true ) );
 	}
 
@@ -362,7 +420,7 @@ final class Arcade_Party {
 	 * Una plaza está libre si no existe o si ni el móvil ni la tele han dado señales en STALE segundos.
 	 */
 	public static function join( WP_REST_Request $req ) {
-		$e = self::limit( 'req' ) ?: self::limit( 'join' );
+		$e = self::limit( 'req' );
 		if ( $e ) {
 			return self::out( $e );
 		}
@@ -389,28 +447,90 @@ final class Arcade_Party {
 				}
 			}
 		}
+		if ( $seat >= 0 ) { // reconexión con su token: no cuenta como «unirse» (el móvil bloqueado vuelve muchas veces)
+			$s         = $slots[ $seat ];
+			$s['seen'] = microtime( true );
+			if ( '' !== $name ) {
+				$s['name'] = $name;
+			}
+			self::save_slot( $code, $seat, $s );
+			return self::out( array( 'p' => $seat, 'tok' => $tok, 'color' => self::COLORS[ $seat ] ) );
+		}
+		$e = self::limit( 'join' );
+		if ( $e ) {
+			return self::out( $e );
+		}
+		// Plaza nueva: bajo cerrojo para que dos móviles que se unen a la vez no se queden la misma.
+		$lock = self::lock( $code );
+		if ( ! $lock ) {
+			return self::err( 'arcade_party_busy', 'Sala ocupada, reintentando…', 503 );
+		}
+		for ( $p = 0; $p < self::PADS && $seat < 0; $p++ ) {
+			$s = self::fresh_slot( $code, $p ); // relectura dentro del cerrojo
+			$gt   = isset( $room['gone'][ $p ] ) ? (float) $room['gone'][ $p ] : 0;
+			$free = ! $s || ( $gt && $gt > (float) $s['seen'] ) || ( $now - (int) $s['seen'] > self::STALE && $now - (int) $room['live'][ $p ] > self::STALE );
+			if ( $free ) {
+				$seat = $p;
+			}
+		}
 		if ( $seat < 0 ) {
-			for ( $p = 0; $p < self::PADS && $seat < 0; $p++ ) {
-				$s    = $slots[ $p ];
-				$free = ! $s || ( $now - (int) $s['seen'] > self::STALE && $now - (int) $room['live'][ $p ] > self::STALE );
-				if ( $free ) {
-					$seat = $p;
-				}
-			}
-			if ( $seat < 0 ) {
-				return self::err( 'arcade_party_full', 'La sala está completa (4 mandos).', 409 );
-			}
-			$tok = self::token();
-			delete_transient( 'arcade_pans_' . $code . '_' . $seat );
-			$slots[ $seat ] = array( 'tok' => $tok, 'oid' => 0, 'offer' => '', 'name' => $name );
+			self::unlock( $lock );
+			return self::err( 'arcade_party_full', 'La sala está completa (4 mandos).', 409 );
 		}
-		$s         = $slots[ $seat ];
-		$s['seen'] = $now;
-		if ( '' !== $name ) {
-			$s['name'] = $name;
+		$tok = self::token();
+		delete_transient( 'arcade_pans_' . $code . '_' . $seat );
+		self::save_slot( $code, $seat, array( 'tok' => $tok, 'oid' => 0, 'offer' => '', 'name' => $name, 'seen' => microtime( true ) ) );
+		$chk = self::fresh_slot( $code, $seat ); // la escritura puede fallar (base de datos ocupada): se comprueba
+		self::unlock( $lock );
+		if ( ! $chk || $chk['tok'] !== $tok ) {
+			return self::err( 'arcade_party_busy', 'Sala ocupada, reintentando…', 503 );
 		}
-		self::save_slot( $code, $seat, $s );
 		return self::out( array( 'p' => $seat, 'tok' => $tok, 'color' => self::COLORS[ $seat ] ) );
+	}
+
+	/** Mando p leído de nuevo, sin la caché de opciones de esta petición (con caché de objetos persistente no hace falta). */
+	private static function fresh_slot( $code, $p ) {
+		$s = self::fresh( 'arcade_pslot_' . $code . '_' . $p );
+		return is_array( $s ) ? $s : null;
+	}
+
+	private static function fresh( $k ) {
+		if ( ! wp_using_ext_object_cache() ) {
+			wp_cache_delete( '_transient_' . $k, 'options' );
+			wp_cache_delete( '_transient_timeout_' . $k, 'options' );
+			wp_cache_delete( 'notoptions', 'options' );
+		}
+		return get_transient( $k );
+	}
+
+	/**
+	 * Cerrojo por sala: INSERT IGNORE sobre la clave única de wp_options (atómico en MySQL y en SQLite;
+	 * add_option() no sirve porque usa ON DUPLICATE KEY UPDATE). Espera como mucho ~2 s; un cerrojo
+	 * de más de 10 s se considera abandonado. No pasa por la caché de opciones.
+	 */
+	private static function lock( $code ) {
+		global $wpdb;
+		$name = '_arcade_plock_' . $code;
+		for ( $i = 0; $i < 40; $i++ ) {
+			$ok = $wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'off')", $name, (string) time() ) ); // phpcs:ignore
+			if ( $ok ) {
+				return $name;
+			}
+			$t = (int) $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $name ) ); // phpcs:ignore
+			if ( $t && time() - $t > 10 ) {
+				self::unlock( $name );
+				continue;
+			}
+			usleep( 50000 );
+		}
+		return '';
+	}
+
+	private static function unlock( $name ) {
+		global $wpdb;
+		if ( $name ) {
+			$wpdb->delete( $wpdb->options, array( 'option_name' => $name ) );
+		}
 	}
 
 	/** POST /party/CODE/offer {p, tok, sdp} → el mando publica su offer (con todos los candidatos). */
@@ -430,8 +550,12 @@ final class Arcade_Party {
 		}
 		$s['oid']   = (int) $s['oid'] + 1;
 		$s['offer'] = $sdp;
-		$s['seen']  = time();
+		$s['seen']  = microtime( true );
 		self::save_slot( $code, $p, $s );
+		$chk = self::fresh_slot( $code, $p );
+		if ( ! $chk || (int) $chk['oid'] !== $s['oid'] ) {
+			return self::err( 'arcade_party_busy', 'No se pudo guardar la oferta.', 503 );
+		}
 		return self::out( array( 'oid' => $s['oid'] ) );
 	}
 
@@ -449,7 +573,7 @@ final class Arcade_Party {
 		$ans = get_transient( 'arcade_pans_' . $code . '_' . $p );
 		$ok  = is_array( $ans ) && (int) $ans['oid'] === (int) $req->get_param( 'oid' ) && (int) $ans['oid'] === (int) $s['oid'];
 		if ( time() - (int) $s['seen'] > 10 ) { // señal de vida sin escribir en cada sondeo
-			$s['seen'] = time();
+			$s['seen'] = microtime( true );
 			self::save_slot( $code, $p, $s );
 		}
 		return self::out( array( 'sdp' => $ok ? $ans['sdp'] : null ) );

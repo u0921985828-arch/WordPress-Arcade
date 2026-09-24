@@ -167,7 +167,12 @@
     peers: {},        // p → {pc, dc, oid, sid, open, held:{}}
     game: null,       // juego en curso (objeto del catálogo) o null (lobby)
     frame: null, ready: false, menu: null, menuSel: 0,
-    pollT: 0, lastChange: Date.now(), polling: false
+    pollT: 0, lastChange: Date.now(), polling: false,
+    padSeq: 0,        // orden de los mensajes «pad» (el canal no es ordenado)
+    recent: {},       // p → hora a la que se fue (para decir «ha vuelto»)
+    gone: {},         // plazas cuyo canal se cerró (se avisa al servidor)
+    gameT0: 0, lastAd: 0, ad: false,
+    lat: []           // retardo mando → tele (ms) de las últimas pulsaciones, para pruebas
   };
   var ui = {};
 
@@ -240,8 +245,11 @@
           '<span class="pt-name">' + esc(g.title) + '</span></button>';
       });
       h += '</div></section>';
+      // Publicidad: un único bloque entre secciones (o al final), separado de la rejilla. Nunca en el mando ni en partida.
+      if (C.ad && (si === 0 || S.sections.length === 1)) h += C.ad;
     });
     ui.grid.innerHTML = h;
+    pushAds();
     ui.grid.addEventListener('click', function (e) {
       var b = e.target.closest ? e.target.closest('.pt-cell') : null;
       if (b) { focusCell(+b.dataset.i); start(S.cells[+b.dataset.i]); }
@@ -250,7 +258,7 @@
       var b = e.target.closest ? e.target.closest('.pt-cell') : null;
       if (b && +b.dataset.i !== S.cur) focusCell(+b.dataset.i, true);
     });
-    var want = (location.search.match(/[?&]g=([a-z0-9-]+)/) || [])[1], wi = 0;
+    var want = (location.search.match(/[?&]g=([a-z0-9-]+)/) || [])[1] || store('arcade:tv:last'), wi = 0;
     if (want) S.cells.forEach(function (g, i) { if (g.slug === want) wi = i; });
     focusCell(wi);
   }
@@ -292,9 +300,11 @@
 
   /* ================================================================ Juego */
   function start(g) {
-    if (!g) return;
+    if (!g || S.ad) return;
     closeMenu();
-    S.game = g; S.ready = false;
+    stopRepeat();
+    S.game = g; S.ready = false; S.gameT0 = Date.now();
+    store('arcade:tv:last', g.slug);
     var f = document.createElement('iframe');
     f.className = 'pt-frame';
     f.allow = 'fullscreen; gamepad; autoplay';
@@ -317,9 +327,10 @@
   }
 
   function toLobby() {
-    releaseAll();
+    releaseAll(null, true);
     closeMenu();
     if (S.frame) { S.frame.remove(); S.frame = null; }
+    var played = S.game ? Date.now() - S.gameT0 : 0;
     S.game = null; S.ready = false;
     ui.stage.hidden = true;
     document.body.classList.remove('pt-ingame');
@@ -327,24 +338,28 @@
     focusCell(S.cur);
     try { window.focus(); } catch (e) { /* nada */ }
     schedulePoll(300);
+    adBreakLobby(played);
   }
 
   function post(msg) { try { if (S.frame) S.frame.contentWindow.postMessage(msg, '*'); } catch (e) { /* nada */ } }
 
   function playersMsg() {
     var list = [];
-    Object.keys(S.peers).forEach(function (p) { if (S.peers[p].open) list.push({ p: +p, color: COLORS[p], name: S.peers[p].name || 'J' + (+p + 1) }); });
+    Object.keys(S.peers).forEach(function (p) { if (active(p)) list.push({ p: +p, color: COLORS[p], name: S.peers[p].name || 'J' + (+p + 1) }); });
     list.sort(function (a, b) { return a.p - b.p; });
     return { type: 'arcade:party', players: list };
   }
 
-  function releaseAll(p) {
+  // Suelta las teclas del jugador p (o de todos). Con `all` envía down:false de las 6 teclas aunque
+  // la tele crea que no estaban pulsadas: así nunca se queda nada pegado en el juego.
+  function releaseAll(p, all) {
     Object.keys(S.peers).forEach(function (q) {
       if (p != null && +q !== +p) return;
       var h = S.peers[q].held;
-      Object.keys(h).forEach(function (key) { if (h[key]) { h[key] = false; post({ type: 'arcade:pkey', p: +q, key: key, down: false }); } });
+      KEYS.forEach(function (key) { if (h[key] || all) { h[key] = false; post({ type: 'arcade:pkey', p: +q, key: key, down: false }); } });
     });
   }
+  function active(p) { var peer = S.peers[p]; return !!(peer && peer.open && !peer.lost); }
 
   window.addEventListener('message', function (e) {
     var d = e.data;
@@ -352,14 +367,47 @@
     if (d.type === 'arcade:hello') { S.ready = true; post(playersMsg()); }
   });
 
+  /* ============================================================ Publicidad */
+  function pushAds() {
+    var ins = ui.grid.querySelectorAll('[data-ax-ad] ins.adsbygoogle');
+    for (var i = 0; i < ins.length; i++) {
+      if (ins[i].getAttribute('data-ax-pushed') || !ins[i].offsetWidth) continue;
+      ins[i].setAttribute('data-ax-pushed', '1');
+      try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch (e) { /* nada */ }
+    }
+  }
+  // Pausa publicitaria (H5 Games Ads) al volver al lobby: solo tras una partida de verdad (≥ 45 s)
+  // y como mucho una cada `freq` s. AdSense decide además si la muestra. Con ?adpreview=1 se simula.
+  function adBreakLobby(played) {
+    var h5 = C.h5, now = Date.now();
+    if (!h5 || played < 45000 || (S.lastAd && now - S.lastAd < h5.freq * 1000)) return;
+    var real = typeof window.adBreak === 'function';
+    if (!real && !h5.preview) return;
+    S.lastAd = now;
+    var done = function () { if (!S.ad) return; S.ad = false; document.body.classList.remove('pt-adon'); broadcastPad(); var o = $('.pt-adprev'); if (o) o.remove(); };
+    var before = function () { S.ad = true; document.body.classList.add('pt-adon'); stopRepeat(); releaseAll(null, true); broadcastPad(); };
+    if (!real) { // vista previa para el administrador
+      before();
+      document.body.appendChild(el('div', 'pt-adprev', '<div class="pt-card"><span class="pt-kick">Publicidad</span><p>Pausa publicitaria (vista previa)</p></div>'));
+      setTimeout(done, 3000);
+      return;
+    }
+    try { window.adBreak({ type: 'next', name: 'tele-lobby', beforeAd: before, afterAd: done, adBreakDone: done }); } catch (e) { done(); }
+  }
+
   /* ================================================================ Menú */
   function openMenu() {
-    if (!S.game) return;
-    releaseAll();
-    post({ type: 'arcade:pause' });
-    S.menu = [['Seguir jugando', closeMenu], ['Elegir otro juego', toLobby], ['Reiniciar', function () { start(S.game); }]];
+    if (S.ad) return;
+    stopRepeat();
+    if (S.game) {
+      releaseAll(null, true);
+      post({ type: 'arcade:pause' });
+      S.menu = [['Seguir jugando', closeMenu], ['Elegir otro juego', toLobby], ['Reiniciar', function () { start(S.game); }]];
+    } else {
+      S.menu = [['Seguir en la tele', closeMenu], ['Salir del modo tele', function () { leave(); }]];
+    }
     S.menuSel = 0;
-    ui.menu.innerHTML = '<div class="pt-card pt-mcard"><span class="pt-kick">Pausa</span><h2>' + esc(S.game.title) + '</h2>' +
+    ui.menu.innerHTML = '<div class="pt-card pt-mcard"><span class="pt-kick">' + (S.game ? 'Pausa' : 'Modo tele') + '</span><h2>' + esc(S.game ? S.game.title : 'Menú') + '</h2>' +
       S.menu.map(function (m, i) { return '<button type="button" data-m="' + i + '">' + esc(m[0]) + '</button>'; }).join('') +
       '<p>Mando: ↑ ↓ y A · Tele: flechas y OK</p></div>';
     ui.menu.hidden = false;
@@ -376,8 +424,15 @@
     if (!S.menu) return;
     S.menu = null; ui.menu.hidden = true;
     broadcastPad();
-    post({ type: 'arcade:resume' }); post({ type: 'arcade:unpause' });
+    if (S.game) { post({ type: 'arcade:resume' }); post({ type: 'arcade:unpause' }); }
     try { if (S.frame) S.frame.contentWindow.focus(); } catch (e) { /* nada */ }
+  }
+  // Salir de verdad: cierra la sala (los mandos lo sabrán al sondear) y vuelve al portal.
+  function leave() {
+    S.leaving = true;
+    try { if (S.code) api('/' + S.code + '/close', { method: 'POST', body: { k: S.k }, keepalive: true }); } catch (e) { /* nada */ }
+    store('arcade:tv', null);
+    location.href = C.home;
   }
   function menuKey(k) {
     if (k === 'up' || k === 'left') menuSel(S.menuSel - 1);
@@ -392,10 +447,16 @@
   var ARROWS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Up: 'up', Down: 'down', Left: 'left', Right: 'right' };
   var ARROW_CODES = { 37: 'left', 38: 'up', 39: 'right', 40: 'down' };
 
+  var PLAY_CODES = { 10252: 1, 415: 1, 19: 1, 179: 1 }; // Reproducir/Pausa (Tizen, webOS, genérico)
+
   function onKey(e) {
     var back = BACK[e.key] || BACK_CODES[e.keyCode];
     var dir = ARROWS[e.key] || ARROW_CODES[e.keyCode];
     var ok = e.key === 'Enter' || e.keyCode === 13 || e.key === ' ';
+    if (e.key === 'MediaPlayPause' || PLAY_CODES[e.keyCode]) back = 1;
+    if (back) { trap.key = Date.now(); e.preventDefault(); }
+    arm();
+    if (S.ad) { e.preventDefault(); return; }
     if (S.menu) {
       e.preventDefault(); e.stopPropagation();
       if (back) closeMenu(); else if (dir) menuKey(dir); else if (ok) menuKey('a');
@@ -409,16 +470,39 @@
       }
       return;
     }
+    if (back) { openMenu(); return; }
     if (dir) { e.preventDefault(); move(dir); }
     else if (ok) { e.preventDefault(); start(S.cells[S.cur]); }
   }
   document.addEventListener('keydown', onKey, true);
 
+  // Trampa del botón Atrás (Smart TV, navegador): una entrada extra en el historial. Atrás la consume
+  // (popstate) y abre el menú en vez de salir. Chrome ignora las entradas creadas sin gesto del usuario,
+  // así que se arma en la primera tecla/clic y se rearma en la siguiente tras cada Atrás.
+  var trap = { armed: false, key: 0 };
+  function arm() {
+    if (trap.armed || S.leaving) return;
+    try { history.pushState({ pt: 1 }, '', location.href); trap.armed = true; } catch (e) { /* nada */ }
+  }
+  window.addEventListener('popstate', function () {
+    trap.armed = false;
+    if (S.leaving || Date.now() - trap.key < 500) return; // ya lo atendió keydown
+    if (S.menu) closeMenu(); else openMenu();
+  });
+  document.addEventListener('pointerdown', arm, true);
+  // Tizen: teclas multimedia (solo en apps instaladas; en el navegador no existe `tizen`).
+  try {
+    if (window.tizen && window.tizen.tvinputdevice) ['MediaPlayPause', 'MediaPlay', 'MediaPause'].forEach(function (k) { try { window.tizen.tvinputdevice.registerKey(k); } catch (e) { /* nada */ } });
+  } catch (e) { /* nada */ }
+
   // Pulsaciones que llegan de los móviles.
   var rep = {}; // repetición del cursor en el lobby por jugador
-  function padKey(p, k, down) {
+  function padKey(p, k, down, ts) {
     var peer = S.peers[p];
     if (!peer) return;
+    var id = p + k;
+    if (rep[id]) { clearTimeout(rep[id]); clearInterval(rep[id]); delete rep[id]; }
+    if (S.ad) return; // pausa publicitaria
     if (S.menu) { if (down) menuKey(k); return; }
     if (k === 'menu') {
       if (!down) return;
@@ -428,12 +512,12 @@
     if (S.game) {
       if (KEYS.indexOf(k) < 0 || !!peer.held[k] === !!down) return;
       peer.held[k] = !!down;
-      post({ type: 'arcade:pkey', p: p, key: k, down: !!down });
+      var m = { type: 'arcade:pkey', p: p, key: k, down: !!down };
+      if (ts) m.ts = ts;
+      post(m);
       return;
     }
     // Lobby: cursor con repetición; A elige (solo el primer jugador conectado), B no hace nada aquí.
-    var id = p + k;
-    clearTimeout(rep[id]); clearInterval(rep[id]);
     if (!down) return;
     if (k === 'a') {
       if (p === leader()) start(S.cells[S.cur]);
@@ -444,9 +528,9 @@
     move(k);
     rep[id] = setTimeout(function () { rep[id] = setInterval(function () { move(k); }, 140); }, 380);
   }
-  function stopRepeat(p) { Object.keys(rep).forEach(function (id) { if (id.charAt(0) === String(p)) { clearTimeout(rep[id]); clearInterval(rep[id]); } }); }
+  function stopRepeat(p) { Object.keys(rep).forEach(function (id) { if (p == null || id.charAt(0) === String(p)) { clearTimeout(rep[id]); clearInterval(rep[id]); delete rep[id]; } }); }
   function leader() {
-    var ps = Object.keys(S.peers).filter(function (p) { return S.peers[p].open; }).map(Number).sort();
+    var ps = Object.keys(S.peers).filter(active).map(Number).sort();
     return ps.length ? ps[0] : 0;
   }
 
@@ -454,9 +538,9 @@
   function renderPlayers() {
     var h = '';
     for (var p = 0; p < 4; p++) {
-      var peer = S.peers[p], on = peer && peer.open, wait = peer && !peer.open;
-      h += '<div class="pt-pl' + (on ? ' on' : wait ? ' wait' : '') + '" style="--pc:' + COLORS[p] + '">' +
-        '<span class="pt-av">' + ICO.pad + '</span><b>J' + (p + 1) + '</b><span>' + (on ? (p === leader() ? 'Listo · elige' : 'Listo') : wait ? 'Conectando…' : 'Libre') + '</span></div>';
+      var peer = S.peers[p], on = active(p), lost = peer && peer.open && peer.lost, wait = peer && !peer.open;
+      h += '<div class="pt-pl' + (on ? ' on' : lost ? ' lost' : wait ? ' wait' : '') + '" style="--pc:' + COLORS[p] + '">' +
+        '<span class="pt-av">' + ICO.pad + '</span><b>J' + (p + 1) + '</b><span>' + (on ? (p === leader() ? 'Listo · elige' : 'Listo') : lost ? 'Sin señal' : wait ? 'Conectando…' : 'Libre') + '</span></div>';
     }
     ui.players.innerHTML = h;
     renderGhud(false);
@@ -465,7 +549,7 @@
   function renderGhud(show) {
     if (!ui.ghud) return;
     var dots = '';
-    Object.keys(S.peers).forEach(function (p) { if (S.peers[p].open) dots += '<i style="--pc:' + COLORS[p] + '">J' + (+p + 1) + '</i>'; });
+    Object.keys(S.peers).forEach(function (p) { if (active(p)) dots += '<i style="--pc:' + COLORS[p] + '">J' + (+p + 1) + '</i>'; });
     ui.ghud.innerHTML = dots + '<span>Menú: botón <b>Menú</b> del móvil o <b>Atrás</b></span>';
     if (show) { ui.ghud.classList.add('show'); clearTimeout(S.ghudT); S.ghudT = setTimeout(function () { ui.ghud.classList.remove('show'); }, 5000); }
   }
@@ -477,58 +561,108 @@
 
   function send(p, msg) { var peer = S.peers[p]; if (peer && peer.dc && peer.dc.readyState === 'open') { try { peer.dc.send(JSON.stringify(msg)); } catch (e) { /* nada */ } } }
   function padSpec() {
+    if (S.ad) return { d: '', a: 'Espera' };
     if (S.menu) return MENU_PAD;
     if (!S.game) return null;
     return S.game.pad && typeof S.game.pad === 'object' ? S.game.pad : DEFAULT_PAD;
   }
+  function padMsg() { return { t: 'pad', s: ++S.padSeq, pad: padSpec(), title: S.ad ? 'Publicidad' : S.menu ? (S.game ? 'Pausa' : 'Menú') : S.game ? S.game.title : 'Elige un juego' }; }
   function broadcastPad() {
-    var m = { t: 'pad', pad: padSpec(), title: S.menu ? 'Pausa' : S.game ? S.game.title : 'Elige un juego' };
+    var m = padMsg();
     Object.keys(S.peers).forEach(function (p) { send(+p, m); });
   }
 
   /* ============================================================== WebRTC */
-  function dropPeer(p) {
+  function dropPeer(p, say) {
     var peer = S.peers[p];
     if (!peer) return;
+    var was = peer.open && !peer.lost;
     stopRepeat(p);
-    releaseAll(p);
+    releaseAll(p, true);
     try { peer.pc.close(); } catch (e) { /* nada */ }
     delete S.peers[p];
+    if (peer.open) S.recent[p] = Date.now();
+    if (say) S.gone[p] = 1; // se lo dice al servidor en el próximo sondeo: plaza libre
     renderPlayers();
     post(playersMsg());
+    if (say && was) toast('J' + (+p + 1) + ' se ha desconectado');
+    schedulePoll(1000);
   }
+
+  // Sin noticias del mando (móvil bloqueado, wifi caída…): fuera de la partida pero conserva la plaza.
+  function lose(p) {
+    var peer = S.peers[p];
+    if (!peer || !peer.open || peer.lost) return;
+    peer.lost = true; peer.lostAt = Date.now();
+    stopRepeat(p);
+    releaseAll(p, true);
+    renderPlayers();
+    post(playersMsg());
+    toast('J' + (+p + 1) + ' se ha desconectado');
+    schedulePoll(1200);
+  }
+  function regain(p) {
+    var peer = S.peers[p];
+    if (!peer || !peer.lost) return;
+    peer.lost = false;
+    renderPlayers();
+    post(playersMsg());
+    send(p, padMsg());
+    toast('J' + (+p + 1) + ' ha vuelto');
+  }
+  // Los mandos envían un latido cada segundo; 3,5 s de silencio = desconectado.
+  setInterval(function () {
+    var now = Date.now();
+    Object.keys(S.peers).forEach(function (p) { var peer = S.peers[p]; if (peer.open && !peer.lost && now - peer.seen > 3500) lose(+p); });
+  }, 500);
 
   function accept(row) {
     var p = row.p;
     if (S.peers[p]) dropPeer(p); // nuevo offer (reconexión u otro móvil en la plaza)
     var pc;
     try { pc = new RTCPeerConnection({ iceServers: C.ice || [] }); } catch (e) { status('Este navegador no admite mandos (WebRTC).', true); return; }
-    var peer = S.peers[p] = { pc: pc, dc: null, oid: row.oid, sid: row.sid, open: false, held: {}, name: row.name || '' };
+    var peer = S.peers[p] = { pc: pc, dc: null, oid: row.oid, sid: row.sid, open: false, lost: false, held: {}, seq: {}, seen: 0, name: row.name || '' };
+    function gone() { if (S.peers[p] === peer) dropPeer(p, true); }
     renderPlayers();
     S.lastChange = Date.now();
     pc.ondatachannel = function (ev) {
       var dc = peer.dc = ev.channel;
       dc.onopen = function () {
         if (S.peers[p] !== peer) return;
-        peer.open = true;
+        peer.open = true; peer.seen = Date.now(); delete S.gone[p];
         send(p, { t: 'you', p: p, color: COLORS[p] });
-        send(p, { t: 'pad', pad: padSpec(), title: S.menu ? 'Pausa' : S.game ? S.game.title : 'Elige un juego' });
+        send(p, padMsg());
         send(p, { t: 'buzz', ms: 40 });
         renderPlayers();
         post(playersMsg());
-        toast('J' + (p + 1) + ' se ha unido');
+        toast('J' + (p + 1) + (Date.now() - (S.recent[p] || 0) < 600000 ? ' ha vuelto' : ' se ha unido'));
         status('');
+        schedulePoll();
       };
       dc.onmessage = function (m) {
         var d; try { d = JSON.parse(m.data); } catch (e) { return; }
-        if (!d) return;
-        if (d.t === 'k') padKey(p, d.k, !!d.d);
+        if (!d || S.peers[p] !== peer) return;
+        peer.seen = Date.now();
+        if (d.t === 'away') { lose(p); return; }
+        if (peer.lost) regain(p);
+        if (d.t === 'k') {
+          // Canal sin orden (sin bloqueo si se pierde un paquete): el número de orden por tecla descarta lo atrasado.
+          if (typeof d.s === 'number') { if (peer.seq[d.k] != null && d.s <= peer.seq[d.k]) return; peer.seq[d.k] = d.s; }
+          if (d.ts) { S.lat.push(Date.now() - d.ts); if (S.lat.length > 500) S.lat.shift(); }
+          padKey(p, d.k, !!d.d, d.ts);
+        } else if (d.t === 'p') send(p, { t: 'P', ts: d.ts });
         else if (d.t === 'hi' && d.name) { peer.name = String(d.name).slice(0, 16); post(playersMsg()); }
       };
-      dc.onclose = function () { if (S.peers[p] === peer) { dropPeer(p); toast('J' + (p + 1) + ' se ha desconectado'); } };
+      dc.onclose = gone;
     };
+    // connectionState no existe en Chromium < 72 (Smart TV antiguas): también iceConnectionState.
     pc.onconnectionstatechange = function () {
-      if (S.peers[p] === peer && (pc.connectionState === 'failed' || pc.connectionState === 'closed')) dropPeer(p);
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') gone();
+    };
+    pc.oniceconnectionstatechange = function () {
+      var s = pc.iceConnectionState;
+      if (s === 'failed' || s === 'closed') gone();
+      else if (s === 'disconnected' && peer.open) lose(p);
     };
     pc.setRemoteDescription({ type: 'offer', sdp: row.offer })
       .then(function () { return pc.createAnswer(); })
@@ -539,6 +673,7 @@
         return api('/' + S.code + '/answer', { method: 'POST', body: { k: S.k, p: p, oid: row.oid, sdp: pc.localDescription.sdp } });
       })
       .then(function (r) {
+        if (r && r._status === 503) throw new Error('busy'); // se reintenta con el siguiente sondeo
         // Si nunca llega a abrirse (red que no deja conectar), libera la plaza en la tele.
         setTimeout(function () { if (S.peers[p] === peer && !peer.open) dropPeer(p); }, 25000);
         return r;
@@ -571,15 +706,20 @@
     }).catch(function () { status('Sin conexión. Reintentando…', true); setTimeout(create, 5000); });
   }
 
-  function live() { return Object.keys(S.peers).filter(function (p) { return S.peers[p].open; }).join(','); }
+  // Plazas: `live` las conserva; `gone` las libera ya (canal cerrado o más de 5 s sin señal) para que el mismo
+  // móvil en una pestaña nueva (sin su token) recupere su número. Con su token vuelve igual a su plaza.
+  function longLost(p) { var peer = S.peers[p]; return peer.lost && Date.now() - peer.lostAt > 5000; }
+  function live() { return Object.keys(S.peers).filter(function (p) { return S.peers[p].open && !longLost(p); }).join(','); }
 
   function poll() {
     if (!S.code || S.polling) return;
     S.polling = true;
-    api('/' + S.code + '?k=' + encodeURIComponent(S.k) + '&live=' + live()).then(function (r) {
+    var gone = Object.keys(S.gone).filter(function (p) { return !S.peers[p]; })
+      .concat(Object.keys(S.peers).filter(function (p) { return S.peers[p].open && longLost(p); })).join(',');
+    api('/' + S.code + '?k=' + encodeURIComponent(S.k) + '&live=' + live() + (gone ? '&gone=' + gone : '')).then(function (r) {
       S.polling = false;
       if (r._status === 404 || r._status === 403) { // sala caducada: otra nueva
-        Object.keys(S.peers).forEach(dropPeer);
+        Object.keys(S.peers).forEach(function (p) { dropPeer(p); });
         store('arcade:tv', null); S.code = ''; ui.code.textContent = '····';
         create();
         return;
@@ -597,7 +737,8 @@
   function schedulePoll(ms) {
     clearTimeout(S.pollT);
     if (ms == null) {
-      var pending = Object.keys(S.peers).some(function (p) { return !S.peers[p].open; });
+      // Con alguien «sin señal» se sondea rápido: su móvil volverá a llamar con un offer nuevo.
+      var pending = Object.keys(S.peers).some(function (p) { return !S.peers[p].open || S.peers[p].lost; });
       var idle = Date.now() - S.lastChange > 5 * 60000;
       ms = pending ? 1000 : S.game ? 6000 : idle ? 3000 : 1000;
       if (document.hidden) ms = Math.max(ms, 10000);

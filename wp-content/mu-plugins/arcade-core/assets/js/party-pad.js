@@ -13,7 +13,10 @@
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
   function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   function store(k, v) { try { if (v === undefined) return sessionStorage.getItem(k); if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch (e) { return null; } return null; }
-  function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* nada */ } }
+  // Vibración: no existe en iOS; en Chrome solo tras el primer toque (si no, avisa en la consola).
+  var touched = false;
+  document.addEventListener('pointerdown', function () { touched = true; }, true);
+  function buzz(ms) { try { if (touched && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* nada */ } }
   function api(path, opt) {
     opt = opt || {};
     var init = { method: opt.method || 'GET', headers: {}, cache: 'no-store', credentials: 'omit' };
@@ -33,7 +36,9 @@
   }
 
   var code = ((location.search.match(/[?&]c=([A-Za-z]{4})/) || [])[1] || '').toUpperCase();
-  var S = { p: -1, tok: '', pc: null, dc: null, open: false, spec: LOBBY, title: 'Conectando…', gen: 0, held: {}, retry: 0 };
+  var S = { p: -1, tok: '', pc: null, dc: null, open: false, spec: LOBBY, title: 'Conectando…', gen: 0, held: {}, retry: 0,
+    seq: 0, padSeq: -1, rx: 0, rtt: [] };
+  var IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   var app = $('#pt-app');
 
   /* ================================================================ Interfaz */
@@ -56,7 +61,8 @@
       '<h1>Usa el móvil como mando</h1>' +
       (msg ? '<p class="bad">' + esc(msg) + '</p>' : '<p>Escribe el código que aparece en la tele o escanea su QR.</p>') +
       '<form data-form><input name="c" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" placeholder="ABCD" aria-label="Código de la sala" value="' + esc(code) + '"><button class="pd-btn" type="submit">Conectar</button></form>' +
-      '<p class="pd-small">En la tele u ordenador abre <b>' + esc(String(C.tv || '').replace(/^https?:\/\//, '')) + '</b></p>');
+      '<p class="pd-small">En la tele u ordenador abre <b>' + esc(String(C.tv || '').replace(/^https?:\/\//, '')) + '</b></p>' +
+      (IOS && !navigator.standalone ? '<p class="pd-small">En iPhone: gira el móvil en horizontal. Para quitar las barras de Safari, Compartir → «Añadir a pantalla de inicio».</p>' : ''));
     var f = $('[data-form]'), inp = f.c;
     inp.addEventListener('input', function () { inp.value = inp.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4); });
     f.addEventListener('submit', function (e) {
@@ -79,10 +85,11 @@
 
   /* ================================================================ Mando */
   function send(m) { if (S.dc && S.dc.readyState === 'open') { try { S.dc.send(JSON.stringify(m)); } catch (e) { /* nada */ } } }
+  // s = número de orden (el canal no es ordenado: la tele descarta lo atrasado); ts = hora de envío (medir latencia).
   function key(k, down) {
     if (!!S.held[k] === !!down) return;
     S.held[k] = !!down;
-    send({ t: 'k', k: k, d: down ? 1 : 0 });
+    send({ t: 'k', k: k, d: down ? 1 : 0, s: ++S.seq, ts: Date.now() });
   }
   function releaseAll() { Object.keys(S.held).forEach(function (k) { if (S.held[k]) key(k, false); }); }
 
@@ -178,6 +185,13 @@
   ui.menu.addEventListener('pointerdown', function (e) { e.preventDefault(); ui.menu.classList.add('on'); buzz(10); key('menu', true); });
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { ui.menu.addEventListener(ev, function () { ui.menu.classList.remove('on'); key('menu', false); }); });
   document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  // iOS Safari ignora user-scalable=no: se bloquean a mano pellizco, doble toque y arrastre de la página
+  // (salvo en la tarjeta del código, donde hay que poder escribir).
+  function inForm(e) { return ui.over.classList.contains('show') && e.target.closest && e.target.closest('.pd-card'); }
+  ['gesturestart', 'gesturechange', 'dblclick'].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); }, { passive: false }); });
+  ['touchstart', 'touchmove'].forEach(function (ev) {
+    document.addEventListener(ev, function (e) { if (!inForm(e) && e.cancelable) e.preventDefault(); }, { passive: false });
+  });
 
   // Pantalla completa (Android) y pantalla siempre encendida al primer toque.
   var lock = null;
@@ -191,9 +205,33 @@
     wake();
     document.removeEventListener('pointerup', first);
   });
+  // Móvil bloqueado / otra app: suelta todo y avisa a la tele. Al volver, comprueba que el canal sigue vivo.
+  function away() { releaseAll(); send({ t: 'away' }); }
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) releaseAll(); else { wake(); if (!S.open && code) connect(); }
+    if (document.hidden) { away(); return; }
+    wake();
+    if (!code) return;
+    if (!S.open) { connect(); return; }
+    var t = Date.now(), gen = S.gen;
+    S.rx = Math.max(S.rx, t - 4000); // oculto no hay latidos: 3 s de margen antes de dar el canal por muerto
+    ping();
+    setTimeout(function () { if (gen === S.gen && S.open && S.rx < t) connect(); }, 3000);
   });
+  window.addEventListener('pagehide', away);
+  window.addEventListener('online', function () { if (code && !S.open) connect(); });
+
+  // Latido: 1 por segundo (la tele da por perdido un mando tras 3,5 s de silencio). Si la tele no
+  // contesta en 7 s, el canal está muerto aunque el navegador no lo sepa: se vuelve a negociar.
+  function ping() { send({ t: 'p', ts: Date.now() }); }
+  var tick = Date.now();
+  setInterval(function () {
+    var now = Date.now(), stalled = now - tick > 3000; // el navegador tuvo el JS parado (suspendido): margen
+    tick = now;
+    if (!S.open || document.hidden) return;
+    if (stalled) S.rx = Math.max(S.rx, now - 4000);
+    if (now - S.rx > 7000) { S.open = false; releaseAll(); retry(S.gen); return; }
+    ping();
+  }, 1000);
 
   /* ================================================================ Conexión */
   function loadSeat() {
@@ -230,34 +268,43 @@
   }
 
   function retry(gen) {
-    if (gen !== S.gen) return;
+    if (gen !== S.gen || S.retrying === gen) return; // onclose + failed llegan juntos: un solo reintento
+    S.retrying = gen;
+    teardown();
     S.retry++;
     var ms = Math.min(10000, 1000 * S.retry);
-    overlay('<span class="pd-spin"></span><h1>Reconectando…</h1><p>Asegúrate de que la tele sigue en la pantalla del código.</p>');
+    overlay('<span class="pd-spin"></span><h1>Reconectando…</h1><p>Comprueba que el móvil tiene wifi y que la tele sigue abierta en la página del modo tele.</p>');
     setTimeout(function () { if (gen === S.gen) connect(); }, ms);
   }
 
   function negotiate(gen) {
     var pc = S.pc = new RTCPeerConnection({ iceServers: C.ice || [] });
-    var dc = S.dc = pc.createDataChannel('arcade', { ordered: true });
+    // Fiable pero sin orden: un paquete perdido no retiene a los siguientes (sin bloqueo de cabeza de línea);
+    // cada pulsación lleva número de orden y la tele descarta las atrasadas. «Soltar» nunca se pierde.
+    var dc = S.dc = pc.createDataChannel('arcade', { ordered: false });
     dc.onopen = function () {
       if (gen !== S.gen) return;
-      S.open = true; S.retry = 0;
+      S.open = true; S.retry = 0; S.rx = Date.now(); S.padSeq = -1;
       overlay('');
       send({ t: 'hi' });
       buzz(30);
     };
     dc.onmessage = function (m) {
       var d; try { d = JSON.parse(m.data); } catch (e) { return; }
-      if (!d) return;
-      if (d.t === 'you') { S.p = d.p; saveSeat(); setMe(); }
-      else if (d.t === 'pad') { S.spec = d.pad || LOBBY; S.title = d.title || ''; build(S.spec); setMe(); }
+      if (!d || gen !== S.gen) return;
+      S.rx = Date.now();
+      if (d.t === 'P') { S.rtt.push(Date.now() - d.ts); if (S.rtt.length > 200) S.rtt.shift(); }
+      else if (d.t === 'you') { S.p = d.p; saveSeat(); setMe(); }
+      else if (d.t === 'pad') {
+        if (typeof d.s === 'number') { if (d.s <= S.padSeq) return; S.padSeq = d.s; }
+        S.spec = d.pad || LOBBY; S.title = d.title || ''; build(S.spec); setMe();
+      }
       else if (d.t === 'buzz') buzz(Math.min(400, d.ms | 0));
     };
     dc.onclose = function () { if (gen === S.gen) { S.open = false; releaseAll(); retry(gen); } };
-    pc.onconnectionstatechange = function () {
-      if (gen === S.gen && pc.connectionState === 'failed') { S.open = false; retry(gen); }
-    };
+    var dead = function () { if (gen === S.gen && S.pc === pc) { S.open = false; releaseAll(); retry(gen); } };
+    pc.onconnectionstatechange = function () { if (pc.connectionState === 'failed') dead(); };
+    pc.oniceconnectionstatechange = function () { if (pc.iceConnectionState === 'failed') dead(); };
     var oid = 0;
     return pc.createOffer()
       .then(function (o) { return pc.setLocalDescription(o); })
@@ -276,7 +323,7 @@
 
   function pollAnswer(gen, oid, t0) {
     if (gen !== S.gen) return null;
-    if (Date.now() - t0 > 45000) { retry(gen); return null; }
+    if (Date.now() - t0 > 25000) { retry(gen); return null; }
     return api('/' + code + '/answer?p=' + S.p + '&tok=' + encodeURIComponent(S.tok) + '&oid=' + oid).then(function (r) {
       if (gen !== S.gen) return null;
       if (r._status === 409) { S.tok = ''; saveSeat(); return connect(); }

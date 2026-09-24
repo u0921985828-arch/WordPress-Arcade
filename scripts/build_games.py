@@ -114,7 +114,7 @@ PAD = {
     'pixel-dash': dict(d='h', a='Saltar'), 'wall-jumper': dict(d='h', a='Saltar'), 'robo-rescue': dict(d='h', a='Saltar'),
     'blade-leap': dict(d='h', a='Saltar', b='Espada'), 'castle-knight': dict(d='h', a='Saltar', b='Espada'),
     'shadow-dash': dict(d='h', a='Saltar', b='Sprint'), 'grapple-hook': dict(d='h', a='Saltar', b='Gancho'),
-    'air-hockey': D8, 'ping-pong-reflex': dict(d='h', a='Saque'),  # sin t: en el portal siguen sin mando (táctiles)
+    'air-hockey': D8, 'ping-pong-reflex': dict(d='8', a='Saque'),  # sin t: en el portal siguen sin mando (táctiles); '8': en la tele la mesa va en apaisado y la raqueta sube y baja
     'canyon-kart': D8, 'low-poly-skater': dict(d='h', a='Saltar'), 'drone-flight': D8,
 }
 
@@ -123,7 +123,7 @@ MP = {'neon-trails': (1, 4), 'tank-duel': (1, 4), 'air-hockey': (1, 2), 'ping-po
 
 TPL = '''<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{title}</title></head>
-<body><script>window.CFG={cfg};</script><script src="../_lib/kit.js?v=10"></script>{deps}<script src="../_lib/{eng}.js?v={ev}"></script></body></html>
+<body><script>window.CFG={cfg};</script><script src="../_lib/kit.js?v=11"></script>{deps}<script src="../_lib/{eng}.js?v={ev}"></script></body></html>
 '''
 
 def main():

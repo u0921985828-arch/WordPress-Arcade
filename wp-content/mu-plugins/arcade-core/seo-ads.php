@@ -215,7 +215,7 @@ final class Arcade_SEO {
 	 * (solo cuando se acerca a la pantalla y es visible), así no hay huecos de ancho 0.
 	 */
 	public static function ad_block( $where ) {
-		$names = array( 'game' => 'bajo el juego', 'side' => 'lateral 300×600', 'feed' => 'entre juegos', 'home' => 'entre secciones' );
+		$names = array( 'game' => 'bajo el juego', 'side' => 'lateral 300×600', 'feed' => 'entre juegos', 'home' => 'entre secciones', 'tv' => 'en el lobby de la tele (horizontal)' );
 		if ( self::preview() ) {
 			return sprintf( '<div class="ax-ad ax-ad-%1$s"><span>Publicidad</span><div class="ax-ad-ph">Anuncio %2$s</div></div>', esc_attr( $where ), esc_html( $names[ $where ] ?? $where ) );
 		}
@@ -223,7 +223,7 @@ final class Arcade_SEO {
 		if ( ! self::opt( 'pub' ) || ! $slot ) {
 			return '';
 		}
-		$fmt = 'side' === $where ? 'data-ad-format="vertical"' : 'data-ad-format="auto" data-full-width-responsive="true"';
+		$fmt = 'side' === $where ? 'data-ad-format="vertical"' : ( 'tv' === $where ? 'data-ad-format="horizontal"' : 'data-ad-format="auto" data-full-width-responsive="true"' );
 		return sprintf( '<div class="ax-ad ax-ad-%1$s" data-ax-ad><span>Publicidad</span><ins class="adsbygoogle" style="display:block" data-ad-client="ca-%2$s" data-ad-slot="%3$s" %4$s%5$s></ins></div>', esc_attr( $where ), esc_attr( self::opt( 'pub' ) ), esc_attr( $slot ), $fmt, self::opt( 'adtest' ) ? ' data-adtest="on"' : '' );
 	}
 }

@@ -15,7 +15,8 @@ const KEYMAP = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3, ArrowLeft: 0, ArrowDown: 1,
 const pressed = [];
 const keyIn = (code) => { if (KEYMAP[code] !== undefined && k.st === 'play' && !k.paused) pressed.push(KEYMAP[code]); };
 addEventListener('keydown', (e) => { if (!e.repeat) keyIn(e.code); });
-addEventListener('message', (e) => { const d = e.data; if (d && d.type === 'arcade:key' && d.event === 'keydown') keyIn(d.code); });
+addEventListener('message', (e) => { const d = e.data; if (d && d.type === 'arcade:key' && d.event === 'keydown') keyIn(d.code);
+  if (d && d.type === 'arcade:pkey' && d.down) keyIn({ left: 'ArrowLeft', down: 'ArrowDown', up: 'ArrowUp', right: 'ArrowRight' }[d.key]); }); /* mando de la tele (modo fiesta) */
 addEventListener('pointerdown', (e) => { audio(); if (k.st !== 'play' || k.paused) return; const r = k.cv.getBoundingClientRect(), x = (e.clientX - r.left) / k.scale, y = (e.clientY - r.top) / k.scale; if (y > 200 && x >= 0 && x < 360) pressed.push(Math.min(3, Math.floor(x / LW))); });
 const acc = () => (accN ? Math.round(accSum / accN * 100) : 100);
 const mult = () => Math.min(4, 1 + Math.floor(combo / 10));
