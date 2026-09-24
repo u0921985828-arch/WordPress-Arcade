@@ -80,7 +80,7 @@ function keepIn(b) { // jugadores dentro del campo (y de su zona en balón prisi
 
 /* ---------------- Arranque de partido / saques ---------------- */
 function reset() {
-  skill = clamp(0.32 + lsGet(CPUK, 0) * 0.07, 0.3, 0.92);
+  skill = clamp(0.2 + lsGet(CPUK, 0) * 0.08, 0.2, 0.92);
   mkBodies(); score = [0, 0]; clock = DUR; golden = false; msg = ''; msgT = 0; rounds = [0, 0]; roundNo = 1; lastTouch = null;
   serveTeam = 0; serveIdx = [0, 0]; touches = [0, 0];
   kickTeam = Math.random() < 0.5 ? 0 : 1; kickoff(); cdPend = true;
