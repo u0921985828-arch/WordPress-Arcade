@@ -1,6 +1,7 @@
 /* Minigolf con arte propio. CFG.mode: 'walls' (Mini Golf 3D: recorridos con paredes de madera) | 'island' (Putt Island: isla rodeada de agua)
+ * | 'party' (Minigolf Party: 1–4 por turnos en horizontal, molinos, cintas y rampas sobre estanques; ver partyMain al final)
  * 9 hoyos, par 3, máximo 8 golpes por hoyo. Arrastra hacia atrás (desde cualquier punto) o flechas + A. Vista previa del primer tramo del tiro. */
-const M = CFG.mode, OUT = ART.OUT, R2 = 6.2832, W = 360, H = 640, T = 30, COLS = 12, ROWS = 20, OY = 22, MAXS = 8, PAR = 3;
+const M = CFG.mode, PARTY = M === 'party', OUT = ART.OUT, R2 = 6.2832, W = PARTY ? 640 : 360, H = PARTY ? 360 : 640, T = PARTY ? 29 : 30, COLS = PARTY ? 22 : 12, ROWS = PARTY ? 11 : 20, OY = PARTY ? 40 : 22, MAXS = PARTY ? 6 : 8, PAR = 3;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: M === 'island' ? '#1d6fb3' : '#23402b' }), c = k.ctx;
 const TOPR = 2; // primera fila jugable: la franja superior queda libre para el marcador (la bandera no se tapa)
 let grid, ball, hole, tee, holeN, strokes, total, pars, aiming, sunkT, lastPos, bumpers, sand, card, state, stT, course, kAng, kPow, kb, t = 0, msg, msgT, lastBump = 0;
@@ -21,7 +22,7 @@ function genHole() {
 }
 function place() { ball = { x: tee[0], y: tee[1], vx: 0, vy: 0, r: 7, s: 1, a: 1 }; lastPos = [...tee]; strokes = 0; sunkT = 0; state = 'aim'; kAng = Math.atan2(hole[1] - tee[1], hole[0] - tee[0]); kPow = 0.5; buildCourse(); }
 function reset() { holeN = 1; total = 0; pars = 0; card = []; msg = ''; msgT = 0; kb = false; genHole(); place(); }
-const isG = (x, y) => y >= 0 && y < ROWS && x >= 0 && x < COLS && grid[y][x] === 1;
+const isG = (x, y) => y >= 0 && y < ROWS && x >= 0 && x < COLS && grid[y][x] > 0; // 1 césped, 2 agua (solo party)
 const solid = (x, y) => { const tx = Math.floor(x / T), ty = Math.floor(y / T); return tx < 0 || ty < 0 || tx >= COLS || ty >= ROWS || !grid[ty][tx]; };
 const isWall = (x, y) => !isG(x, y) && [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]].some(([dx, dy]) => isG(x + dx, y + dy));
 const hr = (a, b) => { const v = Math.sin(a * 127.1 + b * 311.7 + holeN * 17.3) * 43758.5; return v - Math.floor(v); };
@@ -55,10 +56,11 @@ function buildCourse() {
   g.fillStyle = 'rgba(0,0,0,.16)'; cells((x, y) => { if (!isG(x, y)) return; if (!isG(x, y - 1)) g.fillRect(x * T, y * T, T, 7); if (!isG(x - 1, y)) g.fillRect(x * T, y * T, 5, T); });
   // arena
   for (const s of sand) { const [x, y] = s.split(',').map(Number); ART.rr(g, x * T + 2, y * T + 2, T - 4, T - 4, 9); ART.fillOut(g, '#ecd28a', 2); g.fillStyle = '#d0b066'; for (let i = 0; i < 6; i++) g.fillRect(x * T + 6 + hr(x + i, y) * 18, y * T + 6 + hr(y + i, x) * 18, 2, 2); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(x * T + 7, y * T + 5, T - 14, 2); }
+  if (PARTY) partyCourse(g);
   g.restore();
   // tee: alfombrilla
   ART.rr(g, tee[0] - 16, tee[1] - 12, 32, 24, 5); ART.fillOut(g, '#2f7d3a', 2); g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 1.5; g.setLineDash([3, 3]); ART.rr(g, tee[0] - 12, tee[1] - 8, 24, 16, 3); g.stroke(); g.setLineDash([]);
-  if (M === 'walls') {
+  if (M !== 'island') {
     // paredes de madera en 3/4: tapa clara + frente visible hacia el césped
     cells((x, y) => { if (!isWall(x, y)) return; const px = x * T, py = y * T, face = !isWall(x, y + 1), fh = face ? 9 : 0;
       g.fillStyle = '#c98a4b'; g.fillRect(px, py, T, T - fh); g.fillStyle = 'rgba(120,70,30,.35)'; g.fillRect(px, py + (T - fh) / 2, T, 1.2);
@@ -73,14 +75,17 @@ function buildCourse() {
   course = cv;
 }
 /* ---------- Física: un subpaso. real=false para la vista previa ---------- */
-function step(b, h, real) {
-  const inSand = sand.has(Math.floor(b.x / T) + ',' + Math.floor(b.y / T)), fr = inSand ? 3.4 : 1.05; b.vx -= b.vx * fr * h; b.vy -= b.vy * fr * h;
+function step(b, h, real) { // real: true = bola en juego (efectos), false = vista previa (para en el primer rebote), 'sim' = simulación de la CPU
+  const key = Math.floor(b.x / T) + ',' + Math.floor(b.y / T), air = PARTY && b.air > 0, inSand = !air && sand.has(key), fr = air ? 0.3 : inSand ? 3.4 : 1.05; b.vx -= b.vx * fr * h; b.vy -= b.vy * fr * h;
   const sp = Math.hypot(b.vx, b.vy); if (sp > 0 && sp < 30) { const f = Math.max(0, sp - 28 * h) / sp; b.vx *= f; b.vy *= f; }
+  if (PARTY) { const r = partyStep(b, h, real, key, air); if (r) return r; }
   if (M === 'island') { b.x += b.vx * h; b.y += b.vy * h; if (solid(b.x, b.y)) return 'water'; }
-  else { b.x += b.vx * h; if (solid(b.x + Math.sign(b.vx) * b.r, b.y)) { b.x -= b.vx * h; b.vx *= -0.8; if (real) bump(Math.abs(b.vx)); else return 'bounce'; }
-    b.y += b.vy * h; if (solid(b.x, b.y + Math.sign(b.vy) * b.r)) { b.y -= b.vy * h; b.vy *= -0.8; if (real) bump(Math.abs(b.vy)); else return 'bounce'; } }
-  for (const o of bumpers) { const d = Math.hypot(b.x - o.x, b.y - o.y); if (d < o.r + b.r) { const nx = (b.x - o.x) / d, ny = (b.y - o.y) / d, vn = b.vx * nx + b.vy * ny; if (vn < 0) { b.vx -= 2 * vn * nx * 1.05; b.vy -= 2 * vn * ny * 1.05; if (real) { o.p = 1; k.sfx('pop'); k.burst(o.x + nx * o.r, o.y + ny * o.r + OY, '#ffc2cf', 6, 80); } else return 'bounce'; } b.x = o.x + nx * (o.r + b.r); b.y = o.y + ny * (o.r + b.r); } }
+  else { b.x += b.vx * h; if (solid(b.x + Math.sign(b.vx) * b.r, b.y)) { b.x -= b.vx * h; b.vx *= -0.8; if (real) { if (real === true) bump(Math.abs(b.vx)); } else return 'bounce'; }
+    b.y += b.vy * h; if (solid(b.x, b.y + Math.sign(b.vy) * b.r)) { b.y -= b.vy * h; b.vy *= -0.8; if (real) { if (real === true) bump(Math.abs(b.vy)); } else return 'bounce'; }
+    if (PARTY && !(b.air > 0)) { const q = grid[Math.floor(b.y / T)]; if (q && q[Math.floor(b.x / T)] === 2) return 'water'; } }
+  for (const o of bumpers) { const d = Math.hypot(b.x - o.x, b.y - o.y); if (d < o.r + b.r) { const nx = (b.x - o.x) / d, ny = (b.y - o.y) / d, vn = b.vx * nx + b.vy * ny; if (vn < 0) { b.vx -= 2 * vn * nx * 1.05; b.vy -= 2 * vn * ny * 1.05; if (real) { if (real === true) { o.p = 1; k.sfx('pop'); k.burst(o.x + nx * o.r, o.y + ny * o.r + OY, '#ffc2cf', 6, 80); } } else return 'bounce'; } b.x = o.x + nx * (o.r + b.r); b.y = o.y + ny * (o.r + b.r); } }
   const dh = Math.hypot(b.x - hole[0], b.y - hole[1]), s2 = Math.hypot(b.vx, b.vy);
+  if (PARTY) { const r = millStep(b, real); if (r) return r; }
   if (dh < 16 && dh > 0.5 && s2 < 260) { b.vx += (hole[0] - b.x) / dh * 260 * h; b.vy += (hole[1] - b.y) / dh * 260 * h; } // el borde de la copa atrae la bola lenta
   if (dh < 9 && s2 < 420) return 'hole';
   return null;

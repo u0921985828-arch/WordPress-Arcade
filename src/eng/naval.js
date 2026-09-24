@@ -245,7 +245,7 @@ function drawShip(s, tt) {
   for (const [mx, len] of [[10, 13], [-4, 16]]) {
     c.save(); c.translate(mx, 0); c.rotate(boom + Math.PI / 2);
     c.beginPath(); c.moveTo(-len, 0); c.quadraticCurveTo(0, full * Math.sign(Math.cos(rel - boom) || 1), len, 0); c.closePath();
-    const g = c.createLinearGradient(0, -6, 0, 10); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#dcd6e8'); c.fillStyle = g; c.fill(); c.lineWidth = 1.8; c.strokeStyle = OUT; c.stroke();
+    const g = c.createLinearGradient(0, -6, 0, 10); g.addColorStop(0, mix('#ffffff', s.col, 0.18)); g.addColorStop(1, mix('#dcd6e8', s.col, 0.45)); c.fillStyle = g; c.fill(); c.lineWidth = 1.8; c.strokeStyle = OUT; c.stroke();
     c.fillStyle = s.col; c.fillRect(-len * 0.35, -1.2, len * 0.7, 2.4);
     c.lineWidth = 2.4; c.strokeStyle = '#5a3a20'; c.beginPath(); c.moveTo(-len - 1, 0); c.lineTo(len + 1, 0); c.stroke(); c.restore();
   }
@@ -281,13 +281,13 @@ function drawHUD() {
   /* marcador */
   const bw = PORT ? 94 : 112; let x = 6;
   const list = ships.slice(); const cols = PORT ? 2 : 4;
-  list.forEach((s, i) => { const bx = PORT ? 6 + (i % 2) * (bw + 4) : x, by = PORT ? 6 + Math.floor(i / 2) * 30 : 6; x += bw + 5;
+  list.forEach((s, i) => { const bx = PORT ? 6 + (i % 2) * (bw + 4) : i < 2 ? 6 + i * (bw + 5) : W - 6 - (4 - i) * (bw + 5) + 5, by = PORT ? 6 + Math.floor(i / 2) * 30 : 6; x += bw + 5;
     rr(c, bx, by, bw, 26, 8); c.fillStyle = 'rgba(12,20,40,.66)'; c.fill(); c.lineWidth = 2; c.strokeStyle = s.col; c.stroke();
     label(s.cpu ? 'CPU' : s.name, bx + 6, by + 5, 13, s.col); label(String(s.pts), bx + bw - 30, by + 3, 17, '#fff', 'right');
     for (let w = 0; w < WINS; w++) { const px = bx + bw - 20 + w * 8, py = by + 13; c.beginPath(); c.arc(px, py, 3.3, 0, TAU); c.fillStyle = w < s.wins ? '#ffd166' : 'rgba(255,255,255,.15)'; c.fill(); c.lineWidth = 1; c.strokeStyle = OUT; c.stroke(); } });
   void cols;
   /* reloj y viento */
-  const cx = PORT ? W - 44 : W - 44, cy = PORT ? 38 : 76, R = 26;
+  const cx = W - 44, cy = PORT ? 38 : H - 48, R = 26;
   c.beginPath(); c.arc(cx, cy, R, 0, TAU); c.fillStyle = 'rgba(12,20,40,.66)'; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
   c.save(); c.translate(cx, cy); c.rotate(wind); c.beginPath(); c.moveTo(16, 0); c.lineTo(2, -9); c.lineTo(4, -3.5); c.lineTo(-15, -3.5); c.lineTo(-15, 3.5); c.lineTo(4, 3.5); c.lineTo(2, 9); c.closePath(); c.fillStyle = '#e8fbff'; c.fill(); c.lineWidth = 1.8; c.strokeStyle = OUT; c.stroke(); c.restore();
   label('viento', cx, cy + R + 2, 11, '#cfe8ff', 'center');
