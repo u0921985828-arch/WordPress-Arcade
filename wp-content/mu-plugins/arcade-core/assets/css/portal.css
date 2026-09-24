@@ -109,6 +109,7 @@ body.ax :focus-visible{outline:2px solid var(--acc2);outline-offset:2px}
 .ax-act{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 14px;border-radius:12px;background:var(--s1);border:1px solid var(--line);color:var(--mut);font:500 13.5px/1 var(--ff);cursor:pointer;transition:color .15s,border-color .15s,background .15s}
 .ax-act:hover{color:#fff;border-color:rgba(255,255,255,.18)}
 .ax-act b{font-weight:500}
+a.ax-act{text-decoration:none}
 @media(max-width:520px){.ax-actions{width:100%}.ax-act{flex:1;justify-content:center;padding:0 8px}}
 .ax-act[data-ax-like].on{color:#f0647e;border-color:rgba(240,100,126,.4);background:rgba(240,100,126,.08)}
 .ax-act[data-ax-fav].on{color:#e9b949;border-color:rgba(233,185,73,.4);background:rgba(233,185,73,.08)}

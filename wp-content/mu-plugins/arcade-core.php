@@ -60,6 +60,11 @@ final class Arcade_Core {
 			require_once $social;
 			Arcade_Social::boot();
 		}
+		$party = __DIR__ . '/' . self::sub() . 'party.php';
+		if ( file_exists( $party ) ) {
+			require_once $party;
+			Arcade_Party::boot();
+		}
 		$importer = __DIR__ . '/' . self::sub() . 'importer.php';
 		if ( file_exists( $importer ) ) {
 			require_once $importer;
