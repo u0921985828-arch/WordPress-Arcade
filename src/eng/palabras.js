@@ -499,7 +499,8 @@ const SP = (() => {
   let grid, words, cat, time, sinceFind, sel, kc, kSel, kShown, built = false, doneT = 0;
   function build() {
     const cats = Object.keys(CATS), dirs = DIRS.slice(0, [2, 3, 5, 8][lvl]), maxL = Math.max(G.cols, G.rows);
-    for (let attempt = 0; attempt < 30; attempt++) {
+    words = null; let spare = null;
+    for (let attempt = 0; attempt < 120; attempt++) {
       cat = k.pick(cats);
       const pool = k.shuffle(CATS[cat].filter((w) => /^[a-záéíóúüñ]+$/i.test(w)).map((w) => ({ w: w.toUpperCase(), n: norm(w) })).filter((o) => o.n.length >= 3 && o.n.length <= maxL - 1));
       if (pool.length < NW) continue;
@@ -521,9 +522,10 @@ const SP = (() => {
       if (placed.length < NW) continue;
       for (let r = 0; r < G.rows; r++) for (let q = 0; q < G.cols; q++) if (!grid[r][q]) grid[r][q] = LETF[Math.floor(Math.random() * LETF.length)];
       /* que ninguna palabra aparezca dos veces por azar (se comprueba en todas las direcciones) */
-      if (placed.some((p) => countIn(p.n) !== 1)) continue;
+      if (placed.some((p) => countIn(p.n) !== 1)) { spare = { grid, placed, cat }; continue; }
       words = placed.sort((a, b) => a.n.length - b.n.length || a.n.localeCompare(b.n)); break;
     }
+    if (!words && spare) { grid = spare.grid; cat = spare.cat; words = spare.placed.sort((a, b) => a.n.length - b.n.length || a.n.localeCompare(b.n)); } /* 1.23: nunca sin palabras */
     time = 0; sinceFind = 0; sel = null; kc = { r: Math.floor(G.rows / 2), c: Math.floor(G.cols / 2) }; kSel = null; built = true; doneT = 0;
   }
   function countIn(n) {

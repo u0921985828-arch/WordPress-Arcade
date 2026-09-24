@@ -164,7 +164,7 @@ function finishClear() {
 function die() { dying = true; dieT = 0; cur = null; clearing = null; k.sfx('hurt'); k.shake(5); }
 function win() {
   won = true; k.st = 'over'; cur = null;
-  k.show('¡Maratón completada!', `${GOAL} líneas · Puntos: ${score} · Récord ${k.best('tetra-' + MODE, score)}<br>Toca para jugar otra vez`);
+  k.end('tetra-' + MODE, score, '¡Maratón completada!', `${GOAL} líneas`);   // k.end avisa al reproductor (arcade:over) y guarda el récord
 }
 function pop(txt, col, size) { pops.push({ txt, col, size, t: 1.25, max: 1.25 }); if (pops.length > 4) pops.shift(); }
 
