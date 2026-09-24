@@ -30,7 +30,9 @@ Opciones:
 | **B. Packs CC0** (p. ej. Kenney, dominio público) | Sprites de aspecto profesional al momento | Hay que descargarlos (en este entorno la red los bloquea: subir el zip al repo o permitir el dominio); aspecto «visto en otros juegos»; pesos de imagen |
 | **C. Arte encargado o generado** | Identidad única | Coste, tiempo, revisar licencias |
 
-Recomendación: **A como base** (diferencia el portal y mantiene 0 € y 0 riesgo legal) y **B solo para personajes/enemigos** de los juegos estrella (plataformas, shooters, mazmorras) si se aporta el pack.
+Decisión del usuario: **A** (art.js v2 aplicado en 1.19.0).
+
+Recomendación original: **A como base** (diferencia el portal y mantiene 0 € y 0 riesgo legal) y **B solo para personajes/enemigos** de los juegos estrella (plataformas, shooters, mazmorras) si se aporta el pack.
 
 Prioridad de juegos a pulir para la demo (los que más se van a probar): Pixel Dash, Blade Leap, Starfall Defender, Maze Muncher, Tetra Drop, Dungeon Micro, Low Poly Rally, Mini Golf, Pool Break, Klondike.
 
@@ -46,7 +48,7 @@ Prioridad de juegos a pulir para la demo (los que más se van a probar): Pixel D
 ## 4. Plan propuesto
 
 1. Controles 1.17 (hecho) → probar en móvil real.
-2. Decidir arte (A o A+B).
+2. Arte A: art.js v2 (hecho en 1.19) + curva de dificultad común en los 100 juegos (hecho en 1.19).
 3. Pulir los 10 juegos estrella + miniaturas.
 4. Modo demo + service worker + dominio.
 5. Material de presentación.
