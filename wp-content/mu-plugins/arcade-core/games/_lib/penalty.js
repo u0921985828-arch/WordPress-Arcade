@@ -1,38 +1,39 @@
 /* Penalty Flick con arte propio: desliza desde el balón hacia la portería. Largo = alto; un desliz curvo da efecto (engaña al portero).
  * Portero animado que adivina el lado y se estira hacia el balón (mejora con el nivel). Red que se deforma. Diana de escuadra = +3. 3 fallos y se acaba. */
-const OUT = ART.OUT, R2 = 6.2832, W = 360, H = 640;
+const VS = CFG.mode === 'versus', OUT = ART.OUT, R2 = 6.2832, W = VS ? 640 : 360, H = VS ? 360 : 640, CX = W / 2;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#2e8b3e' }), c = k.ctx;
-const GX = 40, GY = 160, GW = 280, GH = 110, GL = GY + GH, SPOT = [180, 548], VP = [180, 120];
-let ball, keeper, goals, pts, shots, misses, state, msg, msgT, msgC, level, target, path, net, cheer, kb, aimK, t = 0, bgCv;
-function setup() { ball = { x: SPOT[0], y: SPOT[1] - 14, gy: SPOT[1], s: 1, e: 0, rot: 0, a: 1, h: 0 }; keeper = { x: 180, tx: 180, a: 0, ta: 0, dive: 0, delay: 0, dir: 0 }; state = 'aim'; path = [];
+const GX = VS ? 170 : 40, GY = VS ? 96 : 160, GW = VS ? 300 : 280, GH = 110, GL = GY + GH, SPOT = VS ? [CX, 326] : [180, 548], VP = [CX, GY - 40];
+let kcol = '#ff9a3d', ball, keeper, goals, pts, shots, misses, state, msg, msgT, msgC, level, target, path, net, cheer, kb, aimK, t = 0, bgCv;
+function setup() { ball = { x: SPOT[0], y: SPOT[1] - 14, gy: SPOT[1], s: 1, e: 0, rot: 0, a: 1, h: 0 }; keeper = { x: CX, tx: CX, a: 0, ta: 0, dive: 0, delay: 0, dir: 0 }; state = 'aim'; path = [];
   target = level >= 2 ? { x: Math.random() < 0.5 ? GX + 34 : GX + GW - 34, y: GY + 30, r: 22 } : null; }
-function reset() { goals = 0; pts = 0; shots = 0; misses = 0; level = 1; msg = ''; msgT = 0; cheer = 0; kb = false; aimK = { x: 180, y: 215 }; net = { a: 0, v: 0, x: 180, y: 220 }; setup(); }
+function reset() { goals = 0; pts = 0; shots = 0; misses = 0; level = 1; msg = ''; msgT = 0; cheer = 0; kb = false; aimK = { x: CX, y: 215 }; net = { a: 0, v: 0, x: CX, y: 220 }; setup(); }
 /* ---------- Fondo cacheado: grada con público, vallas, césped en perspectiva y líneas ---------- */
 function buildBg() {
   const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2; const g = cv.getContext('2d'); g.scale(2, 2);
   const hr = (a, b) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5; return v - Math.floor(v); };
-  let gr = g.createLinearGradient(0, 0, 0, 130); gr.addColorStop(0, '#1b1840'); gr.addColorStop(1, '#3a2f6a'); g.fillStyle = gr; g.fillRect(0, 0, W, 130);
-  for (let r = 0; r < 9; r++) { const y = 8 + r * 13; g.fillStyle = r % 2 ? '#2b2554' : '#322b60'; g.fillRect(0, y + 6, W, 7); for (let i = 0; i < 30; i++) { const x = i * 12.4 + (r % 2) * 6 + hr(i, r) * 3; g.fillStyle = ['#ff5f7a', '#f2d15c', '#5ce1e6', '#ffffff', '#7cf7a0', '#b98cff', '#ff9a3d'][Math.floor(hr(r, i) * 7)]; g.fillRect(x - 4, y + 4, 8, 7); g.fillStyle = ['#ffd1a3', '#e0a878', '#8a5a3b', '#f5c99a'][Math.floor(hr(i + 5, r) * 4)]; g.beginPath(); g.arc(x, y + 1, 3.6, 0, R2); g.fill(); } }
-  g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 0, W, 130);
+  const AY = VS ? 58 : 124, GS = AY + 24, NR = VS ? 4 : 9; // vallas, inicio del césped, filas de público
+  let gr = g.createLinearGradient(0, 0, 0, AY + 6); gr.addColorStop(0, '#1b1840'); gr.addColorStop(1, '#3a2f6a'); g.fillStyle = gr; g.fillRect(0, 0, W, AY + 6);
+  for (let r = 0; r < NR; r++) { const y = 8 + r * 13; g.fillStyle = r % 2 ? '#2b2554' : '#322b60'; g.fillRect(0, y + 6, W, 7); for (let i = 0; i < Math.ceil(W / 12); i++) { const x = i * 12.4 + (r % 2) * 6 + hr(i, r) * 3; g.fillStyle = ['#ff5f7a', '#f2d15c', '#5ce1e6', '#ffffff', '#7cf7a0', '#b98cff', '#ff9a3d'][Math.floor(hr(r, i) * 7)]; g.fillRect(x - 4, y + 4, 8, 7); g.fillStyle = ['#ffd1a3', '#e0a878', '#8a5a3b', '#f5c99a'][Math.floor(hr(i + 5, r) * 4)]; g.beginPath(); g.arc(x, y + 1, 3.6, 0, R2); g.fill(); } }
+  g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 0, W, AY + 6);
   // vallas publicitarias
   const ads = [['ARCADE', '#6e62f5'], ['GOL', '#e0564a'], ['JUEGA', '#2a9e50'], ['PENALTI', '#f2b705']];
-  for (let i = 0; i < 4; i++) { const x = i * 90; ART.rr(g, x + 2, 124, 86, 24, 3); ART.fillOut(g, ads[i][1], 2); g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(x + 4, 126, 82, 5); g.font = '900 13px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; g.fillText(ads[i][0], x + 45, 137); }
+  for (let i = 0; i < Math.ceil(W / 90); i++) { const x = i * 90 - (VS ? 10 : 0), a = ads[i % 4]; ART.rr(g, x + 2, AY, 86, 24, 3); ART.fillOut(g, a[1], 2); g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(x + 4, AY + 2, 82, 5); g.font = '900 13px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; g.fillText(a[0], x + 45, AY + 13); }
   // césped con franjas en perspectiva
-  gr = g.createLinearGradient(0, 148, 0, H); gr.addColorStop(0, '#2f8f3f'); gr.addColorStop(1, '#3fae4c'); g.fillStyle = gr; g.fillRect(0, 148, W, H - 148);
-  let y = 148, hgt = 10; for (let i = 0; y < H; i++) { if (i % 2) { g.fillStyle = 'rgba(255,255,255,.07)'; g.fillRect(0, y, W, hgt); } y += hgt; hgt *= 1.22; }
-  for (let i = 0; i < 1400; i++) { g.fillStyle = i % 2 ? 'rgba(0,50,0,.14)' : 'rgba(255,255,255,.07)'; const yy = 150 + hr(i, 3) * (H - 150); g.fillRect(hr(i, 7) * W, yy, 1.2, 1 + (yy - 150) / 160); }
-  g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(0, 148, W, 6);
+  gr = g.createLinearGradient(0, GS, 0, H); gr.addColorStop(0, '#2f8f3f'); gr.addColorStop(1, '#3fae4c'); g.fillStyle = gr; g.fillRect(0, GS, W, H - GS);
+  let y = GS, hgt = VS ? 7 : 10; for (let i = 0; y < H; i++) { if (i % 2) { g.fillStyle = 'rgba(255,255,255,.07)'; g.fillRect(0, y, W, hgt); } y += hgt; hgt *= 1.22; }
+  for (let i = 0; i < 1400; i++) { g.fillStyle = i % 2 ? 'rgba(0,50,0,.14)' : 'rgba(255,255,255,.07)'; const yy = GS + 2 + hr(i, 3) * (H - GS - 2); g.fillRect(hr(i, 7) * W, yy, 1.2, 1 + (yy - GS - 2) / 160); }
+  g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(0, GS, W, 6);
   // líneas: gol, área pequeña, área grande, punto de penalti
   g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 2.5; g.lineJoin = 'round';
   g.beginPath(); g.moveTo(0, GL); g.lineTo(W, GL); g.stroke();
   g.beginPath(); g.moveTo(GX - 30, GL); g.lineTo(GX - 44, GL + 44); g.lineTo(GX + GW + 44, GL + 44); g.lineTo(GX + GW + 30, GL); g.stroke();
-  g.lineWidth = 3.5; g.beginPath(); g.moveTo(-40, GL); g.lineTo(-120, 640); g.moveTo(W + 40, GL); g.lineTo(W + 120, 640); g.stroke();
+  g.lineWidth = 3.5; g.beginPath(); g.moveTo(GX - 80, GL); g.lineTo(GX - 160, H); g.moveTo(GX + GW + 80, GL); g.lineTo(GX + GW + 160, H); g.stroke();
   g.fillStyle = 'rgba(255,255,255,.9)'; g.beginPath(); g.ellipse(SPOT[0], SPOT[1], 9, 4, 0, 0, R2); g.fill();
   // viñeta
-  gr = g.createRadialGradient(W / 2, H * 0.55, 150, W / 2, H * 0.55, 420); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,.35)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  gr = g.createRadialGradient(W / 2, H * 0.55, VS ? 200 : 150, W / 2, H * 0.55, VS ? 460 : 420); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,.35)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
   bgCv = cv;
 }
-reset(); buildBg(); k.show(CFG.title, 'Desliza desde el balón hacia la portería: más largo = más alto, y un desliz curvo da efecto. Teclado: flechas para apuntar y A para chutar. Las dianas de escuadra valen +3. Fallas 3 y se acaba.');
+if (!VS) { reset(); buildBg(); k.show(CFG.title, 'Desliza desde el balón hacia la portería: más largo = más alto, y un desliz curvo da efecto. Teclado: flechas para apuntar y A para chutar. Las dianas de escuadra valen +3. Fallas 3 y se acaba.'); }
 function shoot(tx, ty, curve) {
   ball.from = [ball.x, ball.gy]; ball.tx = tx; ball.ty = ty; ball.curve = curve; ball.e = 0; state = 'fly'; shots++; k.sfx('shoot');
   // el portero lee la dirección inicial (sin el efecto) y se lanza tras un pequeño retraso
@@ -46,10 +47,10 @@ function result(kind) {
     net.x = ball.x; net.y = ball.y; net.v = 9; ball.inNet = 0; }
   else { misses++; msgC = '#fff'; msg = kind === 'save' ? '¡Parada!' : kind === 'post' ? '¡Al palo!' : 'Fuera'; navigator.vibrate && navigator.vibrate(60);
     if (kind === 'save' || kind === 'post') { ball.vx = k.rnd(-160, 160); ball.vy = k.rnd(80, 220); ball.vh = k.rnd(60, 180); k.burst(ball.x, ball.y, '#fff', 10, 120); if (kind === 'post') k.sfx('hit'); }
-    else { ball.vx = (ball.tx - 180) * 0.6; ball.vy = -120; ball.vh = 40; } }
+    else { ball.vx = (ball.tx - CX) * 0.6; ball.vy = -120; ball.vh = 40; } }
   ball.res = kind;
 }
-k.run((dt) => {
+if (!VS) k.run((dt) => {
   t += dt; msgT -= dt; cheer = Math.max(0, cheer - dt); net.v += (-net.a * 180 - net.v * 9) * dt; net.a += net.v * dt; if (target && target.hit) target.hit = Math.max(0, target.hit - dt);
   if (!k.gate(reset)) return;
   if (state === 'aim') {
@@ -64,17 +65,8 @@ k.run((dt) => {
     if (k.hit.has('a')) shoot(aimK.x, aimK.y, 0);
   }
   if (state === 'fly' || state === 'after') { keeper.delay -= dt; if (keeper.delay <= 0 && keeper.dive < 1) { keeper.dive = Math.min(1, keeper.dive + dt * 3.4); keeper.x += (keeper.tx - keeper.x) * Math.min(1, dt * 7); keeper.a += (keeper.ta - keeper.a) * Math.min(1, dt * 9); } }
-  if (state === 'fly') { ball.e += dt * 2.3; const e = Math.min(1, ball.e), b = ball;
-    b.x = b.from[0] + (b.tx - b.from[0]) * e + b.curve * (e * e * 0.5 + Math.sin(e * Math.PI) * 0.6); b.gy = b.from[1] + (GL + 2 - b.from[1]) * e;
-    b.h = (GL - b.ty) * e + Math.sin(e * Math.PI) * 26; b.y = b.gy - 14 * (1 - e * 0.55) - Math.max(0, b.h); b.s = 1 - e * 0.55; b.rot += dt * 14;
-    if (ball.e >= 1) { const bx = b.x, by = b.y, a = keeper.a, kx = keeper.x, p0 = [kx + Math.sin(a) * 12, GL - Math.cos(a) * 12], R = Math.min(115, 84 + level * 4), p1 = [kx + Math.sin(a) * R, GL - Math.cos(a) * R];
-      const vx = p1[0] - p0[0], vy = p1[1] - p0[1], u = k.clamp(((bx - p0[0]) * vx + (by - p0[1]) * vy) / (vx * vx + vy * vy), 0, 1), dk = Math.hypot(bx - p0[0] - vx * u, by - p0[1] - vy * u);
-      const post = (Math.abs(bx - GX) < 7 || Math.abs(bx - GX - GW) < 7) && by > GY - 6 && by < GL || Math.abs(by - GY) < 6 && bx > GX - 6 && bx < GX + GW + 6;
-      const inGoal = bx > GX + 6 && bx < GX + GW - 6 && by > GY + 6 && by < GL;
-      result(post ? 'post' : inGoal ? (dk < 20 * (keeper.dive > 0.5 ? 1 : 0.8) ? 'save' : 'goal') : 'miss'); } }
-  else if (state === 'after') { const b = ball; b.rot += dt * 6;
-    if (b.res === 'goal') { b.inNet = Math.min(1, b.inNet + dt * 3); if (b.inNet >= 1) { b.y = Math.min(GL - 12 - 3, b.y + 240 * dt); } else { b.x += (VP[0] - b.x) * dt * 0.8; b.y += (VP[1] - b.y) * dt * 0.8; b.s = Math.max(0.3, b.s - dt * 0.25); } }
-    else { b.x += b.vx * dt; b.y += b.vy * dt - b.vh * dt; b.vh -= 400 * dt; b.s = b.res === 'miss' ? Math.max(0.2, b.s - dt * 0.3) : Math.min(1.1, b.s + dt * 0.25); if (b.res === 'miss') b.a = Math.max(0, b.a - dt * 1.2); }
+  if (state === 'fly') { const r = flyStep(dt); if (r) result(r); }
+  else if (state === 'after') { const b = ball; afterMove(dt);
     b.wait -= dt; if (b.wait <= 0) { if (misses >= 3) return k.lose(CFG.id, pts, 'Fin de la tanda', `${goals} goles de ${shots}`); setup(); } }
 }, () => {
   c.drawImage(bgCv, 0, cheer > 0 ? -Math.abs(Math.sin(t * 16)) * 3 : 0, W, H);
@@ -94,6 +86,19 @@ k.run((dt) => {
   panel(W - 112, 6, 104, 44); for (let i = 0; i < 3; i++) { const x = W - 88 + i * 32, y = 28; miniBall(x, y, 11, i < misses ? 0.35 : 1); if (i < misses) { c.strokeStyle = OUT; c.lineWidth = 6; c.lineCap = 'round'; c.beginPath(); c.moveTo(x - 8, y - 8); c.lineTo(x + 8, y + 8); c.moveTo(x + 8, y - 8); c.lineTo(x - 8, y + 8); c.stroke(); c.strokeStyle = '#ff4d5e'; c.lineWidth = 3.5; c.stroke(); } }
   if (msgT > 0) { const e = Math.min(1, (1.3 - msgT) / 0.16), s = 0.5 + 0.5 * e + Math.sin(e * Math.PI) * 0.2; c.save(); c.translate(W / 2, 360); c.scale(s, s); c.rotate(-0.05); c.globalAlpha = Math.min(1, msgT / 0.3); label(msg, 0, -22, 42, msgC, 'center'); c.restore(); c.globalAlpha = 1; }
 });
+/* ---------- Vuelo del balón (compartido por los dos modos) ---------- */
+function flyStep(dt) { ball.e += dt * 2.3 * (ball.sp || 1); const e = Math.min(1, ball.e), b = ball;
+    b.x = b.from[0] + (b.tx - b.from[0]) * e + b.curve * (e * e * 0.5 + Math.sin(e * Math.PI) * 0.6); b.gy = b.from[1] + (GL + 2 - b.from[1]) * e;
+    b.h = (GL - b.ty) * e + Math.sin(e * Math.PI) * 26; b.y = b.gy - 14 * (1 - e * 0.55) - Math.max(0, b.h); b.s = 1 - e * 0.55; b.rot += dt * 14;
+    if (ball.e >= 1) { const bx = b.x, by = b.y, a = keeper.a, kx = keeper.x, p0 = [kx + Math.sin(a) * 12, GL - Math.cos(a) * 12], R = Math.min(115, 84 + level * 4), p1 = [kx + Math.sin(a) * R, GL - Math.cos(a) * R];
+      const vx = p1[0] - p0[0], vy = p1[1] - p0[1], u = k.clamp(((bx - p0[0]) * vx + (by - p0[1]) * vy) / (vx * vx + vy * vy), 0, 1), dk = Math.hypot(bx - p0[0] - vx * u, by - p0[1] - vy * u);
+      const post = (Math.abs(bx - GX) < 7 || Math.abs(bx - GX - GW) < 7) && by > GY - 6 && by < GL || Math.abs(by - GY) < 6 && bx > GX - 6 && bx < GX + GW + 6;
+      const inGoal = bx > GX + 6 && bx < GX + GW - 6 && by > GY + 6 && by < GL;
+      return post ? 'post' : inGoal ? (dk < 20 * (keeper.dive > 0.5 ? 1 : 0.8) ? 'save' : 'goal') : 'miss'; }
+  return null; }
+function afterMove(dt) { const b = ball; b.rot += dt * 6;
+    if (b.res === 'goal') { b.inNet = Math.min(1, b.inNet + dt * 3); if (b.inNet >= 1) { b.y = Math.min(GL - 12 - 3, b.y + 240 * dt); } else { b.x += (VP[0] - b.x) * dt * 0.8; b.y += (VP[1] - b.y) * dt * 0.8; b.s = Math.max(0.3, b.s - dt * 0.25); } }
+    else { b.x += b.vx * dt; b.y += b.vy * dt - b.vh * dt; b.vh -= 400 * dt; b.s = b.res === 'miss' ? Math.max(0.2, b.s - dt * 0.3) : Math.min(1.1, b.s + dt * 0.25); if (b.res === 'miss') b.a = Math.max(0, b.a - dt * 1.2); } }
 /* ---------- Portería: red deformable (fondo, laterales, techo) y postes ---------- */
 function netPt(x, y) { const d2 = (x - net.x) ** 2 + (y - net.y) ** 2, a = net.a * Math.exp(-d2 / 2600); return [x + (VP[0] - x) * a * 0.3, y + (VP[1] - y) * a * 0.3 + a * 10]; }
 function drawGoalBack() {
@@ -128,14 +133,14 @@ function drawKeeper() {
   ART.rr(c, -13, -38, 26, 12, 4); ART.fillOut(c, '#1a1530', 2); // pantalón
   // brazos
   for (const s of [-1, 1]) { const ang = (1 - arm) * (s * 1.9) + arm * (s * 0.25), ax = s * 13, ay = -60, L = 30, hx = ax + Math.sin(ang) * L, hy = ay - Math.cos(ang) * L;
-    c.strokeStyle = OUT; c.lineWidth = 11; c.beginPath(); c.moveTo(ax, ay); c.lineTo(hx, hy); c.stroke(); c.strokeStyle = '#ff9a3d'; c.lineWidth = 7; c.stroke();
+    c.strokeStyle = OUT; c.lineWidth = 11; c.beginPath(); c.moveTo(ax, ay); c.lineTo(hx, hy); c.stroke(); c.strokeStyle = kcol; c.lineWidth = 7; c.stroke();
     c.beginPath(); c.arc(hx, hy, 7.5, 0, R2); ART.fillOut(c, '#7cf7a0', 2); c.fillStyle = 'rgba(255,255,255,.5)'; c.beginPath(); c.arc(hx - 2, hy - 2, 2.5, 0, R2); c.fill(); }
   // camiseta
-  ART.rr(c, -16, -66, 32, 32, 9); ART.fillOut(c, '#ff9a3d', 2.5); c.fillStyle = '#e06a1a'; c.fillRect(-15, -44, 30, 5); c.fillStyle = 'rgba(255,255,255,.3)'; c.fillRect(-11, -63, 5, 20);
+  ART.rr(c, -16, -66, 32, 32, 9); ART.fillOut(c, kcol, 2.5); c.fillStyle = kcol === '#ff9a3d' ? '#e06a1a' : ART.dark(kcol, 0.25); c.fillRect(-15, -44, 30, 5); c.fillStyle = 'rgba(255,255,255,.3)'; c.fillRect(-11, -63, 5, 20);
   c.fillStyle = OUT; c.font = '900 12px ui-rounded,system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('1', 0, -54);
   // cabeza
   c.beginPath(); c.arc(0, -77, 11, 0, R2); ART.fillOut(c, '#f5c99a', 2.5); c.fillStyle = '#5a3a22'; c.beginPath(); c.arc(0, -80, 11, Math.PI * 1.05, Math.PI * 1.95); c.fill(); c.strokeStyle = OUT; c.lineWidth = 2.5; c.beginPath(); c.arc(0, -77, 11, Math.PI * 1.05, Math.PI * 1.95); c.stroke();
-  const look = state === 'aim' ? k.clamp((ball.x - 180) / 60, -1, 1) * 2 : kp.dir * 2; c.fillStyle = OUT; c.beginPath(); c.arc(-4 + look, -76, 1.8, 0, R2); c.arc(4 + look, -76, 1.8, 0, R2); c.fill();
+  const look = state === 'aim' ? k.clamp((ball.x - CX) / 60, -1, 1) * 2 : kp.dir * 2; c.fillStyle = OUT; c.beginPath(); c.arc(-4 + look, -76, 1.8, 0, R2); c.arc(4 + look, -76, 1.8, 0, R2); c.fill();
   c.strokeStyle = OUT; c.lineWidth = 1.6; c.beginPath(); if (d > 0.2) c.arc(look, -70, 2.5, 0, R2); else { c.moveTo(-3 + look, -70); c.lineTo(3 + look, -70); } c.stroke();
   c.restore();
 }

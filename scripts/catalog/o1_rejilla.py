@@ -1,0 +1,75 @@
+"""Oleada 1 — agente «rejilla»: Bloques 10×10, Atasco (motor rejilla), Tetra Duelo (tetraduel),
+Serpientes Hambrientas (snake, modo mp) y Tambores de Fiesta (rhythm, modo drums)."""
+
+GAMES = [
+    dict(
+        title='Bloques 10×10', genre='puzzle', tags=['bloques', 'rejilla', 'reto-diario', 'arrastrar', 'vector'],
+        orient='auto', aspect='fill', inputs='TKMG', engine='rejilla',
+        cfg=dict(mode='blocks', help='Arrastra cada pieza al tablero. Completa filas o columnas para borrarlas. Teclado o mando: flechas mueven, A coloca, B cambia de pieza.'),
+        pad=dict(d='8', a='Colocar', b='Cambiar'), mp=None, players='1 jugador',
+        desc=[
+            'Bloques 10×10 es un puzle tranquilo que se vuelve adictivo en cuanto borras tu primera fila doble. Recibes tres piezas a la vez, de formas y tamaños distintos, y tienes que encajarlas todas en un tablero de diez por diez. Cuando una fila o una columna se llena, desaparece con un estallido de color y te deja sitio para seguir. No hay reloj ni gravedad: puedes pensar cada jugada lo que quieras, pero si ninguna de las piezas que te quedan cabe en ningún hueco, la partida termina.',
+            'En el móvil basta con arrastrar la pieza desde la bandeja; mientras la mueves ves la sombra donde caerá y las líneas que va a limpiar se iluminan. Con teclado o mando se juega igual de bien: las flechas mueven un cursor por el tablero, A coloca la pieza y B cambia a la siguiente de la bandeja. Las piezas que ya no caben en ningún sitio se ven apagadas, así sabes al momento qué te está estorbando.',
+            'La gracia está en la racha: si borras algo al menos una vez cada tres piezas, el multiplicador sube y las líneas valen cada vez más. Borrar filas y columnas a la vez con una sola pieza da premios grandes, y dejar el tablero vacío suma trescientos puntos de golpe. Al principio salen piezas pequeñas y cada tanda se puede colocar entera; con el tiempo aparecen el cuadrado de 3×3 y la barra de cinco. Cada día hay además un reto con la misma secuencia de piezas para todo el mundo, ideal para comparar resultados.',
+        ],
+        tips=['Guarda un hueco de 3×3 libre: el cuadrado grande llega cuando menos lo esperas.',
+              'Antes de soltar, mira la bandeja completa y piensa en qué orden caben las tres piezas.',
+              'Rellena los bordes primero; el centro despejado admite cualquier forma.'],
+    ),
+    dict(
+        title='Atasco', genre='puzzle', tags=['coches', 'deslizar', 'logica', 'rejilla', 'vector'],
+        orient='auto', aspect='fill', inputs='TKMG', engine='rejilla',
+        cfg=dict(mode='jam', help='Desliza cada vehículo por su carril hasta dejar libre el paso al coche rojo. Teclado o mando: flechas eligen, A agarra y suelta, B deshace.'),
+        pad=dict(d='8', a='Agarrar', b='Deshacer', t=1), mp=None, players='1 jugador',
+        desc=[
+            'Atasco es el clásico rompecabezas del aparcamiento lleno. En una cuadrícula de seis por seis hay coches y camiones encajados sin orden, y cada uno solo puede avanzar o retroceder en la dirección en la que está aparcado: los horizontales se mueven a los lados y los verticales arriba y abajo. Tu objetivo es abrir un pasillo para que el coche rojo llegue a la salida del lateral derecho. Parece sencillo hasta que descubres que para mover un camión tienes que apartar antes otros tres vehículos.',
+            'Cada nivel lo crea un generador que recorre todas las posiciones posibles del tablero y elige una cuya solución mínima conoce de antemano, así que siempre tiene salida y el marcador te dice cuántos movimientos hacen falta como mínimo. Si lo resuelves en ese número consigues tres estrellas; si te pasas un poco, dos. El primer nivel se hace en un par de jugadas y la dificultad sube poco a poco hasta pedir más de veinte movimientos bien encadenados.',
+            'Se juega arrastrando los coches con el dedo o el ratón. Con teclado o mando, las flechas eligen vehículo, A lo agarra y entonces las flechas lo desplazan, y B deshace el último movimiento. Tienes botones para deshacer, reiniciar el nivel y pedir una pista que marca el siguiente paso de la solución óptima, aunque usarla te deja como mucho en dos estrellas. Tu progreso se guarda y cada partida dura lo que tardes en ver la jugada.',
+        ],
+        tips=['Empieza por la salida: busca qué vehículo tapa el carril del coche rojo y qué lo bloquea a él.',
+              'Los camiones de tres casillas son los que más estorban; libérales espacio pronto.',
+              'Si te atascas, deshaz varios pasos en vez de reiniciar: a menudo el error fue reciente.'],
+    ),
+    dict(
+        title='Tetra Duelo', genre='arcade', tags=['bloques', 'versus', 'basura', 'duelo', 'vector'],
+        orient='auto', aspect='fill', inputs='TKG', engine='tetraduel',
+        cfg=dict(help='Mueve con ← →, baja con ↓, deja caer con ↑, gira con A y guarda con B. Borra varias líneas a la vez para mandar basura al rival.'),
+        pad=dict(d='8', a='Girar', b='Reserva'), mp=(1, 2), players='1–2 jugadores',
+        desc=[
+            'Tetra Duelo lleva los bloques que caen a un combate cara a cara. Cada jugador tiene su propio pozo y las mismas siete piezas de siempre, pero aquí borrar líneas no solo te salva a ti: también empuja filas grises de basura desde el fondo del pozo de tu rival. Un doble manda una fila, un triple dos, cuatro líneas de golpe mandan cuatro, y los giros de la pieza T en huecos imposibles pegan todavía más fuerte. Gana la ronda quien aguante más sin que su pila toque el techo, y el duelo se lo lleva el primero en ganar dos rondas.',
+            'La basura llega con un único hueco por ataque, así que un buen contraataque consiste en limpiarla para devolverla multiplicada. Las líneas que borras primero cancelan la basura que tienes pendiente, visible en la barra roja junto a tu pozo, y lo que sobra viaja al otro lado. Encadenar borrados seguidos suma un combo y repetir jugadas difíciles da un bonus de ataque continuado. Además la velocidad de caída sube durante la ronda, de modo que ninguna partida se eterniza.',
+            'Juega solo contra la CPU, que empieza tranquila y se vuelve más rápida y precisa cada vez que le ganas, o con un amigo en el modo tele usando dos móviles como mando. Controles: flechas a los lados para mover, abajo para bajar deprisa, arriba para dejar caer, A para girar y B para guardar la pieza en reserva. En el teclado también tienes Z para girar al revés; en pantalla táctil puedes arrastrar, tocar para girar y deslizar hacia abajo para soltar.',
+        ],
+        tips=['Deja una columna libre en un lado para meter la barra larga y mandar cuatro filas de golpe.',
+              'No te lances a limpiar cada fila suelta: guardar el ataque para un triple hace mucho más daño.',
+              'Vigila la barra roja; si crece, borra algo antes de que la basura suba.'],
+    ),
+    dict(
+        title='Serpientes Hambrientas', genre='arcade', tags=['serpiente', 'multijugador-local', 'rejilla', 'versus', 'vector'],
+        orient='landscape', aspect='16:9', inputs='TKG', engine='snake',
+        cfg=dict(mode='mp', help='Gira con el joystick o las flechas. Come manzanas para sumar puntos y crecer, y haz que las demás serpientes choquen contra tu cuerpo. Gana quien más puntos tenga al acabar el tiempo.'),
+        pad=dict(d='8'), mp=(1, 4), players='1–4 jugadores',
+        desc=[
+            'Serpientes Hambrientas mete hasta cuatro serpientes en el mismo prado y les pone un reloj. Cada una tiene su color y todas persiguen las mismas manzanas: la roja da un punto y hace crecer un poco, la dorada da tres y desaparece si nadie llega a tiempo. Cuanto más larga es tu serpiente, más difícil es moverse, pero también más fácil encerrar a las demás. Si una rival mete la cabeza contra tu cuerpo, tú te llevas dos puntos extra y ella vuelve a aparecer más corta tras un breve parpadeo.',
+            'Nadie queda fuera: chocar no te elimina, solo te hace perder la mitad del cuerpo y un par de segundos, así que la partida sigue siendo emocionante hasta el final. La velocidad aumenta poco a poco a lo largo de los noventa segundos de ronda y en la recta final aparecen más manzanas doradas para remontar. Los choques de frente dejan a las dos serpientes KO, ideal para cortar la racha del que va primero.',
+            'Se juega con el joystick del móvil en el modo tele, con las flechas o con un mando. Si solo hay una persona, las demás serpientes las lleva la CPU, que busca comida con cuidado de no encerrarse y mejora cuando le ganas. En pantalla táctil también puedes deslizar el dedo para girar. Al terminar se muestra el podio con los puntos de cada color y una revancha está a un botón de distancia.',
+        ],
+        tips=['Rodea una manzana con tu cuerpo antes de comerla: nadie más podrá llegar.',
+              'Cruza por delante de una serpiente rival para que su cabeza choque contra ti y ganes dos puntos.',
+              'Las manzanas doradas valen el triple; ve a por ellas aunque tengas que dar un rodeo.'],
+    ),
+    dict(
+        title='Tambores de Fiesta', genre='party', tags=['ritmo', 'musica', 'tambores', 'concurso', 'vector'],
+        orient='landscape', aspect='16:9', inputs='TKG', engine='rhythm',
+        cfg=dict(mode='drums', help='Pulsa A para el tambor izquierdo y B para el derecho cuando las notas lleguen al aro. En los redobles, alterna A y B tan rápido como puedas.'),
+        pad=dict(d='', a='Tambor A', b='Tambor B'), mp=(1, 4), players='1–4 jugadores',
+        desc=[
+            'Tambores de Fiesta convierte el salón en un concurso de percusión. Cada jugador tiene dos tambores, uno para el botón A y otro para el B, y todos tocan la misma partitura a la vez en su propio carril. Las notas bajan hacia el aro y hay que golpear justo cuando llegan: un acierto perfecto suma más que uno bueno, y encadenar golpes sin fallar sube el multiplicador hasta cuatro. Al acabar la canción gana quien más puntos haya acumulado.',
+            'Cada tema está generado al momento sobre una base de bombo y arranca a un tempo cómodo para ir acelerando. De vez en cuando llega un redoble: una barra larga durante la que cada golpe cuenta, así que toca alternar A y B lo más rápido posible. También hay golpes dobles que piden los dos tambores a la vez. Las valoraciones aparecen en grande sobre cada carril para que todo el salón vea quién va clavando el ritmo y quién se ha despistado.',
+            'Pensado para el modo tele con hasta cuatro móviles, cada uno con solo dos botones gigantes. Si juegas solo, en el ordenador tienes A en Espacio o Z y B en X, y en pantalla táctil la mitad izquierda es un tambor y la derecha el otro. Los carriles vacíos los ocupan tamborileros de la CPU que fallan de vez en cuando y afinan más cuanto más les ganas. Cada canción dura un par de minutos, perfecta para jugar varias rondas seguidas.',
+        ],
+        tips=['Mira la nota que llega, no el aro: anticipar el golpe da más perfectos.',
+              'En los redobles alterna los dos botones en vez de machacar solo uno.',
+              'No golpees al azar entre notas; un golpe sin nota rompe tu combo.'],
+    ),
+]

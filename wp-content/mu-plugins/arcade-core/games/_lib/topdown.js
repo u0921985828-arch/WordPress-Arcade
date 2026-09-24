@@ -1,4 +1,6 @@
-/* Acción cenital con arte propio (ART). CFG.mode: 'dungeon' | 'crypt' | 'arena' | 'zombie' | 'brawl' | 'tank'
+/* Acción cenital con arte propio (ART). CFG.mode: 'dungeon' | 'crypt' | 'arena' | 'zombie' | 'brawl' | 'tank' | 'bounce' | 'coop'
+ * 'bounce': arena 1–4 por rondas, balas que rebotan 3 veces (tu propia bala te alcanza tras el primer rebote), una vida por ronda.
+ * 'coop': mazmorra cooperativa 1–4 con clases, botín compartido y revivir al compañero caído quedándote a su lado.
  * Salas con obstáculos en perspectiva 3/4, enemigos con IA propia, aviso antes de cada aparición,
  * botín (monedas y corazones), jefe cada 5 salas y una mejora a elegir entre tres al superar cada sala. */
 const M = CFG.mode, land = CFG.land !== false, OUT = ART.OUT, R2 = 6.2832;
@@ -9,10 +11,13 @@ const TH = {
   arena:   { f1: '#62b155', f2: '#5ba84e', edge: '#5d5770', top: '#b9b3c9', face: '#8a8398', wall: 'stone', block: 'rock', foes: ['slime'], boss: 'slime', grass: true, label: 'Oleada', shot: '#fff6a8', vig: 0.3 },
   zombie:  { f1: '#7c6c54', f2: '#75654e', edge: '#3a3026', top: '#c98a4b', face: '#8a5a33', wall: 'fence', block: 'crate', light: 'lamp', foes: ['zombie', 'zombie', 'zombie', 'brute'], boss: 'brute', dirt: true, label: 'Oleada', shot: '#ffd23d', vig: 0.5 },
   brawl:   { f1: '#a06e46', f2: '#976740', grout: '#6e4a2e', edge: '#3e2a1e', top: '#c9a27a', face: '#7e5236', wall: 'panel', block: 'crate', light: 'lantern', foes: ['thug', 'thug', 'brute'], boss: 'brute', plank: true, label: 'Oleada', vig: 0.4 },
+  bounce:  { f1: '#39436e', f2: '#343e67', grout: '#262d52', edge: '#161a31', top: '#aab4de', face: '#5a6494', wall: 'panel', block: 'steel', light: 'lamp', foes: ['tank'], boss: 'tank', label: 'Ronda', vig: 0.45 },
+  coop:    { f1: '#52506a', f2: '#4b4963', grout: '#36344b', edge: '#211f33', top: '#9690b4', face: '#5d5780', wall: 'brick', block: 'brick', light: 'torch', foes: ['bat', 'skel', 'eye', 'slime', 'ghost'], boss: 'eye', door: true, label: 'Sala', shot: '#7df0ff', vig: 0.5 },
   tank:    { f1: '#93b05e', f2: '#8ba757', edge: '#4f6330', top: '#d6cc9f', face: '#a89d70', wall: 'sand', block: 'sand', foes: ['tank'], boss: 'tank', grass: true, label: 'Batalla', vig: 0.3 },
 }[M];
 const k = Kit({ w: W, h: H, title: CFG.title, bg: TH.edge }), c = k.ctx;
-const melee = M === 'crypt' || M === 'brawl', tankM = M === 'tank';
+const melee = M === 'crypt' || M === 'brawl', tankM = M === 'tank', BOUNCE = M === 'bounce', COOP = M === 'coop';
+let hpMul = 1; /* coop: la vida de los enemigos escala con el nº de jugadores */
 /* radio, vida, velocidad, puntos */
 const FOE = { bat: [10, 2, 92, 15], eye: [12, 3, 50, 25], skel: [11, 3, 62, 20], ghost: [12, 2, 46, 25], slime: [16, 3, 56, 20], mini: [9, 1, 95, 10], zombie: [11, 2, 42, 15], brute: [17, 6, 36, 50], thug: [13, 3, 74, 20], tank: [15, 3, 58, 60] };
 const RANGED = { eye: 1, ghost: 1, tank: 1 };
@@ -48,7 +53,7 @@ const spK = () => 0.7 + 0.3 * ramp(), cdK = () => 1.6 - 0.6 * ramp(), bK = () =>
 function pickType() { const f = TH.foes; if (M === 'zombie' && Math.random() < room * 0.02) return 'brute'; return k.pick(f); }
 function addFoe(type, x, y, boss) {
   const b = FOE[type], sc = 1 + (room - 1) * 0.12;
-  const f = { type, x, y, r: b[0] * (boss ? 2.1 : 1), hp: Math.round(b[1] * sc * (boss ? 10 : 1)), sp: b[2] * (boss ? 0.7 : 1) * spK(), pts: b[3] * (boss ? 10 : 1), cd: k.rnd(0.9, 2) * cdK(), cd2: 1.5, a: 0, body: 0, kx: 0, ky: 0, fl: 0, ph: Math.random() * 6, boss, dash: 0, warn: 0, face: 1 };
+  const f = { type, x, y, r: b[0] * (boss ? 2.1 : 1), hp: Math.round(b[1] * sc * (boss ? 10 : 1) * hpMul), sp: b[2] * (boss ? 0.7 : 1) * spK(), pts: b[3] * (boss ? 10 : 1), cd: k.rnd(0.9, 2) * cdK(), cd2: 1.5, a: 0, body: 0, kx: 0, ky: 0, fl: 0, ph: Math.random() * 6, boss, dash: 0, warn: 0, face: 1 };
   f.max = f.hp; foes.push(f); if (boss) bossF = f; return f;
 }
 function queue(type, boss, edge) { const [x, y] = place(boss ? 190 : 150, edge); const t0 = room === 1 && !edge ? 1.4 : 0.9; pend.push({ type, x, y, t: t0 + (edge ? 0 : pend.length * 0.12), max: t0 + pend.length * 0.12, boss }); }
@@ -70,7 +75,8 @@ function buildRoom() {
   msg = `${TH.label} ${room}${isBoss ? ' · Jefe' : ''}`; msgT = 1.8;
 }
 function reset() {
-  VS = tankM && k.party && k.party.length >= 2 ? k.party.slice(0, 4).map((q) => ({ pl: q.p, col: k.pcol(q.p), name: 'J' + (q.p + 1), r: 11, wins: 0 })) : null;
+  if (COOP) return coopReset();
+  VS = BOUNCE ? k.players(4).map((q) => ({ pl: q.p, col: q.color, name: q.cpu ? 'CPU' : q.name, r: 11, wins: 0, kills: 0 })) : tankM && k.party && k.party.length >= 2 ? k.party.slice(0, 4).map((q) => ({ pl: q.p, col: k.pcol(q.p), name: 'J' + (q.p + 1), r: 11, wins: 0 })) : null;
   p = { x: TH.door ? X0 + 40 : W / 2, y: H / 2, r: 11, hp: 5, max: 5, a: 0, aim: 0, inv: 0, kx: 0, ky: 0, mv: false, face: 1, body: 0, recoil: 0 };
   room = 0; score = 0; t = 0; cool = 0; swing = 0; kills = 0; choice = null; upg = { rate: 1, dmg: 1, speed: 1, multi: 1, pierce: 0, reach: 1 }; if (VS) vsRound(true); else buildRoom();
 }
@@ -78,15 +84,83 @@ function reset() {
    Si alguien se va, la CPU lleva su tanque hasta que vuelva; quien llega nuevo entra en la ronda siguiente. ---------- */
 const inParty = (pl) => !!(k.party && k.party.some((x) => x.p === pl));
 let vsCd = false, vsT = 0, vsZ = 0, VS = null, vsR = 0, vsBetween = 0, vsFreeze = 0, vsLast = null;
-const VSWIN = 3, VSHP = 3;
+/* Reglas del duelo: tanques de Tank Duel (3 corazones, 1 rebote) o Tanques Rebote (1 vida por ronda, 3 rebotes, 2 balas en juego, a 4 rondas) */
+const VSC = BOUNCE ? { hp: 1, win: 4, bnc: 3, max: 2, spd: 250, cool: 0.3, life: 7, zone: 22 } : { hp: 3, win: 3, bnc: 1, max: 99, spd: 380, cool: 0.55, life: 1.6, zone: 30 };
+const VSWIN = VSC.win, VSHP = VSC.hp;
+let cpuLv = 0; try { cpuLv = Math.max(0, Math.min(6, +localStorage.getItem('cpu:' + CFG.id) || 0)); } catch (e) {}
+/* Tanques Rebote: obstáculos simétricos (se generan en un cuadrante y se reflejan), así ninguna esquina tiene ventaja */
+function bounceWalls(SP) {
+  const cx = (X0 + X1) / 2, cy = (Y0 + Y1) / 2, L = [], over = (b, q, m) => b.x < q.x + q.w + m && b.x + b.w + m > q.x && b.y < q.y + q.h + m && b.y + b.h + m > q.y;
+  if (Math.random() < 0.75) { const w = k.pick([40, 60, 80]), h = k.pick([30, 40]); L.push({ x: cx - w / 2, y: cy - h / 2, w, h }); }
+  for (let i = 0, tries = 0; i < 3 && tries < 300; tries++) {
+    const w = k.pick([20, 30, 60, 90]), h = w >= 60 ? k.pick([20, 30]) : k.pick([40, 60, 80]);
+    const x = Math.round(k.rnd(X0 + 50, cx - 26 - w) / 10) * 10, y = Math.round(k.rnd(Y0 + 40, cy - 26 - h) / 10) * 10;
+    if (x < X0 + 46 || y < Y0 + 36) continue;
+    const cand = [{ x, y, w, h }, { x: 2 * cx - x - w, y, w, h }, { x, y: 2 * cy - y - h, w, h }, { x: 2 * cx - x - w, y: 2 * cy - y - h, w, h }];
+    if (cand.some((b) => L.some((q) => over(b, q, 46)))) continue;
+    if (cand.some((b) => SP.some((sp) => over(b, { x: sp[0] - 34, y: sp[1] - 34, w: 68, h: 68 }, 20)))) continue;
+    L.push(...cand); i++;
+  }
+  for (const b of L) walls.push({ x: b.x, y: b.y, w: b.w, h: b.h, hp: 0, fl: 0, seed: Math.random() });
+}
+/* Trayectoria de una bala con rebotes (vista previa del jugador y puntería de la CPU). Devuelve el primer tanque alcanzado. */
+function simShot(x, y, a, own, maxB, len) {
+  let vx = Math.cos(a), vy = Math.sin(a), b = 0; const pts = [[x, y]], st = 6;
+  for (let d = 0; d < len; d += st) {
+    const nx = x + vx * st, ny = y + vy * st;
+    if (rectHit(nx, ny, 3)) { if (b >= maxB) break; b++; if (rectHit(nx, y, 3)) vx = -vx; else vy = -vy; pts.push([x, y]); continue; }
+    x = nx; y = ny;
+    for (let i = 0; i < VS.length; i++) { const q = VS[i]; if (!q.alive || (i === own && !b)) continue; if (Math.hypot(q.x - x, q.y - y) < q.r + 3) { pts.push([x, y]); return { hit: i, pts, b }; } }
+  }
+  pts.push([x, y]); return { hit: -1, pts, b };
+}
+const shotsOf = (i) => shots.reduce((n, s) => n + (s.own === i ? 1 : 0), 0);
+/* CPU de Tanques Rebote: esquiva balas que vienen hacia ella, busca tiros con rebote (prueba ángulos y simula la trayectoria)
+   y descarta los que la alcanzarían a ella. Mejora con cada victoria del jugador (cpu:<id>): más ángulos, menos error, más reflejos. */
+function bounceCpu(q, dt, i) {
+  const st = q.ai || (q.ai = { t: k.rnd(0.3, 0.8), plan: null, rest: 0 }), lv = cpuLv;
+  let dodge = null;
+  for (const s of shots) {
+    if (s.own === i && !s.bn) continue;
+    const rx = q.x - s.x, ry = q.y - s.y, sp = Math.hypot(s.vx, s.vy) || 1, tt = (rx * s.vx + ry * s.vy) / (sp * sp);
+    if (tt < 0 || tt > 0.75) continue;
+    const ex = s.x + s.vx * tt - q.x, ey = s.y + s.vy * tt - q.y; if (Math.hypot(ex, ey) > 30) continue;
+    s.roll = s.roll || {}; if (s.roll[i] === undefined) s.roll[i] = Math.random() < 0.3 + lv * 0.1; if (!s.roll[i]) continue;
+    const nx = -s.vy / sp, ny = s.vx / sp, side = ex * nx + ey * ny > 0 ? -1 : 1; dodge = [nx * side, ny * side]; break;
+  }
+  st.t -= dt; st.rest -= dt;
+  if (st.t <= 0 && st.rest <= 0) {
+    st.t = Math.max(0.18, 0.6 - lv * 0.07) * k.rnd(0.8, 1.3);
+    const N = 18 + lv * 6; let best = null;
+    for (let n = 0; n < N; n++) {
+      const a = (n / N) * R2 + Math.random() * 0.1, sx = q.x + Math.cos(a) * 18, sy = q.y + Math.sin(a) * 18; if (rectHit(sx, sy, 3)) continue;
+      const r = simShot(sx, sy, a, i, VSC.bnc, 520 + lv * 60);
+      if (r.hit >= 0 && r.hit !== i) { const sc = -r.b * 0.5 - angDiff(a, q.aim) * 0.25 + Math.random() * 0.3; if (!best || sc > best.sc) best = { a, sc }; }
+    }
+    st.plan = best ? best.a + k.rnd(-1, 1) * Math.max(0.015, 0.1 - lv * 0.014) : null;
+  }
+  if (dodge) return [dodge[0], dodge[1], false, null];
+  if (st.plan != null && shotsOf(i) < VSC.max) {
+    const ok = angDiff(q.aim, st.plan) < 0.07 && q.cool <= 0;
+    if (ok) { const a = st.plan; st.plan = null; st.rest = k.rnd(0.35, 0.9); return [0, 0, true, a]; }
+    return [0, 0, false, st.plan];
+  }
+  const [mx, my] = vsCpu(q, dt); return [mx * 0.9, my * 0.9, false, null];
+}
+function bounceEnd(champ) {
+  if (!k.party) { const hu = VS.find((q) => q.pl === 0); cpuLv = Math.max(0, Math.min(6, cpuLv + (champ === hu ? 1 : -1))); try { localStorage.setItem('cpu:' + CFG.id, cpuLv); } catch (e) {} }
+  const solo = !k.party, head = solo ? (champ.pl === 0 ? '¡Has ganado!' : 'Gana la CPU') : champ.cpu ? 'Gana la CPU' : `¡Gana ${champ.name}!`;
+  k.podium(VS.map((q) => ({ p: q.pl, score: q.wins, name: q.cpu ? 'CPU' : q.name })), { head, noTie: true, fmt: (n) => `${n} ronda${n === 1 ? '' : 's'}` });
+}
 function vsRound(first) {
   vsR = first ? 1 : vsR + 1; room = vsR; vsBetween = 0; vsFreeze = 1.3; vsLast = null; vsT = 0; vsZ = 0;
   walls = []; foes = []; shots = []; eshots = []; pend = []; drops = []; bossF = null; floorCv = null; quota = 0; cleared = true; door = false; choice = null;
   /* 2: esquinas opuestas; 3: arriba a los lados y abajo en el centro (misma distancia entre todos); 4: esquinas */
   const SP = VS.length === 3 ? [[X0 + 46, Y0 + 40], [X1 - 46, Y0 + 40], [W / 2, Y1 - 40]] : [[X0 + 46, Y0 + 40], [X1 - 46, Y1 - 40], [X1 - 46, Y0 + 40], [X0 + 46, Y1 - 40]];
   SP.forEach((sp) => sp.push(Math.atan2(H / 2 + 10 - sp[1], W / 2 - sp[0])));
-  VS.forEach((q, i) => { const sp = SP[i]; q.cpu = !inParty(q.pl); q.ai = null; Object.assign(q, { x: sp[0], y: sp[1], body: sp[2], a: sp[2], aim: sp[2], hp: VSHP, inv: 1.3, alive: true, kx: 0, ky: 0, cool: 0.4, recoil: 0, mv: false }); });
-  for (let i = 0, tries = 0; i < 6 && tries < 200; tries++) {
+  VS.forEach((q, i) => { const sp = SP[i]; q.cpu = BOUNCE ? !k.human(q.pl) : !inParty(q.pl); q.tAim = null; q.zt = 0; q.ai = null; Object.assign(q, { x: sp[0], y: sp[1], body: sp[2], a: sp[2], aim: sp[2], hp: VSHP, inv: 1.3, alive: true, kx: 0, ky: 0, cool: 0.4, recoil: 0, mv: false }); });
+  if (BOUNCE) bounceWalls(SP);
+  else for (let i = 0, tries = 0; i < 6 && tries < 200; tries++) {
     const w = k.pick([30, 60, 90]), h = k.pick([30, 40, 60]);
     const x = Math.round(k.rnd(X0 + 50, X1 - 50 - w) / 10) * 10, y = Math.round(k.rnd(Y0 + 30, Y1 - 30 - h) / 10) * 10;
     if (walls.some((q) => x < q.x + q.w + 44 && x + w + 44 > q.x && y < q.y + q.h + 44 && y + h + 44 > q.y)) continue;
@@ -108,35 +182,46 @@ function vsCpu(q, dt) {
   if (los && d < 330 && off > 0.3 && st.mode !== 'back') a = ang;
   return [Math.cos(a), Math.sin(a), los && off < 0.2 && d < 380 && Math.random() < 0.6];
 }
-const vsZone = () => { const R0 = Math.hypot((X1 - X0) / 2, (Y1 - Y0) / 2); return vsT <= 30 ? R0 : Math.max(60, R0 - (R0 - 60) * Math.min(1, (vsT - 30) / 25)); };
+const vsZone = () => { const R0 = Math.hypot((X1 - X0) / 2, (Y1 - Y0) / 2), Z = VSC.zone; return vsT <= Z ? R0 : Math.max(60, R0 - (R0 - 60) * Math.min(1, (vsT - Z) / 25)); };
 function vsUpdate(dt) {
+  if (BOUNCE && !vsBetween && VS.some((q) => !q.cpu) && !VS.some((q) => q.alive && !q.cpu)) dt *= 2; /* sin humanos vivos, la ronda corre al doble */
   for (const w of walls) w.fl -= dt;
   if (vsBetween) { vsBetween -= dt; if (vsBetween <= 0) vsRound(); }
   if (vsCd) { vsCd = false; k.count(3); }
   vsFreeze = k.counting() ? 1 : 0;
   /* zona que se cierra: a los 30 s de ronda el círculo seguro encoge; fuera de él se pierde un corazón cada 1,5 s (evita rondas eternas con tanques escondidos) */
-  if (!vsFreeze && !vsBetween) { vsT += dt; if (vsT > 30 && vsT - dt <= 30) { msg = '¡La zona se cierra!'; msgT = 2; k.sfx('lose'); }
-    if (vsT > 30) { const zr = vsZone(); for (const q of VS) if (q.alive && Math.hypot(q.x - (X0 + X1) / 2, q.y - (Y0 + Y1) / 2) > zr) { q.zt = (q.zt || 0) + dt; if (q.zt > 1.5) { q.zt = 0; q.hp--; k.sfx('hurt'); k.burst(q.x, q.y, '#ff5f7a', 10, 120); if (q.hp <= 0) { q.alive = false; k.burst(q.x, q.y, q.col, 36, 260); k.sfx('explode'); k.shake(9); } } } else if (q.alive) q.zt = 0; } }
+  if (!vsFreeze && !vsBetween) { vsT += dt; if (vsT > VSC.zone && vsT - dt <= VSC.zone) { msg = '¡La zona se cierra!'; msgT = 2; k.sfx('lose'); }
+    if (vsT > VSC.zone) { const zr = vsZone(); for (const q of VS) if (q.alive && Math.hypot(q.x - (X0 + X1) / 2, q.y - (Y0 + Y1) / 2) > zr) { q.zt = (q.zt || 0) + dt; if (q.zt > 1.5) { q.zt = 0; q.hp--; k.sfx('hurt'); k.burst(q.x, q.y, '#ff5f7a', 10, 120); if (q.hp <= 0) { q.alive = false; k.burst(q.x, q.y, q.col, 36, 260); k.sfx('explode'); k.shake(9); } } } else if (q.alive) q.zt = 0; } }
   VS.forEach((q, i) => {
     if (!q.alive) return;
     q.inv -= dt; q.cool -= dt; q.recoil = Math.max(0, q.recoil - dt);
     const pd = k.pad(q.pl), HS = new Set(pd.held); if (q.pl === 0 && !q.cpu) for (const x of k.held) HS.add(x); /* J1 también con teclado */
-    let mx = 0, my = 0, cf = false; if (q.cpu) { if (!vsBetween) [mx, my, cf] = vsCpu(q, dt); } else { if (HS.has('left')) mx--; if (HS.has('right')) mx++; if (HS.has('up')) my--; if (HS.has('down')) my++; }
-    const ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
+    let mx = 0, my = 0, cf = false, hold = false;
+    if (q.cpu) { if (!vsBetween) { if (BOUNCE) { let ta; [mx, my, cf, ta] = bounceCpu(q, dt, i); q.tAim = ta; hold = ta != null; } else [mx, my, cf] = vsCpu(q, dt); } }
+    else { if (HS.has('left')) mx--; if (HS.has('right')) mx++; if (HS.has('up')) my--; if (HS.has('down')) my++; }
+    let ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
+    /* Tanques Rebote: mantener B = quieto y la cruceta gira solo la torreta */
+    if (BOUNCE && !q.cpu) { hold = HS.has('b'); q.hold = hold; if (hold && ml > 0.1) q.tAim = Math.atan2(my, mx); else if (!hold && ml > 0.1) q.tAim = null; }
+    if (hold) { mx = my = 0; ml = 0; }
     if (vsFreeze > 0) { mx = my = 0; }
     q.mv = ml > 0.1 && !vsFreeze; if (q.mv) { q.a = Math.atan2(my, mx); q.body += k.clamp(((q.a - q.body + 3 * Math.PI) % R2) - Math.PI, -8 * dt, 8 * dt); }
-    q.aim += k.clamp(((q.a - q.aim + 3 * Math.PI) % R2) - Math.PI, -10 * dt, 10 * dt); /* la torreta apunta hacia donde te mueves */
+    const want = BOUNCE && q.tAim != null ? q.tAim : q.a;
+    q.aim += k.clamp(((want - q.aim + 3 * Math.PI) % R2) - Math.PI, -(BOUNCE ? 7 : 10) * dt, (BOUNCE ? 7 : 10) * dt); /* la torreta apunta hacia donde te mueves */
     move(q, (mx * 130 + q.kx) * dt, (my * 130 + q.ky) * dt); const dec = Math.pow(0.002, dt); q.kx *= dec; q.ky *= dec;
     for (const o of VS) if (o !== q && o.alive) { const ex = q.x - o.x, ey = q.y - o.y, e = Math.hypot(ex, ey); if (e > 0 && e < q.r + o.r + 4) move(q, ex / e * 60 * dt, ey / e * 60 * dt); }
-    if ((q.cpu ? cf : HS.has('a') || pd.hit.has('a')) && q.cool <= 0 && !vsFreeze && !vsBetween) {
-      q.cool = 0.55; q.recoil = 0.1; k.sfx('shoot');
-      shots.push({ x: q.x + Math.cos(q.aim) * 18, y: q.y + Math.sin(q.aim) * 18, vx: Math.cos(q.aim) * 380, vy: Math.sin(q.aim) * 380, life: 1.6, b: 1, own: i, col: q.col });
+    if ((q.cpu ? cf : HS.has('a') || pd.hit.has('a')) && q.cool <= 0 && !vsFreeze && !vsBetween && (!BOUNCE || shotsOf(i) < VSC.max)) {
+      const mzx = q.x + Math.cos(q.aim) * 18, mzy = q.y + Math.sin(q.aim) * 18;
+      if (BOUNCE && rectHit(mzx, mzy, 3)) { q.cool = 0.2; k.sfx('click'); } /* cañón pegado al muro: no sale */
+      else { q.cool = VSC.cool; q.recoil = 0.1; k.sfx('shoot'); if (BOUNCE) k.burst(mzx, mzy, q.col, 5, 80);
+        shots.push({ x: mzx, y: mzy, vx: Math.cos(q.aim) * VSC.spd, vy: Math.sin(q.aim) * VSC.spd, life: VSC.life, b: VSC.bnc, bn: 0, own: i, col: q.col, tr: [] }); }
     }
   });
-  const bounce = (s) => { s.x -= s.vx * dt; s.y -= s.vy * dt; if (rectHit(s.x + s.vx * dt, s.y, 2)) s.vx *= -1; else s.vy *= -1; };
+  const bounce = (s) => { s.x -= s.vx * dt; s.y -= s.vy * dt; if (rectHit(s.x + s.vx * dt, s.y, 2)) s.vx *= -1; else s.vy *= -1; s.bn++; if (BOUNCE) { k.sfx('click'); k.burst(s.x, s.y, s.col, 4, 70); } };
   for (const s of shots) {
     s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; if (s.life <= 0) s.dead = true;
-    VS.forEach((q, i) => { if (s.dead || !q.alive || (i === s.own && s.b > 0) || Math.hypot(s.x - q.x, s.y - q.y) > q.r + 4) return; s.dead = true; if (q.inv > 0) return;
+    if (s.tr) { s.tr.push(s.x, s.y); if (s.tr.length > 16) s.tr.splice(0, 2); }
+    VS.forEach((q, i) => { if (s.dead || !q.alive || (i === s.own && (BOUNCE ? !s.bn : s.b > 0)) || Math.hypot(s.x - q.x, s.y - q.y) > q.r + 4) return; s.dead = true; if (q.inv > 0 && !BOUNCE) return; if (q.inv > 0 && vsFreeze) return;
+      if (BOUNCE && q.hp - 1 <= 0) { if (i === s.own) k.float('¡Autogol!', q.x, q.y - 26, '#ffc928'); else VS[s.own].kills++; }
       q.hp--; q.inv = 0.6; const a = Math.atan2(s.vy, s.vx); q.kx = Math.cos(a) * 200; q.ky = Math.sin(a) * 200; k.sfx('hit'); k.shake(4); k.burst(q.x, q.y, q.col, 10, 150);
       if (q.hp <= 0) { q.alive = false; k.burst(q.x, q.y, q.col, 36, 260); k.burst(q.x, q.y, '#fff', 12, 160); k.sfx('explode'); k.shake(9); if (i !== s.own) k.float('¡Tanque destruido!', q.x, q.y - 26, VS[s.own].col); } });
     if (s.dead) continue;
@@ -144,11 +229,13 @@ function vsUpdate(dt) {
     if (w && w.hp) { s.dead = true; w.hp--; w.fl = 0.1; k.sfx('hit'); if (w.hp <= 0) { w.dead = true; k.burst(w.x + w.w / 2, w.y + w.h / 2, TH.top, 20, 200); k.sfx('explode'); } }
     else if (rectHit(s.x, s.y, 3)) { if (s.b > 0) { s.b--; bounce(s); } else { s.dead = true; k.burst(s.x, s.y, '#fff', 3, 60); } }
   }
+  if (BOUNCE) for (let a = 0; a < shots.length; a++) for (let b = a + 1; b < shots.length; b++) { const s = shots[a], u = shots[b]; if (!s.dead && !u.dead && Math.hypot(s.x - u.x, s.y - u.y) < 8) { s.dead = u.dead = true; k.burst((s.x + u.x) / 2, (s.y + u.y) / 2, '#fff', 10, 140); k.sfx('pop'); } }
   shots = shots.filter((s) => !s.dead); walls = walls.filter((w) => !w.dead);
   const al = VS.filter((q) => q.alive);
   if (!vsBetween && al.length <= 1) {
     vsLast = al[0] || null; if (vsLast) { vsLast.wins++; k.sfx('win'); }
     const champ = VS.find((q) => q.wins >= VSWIN);
+    if (champ && BOUNCE) return bounceEnd(champ);
     if (champ) { k.win(champ.cpu ? 'Gana la CPU' : `¡Gana ${champ.name}!`, champ.col, VS.map((q) => `<b style="color:${q.col}">${q.name} ${q.wins}</b>`).join(' · ') + '<br>Toca para la revancha', champ.wins); return; }
     vsBetween = 2; msg = vsLast ? `Ronda para ${vsLast.name}` : 'Ronda nula'; msgT = 1.8;
   }
@@ -157,22 +244,307 @@ function vsDraw() {
   if (!floorCv) floorCv = renderFloor(); if (!vigCv) vigCv = renderVig();
   c.drawImage(floorCv, 0, 0, W, H); lights();
   for (const w of [...walls].sort((a, b) => a.y + a.h - b.y - b.h)) block(w);
+  if (BOUNCE && !vsBetween) VS.forEach((q, i) => { /* vista previa de la trayectoria (solo humanos): con B muestra todos los rebotes */
+    if (!q.alive || q.cpu) return; const a = q.aim, sx = q.x + Math.cos(a) * 18, sy = q.y + Math.sin(a) * 18; if (rectHit(sx, sy, 3)) return;
+    const r = simShot(sx, sy, a, -1, q.hold ? VSC.bnc : 1, q.hold ? 900 : 300);
+    c.save(); c.setLineDash([3, 7]); c.lineDashOffset = -t * 40; c.lineCap = 'round'; c.globalAlpha = q.hold ? 0.8 : 0.45; c.strokeStyle = q.col; c.lineWidth = 3;
+    c.beginPath(); r.pts.forEach((pt, j) => (j ? c.lineTo(pt[0], pt[1]) : c.moveTo(pt[0], pt[1]))); c.stroke(); c.restore();
+    if (r.hit >= 0) { const o = VS[r.hit]; c.strokeStyle = q.col; c.lineWidth = 2.5; c.beginPath(); c.arc(o.x, o.y, 20 + Math.sin(t * 10) * 2, 0, R2); c.stroke(); }
+  });
   for (const q of [...VS].sort((a, b) => a.y - b.y)) { if (!q.alive || (q.inv > 0 && !vsFreeze && Math.floor(q.inv * 14) % 2)) continue; shadow(q.x, q.y + 10, 10); tankSprite(q.x, q.y, q.body, q.aim, q.col, q.recoil, q.mv); label(q.cpu ? 'CPU' : q.name, q.x, q.y - 34, 14, q.cpu ? '#e8e4f4' : q.col, 'center'); }
-  for (const s of shots) { c.save(); c.translate(s.x, s.y); c.rotate(Math.atan2(s.vy, s.vx)); ART.rr(c, -6, -3, 12, 6, 3); ART.fillOut(c, s.col, 1.5); c.restore(); }
-  if (vsT > 30) { const zr = vsZone(), zx = (X0 + X1) / 2, zy = (Y0 + Y1) / 2; c.save(); c.beginPath(); c.rect(0, 0, W, H); c.arc(zx, zy, zr, 0, R2, true); c.fillStyle = 'rgba(200,30,60,.28)'; c.fill();
+  for (const s of shots) {
+    if (BOUNCE) { /* bola de energía del color del dueño con estela; parpadea en blanco cuando ya puede alcanzar a su dueño */
+      c.lineCap = 'round'; for (let j = 2; j < s.tr.length; j += 2) { c.globalAlpha = (j / s.tr.length) * 0.5; c.strokeStyle = s.col; c.lineWidth = 2 + (j / s.tr.length) * 5; c.beginPath(); c.moveTo(s.tr[j - 2], s.tr[j - 1]); c.lineTo(s.tr[j], s.tr[j + 1]); c.stroke(); }
+      c.globalAlpha = 0.3; c.fillStyle = s.col; c.beginPath(); c.arc(s.x, s.y, 10, 0, R2); c.fill(); c.globalAlpha = 1;
+      c.beginPath(); c.arc(s.x, s.y, 5.5, 0, R2); ART.fillOut(c, s.bn && Math.floor(t * 12) % 2 ? '#fff' : s.col, 2); c.fillStyle = 'rgba(255,255,255,.8)'; c.beginPath(); c.arc(s.x - 1.5, s.y - 1.5, 2, 0, R2); c.fill();
+      for (let j = 0; j < s.b - s.bn; j++) { c.fillStyle = '#fff'; c.beginPath(); c.arc(s.x - 5 + j * 5, s.y + 10, 1.6, 0, R2); c.fill(); }
+      continue;
+    }
+    c.save(); c.translate(s.x, s.y); c.rotate(Math.atan2(s.vy, s.vx)); ART.rr(c, -6, -3, 12, 6, 3); ART.fillOut(c, s.col, 1.5); c.restore(); }
+  if (vsT > VSC.zone) { const zr = vsZone(), zx = (X0 + X1) / 2, zy = (Y0 + Y1) / 2; c.save(); c.beginPath(); c.rect(0, 0, W, H); c.arc(zx, zy, zr, 0, R2, true); c.fillStyle = 'rgba(200,30,60,.28)'; c.fill();
     c.beginPath(); c.arc(zx, zy, zr, 0, R2); c.lineWidth = 4; c.setLineDash([14, 10]); c.lineDashOffset = -vsT * 30; c.strokeStyle = '#ff5f7a'; c.stroke(); c.restore(); }
   c.drawImage(vigCv, 0, 0, W, H);
   const pw = Math.min(150, (W - 20) / VS.length - 6);
   VS.forEach((q, i) => { const x = 10 + i * (pw + 6); ART.rr(c, x, 5, pw, 26, 9); c.fillStyle = q.alive ? 'rgba(26,21,48,.85)' : 'rgba(26,21,48,.45)'; c.fill(); c.lineWidth = 2; c.strokeStyle = q.col; c.stroke();
-    label(q.cpu ? 'CPU' : q.name, x + 8, 10, 14, q.alive ? q.col : '#77708f'); for (let h = 0; h < VSHP; h++) ART.heart(c, x + 44 + h * 17, 18, 0.85, h < q.hp && q.alive); label(`${q.wins}`, x + pw - 8, 9, 16, '#ffc928', 'right'); });
-  label(`A ${VSWIN} rondas`, W - 14, Y1 + 1, 11, 'rgba(255,255,255,.85)', 'right');
+    label(q.cpu ? 'CPU' : q.name, x + 8, 10, 14, q.alive ? q.col : '#77708f');
+    if (BOUNCE) for (let h = 0; h < VSC.max; h++) { c.beginPath(); c.arc(x + 50 + h * 14, 18, 5, 0, R2); ART.fillOut(c, q.alive && h < VSC.max - shotsOf(i) ? q.col : '#3a3552', 1.8); }
+    else for (let h = 0; h < VSHP; h++) ART.heart(c, x + 44 + h * 17, 18, 0.85, h < q.hp && q.alive); label(`${q.wins}`, x + pw - 8, 9, 16, '#ffc928', 'right'); });
+  label(BOUNCE ? `Ronda ${vsR} · gana quien llegue a ${VSWIN}` : `A ${VSWIN} rondas`, W - 14, Y1 + 1, 11, 'rgba(255,255,255,.85)', 'right');
   if (msgT > 0) { c.globalAlpha = Math.min(1, msgT * 2); c.font = '800 22px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const mw = c.measureText(msg).width + 36, my = vsFreeze ? 44 : H / 2 - 64; ART.rr(c, W / 2 - mw / 2, my, mw, 40, 12); c.fillStyle = 'rgba(26,21,48,.82)'; c.fill(); label(msg, W / 2, my + 9, 22, vsLast ? vsLast.col : '#ffc928', 'center'); c.globalAlpha = 1; }
 }
 k.onParty = () => {
+  if (COOP) return coopParty();
+  if (BOUNCE) { if (k.st !== 'play') { reset(); return; } const pl = k.players(4); for (const q of VS) { q.cpu = pl[q.pl].cpu; q.name = q.cpu ? 'CPU' : pl[q.pl].name; q.ai = null; } return; }
   if (k.st !== 'play' || !VS) { if (k.st !== 'play') reset(); return; }
   for (const q of VS) { q.cpu = !inParty(q.pl); if (q.cpu) q.ai = null; }
   for (const x of k.party || []) if (VS.length < 4 && !VS.some((q) => q.pl === x.p)) VS.push({ pl: x.p, col: k.pcol(x.p), name: 'J' + (x.p + 1), r: 11, wins: 0, alive: false, hp: 0, cpu: false, x: -99, y: -99, body: 0, aim: 0 });
 };
+/* ---------- Mazmorra a Cuatro (CFG.mode 'coop'): 1–4 héroes con clase, salas con puerta, jefe cada 5 salas y botín compartido.
+   Un héroe sin vida queda caído: un compañero a su lado lo levanta en 2,2 s (el clérigo más rápido y con su Plegaria al instante).
+   Si caen todos, fin. Sin tele: tú (J1) + un compañero CPU; en la tele, los humanos ocupan plazas y la CPU rellena hasta 2.
+   La dificultad escala con el nº de héroes: más enemigos por sala y más vida (hpMul). ---------- */
+const CLS = {
+  knight: { n: 'Caballero', hp: 6, sp: 150, melee: 1, reach: 44, cd: 0.42, dmg: 1.5, sk: 'Torbellino', skd: 'Golpe giratorio a tu alrededor', skcd: 5 },
+  archer: { n: 'Arquera', hp: 4, sp: 178, reach: 360, cd: 0.34, dmg: 1, spd: 480, shot: '#ffe08a', sk: 'Lluvia', skd: 'Doce flechas en círculo', skcd: 5.5 },
+  mage:   { n: 'Maga', hp: 4, sp: 160, reach: 330, cd: 0.62, dmg: 1.7, spd: 300, pierce: 2, shot: '#c9a8ff', sk: 'Escarcha', skd: 'Congela a los enemigos cercanos', skcd: 7 },
+  cleric: { n: 'Clérigo', hp: 5, sp: 160, melee: 1, reach: 38, cd: 0.45, dmg: 1.2, sk: 'Plegaria', skd: 'Cura y levanta a los caídos cerca', skcd: 9 },
+};
+const CK = ['knight', 'archer', 'mage', 'cleric'];
+let HE = [], lobby = null, fxs = [];
+function mkHero(q, cls) { return { pl: q.p, col: q.color, name: q.cpu ? 'CPU' : q.name, cpu: q.cpu, cls, x: X0 + 40, y: H / 2, r: 11, hp: CLS[cls].hp, max: CLS[cls].hp, inv: 0, kx: 0, ky: 0, mv: false, face: 1, a: 0, aim: 0, cool: 0, sk: 2, roll: 0, rollCd: 0, down: false, rev: 0, swing: 0, swingA: 0, ai: null, ph: Math.random() * 6 }; }
+function coopReset() {
+  VS = null; room = 0; score = 0; t = 0; kills = 0; choice = null; fxs = []; hpMul = 1; upg = { rate: 1, dmg: 1, speed: 1, multi: 1, pierce: 0, reach: 1 };
+  const pl = k.players(4), top = Math.max(1, ...pl.filter((q) => !q.cpu).map((q) => q.p + 1));
+  HE = pl.slice(0, Math.max(2, top)).map((q, i) => mkHero(q, CK[i]));
+  lobby = { t: 12, ready: HE.map((h) => h.cpu) };
+  p = { x: X0 + 40, y: H / 2, r: 11 }; walls = []; foes = []; shots = []; eshots = []; pend = []; drops = []; floorCv = null; door = false; cleared = true; quota = 0; msgT = 0; bossF = null;
+}
+function coopParty() {
+  if (k.st !== 'play') { reset(); return; }
+  const pl = k.players(4);
+  for (const h of HE) { h.cpu = pl[h.pl].cpu; h.name = h.cpu ? 'CPU' : pl[h.pl].name; h.ai = null; if (lobby) lobby.ready[HE.indexOf(h)] = h.cpu; }
+  for (const q of pl) if (!q.cpu && !HE.some((h) => h.pl === q.p)) { const h = mkHero(q, CK[q.p]); h.x = X0 + 40; h.y = H / 2; h.inv = 2; HE.push(h); if (lobby) lobby.ready.push(false); k.float('¡' + h.name + ' se une!', h.x + 30, h.y - 30, h.col); }
+  HE.sort((a, b) => a.pl - b.pl); if (lobby) lobby.ready = HE.map((h) => h.cpu);
+  hpMul = 1 + 0.3 * (HE.length - 1);
+}
+function formation() { const n = HE.length; HE.forEach((h, i) => { h.x = X0 + 36 + (i % 2) * 18; h.y = H / 2 + (i - (n - 1) / 2) * 30; h.kx = h.ky = 0; }); }
+function coopRoom() {
+  TH.boss = (room + 1) % 10 === 0 ? 'skel' : 'eye'; p = { x: X0 + 40, y: H / 2, r: 11 };
+  buildRoom(); const n = HE.length;
+  if (room % 5 === 0) { for (let i = 1; i < n; i++) queue(k.pick(['bat', 'skel'])); }
+  else { const extra = Math.round(pend.length * 0.45 * (n - 1)); for (let i = 0; i < extra; i++) queue(pickType()); }
+  formation();
+}
+function coopStart() { hpMul = 1 + 0.3 * (HE.length - 1); HE.forEach((h) => { const C = CLS[h.cls]; h.hp = h.max = C.hp; h.sk = 2; }); lobby = null; coopRoom(); k.count(3); }
+function lobbyUpdate(dt) {
+  lobby.t -= dt;
+  HE.forEach((h, i) => {
+    if (h.cpu) return; const L = k.phit(h.pl, 'left') || k.phit(h.pl, 'up'), R = k.phit(h.pl, 'right') || k.phit(h.pl, 'down');
+    if (!lobby.ready[i] && (L || R)) { h.cls = CK[(CK.indexOf(h.cls) + (R ? 1 : 3)) % 4]; k.sfx('click'); }
+    if (k.phit(h.pl, 'a')) { lobby.ready[i] = !lobby.ready[i]; k.sfx(lobby.ready[i] ? 'coin' : 'click'); }
+    if (h.pl === 0 && !k.party && k.ptr.hit) { const cw = Math.min(150, (W - 40) / HE.length - 10), x0 = W / 2 - (HE.length * (cw + 10) - 10) / 2 + i * (cw + 10);
+      if (k.ptr.x > x0 && k.ptr.x < x0 + cw && k.ptr.y > 70 && k.ptr.y < 290) { if (k.ptr.y > 240) { lobby.ready[i] = true; k.sfx('coin'); } else if (!lobby.ready[i]) { h.cls = CK[(CK.indexOf(h.cls) + 1) % 4]; k.sfx('click'); } } }
+  });
+  /* la CPU elige las clases que falten (prefiere no repetir) */
+  HE.forEach((h, i) => { if (h.cpu) { const used = HE.filter((o) => !o.cpu).map((o) => o.cls), free = CK.filter((c2) => !used.includes(c2) && !HE.some((o, j) => j < i && o.cpu && o.cls === c2)); if (free.length && !free.includes(h.cls)) h.cls = free[0]; } });
+  if (lobby.t <= 0 || lobby.ready.every(Boolean)) coopStart();
+}
+const nearFoe = (x, y) => { let n = null, nd = 1e9; for (const f of foes) { const d = Math.hypot(f.x - x, f.y - y); if (d < nd) { nd = d; n = f; } } return [n, nd]; };
+function heroHurt(h, n, sx, sy) {
+  if (h.inv > 0 || h.down || h.roll > 0) return;
+  h.hp -= n; h.inv = 1; k.shake(5); k.sfx('hurt'); k.burst(h.x, h.y, h.col, 10, 150);
+  if (sx !== undefined) { const a = Math.atan2(h.y - sy, h.x - sx); h.kx = Math.cos(a) * 280; h.ky = Math.sin(a) * 280; }
+  if (h.hp <= 0) { h.hp = 0; h.down = true; h.rev = 0; k.flash('rgba(255,60,80,.25)'); k.float(`¡${h.name} ha caído!`, h.x, h.y - 30, h.col); }
+}
+function skill(h) {
+  const C = CLS[h.cls]; h.sk = C.skcd * (h.skMul || 1); k.sfx('explode'); k.shake(3);
+  if (h.cls === 'knight') { fxs.push({ k: 'ring', x: h.x, y: h.y, r: 70 * upg.reach, t: 0.35, col: '#fff' }); for (const f of foes) { const d = Math.hypot(f.x - h.x, f.y - h.y); if (d < 70 * upg.reach + f.r) dmgFoe(f, 2 * upg.dmg, Math.atan2(f.y - h.y, f.x - h.x)); } }
+  else if (h.cls === 'archer') for (let i = 0; i < 12; i++) { const a = (i / 12) * R2; shots.push({ x: h.x, y: h.y - 4, vx: Math.cos(a) * 460, vy: Math.sin(a) * 460, life: 0.9, b: 0, pierce: 1, hits: [], dmg: 1.2 * upg.dmg, col: C.shot, arrow: 1 }); }
+  else if (h.cls === 'mage') { fxs.push({ k: 'ring', x: h.x, y: h.y, r: 130, t: 0.45, col: '#7df0ff' }); for (const f of foes) if (Math.hypot(f.x - h.x, f.y - h.y) < 130 + f.r) { f.frz = f.boss ? 1.2 : 2.6; dmgFoe(f, 1, Math.atan2(f.y - h.y, f.x - h.x)); } }
+  else { fxs.push({ k: 'ring', x: h.x, y: h.y, r: 120, t: 0.5, col: '#ffd23d' }); for (const o of HE) if (Math.hypot(o.x - h.x, o.y - h.y) < 120) { if (o.down) revive(o, 2); else { o.hp = Math.min(o.max, o.hp + 2); k.float('+2', o.x, o.y - 26, '#7cf7a0'); } } }
+  k.float(C.sk, h.x, h.y - 40, '#ffc928');
+}
+function revive(h, hp) { h.down = false; h.hp = Math.min(h.max, hp); h.inv = 1.5; h.rev = 0; k.sfx('win'); k.burst(h.x, h.y, '#7cf7a0', 18, 160); k.float('¡Arriba!', h.x, h.y - 30, '#7cf7a0'); }
+/* CPU aliada: esquiva, levanta a los caídos, pelea según su clase (cuerpo a cuerpo se acerca; a distancia mantiene 150–210 px) y no se aleja del líder humano */
+function heroCpu(h, dt) {
+  const st = h.ai || (h.ai = { side: Math.random() < 0.5 ? 1 : -1, t: 0, px: h.x, py: h.y, stuck: 0 }), C = CLS[h.cls];
+  st.t -= dt; if (st.t <= 0) { st.t = k.rnd(1, 2.2); st.side *= -1; }
+  st.stuck = Math.hypot(h.x - st.px, h.y - st.py) < 12 * dt ? st.stuck + dt : 0; st.px = h.x; st.py = h.y;
+  const [nf, nd] = nearFoe(h.x, h.y), lead = HE.find((o) => !o.cpu && !o.down) || HE.find((o) => !o.down && o !== h);
+  let mx = 0, my = 0, sk = false, roll = false;
+  for (const s of eshots) { const rx = h.x - s.x, ry = h.y - s.y, sp = Math.hypot(s.vx, s.vy) || 1, tt = (rx * s.vx + ry * s.vy) / (sp * sp); if (tt < 0 || tt > 0.5) continue; const ex = s.x + s.vx * tt - h.x, ey = s.y + s.vy * tt - h.y; if (Math.hypot(ex, ey) < 22) { const nx = -s.vy / sp, ny = s.vx / sp, sd = ex * nx + ey * ny > 0 ? -1 : 1; return [nx * sd, ny * sd, false, h.rollCd <= 0 && Math.random() < 0.04]; } }
+  const dn = HE.filter((o) => o.down).sort((a, b) => Math.hypot(a.x - h.x, a.y - h.y) - Math.hypot(b.x - h.x, b.y - h.y))[0];
+  if (dn && (nd > 60 || !nf) && Math.hypot(dn.x - h.x, dn.y - h.y) < 400) { const dx = dn.x - h.x, dy = dn.y - h.y, d = Math.hypot(dx, dy); if (d > 16) { mx = dx / d; my = dy / d; } if (h.cls === 'cleric' && h.sk <= 0 && d < 110) sk = true; return [mx, my, sk, false]; }
+  if (nf) {
+    const a = Math.atan2(nf.y - h.y, nf.x - h.x);
+    if (C.melee) { if (nd > C.reach * upg.reach * 0.7 + nf.r) { mx = Math.cos(a); my = Math.sin(a); } else { mx = Math.cos(a + 1.57 * st.side) * 0.4; my = Math.sin(a + 1.57 * st.side) * 0.4; } }
+    else { const want = nd < 140 ? -1 : nd > 220 ? 1 : 0; mx = Math.cos(a) * want + Math.cos(a + 1.57) * st.side * 0.7; my = Math.sin(a) * want + Math.sin(a + 1.57) * st.side * 0.7; }
+    const close = foes.filter((f) => Math.hypot(f.x - h.x, f.y - h.y) < (h.cls === 'archer' ? 240 : h.cls === 'mage' ? 125 : 70)).length;
+    if (h.sk <= 0 && (close >= (h.cls === 'archer' ? 3 : 2) || (nf.boss && nd < 140))) sk = true;
+    if (h.cls === 'cleric' && h.sk <= 0 && HE.some((o) => !o.down && o.hp <= 2 && Math.hypot(o.x - h.x, o.y - h.y) < 110)) sk = true;
+    if (nf.boss && nf.warn > 0 && nd < 120 && h.rollCd <= 0) roll = true;
+  }
+  if (lead && lead !== h) { const dx = lead.x - h.x, dy = lead.y - h.y, d = Math.hypot(dx, dy); if (d > (nf ? 190 : 60)) { mx = mx * 0.3 + dx / d; my = my * 0.3 + dy / d; } }
+  if (st.stuck > 0.25 && (mx || my)) { const a = Math.atan2(my, mx) + 1.4 * st.side; mx = Math.cos(a); my = Math.sin(a); }
+  return [mx, my, sk, roll];
+}
+function coopApply(i) {
+  const o = choice.opts[i]; k.sfx('pop'); choice = null;
+  if (o === 'hp') HE.forEach((h) => { h.max++; h.hp++; }); else if (o === 'heal') HE.forEach((h) => { h.down = false; h.hp = h.max; }); else if (o === 'skill') HE.forEach((h) => { h.skMul = (h.skMul || 1) * 0.8; }); else UP[o][2]();
+  HE.forEach((h) => { if (h.down) { h.down = false; h.hp = 1; h.inv = 1.5; } h.sk = Math.min(h.sk, 1); });
+  coopRoom(); k.float(o === 'skill' ? 'Habilidad' : UP[o][0], W / 2, H / 2 - 20, '#ffc928');
+}
+UP.skill = ['Concentración', '−20 % de espera de la habilidad (A)', () => {}];
+function coopChoice() { const pool = ['rate', 'dmg', 'speed', 'hp', 'heal', 'skill', 'reach', 'multi'].filter((o) => !(o === 'multi' && upg.multi >= 3) && !(o === 'heal' && HE.every((h) => h.hp >= h.max))); choice = { opts: k.shuffle(pool).slice(0, 3), sel: 1, t: 0 }; k.sfx('coin'); }
+function coopUpdate(dt) {
+  if (lobby) return lobbyUpdate(dt);
+  for (const f of fxs) f.t -= dt; fxs = fxs.filter((f) => f.t > 0);
+  if (k.counting()) return;
+  if (choice) {
+    choice.t += dt; if (choice.t < 0.35) return;
+    for (const h of HE) { if (h.cpu) continue; if (k.phit(h.pl, 'left')) choice.sel = Math.max(0, choice.sel - 1); if (k.phit(h.pl, 'right')) choice.sel = Math.min(2, choice.sel + 1); if (k.phit(h.pl, 'a')) return coopApply(choice.sel); }
+    if (!k.party && k.ptr.hit) for (let i = 0; i < 3; i++) if (k.ptr.x > cardX(i) && k.ptr.x < cardX(i) + CW && k.ptr.y > CY && k.ptr.y < CY + CHt) return coopApply(i);
+    return;
+  }
+  for (const w of walls) w.fl -= dt;
+  for (const q of pend) { q.t -= dt; if (q.t <= 0) { q.done = 1; addFoe(q.type, q.x, q.y, q.boss); k.burst(q.x, q.y, '#b98cff', 10, 120); } }
+  pend = pend.filter((q) => !q.done);
+  /* héroes */
+  for (const h of HE) {
+    h.inv -= dt; h.cool -= dt; h.sk -= dt; h.swing -= dt; h.rollCd -= dt;
+    if (h.down) { const helpers = HE.filter((o) => !o.down && Math.hypot(o.x - h.x, o.y - h.y) < 36); if (helpers.length) { h.rev += dt * helpers.reduce((s2, o) => s2 + (o.cls === 'cleric' ? 1.6 : 1), 0); if (Math.random() < 0.3) k.burst(h.x, h.y - 8, '#7cf7a0', 1, 40); } else h.rev = Math.max(0, h.rev - dt * 0.5); if (h.rev >= 2.2) revive(h, Math.ceil(h.max / 2)); continue; }
+    const C = CLS[h.cls]; let mx = 0, my = 0, useSk = false, useRoll = false;
+    if (h.cpu) [mx, my, useSk, useRoll] = heroCpu(h, dt);
+    else { const d = k.pdir(h.pl); mx = d.x; my = d.y; useSk = k.phit(h.pl, 'a'); useRoll = k.phit(h.pl, 'b');
+      if (h.pl === 0 && !k.party && k.ptr.down) { const dx = k.ptr.x - k.ptr.sx, dy = k.ptr.y - k.ptr.sy, dd = Math.hypot(dx, dy); if (dd > 8) { mx = dx / Math.max(dd, 40); my = dy / Math.max(dd, 40); } }
+      if (h.pl === 0 && !k.party && k.tap) useSk = true; }
+    const ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
+    h.mv = ml > 0.1; if (h.mv) h.a = Math.atan2(my, mx);
+    if (useSk && h.sk <= 0) skill(h);
+    if (useRoll && h.rollCd <= 0) { h.roll = 0.2; h.rollCd = 1; h.inv = Math.max(h.inv, 0.3); k.sfx('jump'); }
+    if (h.roll > 0) { h.roll -= dt; move(h, Math.cos(h.a) * 400 * dt, Math.sin(h.a) * 400 * dt); if (Math.random() < 0.5) k.burst(h.x, h.y + 8, '#fff', 1, 30); }
+    else move(h, (mx * C.sp * upg.speed + h.kx) * dt, (my * C.sp * upg.speed + h.ky) * dt);
+    const dec = Math.pow(0.002, dt); h.kx *= dec; h.ky *= dec;
+    const [nf, nd] = nearFoe(h.x, h.y);
+    h.aim = nf && (C.melee || nd < C.reach) ? Math.atan2(nf.y - h.y, nf.x - h.x) : h.a; h.face = Math.cos(h.aim) < 0 ? -1 : 1;
+    if (nf && h.cool <= 0) {
+      if (C.melee) { const reach = C.reach * upg.reach; if (nd < reach + nf.r) { h.cool = C.cd / upg.rate; h.swing = 0.18; h.swingA = h.aim; k.sfx('shoot'); for (const f of foes) { const d = Math.hypot(f.x - h.x, f.y - h.y); if (d < reach + f.r && angDiff(Math.atan2(f.y - h.y, f.x - h.x), h.aim) < 1.25) dmgFoe(f, C.dmg * upg.dmg, Math.atan2(f.y - h.y, f.x - h.x)); } } }
+      else if (nd < C.reach) { h.cool = C.cd / upg.rate; const n = upg.multi; for (let i = 0; i < n; i++) { const a = h.aim + (i - (n - 1) / 2) * 0.17; shots.push({ x: h.x + Math.cos(a) * 14, y: h.y - 4 + Math.sin(a) * 14, vx: Math.cos(a) * C.spd, vy: Math.sin(a) * C.spd, life: 1.3, b: 0, pierce: (C.pierce || 0) + upg.pierce, hits: [], dmg: C.dmg * upg.dmg, col: C.shot, arrow: h.cls === 'archer' }); } k.sfx('shoot'); }
+    }
+    for (const o of HE) if (o !== h && !o.down) { const ex = h.x - o.x, ey = h.y - o.y, e = Math.hypot(ex, ey); if (e > 0 && e < 20) move(h, ex / e * 50 * dt, ey / e * 50 * dt); }
+  }
+  /* proyectiles */
+  for (const s of shots) {
+    s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; if (s.life <= 0) s.dead = true;
+    for (const f of foes) if (!s.dead && !f.dead && !s.hits.includes(f) && Math.hypot(s.x - f.x, s.y - f.y) < f.r + 4) { dmgFoe(f, s.dmg, Math.atan2(s.vy, s.vx)); s.hits.push(f); if (s.pierce-- <= 0) s.dead = true; }
+    if (!s.dead && rectHit(s.x, s.y, 3)) { s.dead = true; k.burst(s.x, s.y, s.col, 3, 60); }
+  }
+  const liveH = HE.filter((h) => !h.down);
+  for (const s of eshots) {
+    s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; if (s.life <= 0 || rectHit(s.x, s.y, 3)) s.dead = true;
+    for (const h of liveH) if (!s.dead && Math.hypot(s.x - h.x, s.y - h.y) < h.r + s.r - 2) { s.dead = true; heroHurt(h, 1, s.x - s.vx, s.y - s.vy); }
+  }
+  /* enemigos: persiguen al héroe en pie más cercano */
+  for (const f of foes) {
+    if (f.dead) continue;
+    f.fl -= dt; f.cd -= dt; f.cd2 -= dt;
+    if (f.frz > 0) { f.frz -= dt; move(f, f.kx * dt, f.ky * dt, true); const fd = Math.pow(0.002, dt); f.kx *= fd; f.ky *= fd; continue; }
+    let tg = null, d = 1e9; for (const h of liveH) { const e = Math.hypot(h.x - f.x, h.y - f.y); if (e < d) { d = e; tg = h; } }
+    if (!tg) break;
+    const dx = tg.x - f.x, dy = tg.y - f.y, a = Math.atan2(dy, dx); f.a = a; f.face = dx < 0 ? -1 : 1; d = d || 1;
+    let vx = 0, vy = 0; const ghost = f.type === 'ghost' || f.type === 'bat' || f.type === 'eye';
+    if (f.boss && f.type === 'skel') {
+      if (f.dash > 0) { f.dash -= dt; vx = f.dvx; vy = f.dvy; if (f.dash <= 0) f.cd = 2.2 * cdK(); }
+      else if (f.warn > 0) { f.warn -= dt; if (f.warn <= 0) { f.dash = 0.5; f.dvx = Math.cos(a) * 440; f.dvy = Math.sin(a) * 440; k.sfx('jump'); } }
+      else { vx = Math.cos(a) * f.sp; vy = Math.sin(a) * f.sp; if (f.cd <= 0) f.warn = 0.7; }
+    } else if (f.boss) {
+      vx = Math.cos(a) * f.sp * 0.6; vy = Math.sin(a) * f.sp * 0.6;
+      if (f.cd <= 0) { f.cd = 2.8 * cdK(); for (let i = 0; i < 12; i++) fire(f, (i / 12) * R2 + t, 150); k.sfx('shoot'); }
+      if (f.cd2 <= 0) { f.cd2 = 1.4 * cdK(); for (let i = -1; i <= 1; i++) fire(f, a + i * 0.2, 210); }
+    } else if (RANGED[f.type]) {
+      const want = 170, dir = d > want ? 1 : d < want - 50 ? -1 : 0, st2 = Math.sin(t * 0.9 + f.ph) * 0.8;
+      vx = (Math.cos(a) * dir + Math.cos(a + 1.57) * st2) * f.sp; vy = (Math.sin(a) * dir + Math.sin(a + 1.57) * st2) * f.sp;
+      if (f.cd <= 0 && d < 420) { f.cd = (f.type === 'ghost' ? 2.6 : 2.2) * cdK(); fire(f, a, 200); }
+    } else {
+      let s2 = f.sp; if (f.type === 'slime' || f.type === 'mini') s2 *= Math.sin(t * 5 + f.ph) > 0 ? 1.7 : 0.15;
+      const wob = f.type === 'bat' ? Math.sin(t * 4 + f.ph) * 0.9 : 0; vx = Math.cos(a + wob) * s2; vy = Math.sin(a + wob) * s2;
+    }
+    for (const g of foes) if (g !== f && !g.dead) { const ex = f.x - g.x, ey = f.y - g.y, e = Math.hypot(ex, ey), m = f.r + g.r; if (e > 0 && e < m) { vx += ex / e * 70; vy += ey / e * 70; } }
+    move(f, (vx + f.kx) * dt, (vy + f.ky) * dt, ghost); const fd = Math.pow(0.002, dt); f.kx *= fd; f.ky *= fd;
+    f.mv = Math.hypot(vx, vy) > 5;
+    for (const h of liveH) if (Math.hypot(h.x - f.x, h.y - f.y) < f.r + h.r - 2) heroHurt(h, f.type === 'brute' || f.boss ? 2 : 1, f.x, f.y);
+  }
+  foes = foes.filter((f) => !f.dead); shots = shots.filter((s) => !s.dead); eshots = eshots.filter((s) => !s.dead);
+  /* botín compartido: las monedas suman al equipo y el corazón cura a quien lo coge */
+  for (const dr of drops) {
+    dr.t -= dt; let tg = null, dd = 1e9; for (const h of liveH) { const e = Math.hypot(h.x - dr.x, h.y - dr.y); if (e < dd) { dd = e; tg = h; } }
+    if (!tg) continue;
+    if (dd < 80 || cleared) { const v = cleared ? 420 : 280; dr.x += (tg.x - dr.x) / (dd || 1) * v * dt; dr.y += (tg.y - dr.y) / (dd || 1) * v * dt; }
+    if (dd < 16) { dr.got = true; if (dr.k === 'coin') { score += dr.v; k.sfx('coin'); k.float(`+${dr.v}`, dr.x, dr.y - 10, '#ffc928'); } else { tg.hp = Math.min(tg.max, tg.hp + 1); k.sfx('pop'); k.float('+1', dr.x, dr.y - 10, '#ff5f7a'); } }
+  }
+  drops = drops.filter((dr) => !dr.got && (dr.t > 0 || cleared));
+  if (!liveH.length) { k.burst(W / 2, H / 2, '#ff5f7a', 30, 240); return k.lose(CFG.id, score, 'Equipo derrotado', `${TH.label} ${room} · ${kills} bajas · ${HE.length} héroes`); }
+  if (!cleared && !foes.length && !pend.length) { cleared = true; clearT = 0; score += 50 * room * HE.length; k.sfx('win'); door = true; msg = 'Sala despejada: salid por la puerta'; msgT = 2; }
+  if (door && liveH.some((h) => h.x > X1 - 22 && Math.abs(h.y - H / 2) < 36)) coopChoice(); /* los caídos se levantan con 1 corazón en la sala siguiente */
+}
+const CLSI = { knight: 'dmg', archer: 'multi', mage: 'rate', cleric: 'heal' };
+function heroSprite(h, x, y, sc) {
+  const C = CLS[h.cls];
+  ART.hero(c, x, y + 11 * sc / 0.72, sc, { face: h.face, state: h.mv && !h.down ? 'run' : 'idle', t: t + h.ph, col: h.col, sword: h.cls === 'knight' ? (h.swing > 0 ? -1.9 + (0.18 - h.swing) * 18 : 0.6) : 0 });
+  if (h.cls === 'knight') return;
+  c.save(); c.translate(x + h.face * 4 * sc / 0.72, y - 4 * sc / 0.72); c.scale(sc / 0.72, sc / 0.72);
+  if (h.cls === 'archer') { c.rotate(h.aim); c.strokeStyle = OUT; c.lineWidth = 4; c.beginPath(); c.arc(4, 0, 10, -1.3, 1.3); c.stroke(); c.strokeStyle = '#a0683c'; c.lineWidth = 2.2; c.stroke(); c.strokeStyle = '#f4efe6'; c.lineWidth = 1; c.beginPath(); c.moveTo(4 + Math.cos(-1.3) * 10, Math.sin(-1.3) * 10); c.lineTo(h.cool > 0.2 ? 4 : -1, 0); c.lineTo(4 + Math.cos(1.3) * 10, Math.sin(1.3) * 10); c.stroke(); }
+  else if (h.cls === 'mage') { c.rotate(-0.25 * h.face); ART.rr(c, -1.5, -18, 3, 24, 1.5); ART.fillOut(c, '#7a5230', 1.5); c.beginPath(); c.arc(0, -20, 4.5, 0, R2); ART.fillOut(c, C.shot, 1.8); c.globalAlpha = 0.35 + Math.sin(t * 6) * 0.15; c.fillStyle = C.shot; c.beginPath(); c.arc(0, -20, 9, 0, R2); c.fill(); c.globalAlpha = 1; }
+  else { const sw = h.swing > 0 ? (0.18 - h.swing) * 14 - 1.2 : -0.4; c.rotate(h.face > 0 ? sw : -sw); ART.rr(c, -1.5, -14, 3, 16, 1.5); ART.fillOut(c, '#7a5230', 1.5); c.beginPath(); c.arc(0, -16, 5, 0, R2); ART.fillOut(c, '#c9d1e6', 1.8); c.fillStyle = '#ffd23d'; c.fillRect(-1, -19, 2, 6); c.fillRect(-3, -17, 6, 2); }
+  c.restore();
+}
+function coopHero(h) {
+  if (h.down) {
+    c.save(); c.translate(h.x, h.y + 6); c.globalAlpha = 0.9; c.rotate(Math.PI / 2 * h.face); ART.hero(c, 0, 8, 0.66, { face: 1, state: 'fall', t: 0, col: h.col }); c.restore();
+    const pr = Math.min(1, h.rev / 2.2); c.lineWidth = 5; c.strokeStyle = 'rgba(26,21,48,.7)'; c.beginPath(); c.arc(h.x, h.y, 22, 0, R2); c.stroke();
+    c.strokeStyle = '#7cf7a0'; c.beginPath(); c.arc(h.x, h.y, 22, -Math.PI / 2, -Math.PI / 2 + pr * R2); c.stroke();
+    if (Math.floor(t * 3) % 2) label('¡Ayuda!', h.x, h.y - 44, 14, h.col, 'center');
+    return;
+  }
+  if (h.inv > 0 && h.roll <= 0 && Math.floor(h.inv * 14) % 2) return;
+  c.strokeStyle = h.col; c.lineWidth = 3; c.globalAlpha = 0.85; c.beginPath(); c.ellipse(h.x, h.y + 11, 14, 5.5, 0, 0, R2); c.stroke(); c.globalAlpha = 1;
+  heroSprite(h, h.x, h.y, 0.72);
+  label(h.cpu ? 'CPU' : h.name, h.x, h.y - 40, 13, h.cpu ? '#e8e4f4' : h.col, 'center');
+}
+function coopDraw() {
+  if (!floorCv) floorCv = renderFloor(); if (!vigCv) vigCv = renderVig();
+  c.drawImage(floorCv, 0, 0, W, H); lights();
+  if (lobby) {
+    c.fillStyle = 'rgba(12,10,22,.7)'; c.fillRect(0, 0, W, H); label('Elegid clase', W / 2, 22, 26, '#fff', 'center');
+    const n = HE.length, cw = Math.min(150, (W - 40) / n - 10), x0 = W / 2 - (n * (cw + 10) - 10) / 2;
+    HE.forEach((h, i) => {
+      const x = x0 + i * (cw + 10), y = 70, C = CLS[h.cls], rd = lobby.ready[i];
+      ART.rr(c, x, y, cw, 220, 16); c.fillStyle = rd ? '#262046' : '#1b1733'; c.fill(); c.lineWidth = 3; c.strokeStyle = h.col; c.stroke();
+      label(h.cpu ? 'CPU' : h.name, x + cw / 2, y + 10, 18, h.col, 'center');
+      heroSprite({ ...h, face: 1, mv: false, aim: -0.3, swing: 0, cool: 0 }, x + cw / 2, y + 88, 1.25);
+      label(C.n, x + cw / 2, y + 118, 17, '#fff', 'center'); wrap(`A: ${C.sk}. ${C.skd}`, x + cw / 2, y + 142, cw - 16, 12, '#aab0bf');
+      for (let j = 0; j < C.hp; j++) ART.heart(c, x + cw / 2 - (C.hp - 1) * 7 + j * 14, y + 186, 0.7, true);
+      if (!h.cpu && !rd) { label('◀', x + 8, y + 70, 18, '#fff'); label('▶', x + cw - 8, y + 70, 18, '#fff', 'right'); }
+      ART.rr(c, x + 12, y + 198, cw - 24, 16, 8); c.fillStyle = rd ? '#5fbf45' : 'rgba(255,255,255,.12)'; c.fill(); label(rd ? '¡Listo!' : 'A: listo', x + cw / 2, y + 199, 12, '#fff', 'center');
+    });
+    label(`Empieza en ${Math.max(0, Math.ceil(lobby.t))} s`, W / 2, H - 40, 14, '#ffc928', 'center');
+    return;
+  }
+  drawDoor();
+  for (const w of [...walls].sort((a, b) => a.y + a.h - b.y - b.h)) block(w);
+  for (const q of pend) { const k2 = 1 - q.t / Math.max(q.max, 0.9); c.save(); c.translate(q.x, q.y); c.rotate(t * 4); c.globalAlpha = 0.35 + k2 * 0.5; c.strokeStyle = q.boss ? '#ff3b5c' : '#b98cff'; c.lineWidth = 3; c.setLineDash([6, 6]); c.beginPath(); c.arc(0, 0, (q.boss ? 30 : 16) * (0.5 + k2 * 0.5), 0, R2); c.stroke(); c.setLineDash([]); c.restore(); c.globalAlpha = 1; }
+  for (const d of drops) { if (d.t < 2 && Math.floor(d.t * 8) % 2) continue; if (d.k === 'coin') ART.coin(c, d.x, d.y, t, 7); else ART.heart(c, d.x, d.y + Math.sin(t * 4) * 2, 1.1, true); }
+  const ents = foes.map((f) => ({ y: f.y, f })).concat(HE.map((h) => ({ y: h.y, h }))).sort((a, b) => a.y - b.y);
+  for (const e of ents) if (e.h) coopHero(e.h); else { drawFoe(e.f); if (e.f.frz > 0) { c.globalAlpha = 0.45; c.fillStyle = '#9ff3ff'; c.beginPath(); c.arc(e.f.x, e.f.y - 4, e.f.r + 4, 0, R2); c.fill(); c.globalAlpha = 1; } }
+  for (const s of shots) {
+    if (s.arrow) { c.save(); c.translate(s.x, s.y); c.rotate(Math.atan2(s.vy, s.vx)); c.strokeStyle = OUT; c.lineWidth = 4; c.beginPath(); c.moveTo(-10, 0); c.lineTo(6, 0); c.stroke(); c.strokeStyle = '#e8d7b0'; c.lineWidth = 2; c.stroke(); c.beginPath(); c.moveTo(9, 0); c.lineTo(3, -4); c.lineTo(3, 4); c.closePath(); ART.fillOut(c, '#e8eef8', 1.5); c.restore(); continue; }
+    c.globalAlpha = 0.35; c.fillStyle = s.col; c.beginPath(); c.arc(s.x - s.vx * 0.02, s.y - s.vy * 0.02, 8, 0, R2); c.fill(); c.globalAlpha = 1; c.beginPath(); c.arc(s.x, s.y, 5, 0, R2); ART.fillOut(c, s.col, 1.5);
+  }
+  for (const s of eshots) { c.beginPath(); c.arc(s.x, s.y, s.r, 0, R2); ART.fillOut(c, '#ff5f7a', 2); c.fillStyle = '#ffe0e6'; c.beginPath(); c.arc(s.x - 1, s.y - 1, s.r * 0.4, 0, R2); c.fill(); }
+  for (const h of HE) if (h.swing > 0 && h.cls === 'cleric') { c.globalAlpha = h.swing / 0.18; c.strokeStyle = '#ffd23d'; c.lineWidth = 5; c.lineCap = 'round'; c.beginPath(); c.arc(h.x, h.y - 4, 34 * upg.reach, h.swingA - 1, h.swingA + 1); c.stroke(); c.globalAlpha = 1; }
+    else if (h.swing > 0 && h.cls === 'knight') { c.globalAlpha = h.swing / 0.18; c.strokeStyle = '#fff'; c.lineWidth = 7; c.lineCap = 'round'; c.beginPath(); c.arc(h.x, h.y - 4, 38 * upg.reach, h.swingA - 1.1, h.swingA + 1.1); c.stroke(); c.strokeStyle = h.col; c.lineWidth = 3; c.stroke(); c.globalAlpha = 1; }
+  for (const f of fxs) { const k2 = f.t / 0.45; c.globalAlpha = Math.min(1, k2 * 1.5); c.strokeStyle = f.col; c.lineWidth = 6; c.beginPath(); c.arc(f.x, f.y, f.r * (1.15 - k2 * 0.4), 0, R2); c.stroke(); c.globalAlpha = 1; }
+  c.drawImage(vigCv, 0, 0, W, H);
+  /* marcador por héroe: vida, habilidad y color */
+  const n = HE.length, pw = Math.min(140, (W - 110) / n - 6);
+  HE.forEach((h, i) => { const x = 8 + i * (pw + 6); ART.rr(c, x, 4, pw, 30, 9); c.fillStyle = h.down ? 'rgba(80,20,40,.8)' : 'rgba(26,21,48,.85)'; c.fill(); c.lineWidth = 2; c.strokeStyle = h.col; c.stroke();
+    label(h.cpu ? 'CPU' : h.name, x + 7, 7, 12, h.col); const hs = Math.min(10, (pw - 50) / Math.max(1, h.max));
+    for (let j = 0; j < h.max; j++) ART.heart(c, x + 50 + j * hs, 13, 0.55, j < h.hp);
+    const sk = Math.max(0, h.sk) / (CLS[h.cls].skcd * (h.skMul || 1)); ART.rr(c, x + 7, 24, pw - 14, 5, 2.5); c.fillStyle = 'rgba(255,255,255,.15)'; c.fill(); ART.rr(c, x + 7, 24, (pw - 14) * (1 - sk), 5, 2.5); c.fillStyle = sk <= 0 ? '#ffc928' : '#8a7fd8'; c.fill(); });
+  coinIcon(W - 18, 19); label(`${score}`, W - 32, 10, 18, '#fff', 'right');
+  label(`${TH.label} ${room}`, W - 14, Y1 + 1, 11, 'rgba(255,255,255,.85)', 'right');
+  if (bossF && !bossF.dead) { const bw = Math.min(260, W - 160), x = W / 2 - bw / 2, y = Y1 + 3; c.fillStyle = OUT; c.fillRect(x - 2, y - 2, bw + 4, 12); c.fillStyle = '#5a1f2c'; c.fillRect(x, y, bw, 8); c.fillStyle = '#ff3b5c'; c.fillRect(x, y, bw * Math.max(0, bossF.hp) / bossF.max, 8); }
+  if (msgT > 0 && !choice) { c.globalAlpha = Math.min(1, msgT * 2); c.font = '800 22px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const mw = c.measureText(msg).width + 36; ART.rr(c, W / 2 - mw / 2, H / 2 - 64, mw, 40, 12); c.fillStyle = 'rgba(26,21,48,.82)'; c.fill(); label(msg, W / 2, H / 2 - 55, 22, '#ffc928', 'center'); c.globalAlpha = 1; }
+  if (choice) {
+    c.fillStyle = 'rgba(12,10,22,.72)'; c.fillRect(0, 0, W, H); label('Mejora para todo el equipo', W / 2, CY - 42, 22, '#fff', 'center');
+    choice.opts.forEach((o, i) => {
+      const x = cardX(i), sel = choice.sel === i, lift = sel ? -6 : 0;
+      ART.rr(c, x, CY + lift, CW, CHt, 16); c.fillStyle = sel ? '#262046' : '#1b1733'; c.fill(); c.lineWidth = sel ? 3 : 2; c.strokeStyle = sel ? '#6e62f5' : 'rgba(255,255,255,.14)'; c.stroke();
+      c.globalAlpha = Math.min(1, choice.t * 4); icon(o === 'skill' ? 'rate' : o, x + CW / 2, CY + 48 + lift); label(UP[o][0], x + CW / 2, CY + 86 + lift, 17, '#fff', 'center'); wrap(UP[o][1], x + CW / 2, CY + 116 + lift, CW - 20, 13, '#aab0bf'); c.globalAlpha = 1;
+    });
+  }
+}
+
 reset(); k.show(CFG.title, CFG.help);
 function hurt(n, sx, sy) {
   if (p.inv > 0 || k.st !== 'play') return;
@@ -208,6 +580,7 @@ k.run((dt) => {
   if (!k.gate(reset)) return;
   t += dt; msgT -= dt;
   if (VS) return vsUpdate(dt);
+  if (COOP) return coopUpdate(dt);
   if (choice) {
     choice.t += dt; if (choice.t < 0.35) return;
     if (k.hit.has('left')) choice.sel = Math.max(0, choice.sel - 1); if (k.hit.has('right')) choice.sel = Math.min(2, choice.sel + 1);
@@ -374,6 +747,15 @@ function block(w) {
     for (let row = 0; row < Math.max(1, Math.round(bh / 12)); row++) for (let cx = x + (row % 2 ? 10 : 0); cx + 10 < x + bw + 2; cx += 20) { c.beginPath(); c.ellipse(cx + 10, y + row * 12 + 4, 11, 7, 0, 0, R2); ART.fillOut(c, fl ? '#fff' : row % 2 ? '#c8bc8e' : '#d6cc9f', 2); c.strokeStyle = 'rgba(0,0,0,.15)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(cx + 4, y + row * 12 + 4); c.lineTo(cx + 16, y + row * 12 + 4); c.stroke(); }
     return;
   }
+  if (s === 'steel') {
+    const FH = 9; ART.rr(c, x, y + bh - FH - 2, bw, FH + 4, 3); ART.fillOut(c, fl ? '#fff' : TH.face, 2.5);
+    const ty = y - 7, th = bh - FH + 5; ART.rr(c, x, ty, bw, th, 4);
+    const gr = c.createLinearGradient(x, ty, x + bw, ty + th); gr.addColorStop(0, '#c9d1f0'); gr.addColorStop(1, TH.top); c.fillStyle = gr; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
+    c.save(); ART.rr(c, x + 2, ty + 2, bw - 4, th - 4, 3); c.clip(); c.strokeStyle = 'rgba(255,209,102,.55)'; c.lineWidth = 4;
+    if (bw >= 40 || th >= 40) for (let d = -th; d < bw; d += 14) { c.beginPath(); c.moveTo(x + d, ty + th); c.lineTo(x + d + th, ty); c.stroke(); } c.restore();
+    c.fillStyle = '#6a739e'; for (const [rx, ry] of [[x + 5, ty + 5], [x + bw - 5, ty + 5], [x + 5, ty + th - 5], [x + bw - 5, ty + th - 5]]) { c.beginPath(); c.arc(rx, ry, 1.8, 0, R2); c.fill(); }
+    c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(x + 6, ty + 2.5, bw - 12, 2); return;
+  }
   const FH = 10, top = fl ? '#fff' : s === 'crate' ? TH.top : TH.top, face = s === 'crate' ? '#8a5a33' : TH.face;
   ART.rr(c, x, y + bh - FH - 2, bw, FH + 4, 3); ART.fillOut(c, face, 2.5);
   ART.rr(c, x, y - 8, bw, bh - FH + 6, 4); ART.fillOut(c, top, 2.5);
@@ -482,6 +864,7 @@ function wrap(s, x, y, maxW, size, col) {
 }
 function draw() {
   if (VS) return vsDraw();
+  if (COOP) return coopDraw();
   if (!floorCv) floorCv = renderFloor(); if (!vigCv) vigCv = renderVig();
   c.drawImage(floorCv, 0, 0, W, H); lights(); drawDoor();
   for (const w of [...walls].sort((a, b) => a.y + a.h - b.y - b.h)) block(w);
