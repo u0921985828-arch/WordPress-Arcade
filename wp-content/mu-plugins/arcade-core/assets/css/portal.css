@@ -209,15 +209,15 @@ body.ax a.ax-act:hover{color:#fff}
 .ax-tvbtn:hover{background:rgba(110,98,245,.28);border-color:var(--acc2)}.ax-tvbtn svg{flex:none;color:var(--acc2)}
 @media(max-width:759px){.ax-tvbtn{width:40px;padding:0;justify-content:center}.ax-tvbtn span{display:none}}
 .ax-party{display:grid;gap:8px;align-items:center;margin:0 0 28px;padding:22px 20px 0;border-radius:20px;border:1px solid rgba(138,128,255,.28);background:radial-gradient(120% 140% at 100% 0,rgba(110,98,245,.32),transparent 60%),linear-gradient(180deg,#151833,#10131d);overflow:hidden}
-.ax-party h2{margin:0 0 8px;font-size:clamp(21px,3.2vw,30px);line-height:1.15;font-weight:750;letter-spacing:-.02em;color:#fff}
+.ax-party h2{margin:0 0 10px;font-size:clamp(21px,3.2vw,30px);line-height:1.15;font-weight:750;letter-spacing:-.02em;color:#fff}
 .ax-party-txt>p{margin:0 0 16px;color:#b9bdd0;font-size:15px;line-height:1.5;max-width:52ch}
 .ax-party .ax-btn svg{flex:none}
-.ax-party-games{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:16px 0 0;font-size:13px;color:var(--mut)}
+.ax-party-txt>.ax-party-games{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:18px 0 0;font-size:13px;color:var(--mut)}
 .ax-party-games svg{color:#ffd166}
 .ax-party-games a{padding:4px 10px;border-radius:99px;background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--tx)!important;font-weight:500}
 .ax-party-games a:hover{border-color:var(--acc2)}
-.ax-party-art{display:block;width:100%;max-width:380px;height:auto;margin:6px auto 0;justify-self:center}
-@media(min-width:760px){.ax-party{grid-template-columns:1.3fr 1fr;gap:24px;padding:30px 28px 0 36px}.ax-party-txt{padding-bottom:30px}.ax-party-art{align-self:end;margin:0}.ax-hascode{display:none!important}}
+.ax-party-art{display:block;width:100%;max-width:250px;height:auto;margin:4px auto 14px;justify-self:center}
+@media(min-width:760px){.ax-party{grid-template-columns:1.3fr 1fr;gap:24px;padding:30px 28px 0 36px}.ax-party-txt{padding-bottom:30px}.ax-party-art{align-self:center;max-width:380px;margin:0 0 24px}.ax-hascode{display:none!important}}
 .ax-act.ax-tv{border-color:rgba(138,128,255,.5);background:rgba(110,98,245,.16);color:#fff}
 body.ax a.ax-act.ax-tv{color:#fff}.ax-act.ax-tv svg{color:var(--acc2)}.ax-act.ax-tv b{font-weight:650}
 .ax-act.ax-tv:hover{background:rgba(110,98,245,.3);border-color:var(--acc2)}
