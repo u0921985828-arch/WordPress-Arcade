@@ -99,7 +99,7 @@ function refreshCtl() { const P = k.players(4); pl.forEach((q) => { const hu = !
 k.onParty = () => { if (k.st !== 'play') { reset(); return; } refreshCtl(); };
 
 function reset() {
-  skill = Math.max(0.25, Math.min(0.88, 0.3 + lsGet(CPUK, 0) * 0.06));
+  skill = Math.max(0.15, Math.min(0.75, 0.21 + lsGet(CPUK, 0) * 0.03)); /* 1.23: más fácil (antes 0,3 + 0,06/victoria, tope 0,88) */
   pl = null; newPlayers(); round = 0; newRound();
 }
 function newRound() {
@@ -197,7 +197,7 @@ function hitsFoe(q, x, y) { for (const [a, b] of blast({ x, y, range: q.range })
 function hitsCrate(q, x, y) { return blast({ x, y, range: q.range }).some(([a, b]) => grid[b][a] === 2); }
 function aiThink(q) {
   const D = dangerMap(), [cx, cy] = cellOf(q), here = D[cy][cx];
-  const early = rT < 3.5, aggr = Math.min(1, 0.35 + skill * 0.5 + rT / 90);
+  const early = rT < 5, aggr = Math.min(1, 0.25 + skill * 0.5 + rT / 135);
   if (here !== Infinity) { // huir
     const path = bfs(q, D, (x, y) => D[y][x] === Infinity);
     q.ai = path && path.length > 1 ? path : null; q.think = 0.05; return;

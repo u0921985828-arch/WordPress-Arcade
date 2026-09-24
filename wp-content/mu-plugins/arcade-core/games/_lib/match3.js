@@ -33,7 +33,7 @@ function gravity() {
   clearing = null; check = true;
 }
 function reshuffle() { k.float('Sin jugadas: nuevo tablero', 240, OY + N * S / 2, '#fff38a'); k.sfx('explode'); fill(); check = true; }
-function reset() { score = 0; level = 1; moves = 25; target = 800; prevT = 0; time = 90; combo = 0; fill(); sel = null; clearing = null; swapA = null; check = true; cur = [3, 3]; kbd = false; idle = 0; hint = null; comboT = 0; lvlT = 0; queued = null; }
+function reset() { score = 0; level = 1; moves = 30; target = 650; prevT = 0; time = 135; combo = 0; fill(); sel = null; clearing = null; swapA = null; check = true; cur = [3, 3]; kbd = false; idle = 0; hint = null; comboT = 0; lvlT = 0; queued = null; }
 
 /* ---------- Gráficos cacheados ---------- */
 function shape(v) {
@@ -77,7 +77,7 @@ function makeBg() {
 function label(s, x, y, size, col, align, base) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = base || 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
 function small(s, x, y, col, align) { c.font = '800 11px ui-rounded,"Trebuchet MS",sans-serif'; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.fillStyle = col || '#c9b8f0'; c.fillText(s, x, y); }
 
-reset(); k.show(CFG.title, TIMED ? 'Haz todas las combinaciones que puedas en 90 segundos. Desliza o toca dos gemas vecinas.' : 'Consigue los puntos objetivo antes de quedarte sin movimientos. Desliza o toca dos gemas vecinas.');
+reset(); k.show(CFG.title, TIMED ? 'Haz todas las combinaciones que puedas en 135 segundos. Desliza o toca dos gemas vecinas.' : 'Consigue los puntos objetivo antes de quedarte sin movimientos. Desliza o toca dos gemas vecinas.');
 let drag = null;
 function trySwap(a, bb) {
   if (!bb || bb[0] < 0 || bb[1] < 0 || bb[0] >= N || bb[1] >= N) return;
@@ -101,9 +101,9 @@ k.run((dt) => {
   if (clearing) { clearing.t += dt / 0.2; if (clearing.t >= 1) gravity(); return; }
   if (settling) return;
   if (check) { const m = matches(); if (m.size) return startClear(m); check = false; combo = 0; if (!hasMove()) return reshuffle(); }
-  if (!TIMED) { if (score >= target) { level++; prevT = target; target = score + Math.min(3000, 800 + 275 * (level - 1)); moves = 25; lvlT = 1.6; k.sfx('win'); k.confetti(); }
+  if (!TIMED) { if (score >= target) { level++; prevT = target; target = score + Math.min(2600, 650 + 220 * (level - 1)); moves = 30; /* 1.23: más fácil */ lvlT = 1.6; k.sfx('win'); k.confetti(); }
     else if (moves <= 0) return k.lose(CFG.id, score, 'Sin movimientos', `Nivel ${level}`); }
-  idle += dt; if (idle > 6 && !hint) hint = findMove();
+  idle += dt; if (idle > 4 && !hint) hint = findMove();
   if (queued) { const q = queued; queued = null; trySwap(q[0], q[1]); return; }
   else if (drag && !drag.done && k.ptr.up) { const s0 = drag.s0; if (sel && Math.abs(sel[0] - s0[0]) + Math.abs(sel[1] - s0[1]) === 1) trySwap(sel, s0); else { sel = sel && sel[0] === s0[0] && sel[1] === s0[1] ? null : s0; k.sfx('click'); } }
   if (k.ptr.up) drag = null;
@@ -118,7 +118,7 @@ k.run((dt) => {
   if (TIMED) { small('TIEMPO', W - 30, 20, '#c9b8f0', 'right'); label(`${Math.ceil(time)} s`, W - 30, 34, 26, time < 10 ? '#ff6b7a' : '#ffd23d', 'right'); }
   else { small(`NIVEL ${level}`, W - 30, 20, '#c9b8f0', 'right'); label(`${moves} movs`, W - 30, 34, 26, moves <= 5 ? '#ff6b7a' : '#ffd23d', 'right'); }
   // barra de progreso: meta de puntos o tiempo restante
-  const pr = TIMED ? time / 90 : k.clamp((score - prevT) / (target - prevT), 0, 1), bw = (W - 54) * pr;
+  const pr = TIMED ? time / 135 : k.clamp((score - prevT) / (target - prevT), 0, 1), bw = (W - 54) * pr;
   if (bw > 2) { ART.rr(c, 27, 93, Math.max(18, bw), 18, 9); c.fillStyle = TIMED ? (time < 10 ? '#ff5f7a' : '#4cc3ff') : '#ffd23d'; c.fill(); ART.rr(c, 31, 95, Math.max(10, bw - 8), 5, 2.5); c.fillStyle = 'rgba(255,255,255,.45)'; c.fill(); }
   c.font = '800 12px ui-rounded,"Trebuchet MS",sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 3; c.strokeStyle = OUT; const bt = TIMED ? 'Combina rápido' : `Meta ${target}`; c.strokeText(bt, W / 2, 103); c.fillStyle = '#fff'; c.fillText(bt, W / 2, 103);
   // gemas
@@ -139,5 +139,5 @@ k.run((dt) => {
     if (cl) { c.globalAlpha = Math.sin(clearing.t * Math.PI) * 0.8; c.fillStyle = '#fff'; c.beginPath(); c.arc(X, Y, 20 * s + 4, 0, 6.283); c.fill(); c.globalAlpha = 1; } }
   c.restore();
   if (comboT > 0) { const a = Math.min(1, comboT / 0.3), sc = 1 + Math.max(0, comboT - 0.9) * 2; c.globalAlpha = a; label(comboTxt, W / 2, OY + N * S / 2 - 40, 38 * sc, '#ff9ad5', 'center', 'middle'); label(`Combo x${combo}`, W / 2, OY + N * S / 2, 20, '#fff', 'center', 'middle'); c.globalAlpha = 1; }
-  if (lvlT > 0) { c.globalAlpha = Math.min(1, lvlT / 0.3); label(`¡Nivel ${level}!`, W / 2, OY + N * S / 2 + 50, 40, '#ffd23d', 'center', 'middle'); label('25 movimientos', W / 2, OY + N * S / 2 + 86, 18, '#fff', 'center', 'middle'); c.globalAlpha = 1; }
+  if (lvlT > 0) { c.globalAlpha = Math.min(1, lvlT / 0.3); label(`¡Nivel ${level}!`, W / 2, OY + N * S / 2 + 50, 40, '#ffd23d', 'center', 'middle'); label('30 movimientos', W / 2, OY + N * S / 2 + 86, 18, '#fff', 'center', 'middle'); c.globalAlpha = 1; }
 });

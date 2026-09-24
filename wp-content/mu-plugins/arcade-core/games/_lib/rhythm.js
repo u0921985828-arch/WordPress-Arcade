@@ -59,12 +59,12 @@ function label(s, x, y, size, col, align, base) {
 k.run((dt) => {
   judgeT -= dt; flash = flash.map((f) => Math.max(0, f - dt * 4)); rings.forEach((r) => (r.t += dt)); rings = rings.filter((r) => r.t < 0.4);
   if (!k.gate(reset)) { pressed.length = 0; return; }
-  /* dificultad continua: d 0→1 en 200 s (≈3,3 min). 88→165 ppm, densidad 0,4→0,9; corcheas desde 25 s y acordes desde 60 s, ambos con entrada gradual */
-  audio(); t += dt; const d = Math.min(1, t / 200), e = d; bpm = 88 + 77 * e; const beat = 60 / bpm, travel = (HITY + 40) / SPEED;
-  while (nextBeat < t + travel) { const at = nextBeat; beatN++; beats.push(at); if (ac) kick(ac.currentTime + Math.max(0, at - t)); const r = Math.random(), dens = 0.4 + 0.5 * e;
+  /* dificultad continua (1.23: más fácil): d 0→1 en 300 s (5 min). 72→140 ppm, densidad 0,32→0,77; corcheas desde 40 s y acordes desde 90 s, ambos con entrada gradual */
+  audio(); t += dt; const d = Math.min(1, t / 300), e = d; bpm = 72 + 68 * e; const beat = 60 / bpm, travel = (HITY + 40) / SPEED;
+  while (nextBeat < t + travel) { const at = nextBeat; beatN++; beats.push(at); if (ac) kick(ac.currentTime + Math.max(0, at - t)); const r = Math.random(), dens = 0.32 + 0.45 * e;
     if (r < dens) notes.push({ lane: k.ri(0, 3), time: at, pitch: k.pick(SCALE) });
-    if (at > 25 && Math.random() < dens * 0.4 * Math.min(1, (at - 25) / 40)) notes.push({ lane: k.ri(0, 3), time: at + beat / 2, pitch: k.pick(SCALE) });
-    if (at > 60 && Math.random() < 0.15 * Math.min(1, (at - 60) / 60)) { const l = k.ri(0, 2); notes.push({ lane: l, time: at, pitch: 0 }, { lane: l + 1, time: at, pitch: 7 }); }
+    if (at > 40 && Math.random() < dens * 0.4 * Math.min(1, (at - 40) / 60)) notes.push({ lane: k.ri(0, 3), time: at + beat / 2, pitch: k.pick(SCALE) });
+    if (at > 90 && Math.random() < 0.15 * Math.min(1, (at - 90) / 90)) { const l = k.ri(0, 2); notes.push({ lane: l, time: at, pitch: 0 }, { lane: l + 1, time: at, pitch: 7 }); }
     nextBeat += beat; }
   // quita notas duplicadas en el mismo carril y momento
   const seen = {}; notes = notes.filter((n) => { const key = n.lane + ':' + Math.round(n.time * 100); if (seen[key]) return false; seen[key] = 1; return true; });
@@ -75,8 +75,8 @@ k.run((dt) => {
       hp = Math.min(100, hp + (j[3] === 1 ? 4 : 2)); setJudge(j[1], j[4]); tone(root * Math.pow(2, n.pitch / 12) * 2, 0.25, 'triangle', 0.15);
       rings.push({ lane, t: 0, col: COLS[lane], big: j[3] === 1 }); k.burst(lane * LW + LW / 2, HITY, j[3] === 1 ? '#fff27a' : COLS[lane], j[3] === 1 ? 14 : 8, 170);
       if (combo % 50 === 0) { k.float(`¡${combo} COMBO!`, 180, 300, '#fff27a'); k.sfx('coin'); } else if (combo % 10 === 0 && combo <= 30) k.float(`x${mult()}`, 180, 300, '#fff27a'); }
-    else if (!n || bd > 0.3) { hp -= 3; if (combo >= 10) k.sfx('hurt'); combo = 0; setJudge('FALLO', '#ff5f7a'); } }
-  for (const n of notes) if (!n.hit && !n.miss && t - n.time > 0.16) { n.miss = true; hp -= 6 + 3 * Math.min(1, t / 200); miss(); }
+    else if (!n || bd > 0.3) { hp -= 2; if (combo >= 10) k.sfx('hurt'); combo = 0; setJudge('FALLO', '#ff5f7a'); } }
+  for (const n of notes) if (!n.hit && !n.miss && t - n.time > 0.16) { n.miss = true; hp -= 5 + 2.5 * Math.min(1, t / 300); miss(); }
   notes = notes.filter((n) => t - n.time < 0.6); beats = beats.filter((b) => t - b < 0.3);
   if (hp <= 0) { hp = 0; return k.lose(CFG.id, score, 'Te perdiste el ritmo', `${Math.floor(t)} s · Precisión ${acc()} % · Combo máx. ${maxCombo}`); }
 }, () => {
@@ -190,7 +190,7 @@ function drumsGame() {
   }
   /* CPU: planifica sus golpes al aparecer cada nota (acierta, se adelanta/retrasa o falla según su nivel) */
   function cpuPlan(q, n) {
-    const pMiss = Math.max(0.03, 0.14 - cpuLv * 0.011), pPerf = Math.min(0.8, 0.4 + cpuLv * 0.04), r = Math.random();
+    const pMiss = Math.max(0.05, 0.2 - cpuLv * 0.012), pPerf = Math.min(0.7, 0.28 + cpuLv * 0.035) /* 1.23: CPU más fallona */, r = Math.random();
     if (n.kind === 'roll') { const rate = 7 + cpuLv * 0.6; for (let x = n.time + 0.05; x < n.end; x += 1 / rate * (0.8 + Math.random() * 0.4)) q.plan.push({ at: x, d: Math.random() < 0.5 ? 'a' : 'b' }); return; }
     if (r < pMiss) { if (Math.random() < 0.3) q.plan.push({ at: n.time + 0.2 + Math.random() * 0.1, d: Math.random() < 0.5 ? 'a' : 'b' }); return; }
     const off = (r < pMiss + pPerf ? 0.035 : 0.1) * (Math.random() * 2 - 1);
@@ -228,7 +228,7 @@ function drumsGame() {
   function kicks() { if (!ac || over || k.st !== 'play' || k.counting() || k.paused) return; for (const b of beats) if (b > kicked && b <= t + 0.12) { kicked = b; drum('kick', ac.currentTime + Math.max(0, b - t), 0.5); } }
   function finish() {
     over = false; const rows = P.map((q) => ({ p: q.p, score: q.score })), hu = P.filter((q) => !q.cpu), top = Math.max(...rows.map((r) => r.score));
-    if (hu.length === 1 && hu[0].score === top) lsSet('cpu:' + ID, Math.min(10, cpuLv + 1));
+    if (hu.length === 1 && hu[0].score === top) lsSet('cpu:' + ID, Math.min(10, cpuLv + 0.5));
     k.podium(rows, { fmt: (v) => v + ' pts', head: hu.length === 1 && hu[0].score === top && rows.filter((r) => r.score === top).length === 1 ? '¡Has ganado!' : undefined });
   }
   /* ---------- dibujo ---------- */

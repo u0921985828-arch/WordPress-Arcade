@@ -10,7 +10,7 @@ const LAND = innerWidth >= innerHeight * 0.98;
 const W = LAND ? 800 : 450, H = LAND ? 450 : 800;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: TF ? '#14233a' : '#1b1640' }), c = k.ctx;
 const FONT = (s, wt) => `${wt || 800} ${s}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
-const NQ = 10, TQ = TF ? 10 : 15, SEATS = 4;
+const NQ = 10, TQ = TF ? 15 : 22, /* 1.23: más tiempo (antes 10/15 s) */ SEATS = 4;
 const OPC = ['#ff6b6b', '#4fb3ff', '#ffc94a', '#6fd66f'], LET = ['A', 'B', 'C', 'D'];
 let CPU = 0; try { CPU = Math.min(8, +localStorage.getItem('cpu:' + CFG.id) || 0); } catch (e) { /* sin almacenamiento */ }
 
@@ -63,10 +63,10 @@ function beginQ() {
 }
 function onAsk() {
   phase = 'ask'; pt = 0; const q = curQ();
-  const base = TF ? [0, 0.74, 0.62, 0.5][q.d] : [0, 0.72, 0.52, 0.36][q.d];
+  const base = TF ? [0, 0.64, 0.55, 0.47][q.d] : [0, 0.52, 0.38, 0.26][q.d]; // 1.23: CPU acierta menos (antes 0.74/0.62/0.5 y 0.72/0.52/0.36)
   for (const s of seat) {
     if (hum(s.p)) continue;
-    const pc = Math.min(0.92, base + CPU * 0.03 + k.rnd(-0.05, 0.05));
+    const pc = Math.min(0.85, base + CPU * 0.015 + k.rnd(-0.05, 0.05));
     s.cpuPick = Math.random() < pc ? q.right : k.pick([...Array(q.n).keys()].filter((i) => i !== q.right));
     s.cpuT = k.rnd(TF ? 1.8 : 3, TQ * (0.55 + Math.random() * 0.3));
   }

@@ -11,11 +11,12 @@ function reach(block) { const seen = new Set(['1,1']), q = [[1, 1]]; while (q.le
  * y aceleración de la canica 680 → 900 (más controlable al principio). */
 function build() { N = Math.min(15, 7 + 2 * Math.floor(level / 2)); S = Math.floor(440 / N); OX = (480 - N * S) / 2; OY = 128; g = carve(N); goal = [N - 2, N - 2];
   holes = []; const block = new Set(), cells = []; for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) if (!g[y][x] && x + y > 3 && !(x === N - 2 && y === N - 2)) cells.push([x, y]);
-  const want = Math.min(cells.length / 5, 1 + level); for (const [x, y] of k.shuffle(cells)) { if (holes.length >= want) break; block.add(x + ',' + y); if (!reach(block)) { block.delete(x + ',' + y); continue; }
+  const want = Math.min(cells.length / 5, 1 + Math.floor(level * 0.8)); // 1.23: más fácil (antes 1+nivel)
+  for (const [x, y] of k.shuffle(cells)) { if (holes.length >= want) break; block.add(x + ',' + y); if (!reach(block)) { block.delete(x + ',' + y); continue; }
     holes.push({ x: OX + x * S + S / 2 + k.rnd(-S * 0.12, S * 0.12), y: OY + y * S + S / 2 + k.rnd(-S * 0.12, S * 0.12), r: S * 0.27 }); }
   t = 0; bake(); spawnBall(); }
 function spawnBall() { ball = { x: OX + 1.5 * S, y: OY + 1.5 * S, vx: 0, vy: 0, r: S * 0.3, rot: 0, pop: 0.4 }; sink = null; trail = []; }
-function reset() { if (!level || (k.st === 'over' && lives <= 0)) { level = 1; score = 0; lives = 3; } build(); }
+function reset() { if (!level || (k.st === 'over' && lives <= 0)) { level = 1; score = 0; lives = 4; } build(); }
 /* ---------- Cachés ---------- */
 const mk = (w, h, f) => { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const q = cv.getContext('2d'); q.scale(2, 2); q.lineJoin = 'round'; f(q); return cv; };
 bgc = mk(480, 640, (q) => { const gr = q.createLinearGradient(0, 0, 0, 640); gr.addColorStop(0, '#2c2150'); gr.addColorStop(1, '#171230'); q.fillStyle = gr; q.fillRect(0, 0, 480, 640);
@@ -59,9 +60,9 @@ k.run((dt) => {
     if (sink.t > 0.6) { if (sink.goal) { score += Math.max(50, 500 - Math.floor(t) * 5) * level; level++; k.st = 'over'; k.sfx('win'); k.confetti(); k.show('¡Meta!', `${score} puntos<br>Toca para el nivel ${level}`); }
       else { lives--; if (lives <= 0) return k.lose(CFG.id, score, 'La canica cayó', `Nivel ${level}`); spawnBall(); } } return; }
   const steps = Math.max(3, Math.ceil(Math.hypot(ball.vx, ball.vy) * dt / (ball.r * 0.4)));
-  for (let s = 0; s < steps; s++) { const h = dt / steps; const A = 680 + 220 * Math.min(1, (level - 1) / 7); ball.vx = (ball.vx + ax * A * h) * (1 - 0.8 * h); ball.vy = (ball.vy + ay * A * h) * (1 - 0.8 * h); ball.x += ball.vx * h; ball.y += ball.vy * h; collide(); }
+  for (let s = 0; s < steps; s++) { const h = dt / steps; const A = 600 + 170 * Math.min(1, (level - 1) / 10); ball.vx = (ball.vx + ax * A * h) * (1 - 0.8 * h); ball.vy = (ball.vy + ay * A * h) * (1 - 0.8 * h); ball.x += ball.vx * h; ball.y += ball.vy * h; collide(); }
   const sp = Math.hypot(ball.vx, ball.vy); ball.rot += sp * dt / ball.r; if (sp > 250 && Math.random() < 0.5) trail.push({ x: ball.x, y: ball.y, l: 0.35 }); for (const q of trail) q.l -= dt; trail = trail.filter((q) => q.l > 0);
-  for (const ho of holes) if (Math.hypot(ball.x - ho.x, ball.y - ho.y) < ho.r) { sink = { t: 0, x: ho.x, y: ho.y }; k.sfx('hurt'); k.shake(5); navigator.vibrate && navigator.vibrate(60); return; }
+  for (const ho of holes) if (Math.hypot(ball.x - ho.x, ball.y - ho.y) < ho.r * 0.85) { sink = { t: 0, x: ho.x, y: ho.y }; k.sfx('hurt'); k.shake(5); navigator.vibrate && navigator.vibrate(60); return; }
   const gx = OX + goal[0] * S + S / 2, gy = OY + goal[1] * S + S / 2;
   if (Math.hypot(ball.x - gx, ball.y - gy) < S * 0.3) { sink = { t: 0, x: gx, y: gy, goal: true }; k.sfx('coin'); k.burst(gx, gy, '#ffc928', 20, 180); }
 }, () => {
@@ -86,7 +87,7 @@ k.run((dt) => {
   c.restore();
   // HUD
   label(`Nivel ${level}`, 16, 14, 24, '#f2d15c'); label(`${score}`, 464, 14, 24, '#fff', 'right');
-  for (let i = 0; i < 3; i++) { const x = 26 + i * 24, y = 62; c.globalAlpha = i < lives ? 1 : 0.25; c.drawImage(ballImg, x - 9, y - 9, 18, 18); } c.globalAlpha = 1;
+  for (let i = 0; i < 4; i++) { const x = 26 + i * 24, y = 62; c.globalAlpha = i < lives ? 1 : 0.25; c.drawImage(ballImg, x - 9, y - 9, 18, 18); } c.globalAlpha = 1;
   label(`${Math.floor(t)} s`, 464, 50, 16, '#b8b6e0', 'right');
   if (k.ptr.down && k.st === 'play') { const r0 = 44; c.globalAlpha = 0.55; c.strokeStyle = '#fff'; c.lineWidth = 3; c.beginPath(); c.arc(k.ptr.sx, k.ptr.sy, r0, 0, 6.283); c.stroke(); c.fillStyle = '#fff'; c.beginPath(); c.arc(k.ptr.sx + ax * r0 * 0.8, k.ptr.sy + ay * r0 * 0.8, 16, 0, 6.283); c.fill(); c.globalAlpha = 1; }
   else if (!gyro && t < 4 && k.st === 'play') { c.globalAlpha = Math.min(1, 4 - t); label('Arrastra para inclinar', 240, 600, 18, '#fff', 'center'); c.globalAlpha = 1; }

@@ -15,8 +15,8 @@ const W8 = [[100, -20, 10, 5, 5, 10, -20, 100], [-20, -50, -2, -2, -2, -2, -50, 
 function rEval(bd) { let s = 0; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) s += bd[y][x] === 2 ? W8[y][x] : bd[y][x] === 1 ? -W8[y][x] : 0; return s + (rMoves(bd, 2).length - rMoves(bd, 1).length) * 3; }
 function rPlay(bd, m, p) { const nb = bd.map((r) => [...r]); nb[m.y][m.x] = p; for (const [x, y] of m.f) nb[y][x] = p; return nb; }
 /* Nivel de la IA (sube al ganar, baja al perder): 0 = voraz 1 jugada con despistes, 1 = 2 jugadas con algún despiste, 2+ = 2 jugadas sin fallos */
-const AIERR = [0.35, 0.15, 0];
-function rAI() { const ms = rMoves(b, 2); if (!ms.length) return null; const L = Math.min(lvl, 2);
+const AIERR = [0.5, 0.25, 0.08]; // 1.23: más fácil (antes 0.35/0.15/0)
+function rAI() { const ms = rMoves(b, 2); if (!ms.length) return null; const L = Math.min(lvl | 0, 2);
   if (Math.random() < AIERR[L]) return k.pick(ms);
   if (L === 0) { let best = null, bv = -1e9; for (const m of k.shuffle(ms)) { const v = rEval(rPlay(b, m, 2)); if (v > bv) { bv = v; best = m; } } return best; }
   let best = null, bv = -1e9; for (const m of k.shuffle(ms)) { const nb = rPlay(b, m, 2); const rep = rMoves(nb, 1); let worst = rep.length ? 1e9 : rEval(nb); for (const r of rep) worst = Math.min(worst, rEval(rPlay(nb, r, 1))); if (worst > bv) { bv = worst; best = m; } } return best; }
@@ -33,12 +33,12 @@ function cSeqs(bd, p) { const ms = cMoves(bd, p); if (!ms.length || !ms[0].cap) 
 function cSearch(bd, p, depth, al, be) { const ss = cSeqs(bd, p); if (!ss.length) return p === 2 ? -100 - depth : 100 + depth; if (!depth) return cEval(bd);
   for (const q of ss) { const v = cSearch(q.bd, 3 - p, depth - 1, al, be); if (p === 2) al = Math.max(al, v); else be = Math.min(be, v); if (al >= be) break; } return p === 2 ? al : be; }
 /* Damas: profundidad 1 → 4 según el nivel y probabilidad de despiste (jugada legal al azar, respeta la captura obligatoria) */
-const CDEP = [1, 2, 3, 4], CERR = [0.3, 0.15, 0.05, 0];
-function cAI() { const ss = cSeqs(b, 2); if (!ss.length) return null; const L = Math.min(lvl, 3); if (Math.random() < CERR[L]) return k.pick(ss);
+const CDEP = [1, 2, 2, 3], CERR = [0.45, 0.25, 0.12, 0.04]; // 1.23: más fácil (antes prof. 1-4, despiste 0.3→0)
+function cAI() { const ss = cSeqs(b, 2); if (!ss.length) return null; const L = Math.min(lvl | 0, 3); if (Math.random() < CERR[L]) return k.pick(ss);
   let best = null, bv = -1e9; for (const q of k.shuffle(ss)) { const v = cSearch(q.bd, 1, CDEP[L], bv, 1e9); if (v > bv) { bv = v; best = q; } } return best; }
 function reset() { if (wins === undefined) wins = 0; build(); }
 function finish() { let me = 0, ai = 0; for (const r of b) for (const v of r) { if (owner(v) === 1 || (M === 'reversi' && v === 1)) me++; if (owner(v) === 2) ai++; }
-  const won = M === 'reversi' ? me > ai : !cMoves(b, 2).length; if (won) { wins++; lvl++; } else if (!(M === 'reversi' && me === ai)) lvl = Math.max(0, lvl - 1); k.st = 'over'; k.show(won ? '¡Ganaste!' : me === ai && M === 'reversi' ? 'Empate' : 'Perdiste', `${M === 'reversi' ? `${me} – ${ai} · ` : `Piezas: tú ${me}, IA ${ai} · `}Victorias seguidas: ${wins} · Récord ${k.best(CFG.id, wins)}<br>Toca para jugar otra vez`); if (!won) { wins = 0; k.sfx('lose'); } }
+  const won = M === 'reversi' ? me > ai : !cMoves(b, 2).length; if (won) { wins++; lvl += 0.5; } else if (!(M === 'reversi' && me === ai)) lvl = Math.max(0, lvl - 1); k.st = 'over'; k.show(won ? '¡Ganaste!' : me === ai && M === 'reversi' ? 'Empate' : 'Perdiste', `${M === 'reversi' ? `${me} – ${ai} · ` : `Piezas: tú ${me}, IA ${ai} · `}Victorias seguidas: ${wins} · Récord ${k.best(CFG.id, wins)}<br>Toca para jugar otra vez`); if (!won) { wins = 0; k.sfx('lose'); } }
 /* ---- Animaciones ---- */
 const cx = (x) => OX + x * S + S / 2, cy = (y) => OY + y * S + S / 2;
 function animMove(v, path, caps) { const step = 0.26, t0 = Math.max(at, animEnd); anims.push({ v, path, caps, t0, step, hide: path[path.length - 1] }); animEnd = t0 + step * (path.length - 1); return t0; }
@@ -138,7 +138,7 @@ function draw() {
   if (idle && sel) for (const q of legal) if (q.x === sel[0] && q.y === sel[1]) { c.fillStyle = q.cap ? 'rgba(255,120,120,.85)' : 'rgba(255,226,122,.85)'; c.beginPath(); c.arc(cx(q.nx), cy(q.ny), 9 + Math.sin(now * 5) * 1.5, 0, 6.283); c.fill(); c.strokeStyle = OUT; c.lineWidth = 2; c.stroke(); }
   if (kbd && cur && k.st === 'play') { c.strokeStyle = '#5ce1e6'; c.lineWidth = 3; c.setLineDash([6, 4]); c.strokeRect(OX + cur[0] * S + 3, OY + cur[1] * S + 3, S - 6, S - 6); c.setLineDash([]); }
   // HUD
-  label(CFG.title, 16, 12, 20, '#ffe27a'); label(`Victorias ${wins}`, W - 16, 14, 15, '#fff', 'right'); label(`IA nivel ${Math.min(lvl, M === 'reversi' ? 2 : 3) + 1}`, W - 16, 36, 12, '#cfd6ff', 'right');
+  label(CFG.title, 16, 12, 20, '#ffe27a'); label(`Victorias ${wins}`, W - 16, 14, 15, '#fff', 'right'); label(`IA nivel ${Math.min(lvl | 0, M === 'reversi' ? 2 : 3) + 1}`, W - 16, 36, 12, '#cfd6ff', 'right');
   const my = OY + N * S + 18; let me = 0, ai = 0; for (const r of b) for (const v of r) { if (owner(v) === 1) me++; if (owner(v) === 2) ai++; }
   piece(1, 36, my + 12, 0.5, 0.5); label(`Tú ${me}`, 52, my + 3, 16, '#fff'); piece(2, W - 36, my + 12, 0.5, 0.5); label(`IA ${ai}`, W - 52, my + 3, 16, '#fff', 'right');
   const tc = turn === 1 ? '#7cf7a0' : '#ffb0e0'; label(turn === 2 && !busy() ? 'La IA piensa' + '.'.repeat(1 + Math.floor(now * 3) % 3) : msg, W / 2, my + 4, 15, msg === 'Captura obligatoria' ? '#ff8a9a' : tc, 'center');
@@ -166,8 +166,8 @@ function f4Neg(g, p, depth, al, be, ply) {
   for (const c0 of F4ORD) if (g.h[c0] < F4R) { const r = f4Play(g, c0, p), w = f4Line(g, c0, r, p); f4Undo(g, c0); if (w) return 1000 - ply; }
   if (g.n >= F4C * F4R) return 0; if (depth <= 0) return f4Eval(g, p);
   let best = -1e9; for (const c0 of F4ORD) { if (g.h[c0] >= F4R) continue; f4Play(g, c0, p); const v = -f4Neg(g, 3 - p, depth - 1, -be, -al, ply + 1); f4Undo(g, c0); if (v > best) best = v; if (v > al) al = v; if (al >= be) break; } return best; }
-/* Jugada de la IA. lvl 0 = fácil (profundidad 2, despistes), 1 = normal (4), 2 = difícil (6, sin despistes). */
-const F4DEP = [2, 4, 6], F4ERR = [0.28, 0.08, 0];
+/* Jugada de la IA. lvl 0 = fácil (profundidad 1, despistes), 1 = normal (3), 2 = difícil (5); sube medio nivel por victoria. */
+const F4DEP = [1, 3, 5], F4ERR = [0.4, 0.15, 0.04]; // 1.23: más fácil (antes 2/4/6, 0.28/0.08/0)
 function f4AI(g, p, lvl, rnd) { rnd = rnd || Math.random; const L = Math.max(0, Math.min(2, lvl | 0)), ms = f4Legal(g); if (!ms.length) return -1;
   for (const c0 of ms) { const r = f4Play(g, c0, p), w = f4Line(g, c0, r, p); f4Undo(g, c0); if (w) return c0; } // siempre remata
   if (rnd() < F4ERR[L]) return ms[Math.floor(rnd() * ms.length)];
@@ -211,7 +211,7 @@ function f4Main() {
     const w = f4Line(g, c0, r, p); if (w) { winLine = { cells: w, p: turn }; over4 = true; pendEnd = 1; } else if (g.n >= F4C * F4R) { over4 = true; pendEnd = 2; } else { turn = 1 - turn; hover[turn] = c0; think = 0; cpuPick = -1; } return true; }
   function finish4() { const vsCPU = seats[0].cpu !== seats[1].cpu, hp = seats[0].cpu ? 1 : 0;
     if (pendEnd === 1) { const wp = winLine.p; series[wp]++;
-      if (vsCPU) { if (wp === hp) lvl4 = Math.min(2, lvl4 + 1); else lvl4 = Math.max(0, lvl4 - 1); try { localStorage.setItem(LS, lvl4); } catch (e) {} }
+      if (vsCPU) { if (wp === hp) lvl4 = Math.min(2, lvl4 + 0.5); else lvl4 = Math.max(0, lvl4 - 1); try { localStorage.setItem(LS, lvl4); } catch (e) {} }
       k.podium([{ p: 0, score: series[0] }, { p: 1, score: series[1] }], { head: `¡Cuatro en línea de ${nameOf(wp)}!`, noTie: true, fmt: (v) => `${v} ${v === 1 ? 'partida' : 'partidas'}`, go: 'Toca para la siguiente' }); }
     else k.podium([{ p: 0, score: series[0] }, { p: 1, score: series[1] }], { head: '¡Tablero lleno: empate!', noTie: true, fmt: (v) => `${v} ${v === 1 ? 'partida' : 'partidas'}`, go: 'Toca para la siguiente' }); }
   const help = 'Deja caer fichas por las columnas y conecta 4 en horizontal, vertical o diagonal antes que el rival. ← → o joystick para elegir columna, A (o ↓) para soltar; en el móvil, toca la columna. Contra la IA, cada victoria la hace más lista.';
@@ -242,7 +242,7 @@ function f4Main() {
     for (const p of [0, 1]) { const x = p ? W - 66 : 66, act = k.st === 'play' && !over4 && turn === p, col = k.pcol(p);
       ART.rr(c, x - 56, 150, 112, 170, 16); c.fillStyle = act ? ART.alpha(col, 0.28) : 'rgba(20,16,50,.72)'; c.fill(); c.lineWidth = act ? 4 : 2; c.strokeStyle = act ? col : 'rgba(255,255,255,.15)'; c.stroke();
       disc(p, x, 196 + (act ? Math.sin(now * 5) * 3 : 0), 1.05); label(nameOf(p), x, 236, 22, col, 'center'); label(String(series ? series[p] : 0), x, 262, 30, '#fff', 'center');
-      label(seats && seats[p].cpu ? LVLN[lvl4] : (act ? 'Tu turno' : ' '), x, 298, 15, act ? '#fff' : '#cfd6ff', 'center'); }
+      label(seats && seats[p].cpu ? LVLN[lvl4 | 0] : (act ? 'Tu turno' : ' '), x, 298, 15, act ? '#fff' : '#cfd6ff', 'center'); }
     // fichas (detrás del marco)
     for (let r = 0; r < F4R; r++) for (let c0 = 0; c0 < F4C; c0++) { const v = g.b[r * F4C + c0]; if (!v) continue; const d = drops.find((q) => q.c === c0 && q.r === r); if (d && !d.done) continue; disc(v - 1, cxF(c0), cyF(r)); }
     for (const d of drops) if (!d.done) disc(d.p, cxF(d.c), d.y);

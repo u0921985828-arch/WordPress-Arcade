@@ -1,7 +1,7 @@
 /* Stack Tower 3D (isométrico): toca para soltar el bloque y apilarlo. Lo que sobresale se corta y cae. */
 const k = Kit({ w: 360, h: 640, title: CFG.title, bg: '#1b1f3b' }), c = k.ctx, OUT = ART.OUT;
 /* velocidad del bloque: 125 → 340 u/s de forma suave hasta el piso 40 (antes 150 + 6 por piso hasta 360) */
-const SPD = (n) => { const d = Math.min(1, n / 40); return 125 + 215 * d * d * (3 - 2 * d); };
+const SPD = (n) => { const d = Math.min(1, n / 60); return 100 + 190 * d * d * (3 - 2 * d); }; // 1.23: más fácil (antes 125→340 hasta el piso 40)
 let blocks, cur, score, axis, dir, speed, perfect, falling, camY, hue, rings, t, flashB, best;
 function reset() { blocks = [{ x: 0, z: 0, w: 120, d: 120, y: 0, hue: 200 }]; score = 0; axis = 'x'; speed = SPD(0); perfect = 0; falling = []; rings = []; camY = 0; hue = 200; t = 0; flashB = null; best = k.best(CFG.id, 0); spawn(); }
 function spawn() { const top = blocks[blocks.length - 1]; axis = axis === 'x' ? 'z' : 'x'; hue = (hue + 12) % 360; cur = { x: axis === 'x' ? -180 : top.x, z: axis === 'z' ? -180 : top.z, w: top.w, d: top.d, y: top.y + 1, hue }; dir = 1; }
@@ -31,7 +31,7 @@ k.run((dt) => {
   if (k.ptr.hit || k.hit.has('a') || k.hit.has('up')) {
     const top = blocks[blocks.length - 1], key = axis, size = axis === 'x' ? 'w' : 'd', delta = cur[key] - top[key];
     const [bx, by] = ISO(cur.x + cur.w / 2, cur.y + 1, cur.z + cur.d / 2);
-    if (Math.abs(delta) < 5) { cur[key] = top[key]; perfect++; score += 2; rings.push({ b: { ...cur }, t: 0 }); k.sfx(perfect > 2 ? 'win' : 'coin'); k.burst(bx, by, '#fff', 16, 140);
+    if (Math.abs(delta) < 6) { cur[key] = top[key]; perfect++; score += 2; rings.push({ b: { ...cur }, t: 0 }); k.sfx(perfect > 2 ? 'win' : 'coin'); k.burst(bx, by, '#fff', 16, 140);
       if (perfect >= 3) { const g = Math.min(12, 120 - cur[size]); cur[size] += g; cur[key] -= g / 2; }
       k.float(perfect > 1 ? `¡Perfecto! x${perfect}` : '¡Perfecto!', 180, by - 40, '#f2d15c'); navigator.vibrate && navigator.vibrate(15); }
     else { perfect = 0; const overlap = cur[size] - Math.abs(delta);

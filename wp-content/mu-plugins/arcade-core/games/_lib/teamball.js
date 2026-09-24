@@ -46,7 +46,7 @@ const nameOf = (b) => (b.ctl < 0 ? 'CPU' : k.party ? 'J' + (b.ctl + 1) : 'TÚ');
 const humanTeam = () => { const h = B.filter((b) => b.ctl >= 0).map((b) => b.team); return h.length && h.every((x) => x === h[0]) ? h[0] : -1; };
 const atk = (tm) => (tm === 0 ? 1 : -1); // sentido de ataque en x
 /* Ventaja amable: un equipo solo de CPU que gana de 2 o más a un equipo con humanos afloja un poco (partidos igualados) */
-function ease(b) { if (!score || B.some((o) => o.team === b.team && o.ctl >= 0) || !B.some((o) => o.team !== b.team && o.ctl >= 0)) return 1; const lead = score[b.team] - score[1 - b.team]; return lead >= 2 ? clamp(1 - 0.08 * (lead - 1), 0.72, 1) : 1; }
+function ease(b) { if (!score || B.some((o) => o.team === b.team && o.ctl >= 0) || !B.some((o) => o.team !== b.team && o.ctl >= 0)) return 1; const lead = score[b.team] - score[1 - b.team]; return lead >= 1 ? clamp(1 - 0.1 * lead, 0.62, 1) : 1; } // 1.23: afloja desde 1 gol de ventaja
 
 /* ---------------- Configuración por modo ---------------- */
 const M = {
@@ -80,7 +80,7 @@ function keepIn(b) { // jugadores dentro del campo (y de su zona en balón prisi
 
 /* ---------------- Arranque de partido / saques ---------------- */
 function reset() {
-  skill = clamp(0.2 + lsGet(CPUK, 0) * 0.08, 0.2, 0.92);
+  skill = clamp(0.2 + lsGet(CPUK, 0) * 0.04, 0.2, 0.85); // 1.23: más fácil (subida 0.08→0.04 por victoria, tope 0.92→0.85)
   mkBodies(); score = [0, 0]; clock = DUR; golden = false; msg = ''; msgT = 0; rounds = [0, 0]; roundNo = 1; lastTouch = null;
   serveTeam = 0; serveIdx = [0, 0]; touches = [0, 0];
   kickTeam = Math.random() < 0.5 ? 0 : 1; kickoff(); cdPend = true;
@@ -131,7 +131,7 @@ function doShot(b, dir, power) {
   const gx = goalX(b.team), gy = FH / 2; let ax = dir ? dir.x : Math.cos(b.a), ay = dir ? dir.y : Math.sin(b.a);
   const tx = gx - ball.x, ty = gy - ball.y, td = hyp(tx, ty) || 1;
   if ((ax * tx + ay * ty) / td > Math.cos(0.7)) { // ayuda de puntería: hacia un palo del lado al que apuntas
-    const side = (ay - ty / td) >= 0 ? 1 : -1, py = gy + side * M.gw * 0.3 + (b.ctl < 0 ? k.rnd(-1, 1) * (1 - skill) * M.gw * 0.5 : 0), px = gx, pd = hyp(px - ball.x, py - ball.y) || 1;
+    const side = (ay - ty / td) >= 0 ? 1 : -1, py = gy + side * M.gw * 0.3 + (b.ctl < 0 ? k.rnd(-1, 1) * (1 - skill) * M.gw * 0.7 : 0), px = gx, pd = hyp(px - ball.x, py - ball.y) || 1;
     ax = lerp(ax, (px - ball.x) / pd, 0.7); ay = lerp(ay, (py - ball.y) / pd, 0.7); const m = hyp(ax, ay); ax /= m; ay /= m; }
   const sp = lerp(M.shot[0], M.shot[1], power); release(b, ax * sp, ay * sp); k.sfx(power > 0.7 ? 'shoot' : 'hit'); if (power > 0.8) { k.shake(4); k.float('¡Cañonazo!', ...V(ball.x, ball.y - 14), '#ffd166'); }
 }
@@ -232,11 +232,11 @@ function stepField(dt) {
     if (walls(ball, ball.r, M.rest) && hyp(ball.vx, ball.vy) > 120) { k.sfx('click'); }
     const v = hyp(ball.vx, ball.vy);
     for (const q of B) { if (q === ball.nt || q.st > 0) continue; const dx = ball.x - q.x, dy = ball.y - q.y, d = hyp(dx, dy);
-      const keeper = Math.abs(q.x - goalX(1 - q.team)) < 90 && q.y > GY0 - 30 && q.y < GY1 + 30, reach = M.r + ball.r + 3 + (keeper ? 12 + (q.ctl < 0 ? 6 * skill : 6) : 0); // el que guarda la portería llega más lejos (estirada)
+      const keeper = Math.abs(q.x - goalX(1 - q.team)) < 90 && q.y > GY0 - 30 && q.y < GY1 + 30, reach = M.r + ball.r + 3 + (keeper ? (q.ctl < 0 ? 4 + 14 * skill : 18) : 0); // el que guarda la portería llega más lejos (estirada)
       if (d < reach) {
         const rel = hyp(ball.vx - q.vx, ball.vy - q.vy);
         if (keeper && d > M.r + ball.r + 3) { const [sx, sy] = V(q.x, q.y); k.float('¡Parada!', sx, sy - 20, TEAM[q.team].col); }
-        if (rel < (MODE === 'hockey' ? 330 : 280) * (keeper ? 1.6 : 1) || q.slide > 0) { ball.own = q; q.chg = -1; lastTouch = q; if (q.recv > 0) q.recv = 0; k.sfx('click'); break; }
+        if (rel < (MODE === 'hockey' ? 330 : 280) * (keeper ? (q.ctl < 0 ? 1.15 + 0.45 * skill : 1.6) : 1) || q.slide > 0) { ball.own = q; q.chg = -1; lastTouch = q; if (q.recv > 0) q.recv = 0; k.sfx('click'); break; }
         const nx = dx / (d || 1), ny = dy / (d || 1), vn = ball.vx * nx + ball.vy * ny; if (vn < 0) { ball.vx -= 1.6 * vn * nx; ball.vy -= 1.6 * vn * ny; ball.vx *= 0.6; ball.vy *= 0.6; } ball.x = q.x + nx * reach; ball.y = q.y + ny * reach; lastTouch = q; k.sfx('hit');
       } }
     if (v < 0.5) { ball.vx = ball.vy = 0; }

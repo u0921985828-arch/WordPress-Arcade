@@ -50,9 +50,9 @@ k.run((dt) => {
   for (let i = 0; i < 16; i++) { const q = cells[i]; if (q && q.hit) q.hit += dt; }
   if (!k.gate(reset)) return; time -= dt; if (time <= 0) { time = 0; return k.lose(CFG.id, score, '¡Tiempo!', `Nivel ${lvl}`); }
   if (score > 1500 && N === 3) { N = 4; cells = Array(16).fill(null); lvl = 2; lvlT = 1.6; sel = 5; boardCv = board(4); k.sfx('win'); k.confetti(); }
-  /* dificultad: d 0→1 en 55 s de juego (el oro no la rebaja); ritmo e intervalo suaves al principio, bombas desde los 4 s */
-  el += dt; const d = Math.min(1, el / 55), e = d * d * (3 - 2 * d);
-  spawnT -= dt; if (spawnT <= 0) { spawnT = 1.0 - 0.7 * e; const free = [...Array(N * N).keys()].filter((i) => !cells[i]); if (free.length) { const i = k.pick(free); const bomb = el > 4 && Math.random() < 0.06 + 0.12 * e, gold = !bomb && Math.random() < 0.1; const life = (1.6 - 1.0 * e) * (gold ? 0.6 : 1); cells[i] = { life, max: life, bomb, gold, age: 0, hit: 0 }; } }
+  /* dificultad (1.23: más fácil): d 0→1 en 82 s de juego (el oro no la rebaja); ritmo e intervalo suaves al principio, bombas desde los 5 s */
+  el += dt; const d = Math.min(1, el / 82), e = d * d * (3 - 2 * d);
+  spawnT -= dt; if (spawnT <= 0) { spawnT = 1.0 - 0.7 * e; const free = [...Array(N * N).keys()].filter((i) => !cells[i]); if (free.length) { const i = k.pick(free); const bomb = el > 5 && Math.random() < 0.05 + 0.1 * e, gold = !bomb && Math.random() < 0.1; const life = (2.0 - 1.3 * e) * (gold ? 0.6 : 1); cells[i] = { life, max: life, bomb, gold, age: 0, hit: 0 }; } }
   for (let i = 0; i < N * N; i++) { const q = cells[i]; if (!q) continue; q.age += dt; q.life -= dt; if (q.life <= 0) { if (!q.bomb && !q.hit) combo = 0; cells[i] = null; } }
   // teclado: cursor por la cuadrícula
   const mv = (dx, dy) => { kbd = true; const x = k.clamp(sel % N + dx, 0, N - 1), y = k.clamp(Math.floor(sel / N) + dy, 0, N - 1); sel = y * N + x; };

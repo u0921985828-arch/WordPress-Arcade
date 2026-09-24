@@ -48,15 +48,15 @@ function place(minD, edge) {
   return [p.x < W / 2 ? X1 - 40 : X0 + 40, p.y < H / 2 ? Y1 - 40 : Y0 + 40];
 }
 /* Curva de dificultad: 0 en la sala 1 → 1 hacia la sala 9 (suavizada). Velocidad, cadencia y balas enemigas escalan con ella. */
-const ramp = () => { const d = Math.min(1, (room - 1) / 8); return d * d * (3 - 2 * d); };
-const spK = () => 0.7 + 0.3 * ramp(), cdK = () => 1.6 - 0.6 * ramp(), bK = () => 0.8 + 0.2 * ramp();
+const ramp = () => { const d = Math.min(1, (room - 1) / 12); return d * d * (3 - 2 * d); };
+const spK = () => 0.56 + 0.29 * ramp(), cdK = () => (1.6 - 0.6 * ramp()) / 0.75, bK = () => 0.64 + 0.16 * ramp(); // 1.23: más fácil (vel. ×0,8/×0,85, cadencia −25 %, balas −20 %)
 function pickType() { const f = TH.foes; if (M === 'zombie' && Math.random() < room * 0.02) return 'brute'; return k.pick(f); }
 function addFoe(type, x, y, boss) {
   const b = FOE[type], sc = 1 + (room - 1) * 0.12;
-  const f = { type, x, y, r: b[0] * (boss ? 2.1 : 1), hp: Math.round(b[1] * sc * (boss ? 10 : 1) * hpMul), sp: b[2] * (boss ? 0.7 : 1) * spK(), pts: b[3] * (boss ? 10 : 1), cd: k.rnd(0.9, 2) * cdK(), cd2: 1.5, a: 0, body: 0, kx: 0, ky: 0, fl: 0, ph: Math.random() * 6, boss, dash: 0, warn: 0, face: 1 };
+  const f = { type, x, y, r: b[0] * (boss ? 2.1 : 1), hp: Math.round(b[1] * sc * (boss ? 8 : 1) * hpMul), sp: b[2] * (boss ? 0.7 : 1) * spK(), pts: b[3] * (boss ? 10 : 1), cd: k.rnd(0.9, 2) * cdK(), cd2: 1.5, a: 0, body: 0, kx: 0, ky: 0, fl: 0, ph: Math.random() * 6, boss, dash: 0, warn: 0, face: 1 };
   f.max = f.hp; foes.push(f); if (boss) bossF = f; return f;
 }
-function queue(type, boss, edge) { const [x, y] = place(boss ? 190 : 150, edge); const t0 = room === 1 && !edge ? 1.4 : 0.9; pend.push({ type, x, y, t: t0 + (edge ? 0 : pend.length * 0.12), max: t0 + pend.length * 0.12, boss }); }
+function queue(type, boss, edge) { const [x, y] = place(boss ? 190 : 150, edge); const t0 = room === 1 && !edge ? 2.2 : 1.2; pend.push({ type, x, y, t: t0 + (edge ? 0 : pend.length * 0.12), max: t0 + pend.length * 0.12, boss }); }
 function buildRoom() {
   room++; walls = []; foes = []; shots = []; eshots = []; pend = []; drops = []; cleared = false; door = false; bossF = null; floorCv = null; clearT = 0;
   const isBoss = room % 5 === 0, nb = isBoss ? 2 : M === 'brawl' ? k.ri(0, 2) : M === 'arena' ? k.ri(1, 3) : k.ri(3, 6);
@@ -70,14 +70,14 @@ function buildRoom() {
   }
   quota = 0;
   if (isBoss) { queue(TH.boss, true); if (M === 'zombie') quota = 6; }
-  else if (M === 'zombie') { quota = 6 + room * 4; spawnT = 1.5; }
-  else { const n = tankM ? Math.min(5, 1 + Math.ceil(room / 2)) : M === 'arena' ? Math.min(10, 2 + room) : Math.min(14, 3 + Math.round((room - 1) * 1.4)); for (let i = 0; i < n; i++) queue(pickType()); }
+  else if (M === 'zombie') { quota = 5 + room * 3; spawnT = 2.5; }
+  else { const n = tankM ? Math.min(4, 1 + Math.ceil((room - 1) / 2)) : M === 'arena' ? Math.min(8, 2 + Math.round((room - 1) * 0.8)) : Math.min(11, 3 + Math.round((room - 1) * 1.1)); for (let i = 0; i < n; i++) queue(pickType()); }
   msg = `${TH.label} ${room}${isBoss ? ' · Jefe' : ''}`; msgT = 1.8;
 }
 function reset() {
   if (COOP) return coopReset();
   VS = BOUNCE ? k.players(4).map((q) => ({ pl: q.p, col: q.color, name: q.cpu ? 'CPU' : q.name, r: 11, wins: 0, kills: 0 })) : tankM && k.party && k.party.length >= 2 ? k.party.slice(0, 4).map((q) => ({ pl: q.p, col: k.pcol(q.p), name: 'J' + (q.p + 1), r: 11, wins: 0 })) : null;
-  p = { x: TH.door ? X0 + 40 : W / 2, y: H / 2, r: 11, hp: 5, max: 5, a: 0, aim: 0, inv: 0, kx: 0, ky: 0, mv: false, face: 1, body: 0, recoil: 0 };
+  p = { x: TH.door ? X0 + 40 : W / 2, y: H / 2, r: 11, hp: 6, max: 6, a: 0, aim: 0, inv: 0, kx: 0, ky: 0, mv: false, face: 1, body: 0, recoil: 0 };
   room = 0; score = 0; t = 0; cool = 0; swing = 0; kills = 0; choice = null; upg = { rate: 1, dmg: 1, speed: 1, multi: 1, pierce: 0, reach: 1 }; if (VS) vsRound(true); else buildRoom();
 }
 /* ---------- Modo tele (fiesta): 2–4 tanques humanos, todos contra todos; gana quien gane 3 rondas.
@@ -87,7 +87,7 @@ let vsCd = false, vsT = 0, vsZ = 0, VS = null, vsR = 0, vsBetween = 0, vsFreeze 
 /* Reglas del duelo: tanques de Tank Duel (3 corazones, 1 rebote) o Tanques Rebote (1 vida por ronda, 3 rebotes, 2 balas en juego, a 4 rondas) */
 const VSC = BOUNCE ? { hp: 1, win: 4, bnc: 3, max: 2, spd: 250, cool: 0.3, life: 7, zone: 22 } : { hp: 3, win: 3, bnc: 1, max: 99, spd: 380, cool: 0.55, life: 1.6, zone: 30 };
 const VSWIN = VSC.win, VSHP = VSC.hp;
-let cpuLv = 0; try { cpuLv = Math.max(0, Math.min(6, +localStorage.getItem('cpu:' + CFG.id) || 0)); } catch (e) {}
+let cpuLv = 0; try { cpuLv = Math.max(0, Math.min(5, +localStorage.getItem('cpu:' + CFG.id) || 0)); } catch (e) {}
 /* Tanques Rebote: obstáculos simétricos (se generan en un cuadrante y se reflejan), así ninguna esquina tiene ventaja */
 function bounceWalls(SP) {
   const cx = (X0 + X1) / 2, cy = (Y0 + Y1) / 2, L = [], over = (b, q, m) => b.x < q.x + q.w + m && b.x + b.w + m > q.x && b.y < q.y + q.h + m && b.y + b.h + m > q.y;
@@ -125,19 +125,19 @@ function bounceCpu(q, dt, i) {
     const rx = q.x - s.x, ry = q.y - s.y, sp = Math.hypot(s.vx, s.vy) || 1, tt = (rx * s.vx + ry * s.vy) / (sp * sp);
     if (tt < 0 || tt > 0.75) continue;
     const ex = s.x + s.vx * tt - q.x, ey = s.y + s.vy * tt - q.y; if (Math.hypot(ex, ey) > 30) continue;
-    s.roll = s.roll || {}; if (s.roll[i] === undefined) s.roll[i] = Math.random() < 0.3 + lv * 0.1; if (!s.roll[i]) continue;
+    s.roll = s.roll || {}; if (s.roll[i] === undefined) s.roll[i] = Math.random() < 0.21 + lv * 0.05; if (!s.roll[i]) continue;
     const nx = -s.vy / sp, ny = s.vx / sp, side = ex * nx + ey * ny > 0 ? -1 : 1; dodge = [nx * side, ny * side]; break;
   }
   st.t -= dt; st.rest -= dt;
   if (st.t <= 0 && st.rest <= 0) {
-    st.t = Math.max(0.18, 0.6 - lv * 0.07) * k.rnd(0.8, 1.3);
-    const N = 18 + lv * 6; let best = null;
+    st.t = Math.max(0.3, 0.78 - lv * 0.035) * k.rnd(0.8, 1.3);
+    const N = 13 + lv * 3; let best = null;
     for (let n = 0; n < N; n++) {
       const a = (n / N) * R2 + Math.random() * 0.1, sx = q.x + Math.cos(a) * 18, sy = q.y + Math.sin(a) * 18; if (rectHit(sx, sy, 3)) continue;
       const r = simShot(sx, sy, a, i, VSC.bnc, 520 + lv * 60);
       if (r.hit >= 0 && r.hit !== i) { const sc = -r.b * 0.5 - angDiff(a, q.aim) * 0.25 + Math.random() * 0.3; if (!best || sc > best.sc) best = { a, sc }; }
     }
-    st.plan = best ? best.a + k.rnd(-1, 1) * Math.max(0.015, 0.1 - lv * 0.014) : null;
+    st.plan = best ? best.a + k.rnd(-1, 1) * Math.max(0.03, 0.14 - lv * 0.01) : null;
   }
   if (dodge) return [dodge[0], dodge[1], false, null];
   if (st.plan != null && shotsOf(i) < VSC.max) {
@@ -148,7 +148,7 @@ function bounceCpu(q, dt, i) {
   const [mx, my] = vsCpu(q, dt); return [mx * 0.9, my * 0.9, false, null];
 }
 function bounceEnd(champ) {
-  if (!k.party) { const hu = VS.find((q) => q.pl === 0); cpuLv = Math.max(0, Math.min(6, cpuLv + (champ === hu ? 1 : -1))); try { localStorage.setItem('cpu:' + CFG.id, cpuLv); } catch (e) {} }
+  if (!k.party) { const hu = VS.find((q) => q.pl === 0); cpuLv = Math.max(0, Math.min(5, cpuLv + (champ === hu ? 1 : -1))); try { localStorage.setItem('cpu:' + CFG.id, cpuLv); } catch (e) {} }
   const solo = !k.party, head = solo ? (champ.pl === 0 ? '¡Has ganado!' : 'Gana la CPU') : champ.cpu ? 'Gana la CPU' : `¡Gana ${champ.name}!`;
   k.podium(VS.map((q) => ({ p: q.pl, score: q.wins, name: q.cpu ? 'CPU' : q.name })), { head, noTie: true, fmt: (n) => `${n} ronda${n === 1 ? '' : 's'}` });
 }
@@ -180,7 +180,7 @@ function vsCpu(q, dt) {
   if (st.t <= 0 || st.stuck > 0.3) { st.t = 0.6 + Math.random() * 1.1; st.stuck = 0; st.side = Math.random() < 0.5 ? 1 : -1; st.mode = !los ? (Math.random() < 0.5 ? 'side' : 'chase') : d < 100 ? 'back' : Math.random() < 0.3 ? 'side' : 'chase'; }
   const off = angDiff(q.aim, ang); let a = st.mode === 'side' ? ang + st.side * 1.4 : st.mode === 'back' ? ang + Math.PI : ang;
   if (los && d < 330 && off > 0.3 && st.mode !== 'back') a = ang;
-  return [Math.cos(a), Math.sin(a), los && off < 0.2 && d < 380 && Math.random() < 0.6];
+  return [Math.cos(a), Math.sin(a), los && off < 0.2 && d < 380 && Math.random() < 0.4];
 }
 const vsZone = () => { const R0 = Math.hypot((X1 - X0) / 2, (Y1 - Y0) / 2), Z = VSC.zone; return vsT <= Z ? R0 : Math.max(60, R0 - (R0 - 60) * Math.min(1, (vsT - Z) / 25)); };
 function vsUpdate(dt) {
@@ -212,7 +212,7 @@ function vsUpdate(dt) {
     if ((q.cpu ? cf : HS.has('a') || pd.hit.has('a')) && q.cool <= 0 && !vsFreeze && !vsBetween && (!BOUNCE || shotsOf(i) < VSC.max)) {
       const mzx = q.x + Math.cos(q.aim) * 18, mzy = q.y + Math.sin(q.aim) * 18;
       if (BOUNCE && rectHit(mzx, mzy, 3)) { q.cool = 0.2; k.sfx('click'); } /* cañón pegado al muro: no sale */
-      else { q.cool = VSC.cool; q.recoil = 0.1; k.sfx('shoot'); if (BOUNCE) k.burst(mzx, mzy, q.col, 5, 80);
+      else { q.cool = VSC.cool * (q.cpu ? 1.35 : 1); q.recoil = 0.1; k.sfx('shoot'); if (BOUNCE) k.burst(mzx, mzy, q.col, 5, 80);
         shots.push({ x: mzx, y: mzy, vx: Math.cos(q.aim) * VSC.spd, vy: Math.sin(q.aim) * VSC.spd, life: VSC.life, b: VSC.bnc, bn: 0, own: i, col: q.col, tr: [] }); }
     }
   });
@@ -284,10 +284,10 @@ k.onParty = () => {
    Si caen todos, fin. Sin tele: tú (J1) + un compañero CPU; en la tele, los humanos ocupan plazas y la CPU rellena hasta 2.
    La dificultad escala con el nº de héroes: más enemigos por sala y más vida (hpMul). ---------- */
 const CLS = {
-  knight: { n: 'Caballero', hp: 6, sp: 150, melee: 1, reach: 44, cd: 0.42, dmg: 1.5, sk: 'Torbellino', skd: 'Golpe giratorio a tu alrededor', skcd: 5 },
-  archer: { n: 'Arquera', hp: 4, sp: 178, reach: 360, cd: 0.34, dmg: 1, spd: 480, shot: '#ffe08a', sk: 'Lluvia', skd: 'Doce flechas en círculo', skcd: 5.5 },
-  mage:   { n: 'Maga', hp: 4, sp: 160, reach: 330, cd: 0.62, dmg: 1.7, spd: 300, pierce: 2, shot: '#c9a8ff', sk: 'Escarcha', skd: 'Congela a los enemigos cercanos', skcd: 7 },
-  cleric: { n: 'Clérigo', hp: 5, sp: 160, melee: 1, reach: 38, cd: 0.45, dmg: 1.2, sk: 'Plegaria', skd: 'Cura y levanta a los caídos cerca', skcd: 9 },
+  knight: { n: 'Caballero', hp: 7, sp: 150, melee: 1, reach: 44, cd: 0.42, dmg: 1.5, sk: 'Torbellino', skd: 'Golpe giratorio a tu alrededor', skcd: 5 },
+  archer: { n: 'Arquera', hp: 5, sp: 178, reach: 360, cd: 0.34, dmg: 1, spd: 480, shot: '#ffe08a', sk: 'Lluvia', skd: 'Doce flechas en círculo', skcd: 5.5 },
+  mage:   { n: 'Maga', hp: 5, sp: 160, reach: 330, cd: 0.62, dmg: 1.7, spd: 300, pierce: 2, shot: '#c9a8ff', sk: 'Escarcha', skd: 'Congela a los enemigos cercanos', skcd: 7 },
+  cleric: { n: 'Clérigo', hp: 6, sp: 160, melee: 1, reach: 38, cd: 0.45, dmg: 1.2, sk: 'Plegaria', skd: 'Cura y levanta a los caídos cerca', skcd: 9 },
 };
 const CK = ['knight', 'archer', 'mage', 'cleric'];
 let HE = [], lobby = null, fxs = [];
@@ -332,7 +332,7 @@ function lobbyUpdate(dt) {
 const nearFoe = (x, y) => { let n = null, nd = 1e9; for (const f of foes) { const d = Math.hypot(f.x - x, f.y - y); if (d < nd) { nd = d; n = f; } } return [n, nd]; };
 function heroHurt(h, n, sx, sy) {
   if (h.inv > 0 || h.down || h.roll > 0) return;
-  h.hp -= n; h.inv = 1; k.shake(5); k.sfx('hurt'); k.burst(h.x, h.y, h.col, 10, 150);
+  h.hp -= n; h.inv = 1.5; k.shake(5); k.sfx('hurt'); k.burst(h.x, h.y, h.col, 10, 150);
   if (sx !== undefined) { const a = Math.atan2(h.y - sy, h.x - sx); h.kx = Math.cos(a) * 280; h.ky = Math.sin(a) * 280; }
   if (h.hp <= 0) { h.hp = 0; h.down = true; h.rev = 0; k.flash('rgba(255,60,80,.25)'); k.float(`¡${h.name} ha caído!`, h.x, h.y - 30, h.col); }
 }
@@ -422,7 +422,7 @@ function coopUpdate(dt) {
   const liveH = HE.filter((h) => !h.down);
   for (const s of eshots) {
     s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; if (s.life <= 0 || rectHit(s.x, s.y, 3)) s.dead = true;
-    for (const h of liveH) if (!s.dead && Math.hypot(s.x - h.x, s.y - h.y) < h.r + s.r - 2) { s.dead = true; heroHurt(h, 1, s.x - s.vx, s.y - s.vy); }
+    for (const h of liveH) if (!s.dead && Math.hypot(s.x - h.x, s.y - h.y) < h.r * 0.85 + s.r - 2) { s.dead = true; heroHurt(h, 1, s.x - s.vx, s.y - s.vy); }
   }
   /* enemigos: persiguen al héroe en pie más cercano */
   for (const f of foes) {
@@ -452,7 +452,7 @@ function coopUpdate(dt) {
     for (const g of foes) if (g !== f && !g.dead) { const ex = f.x - g.x, ey = f.y - g.y, e = Math.hypot(ex, ey), m = f.r + g.r; if (e > 0 && e < m) { vx += ex / e * 70; vy += ey / e * 70; } }
     move(f, (vx + f.kx) * dt, (vy + f.ky) * dt, ghost); const fd = Math.pow(0.002, dt); f.kx *= fd; f.ky *= fd;
     f.mv = Math.hypot(vx, vy) > 5;
-    for (const h of liveH) if (Math.hypot(h.x - f.x, h.y - f.y) < f.r + h.r - 2) heroHurt(h, f.type === 'brute' || f.boss ? 2 : 1, f.x, f.y);
+    for (const h of liveH) if (Math.hypot(h.x - f.x, h.y - f.y) < f.r + h.r * 0.85 - 2) heroHurt(h, f.type === 'brute' || f.boss ? 2 : 1, f.x, f.y);
   }
   foes = foes.filter((f) => !f.dead); shots = shots.filter((s) => !s.dead); eshots = eshots.filter((s) => !s.dead);
   /* botín compartido: las monedas suman al equipo y el corazón cura a quien lo coge */
@@ -460,7 +460,7 @@ function coopUpdate(dt) {
     dr.t -= dt; let tg = null, dd = 1e9; for (const h of liveH) { const e = Math.hypot(h.x - dr.x, h.y - dr.y); if (e < dd) { dd = e; tg = h; } }
     if (!tg) continue;
     if (dd < 80 || cleared) { const v = cleared ? 420 : 280; dr.x += (tg.x - dr.x) / (dd || 1) * v * dt; dr.y += (tg.y - dr.y) / (dd || 1) * v * dt; }
-    if (dd < 16) { dr.got = true; if (dr.k === 'coin') { score += dr.v; k.sfx('coin'); k.float(`+${dr.v}`, dr.x, dr.y - 10, '#ffc928'); } else { tg.hp = Math.min(tg.max, tg.hp + 1); k.sfx('pop'); k.float('+1', dr.x, dr.y - 10, '#ff5f7a'); } }
+    if (dd < 19) { dr.got = true; if (dr.k === 'coin') { score += dr.v; k.sfx('coin'); k.float(`+${dr.v}`, dr.x, dr.y - 10, '#ffc928'); } else { tg.hp = Math.min(tg.max, tg.hp + 1); k.sfx('pop'); k.float('+1', dr.x, dr.y - 10, '#ff5f7a'); } }
   }
   drops = drops.filter((dr) => !dr.got && (dr.t > 0 || cleared));
   if (!liveH.length) { k.burst(W / 2, H / 2, '#ff5f7a', 30, 240); return k.lose(CFG.id, score, 'Equipo derrotado', `${TH.label} ${room} · ${kills} bajas · ${HE.length} héroes`); }
@@ -548,7 +548,7 @@ function coopDraw() {
 reset(); k.show(CFG.title, CFG.help);
 function hurt(n, sx, sy) {
   if (p.inv > 0 || k.st !== 'play') return;
-  p.hp -= n; p.inv = 1; k.shake(6); k.flash('rgba(255,60,80,.3)'); k.sfx('hurt');
+  p.hp -= n; p.inv = 1.5; k.shake(6); k.flash('rgba(255,60,80,.3)'); k.sfx('hurt');
   if (sx !== undefined) { const a = Math.atan2(p.y - sy, p.x - sx); p.kx = Math.cos(a) * 280; p.ky = Math.sin(a) * 280; }
   if (p.hp <= 0) { k.burst(p.x, p.y, '#5ce1e6', 30, 240); k.lose(CFG.id, score, 'Derrotado', `${TH.label} ${room} · ${kills} bajas`); }
 }
@@ -599,7 +599,7 @@ k.run((dt) => {
   // apariciones anunciadas
   for (const q of pend) { q.t -= dt; if (q.t <= 0) { q.done = 1; addFoe(q.type, q.x, q.y, q.boss); k.burst(q.x, q.y, '#b98cff', 10, 120); } }
   pend = pend.filter((q) => !q.done);
-  if (quota > 0) { spawnT -= dt; if (spawnT <= 0 && foes.length + pend.length < 10 + room * 2) { spawnT = Math.max(0.4, 1.7 - room * 0.12); quota--; queue(pickType(), false, true); } }
+  if (quota > 0) { spawnT -= dt; if (spawnT <= 0 && foes.length + pend.length < 10 + room * 2) { spawnT = Math.max(0.5, 2.1 - room * 0.12); quota--; queue(pickType(), false, true); } }
   // objetivo más cercano
   let near = null, nd = 1e9; for (const f of foes) { const d = Math.hypot(f.x - p.x, f.y - p.y); if (d < nd) { nd = d; near = f; } }
   p.aim = near && (melee || nd < 380) ? Math.atan2(near.y - p.y, near.x - p.x) : tankM ? p.body : p.a;
@@ -634,7 +634,7 @@ k.run((dt) => {
     const w = wallAt(s.x, s.y, 3);
     if (w && w.hp && tankM) { s.dead = true; w.hp--; w.fl = 0.1; if (w.hp <= 0) { w.dead = true; k.burst(w.x + w.w / 2, w.y + w.h / 2, TH.top, 20, 200); k.sfx('explode'); } }
     else if (rectHit(s.x, s.y, 3)) { if (s.b > 0) { s.b--; bounce(s); } else s.dead = true; }
-    if (!s.dead && Math.hypot(s.x - p.x, s.y - p.y) < p.r + s.r - 2) { s.dead = true; hurt(1, s.x - s.vx, s.y - s.vy); }
+    if (!s.dead && Math.hypot(s.x - p.x, s.y - p.y) < p.r * 0.85 + s.r - 2) { s.dead = true; hurt(1, s.x - s.vx, s.y - s.vy); }
   }
   walls = walls.filter((w) => !w.dead);
   // enemigos
@@ -663,14 +663,14 @@ k.run((dt) => {
     move(f, (vx + f.kx) * dt, (vy + f.ky) * dt, ghost); const fd = Math.pow(0.002, dt); f.kx *= fd; f.ky *= fd;
     f.mv = Math.hypot(vx, vy) > 5; if (f.mv && f.type === 'tank') f.body += k.clamp(((Math.atan2(vy, vx) - f.body + 3 * Math.PI) % R2) - Math.PI, -5 * dt, 5 * dt);
     if (f.recoil) f.recoil = Math.max(0, f.recoil - dt);
-    if (d < f.r + p.r - 2) hurt(f.type === 'brute' || f.boss ? 2 : 1, f.x, f.y);
+    if (d < f.r + p.r * 0.85 - 2) hurt(f.type === 'brute' || f.boss ? 2 : 1, f.x, f.y);
   }
   foes = foes.filter((f) => !f.dead); shots = shots.filter((s) => !s.dead); eshots = eshots.filter((s) => !s.dead);
   // botín
   for (const d of drops) {
     d.t -= dt; const dd = Math.hypot(p.x - d.x, p.y - d.y) || 1;
     if (dd < 80 || cleared) { const v = cleared ? 420 : 280; d.x += (p.x - d.x) / dd * v * dt; d.y += (p.y - d.y) / dd * v * dt; }
-    if (dd < 16) { d.got = true; if (d.k === 'coin') { score += d.v; k.sfx('coin'); k.float(`+${d.v}`, d.x, d.y - 10, '#ffc928'); } else { p.hp = Math.min(p.max, p.hp + 1); k.sfx('pop'); k.float('+1', d.x, d.y - 10, '#ff5f7a'); } }
+    if (dd < 19) { d.got = true; if (d.k === 'coin') { score += d.v; k.sfx('coin'); k.float(`+${d.v}`, d.x, d.y - 10, '#ffc928'); } else { p.hp = Math.min(p.max, p.hp + 1); k.sfx('pop'); k.float('+1', d.x, d.y - 10, '#ff5f7a'); } }
   }
   drops = drops.filter((d) => !d.got && (d.t > 0 || cleared));
   // sala superada

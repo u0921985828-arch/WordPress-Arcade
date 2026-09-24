@@ -79,7 +79,7 @@ const TAB = (() => {
   /* IA por reglas: come, se protege en seguros, huye de amenazas, entra en el pasillo, forma barreras. lvl 0..3 = menos despistes. */
   function threat(S, p, t) { let n = 0; S.pcs.forEach((a, q) => { if (q === p) return; a.forEach((pc) => { if (pc.r < 0 || pc.r > LAST) return; const d = (t - tIdx(S, q, pc.r) + 68) % 68; if (d >= 1 && d <= 7 && pc.r + d <= LAST) n += d <= 6 ? 1 : 0.4; }); }); return n; }
   function aiPick(S, moves, lvl, rnd) {
-    const p = S.cur, M = occ(S), noise = [30, 16, 7, 2][Math.max(0, Math.min(3, lvl | 0))]; let best = moves[0], bv = -1e9;
+    const p = S.cur, M = occ(S), noise = [42, 26, 14, 7][ /* 1.23: más fácil (antes 30/16/7/2) */Math.max(0, Math.min(3, lvl | 0))]; let best = moves[0], bv = -1e9;
     for (const m of moves) {
       let s = m.v * 0.35;
       if (m.exit) s += 30;
@@ -368,7 +368,7 @@ else (function () {
   function nextO() { TAB.ocaEnd(S); beginTurn(); }
   function finish() {
     phase = 'over'; const w = S.winner, rows = pl.map((q) => ({ p: q.p, score: OCA ? S.pos[q.p] : TAB.pscore(S, q.p) }));
-    const humWin = !isCpu(w); if (pl.some((q) => !q.cpu)) { lvl = humWin ? Math.min(3, lvl + 1) : Math.max(0, lvl - 1); try { localStorage.setItem(LK, lvl); } catch (e) { /* nada */ } }
+    const humWin = !isCpu(w); if (pl.some((q) => !q.cpu)) { lvl = humWin ? Math.min(2.5, lvl + 0.5) : Math.max(0, lvl - 1); try { localStorage.setItem(LK, lvl); } catch (e) { /* nada */ } }
     rows.sort((a, b) => (a.p === w ? -1 : b.p === w ? 1 : b.score - a.score)); rows.forEach((r, i) => (r.score = rows.length - i));
     const det = (p) => (OCA ? `casilla ${S.pos[p]}` : `${S.pcs[p].filter((q) => q.r === TAB.END).length}/${S.o.np} en meta`);
     const map = {}; rows.forEach((r) => (map[r.score] = r.p));

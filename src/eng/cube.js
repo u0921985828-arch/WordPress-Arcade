@@ -10,13 +10,13 @@ function roll(s, d) { const [dx, dy] = d; if (s.o === 0) { if (dx) return { x: d
 const ok = (s) => cellsOf(s).every(([x, y]) => tiles.has(x + ',' + y));
 const DD = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 function build() {
-  NX = Math.min(14, 8 + level); NY = Math.min(9, 5 + Math.floor(level / 2));
+  NX = Math.min(14, 8 + Math.floor(level * 0.7)); NY = Math.min(9, 5 + Math.floor(level / 3)); // 1.23: más fácil (antes 8+nivel, 5+nivel/2)
   // Se repite hasta encontrar un nivel resoluble (BFS); tras 300 intentos se relaja la distancia mínima
   /* recorrido mínimo del nivel en una franja creciente: 5-8 (nivel 1), 6-9, 8-11 … hasta 14-17 desde el nivel 7 (antes ≥7 y la meta más lejana posible)
    * y tablero más lleno al principio (56 % → 35 %) */
-  const LO = Math.min(14, 3 + Math.round(level * 1.5)), HI = LO + 3;
+  const LO = Math.min(14, 3 + Math.round(level * 1.0)), HI = LO + 3; // 1.23: rampa más lenta (antes ×1,5)
   for (let tries = 0; ; tries++) {
-    tiles = new Set(); let x = 1, y = Math.floor(NY / 2); const target = Math.floor(NX * NY * (0.56 - Math.min(0.21, level * 0.03)));
+    tiles = new Set(); let x = 1, y = Math.floor(NY / 2); const target = Math.floor(NX * NY * (0.56 - Math.min(0.21, level * 0.02)));
     while (tiles.size < target) { tiles.add(x + ',' + y); const d = k.pick([[1, 0], [1, 0], [0, 1], [0, -1], [-1, 0]]); x = k.clamp(x + d[0], 0, NX - 1); y = k.clamp(y + d[1], 0, NY - 1); if (Math.random() < 0.3) tiles.add(k.clamp(x + 1, 0, NX - 1) + ',' + y); }
     const start = { x: 1, y: Math.floor(NY / 2), o: 0 }; if (!ok(start)) continue;
     const K = (s) => s.x + ',' + s.y + ',' + s.o, seen = new Map([[K(start), 0]]), q = [start]; let far = null, fd = 0;

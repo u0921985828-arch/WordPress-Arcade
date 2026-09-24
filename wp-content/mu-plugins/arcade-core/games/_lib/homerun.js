@@ -5,7 +5,7 @@ const k = Kit({ w: 360, h: 640, title: CFG.title, bg: '#0b1238' }), c = k.ctx;
 const PY = 292, ZY = 552, WALL = 206, HX = 150, HY = 548, BAT = 92;
 let ball, swing, outs, hrs, total, msg, msgT, msgD = 1, msgC, wait, hit, pitchN, trail, streak, fw, tm, outMarks;
 /* dificultad por lanzamiento: d 0→1 en 30 lanzamientos. Velocidad media 0,78→1,65 (antes 1,2→1,8 al 10.º), la variación y el efecto crecen con d */
-function pitch() { pitchN++; const d = Math.min(1, (pitchN - 1) / 30), e = d * d * (3 - 2 * d) * 0.6 + d * 0.4; const sp = (0.78 + 0.87 * e) * (1 + k.rnd(-1, 1) * (0.04 + 0.2 * e)); const curve = k.rnd(-40, 40) * Math.min(1, (pitchN - 1) / 12); ball = { t: 0, sp, curve, x: 180, y: PY, s: 0.3, live: true, spin: 0 }; swing = 0; hit = null; trail = []; k.sfx('click'); }
+function pitch() { pitchN++; const d = Math.min(1, (pitchN - 1) / 45), /* 1.23: más fácil (rampa 30→45 lanzamientos, velocidad 0,78–1,65 → 0,62–1,40) */ e = d * d * (3 - 2 * d) * 0.6 + d * 0.4; const sp = (0.62 + 0.78 * e) * (1 + k.rnd(-1, 1) * (0.04 + 0.2 * e)); const curve = k.rnd(-40, 40) * Math.min(1, (pitchN - 1) / 18); ball = { t: 0, sp, curve, x: 180, y: PY, s: 0.3, live: true, spin: 0 }; swing = 0; hit = null; trail = []; k.sfx('click'); }
 function reset() { outs = 0; hrs = 0; total = 0; msg = ''; msgT = 0; msgC = '#fff'; wait = 1.2; pitchN = 0; ball = null; hit = null; swing = 0; trail = []; streak = 0; fw = []; tm = 0; outMarks = []; }
 reset(); k.show(CFG.title, 'Toca (o pulsa A) para batear cuando la bola entre en la zona de strike. Buen momento = jonrón. 10 eliminaciones y se acaba.');
 function say(s, col, d) { msg = s; msgC = col; msgT = msgD = d || 1.2; }
@@ -107,7 +107,7 @@ k.run((dt) => {
   ball.t += dt * ball.sp; ball.spin += dt * 20; const e = ball.t; ball.y = PY + e * (ZY - PY) / 0.93; ball.s = 0.3 + e * 0.7; ball.x = 180 + Math.sin(e * 3) * ball.curve * e;
   trail.push([ball.x, ball.y]); if (trail.length > 6) trail.shift();
   if ((k.ptr.hit || k.hit.has('a')) && swing <= 0) { swing = 0.3; k.sfx('jump'); const off = e - 0.93;
-    if (Math.abs(off) < 0.12 && Math.abs(ball.x - 180) < 60) { const q = 1 - Math.abs(off) / 0.12; const dist = Math.round(60 + q * 110 + k.rnd(-8, 8)); const ang = k.clamp(off * 6 + (ball.x - 180) / 120, -0.8, 0.8);
+    if (Math.abs(off) < 0.14 && Math.abs(ball.x - 180) < 66) { const q = 1 - Math.abs(off) / 0.14; const dist = Math.round(60 + q * 110 + k.rnd(-8, 8)); const ang = k.clamp(off * 6 + (ball.x - 180) / 120, -0.8, 0.8);
       hit = { t: 0, dist, ang, x0: ball.x, y0: ball.y, hr: dist >= 110 }; trail = []; k.sfx('hit'); k.shake(q > 0.7 ? 6 : 3); k.burst(ball.x, ball.y, '#fff', 10, 200);
       if (hit.hr) { hrs++; total += dist; streak++; k.sfx('win'); k.confetti(); k.flash('rgba(255,250,200,.35)'); say(streak > 1 ? `¡JONRÓN x${streak}!` : '¡JONRÓN!', '#fff27a', 1.8); navigator.vibrate && navigator.vibrate(40); }
       else { outs++; outMarks.push(0); streak = 0; say(`Atrapada · ${dist} m`, '#ffd08a', 1.5); } }

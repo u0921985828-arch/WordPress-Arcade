@@ -4,8 +4,8 @@
 const OUT = ART.OUT, R2 = 6.2832, W = 360, H = 640, FLOOR = 578, BR = 13, RIM = 26, NC = 7, NR = 5;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#241a3a' }), c = k.ctx;
 let shotN = 0, ball, hoop, score, time, streak, aim, msg, msgT, msgC, best, net, kAng, kPow, kb, t = 0, bgCv, ballSpr, fireT = 0, clankT = 0;
-/* los primeros lanzamientos salen cerca del aro; la zona se abre hasta la completa hacia el 12.º */
-function newBall() { const d = Math.min(1, shotN++ / 12); ball = { x: k.rnd(190 - 140 * d, 190 - 10 * (1 - d)), y: k.rnd(440 - 40 * d, 480 + 40 * d), vx: 0, vy: 0, fly: false, scored: false, prevY: 0, rot: 0, sp: 0, touched: false, bounces: 0, pop: 0, done: 0 }; ball.sx = ball.x; ball.sy = ball.y;
+/* los primeros lanzamientos salen cerca del aro; la zona se abre hasta la completa hacia el 18.º (1.23) */
+function newBall() { const d = Math.min(1, shotN++ / 18); ball = { x: k.rnd(190 - 140 * d, 190 - 10 * (1 - d)), y: k.rnd(440 - 40 * d, 480 + 40 * d), vx: 0, vy: 0, fly: false, scored: false, prevY: 0, rot: 0, sp: 0, touched: false, bounces: 0, pop: 0, done: 0 }; ball.sx = ball.x; ball.sy = ball.y;
   const dx = hoop.x - ball.x, hh = ball.y - hoop.y, a = 1.0, den = 2 * Math.cos(a) ** 2 * (dx * Math.tan(a) - hh); kAng = -a; kPow = den > 0 ? k.clamp(Math.sqrt(1300 * dx * dx / den) / 950 * 0.9, 0.2, 1) : 0.8; } /* el teclado parte de un tiro corto: hay que ajustarlo */
 function reset() { shotN = 0; hoop = { x: 280, y: 230, vx: 0 }; score = 0; time = 60; streak = 0; best = 0; msg = ''; msgT = 0; kb = false; net = []; for (let j = 0; j < NR; j++) for (let i = 0; i < NC; i++) net.push({ i, j, dx: 0, dy: 0, vx: 0, vy: 0 }); newBall(); }
 /* ---------- Cacheados: pabellón y balón ---------- */
@@ -38,7 +38,7 @@ function throwBall(a, p) { ball.vx = Math.cos(a) * p * 950; ball.vy = Math.sin(a
 const rimL = () => [hoop.x - RIM, hoop.y], rimR = () => [hoop.x + RIM, hoop.y], BB = () => ({ x0: hoop.x + RIM + 8, x1: hoop.x + RIM + 20, y0: hoop.y - 92, y1: hoop.y + 14 });
 k.run((dt) => {
   t += dt; msgT -= dt; clankT -= dt; if (!k.gate(reset)) return; time -= dt; if (time <= 0) { time = 0; return k.lose(CFG.id, score, '¡Tiempo!', `Mejor racha x${best}`); }
-  if (streak >= 3) { if (!hoop.vx) hoop.vx = 40; const hv = Math.min(95, 40 + (streak - 3) * 6); hoop.vx = Math.sign(hoop.vx) * hv; hoop.x += hoop.vx * dt; if (hoop.x > 300) { hoop.x = 300; hoop.vx = -Math.abs(hoop.vx); } if (hoop.x < 205) { hoop.x = 205; hoop.vx = Math.abs(hoop.vx); } } else { hoop.vx = 0; hoop.x += (280 - hoop.x) * Math.min(1, dt * 2); }
+  if (streak >= 3) { if (!hoop.vx) hoop.vx = 32; const hv = Math.min(80, 32 + (streak - 3) * 4); hoop.vx = Math.sign(hoop.vx) * hv; hoop.x += hoop.vx * dt; if (hoop.x > 300) { hoop.x = 300; hoop.vx = -Math.abs(hoop.vx); } if (hoop.x < 205) { hoop.x = 205; hoop.vx = Math.abs(hoop.vx); } } else { hoop.vx = 0; hoop.x += (280 - hoop.x) * Math.min(1, dt * 2); }
   stepNet(dt);
   ball.pop = Math.min(1, ball.pop + dt * 5);
   if (!ball.fly) {
@@ -53,7 +53,7 @@ k.run((dt) => {
   const h = dt / 5; for (let s = 0; s < 5; s++) { const b = ball; b.prevY = b.y; b.vy += 1300 * h; b.x += b.vx * h; b.y += b.vy * h; b.rot += b.sp * h * 6;
     for (const [rx, ry] of [rimL(), rimR()]) { const d = Math.hypot(b.x - rx, b.y - ry); if (d < BR + 3) { const nx = (b.x - rx) / d, ny = (b.y - ry) / d, vn = b.vx * nx + b.vy * ny; if (vn < 0) { b.vx -= 1.6 * vn * nx; b.vy -= 1.6 * vn * ny; b.sp += vn * nx * 0.02; if (clankT <= 0 && vn < -80) { k.sfx('hit'); clankT = 0.12; } b.touched = true; } b.x = rx + nx * (BR + 3); b.y = ry + ny * (BR + 3); } }
     const bb = BB(); if (b.x + BR > bb.x0 && b.x - BR < bb.x1 && b.y > bb.y0 && b.y < bb.y1) { if (b.vx > 0 && b.x < bb.x0) { b.x = bb.x0 - BR; b.vx = -Math.abs(b.vx) * 0.6; b.touched = true; if (clankT <= 0) { k.sfx('click'); clankT = 0.12; } } else if (b.y < bb.y0 + 10 && b.vy > 0) { b.y = bb.y0 - 1; b.vy = -Math.abs(b.vy) * 0.5; } }
-    if (!b.scored && b.prevY < hoop.y && b.y >= hoop.y && Math.abs(b.x - hoop.x) < RIM - 8 && b.vy > 0) scored();
+    if (!b.scored && b.prevY < hoop.y && b.y >= hoop.y && Math.abs(b.x - hoop.x) < RIM - 5 && b.vy > 0) scored(); /* 1.23: más fácil (RIM-8→RIM-5) */
     // el balón empuja la red
     for (const n of net) { const [nx0, ny0] = netRest(n), px = nx0 + n.dx, py = ny0 + n.dy, d = Math.hypot(px - b.x, py - b.y); if (d < BR + 1 && d > 0) { const f = (BR + 1 - d); n.dx += (px - b.x) / d * f * 0.7; n.dy += (py - b.y) / d * f * 0.7; n.vx += b.vx * 0.02; n.vy += b.vy * 0.03; } }
     if (b.y > FLOOR - BR && b.vy > 0) { b.y = FLOOR - BR; b.vy *= -0.55; b.vx *= 0.8; b.sp *= 0.8; b.bounces++; if (Math.abs(b.vy) > 60) k.sfx('pop'); } }

@@ -15,7 +15,7 @@ const BJ = (() => {
   const rm = (h, c) => { const i = h.indexOf(c); if (i >= 0) h.splice(i, 1); return i >= 0; };
   const cid = (a) => (typeof a === 'string' && a.startsWith('c:') ? CARDS[+a.slice(2)] : null);
   const ev = (S, e) => { S.ev.push(e); if (S.ev.length > 200) S.ev.shift(); };
-  const NOISE = [0.3, 0.22, 0.15, 0.1, 0.06];
+  const NOISE = [0.42, 0.32, 0.22, 0.15, 0.1]; // 1.23: más fácil (antes 0.3/0.22/0.15/0.1/0.06)
 
   /* =========================== BRISCA =========================== */
   const STR = { 2: 0, 4: 1, 5: 2, 6: 3, 7: 4, 10: 5, 11: 6, 12: 7, 3: 8, 1: 9 }, PTS = { 1: 11, 3: 10, 12: 4, 11: 3, 10: 2 };
@@ -398,7 +398,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
   const CW = PORT ? 78 : 82, CH = Math.round(CW * 1.55), TW = PORT ? 66 : 66, SW = PORT ? 40 : 44, RW = PORT ? 50 : 54;
   const FONT = 'ui-rounded,"Trebuchet MS",system-ui,sans-serif';
   const LVKEY = 'cpu:' + CFG.id;
-  const lvlGet = () => { try { return Math.min(4, +localStorage.getItem(LVKEY) || 0); } catch (e) { return 0; } };
+  const lvlGet = () => { try { return Math.min(3, Math.floor(+localStorage.getItem(LVKEY) || 0)); } catch (e) { return 0; } };
 
   /* ------------------------------------------------ Dibujo de cartas (espacio 100 × 155) */
   function fo(g, fill, lw) { g.fillStyle = fill; g.fill(); g.lineWidth = lw || 1.7; g.strokeStyle = OUT; g.stroke(); }
@@ -598,7 +598,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
   function finish() {
     if (finished) return; finished = true; for (const p of humans()) k.priv(p, null);
     const humWin = MODE === 'chinchon' || (MODE === 'brisca' && S.n === 2) ? humans().includes(S.winner) : humans().some((p) => p % 2 === S.winner);
-    let lv = lvlGet(); try { if (humWin) localStorage.setItem(LVKEY, String(Math.min(8, (+localStorage.getItem(LVKEY) || 0) + 1))); } catch (e) { /* nada */ }
+    let lv = lvlGet(); try { const v0 = +localStorage.getItem(LVKEY) || 0; localStorage.setItem(LVKEY, String(humWin ? Math.min(3.5, v0 + 0.5) : Math.max(0, v0 - 0.5))); } /* 1.23: medio nivel por victoria, tope 3 */ catch (e) { /* nada */ }
     if (humWin) k.best(CFG.id, lv + 1);
     if (MODE === 'chinchon') {
       const rows = S.score.map((v, p) => ({ p, name: label(p), score: p === S.winner ? Math.min(v, -1000 + v) : v }));

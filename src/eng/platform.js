@@ -5,12 +5,12 @@ const TH = ART.THEMES[CFG.theme || { barrels: 'factory', ninja: 'night', hopper:
 const W = port ? 360 : 480, H = port ? 640 : 360, T = 20;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: CFG.bg || TH.sky[0] }), c = k.ctx;
 const PAL = CFG.pal || {}, HERO = PAL.p || { barrels: '#5ce1e6', ninja: '#ff4d6d', hopper: '#ff5fa2', lava: '#5ce1e6' }[M];
-const BUFFER = 0.12, COYOTE = 0.09, WALL = 46;
+const BUFFER = 0.14, COYOTE = 0.13, WALL = 46;
 let map, MW, MH, p, enemies, coins, anchors, barrels, flag, cam, level, lives, score, t, jumpBuf, coyote, rope, dashT, dashCd, swordT, lava, hiY, platforms, bT;
 let plan, planY, planSide, ladders, foes, fx, dead, sq, got, bonus, genY, lastX, startY, intro, throwT, drumT, lvCv, climbPh, steer, diffT;
 const R2 = Math.PI * 2, tileAt = (x, y) => { const tx = Math.floor(x / T), ty = Math.floor(y / T); if (tx < 0 || tx >= MW || ty < 0 || ty >= MH) return 0; return map[ty][tx]; };
 const height = () => Math.max(0, Math.floor((startY - hiY) / 10));
-const diff = (y) => Math.min(1, (startY - y) / 14000);
+const diff = (y) => Math.min(1, (startY - y) / 21000);
 function mkCv(w, h, draw) { const cv = document.createElement('canvas'); cv.width = Math.ceil(w * 2); cv.height = Math.ceil(h * 2); const g = cv.getContext('2d'); g.scale(2, 2); g.lineJoin = 'round'; draw(g); return cv; }
 function label(s, x, y, size, col, align) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top';
@@ -22,7 +22,7 @@ function mkP(x, y) { return { x, y, vx: 0, vy: 0, w: port ? 18 : 14, h: port ? 3
 const fyRow = (i) => MH - 1 - i * 3; // fila de la viga i (0 = suelo)
 const floorDir = (j) => j === 0 ? 1 : j % 2 ? -1 : 1; // hacia dónde ruedan los barriles en cada piso
 function genBarrels() {
-  MW = 24; MH = 18; map = Array.from({ length: MH }, () => Array(MW).fill(0)); barrels = []; coins = []; enemies = []; ladders = []; fx = []; bT = 1.4; throwT = 0; drumT = 0; climbPh = 0;
+  MW = 24; MH = 18; map = Array.from({ length: MH }, () => Array(MW).fill(0)); barrels = []; coins = []; enemies = []; ladders = []; fx = []; bT = 2; throwT = 0; drumT = 0; climbPh = 0;
   for (let x = 0; x < MW; x++) map[MH - 1][x] = 1;
   for (let i = 1; i <= 5; i++) { const y = fyRow(i); for (let x = 0; x < MW; x++) if (i % 2 ? x > 2 : x < MW - 3) map[y][x] = 2; }
   for (let i = 0; i < 5; i++) { // dos escaleras por tramo, separadas y lejos de huecos, bandera y lanzador
@@ -40,11 +40,11 @@ function genMore() {
     while (genY > cam - H) {
       // ruta planificada (cruces y dobles saltos): los pinchos nunca tapan sus puntos de agarre → siempre hay camino
       while (planY > genY - 700) { const same = Math.random() < 0.35; if (!same) planSide = -planSide; planY -= same ? 118 : 92; plan.push({ side: planSide, y0: planY - 8, y1: planY + 30 + 28 }); }
-      const d = diff(genY), gap = k.rnd(95 - d * 30, 175 - d * 85), h = k.ri(40, 50 + Math.round(d * 60));
+      const d = diff(genY), gap = k.rnd(119 - d * 38, 219 - d * 106), h = k.ri(40, 50 + Math.round(d * 60));
       genY -= gap + h; const free = (s) => !plan.some((q) => q.side === s && q.y1 > genY && q.y0 < genY + h);
       let side = k.pick([-1, 1]); if (!free(side)) side = -side; if (free(side)) enemies.push({ side, y: genY, h });
       if (Math.random() < 0.55) coins.push({ x: W / 2 + k.rnd(-50, 50), y: genY + h + gap / 2 });
-      if (d > 0.08 && Math.random() < 0.12 + d * 0.3) foes.push({ x: k.rnd(WALL + 20, W - WALL - 20), y: genY - k.rnd(20, 60), vx: k.pick([-1, 1]) * (60 + d * 80), ph: Math.random() * 6 });
+      if (d > 0.08 && Math.random() < 0.1 + d * 0.24) foes.push({ x: k.rnd(WALL + 20, W - WALL - 20), y: genY - k.rnd(20, 60), vx: k.pick([-1, 1]) * (48 + d * 70), ph: Math.random() * 6 });
     }
     return;
   }
@@ -53,15 +53,15 @@ function genMore() {
     if (M === 'hopper') {
       genY -= k.rnd(46, 62 + d * 72); const w = cloudW(d), prev = platforms[platforms.length - 1];
       const kind = r < 0.07 + d * 0.13 ? 'move' : r < 0.14 + d * 0.2 && prev.kind !== 'break' ? 'break' : r < 0.19 + d * 0.2 ? 'spring' : 'n';
-      const q = { x: k.rnd(6, W - w - 6), y: genY, w, kind, vx: k.pick([-1, 1]) * (45 + d * 70), sq: 0 }; platforms.push(q);
+      const q = { x: k.rnd(6, W - w - 6), y: genY, w, kind, vx: k.pick([-1, 1]) * (36 + d * 60), sq: 0 }; platforms.push(q);
       if (kind !== 'break' && Math.random() < 0.28) coins.push({ x: q.x + w / 2, y: genY - 30 });
-      if (d > 0.05 && kind === 'n' && Math.random() < 0.05 + d * 0.12) foes.push({ x: k.rnd(30, W - 30), y: genY - 70, x0: 0, vx: k.pick([-1, 1]) * (40 + d * 60), ph: Math.random() * 6 });
+      if (d > 0.05 && kind === 'n' && Math.random() < 0.04 + d * 0.1) foes.push({ x: k.rnd(30, W - 30), y: genY - 70, x0: 0, vx: k.pick([-1, 1]) * (32 + d * 51), ph: Math.random() * 6 });
     } else {
       genY -= k.rnd(62, 78 + d * 24); const w = k.ri(Math.round(96 - d * 34), Math.round(132 - d * 44));
       const cx = k.clamp(lastX + k.pick([-1, 1]) * k.rnd(40, 105), w / 2 + 6, W - w / 2 - 6); lastX = cx;
       const prev = platforms[platforms.length - 1];
       const kind = d > 0.12 && r < 0.12 + d * 0.15 ? 'move' : d > 0.05 && r < 0.3 + d * 0.15 && prev.kind !== 'crumble' ? 'crumble' : 'n';
-      platforms.push({ x: cx - w / 2, y: genY, w, kind, vx: k.pick([-1, 1]) * (35 + d * 45), cr: 0, vy: 0 });
+      platforms.push({ x: cx - w / 2, y: genY, w, kind, vx: k.pick([-1, 1]) * (28 + d * 38), cr: 0, vy: 0 });
       if (Math.random() < 0.35) coins.push({ x: cx + k.rnd(-w / 3, w / 3), y: genY - 22 });
     }
   }
@@ -74,7 +74,7 @@ function genVert() {
 }
 function build() { t = 0; rope = null; dashT = 0; dashCd = 0; swordT = 0; jumpBuf = 0; coyote = 0; cam = 0; dead = 0; sq = 0; steer = 0; diffT = 0; if (M === 'barrels') genBarrels(); else genVert(); }
 let rec = 0;
-function reset() { try { rec = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) { /* sin almacenamiento */ } level = 1; lives = 3; score = 0; got = 0; build(); }
+function reset() { try { rec = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) { /* sin almacenamiento */ } level = 1; lives = 4; score = 0; got = 0; build(); }
 reset(); k.show(CFG.title, CFG.help);
 
 /* ================= Muerte ================= */
@@ -85,7 +85,7 @@ function die(col) {
 function finish() {
   if (M === 'barrels') {
     lives--; if (lives <= 0) return k.lose(CFG.id, score, 'Sin vidas', `Nivel ${level} · ${got} moneda${got === 1 ? "" : "s"}`);
-    p = mkP(4 * T, (MH - 1) * T - 26); barrels = []; bT = 1.4; dead = 0; bonus = 3000 + (level - 1) * 500; intro = 1; return;
+    p = mkP(4 * T, (MH - 1) * T - 26); barrels = []; bT = 2; dead = 0; bonus = 3000 + (level - 1) * 500; intro = 1; return;
   }
   const m = Math.floor(height() / 3.2);
   k.lose(CFG.id, Math.floor(score), { ninja: 'Fin de la escalada', hopper: '¡Te caíste!', lava: '¡Te alcanzó la lava!' }[M] || 'Fin', `${m} m · ${got} moneda${got === 1 ? "" : "s"}`);
@@ -136,8 +136,8 @@ function upBarrels(dt, L, R, U, D, kx) {
   if (intro > 0) return;
   // lanzador y barriles
   throwT -= dt; bT -= dt;
-  if (bT <= 0) { bT = Math.max(1.2, 3.6 - (level - 1) * 0.28) * k.rnd(0.8, 1.25); throwT = 0.45; k.sfx('pop'); barrels.push({ x: W - 78, y: fyRow(5) * T - 16, w: 16, h: 16, vy: 0, dir: -1, a: 0, blue: level >= 3 && Math.random() < Math.min(0.4, 0.12 + level * 0.03), seen: new Set(), ground: true }); }
-  const spd = Math.min(170, 78 + (level - 1) * 11.5);
+  if (bT <= 0) { bT = Math.max(1.5, 4.5 - (level - 1) * 0.2) * k.rnd(0.8, 1.25); throwT = 0.45; k.sfx('pop'); barrels.push({ x: W - 78, y: fyRow(5) * T - 16, w: 16, h: 16, vy: 0, dir: -1, a: 0, blue: level >= 3 && Math.random() < Math.min(0.4, 0.12 + level * 0.03), seen: new Set(), ground: true }); }
+  const spd = Math.min(145, 62 + (level - 1) * 7.7);
   for (const b of barrels) {
     const bcx = b.x + 8;
     if (b.lad) { b.y += 100 * dt; b.a += dt * 3; if (b.y + 16 >= b.lad.y1) { b.y = b.lad.y1 - 16; b.lad = null; b.ground = true; b.dir = floorDir(Math.round((MH - 1 - (b.y + 16) / T) / 3)); } }
@@ -150,18 +150,18 @@ function upBarrels(dt, L, R, U, D, kx) {
       if (b.ground && j > 0) for (const l of ladders) if (l.y0 === b.y + 16 && (bcx - l.x) * (b.x + 8 - l.x) <= 0 && !b.seen.has(l)) { b.seen.add(l); if (b.blue || Math.random() < Math.min(0.55, 0.12 + (level - 1) * 0.05)) { b.lad = l; b.x = l.x - 8; } }
       if (b.ground && j === 0 && b.x > W - 52) { b.dead = true; drumT = 0.6; k.burst(W - 30, H - T - 36, '#ffb13d', 10, 120); }
     }
-    if (Math.abs(b.x + 8 - (p.x + p.w / 2)) < 12 && Math.abs(b.y + 8 - (p.y + p.h / 2)) < 17) return die('#ffb13d');
+    if (Math.abs(b.x + 8 - (p.x + p.w / 2)) < 10 && Math.abs(b.y + 8 - (p.y + p.h / 2)) < 14.5) return die('#ffb13d');
     if (!b.jumped && !p.ground && !p.lad && Math.abs(b.x + 8 - (p.x + p.w / 2)) < 12 && p.y + p.h < b.y + 2 && b.y - (p.y + p.h) < 46) { b.jumped = true; score += 100; k.sfx('coin'); k.float('+100', b.x + 8, b.y - 18, '#7cf7a0'); }
   }
   barrels = barrels.filter((b) => !b.dead);
-  for (const co of coins) if (!co.got && Math.abs(co.x - p.x - p.w / 2) < 14 && Math.abs(co.y - p.y - p.h / 2) < 18) coinGet(co, 0);
+  for (const co of coins) if (!co.got && Math.abs(co.x - p.x - p.w / 2) < 17 && Math.abs(co.y - p.y - p.h / 2) < 22) coinGet(co, 0);
   if (p.ground && Math.abs(p.y + p.h - flag.y) < 2 && Math.abs(p.x + p.w / 2 - flag.x) < 18) {
     const b = Math.round(bonus / 100) * 100; score += 500 * level + b; k.sfx('win'); k.confetti(); k.float(`+${500 * level + b}`, flag.x + 30, flag.y - 40, '#ffc928');
     level++; genBarrels();
   }
 }
 function upNinja(dt, J) {
-  const d = diff(p.y), slide = 32 + d * 60;
+  const d = diff(p.y), slide = 26 + d * 52;
   if (p.cling) {
     p.y += slide * dt; p.face = -p.side; p.state = 'wall';
     if (Math.random() < dt * 8) fx.push({ x: p.side < 0 ? WALL + 2 : W - WALL - 2, y: p.y + p.h - 4, vx: -p.side * 10, vy: -20, t: 0, max: 0.4, k: 'dust' });
@@ -174,10 +174,10 @@ function upNinja(dt, J) {
   }
   hiY = Math.min(hiY, p.y);
   for (const e of enemies) { const near = (p.side < 0 && p.cling) || (!p.cling && p.vx < 0 && p.x < WALL + 10) ? -1 : (p.side > 0 && p.cling) || (!p.cling && p.vx > 0 && p.x > W - WALL - p.w - 10) ? 1 : 0; // al despegar no cuenta la pared que dejas
-    if (near === e.side && p.y + p.h - 5 > e.y && p.y + 5 < e.y + e.h) return die('#dfe6f2'); }
-  for (const f of foes) { f.x += f.vx * dt; if (f.x < WALL + 16 || f.x > W - WALL - 16) f.vx *= -1; if (Math.abs(f.x - p.x - p.w / 2) < 16 && Math.abs(f.y + Math.sin(t * 3 + f.ph) * 8 - p.y - p.h / 2) < 17) return die('#ff9a3d'); }
-  for (const co of coins) if (!co.got && Math.abs(co.x - p.x - p.w / 2) < 18 && Math.abs(co.y - p.y - p.h / 2) < 20) coinGet(co, cam);
-  diffT += dt; const auto = hiY < startY - 800 ? Math.min(45, 8 + (startY - hiY - 800) / 250) : 0;
+    if (near === e.side && p.y + p.h - 8 > e.y && p.y + 8 < e.y + e.h) return die('#dfe6f2'); }
+  for (const f of foes) { f.x += f.vx * dt; if (f.x < WALL + 16 || f.x > W - WALL - 16) f.vx *= -1; if (Math.abs(f.x - p.x - p.w / 2) < 14 && Math.abs(f.y + Math.sin(t * 3 + f.ph) * 8 - p.y - p.h / 2) < 14.5) return die('#ff9a3d'); }
+  for (const co of coins) if (!co.got && Math.abs(co.x - p.x - p.w / 2) < 22 && Math.abs(co.y - p.y - p.h / 2) < 24) coinGet(co, cam);
+  diffT += dt; const auto = hiY < startY - 800 ? Math.min(38, 6.4 + (startY - hiY - 800) / 375) : 0;
   const tgt = p.y - H * 0.6; cam = Math.min(cam - auto * dt, cam + (tgt - cam) * Math.min(1, dt * 5));
   score = height() + got * 25; prune(); genMore();
   if (p.y > cam + H + 10) { k.sfx('hurt'); dead = 0.5; p.vy = 0; }
@@ -220,17 +220,17 @@ function upVert(dt, J, kx) {
   if (!p.ground) p.on = null;
   p.state = p.ground ? (Math.abs(p.vx) > 25 ? 'run' : 'idle') : p.vy < 0 ? 'jump' : 'fall';
   hiY = Math.min(hiY, p.y);
-  for (const co of coins) if (!co.got && Math.abs(co.x - p.x - p.w / 2) < 18 && Math.abs(co.y - p.y - p.h / 2) < 22) coinGet(co, cam);
+  for (const co of coins) if (!co.got && Math.abs(co.x - p.x - p.w / 2) < 22 && Math.abs(co.y - p.y - p.h / 2) < 26) coinGet(co, cam);
   for (const f of foes) { if (f.dead) { f.y += 500 * dt; continue; } f.x += f.vx * dt; if (f.x < 24 || f.x > W - 24) f.vx *= -1;
     const fy = f.y + Math.sin(t * 3 + f.ph) * 6;
-    if (Math.abs(f.x - p.x - p.w / 2) < 20 && Math.abs(fy - p.y - p.h / 2) < 22) { if (p.vy > 0 && p.y + p.h < fy + 4) { f.dead = true; p.vy = -700; score += 50; k.sfx('hit'); k.burst(f.x, fy - cam, '#ff9a3d', 14, 150); k.float('+50', f.x, fy - cam - 18, '#ffc928'); } else return die('#ff9a3d'); } }
+    if (Math.abs(f.x - p.x - p.w / 2) < 17 && Math.abs(fy - p.y - p.h / 2) < 19) { if (p.vy > 0 && p.y + p.h < fy + 4) { f.dead = true; p.vy = -700; score += 50; k.sfx('hit'); k.burst(f.x, fy - cam, '#ff9a3d', 14, 150); k.float('+50', f.x, fy - cam - 18, '#ffc928'); } else return die('#ff9a3d'); } }
   const tgt = p.y - H * (hop ? 0.42 : 0.5); if (tgt < cam) cam += (tgt - cam) * Math.min(1, dt * 6);
   score = Math.max(score, height() + got * 25);
   if (!hop) {
-    diffT += dt; const lq = Math.min(1, Math.max(0, diffT - 3) / 210); lava -= (diffT < 3 ? 4 : 14 + 76 * lq * lq * (3 - 2 * lq)) * dt; lava = Math.min(lava, cam + H + 50);
+    diffT += dt; const lq = Math.min(1, Math.max(0, diffT - 5) / 315); lava -= (diffT < 5 ? 3 : 11 + 66 * lq * lq * (3 - 2 * lq)) * dt; // 1.23: más fácil lava = Math.min(lava, cam + H + 50);
     if (Math.random() < dt * 14) fx.push({ x: Math.random() * W, y: lava, vx: k.rnd(-12, 12), vy: -k.rnd(30, 70), t: 0, max: k.rnd(1, 2), k: 'ember' });
     if (Math.random() < dt * 5) fx.push({ x: Math.random() * W, y: lava + k.rnd(8, 30), vx: 0, vy: 0, t: 0, max: 0.7, k: 'bubble', r: k.rnd(3, 7) });
-    if (p.y + p.h > lava + 6) return die('#ffb13d');
+    if (p.y + p.h > lava + 10) return die('#ffb13d');
   }
   prune(); genMore();
   if (p.y > cam + H + 30) { k.sfx('hurt'); dead = 0.6; p.vy = 0; }
@@ -383,7 +383,7 @@ function drawBarrels() {
   for (const b of barrels) barrel(b.x + 8, b.y + 8, b.a, b.blue);
   hero(p, 0.68);
   // HUD
-  for (let i = 0; i < 3; i++) ART.heart(c, 14 + i * 20, 12, 1, i < lives);
+  for (let i = 0; i < 4; i++) ART.heart(c, 14 + i * 20, 12, 1, i < lives);
   label(`${score}`, 8, 22, 16, '#fff');
   label(`Bonus ${Math.round(bonus / 100) * 100}`, W - 92, 5, 12, bonus < 1000 ? '#ff9a5c' : '#ffc928', 'right'); // lejos de pausa/sonido
   label(`Nivel ${level}`, 8, 42, 11, 'rgba(255,255,255,.9)');

@@ -26,7 +26,7 @@ function buildSprites() {
 }
 buildSprites(); reset();
 if (TURN) k.show(CFG.title, 'Bolos por turnos para 1–4 con marcador oficial. Joystick ← → coloca la bola, ↑ ↓ elige el efecto y mantén A: suelta cuando la barra de fuerza esté en verde. En el móvil también puedes arrastrar y deslizar hacia arriba.'); else k.show(CFG.title, 'Arrastra la bola a los lados para colocarla y desliza hacia arriba para lanzar: cuanto más rápido, más fuerte; un desliz curvo le da efecto. Teclado: ← → colocar, ↑ ↓ ángulo, A lanzar. 10 frames con puntuación oficial.');
-function launch(vy, ang, hook) { ball.vy = vy; ball.vx = Math.tan(ang) * vy + k.rnd(-12, 12); /* la pista nunca es perfecta */ ball.hook = hook; ball.rolling = true; state = 'roll'; k.sfx('shoot'); k.shake(2); }
+function launch(vy, ang, hook) { ball.vy = vy; ball.vx = Math.tan(ang) * vy + k.rnd(-9, 9); /* la pista nunca es perfecta (1.23: ±12→±9) */ ball.hook = hook; ball.rolling = true; state = 'roll'; k.sfx('shoot'); k.shake(2); }
 k.run((dt) => {
   t += dt; msgT -= dt; if (!k.gate(reset)) return;
   if (TURN && turnAim(dt)) return;
@@ -165,7 +165,7 @@ k.onParty = () => { if (!TURN) return; if (k.st === 'ready' || !PL.length) reset
 const nmB = (i) => (seats[i].cpu ? 'CPU' : String(seats[i].name).slice(0, 8));
 function scoreOf(fr) { const sv = frames; frames = fr; const r = score(); frames = sv; return r; }
 function finishT() { k.st = 'over'; state = 'done'; const rows = PL.map((q, i) => ({ p: q.p, score: scoreOf(q.frames).pop() || 0 })); const hum = seats.filter((q) => !q.cpu);
-  if (hum.length === 1) { const best = rows.slice().sort((a, b) => b.score - a.score)[0]; lvlB = seats[best.p].cpu ? Math.max(0, lvlB - 1) : Math.min(6, lvlB + 1); try { localStorage.setItem(LSB, lvlB); } catch (e) {} }
+  if (hum.length === 1) { const best = rows.slice().sort((a, b) => b.score - a.score)[0]; lvlB = seats[best.p].cpu ? Math.max(0, lvlB - 1) : Math.min(5.5, lvlB + 0.5); try { localStorage.setItem(LSB, lvlB); } catch (e) {} }
   k.podium(rows, { fmt: (v) => `${v} puntos` }); }
 function launchT(p) { pwOn = false; const vy = 700 + p * 1000; launch(vy, 0, hookS * 45); if (p > 0.88) ball.vx += k.rnd(-1, 1) * (p - 0.88) * 320; plan = null; }
 function turnAim(dt) {
@@ -182,8 +182,8 @@ function turnAim(dt) {
   return !!k.party; // en local el puntero (arrastrar y deslizar) sigue funcionando
 }
 function cpuBowl(dt) {
-  if (!plan) { const hk = k.pick([-2, -1, 0, 1, 2, lvlB > 2 ? 2 : 1]), p = k.clamp(0.66 + (Math.random() - 0.5) * Math.max(0.1, 0.4 - lvlB * 0.04), 0.35, 0.86), vy = 700 + p * 1000, T = (1500 - 750) / vy;
-    const tgt = (hk >= 0 ? 1 : -1) * 9, x0 = tgt - 0.5 * hk * 45 * T * T + k.rnd(-1, 1) * Math.max(4, 17 - lvlB * 2); plan = { x0: k.clamp(x0, -LANE_W + BR, LANE_W - BR), hk, p, t: 0, st: 0 }; }
+  if (!plan) { const hk = k.pick([-2, -1, 0, 1, 2, lvlB > 2 ? 2 : 1]), p = k.clamp(0.66 + (Math.random() - 0.5) * Math.max(0.1, 0.5 - lvlB * 0.04), 0.35, 0.86), vy = 700 + p * 1000, T = (1500 - 750) / vy;
+    const tgt = (hk >= 0 ? 1 : -1) * 9, x0 = tgt - 0.5 * hk * 45 * T * T + k.rnd(-1, 1) * Math.max(5, 23 - lvlB * 1.6); /* 1.23: CPU más fallona (17→23) */ plan = { x0: k.clamp(x0, -LANE_W + BR, LANE_W - BR), hk, p, t: 0, st: 0 }; }
   plan.t += dt; const d = plan.x0 - aimX; if (Math.abs(d) > 1) { aimX += Math.sign(d) * Math.min(Math.abs(d), 70 * dt); ball.x = aimX; }
   if (hookS !== plan.hk && (plan.st += dt) > 0.25) { plan.st = 0; hookS += Math.sign(plan.hk - hookS); k.sfx('click'); }
   if (Math.abs(d) <= 1 && hookS === plan.hk && plan.t > 1) { pwOn = true; pw = Math.min(plan.p, pw + dt * 0.8); if (pw >= plan.p) launchT(plan.p); }

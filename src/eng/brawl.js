@@ -5,7 +5,7 @@
  * Cuanto más % acumulas, más lejos sales volando; si sales de la pantalla pierdes una vida (3 vidas).
  * Objetos en regalos con paracaídas: almohadón gigante, pelota de playa y bomba de plumas.
  * El escenario cambia cada 30 s: pradera, atardecer con viento, pista helada y noche con tablones que se mueven.
- * CPU: nivel 0..5 en localStorage 'cpu:<id>' (sube si gana un humano, baja si un humano queda último). */
+ * CPU: nivel 0..9 en localStorage 'cpu:<id>' (sube si gana un humano, baja si un humano queda último). */
 const W = 800, H = 450, OUT = ART.OUT, TAU = 6.2832, NP = 4, TH = ART.THEMES;
 const ID = CFG.id || 'brawl';
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#1d1840' }), c = k.ctx;
@@ -18,8 +18,8 @@ function label(s, x, y, size, col, align, lw) {
 function panel(x, y, w, h, r, fill, lw) { ART.rr(c, x, y, w, h, r); ART.fillOut(c, fill, lw || 3); }
 
 /* ---------------- Jugadores y CPU ---------------- */
-let LV = 0; try { LV = clamp(+localStorage.getItem('cpu:' + ID) || 0, 0, 5); } catch (e) { /* sin almacenamiento */ }
-const SK = () => 0.25 + LV * 0.15; // 0,25 … 1
+let LV = 0; try { LV = clamp(+localStorage.getItem('cpu:' + ID) || 0, 0, 9); } catch (e) { /* sin almacenamiento */ }
+const SK = () => 0.175 + LV * 0.075; // 1.23: más fácil — 0,175 … 0,85 (antes 0,25 … 1)
 let demo = true, t = 0;
 const CNAME = ['roja', 'azul', 'amarilla', 'verde'];
 const cpu = (p) => demo || !k.human(p);
@@ -268,7 +268,7 @@ function updItems(dt, live) {
 
 /* ---------------- CPU ---------------- */
 function aiInput(f) {
-  const ai = f.ai, sk = SK() * (demo ? 0.8 : lerp(0.72, 1, ease(clock / 70))), o = { x: 0, y: 0, aHit: false, aHeld: false, bHit: false, upHit: false };
+  const ai = f.ai, sk = SK() * (demo ? 0.8 : lerp(0.6, 1, ease(clock / 105))), o = { x: 0, y: 0, aHit: false, aHeld: false, bHit: false, upHit: false };
   ai.atkCd -= 1 / 60; ai.think -= 1 / 60; ai.tgtT -= 1 / 60;
   if (ai.hold > 0) { ai.hold -= 1 / 60; o.aHeld = true; }
   if (f.stun > 0) return o;
@@ -479,7 +479,7 @@ function endMatch() {
   const byScore = new Map(rows.map((r) => [r.score, r.txt]));
   const r = rows.slice().sort((a, b) => b.score - a.score), top = r[0], hum = F.filter((f) => !cpu(f.p)).map((f) => f.p);
   if (hum.length) { let d = 0; if (hum.includes(top.p)) d = 1; else if (hum.every((p) => r.findIndex((x) => x.p === p) === r.length - 1)) d = -1;
-    LV = clamp(LV + d, 0, 5); try { localStorage.setItem('cpu:' + ID, LV); } catch (e) { /* sin almacenamiento */ } }
+    LV = clamp(LV + d, 0, 9); try { localStorage.setItem('cpu:' + ID, LV); } catch (e) { /* sin almacenamiento */ } }
   const head = r.length > 1 && r[1].score === top.score ? '¡Empate!' : nm(top.p) === 'Tú' ? '¡Ganas tú!' : `¡Gana ${nm(top.p)}!`;
   k.podium(rows, { head, fmt: (s) => byScore.get(s) || '' });
 }

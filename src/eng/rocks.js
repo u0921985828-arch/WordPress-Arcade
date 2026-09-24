@@ -63,21 +63,21 @@ function rockSprite(r, seed, ore) {
   }) };
 }
 /* Dificultad 0→1 por oleada (máximo en la 9): velocidad de las rocas, cadencia y puntería de los OVNIs. */
-const DF = () => Math.min(1, (wave - 1) / 8), lerp = (a, b, q) => a + (b - a) * q;
+const DF = () => Math.min(1, (wave - 1) / 12), /* 1.23: más fácil */ lerp = (a, b, q) => a + (b - a) * q;
 function mkRock(x, y, size, vx, vy) {
   const seed = Math.random() * 1000, ore = Math.random() < 0.08, sp = rockSprite(RS[size], seed, ore), r = RS[size];
-  if (vx === undefined) { const a = k.rnd(0, R2), v = k.rnd(30, 60) * (1 + (3 - size) * 0.45) * lerp(0.7, 1.4, DF()); vx = Math.cos(a) * v; vy = Math.sin(a) * v; }
+  if (vx === undefined) { const a = k.rnd(0, R2), v = k.rnd(30, 60) * (1 + (3 - size) * 0.45) * lerp(0.56, 1.19, DF()); vx = Math.cos(a) * v; vy = Math.sin(a) * v; }
   return { x, y, size, r, vx, vy, ang: k.rnd(0, R2), rot: k.rnd(-1, 1) * (1.4 - size * 0.3), ore, cv: sp.cv, hit: 0 };
 }
 
 /* ---------- estado ---------- */
-function newShip() { return { x: W / 2, y: H / 2, vx: 0, vy: 0, a: -Math.PI / 2, inv: 2.5, thr: 0, tilt: 0 }; }
+function newShip() { return { x: W / 2, y: H / 2, vx: 0, vy: 0, a: -Math.PI / 2, inv: 3, thr: 0, tilt: 0 }; }
 function spawnWave() {
   wave++; bannerT = 2;
-  for (let i = 0; i < Math.min(3 + wave, 11); i++) { let x, y; do { x = k.rnd(0, W); y = k.rnd(0, H); } while (Math.hypot(x - ship.x, y - ship.y) < 170); rocks.push(mkRock(x, y, 3)); }
+  for (let i = 0; i < Math.min(2 + wave, 9); i++) { let x, y; do { x = k.rnd(0, W); y = k.rnd(0, H); } while (Math.hypot(x - ship.x, y - ship.y) < 190); rocks.push(mkRock(x, y, 3)); }
 }
 function reset() {
-  ship = newShip(); rocks = []; shots = []; eshots = []; pups = []; ufo = null; ufoT = 20; score = 0; lives = 3; wave = 0; cool = 0; t = 0;
+  ship = newShip(); rocks = []; shots = []; eshots = []; pups = []; ufo = null; ufoT = 20; score = 0; lives = 4; wave = 0; cool = 0; t = 0;
   dead = false; respT = 0; hyperCd = 0; warp = 0; trip = rapid = 0; shield = false; nextLife = 10000; spawnWave();
 }
 
@@ -103,12 +103,12 @@ function breakRock(r, byPlayer) {
   k.sfx(r.size === 3 ? 'explode' : 'hit'); k.shake(r.size * 2);
   if (byPlayer) { const p = PTS[r.size] * (r.ore ? 3 : 1); addScore(p); if (r.ore || r.size === 3) k.float(`+${p}`, r.x, r.y - 10, r.ore ? '#ffd23d' : '#fff'); }
   if (r.size > 1) {
-    const sp = Math.hypot(r.vx, r.vy) * lerp(1.2, 1.35, DF()) + lerp(15, 25, DF()), a = Math.atan2(r.vy, r.vx);
+    const sp = Math.hypot(r.vx, r.vy) * lerp(1.1, 1.25, DF()) + lerp(12, 21, DF()), a = Math.atan2(r.vy, r.vx);
     for (const d of [-0.7, 0.7]) rocks.push(mkRock(r.x, r.y, r.size - 1, Math.cos(a + d) * sp, Math.sin(a + d) * sp));
   }
   if (byPlayer && (r.ore || Math.random() < 0.05)) dropPup(r.x, r.y);
 }
-function dropPup(x, y) { const kind = lives < 3 && Math.random() < 0.25 ? 'life' : k.pick(['triple', 'rapid', 'shield']); pups.push({ x, y, vx: k.rnd(-30, 30), vy: k.rnd(-30, 30), kind, life: 9, pop: 0 }); }
+function dropPup(x, y) { const kind = lives < 4 && Math.random() < 0.25 ? 'life' : k.pick(['triple', 'rapid', 'shield']); pups.push({ x, y, vx: k.rnd(-30, 30), vy: k.rnd(-30, 30), kind, life: 9, pop: 0 }); }
 function addScore(p) { score += p; if (score >= nextLife) { nextLife += 10000; lives++; k.sfx('coin'); k.float('Vida extra', ship.x, ship.y - 30, '#ff4d6d'); } }
 function killShip() {
   if (shield) { shield = false; ship.inv = 1.2; k.sfx('hit'); k.flash('rgba(124,247,160,.3)'); k.burst(ship.x, ship.y, '#7cf7a0', 20, 200); return; }
@@ -166,13 +166,13 @@ function update(dt) {
   for (const s of eshots) { s.x += s.vx * dt; s.y += s.vy * dt; s.t -= dt; wrap(s); }
   for (const r of rocks) { r.x += r.vx * dt; r.y += r.vy * dt; r.ang += r.rot * dt; wrap(r); r.hit = Math.max(0, r.hit - dt); }
   // OVNI
-  if (!ufo && wave >= 2 && (ufoT -= dt) <= 0) { spawnUfo(); ufoT = k.rnd(16, 24); }
+  if (!ufo && wave >= 2 && (ufoT -= dt) <= 0) { spawnUfo(); ufoT = k.rnd(20, 30); }
   if (ufo) {
     ufo.x += ufo.vx * dt; ufo.y += ufo.vy * dt; ufo.y = (ufo.y + H) % H;
     if ((ufo.turn -= dt) <= 0) { ufo.turn = k.rnd(0.8, 1.6); ufo.vy = k.pick([-1, 0, 1]) * 60; }
     if ((ufo.cd -= dt) <= 0 && !dead) {
-      ufo.cd = (ufo.small ? lerp(1.6, 1.05, DF()) : lerp(2, 1.4, DF())); const a = ufo.small ? Math.atan2(ship.y - ufo.y, ship.x - ufo.x) + k.rnd(-0.12, 0.12) * Math.max(0.3, 1.5 - wave * 0.1) : k.rnd(0, R2);
-      eshots.push({ x: ufo.x, y: ufo.y, vx: Math.cos(a) * lerp(210, 250, DF()), vy: Math.sin(a) * lerp(210, 250, DF()), t: 1.6 }); k.sfx('shoot');
+      ufo.cd = (ufo.small ? lerp(2.13, 1.4, DF()) : lerp(2.67, 1.87, DF())); const a = ufo.small ? Math.atan2(ship.y - ufo.y, ship.x - ufo.x) + k.rnd(-0.12, 0.12) * Math.max(0.3, 1.5 - wave * 0.1) : k.rnd(0, R2);
+      eshots.push({ x: ufo.x, y: ufo.y, vx: Math.cos(a) * lerp(168, 200, DF()), vy: Math.sin(a) * lerp(168, 200, DF()), t: 1.6 }); k.sfx('shoot');
     }
     if (ufo.x < -40 || ufo.x > W + 40) ufo = null;
   }
@@ -188,11 +188,11 @@ function update(dt) {
   for (const s of eshots) { if (s.t <= 0) continue; for (const r of rocks) if (!r.dead && Math.hypot(s.x - r.x, s.y - r.y) < r.r) { s.t = 0; breakRock(r, false); break; } }
   if (!dead && warp <= 0) {
     if (ship.inv <= 0) {
-      for (const r of rocks) if (!r.dead && Math.hypot(ship.x - r.x, ship.y - r.y) < r.r * 0.9 + 10) { breakRock(r, true); killShip(); break; }
-      if (!dead) for (const s of eshots) if (s.t > 0 && Math.hypot(ship.x - s.x, ship.y - s.y) < 12) { s.t = 0; killShip(); break; }
-      if (!dead && ufo && Math.hypot(ship.x - ufo.x, ship.y - ufo.y) < ufo.r + 10) { k.burst(ufo.x, ufo.y, '#7cf7a0', 20, 200); ufo = null; killShip(); }
+      for (const r of rocks) if (!r.dead && Math.hypot(ship.x - r.x, ship.y - r.y) < r.r * 0.9 + 8.5) { breakRock(r, true); killShip(); break; }
+      if (!dead) for (const s of eshots) if (s.t > 0 && Math.hypot(ship.x - s.x, ship.y - s.y) < 10) { s.t = 0; killShip(); break; }
+      if (!dead && ufo && Math.hypot(ship.x - ufo.x, ship.y - ufo.y) < ufo.r + 8.5) { k.burst(ufo.x, ufo.y, '#7cf7a0', 20, 200); ufo = null; killShip(); }
     }
-    for (const p of pups) if (p.life > 0 && Math.hypot(ship.x - p.x, ship.y - p.y) < 22) {
+    for (const p of pups) if (p.life > 0 && Math.hypot(ship.x - p.x, ship.y - p.y) < 26) {
       p.life = 0; k.sfx('coin'); k.burst(p.x, p.y, PCOL[p.kind], 16, 160); k.float(PNAME[p.kind], p.x, p.y - 20, PCOL[p.kind]);
       if (p.kind === 'triple') trip = 12; else if (p.kind === 'rapid') rapid = 12; else if (p.kind === 'shield') shield = true; else lives++;
     }

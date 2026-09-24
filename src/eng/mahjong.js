@@ -26,7 +26,7 @@ function build() {
   tiles = null; let pos = layout().map(([x, y, z]) => ({ x, y, z })); if (pos.length % 2) pos.pop();
   const nT = Math.min(NT, 9 + (level - 1) * 4); /* nivel 1: 9 símbolos (más parejas a la vista) → 27 en el nivel 6 */
   tiles = assign(pos, [...Array(pos.length / 2).keys()].map((i) => i % nT)); if (!tiles || !tiles.length) return build();
-  sel = null; done = false; hints = level <= 2 ? 5 : 3; shuf = level <= 2 ? 3 : 2; t = 0; hint = null; combo = 0; comboT = 0; fly = []; dirty = true;
+  sel = null; done = false; hints = level <= 2 ? 6 : 4; shuf = level <= 2 ? 4 : 3; t = 0; hint = null; combo = 0; comboT = 0; fly = []; dirty = true;
 }
 function moves() { const fr = tiles.filter((q) => free(q, tiles)); for (let i = 0; i < fr.length; i++) for (let j = i + 1; j < fr.length; j++) if (fr[i].t === fr[j].t) return [fr[i], fr[j]]; return null; }
 /* Barajado que conserva la garantía: se reasignan los tipos restantes con colocación inversa */

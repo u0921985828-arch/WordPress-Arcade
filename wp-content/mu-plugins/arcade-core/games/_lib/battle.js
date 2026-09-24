@@ -20,11 +20,11 @@ function say(t) { msg = t; msgT = 0.35; }
 const ecell = (x, y) => [EX + x * S + S / 2, EY + y * S + S / 2], mcell = (x, y) => [MX + x * MS + MS / 2, MY + y * MS + MS / 2];
 
 /* IA: remata en línea los impactos abiertos; si no hay, caza en damero. Mejora con la racha:
- * con 0 victorias sigue los impactos el 60 % de las veces y apenas usa el damero; con 4 victorias juega al máximo. */
+ * con 0 victorias sigue los impactos el 42 % de las veces y apenas usa el damero; sube 5 puntos por victoria hasta el 90 %. */
 function aiPick() {
   const free = (x, y) => x >= 0 && y >= 0 && x < N && y < N && !aiShots[y][x], hits = [];
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (aiShots[y][x] && mine[y][x] >= 0 && !sunk(mine, aiShots, mine[y][x])) hits.push([x, y]);
-  const sk = Math.min(1, 0.6 + wins * 0.1);
+  const sk = Math.min(0.9, 0.42 + wins * 0.05); // 1.23: más fácil (antes 0.6 + 0.1/victoria, tope 1)
   if (hits.length && Math.random() < sk) { let cand = [], bw = 0;
     for (const [x, y] of hits) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { let nx = x + dx, ny = y + dy; const line = hits.some(([a, b]) => a === x - dx && b === y - dy); if (!free(nx, ny)) continue; const w = line ? 3 : 1; if (w > bw) { bw = w; cand = []; } if (w === bw) cand.push([nx, ny]); }
     if (cand.length) return k.pick(cand); }

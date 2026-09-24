@@ -6,18 +6,18 @@ let TH = ART.THEMES[CFG.theme || 'meadow'];
 const W = 640, H = 360, T = 32, MH = 16;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: TH.sky[0] }), c = k.ctx;
 /* Física ajustada a la escala de 32 px */
-const G = 2300, JUMP = 830, CUT = 350, RUN = A.swing ? 250 : 285, FALL = 1100, COYOTE = 0.09, BUFFER = 0.13;
-let map, MW, p, enemies, coins, anchors, decos, flag, check, cx = 0, cy = 0, level, lives, score, coinsGot, t, jumpBuf, coyote, rope, dashT, dashCd, swordT, dead, intro, landSq, spawn;
+const G = 2300, JUMP = 830, CUT = 350, RUN = A.swing ? 250 : 285, FALL = 1100, COYOTE = 0.13, BUFFER = 0.15;
+let map, MW, p, enemies, coins, anchors, decos, flag, check, checks = [], inv = 0, go = 0, cx = 0, cy = 0, level, lives, score, coinsGot, t, jumpBuf, coyote, rope, dashT, dashCd, swordT, dead, intro, landSq, spawn;
 function label(s, x, y, size, col, align) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top';
   c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = ART.OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
 }
 const tileAt = (x, y) => { const tx = Math.floor(x / T), ty = Math.floor(y / T); if (tx < 0 || tx >= MW) return 1; if (ty < 0 || ty >= MH) return 0; return map[ty][tx]; };
 function gen() {
-  const lv = RACE ? Math.min(1, (level - 1) / 5) : Math.min(1, (level - 1) / 8); MW = RACE ? 120 + Math.min(level, 6) * 8 : 62 + Math.min(level, 12) * 16; map = Array.from({ length: MH }, () => Array(MW).fill(0)); enemies = []; coins = []; anchors = []; decos = [];
+  const lv = RACE ? Math.min(1, (level - 1) / 5) : Math.min(1, (level - 1) / 12); MW = RACE ? 120 + Math.min(level, 6) * 8 : 62 + Math.min(level, 12) * 16; map = Array.from({ length: MH }, () => Array(MW).fill(0)); enemies = []; coins = []; anchors = []; decos = [];
   const col = (x, h) => { for (let y = MH - h; y < MH; y++) if (x >= 0 && x < MW) map[y][x] = 1; };
   const spare = []; // tramos aptos sin enemigo: garantizan un mínimo por nivel
-  let x = 0, h = 3; for (; x < (RACE ? 20 : 7); x++) col(x, h); /* en la carrera, recta inicial de ~2 s sin peligros */
+  let x = 0, h = 3; for (; x < (RACE ? 20 : A.swing ? 14 : 7); x++) col(x, h); /* en la carrera, recta inicial de ~2 s sin peligros */
   for (let i = 3; i < 7; i++) coins.push({ x: (i + 0.5) * T, y: (MH - h - 1) * T - 6 - Math.sin((i - 3) / 3 * Math.PI) * 26 }); // arranque con algo que recoger
   if (!A.swing) decos.push({ x: 1.5 * T, y: (MH - h) * T });
   while (x < MW - 10) {
@@ -37,25 +37,25 @@ function gen() {
     const seg = A.swing ? k.ri(2, 4) : k.ri(4, 9);
     for (let i = 0; i < seg; i++) {
       col(x + i, nh);
-      if (CFG.spikes && i > 0 && i < seg - 1 && x > 10 && Math.random() < CFG.spikes * (0.4 + 0.6 * lv)) map[MH - nh - 1][x + i] = 3;
+      if (CFG.spikes && i > 0 && i < seg - 1 && x > 16 && Math.random() < CFG.spikes * (0.32 + 0.48 * lv)) map[MH - nh - 1][x + i] = 3;
       else if (Math.random() < 0.22) coins.push({ x: (x + i + 0.5) * T, y: (MH - nh - 1) * T - 6 });
       else if (Math.random() < 0.12 && !A.swing) decos.push({ x: (x + i + 0.5) * T, y: (MH - nh) * T });
     }
-    const foe = () => ({ x: (x + 1) * T, y: (MH - nh) * T - 24, w: 26, h: 24, vx: (55 + 55 * lv) * k.pick([-1, 1]), min: x * T, max: (x + seg) * T - 26, alive: true, fly: TH.enemy === 'bird' });
-    if (CFG.enemies && seg >= 5 && x > 12) { if (Math.random() < CFG.enemies * (0.55 + 0.45 * lv)) enemies.push(foe()); else spare.push(foe()); }
+    const foe = () => ({ x: (x + 1) * T, y: (MH - nh) * T - 24, w: 26, h: 24, vx: (44 + 50 * lv) * k.pick([-1, 1]), min: x * T, max: (x + seg) * T - 26, alive: true, fly: TH.enemy === 'bird' });
+    if (CFG.enemies && seg >= 5 && x > 16) { if (Math.random() < CFG.enemies * (0.44 + 0.36 * lv)) enemies.push(foe()); else spare.push(foe()); }
     if (Math.random() < 0.22 && !A.swing && seg >= 4) { const py = MH - nh - 4; for (let i = 1; i < 4; i++) if (map[py] && !map[py][x + i]) map[py][x + i] = 2; for (let i = 1; i < 4; i++) coins.push({ x: (x + i + 0.5) * T, y: (py - 1) * T + 10 }); }
     x += seg; h = nh;
-    if (!check && x > MW / 2) check = { x: (x - 2) * T, y: (MH - h) * T, on: false };
+    if (checks.length < 2 && x > MW * (checks.length + 1) / 3) checks.push({ x: (x - 2) * T, y: (MH - h) * T, on: false }); // 1.23: dos puntos de control
   }
-  if (CFG.enemies) { k.shuffle(spare); while (enemies.length < 2 + Math.round(2 * lv) && spare.length) enemies.push(spare.pop()); }
+  if (CFG.enemies) { k.shuffle(spare); while (enemies.length < 1 + Math.round(2 * lv) && spare.length) enemies.push(spare.pop()); }
   for (; x < MW; x++) col(x, h); flag = { x: (MW - 5) * T, y: (MH - h) * T };
   spawn = { x: 3 * T, y: (MH - 3) * T - 40 };
 }
 function mkP(s) { return { x: s.x, y: s.y, vx: 0, vy: 0, w: 22, h: 30, face: 1, ground: false, state: 'idle', wall: 0 }; }
-function build() { check = null; gen(); p = mkP(spawn); t = 0; rope = null; dashT = 0; dashCd = 0; swordT = 0; jumpBuf = 0; coyote = 0; dead = 0; intro = 1.6; landSq = 0; cx = 0; cy = (MH * T - H); }
-function reset() { if (RACE) return raceNew(); level = 1; lives = 3; score = 0; coinsGot = 0; build(); }
-function die() { if (dead) return; dead = 1.1; p.vy = -600; k.sfx('hurt'); k.shake(8); k.flash('rgba(255,60,80,.35)'); }
-function respawn() { lives--; if (lives <= 0) return k.lose(CFG.id, score, 'Sin vidas', `Nivel ${level} · ${coinsGot} moneda${coinsGot === 1 ? '' : 's'}`); const s = check && check.on ? { x: check.x, y: check.y - 40 } : spawn; p = mkP(s); rope = null; dead = 0; dashT = 0; }
+function build() { check = null; checks = []; inv = 0; go = 0; gen(); p = mkP(spawn); t = 0; rope = null; dashT = 0; dashCd = 0; swordT = 0; jumpBuf = 0; coyote = 0; dead = 0; intro = 1.6; landSq = 0; cx = 0; cy = (MH * T - H); }
+function reset() { if (RACE) return raceNew(); level = 1; lives = 4; score = 0; coinsGot = 0; build(); }
+function die() { if (dead || inv > 0) return; dead = 1.1; p.vy = -600; k.sfx('hurt'); k.shake(8); k.flash('rgba(255,60,80,.35)'); }
+function respawn() { lives--; if (lives <= 0) return k.lose(CFG.id, score, 'Sin vidas', `Nivel ${level} · ${coinsGot} moneda${coinsGot === 1 ? '' : 's'}`); const s = check && check.on ? { x: check.x, y: check.y - 40 } : spawn; p = mkP(s); rope = null; dead = 0; dashT = 0; inv = 1.6; }
 function collide(o, dt) {
   o.x += o.vx * dt; o.wall = 0;
   for (const yy of [o.y + 2, o.y + o.h / 2, o.y + o.h - 2]) for (const xx of [o.x, o.x + o.w]) if (tileAt(xx, yy) === 1) {
@@ -69,11 +69,12 @@ function collide(o, dt) {
 }
 function upd(dt) {
   if (!k.gate(reset)) return;
-  t += dt; intro -= dt; landSq = Math.max(0, landSq - dt);
+  t += dt; intro -= dt; inv -= dt; landSq = Math.max(0, landSq - dt);
   if (dead) { dead -= dt; p.vy += G * dt; p.y += p.vy * dt; if (dead <= 0) respawn(); return; }
   let L = k.held.has('left'), R = k.held.has('right'), J = k.hit.has('up') || k.hit.has('a'), JH = k.held.has('up') || k.held.has('a'), B = k.hit.has('b'), BH = k.held.has('b');
   if (A.grapple && !A.swing) { if (k.ptr.down) BH = true; if (k.ptr.hit) B = true; }
-  if (A.swing) { R = true; BH = BH || JH || k.ptr.down; B = B || J || k.ptr.hit; J = false; }
+  if (A.swing) { if (J || B || k.ptr.hit || t > 3) go = 1; R = !!go; // 1.23: la carrera automática espera al primer toque (o 3 s)
+    BH = BH || JH || k.ptr.down; B = B || J || k.ptr.hit; J = false; }
   dashCd -= dt; swordT -= dt; jumpBuf -= dt; coyote -= dt;
   if (J) jumpBuf = BUFFER;
   if (A.dash && B && dashCd <= 0) { dashT = 0.16; dashCd = 0.55; k.sfx('shoot'); }
@@ -95,13 +96,13 @@ function upd(dt) {
   p.state = !p.ground ? (sliding ? 'wall' : p.vy < 0 ? 'jump' : 'fall') : Math.abs(p.vx) > 30 ? 'run' : 'idle';
   // enemigos
   for (const e of enemies) if (e.alive) { e.x += e.vx * dt; if (e.x < e.min || e.x > e.max) { e.vx *= -1; e.x = k.clamp(e.x, e.min, e.max); }
-    const ey = e.fly ? e.y - 20 + Math.sin(t * 2 + e.min) * 16 : e.y, hit = p.x + p.w > e.x + 3 && p.x < e.x + e.w - 3 && p.y + p.h > ey + 4 && p.y < ey + e.h;
+    const ey = e.fly ? e.y - 20 + Math.sin(t * 2 + e.min) * 16 : e.y, hit = p.x + p.w > e.x + 6 && p.x < e.x + e.w - 6 && p.y + p.h > ey + 7 && p.y < ey + e.h - 2;
     if (swordT > 0 && Math.abs(e.x + 13 - (p.x + 11 + p.face * 22)) < 30 && Math.abs(ey + 12 - p.y - 15) < 28) { e.alive = false; score += 100; k.burst(e.x + 13, ey + 12, '#fff', 16); k.float('+100', e.x + 13, ey); k.sfx('hit'); continue; }
     if (hit) { if ((p.vy > 0 && p.y + p.h - ey < 14) || dashT > 0) { e.alive = false; p.vy = -620; score += 100; k.burst(e.x + 13, ey + 12, '#fff', 16); k.float('+100', e.x + 13, ey); k.sfx('hit'); } else return die(); } }
-  for (const co of coins) if (!co.got && Math.abs(co.x - p.x - 11) < 18 && Math.abs(co.y - p.y - 15) < 22) { co.got = true; coinsGot++; score += 10; k.sfx('coin'); k.burst(co.x, co.y, '#ffc928', 6, 80); }
-  for (const xx of [p.x + 4, p.x + p.w - 4]) if (tileAt(xx, p.y + p.h - 3) === 3) return die();
-  if (p.y > MH * T + 60) return die();
-  if (check && !check.on && p.x > check.x - 10) { check.on = true; k.sfx('coin'); k.float('¡Punto de control!', check.x, check.y - 70, '#7cf7a0'); }
+  for (const co of coins) if (!co.got && Math.abs(co.x - p.x - 11) < 22 && Math.abs(co.y - p.y - 15) < 26) { co.got = true; coinsGot++; score += 10; k.sfx('coin'); k.burst(co.x, co.y, '#ffc928', 6, 80); }
+  for (const xx of [p.x + 7, p.x + p.w - 7]) if (tileAt(xx, p.y + p.h - 3) === 3) return die();
+  if (p.y > MH * T + 60) { inv = 0; return die(); }
+  for (const q of checks) if (!q.on && p.x > q.x - 10) { q.on = true; check = q; k.sfx('coin'); k.float('¡Punto de control!', q.x, q.y - 70, '#7cf7a0'); }
   if (p.x > flag.x - 10) { k.sfx('win'); k.confetti(); score += 500 * level + coinsGot * 5; level++; const s = score, lv = lives, cg = coinsGot; build(); score = s; lives = lv; coinsGot = cg; return; }
   cx += (k.clamp(p.x - W * 0.38 + p.vx * 0.25, 0, MW * T - W) - cx) * Math.min(1, dt * 6);
   cy += (k.clamp(p.y - H * 0.55, 0, MH * T - H) - cy) * Math.min(1, dt * 5);
@@ -115,19 +116,20 @@ function drw() {
     if (v === 1) ART.tile(c, TH, 'ground', x * T, y * T, T, { top: !map[y - 1] || map[y - 1][x] !== 1, left: x > 0 && map[y][x - 1] !== 1, right: x < MW - 1 && map[y][x + 1] !== 1 });
     else ART.tile(c, TH, v === 2 ? 'plank' : 'spike', x * T, y * T, T, {}); }
   for (const a of anchors) ART.anchor(c, a.x, a.y, t);
-  if (check) ART.flag(c, check.x, check.y, t, check.on ? '#7cf7a0' : '#8a86b5', 60);
+  for (const q of checks) ART.flag(c, q.x, q.y, t, q.on ? '#7cf7a0' : '#8a86b5', 60);
   ART.flag(c, flag.x, flag.y, t, '#ff5f7a', 110);
   for (const co of coins) if (!co.got && co.x > cx - 20 && co.x < cx + W + 20) ART.coin(c, co.x, co.y, t);
   for (const e of enemies) if (e.alive && e.x > cx - 40 && e.x < cx + W + 40) ART.enemy(c, TH.enemy, e.x, e.fly ? e.y - 20 + Math.sin(t * 2 + e.min) * 16 : e.y, e.w, e.h, { t, face: e.vx > 0 ? 1 : -1 });
   if (rope) { c.strokeStyle = ART.OUT; c.lineWidth = 4; c.beginPath(); c.moveTo(rope.a.x, rope.a.y); c.lineTo(p.x + 11, p.y + 12); c.stroke(); c.strokeStyle = '#e6d3a3'; c.lineWidth = 2; c.stroke(); }
   if (dashT > 0) { c.globalAlpha = 0.35; ART.hero(c, p.x + 11 - p.face * 18, p.y + p.h, 1, { face: p.face, state: 'run', t, col: TH.hero }); c.globalAlpha = 1; }
   const sq = landSq > 0 ? landSq : landSq < 0 ? landSq : 0;
-  ART.hero(c, p.x + 11, p.y + p.h, 1, { face: p.face, state: dead ? 'fall' : p.state, t, col: TH.hero, squash: sq, sword: A.sword ? (swordT > 0 ? -1.6 + (0.22 - swordT) * 14 : 0.5) : 0 });
+  if (inv > 0 && !dead && Math.floor(t * 12) % 2) c.globalAlpha = 0.45;
+  ART.hero(c, p.x + 11, p.y + p.h, 1, { face: p.face, state: dead ? 'fall' : p.state, t, col: TH.hero, squash: sq, sword: A.sword ? (swordT > 0 ? -1.6 + (0.22 - swordT) * 14 : 0.5) : 0 }); c.globalAlpha = 1;
   if (swordT > 0) { c.strokeStyle = 'rgba(255,255,255,.8)'; c.lineWidth = 4; c.beginPath(); c.arc(p.x + 11, p.y + 12, 30, p.face > 0 ? -1.3 : 1.8, p.face > 0 ? 1.1 : 4.2); c.stroke(); }
   c.restore();
   // HUD
-  for (let i = 0; i < 3; i++) ART.heart(c, 22 + i * 24, 22, 1.25, i < lives);
-  ART.coin(c, 104, 22, 0, 8); label(`× ${coinsGot}`, 116, 13, 17, '#fff');
+  for (let i = 0; i < 4; i++) ART.heart(c, 22 + i * 24, 22, 1.25, i < lives);
+  ART.coin(c, 128, 22, 0, 8); label(`× ${coinsGot}`, 140, 13, 17, '#fff');
   label(`${score}`, W - 12, 8, 22, '#fff', 'right'); label(`Nivel ${level}`, W - 12, 34, 13, '#ffc928', 'right');
   if (intro > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, intro); ART.rr(c, W / 2 - 110, H / 2 - 38, 220, 64, 18); c.fillStyle = 'rgba(26,21,48,.8)'; c.fill(); label(`Nivel ${level}`, W / 2, H / 2 - 30, 30, '#fff', 'center'); label(CFG.title, W / 2, H / 2 + 4, 14, '#ffc928', 'center'); c.globalAlpha = 1; }
 }
@@ -136,10 +138,10 @@ function drw() {
    la bandera o el último en pie; a 3 rondas, podio. A salta (mantén = más alto), B empujón; pisar a un rival lo aturde.
    La CPU sigue la ruta leyendo las columnas que tiene delante (fosos, escalones, pinchos, enemigos) y mejora con tus victorias. ---------- */
 const RWIN = 3, RTH = ['meadow', 'jungle', 'dusk', 'snow', 'castle', 'sky'];
-let R = null, rcpu = 0; try { rcpu = Math.max(0, Math.min(6, +localStorage.getItem('cpu:' + CFG.id) || 0)); } catch (e) {}
+let R = null, rcpu = 0; try { rcpu = Math.max(0, Math.min(5, +localStorage.getItem('cpu:' + CFG.id) || 0)); } catch (e) {}
 function raceNew() { const pl = k.players(4); R = { rs: pl.map((q) => ({ pl: q.p, col: q.color, name: q.cpu ? 'CPU' : q.name, cpu: q.cpu, wins: 0 })), round: 0 }; raceRound(); }
 function raceRound() {
-  R.round++; level = R.round; TH = ART.THEMES[RTH[(R.round - 1) % RTH.length]]; check = null; gen(); check = null;
+  R.round++; level = R.round; TH = ART.THEMES[RTH[(R.round - 1) % RTH.length]]; check = null; checks = []; gen(); check = null;
   t = 0; cx = 0; cy = MH * T - H; R.between = 0; R.win = null; R.scroll = 0; R.msg = `Ronda ${R.round}`; R.msgT = 2.4; R.cd = true; R.order = [];
   const ord = R.rs.map((r, i) => i).sort((a, b) => R.rs[b].wins - R.rs[a].wins || a - b); /* quien va ganando sale detrás */
   ord.forEach((ri, slot) => { const r = R.rs[ri]; Object.assign(r, mkP({ x: (0.6 + slot * 1.3) * T, y: (MH - 3) * T - 30 }), { out: false, dead: 0, jb: 0, co: 0, dashT: 0, dashCd: 0, stun: 0, sq: 0, ai: { miss: 0, hold: 0, lag: 0 }, face: 1 }); });
@@ -152,13 +154,13 @@ function raceCpu(r, dt) {
     for (let c2 = col + 1; c2 <= col + 3; c2++) {
       const tp = colTop(c2), edge = c2 * T - fx, spike = tp < MH && tp > 0 && map[tp - 1][c2] === 3;
       const need = tp === MH ? 6 : tp < my ? 26 : spike ? 22 : -1; /* foso: saltar en el borde; escalón: un poco antes */
-      if (need >= 0) { if (ai.lag <= 0) ai.lag = Math.random() < Math.max(0.02, 0.13 - lv * 0.018) ? k.rnd(-18, 22) : k.rnd(-4, 4); if (edge < need + ai.lag) { jump = true; ai.lag = 0; } break; }
+      if (need >= 0) { if (ai.lag <= 0) ai.lag = Math.random() < Math.max(0.04, 0.17 - lv * 0.009) ? k.rnd(-18, 22) : k.rnd(-4, 4); if (edge < need + ai.lag) { jump = true; ai.lag = 0; } break; }
     }
     for (const e of enemies) if (e.alive && e.x > r.x && e.x - fx < 46 && Math.abs(e.y - r.y) < 40) jump = true;
   }
   if (jump) ai.hold = 0.32;
-  for (const o of R.rs) if (o !== r && !o.out && !o.dead && o.x > r.x && o.x - fx < 18 && Math.abs(o.y - r.y) < 20 && r.dashCd <= 0 && Math.random() < 0.02 + lv * 0.01) dash = true;
-  return { L: false, R: true, J: jump, JH: ai.hold > 0 || (!r.ground && r.vy < 0 && ai.hold > -0.05), B: dash, sp: 0.9 + lv * 0.017 };
+  for (const o of R.rs) if (o !== r && !o.out && !o.dead && o.x > r.x && o.x - fx < 18 && Math.abs(o.y - r.y) < 20 && r.dashCd <= 0 && Math.random() < 0.014 + lv * 0.005) dash = true;
+  return { L: false, R: true, J: jump, JH: ai.hold > 0 || (!r.ground && r.vy < 0 && ai.hold > -0.05), B: dash, sp: 0.86 + lv * 0.009 };
 }
 function raceOut(r, why) { if (r.out) return; r.out = true; R.order.push(r); k.sfx('lose'); k.float(why, k.clamp(r.x, cx + 40, cx + W - 40), k.clamp(r.y, cy + 60, cy + H - 30), r.col); }
 function raceUpdate(dt) {
@@ -207,7 +209,7 @@ function raceUpdate(dt) {
   /* cámara: sigue al líder y avanza sola despacio; quien queda a la izquierda del borde, fuera */
   const lead = live.filter((r) => !r.dead).sort((a, b) => b.x - a.x)[0];
   if (lead && !R.between) {
-    R.scroll = Math.min(150, 25 + t * 4); const tx = k.clamp(Math.max(lead.x - W * 0.6, cx + R.scroll * dt), 0, MW * T - W);
+    R.scroll = Math.min(128, 20 + t * 2.3); const tx = k.clamp(Math.max(lead.x - W * 0.6, cx + R.scroll * dt), 0, MW * T - W);
     cx += Math.max(0, tx - cx) * Math.min(1, dt * 5); cy += (k.clamp(lead.y - H * 0.55, 0, MH * T - H) - cy) * Math.min(1, dt * 4);
     for (const r of live) if (!r.dead && r.x + r.w < cx - 2) raceOut(r, '¡Fuera de cámara!');
   }
@@ -218,7 +220,7 @@ function raceUpdate(dt) {
   }
 }
 function raceEnd(ch) {
-  if (!k.party) { const hu = R.rs.find((r) => r.pl === 0); rcpu = Math.max(0, Math.min(6, rcpu + (ch === hu ? 1 : -1))); try { localStorage.setItem('cpu:' + CFG.id, rcpu); } catch (e) {} }
+  if (!k.party) { const hu = R.rs.find((r) => r.pl === 0); rcpu = Math.max(0, Math.min(5, rcpu + (ch === hu ? 1 : -1))); try { localStorage.setItem('cpu:' + CFG.id, rcpu); } catch (e) {} }
   const head = !k.party ? (ch.pl === 0 ? '¡Has ganado la carrera!' : 'Gana la CPU') : ch.cpu ? 'Gana la CPU' : `¡Gana ${ch.name}!`;
   k.podium(R.rs.map((r) => ({ p: r.pl, score: r.wins, name: r.cpu ? 'CPU' : r.name })), { head, noTie: true, fmt: (n) => `${n} ronda${n === 1 ? '' : 's'}` });
 }

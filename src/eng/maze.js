@@ -65,7 +65,7 @@ function build() {
   if (M === 'muncher') buildMuncher(); else if (M === 'digger') buildDigger(); else buildIso();
   left = items.length;
 }
-function reset() { score = 0; lives = 3; level = 1; swordT = 0; invT = 0; best = k.best(CFG.id, 0); build(); }
+function reset() { score = 0; lives = 4; level = 1; swordT = 0; invT = 0; best = k.best(CFG.id, 0); build(); }
 
 /* ================= COME-COCOS ================= */
 const GCOL = ['#ff4d5e', '#ff9ad5', '#4fd8e8', '#ffa94d'];
@@ -102,7 +102,7 @@ function buildMuncher() {
   foes = [[h, h - 1], [h, h], [h - 1, h], [h + 1, h]].map(([x, y], i) => { const f = ent(x, y, 4.6); f.id = i; return f; });
   homeReset(); ready = 1.6;
 }
-function homeReset() { const rel = [0, 1.2, 4, 7].map((v) => v * Math.max(0.35, 1 - (level - 1) * 0.15)); foes.forEach((f, i) => { respawnEnt(f); f.mode = 'house'; f.rel = rel[i]; f.scared = false; }); }
+function homeReset() { const rel = [0.8, 2.4, 6, 10].map((v) => v * Math.max(0.45, 1 - (level - 1) * 0.1)); foes.forEach((f, i) => { respawnEnt(f); f.mode = 'house'; f.rel = rel[i]; f.scared = false; }); }
 function ghostTarget(f) {
   const corners = [[N - 2, -2], [1, -2], [N - 2, N + 1], [1, N + 1]], d = D[pl.dir || 'left'];
   if ((lvT < 6 || (lvT > 26 && lvT < 32)) && f.id < 3) return corners[f.id];
@@ -120,7 +120,7 @@ function ghostPick(f) {
   if (!opts.length) opts = DIRS.filter((d) => walk(f.x + D[d][0], f.y + D[d][1]));
   if (f.scared) return k.pick(opts);
   const [tx, ty] = ghostTarget(f); let bd = null, bv = Infinity;
-  for (const d of opts) { const v = Math.hypot(f.x + D[d][0] - tx, f.y + D[d][1] - ty) + Math.random() * Math.max(0.4, 1.5 - (level - 1) * 0.2); if (v < bv) { bv = v; bd = d; } }
+  for (const d of opts) { const v = Math.hypot(f.x + D[d][0] - tx, f.y + D[d][1] - ty) + Math.random() * Math.max(0.6, 1.8 - (level - 1) * 0.13); if (v < bv) { bv = v; bd = d; } }
   return bd;
 }
 const cellX = (x) => BX + (x + 0.5) * S, cellY = (y) => BY + (y + 0.5) * S;
@@ -130,7 +130,7 @@ function eatAt(x, y) {
     it.got = true; left--;
     if (it.t === 'dot') { score += 10; eaten++; if (eaten % 2) k.sfx('pop'); if (eaten === 70 || eaten === 150) fruit = { x: home[0], y: home[1] + 2, t: 9 }; }
     else {
-      score += 50; fright = Math.max(1.8, 7 - (level - 1) * 0.8); chain = 0; k.sfx('coin'); k.burst(cellX(x), cellY(y), '#fff3d6', 14, 140);
+      score += 50; fright = Math.max(2.5, 8.5 - (level - 1) * 0.6); chain = 0; k.sfx('coin'); k.burst(cellX(x), cellY(y), '#fff3d6', 14, 140);
       for (const f of foes) if (f.mode !== 'eyes') { if (f.mode === 'go' && !f.scared) reverse(f); f.scared = true; }
     }
     if (left <= 0) { clearT = 1.8; score += 300 * level; k.sfx('win'); k.confetti(); msg = '¡Nivel superado!'; msgT = 1.8; }
@@ -145,11 +145,11 @@ function updMuncher(dt) {
   if (stepEnt(pl, dt, (e) => { for (const d of [e.next, e.dir]) if (d && walk(e.x + D[d][0], e.y + D[d][1])) return d; return null; })) eatAt(pl.px, pl.py);
   if (clearT > 0) return;
   if (fright > 0 && (fright -= dt) <= 0) foes.forEach((f) => { f.scared = false; });
-  const base = Math.min(6.8, 4.1 + level * 0.3);
+  const base = Math.min(5.8, 3.3 + level * 0.2); // 1.23: más fácil (antes 4,4→6,8)
   for (const f of foes) {
     if (f.mode === 'house') { f.fx = f.x; f.fy = f.y + Math.sin(t * 7 + f.id) * 0.18; if ((f.rel -= dt) <= 0) f.mode = 'go'; }
     else { f.sp = f.mode === 'eyes' ? 12 : base * (f.scared ? 0.55 : 1); stepEnt(f, dt, ghostPick); }
-    if (f.mode === 'eyes' || Math.hypot(f.fx - pl.fx, f.fy - pl.fy) > 0.6) continue;
+    if (f.mode === 'eyes' || Math.hypot(f.fx - pl.fx, f.fy - pl.fy) > 0.51) continue;
     if (f.scared) {
       chain++; const v = 200 * 2 ** Math.min(3, chain - 1); score += v; f.mode = 'eyes'; f.scared = false; freeze = 0.45;
       k.float(`+${v}`, cellX(f.fx), cellY(f.fy) - 8, '#8fd3ff'); k.burst(cellX(f.fx), cellY(f.fy), '#3d5afe', 16); k.sfx('coin');
@@ -162,7 +162,7 @@ const GEMC = ['#4fe3ff', '#ff5fa2', '#7cf78a', '#ffc53d'];
 function buildDigger() {
   N = 15; S = 32; BX = 0; BY = TOP; g = Array.from({ length: N }, () => Array(N).fill(2));
   for (let x = 0; x < N; x++) g[0][x] = 0; for (let y = 1; y < 4; y++) g[y][7] = 0;
-  const nf = Math.min(6, 1 + level), sp = Math.min(4.4, 2.2 + level * 0.25);
+  const nf = Math.min(5, 1 + Math.round(level * 0.8)), sp = Math.min(3.7, 1.76 + level * 0.2);
   for (let i = 0; i < nf; i++) { const x = k.ri(2, N - 3), y = k.ri(5, N - 2); for (let j = -2; j <= 2; j++) g[y][x + j] = 0; const f = ent(x, y, sp); f.id = i; f.base = sp; f.gh = false; f.ghost = 0; f.gcd = k.rnd(5, 9) + Math.max(0, 4 - level * 2); foes.push(f); }
   const cells = []; for (let y = 3; y < N; y++) for (let x = 0; x < N; x++) if (g[y][x] === 2) cells.push([x, y]);
   k.shuffle(cells); for (let i = 0; i < 12 + level * 2 && cells.length; i++) { const [x, y] = cells.pop(); items.push({ x, y, t: 'gem', c: i % 4 }); }
@@ -209,7 +209,7 @@ function updDigger(dt) {
     else {
       r.v = Math.min(11, r.v + 30 * dt); r.fy += r.v * dt;
       for (const f of foes) if (!f.dead && Math.abs(f.fx - r.x) < 0.7 && f.fy - r.fy > 0.1 && f.fy - r.fy < 0.8) { f.dead = true; r.kills++; const v = 250 * r.kills; score += v; k.burst(cellX(f.fx), cellY(f.fy), '#ff6b6b', 18); k.float(`+${v}`, cellX(f.fx), cellY(f.fy) - 10, '#ffc928'); k.sfx('hit'); }
-      if (invT <= 0 && Math.abs(pl.fx - r.x) < 0.7 && pl.fy - r.fy > 0.1 && pl.fy - r.fy < 0.8) { r.fy = Math.floor(r.fy); r.dead = true; k.burst(cellX(r.x), cellY(r.fy), '#9a97a8', 20); return die(); }
+      if (invT <= 0 && Math.abs(pl.fx - r.x) < 0.6 && pl.fy - r.fy > 0.1 && pl.fy - r.fy < 0.8) { r.fy = Math.floor(r.fy); r.dead = true; k.burst(cellX(r.x), cellY(r.fy), '#9a97a8', 20); return die(); }
       const n = Math.floor(r.fy), ny = n + 1;
       if (ny >= N || g[ny][r.x] !== 0 || gemAt(r.x, ny)) { r.fy = n; r.dead = true; k.burst(cellX(r.x), cellY(n) + 8, '#9a97a8', 22, 170); k.burst(cellX(r.x), cellY(n) + 8, '#6e4527', 10, 120); k.sfx('explode'); k.shake(4); }
     }
@@ -218,7 +218,7 @@ function updDigger(dt) {
   for (const f of foes) {
     f.gcd -= dt; if (f.gh) f.ghost -= dt; f.sp = f.base * (f.gh ? 0.6 : 1);
     stepEnt(f, dt, pickBug);
-    if (!f.gh && invT <= 0 && Math.hypot(f.fx - pl.fx, f.fy - pl.fy) < 0.62) return die();
+    if (!f.gh && invT <= 0 && Math.hypot(f.fx - pl.fx, f.fy - pl.fy) < 0.53) return die();
   }
 }
 
@@ -232,7 +232,7 @@ function buildIso() {
   k.shuffle(cells); for (let i = 0; i < need; i++) { const [x, y] = cells.pop(); items.push({ x, y, t: 'key' }); }
   if (DG) { const kinds = level >= 3 ? ['slime', 'ghost', 'knight'] : level >= 2 ? ['slime', 'ghost'] : ['slime'];
     const dm = distMap(1, 1, walk), far = cells.filter(([x, y]) => (dm[x + ',' + y] || 0) >= 10), pool = far.length >= 3 ? far : cells; // lejos de la entrada
-    for (let i = 0; i < Math.min(11, 2 + level) && pool.length; i++) { const [x, y] = pool.pop(); if (pool !== cells) cells.splice(cells.findIndex((q) => q[0] === x && q[1] === y), 1); const f = ent(x, y, Math.min(4, 2 + level * 0.25)); f.id = i; f.kind = kinds[i % kinds.length]; f.hp = f.max = f.kind === 'knight' ? 3 : 2; f.stun = 1.5; f.fl = 0; foes.push(f); } }
+    for (let i = 0; i < Math.min(9, 2 + Math.round((level - 1) * 0.8)) && pool.length; i++) { const [x, y] = pool.pop(); if (pool !== cells) cells.splice(cells.findIndex((q) => q[0] === x && q[1] === y), 1); const f = ent(x, y, Math.min(3.4, 1.6 + level * 0.2)); f.id = i; f.kind = kinds[i % kinds.length]; f.hp = f.max = f.kind === 'knight' ? 3 : 2; f.stun = 1.5; f.fl = 0; foes.push(f); } }
   else for (let i = 0; i < 5 && cells.length; i++) { const [x, y] = cells.pop(); drops.push({ x, y, t: 'coin' }); }
   torches = []; if (DG) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (g[y][x] === 1 && rnd(x * 31 + y * 7 + level) < 0.07) { if (walk(x, y + 1)) torches.push([x, y, -1]); else if (walk(x + 1, y)) torches.push([x, y, 1]); }
   cam = { x: PX(1, 1), y: PY(1, 1) }; ready = 0; msg = `Nivel ${level}`; msgT = 1.6;
@@ -246,7 +246,7 @@ function pickMon(f) {
   const nr = opts.filter((d) => d !== OPP[f.dir]); return nr.length ? k.pick(nr) : opts[0] || null;
 }
 const allKeys = () => items.every((q) => q.got);
-const isoLim = () => Math.round(40 + N * N * 0.3);
+const isoLim = () => Math.round(60 + N * N * 0.45); // 1.23: +50 %
 function updIso(dt) {
   const hk = DIRS.find((d) => k.hit.has(d)); if (hk) pl.next = hk;
   invT -= dt; swordT -= dt; lvT += dt;
@@ -255,7 +255,7 @@ function updIso(dt) {
     if (it) { it.got = true; score += 200; k.sfx('coin'); k.burst(sx, sy - 20, '#ffc928', 16, 150); k.float('+200', sx, sy - 44, '#ffc928');
       if (allKeys()) { msg = '¡Salida abierta!'; msgT = 1.6; k.sfx('start'); } }
     const dp = drops.find((q) => q.x === x && q.y === y);
-    if (dp) { drops.splice(drops.indexOf(dp), 1); if (dp.t === 'coin') { score += 50; k.sfx('coin'); k.float('+50', sx, sy - 44, '#ffe27a'); } else { lives = Math.min(5, lives + 1); k.sfx('pop'); k.float('+1', sx, sy - 44, '#ff7a8a'); } k.burst(sx, sy - 16, dp.t === 'coin' ? '#ffc928' : '#ff4d6d', 10); }
+    if (dp) { drops.splice(drops.indexOf(dp), 1); if (dp.t === 'coin') { score += 50; k.sfx('coin'); k.float('+50', sx, sy - 44, '#ffe27a'); } else { lives = Math.min(6, lives + 1); k.sfx('pop'); k.float('+1', sx, sy - 44, '#ff7a8a'); } k.burst(sx, sy - 16, dp.t === 'coin' ? '#ffc928' : '#ff4d6d', 10); }
     if (x === exitC[0] && y === exitC[1] && allKeys()) { const bonus = Math.max(0, Math.round(90 - lvT)) * 5; score += 500 * level + bonus; clearT = 1.5; k.sfx('win'); k.confetti(); msg = bonus ? `¡Salida! +${bonus} por rapidez` : '¡Salida!'; msgT = 1.5; return; }
   }
   if (!DG) { // laberinto sin monstruos: límite de tiempo por nivel (si no, la partida no acababa ni guardaba récord)
@@ -274,8 +274,8 @@ function updIso(dt) {
   for (const f of foes) {
     f.fl -= dt; if (f.stun > 0) { f.stun -= dt; if (f.dir) continue; }
     stepEnt(f, dt, pickMon);
-    if (invT <= 0 && f.stun <= 0 && Math.hypot(f.fx - pl.fx, f.fy - pl.fy) < 0.55) {
-      lives--; invT = 1.6; f.stun = 1.2; k.sfx('hurt'); k.shake(6); k.flash('rgba(255,60,80,.3)');
+    if (invT <= 0 && f.stun <= 0 && Math.hypot(f.fx - pl.fx, f.fy - pl.fy) < 0.47) {
+      lives--; invT = 1.8; f.stun = 1.2; k.sfx('hurt'); k.shake(6); k.flash('rgba(255,60,80,.3)');
       if (lives <= 0) { dying = 1.2; return; }
     }
   }

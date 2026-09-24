@@ -3,7 +3,7 @@
 const M = CFG.mode, W = 480, H = 680, OUT = ART.OUT, k = Kit({ w: W, h: H, title: CFG.title, bg: '#0c4a2e' }), c = k.ctx;
 const RN = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 const red = (cd) => cd.s === 1 || cd.s === 2;
-let tab, stock, waste, found, cells, hs, moves, score, sel, done, removed, pyr, peaks, deals, recycles, streak, hist, comp, disc, time, auto, autoT, drag, hintT, hintR, cur, kbd, casc, newAsk, stuckT, uid = 0;
+let idleH = 0, tab, stock, waste, found, cells, hs, moves, score, sel, done, removed, pyr, peaks, deals, recycles, streak, hist, comp, disc, time, auto, autoT, drag, hintT, hintR, cur, kbd, casc, newAsk, stuckT, uid = 0;
 const CW = M === 'spider' ? 44 : M === 'freecell' ? 54 : M === 'tripeaks' ? 46 : 60, CH = Math.round(CW * 1.4), CR = Math.round(CW * 0.1), PAD = 5;
 const NC = M === 'spider' ? 10 : M === 'freecell' ? 8 : 7, GAP = (W - NC * CW) / (NC + 1), colX = (i) => GAP + i * (CW + GAP);
 const TOP = 58, TY = TOP + CH + 22, BOT = 632, BY = 640;
@@ -336,6 +336,8 @@ k.run((dt) => {
   time += dt; newAsk = Math.max(0, newAsk - dt); spawnQ = Math.max(0, spawnQ - dt); if (hintT > 0 && (hintT -= dt) <= 0) hintR = null;
   if (stuckT > 0 && (stuckT -= dt) <= 0) { k.lose(CFG.id, score, 'Sin movimientos', `${moves} movimientos`); return; }
   if (auto) { autoT -= dt; if (autoT <= 0) { autoT = 0.09; if (!autoStep()) auto = false; } return; }
+  /* 1.23: más fácil — pista automática tras 15 s sin tocar */
+  if (k.ptr.down || k.held.size) idleH = 0; else if ((idleH += dt) > 15 && !hintR && !stuckT) { idleH = -30; const h = findHint(); if (h && h[0]) { hintR = h.filter(Boolean); hintT = 2.4; } }
   for (const d of ['left', 'right', 'up', 'down']) if (k.hit.has(d)) nav(d);
   if (k.hit.has('a')) { if (kbd) act(curH()); else nav('right'); }
   if (k.hit.has('b')) undo();

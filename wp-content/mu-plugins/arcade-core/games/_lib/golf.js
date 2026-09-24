@@ -15,7 +15,7 @@ function genHole() {
     if (Math.hypot(tee[0] - hole[0], tee[1] - hole[1]) < 200) continue;
     for (let i = 0; i < 1 + Math.floor(holeN / 3); i++) { const r = k.pick(rooms.slice(1, -1).length ? rooms.slice(1, -1) : rooms); const bx = (r[0] + k.rnd(1, r[2] - 1)) * T, by = (r[1] + k.rnd(1, r[3] - 1)) * T; if (Math.hypot(bx - hole[0], by - hole[1]) > 60 && Math.hypot(bx - tee[0], by - tee[1]) > 60) bumpers.push({ x: bx, y: by, r: 14, p: 0 }); }
     // búnkeres de arena: siempre en la isla, desde el hoyo 4 en paredes (nunca bajo el tee ni el hoyo)
-    const ns = M === 'island' ? Math.min(6, 2 + holeN) : holeN >= 4 ? 4 : 0;
+    const ns = M === 'island' ? Math.min(5, 1 + Math.floor(holeN * 0.67)) : holeN >= 5 ? 3 : 0;
     for (let i = 0; i < ns; i++) { const x = k.ri(0, COLS - 1), y = k.ri(0, ROWS - 1); if (grid[y][x] && Math.hypot((x + 0.5) * T - tee[0], (y + 0.5) * T - tee[1]) > 40 && Math.hypot((x + 0.5) * T - hole[0], (y + 0.5) * T - hole[1]) > 40) sand.add(x + ',' + y); }
     return;
   }
@@ -86,8 +86,8 @@ function step(b, h, real) { // real: true = bola en juego (efectos), false = vis
   for (const o of bumpers) { const d = Math.hypot(b.x - o.x, b.y - o.y); if (d < o.r + b.r) { const nx = (b.x - o.x) / d, ny = (b.y - o.y) / d, vn = b.vx * nx + b.vy * ny; if (vn < 0) { b.vx -= 2 * vn * nx * 1.05; b.vy -= 2 * vn * ny * 1.05; if (real) { if (real === true) { o.p = 1; k.sfx('pop'); k.burst(o.x + nx * o.r, o.y + ny * o.r + OY, '#ffc2cf', 6, 80); } } else return 'bounce'; } b.x = o.x + nx * (o.r + b.r); b.y = o.y + ny * (o.r + b.r); } }
   const dh = Math.hypot(b.x - hole[0], b.y - hole[1]), s2 = Math.hypot(b.vx, b.vy);
   if (PARTY) { const r = millStep(b, real); if (r) return r; }
-  if (dh < 16 && dh > 0.5 && s2 < 260) { b.vx += (hole[0] - b.x) / dh * 260 * h; b.vy += (hole[1] - b.y) / dh * 260 * h; } // el borde de la copa atrae la bola lenta
-  if (dh < 9 && s2 < 420) return 'hole';
+  if (dh < 19 && dh > 0.5 && s2 < 300) { b.vx += (hole[0] - b.x) / dh * 300 * h; b.vy += (hole[1] - b.y) / dh * 300 * h; } // 1.23: copa algo más amable (16→19) // el borde de la copa atrae la bola lenta
+  if (dh < 10.5 && s2 < 480) return 'hole';
   return null;
 }
 function bump(v) { if (v > 60 && t - lastBump > 0.06) { lastBump = t; k.sfx('click'); if (v > 300) k.shake(2); } }
@@ -247,7 +247,7 @@ function partyMain() {
           for (let xx = x0; xx < x0 + w2; xx++) for (let yy = r[1]; yy < r[1] + r[3]; yy++) if (grid[yy][xx] === 1 && far(xx, yy, 45) && !occ.has(xx + ',' + yy)) { belts.set(xx + ',' + yy, [0, dir]); occ.add(xx + ',' + yy); } }
         else if (ft === 'mill') { const r = room(), mx = (r[0] + r[2] / 2) * T, my = (r[1] + r[3] / 2) * T, L = k.clamp(Math.min(r[2], r[3]) * T / 2 - 4, 32, 46);
           if (Math.hypot(mx - tee[0], my - tee[1]) < L + 30 || Math.hypot(mx - hole[0], my - hole[1]) < L + 30 || occ.has(cellOf(mx, my))) { ok = false; break; }
-          mills.push({ x: mx, y: my, L, a0: k.rnd(0, R2), sp: k.pick([-1, 1]) * (0.8 + holeN * 0.07) }); occ.add(cellOf(mx, my)); }
+          mills.push({ x: mx, y: my, L, a0: k.rnd(0, R2), sp: k.pick([-1, 1]) * (0.7 + holeN * 0.05) }); occ.add(cellOf(mx, my)); }
         else if (ft === 'ramp') { const r = room(); if (r[2] < 3) { ok = false; break; } const xw = r[0] + k.ri(1, r[2] - 2), top = Math.random() < 0.5, y0 = r[1] + (top ? 1 : 0), y1 = r[1] + r[3] - (top ? 0 : 1);
           for (let yy = y0; yy < y1; yy++) { if (grid[yy][xw] !== 1 || grid[yy][xw - 1] !== 1 || occ.has(xw + ',' + yy) || occ.has(xw - 1 + ',' + yy) || !far(xw, yy, 50) || !far(xw - 1, yy, 40)) continue;
             grid[yy][xw] = 2; ramps.set(xw - 1 + ',' + yy, [1, 0]); occ.add(xw + ',' + yy); occ.add(xw - 1 + ',' + yy); }
@@ -278,7 +278,7 @@ function partyMain() {
   function holeOut(q, n, max) { q.done = true; q.card[holeN - 1] = n; q.tot += n; pst = 'sink'; stT = 1.3; msg = max ? 'Máximo de golpes' : holeName(n); msgT = 1.6;
     if (max) { k.sfx('lose'); q.b.a = 0; } else { k.sfx(n < PAR ? 'win' : 'coin'); if (n < PAR) k.confetti(); k.burst(hole[0], hole[1] + OY, '#fff6a8', 16, 120); } }
   function finishP() { const rows = PL.map((q) => ({ p: q.p, score: q.tot })), hum = seats.filter((q) => !q.cpu);
-    if (hum.length === 1 && hum.length < seats.length) { const best = rows.slice().sort((a, b) => a.score - b.score)[0]; lvl = seats[best.p].cpu ? Math.max(0, lvl - 1) : Math.min(6, lvl + 1); try { localStorage.setItem(LS, lvl); } catch (e) {} }
+    if (hum.length === 1 && hum.length < seats.length) { const best = rows.slice().sort((a, b) => a.score - b.score)[0]; lvl = seats[best.p].cpu ? Math.max(0, lvl - 1) : Math.min(5.5, lvl + 0.5); try { localStorage.setItem(LS, lvl); } catch (e) {} }
     k.podium(rows, { asc: true, fmt: (v) => `${v} golpes (${v - 27 > 0 ? '+' : ''}${v - 27})` }); }
   k.onParty = () => { if (PL.length) seats = k.players(PL.length); };
   /* ---- CPU: búsqueda de golpe con el simulador ---- */
@@ -294,7 +294,7 @@ function partyMain() {
     if (ai.i < ai.c.length) { const t0 = performance.now();
       while (ai.i < ai.c.length && performance.now() - t0 < 6) { const [a, p] = ai.c[ai.i++], sc = simShot(B, a, p, ai.at - t); ai.top.push([a, p, sc]); }
       if (ai.i >= ai.c.length) { ai.top.sort((x, y) => x[2] - y[2]); const pool = ai.top.filter((x) => x[2] < ai.top[0][2] + 50).slice(0, lvl < 2 ? 3 : 1), ch = k.pick(pool);
-        const eA = 0.09 - lvl * 0.012, eP = 0.12 - lvl * 0.015; ai.ta = ch[0] + k.rnd(-1, 1) * eA; ai.tp = k.clamp(ch[1] * (1 + k.rnd(-1, 1) * eP), 0.08, 1); ai.ready = true; }
+        const eA = 0.12 - lvl * 0.013, eP = 0.16 - lvl * 0.017; /* 1.23: CPU más fallona */ ai.ta = ch[0] + k.rnd(-1, 1) * eA; ai.tp = k.clamp(ch[1] * (1 + k.rnd(-1, 1) * eP), 0.08, 1); ai.ready = true; }
       return; }
     let d = Math.atan2(Math.sin(ai.ta - aimA), Math.cos(ai.ta - aimA)); aimA += Math.sign(d) * Math.min(Math.abs(d), dt * 4);
     chg = true; pw = ai.tp * k.clamp(1 - (ai.at - t) / 0.8, 0, 1);

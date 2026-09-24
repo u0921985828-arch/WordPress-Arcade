@@ -22,8 +22,8 @@ const CORN = [[-1, -1], [-1, 1], [1, -1], [1, 1]]; /* J1 arriba izq., J2 abajo i
 const PIL = MD.pil ? [[220, 92, 24], [220, 348, 24], [92, 220, 24], [348, 220, 24]] : [];
 const lerp = (a, b, t) => a + (b - a) * Math.max(0, Math.min(1, t)), adiff = (a) => Math.atan2(Math.sin(a), Math.cos(a)), hyp = Math.hypot;
 let P = [], round = 0, rt = 0, T = 0, phase = 'play', btw = 0, banner = null, cdPend = false, elimOrder = [], S = {}, waves = [];
-let CPU = 0; try { CPU = Math.min(6, +localStorage.getItem('cpu:' + CFG.id) || 0); } catch (e) { /* sin almacenamiento */ }
-const skill = () => Math.min(0.95, 0.3 + CPU * 0.1 + (round - 1) * 0.04);
+let CPU = 0; try { CPU = Math.min(8, +localStorage.getItem('cpu:' + CFG.id) || 0); } catch (e) { /* sin almacenamiento */ }
+const skill = () => Math.min(0.8, 0.21 + CPU * 0.05 + (round - 1) * 0.03); /* 1.23: más fácil (antes 0,3 + 0,1/victoria, tope 0,95) */
 const spdK = () => lerp(0.8, 1, rt / 20); /* arranque suave: 80 % → 100 % en 20 s */
 function mk(w, h, fn) { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const q = cv.getContext('2d'); q.scale(2, 2); if (fn) fn(q); return cv; }
 function label(s, x, y, size, col, align, q) {
@@ -216,7 +216,7 @@ function AI(pl, dt) {
   if (ai.t <= 0) { ai.t = lerp(0.5, 0.14, s) * k.rnd(0.7, 1.3); ai.nx = k.rnd(-1, 1) * (1 - s) * 0.7; ai.ny = k.rnd(-1, 1) * (1 - s) * 0.7; ai.go = true; }
   const o = MODES[M].ai(pl, ai, s, dt) || { x: 0, y: 0 }; ai.go = false;
   if (o.x || o.y) { o.x += ai.nx; o.y += ai.ny; const L = hyp(o.x, o.y) || 1; o.x /= L; o.y /= L; }
-  if (rt < 3 && M !== 'silla') { o.ah = false; if (M === 'sumo') o.a = false; } /* respiro inicial: la CPU no ataca en los 3 primeros segundos */
+  if (rt < 5 && M !== 'silla') { o.ah = false; if (M === 'sumo') o.a = false; } /* respiro inicial: la CPU no ataca en los 5 primeros segundos */
   return o;
 }
 function control(pl, inp, dt) {
@@ -279,7 +279,7 @@ function endRound() {
 function finish() {
   /* desempate: más rondas ganadas y, después, mejor puesto en la última ronda (el podio solo muestra los puntos) */
   const sc = (pl) => pl.pts * 100 + pl.wins * 10 + pl.gain, best = Math.max(...P.map(sc)), win = P.filter((pl) => sc(pl) === best);
-  if (win.length === 1) { CPU = win[0].cpu ? Math.max(0, CPU - 1) : Math.min(6, CPU + 1); try { localStorage.setItem('cpu:' + CFG.id, CPU); } catch (e) { /* sin almacenamiento */ } }
+  if (win.length === 1) { CPU = win[0].cpu ? Math.max(0, CPU - 1) : Math.min(8, CPU + 1); try { localStorage.setItem('cpu:' + CFG.id, CPU); } catch (e) { /* sin almacenamiento */ } }
   k.podium(P.map((pl) => ({ p: pl.p, score: sc(pl) })), { fmt: (v) => Math.floor(v / 100) + ' pts', head: !k.party && win.length === 1 && !win[0].cpu ? '¡Has ganado!' : undefined });
 }
 

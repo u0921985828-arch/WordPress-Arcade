@@ -81,17 +81,17 @@ function label(s, x, y, size, col, align) {
 /* ---------------------------------------------------------------- lógica */
 /* Dificultad 0→1: por tiempo jugado en starfall (máximo hacia los 3,5 min) y por oleada en el resto (máximo en la 9). */
 const lerp = (a, b, q) => a + (b - a) * q, ease = (q) => q * q * (3 - 2 * q);
-function diff() { return M === 'vertical' ? Math.min(1, pt / 210) : ease(Math.min(1, (wave - 1) / 8)); }
+function diff() { return M === 'vertical' ? Math.min(1, pt / 315) : ease(Math.min(1, (wave - 1) / 12)); } // 1.23: más fácil (máx. 5,25 min / oleada 13)
 function msg(txt) { banner = txt; bannerT = 1.8; }
 function spawnWave() {
-  wave++; foes = []; calm = wave === 1 ? 2.5 : 1.5;
+  wave++; foes = []; calm = wave === 1 ? 5 : 2;
   if (M === 'invaders') { const rows = 5, cols = 9; for (let r = 0; r < rows; r++) for (let i = 0; i < cols; i++) foes.push({ x: 50 + i * 42, y: 60 + r * 30, r: 12, hp: 1, pts: [30, 20, 20, 10, 10][r], kind: r < 1 ? 1 : r < 3 ? 0 : 2 }); dirX = 1; if (wave === 1) makeBunkers(); msg(`Oleada ${wave}`); }
   if (M === 'centipede') { if (wave === 1) { mush = []; for (let i = 0; i < 34; i++) mush.push({ x: k.ri(1, 16) * 20 + 10, y: k.ri(3, 25) * 20 + 10, hp: 3 }); } for (let i = 0; i < Math.min(25, 9 + wave * 2); i++) foes.push({ x: 10 - i * 20, y: 30, r: 9, hp: 1, pts: i === 0 ? 100 : 20, dir: 1, seg: true, head: i === 0 }); msg(`Oleada ${wave}`); }
-  if (M === 'bullethell' || (M === 'vertical' && wave % 3 === 0)) { const hp = M === 'bullethell' ? 140 + wave * 50 : 40 + wave * 12; foes.push({ x: W / 2, y: -60, ty: 110, r: 30, hp, max: hp, pts: 500 * wave, boss: true, a: 0, phase: 1 }); msg(M === 'bullethell' ? `Jefe ${wave}` : '¡Jefe!'); }
+  if (M === 'bullethell' || (M === 'vertical' && wave % 3 === 0)) { const hp = M === 'bullethell' ? 112 + wave * 40 : 32 + wave * 10; foes.push({ x: W / 2, y: -60, ty: 110, r: 30, hp, max: hp, pts: 500 * wave, boss: true, a: 0, phase: 1 }); msg(M === 'bullethell' ? `Jefe ${wave}` : '¡Jefe!'); }
   else if (M === 'vertical') msg(`Oleada ${wave}`);
 }
 function makeBunkers() { bunkers = []; for (let b = 0; b < 4; b++) { const bx = 70 + b * 110, by = H - 100; for (let y = 0; y < 5; y++) for (let x = 0; x < 8; x++) { if ((y === 4 && x > 2 && x < 5) || (y === 0 && (x === 0 || x === 7))) continue; bunkers.push({ x: bx + x * 5, y: by + y * 5 }); } } }
-function reset() { p = { x: W / 2, y: H - 50, tilt: 0 }; shots = []; foes = []; eb = []; pups = []; score = 0; lives = 3; wave = 0; cool = 0; inv = 2; t = 0; pt = 0; calm = 0; power = 1; shield = 0; ufo = null; bunkers = []; stars = Array.from({ length: 70 }, () => ({ x: k.rnd(0, W), y: k.rnd(0, H), z: k.rnd(0.2, 1) })); spawnWave(); }
+function reset() { p = { x: W / 2, y: H - 50, tilt: 0 }; shots = []; foes = []; eb = []; pups = []; score = 0; lives = 4; wave = 0; cool = 0; inv = 3; t = 0; pt = 0; calm = 0; power = 1; shield = 0; ufo = null; bunkers = []; stars = Array.from({ length: 70 }, () => ({ x: k.rnd(0, W), y: k.rnd(0, H), z: k.rnd(0.2, 1) })); spawnWave(); }
 reset(); k.show(CFG.title, CFG.help);
 function hitPlayer() { if (inv > 0) return; if (shield > 0) { shield = 0; inv = 1; k.sfx('hit'); k.burst(p.x, p.y, '#5ce1e6', 16); return; } lives--; inv = 2; eb = []; power = Math.max(1, power - 1); k.burst(p.x, p.y, '#ffb347', 30, 220); k.sfx('explode'); k.shake(8); k.flash('rgba(255,80,90,.35)'); if (lives <= 0) k.lose(CFG.id, Math.floor(score), 'Nave destruida', `Oleada ${wave}`); }
 function killFoe(f) { f.dead = true; score += f.pts; k.burst(f.x, f.y, f.boss ? '#f0647e' : EC[(f.kind || 0) % 4], f.boss ? 70 : 14, f.boss ? 260 : 160); k.sfx(f.boss ? 'explode' : 'hit'); if (f.boss) { k.shake(12); k.float(`+${f.pts}`, f.x, f.y, '#e9b949'); pups.push({ x: f.x, y: f.y, t: 'P' }); }
@@ -114,10 +114,10 @@ k.run((dt) => {
   for (const s of shots) { s.y -= 560 * dt; s.x += (s.vx || 0) * dt; }
   /* enemigos */
   if (M === 'invaders') {
-    const alive = foes.length, sp2 = lerp(20, 40, D) + (45 - alive) * 3.2; let edge = false; const fr = Math.floor(t * (1 + (45 - alive) / 12)) % 2;
+    const alive = foes.length, sp2 = lerp(16, 34, D) + (45 - alive) * 2.7; let edge = false; const fr = Math.floor(t * (1 + (45 - alive) / 12)) % 2;
     for (const f of foes) { f.fr = fr; f.x += dirX * sp2 * dt; if (f.x < 16 || f.x > W - 16) edge = true; }
     if (edge) { dirX *= -1; for (const f of foes) { f.y += 10; f.x += dirX * 4; if (f.y > H - 72) return k.lose(CFG.id, Math.floor(score), 'Invadido', `Oleada ${wave}`); } }
-    if (foes.length && calm <= 0 && Math.random() < dt * lerp(0.6, 3, D)) { const cols = {}; for (const f of foes) { const key = Math.round(f.x / 10); if (!cols[key] || cols[key].y < f.y) cols[key] = f; } const f = k.pick(Object.values(cols)); eb.push({ x: f.x, y: f.y + 10, vx: 0, vy: lerp(160, 260, D), zig: 1 }); }
+    if (foes.length && calm <= 0 && Math.random() < dt * lerp(0.45, 2.25, D)) { const cols = {}; for (const f of foes) { const key = Math.round(f.x / 10); if (!cols[key] || cols[key].y < f.y) cols[key] = f; } const f = k.pick(Object.values(cols)); eb.push({ x: f.x, y: f.y + 10, vx: 0, vy: lerp(128, 208, D), zig: 1 }); }
     if (!ufo && Math.random() < dt * 0.06) ufo = { x: -30, y: 34, vx: 90, pts: k.pick([50, 100, 150, 300]) };
     if (ufo) { ufo.x += ufo.vx * dt; if (ufo.x > W + 40) ufo = null; }
     for (const s of shots) { if (ufo && !s.dead && Math.abs(s.x - ufo.x) < 18 && Math.abs(s.y - ufo.y) < 10) { s.dead = true; score += ufo.pts; k.float(`+${ufo.pts}`, ufo.x, ufo.y, '#e9b949'); k.burst(ufo.x, ufo.y, '#f0647e', 24); k.sfx('coin'); ufo = null; }
@@ -126,31 +126,31 @@ k.run((dt) => {
     for (const f of foes) for (const b of bunkers) if (!b.dead && Math.abs(f.x - b.x) < 14 && Math.abs(f.y - b.y) < 10) b.dead = true;
     bunkers = bunkers.filter((b) => !b.dead);
   } else if (M === 'vertical') {
-    if (!foes.some((f) => f.boss) && calm <= 0 && Math.random() < dt * lerp(1.0, 3.2, D)) { const big = Math.random() < lerp(0.06, 0.22, D); foes.push({ x: k.rnd(24, W - 24), y: -20, r: big ? 18 : 12, hp: big ? 6 : 1, pts: big ? 60 : 15, vy: k.rnd(60, 120) * lerp(0.7, 1.15, D), ph: k.rnd(0, 6), big, kind: k.ri(0, 3) }); }
-    for (const f of foes) { if (f.boss) continue; f.y += f.vy * dt; f.x += Math.sin(t * 2 + f.ph) * 45 * dt; if (f.big && f.y > 20 && Math.random() < dt * lerp(0.45, 1, D)) { const a = Math.atan2(p.y - f.y, p.x - f.x), v = lerp(140, 190, D); eb.push({ x: f.x, y: f.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v }); } if (f.y > H + 30) f.dead = true; }
+    if (!foes.some((f) => f.boss) && calm <= 0 && Math.random() < dt * lerp(0.8, 2.56, D)) { const big = Math.random() < lerp(0.06, 0.22, D); foes.push({ x: k.rnd(24, W - 24), y: -20, r: big ? 18 : 12, hp: big ? 6 : 1, pts: big ? 60 : 15, vy: k.rnd(60, 120) * lerp(0.56, 0.98, D), ph: k.rnd(0, 6), big, kind: k.ri(0, 3) }); }
+    for (const f of foes) { if (f.boss) continue; f.y += f.vy * dt; f.x += Math.sin(t * 2 + f.ph) * 45 * dt; if (f.big && f.y > 20 && Math.random() < dt * lerp(0.34, 0.75, D)) { const a = Math.atan2(p.y - f.y, p.x - f.x), v = lerp(112, 152, D); eb.push({ x: f.x, y: f.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v }); } if (f.y > H + 30) f.dead = true; }
     if (!foes.some((f) => f.boss) && pt > wave * 26) spawnWave();
   } else if (M === 'centipede') {
-    for (const f of foes) { if (f.spider) continue; f.x += f.dir * lerp(70, 150, D) * dt;
+    for (const f of foes) { if (f.spider) continue; f.x += f.dir * lerp(56, 128, D) * dt;
       const blocked = f.x < 10 || f.x > W - 10 || mush.some((m) => m.hp > 0 && Math.abs(m.x - f.x) < 14 && Math.abs(m.y - f.y) < 10);
       if (blocked) { f.dir *= -1; f.x = k.clamp(f.x, 10, W - 10); f.y += 20; if (f.y > H - 20) f.y = H * 0.62; }
-      if (Math.hypot(f.x - p.x, f.y - p.y) < 20) hitPlayer(); }
+      if (Math.hypot(f.x - p.x, f.y - p.y) < 17) hitPlayer(); }
     const segs = foes.filter((f) => f.seg); segs.forEach((f, i) => { if (i === 0 || !segs[i - 1] || Math.hypot(segs[i - 1].x - f.x, segs[i - 1].y - f.y) > 24) f.head = true; });
     for (const s of shots) for (const m of mush) if (m.hp > 0 && !s.dead && Math.abs(s.x - m.x) < 10 && Math.abs(s.y - m.y) < 10) { m.hp--; s.dead = true; score += 1; if (!m.hp) k.burst(m.x, m.y, '#e0649a', 6, 60); }
-    if (calm <= -2 && Math.random() < dt * lerp(0.15, 0.5, D)) { const sx = Math.random() < 0.5 ? -10 : W + 10; foes.push({ x: sx, y: k.rnd(H * 0.6, H - 40), r: 11, hp: 1, pts: k.pick([300, 600, 900]), dir: sx < 0 ? 1 : -1, spider: true }); }
-    for (const f of foes) if (f.spider) { f.x += f.dir * lerp(80, 115, D) * dt; f.y += Math.sin(t * 7 + f.x * 0.05) * 140 * dt; f.y = k.clamp(f.y, H * 0.55, H - 20); if (f.x < -20 || f.x > W + 20) f.dead = true; if (Math.hypot(f.x - p.x, f.y - p.y) < 20) hitPlayer(); mush.forEach((m) => { if (Math.abs(m.x - f.x) < 10 && Math.abs(m.y - f.y) < 10) m.hp = 0; }); }
+    if (calm <= -2 && Math.random() < dt * lerp(0.12, 0.4, D)) { const sx = Math.random() < 0.5 ? -10 : W + 10; foes.push({ x: sx, y: k.rnd(H * 0.6, H - 40), r: 11, hp: 1, pts: k.pick([300, 600, 900]), dir: sx < 0 ? 1 : -1, spider: true }); }
+    for (const f of foes) if (f.spider) { f.x += f.dir * lerp(64, 98, D) * dt; f.y += Math.sin(t * 7 + f.x * 0.05) * 140 * dt; f.y = k.clamp(f.y, H * 0.55, H - 20); if (f.x < -20 || f.x > W + 20) f.dead = true; if (Math.hypot(f.x - p.x, f.y - p.y) < 17) hitPlayer(); mush.forEach((m) => { if (Math.abs(m.x - f.x) < 10 && Math.abs(m.y - f.y) < 10) m.hp = 0; }); }
   }
   for (const b of foes) if (b.boss) {
     b.y += (b.ty - b.y) * Math.min(1, dt * 1.5); b.a += dt; b.x = W / 2 + Math.sin(t * 0.7) * 110; b.phase = b.hp < b.max * 0.33 ? 3 : b.hp < b.max * 0.66 ? 2 : 1;
     /* no dispara hasta estar en posición; anillos y ráfagas crecen con la dificultad y con la fase */
-    const n = Math.round(lerp(7, 18, D)) + b.phase * 2, rv = lerp(85, 110, D) + b.phase * 15, av = lerp(165, 210, D);
-    if (b.y > b.ty - 25 && Math.random() < dt * (lerp(0.9, 1.7, D) + b.phase * lerp(0.5, 0.9, D))) for (let i = 0; i < n; i++) { const a = b.a * (b.phase === 3 ? 3 : 2) + i / n * 6.283; eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * rv, vy: Math.sin(a) * rv }); }
-    if (b.y > b.ty - 25 && Math.random() < dt * (lerp(0.5, 0.9, D) + b.phase * 0.35)) { const a = Math.atan2(p.y - b.y, p.x - b.x); for (let j = -1; j <= 1; j++) eb.push({ x: b.x, y: b.y, vx: Math.cos(a + j * 0.2) * av, vy: Math.sin(a + j * 0.2) * av }); }
+    const n = Math.round(lerp(7, 18, D)) + b.phase * 2, rv = lerp(68, 88, D) + b.phase * 12, av = lerp(132, 168, D);
+    if (b.y > b.ty - 25 && Math.random() < dt * (lerp(0.68, 1.28, D) + b.phase * lerp(0.38, 0.68, D))) for (let i = 0; i < n; i++) { const a = b.a * (b.phase === 3 ? 3 : 2) + i / n * 6.283; eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * rv, vy: Math.sin(a) * rv }); }
+    if (b.y > b.ty - 25 && Math.random() < dt * (lerp(0.38, 0.68, D) + b.phase * 0.26)) { const a = Math.atan2(p.y - b.y, p.x - b.x); for (let j = -1; j <= 1; j++) eb.push({ x: b.x, y: b.y, vx: Math.cos(a + j * 0.2) * av, vy: Math.sin(a + j * 0.2) * av }); }
     if (M === 'bullethell') score += dt * 5;
   }
   for (const s of shots) for (const f of foes) if (!f.dead && !s.dead && Math.hypot(s.x - f.x, s.y - f.y) < f.r + 4) { s.dead = true; f.flash = 0.06; if (--f.hp <= 0) killFoe(f); }
-  for (const e of eb) { e.x += e.vx * dt; e.y += e.vy * dt; if (Math.hypot(e.x - p.x, e.y - p.y) < (M === 'bullethell' ? 5 : 11)) { e.dead = true; hitPlayer(); } }
-  for (const f of foes) { f.flash = (f.flash || 0) - dt; if (!f.dead && !f.boss && M !== 'centipede' && Math.hypot(f.x - p.x, f.y - p.y) < f.r + 12) { killFoe(f); hitPlayer(); } }
-  for (const u of pups) { u.y += 90 * dt; if (Math.hypot(u.x - p.x, u.y - p.y) < 22) { u.dead = true; k.sfx('coin'); if (u.t === 'P') { power = Math.min(3, power + 1); k.float('¡Disparo mejorado!', p.x, p.y - 30, '#5ce1e6'); } else { shield = 10; k.float('¡Escudo!', p.x, p.y - 30, '#9b8afb'); } } }
+  for (const e of eb) { e.x += e.vx * dt; e.y += e.vy * dt; if (Math.hypot(e.x - p.x, e.y - p.y) < (M === 'bullethell' ? 4.25 : 9.4)) { e.dead = true; hitPlayer(); } }
+  for (const f of foes) { f.flash = (f.flash || 0) - dt; if (!f.dead && !f.boss && M !== 'centipede' && Math.hypot(f.x - p.x, f.y - p.y) < f.r + 10) { killFoe(f); hitPlayer(); } }
+  for (const u of pups) { u.y += 90 * dt; if (Math.hypot(u.x - p.x, u.y - p.y) < 26) { u.dead = true; k.sfx('coin'); if (u.t === 'P') { power = Math.min(3, power + 1); k.float('¡Disparo mejorado!', p.x, p.y - 30, '#5ce1e6'); } else { shield = 10; k.float('¡Escudo!', p.x, p.y - 30, '#9b8afb'); } } }
   shots = shots.filter((s) => !s.dead && s.y > -10); eb = eb.filter((e) => !e.dead && e.y > -20 && e.y < H + 20 && e.x > -20 && e.x < W + 20); foes = foes.filter((f) => !f.dead); pups = pups.filter((u) => !u.dead && u.y < H + 20);
   if (k.st === 'play' && M !== 'vertical' && !foes.some((f) => !f.spider)) { score += 200 * wave; k.float(`+${200 * wave}`, W / 2, H * 0.5, '#e9b949'); k.sfx('win'); k.confetti(); spawnWave(); }
   if (k.st === 'play' && M === 'vertical' && wave % 3 === 0 && !foes.some((f) => f.boss) && t > 3) { /* jefe vencido */ }

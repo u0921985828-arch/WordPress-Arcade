@@ -289,7 +289,7 @@ const HG = (() => {
   const L = LAND
     ? { top: [16, 8, 768, 40], art: [16, 58, 316, 380], chips: [346, 58, 438, 48], word: [346, 118, 438, 86], ab: [346, 222, 438, 216] }
     : { top: [12, 10, 426, 42], art: [12, 118, 426, 318], chips: [12, 60, 426, 48], word: [12, 448, 426, 82], ab: [12, 548, 426, 236] };
-  const lvl = () => Math.min(8, +ST('cpu:' + CFG.id, 0) || 0);
+  const lvl = () => Math.min(8, Math.floor(+ST('cpu:' + CFG.id, 0) || 0));
   let seats, words, wi, guessed, miss, turn, phase, pt, turnT, first, started, rescueT, lastMsg, msgT, cursorShown;
   function keyRect(i) { const [x, y, w, h] = L.ab, g = 6, kw = (w - g * (COLS - 1)) / COLS, kh = (h - g * (ROWS - 1)) / ROWS; return [x + (i % COLS) * (kw + g), y + Math.floor(i / COLS) * (kh + g), kw, kh]; }
   function mkWords() {
@@ -332,20 +332,20 @@ const HG = (() => {
     }
   }
   function cpuChoice() {
-    const w = W0(), L2 = lvl(), smart = Math.random() < Math.min(0.85, 0.25 + L2 * 0.07);
+    const w = W0(), L2 = lvl(), smart = Math.random() < Math.min(0.6, 0.15 + L2 * 0.04); // 1.23: CPU más floja (antes 0.25 + 0.07/nivel, tope 0.85)
     if (smart) {
       const wrong = [...guessed].filter((ch) => !w.n.includes(ch));
       const cand = CATS[w.cat].map(norm).filter((x) => x.length === w.n.length && [...x].every((ch, i) => (guessed.has(w.n[i]) ? ch === w.n[i] : !guessed.has(ch))) && !wrong.some((ch) => x.includes(ch)));
       if (cand.length) { const cnt = {}; cand.forEach((x) => new Set(x).forEach((ch) => { if (!guessed.has(ch)) cnt[ch] = (cnt[ch] || 0) + 1; })); const best = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a] || FREQ.indexOf(a) - FREQ.indexOf(b))[0]; if (best) return best; }
     }
-    for (const ch of FREQ) if (!guessed.has(ch) && Math.random() < 0.55) return ch;
+    for (const ch of FREQ) if (!guessed.has(ch) && Math.random() < 0.4) return ch;
     return [...FREQ].find((ch) => !guessed.has(ch));
   }
   function finish() {
     phase = 'end';
     const rows = seats.map((s) => ({ p: s.p, score: s.score, name: s.name })), top = rows.slice().sort((a, b) => b.score - a.score);
     const humTop = !seats.find((s) => s.p === top[0].p).cpu && (top.length < 2 || top[0].score > top[1].score);
-    if (humTop) SAVE('cpu:' + CFG.id, Math.min(8, lvl() + 1));
+    if (humTop) SAVE('cpu:' + CFG.id, Math.min(8, (+ST('cpu:' + CFG.id, 0) || 0) + 0.5));
     if (!k.party) k.best(CFG.id, seats[0].score);
     if (k.privOK) for (const q of seats) if (!q.cpu) k.priv(q.p, null);
     k.podium(rows, { head: humTop && !k.party ? '¡Has ganado!' : undefined, go: `${k.party ? '' : 'Tu récord: ' + k.best(CFG.id, 0) + '<br>'}Toca para otra partida` });
@@ -591,8 +591,8 @@ const SP = (() => {
     if (k.st === 'ready') words.slice(0, 2).forEach((o) => capsule({ r0: o.r, c0: o.c, r1: o.r + o.dr * (o.n.length - 1), c1: o.c + o.dc * (o.n.length - 1) }, o.col, 0.5));
     if (sel) capsule(sel, '#6e62f5', 0.45);
     if (kSel) capsule(snap(kSel, kc), '#6e62f5', 0.4);
-    /* pista: primera letra de una palabra pendiente parpadea tras 45 s sin encontrar nada */
-    const hint = !doneT && sinceFind > 45 ? words.find((o) => !o.found) : null;
+    /* pista: primera letra de una palabra pendiente parpadea tras 25 s sin encontrar nada (1.23: antes 45 s) */
+    const hint = !doneT && sinceFind > 25 ? words.find((o) => !o.found) : null;
     for (let r = 0; r < G.rows; r++) for (let q = 0; q < G.cols; q++) {
       const [x, y] = cellC(r, q);
       if (hint && hint.r === r && hint.c === q) { c.fillStyle = ART.alpha('#ffd166', 0.45 + 0.35 * Math.sin(t * 6)); c.beginPath(); c.arc(x, y, G.cs * 0.42, 0, TAU); c.fill(); }

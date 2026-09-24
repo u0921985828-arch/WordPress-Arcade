@@ -5,7 +5,7 @@
  * Cada minijuego es un objeto { name, help, update(dt), draw(), done, rank } — rank[p] = nº de jugadores que quedaron
  * estrictamente por delante (los empates comparten puesto) o null si la ronda no cuenta. El marco pone presentación,
  * cuenta atrás, marcador, resultado de la ronda, la ruleta y el podio final. Solo joystick + A/B (modo tele).
- * CPU: nivel 0..5 en localStorage 'cpu:<id>' (sube si gana un humano, baja si un humano queda último). */
+ * CPU: nivel 0..11 en localStorage 'cpu:<id>' (sube si gana un humano, baja si un humano queda último). */
 const W = 800, H = 450, OUT = ART.OUT, TAU = 6.2832, NP = 4, TH = ART.THEMES;
 const MODE = CFG.mode || 'roulette', ID = CFG.id || MODE;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#1d1840' }), c = k.ctx;
@@ -20,8 +20,8 @@ function panel(x, y, w, h, r, fill, lw) { ART.rr(c, x, y, w, h, r); ART.fillOut(
 function mk(w, h, draw) { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const g = cv.getContext('2d'); g.scale(2, 2); g.lineJoin = 'round'; g.lineCap = 'round'; draw(g); return cv; }
 
 /* ---------------- Jugadores, CPU y entrada ---------------- */
-let LV = 0; try { LV = clamp(+localStorage.getItem('cpu:' + ID) || 0, 0, 5); } catch (e) { /* sin almacenamiento */ }
-const SK = () => LV / 5;
+let LV = 0; try { LV = clamp(+localStorage.getItem('cpu:' + ID) || 0, 0, 11); } catch (e) { /* sin almacenamiento */ }
+const SK = () => -0.3 + LV * 0.1; /* 1.23: más fácil (antes LV/5: 0…1; ahora −0,3…0,8, media subida por victoria) */
 let demo = true, t = 0;
 const CNAME = ['roja', 'azul', 'amarilla', 'verde'];
 const cpu = (p) => demo || !k.human(p);
@@ -105,13 +105,13 @@ function mgAnvil() {
   const F = { x0: 62, x1: 738, y0: 200, y1: 432 };
   const m = { name: 'Lluvia de Yunques', help: 'Aparta a tu muñeco de las sombras que crecen. A: acelerón.', done: false, rank: null };
   const ps = [0, 1, 2, 3].map((p) => ({ p, x: [260, 540, 260, 540][p], y: [262, 262, 372, 372][p], face: p % 2 ? -1 : 1, mv: false, out: -1, dT: 0, cd: 0, ax: 0, ay: 0, aiT: 0, dash: false }));
-  const an = [], land = []; let el = 0, next = 1.7, over = false, endT = 0;
+  const an = [], land = []; let el = 0, next = 3, over = false, endT = 0;
   const inside = (a, x, y, pad) => { const rx = a.R + pad, ry = rx * 0.55; return ((x - a.x) / rx) ** 2 + ((y - a.y) / ry) ** 2 < 1; };
   function spawn() {
-    const d = ease(el / 40), alive = ps.filter((q) => q.out < 0), big = el > 18 && Math.random() < 0.14, R = big ? 50 : 30, T = lerp(1.75, 0.95, d);
+    const d = ease(el / 60), alive = ps.filter((q) => q.out < 0), big = el > 18 && Math.random() < 0.14, R = big ? 50 : 30, T = lerp(2.0, 1.1, d);
     let x, y; if (alive.length && Math.random() < lerp(0.3, 0.5, d)) { const q = k.pick(alive); x = q.x + k.rnd(-30, 30); y = q.y + k.rnd(-16, 16); } else { x = k.rnd(F.x0 + 20, F.x1 - 20); y = k.rnd(F.y0 + 8, F.y1 - 8); }
     an.push({ x: clamp(x, F.x0 + 8, F.x1 - 8), y: clamp(y, F.y0 + 4, F.y1 - 4), R, T, t: T, big });
-    next = lerp(0.95, 0.24, d) * k.rnd(0.8, 1.2) * (big ? 1.4 : 1);
+    next = lerp(1.2, 0.3, d) * k.rnd(0.8, 1.2) * (big ? 1.4 : 1);
   }
   function danger(x, y, react) { let s = 0; for (const a of an) { if (a.T - a.t < react) continue; const rx = a.R + 24, ry = rx * 0.6, e = ((x - a.x) / rx) ** 2 + ((y - a.y) / ry) ** 2; if (e < 1) s += (1.2 - e) * (3.2 - Math.min(2.6, a.t)); } return s; }
   function ai(q, dt) {
@@ -126,7 +126,7 @@ function mgAnvil() {
   function impact(a) {
     k.shake(a.big ? 9 : 5); k.sfx(a.big ? 'explode' : 'hit'); k.burst(a.x, a.y, '#e6d6b0', a.big ? 22 : 12, 200);
     land.push({ x: a.x, y: a.y, R: a.R, t: 1.3 });
-    for (const q of ps) if (q.out < 0 && inside(a, q.x, q.y, 8)) { q.out = el; k.float('¡Plof!', q.x, q.y - 60, col(q.p)); k.burst(q.x, q.y - 10, col(q.p), 14, 220); }
+    for (const q of ps) if (q.out < 0 && inside(a, q.x, q.y, cpu(q.p) ? 8 : 2)) { q.out = el; k.float('¡Plof!', q.x, q.y - 60, col(q.p)); k.burst(q.x, q.y - 10, col(q.p), 14, 220); }
   }
   m.update = (dt) => {
     el += dt;
@@ -566,7 +566,7 @@ function endMatch() {
   live = false;
   const rows = [0, 1, 2, 3].map((p) => ({ p, score: score[p], name: nm(p) })), top = Math.max(...score), low = Math.min(...score);
   const hs = [0, 1, 2, 3].filter((p) => !cpu(p));
-  if (hs.some((p) => score[p] === top)) LV = Math.min(5, LV + 1); else if (hs.length && hs.every((p) => score[p] === low)) LV = Math.max(0, LV - 1);
+  if (hs.some((p) => score[p] === top)) LV = Math.min(11, LV + 1); else if (hs.length && hs.every((p) => score[p] === low)) LV = Math.max(0, LV - 1);
   try { localStorage.setItem('cpu:' + ID, LV); } catch (e) { /* sin almacenamiento */ }
   const winners = [0, 1, 2, 3].filter((p) => score[p] === top);
   let head = null;

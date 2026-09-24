@@ -6,9 +6,9 @@ const k = Kit({ w: W, h: H, title: CFG.title, bg: '#f4efe4' }), c = k.ctx;
 let stuckT = 0, level, score, segs, userSegs, ink, maxInk, ball, running, cup, stroke, fixed, goalX, done, t, strokes = [], path = [], ghost = [], clk = 0, doneT = 0, bgCv, pathT = 0, failT = 0;
 function build() {
   segs = []; userSegs = []; strokes = []; path = []; ghost = []; running = false; stroke = null; done = false; t = 0; doneT = 0; bgCv = null;
-  if (M === 'funnel') { maxInk = 700 + 50 * Math.max(0, 4 - level); const bx = k.rnd(60, 300), reach = Math.min(260, 60 + level * 40); ball = { x: bx, y: 86, vx: 0, vy: 0, r: 11, sx: bx, sy: 86, a: 0 }; cup = { x: k.clamp(bx + k.rnd(-reach, reach), 50, 310), y: 548 }; /* copa cerca de la bola al principio */
-    for (let i = 0; i < Math.min(7, level); i++) { const w = k.rnd(50, 120), x = k.rnd(20, 340 - w), y = k.rnd(160, 470); segs.push([x, y, x + w, y + k.rnd(-20, 20)]); } }
-  else { maxInk = 360 + 20 * Math.max(0, 6 - level); const gap = Math.min(300, 100 + (level - 1) * 25), lx = 180, rx = lx + gap, ly = 240, ry = 240 + k.ri(-40, 30);
+  if (M === 'funnel') { maxInk = 840 + 60 * Math.max(0, 4 - level); /* 1.23: +20 % tinta */ const bx = k.rnd(60, 300), reach = Math.min(260, 60 + level * 28); ball = { x: bx, y: 86, vx: 0, vy: 0, r: 11, sx: bx, sy: 86, a: 0 }; cup = { x: k.clamp(bx + k.rnd(-reach, reach), 50, 310), y: 548 }; /* copa cerca de la bola al principio */
+    for (let i = 0; i < Math.min(7, Math.ceil(level * 0.7)); i++) { const w = k.rnd(50, 120), x = k.rnd(20, 340 - w), y = k.rnd(160, 470); segs.push([x, y, x + w, y + k.rnd(-20, 20)]); } }
+  else { maxInk = 430 + 25 * Math.max(0, 6 - level); const gap = Math.min(300, 100 + (level - 1) * 17) /* 1.23: +20 % tinta, hueco crece más despacio */, lx = 180, rx = lx + gap, ly = 240, ry = 240 + k.ri(-40, 30);
     segs.push([0, ly, lx, ly], [lx, ly, lx, H], [rx, ry, rx, H], [rx, ry, W, ry]); ball = { x: 30, y: ly - 14, vx: 0, vy: 0, r: 13, sx: 30, sy: ly - 14, a: 0 }; goalX = W - 50; fixed = { ly, ry, lx, rx }; }
   ink = maxInk;
 }
@@ -44,7 +44,7 @@ k.run((dt) => {
   t += dt; const steps = 8, h = dt / steps;
   for (let s = 0; s < steps; s++) { ball.vy += 900 * h; if (M === 'bridge') ball.vx += (ball.vx < 170 ? 260 : 0) * h; ball.x += ball.vx * h; ball.y += ball.vy * h; for (const sg of segs) collide(ball, sg); for (const sg of userSegs) collide(ball, sg); }
   ball.a += ball.vx / ball.r * dt; pathT += dt; if (pathT > 0.04) { pathT = 0; path.push([ball.x, ball.y]); }
-  if (M === 'funnel') { if (Math.abs(ball.x - cup.x) < 30 && ball.y > cup.y - 20 && ball.y < cup.y + 30) win(); if (ball.y > H + 40 || ball.x < -40 || ball.x > W + 40) fail(); }
+  if (M === 'funnel') { if (Math.abs(ball.x - cup.x) < 33 && ball.y > cup.y - 20 && ball.y < cup.y + 30) win(); if (ball.y > H + 40 || ball.x < -40 || ball.x > W + 40) fail(); }
   else { if (ball.x > goalX && ball.y < fixed.ry) win(); if (ball.y > H + 40) fail(); }
   // atascada: si apenas se mueve durante 1,5 s, se reinicia el intento
   stuckT = Math.hypot(ball.vx, ball.vy) < 12 ? stuckT + dt : 0; if (t > 12 || stuckT > 1.5) fail();

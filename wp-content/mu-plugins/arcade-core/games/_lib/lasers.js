@@ -7,15 +7,15 @@ const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 function reflect(d, m) { const [dx, dy] = DIRS[d]; const nd = m === 1 ? [-dy, -dx] : [dy, dx]; return DIRS.findIndex((q) => q[0] === nd[0] && q[1] === nd[1]); }
 function trace() { const pts = [[emit.x, emit.y]]; let x = emit.x, y = emit.y, d = emit.d, hit = false, stop = 'edge'; for (let s = 0; s < 200; s++) { x += DIRS[d][0]; y += DIRS[d][1]; if (x < 0 || y < 0 || x >= N || y >= N) { pts.push([x, y]); break; } if (x === target[0] && y === target[1]) { pts.push([x, y]); hit = true; break; } const cell = grid[y][x]; if (cell.block) { pts.push([x, y]); stop = 'block'; break; } if (cell.m) { d = reflect(d, cell.m); pts.push([x, y]); } } return { pts, hit, d, stop }; }
 function build() {
-  N = Math.min(9, 5 + Math.floor(level / 2)); S = Math.floor(430 / (N + 0.8)); OX = Math.round((480 - (N + 0.8) * S) / 2 + 0.8 * S); done = false;
+  N = Math.min(9, 5 + Math.floor((level - 1) / 3)); S = Math.floor(430 / (N + 0.8)); OX = Math.round((480 - (N + 0.8) * S) / 2 + 0.8 * S); done = false;
   for (let tries = 0; tries < 500; tries++) {
     grid = Array.from({ length: N }, () => Array.from({ length: N }, () => ({ m: 0 }))); emit = { x: -1, y: k.ri(0, N - 1), d: 0 };
-    let x = emit.x, y = emit.y, d = 0, turns = 0; const used = new Set(); let ok = false; const want = Math.min(6, 1 + level); /* nivel 1: 2 espejos en el camino */
+    let x = emit.x, y = emit.y, d = 0, turns = 0; const used = new Set(); let ok = false; const want = Math.min(6, 2 + Math.floor((level - 1) / 2)); /* 1.23: nivel 1-2: 2 espejos; sube cada 2 niveles */
     for (let s = 0; s < N * 4; s++) { x += DIRS[d][0]; y += DIRS[d][1]; if (x < 0 || y < 0 || x >= N || y >= N || used.has(x + ',' + y)) break; used.add(x + ',' + y);
       if (turns >= want && Math.random() < 0.4) { target = [x, y]; ok = true; break; }
       if (Math.random() < 0.35) { const nd = (d + (Math.random() < 0.5 ? 1 : 3)) % 4; const m = [1, 2].find((mm) => reflect(d, mm) === nd); grid[y][x].m = m; grid[y][x].fixed = true; d = nd; turns++; } }
     if (!ok) continue;
-    for (let i = 0; i < Math.min(N, 1 + level); i++) { const rx = k.ri(0, N - 1), ry = k.ri(0, N - 1); if (!used.has(rx + ',' + ry) && !(rx === target[0] && ry === target[1])) { if (Math.random() < 0.5) grid[ry][rx].m = k.ri(1, 2); else grid[ry][rx].block = true; } }
+    for (let i = 0; i < Math.min(N, 1 + Math.floor(level / 2)); i++) { const rx = k.ri(0, N - 1), ry = k.ri(0, N - 1); if (!used.has(rx + ',' + ry) && !(rx === target[0] && ry === target[1])) { if (Math.random() < 0.5) grid[ry][rx].m = k.ri(1, 2); else grid[ry][rx].block = true; } }
     for (const row of grid) for (const cl of row) { if (cl.fixed) cl.sol = cl.m; if (cl.m && Math.random() < 0.6) cl.m = 3 - cl.m; }
     if (!trace().hit) break;
   }

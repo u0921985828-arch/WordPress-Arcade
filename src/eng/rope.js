@@ -50,8 +50,8 @@ k.run((dt) => {
   candy.a += (candy.x - candy.ox) * 0.08;
   if (L.bumper) { const [bx, by] = L.bumper, d = Math.hypot(candy.x - bx, candy.y - by); if (d < 34) { const nx = (candy.x - bx) / d, ny = (candy.y - by) / d; candy.x = bx + nx * 34; candy.y = by + ny * 34; candy.ox = candy.x - nx * 9; candy.oy = candy.y - ny * 9; if (bumpT < 0.1) { k.sfx('jump'); bumpT = 0.3; } } }
   if (candy.x < 14 || candy.x > 346) { candy.x = k.clamp(candy.x, 14, 346); candy.ox = candy.x + (candy.x - candy.ox) * 0.5; }
-  for (const s of stars) if (!s.got && Math.hypot(s.x - candy.x, s.y - candy.y) < 26) { s.got = true; s.gt = t; got++; k.sfx('coin'); k.burst(s.x, s.y, '#ffd23d', 16); k.float('+100', s.x, s.y - 20, '#ffd23d'); }
-  if (candy.y > 560 && candy.y < 600 && Math.abs(candy.x - L.basket) < 44 && candy.y - candy.oy > 0) { state = 'won'; chew = 0.8; score += 100 + got * 100; k.sfx('pop'); k.burst(L.basket, 575, '#ff7aa8', 20, 150);
+  for (const s of stars) if (!s.got && Math.hypot(s.x - candy.x, s.y - candy.y) < 31) { s.got = true; s.gt = t; got++; k.sfx('coin'); k.burst(s.x, s.y, '#ffd23d', 16); k.float('+100', s.x, s.y - 20, '#ffd23d'); }
+  if (candy.y > 560 && candy.y < 600 && Math.abs(candy.x - L.basket) < 48 && candy.y - candy.oy > 0) { state = 'won'; chew = 0.8; score += 100 + got * 100; k.sfx('pop'); k.burst(L.basket, 575, '#ff7aa8', 20, 150);
     setTimeout(() => { k.st = 'over'; k.show('¡Dentro!', `Nivel ${lv} · Estrellas ${got}/${stars.length} · ${score} puntos<br>Toca para el siguiente nivel`); lv++; }, 1300); }
   if (candy.y > 680) { state = 'lost'; k.lose(CFG.id, score, 'Se cayó', `Nivel ${lv}`); }
 }, draw);

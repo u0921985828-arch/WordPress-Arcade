@@ -2,9 +2,10 @@
 const k = Kit({ w: 640, h: 360, title: CFG.title, bg: '#0a1030' }), c = k.ctx, F = 300, OUT = ART.OUT;
 /* Dificultad: de 600 a 1400 u/s en ~3,5 min (suavizado); anillos más juntos, pequeños y desplazados con el progreso.
  * Antes: 900 u/s + 8/s sin tope, separación 900→600 y radio 140→90 a los 80-100 s. */
-const V0 = 600, V1 = 1400, DIF = () => { const d = Math.min(1, t / 210); return d * d * (3 - 2 * d); };
+const V0 = 480, V1 = 1190, DIF = () => { const d = Math.min(1, t / 315); // 1.23: más fácil (antes 600→1400 en 210 s)
+  return d * d * (3 - 2 * d); };
 let d, rings, z, speed, score, lives, t, combo, parts, camX, camY, streaks, passed;
-function reset() { d = { x: 0, y: 0, vx: 0, vy: 0 }; rings = []; z = 0; speed = V0; score = 0; lives = 3; t = 0; combo = 0; parts = []; camX = 0; camY = -50; streaks = []; passed = 0;
+function reset() { d = { x: 0, y: 0, vx: 0, vy: 0 }; rings = []; z = 0; speed = V0; score = 0; lives = 4; t = 0; combo = 0; parts = []; camX = 0; camY = -50; streaks = []; passed = 0;
   // arranque justo: el primer anillo está frente al dron y los siguientes se separan poco a poco
   let rz = 2300, rx = 0, ry = 0; for (let i = 0; i < 12; i++) { const sc = Math.min(1, i / 5); rx = k.clamp(rx + k.rnd(-260, 260) * sc, -500, 500); ry = k.clamp(ry + k.rnd(-160, 160) * sc, -260, 260); rings.push({ x: rx, y: ry, z: rz, r: i < 3 ? 170 : 140 }); rz += i < 3 ? 1100 : 900; } }
 reset(); k.show(CFG.title, 'Guía el dron a través de los anillos. Arrastra o usa las flechas. Pasar cerca del centro da más puntos y encadena combos.');
@@ -27,7 +28,7 @@ k.run((dt) => {
   d.vx += (ax * 900 - d.vx) * Math.min(1, dt * 4); d.vy += (ay * 700 - d.vy) * Math.min(1, dt * 4); d.x = k.clamp(d.x + d.vx * dt, -600, 600); d.y = k.clamp(d.y + d.vy * dt, -320, 320);
   camX += (d.x * 0.85 - camX) * Math.min(1, dt * 8); camY += (d.y * 0.85 - 50 - camY) * Math.min(1, dt * 8);
   for (const r of rings) if (!r.done && r.z < z) { r.done = true; r.pt = 0.5; const dist = Math.hypot(d.x - r.x, d.y - r.y), [sx, sy] = P(r.x, r.y, r.z);
-    if (dist < r.r) { combo++; passed++; const center = dist < r.r * 0.35, pts = Math.round((center ? 100 : 50) * (1 + combo * 0.1)); score += pts; r.ok = true; k.sfx(center ? 'win' : 'coin');
+    if (dist < r.r * 1.15) { combo++; passed++; const center = dist < r.r * 0.35, pts = Math.round((center ? 100 : 50) * (1 + combo * 0.1)); score += pts; r.ok = true; k.sfx(center ? 'win' : 'coin');
       k.burst(sx, sy, center ? '#f2d15c' : '#5ce1e6', center ? 24 : 12, 220); k.float(center ? `¡Centro! +${pts}` : `+${pts}`, sx, sy - 40, center ? '#f2d15c' : '#fff'); }
     else { combo = 0; lives--; r.miss = true; navigator.vibrate && navigator.vibrate(110); k.float('¡Fallo!', 320, 120, '#ff5f7a'); if (lives <= 0) return k.lose(CFG.id, score, 'Sin batería', `${passed} anillos`); } }
   for (const r of rings) if (r.pt) r.pt = Math.max(0, r.pt - dt);
@@ -58,7 +59,7 @@ k.run((dt) => {
   // flecha hacia el próximo anillo si queda fuera de la vista
   if (next && k.st === 'play') { const [nx, ny] = P(next.x, next.y, next.z); if (nx < 20 || nx > 620 || ny < 20 || ny > 340) { const a = Math.atan2(ny - 180, nx - 320), ex = k.clamp(nx, 30, 610), ey = k.clamp(ny, 50, 330); c.save(); c.translate(ex, ey); c.rotate(a); c.beginPath(); c.moveTo(14, 0); c.lineTo(-8, -10); c.lineTo(-8, 10); c.closePath(); ART.fillOut(c, '#f2d15c', 2.5); c.restore(); } }
   // HUD
-  label(`${score}`, 14, 10, 26); for (let i = 0; i < 3; i++) battery(626 - 34 - i * 40, 14, i < lives);
+  label(`${score}`, 14, 10, 26); for (let i = 0; i < 4; i++) battery(626 - 34 - i * 40, 14, i < lives);
   if (combo > 1) label(`Combo x${combo}`, 320, 56, 18, '#f2d15c', 'center');
 });
 function battery(x, y, full) { ART.rr(c, x, y, 30, 16, 4); ART.fillOut(c, full ? '#2a2248' : 'rgba(42,34,72,.5)', 2.5); c.fillStyle = OUT; c.fillRect(x + 30, y + 4, 4, 8); if (full) { c.fillStyle = '#7cf7a0'; for (let i = 0; i < 3; i++) c.fillRect(x + 4 + i * 8, y + 4, 6, 8); } }

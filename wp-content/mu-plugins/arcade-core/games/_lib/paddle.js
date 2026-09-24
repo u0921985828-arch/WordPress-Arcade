@@ -13,8 +13,8 @@ const tp = (x, y) => (LAND ? [640 - y, x] : [OXT + x * SCL, TOP + y * SCL]);
 const burstAt = (x, y, col, n, v) => { const [a, b] = tp(x, y); k.burst(a, b, col, n, v); }, floatAt = (txt, x, y, col) => { const [a, b] = tp(x, y); k.float(txt, a, b, col); };
 /* teclas en coordenadas de mesa: en apaisado → (↑ pantalla = ← mesa, → pantalla = ↑ mesa, hacia el rival) */
 const keyset = (S) => (LAND ? { l: S.has('up'), r: S.has('down'), u: S.has('right'), d: S.has('left') } : { l: S.has('left'), r: S.has('right'), u: S.has('up'), d: S.has('down') });
-/* CPU: empieza floja (0,5) y mejora con los puntos jugados del partido (+0,4 como máximo) y con cada victoria tuya (+0,04, hasta 5).
- * Si te saca 3 o más puntos afloja un poco. Antes: 0,55 + 0,03 por punto sin tope (1,15 al final de un partido largo). */
+/* CPU: empieza floja (0,35; 1.23) y mejora con los puntos jugados del partido (+0,32 como máximo) y con cada victoria tuya (+0,02, hasta 5).
+ * Si te saca 2 o más puntos afloja un poco. Antes: 0,55 + 0,03 por punto sin tope (1,15 al final de un partido largo). */
 let CPU = 0; try { CPU = Math.min(5, +localStorage.getItem('cpu:' + CFG.id) || 0); } catch (e) { /* sin almacenamiento */ }
 let me, ai, puck, sMe, sAi, serveT, rally, trail, goalT, goalMe, tm, bounceMk, server, aiOff = 0, meOff = 0, cdPend = false;
 /* Modo tele: SLOT = [jugador abajo, jugador arriba] fijado al empezar el partido (J1 abajo/izquierda, J2 arriba/derecha).
@@ -32,7 +32,7 @@ function serve(dir) {
   trail = []; rally = 0; bounceMk = null; aiOff = 0;
   if (HK) { puck = { x: 180, y: 320, vx: k.rnd(-120, 120), vy: dir * 60, r: 16, bz: 0 }; serveT = 1; return; }
   server = serverIsMe(); const d = server ? -1 : 1, p = server ? me : ai; // la pelota sale de la raqueta de quien saca
-  puck = { x: p.x, y: server ? PYME - 14 : PYAI + 14, vx: k.rnd(-90, 90), vy: d * (VSM() ? 380 : 300), r: 9, from: server ? PYME : PYAI, bounced: false }; serveT = 0.9; serveWait = 0;
+  puck = { x: p.x, y: server ? PYME - 14 : PYAI + 14, vx: k.rnd(-90, 90), vy: d * (VSM() ? 380 : 250), r: 9, from: server ? PYME : PYAI, bounced: false }; serveT = 0.9; serveWait = 0;
 }
 function reset() { SLOT = k.party ? [k.party[0].p, k.party[1] ? k.party[1].p : null] : [null, null]; cdPend = !!k.party; me = { x: 180, y: HK ? 560 : PYME, px: 180, py: 560, r: HK ? 28 : 0, w: 80 }; ai = { x: 180, y: HK ? 80 : PYAI, px: 180, py: 80, r: HK ? 28 : 0, w: 80 }; sMe = 0; sAi = 0; tm = 0; goalT = 0; serve(1); }
 k.onParty = () => { if (k.st !== 'play') return reset();
@@ -106,7 +106,7 @@ k.run((dt) => {
   if (!k.gate(reset)) return;
   if (cdPend) { cdPend = false; k.count(3); }
   if (k.counting()) return;
-  const lvl = 0.5 + CPU * 0.04 + Math.min(0.4, (sMe + sAi) * (HK ? 0.035 : 0.022)) - (sAi - sMe >= 3 ? 0.08 : 0);
+  const lvl = 0.35 + CPU * 0.02 + Math.min(0.32, (sMe + sAi) * (HK ? 0.026 : 0.016)) - (sAi - sMe >= 2 ? 0.1 : 0); // 1.23: más fácil (base 0,5→0,35, +0,04→+0,02 por victoria)
   me.px = me.x; me.py = me.y; ai.px = ai.x; ai.py = ai.y;
   const botHum = k.party ? HUM(0) : true;
   if (k.ptr.down && (botHum || !k.party)) { const qx = LAND ? k.ptr.y : (k.ptr.x - OXT) / SCL, qy = LAND ? 640 - k.ptr.x : (k.ptr.y - TOP) / SCL; me.x += (qx - me.x) * Math.min(1, dt * 25); if (HK) me.y += (qy - me.y) * Math.min(1, dt * 25); }
@@ -134,11 +134,11 @@ k.run((dt) => {
       if (puck.y > 628 - puck.r) { if (inGoal) return goal(false); puck.vy = -Math.abs(puck.vy); puck.y = 628 - puck.r; k.sfx('click'); }
       for (const m of [me, ai]) { const dx = puck.x - m.x, dy = puck.y - m.y, d = Math.hypot(dx, dy); if (d < m.r + puck.r && d > 0) { const nx = dx / d, ny = dy / d; puck.x = m.x + nx * (m.r + puck.r); puck.y = m.y + ny * (m.r + puck.r); const mvx = (m.x - m.px) / dt, mvy = (m.y - m.py) / dt; const rv = (puck.vx - mvx) * nx + (puck.vy - mvy) * ny;
         if (rv < 0) { puck.vx -= 1.9 * rv * nx; puck.vy -= 1.9 * rv * ny; k.sfx('hit'); puck.bz = 0.2; if (-rv > 500) burstAt(puck.x - nx * puck.r, puck.y - ny * puck.r, '#fff', 6, 120); }
-        const spd = Math.hypot(puck.vx, puck.vy); if (spd > 900) { puck.vx *= 900 / spd; puck.vy *= 900 / spd; }
+        const spd = Math.hypot(puck.vx, puck.vy); const CAP = VSM() ? 900 : 780; if (spd > CAP) { puck.vx *= CAP / spd; puck.vy *= CAP / spd; }
         /* disco pillado contra la baranda: no puede salirse de la mesa → retrocede el mazo (antes se quedaba atascado fuera, en la esquina) */
         const cx = k.clamp(puck.x, WX0 + puck.r, WX1 - puck.r), cy = Math.abs(puck.x - 180) < GOAL / 2 - 4 ? puck.y : k.clamp(puck.y, RAIL + puck.r, 628 - puck.r);
         if (cx !== puck.x || cy !== puck.y) { puck.x = cx; puck.y = cy; m.x = puck.x - nx * (m.r + puck.r); m.y = puck.y - ny * (m.r + puck.r); } } } }
-    else { for (const [p, dir] of [[me, -1], [ai, 1]]) { const py = p === me ? PYME : PYAI; if (Math.sign(puck.vy) === -dir && Math.abs(puck.y - py) < 10 && Math.abs(puck.x - p.x) < p.w / 2 + puck.r) { rally++; k.sfx('hit'); { const o = k.rnd(-34, 34) * (Math.random() < 0.1 + Math.min(0.35, rally * 0.02) ? 1.9 : 1); if (p === me) aiOff = o; else meOff = o; } /* la CPU apunta a un lado (devuelve con ángulo) y a veces calcula mal */ const spd = VSM() ? Math.min(1050, Math.hypot(puck.vx, puck.vy) * 1.1) : Math.min(820, Math.hypot(puck.vx, puck.vy) * 1.05); /* dos jugadores: bola más viva, puntos más cortos */ const off = (puck.x - p.x) / (p.w / 2), spin = (p.x - p.px) / dt * 0.25; puck.vx = off * spd * 0.7 + spin; puck.vy = dir * Math.sqrt(Math.max(1, spd * spd - puck.vx * puck.vx * 0.5)); puck.y = py + dir * 11; puck.from = py; puck.bounced = false; burstAt(puck.x, py, '#fff', 5, 90); if (rally > 0 && rally % 10 === 0) floatAt(`Rally ${rally}`, 180, 360, '#fff27a'); } }
+    else { for (const [p, dir] of [[me, -1], [ai, 1]]) { const py = p === me ? PYME : PYAI; if (Math.sign(puck.vy) === -dir && Math.abs(puck.y - py) < 10 && Math.abs(puck.x - p.x) < p.w / 2 + puck.r) { rally++; k.sfx('hit'); { const o = k.rnd(-34, 34) * (Math.random() < 0.1 + Math.min(0.35, rally * 0.02) ? 1.9 : 1); if (p === me) aiOff = o; else meOff = o; } /* la CPU apunta a un lado (devuelve con ángulo) y a veces calcula mal */ const spd = VSM() ? Math.min(1050, Math.hypot(puck.vx, puck.vy) * 1.1) : Math.min(700, Math.hypot(puck.vx, puck.vy) * 1.05) /* 1.23: 820→700 */; /* dos jugadores: bola más viva, puntos más cortos */ const off = (puck.x - p.x) / (p.w / 2), spin = (p.x - p.px) / dt * 0.25; puck.vx = off * spd * 0.7 + spin; puck.vy = dir * Math.sqrt(Math.max(1, spd * spd - puck.vx * puck.vx * 0.5)); puck.y = py + dir * 11; puck.from = py; puck.bounced = false; burstAt(puck.x, py, '#fff', 5, 90); if (rally > 0 && rally % 10 === 0) floatAt(`Rally ${rally}`, 180, 360, '#fff27a'); } }
       const tot = Math.abs(PYME - PYAI); if (!puck.bounced && Math.abs(puck.y - puck.from) / tot > 0.72) { puck.bounced = true; bounceMk = { x: puck.x, y: puck.y, t: 0.35 }; k.sfx('click'); }
       if (puck.y < 0) return goal(true); if (puck.y > 640) return goal(false); } }
   if (puck.bz) puck.bz = Math.max(0, puck.bz - dt);

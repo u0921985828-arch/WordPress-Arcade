@@ -21,7 +21,7 @@ const FT = {
   norm: { art: 'slime', hp: 1, sp: 1.35, w: 26, h: 22, gold: 5, col: '#8be04a' },
   fast: { art: 'bird', hp: 0.55, sp: 2.5, w: 26, h: 22, gold: 5 },
   armor: { art: 'knight', hp: 2.2, sp: 0.95, w: 22, h: 26, gold: 9, armor: 3 },
-  boss: { art: 'slime', hp: 11, sp: 0.62, w: 44, h: 38, gold: 60, col: '#b36cff' },
+  boss: { art: 'slime', hp: 8.8, sp: 0.62, w: 44, h: 38, gold: 60, col: '#b36cff' },
 };
 let grid, path, towers, foes, bullets, gold, lives, wave, spawnQ, spawnT, pick, score, between, fxs, sel, preview, banner, msg, tt, bg, cur, kbd, START, GOAL;
 
@@ -73,7 +73,7 @@ function build() {
   }
   bake();
 }
-function reset() { towers = []; foes = []; bullets = []; fxs = []; gold = 150; lives = 20; wave = 0; spawnQ = []; spawnT = 0; pick = 0; score = 0; between = 12; sel = null; preview = null; banner = null; msg = null; tt = 0; cur = [2, 3]; kbd = false; build(); }
+function reset() { towers = []; foes = []; bullets = []; fxs = []; gold = 200; lives = 25; /* 1.23: más fácil (antes 150 oro, 20 vidas) */ wave = 0; spawnQ = []; spawnT = 0; pick = 0; score = 0; between = 12; sel = null; preview = null; banner = null; msg = null; tt = 0; cur = [2, 3]; kbd = false; build(); }
 
 /* ---------- Fondo cacheado a 2× ---------- */
 const rnd = (s) => { const x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -158,7 +158,7 @@ function startWave() {
   k.sfx(wave % 5 === 0 ? 'hurt' : 'start'); spawnT = 0.4;
 }
 /* Primeras oleadas suaves: 0 en la oleada 1 → 1 en la 5 (vida, velocidad y separación de enemigos). */
-const easeW = () => Math.min(1, (wave - 1) / 4);
+const easeW = () => Math.min(1, (wave - 1) / 6); // 1.23: rampa hasta la oleada 7 (antes 5)
 function damage(f, d) { const T = FT[f.ty]; f.hp -= Math.max(1, d - (T.armor || 0)); f.hf = 0.1; }
 /* rectángulos del panel: tarjetas de torre y botón de oleada */
 const cardR = (i) => (PORT ? { x: 6 + i * 70, y: BB + 8, w: 64, h: H - BB - 14 } : { x: PX + 7, y: OY + 6 + i * 62, w: W - PX - 12, h: 56 });
@@ -205,8 +205,8 @@ k.run((dt) => {
   if (banner) { banner.t -= dt; if (banner.t <= 0) banner = null; }
   if (msg) { msg.life -= dt; if (msg.life <= 0) msg = null; }
   spawnT -= dt;
-  if (spawnQ.length && spawnT <= 0) { const ty = spawnQ.shift(), T = FT[ty]; spawnT = (ty === 'fast' ? 0.45 : 0.75) * (1 + 0.5 * (1 - easeW())); const hp = Math.round((18 + wave * 8 + wave * wave * 0.7) * T.hp * (0.6 + 0.4 * easeW()));
-    foes.push({ ty, i: 0, p: 0, hp, max: hp, slow: 0, hf: 0, face: 1, ph: Math.random() * 6, path: path.slice(), x: -20, y: 0, walked: 0, spk: 0.8 + 0.2 * easeW() }); }
+  if (spawnQ.length && spawnT <= 0) { const ty = spawnQ.shift(), T = FT[ty]; spawnT = (ty === 'fast' ? 0.56 : 0.94) * (1 + 0.5 * (1 - easeW())); const hp = Math.round((18 + wave * 8 + wave * wave * 0.7) * T.hp * (0.5 + 0.5 * easeW()) * 0.9);
+    foes.push({ ty, i: 0, p: 0, hp, max: hp, slow: 0, hf: 0, face: 1, ph: Math.random() * 6, path: path.slice(), x: -20, y: 0, walked: 0, spk: 0.65 + 0.2 * easeW() }); }
   /* --- enemigos --- */
   for (const f of foes) {
     f.slow -= dt; f.hf -= dt; const sp = FT[f.ty].sp * f.spk * (f.slow > 0 ? 0.5 : 1); f.p += sp * dt; f.walked += sp * dt;

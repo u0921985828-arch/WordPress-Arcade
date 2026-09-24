@@ -19,7 +19,7 @@ const LANE = {
 const VW = { truck: 2.4, car: 1.25, racer: 1.3, dozer: 1.5 };
 const CARCOL = ['#ff6b6b', '#5ce1e6', '#f2d15c', '#b98cff', '#ffa94d'];
 function build() {
-  lanes = []; const lv = Math.min(1, (level - 1) / 8), sp = 0.8 + 0.8 * lv, dive = 0.15 + 0.55 * lv; // nivel 1 suave → máximo en el nivel 9
+  lanes = []; const lv = Math.min(1, (level - 1) / 12), sp = 0.64 + 0.72 * lv, dive = 0.1 + 0.45 * lv; // nivel 1 suave → máximo en el nivel 13 (1.23: más fácil)
   for (const r in LANE) {
     const [type, dir, v, len] = LANE[r], river = type === 'log' || type === 'turtle', L = { type, dir, sp: v * sp, items: [], river };
     const gap = () => (river ? k.ri(2, 3) : k.ri(2, 4) + (level < 3 ? 1 : 0)) * S, first = LO + k.rnd(0, 80); let x = first;
@@ -29,8 +29,8 @@ function build() {
   }
   homes = [0, 1, 2, 3, 4].map((i) => ({ x: 36 + i * 88, filled: false, pop: 0 })); fly = { i: -1, t: 3 }; place();
 }
-function place() { f = { x: 6 * S, y: 12, fx: 6 * S, fy: 12, jt: 0, dir: 0, q: null, dead: 0, kind: '', land: 0 }; timer = 30; best = 12; }
-function reset() { score = 0; lives = 3; level = 1; build(); }
+function place() { f = { x: 6 * S, y: 12, fx: 6 * S, fy: 12, jt: 0, dir: 0, q: null, dead: 0, kind: '', land: 0 }; timer = 45; best = 12; }
+function reset() { score = 0; lives = 4; level = 1; build(); }
 /* profundidad de una tortuga que bucea (0 = a flote, 1 = sumergida) */
 function depth(it) { if (!it.dive) return 0; const q = (t + it.ph) % 5; return q < 3.2 ? 0 : q < 3.8 ? (q - 3.2) / 0.6 : q < 4.5 ? 1 : 1 - (q - 4.5) / 0.5; }
 reset(); k.show(CFG.title, 'Cruza la carretera y el río hasta las 5 charcas. Sube a troncos y tortugas (¡algunas bucean!). Atrapa la mosca para ganar puntos extra. Desliza, toca o usa las flechas.');
@@ -59,14 +59,14 @@ k.run((dt) => {
   f.land = Math.max(0, f.land - dt);
   timer -= dt; if (timer <= 0) { timer = 0; return die('time'); }
   const L = lanes[f.y], cx = f.x + S / 2;
-  if (L && !L.river && L.items.some((it) => cx + 10 > it.x + 3 && cx - 10 < it.x + it.w - 3)) return die('squash');
+  if (L && !L.river && L.items.some((it) => cx + 8.5 > it.x + 3 && cx - 8.5 < it.x + it.w - 3)) return die('squash');
   if (f.jt > 0) return;
   if (L && L.river) {
-    const on = L.items.find((it) => cx > it.x + 2 && cx < it.x + it.w - 2 && depth(it) < 0.7); if (!on) return die('splash');
+    const on = L.items.find((it) => cx > it.x - 3 && cx < it.x + it.w + 3 && depth(it) < 0.7); if (!on) return die('splash');
     f.x += L.dir * L.sp * dt; if (f.x < -12 || f.x > W - S + 12) return die('splash');
   }
   if (f.y === 0) {
-    const i = homes.findIndex((q) => Math.abs(q.x - cx) < 24 && !q.filled); if (i < 0) { f.y = 0; return die('squash'); }
+    const i = homes.findIndex((q) => Math.abs(q.x - cx) < 28 && !q.filled); if (i < 0) { f.y = 0; return die('squash'); }
     const h = homes[i]; h.filled = true; h.pop = 1; let pts = 50 + Math.floor(timer) * 5; if (fly.i === i) { pts += 200; fly.i = -1; fly.t = 6; k.float('¡Mosca! +200', h.x, rowY(0) + 30, '#f2d15c'); }
     score += pts; k.float(`+${pts}`, h.x, rowY(0) + 8, '#7cf7a0'); k.burst(h.x, rowY(0) + S / 2, '#7cf7a0', 16); k.sfx('coin');
     if (homes.every((q) => q.filled)) { score += 500 * level; level++; k.sfx('win'); k.confetti(); clearT = 1.6; build(); } else place();
@@ -193,9 +193,9 @@ function draw() {
 }
 function hud() {
   label(`${score}`, 12, 8, 22, '#fff'); label(`Nivel ${level}`, 12, 32, 12, '#9fe7ff');
-  for (let i = 0; i < 3; i++) { const x = W - 22 - i * 26, y = 20; c.save(); c.globalAlpha = i < lives ? 1 : 0.25; c.translate(x, y); c.beginPath(); c.ellipse(0, 2, 10, 8, 0, 0, R2); ART.fillOut(c, '#5ccf5a', 2);
+  for (let i = 0; i < 4; i++) { const x = W - 22 - i * 26, y = 20; c.save(); c.globalAlpha = i < lives ? 1 : 0.25; c.translate(x, y); c.beginPath(); c.ellipse(0, 2, 10, 8, 0, 0, R2); ART.fillOut(c, '#5ccf5a', 2);
     [-1, 1].forEach((sd) => { c.beginPath(); c.arc(sd * 5, -4, 4, 0, R2); ART.fillOut(c, '#fff', 1.5); c.fillStyle = OUT; c.beginPath(); c.arc(sd * 5, -4, 1.8, 0, R2); c.fill(); }); c.strokeStyle = OUT; c.lineWidth = 1.5; c.beginPath(); c.arc(0, 3, 4, 0.3, Math.PI - 0.3); c.stroke(); c.restore(); }
-  const fr = timer / 30, bx = 12, by = 48, bw = W - 24, low = timer < 8;
+  const fr = timer / 45, bx = 12, by = 48, bw = W - 24, low = timer < 8;
   ART.rr(c, bx, by, bw, 10, 5); ART.fillOut(c, '#0a0c20', 2);
   if (fr > 0) { ART.rr(c, bx + 2, by + 2, Math.max(6, (bw - 4) * fr), 6, 3); c.fillStyle = low ? (Math.sin(t * 12) > 0 ? '#ff5f7a' : '#ff9a5c') : fr > 0.5 ? '#7cf7a0' : '#f2d15c'; c.fill(); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(bx + 4, by + 3, Math.max(0, (bw - 8) * fr), 1.5); }
   if (clearT > 0) { c.globalAlpha = Math.min(1, clearT); label(`¡Nivel ${level}!`, W / 2, H / 2 - 20, 34, '#f2d15c', 'center'); c.globalAlpha = 1; }

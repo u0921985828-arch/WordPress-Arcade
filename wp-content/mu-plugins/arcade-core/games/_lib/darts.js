@@ -49,7 +49,7 @@ k.run((dt) => {
   hold = k.ptr.down || aDown; holdT = hold ? holdT + dt : 0;
   if (k.ptr.down) { aim.bx = k.ptr.x; aim.by = k.ptr.y - 80; }
   aim.bx = k.clamp(aim.bx, 20, 340); aim.by = k.clamp(aim.by, 90, 440);
-  const fat = Math.max(0, holdT - 2.2) * 0.6, amp = (24 + 10 * Math.min(1, darts / 15)) * (hold ? Math.min(1.3, 0.42 + fat) : 1);
+  const fat = Math.max(0, holdT - 3) * 0.5, amp = (19 + 10 * Math.min(1, darts / 22)) * (hold ? Math.min(1.3, 0.4 + fat) : 1); // 1.23: más fácil (oscilación 24–34 → 19–29, pulso firme 2,2→3 s)
   aim.x = aim.bx + Math.sin(t * 2.3) * amp + Math.sin(t * 5.1) * amp * 0.3; aim.y = aim.by + Math.cos(t * 1.9) * amp + Math.sin(t * 4.3) * amp * 0.3;
   if (k.ptr.up || (prevA && !aDown)) release(); prevA = aDown;
 }, () => {
@@ -57,10 +57,10 @@ k.run((dt) => {
   for (const d of thrown) drawDart(d.x, d.y, 1 + (1 - d.s) * 0.6, d.a);
   if (fly) { const e = fly.t, x = 180 + (fly.x - 180) * e, y = 720 + (fly.y - 720) * e - Math.sin(e * Math.PI) * 60; drawDart(x, y, 2.4 - e * 1.4, 1); }
   // mira
-  if (!fly && turnT <= 0) { const col = hold ? (holdT > 2.2 ? '#ff9a3d' : '#7cf7a0') : '#fff'; c.lineCap = 'round';
+  if (!fly && turnT <= 0) { const col = hold ? (holdT > 3 ? '#ff9a3d' : '#7cf7a0') : '#fff'; c.lineCap = 'round';
     for (const [lw, cl] of [[5, OUT], [2.5, col]]) { c.strokeStyle = cl; c.lineWidth = lw; c.beginPath(); c.arc(aim.x, aim.y, 11, 0, R2); c.moveTo(aim.x - 19, aim.y); c.lineTo(aim.x - 6, aim.y); c.moveTo(aim.x + 6, aim.y); c.lineTo(aim.x + 19, aim.y); c.moveTo(aim.x, aim.y - 19); c.lineTo(aim.x, aim.y - 6); c.moveTo(aim.x, aim.y + 6); c.lineTo(aim.x, aim.y + 19); c.stroke(); }
     c.fillStyle = col; c.beginPath(); c.arc(aim.x, aim.y, 2, 0, R2); c.fill();
-    if (hold) { const p = Math.min(1, holdT / 2.2); c.strokeStyle = OUT; c.lineWidth = 6; c.beginPath(); c.arc(aim.x, aim.y, 26, -Math.PI / 2, -Math.PI / 2 + R2 * p); c.stroke(); c.strokeStyle = col; c.lineWidth = 3; c.stroke(); }
+    if (hold) { const p = Math.min(1, holdT / 3); c.strokeStyle = OUT; c.lineWidth = 6; c.beginPath(); c.arc(aim.x, aim.y, 26, -Math.PI / 2, -Math.PI / 2 + R2 * p); c.stroke(); c.strokeStyle = col; c.lineWidth = 3; c.stroke(); }
     const [, lb] = scoreAt(aim.x, aim.y); label(lb, aim.x + 24, aim.y - 30, 12, '#fff6a8'); }
   // marcador tipo pizarra
   const y0 = 440; ART.rr(c, 10, y0, W - 20, 190, 12); ART.fillOut(c, '#6b4a2f', 3); ART.rr(c, 20, y0 + 10, W - 40, 170, 8); c.fillStyle = '#1f3a2e'; c.fill(); c.fillStyle = 'rgba(255,255,255,.04)'; for (let i = 0; i < 6; i++) c.fillRect(24 + i * 50, y0 + 14, 30, 160);

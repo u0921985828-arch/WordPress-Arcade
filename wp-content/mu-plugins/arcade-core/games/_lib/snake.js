@@ -94,7 +94,7 @@ function freeOk() {
 }
 function buildLevel() {
   th = THM[(level - 1) % THM.length]; floorCv = renderFloor(); rockCv = renderRock();
-  rocks = []; const n = Math.min(3 * (level - 1), Math.floor(COLS * ROWS * 0.1)), h = snake[0], d = DIRS[dir];
+  rocks = []; const n = Math.min(2 * (level - 1), Math.floor(COLS * ROWS * 0.08)), h = snake[0], d = DIRS[dir];
   for (let tries = 0; rocks.length < n && tries < 400; tries++) {
     const x = k.ri(0, COLS - 1), y = k.ri(0, ROWS - 1);
     if (onSnake(x, y) || rockAt(x, y) || foods.some((f) => f.x === x && f.y === y)) continue;
@@ -117,7 +117,7 @@ function reset() {
   dir = PORT ? 'up' : 'right'; const d = DIRS[dir], sx = PORT ? Math.floor(COLS / 2) : 6, sy = PORT ? ROWS - 6 : Math.floor(ROWS / 2);
   snake = []; for (let i = 0; i < 4; i++) snake.push({ x: sx - d[0] * i, y: sy - d[1] * i });
   prev = snake.map((s) => ({ x: s.x - d[0], y: s.y - d[1] }));
-  step = 1 / 4.5; acc = step * 0.999; foods = []; rocks = [];
+  step = 1 / 3.6; acc = step * 0.999; foods = []; rocks = [];
   buildLevel(); spawnFood('apple');
 }
 
@@ -186,8 +186,8 @@ function update(dt) {
   for (let i = foods.length - 1; i >= 0; i--) { const f = foods[i]; if (f.max && (f.life -= dt) <= 0) { k.burst(cx(f.x), cy(f.y), '#fff', 8, 80); foods.splice(i, 1); } }
   slowT = Math.max(0, slowT - dt);
   /* velocidad continua por manzanas comidas: 4,5 casillas/s al empezar → 11,5 hacia la manzana 64 (nivel 9) */
-  const dq = Math.min(1, eatenTotal / 64);
-  step = 1 / (4.5 + 7 * dq) * (slowT > 0 ? 1.45 : 1);
+  const dq = Math.min(1, eatenTotal / 96); // 1.23: más fácil (antes 4,5 → 11,5 en 64 manzanas)
+  step = 1 / (3.6 + 6.2 * dq) * (slowT > 0 ? 1.45 : 1);
   for (const b of bulges) b.d += dt / step; bulges = bulges.filter((b) => b.d < snake.length + 1);
   acc += dt; if (acc >= step) { acc -= step; if (acc > step) acc = 0; tick(); }
 }
@@ -349,10 +349,10 @@ function snakeMP() {
   }
   k.onParty = () => setup();
   function reset() {
-    cpuLv = Math.min(10, lsGet('cpu:' + ID)); S = []; setup(); clock = 0; over = false; overT = 0; goldT = 6; warned = 0; foods = []; t = 0;
+    cpuLv = Math.min(8, lsGet('cpu:' + ID)); S = []; setup(); clock = 0; over = false; overT = 0; goldT = 6; warned = 0; foods = []; t = 0;
     S.forEach((s, i) => { s.score = 0; s.alive = true; s.inv = 0; s.dying = 0; s.down = 0; place(s, START[i][0], START[i][1], START[i][2], 4); s.len0 = 4; });
     for (let i = 0; i < APPLES; i++) spawnApple('apple');
-    step = 1 / 3.3; acc = 0; k.count(3);
+    step = 1 / 3.0; acc = 0; k.count(3);
   }
   function turnS(s, nd) {
     const last = s.queue.length ? s.queue[s.queue.length - 1] : s.dir;
@@ -374,7 +374,8 @@ function snakeMP() {
     return q.length;
   }
   function cpuThink(s) {
-    const o = occGrid(true), h = s.body[0], err = Math.max(0.02, 0.16 - cpuLv * 0.014);
+    const o = occGrid(true), h = s.body[0], err = Math.max(0.05, 0.22 - cpuLv * 0.009); // 1.23: CPU más torpe (antes 0,16 − 0,014·nivel, mín 0,02)
+ 
     // BFS desde la cabeza hasta la comida más valiosa y cercana
     const par = new Int32Array(COLS * ROWS).fill(-2), q = [h.y * COLS + h.x]; par[q[0]] = -1; let goal = -1;
     const food = new Map(foods.map((f) => [f.y * COLS + f.x, f]));
@@ -443,12 +444,12 @@ function snakeMP() {
     // doradas: cada 9–13 s; en los últimos 25 s, cada 3–5 s
     if ((goldT -= dt) <= 0) { const late = left < 25; goldT = late ? 3 + Math.random() * 2 : 9 + Math.random() * 4; if (foods.filter((f) => f.kind === 'gold').length < (late ? 3 : 1)) spawnApple('gold', late ? 6 : 7); }
     // velocidad: 3,3 casillas/s → 8 hacia el final de la ronda
-    const e = Math.min(1, clock / (ROUND * 0.9)); step = 1 / (3.3 + 4.7 * e * e * (3 - 2 * e));
+    const e = Math.min(1, clock / (ROUND * 0.9)); step = 1 / (3.0 + 4.0 * e * e * (3 - 2 * e));
     acc += dt; if (acc >= step) { acc -= step; if (acc > step) acc = 0; tick(); }
   }
   function finish() {
     const rows = S.map((s) => ({ p: s.p, score: s.score })), hu = S.filter((s) => !s.cpu), top = Math.max(...rows.map((r) => r.score));
-    if (hu.length === 1 && hu[0].score === top && S.filter((s) => s.score === top).length === 1) lsSet('cpu:' + ID, Math.min(10, cpuLv + 1));
+    if (hu.length === 1 && hu[0].score === top && S.filter((s) => s.score === top).length === 1) lsSet('cpu:' + ID, Math.min(8, cpuLv + 0.5));
     k.podium(rows, { fmt: (v) => v + (v === 1 ? ' punto' : ' puntos'), head: hu.length === 1 && hu[0].score === top && S.filter((s) => s.score === top).length === 1 ? '¡Has ganado!' : undefined });
   }
   function draw() {

@@ -145,8 +145,8 @@ function finishClear(q) {
 }
 function die(q) { if (!q.alive) return; q.alive = false; q.cur = null; q.clearing = null; q.dieT = 0; k.sfx('explode'); k.shake(6); if (!over) { over = true; overT = 0; } }
 function pop(q, txt, col, size) { q.pops.push({ txt, col, size, t: 1.2, max: 1.2 }); if (q.pops.length > 3) q.pops.shift(); }
-/* gravedad (s por fila): 0,95 s al empezar (≈60 % de la normal) → 0,07 s hacia los 2,5 min de ronda */
-const grav = () => { const d = Math.min(1, rt / 150), e = d * d * (3 - 2 * d); return 0.95 + (0.07 - 0.95) * e; };
+/* gravedad (s por fila): 1,19 s al empezar → 0,082 s hacia los 3,75 min de ronda */
+const grav = () => { const d = Math.min(1, rt / 225), e = d * d * (3 - 2 * d); return 1.19 + (0.082 - 1.19) * e; }; /* 1.23: más fácil (antes 0,95 → 0,07 en 150 s) */
 
 /* ---------- IA de la CPU: evalúa todas las colocaciones (con y sin reserva) ---------- */
 function evalBoard(b, lines) {
@@ -167,10 +167,10 @@ function bestPlacements(q, t) {
   return out.sort((a, b) => b.s - a.s);
 }
 function cpuThink(q) {
-  const lv = cpuLv, a = bestPlacements(q, q.cur.t), alt = !q.holdUsed ? bestPlacements(q, q.hold || q.queue[0]) : [];
+  const lv = cpuLv * 0.5, a = bestPlacements(q, q.cur.t), alt = !q.holdUsed ? bestPlacements(q, q.hold || q.queue[0]) : [];
   let use = a, hold = false; if (alt.length && (!a.length || alt[0].s > a[0].s + 1.5)) { use = alt; hold = true; }
-  const err = Math.max(0.03, 0.2 - lv * 0.017), pick = use[Math.random() < err ? Math.min(use.length - 1, 1 + Math.floor(Math.random() * 3)) : 0] || { r: 0, x: 3 };
-  q.ai = { hold, r: pick.r, x: pick.x, t: Math.max(0.1, 0.5 - lv * 0.04) * (0.8 + Math.random() * 0.4), step: Math.max(0.028, 0.1 - lv * 0.007) };
+  const err = Math.max(0.06, 0.29 - lv * 0.017), pick = use[Math.random() < err ? Math.min(use.length - 1, 1 + Math.floor(Math.random() * 3)) : 0] || { r: 0, x: 3 };
+  q.ai = { hold, r: pick.r, x: pick.x, t: Math.max(0.16, 0.65 - lv * 0.04) * (0.8 + Math.random() * 0.4), step: Math.max(0.04, 0.13 - lv * 0.007) }; /* 1.23: más fácil */
 }
 function cpuTick(q, dt) {
   if (!q.cur) return; if (!q.ai) cpuThink(q);

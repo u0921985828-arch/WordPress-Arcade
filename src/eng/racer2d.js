@@ -210,7 +210,7 @@ function itemIcon(g, type, x, y, s) {
 /* ---------- Estado ---------- */
 const NCAR = 4, PTS = [10, 6, 3, 1], LAPS = () => (T.L < 4300 ? 3 : 2);
 let cars, race, phase, phT, cam, skids, parts, shots, puddles, finishOrder, raceT, round, roundT, lastWin, msg, msgT, cdPend = false, humans0 = 0;
-const skill = () => clamp(0.45 + CUP * 0.1, 0.45, 0.95);
+const skill = () => clamp(0.32 + CUP * 0.05, 0.32, 0.6); // 1.23: CPU más torpe (antes 0,45 + 0,1·copa, tope 0,95)
 const pace = () => (GAR ? Math.min(1, 0.8 + (round - 1) * 0.04) : [0.82, 0.91, 1][race] || 1);
 function mkCar(p) {
   const hu = k.human(p);
@@ -301,9 +301,9 @@ function cpuInput(car, dt) {
 }
 function vmax(car) {
   let v = 255 * pace();
-  if (car.cpu) { v *= ((GAR ? 0.9 : 0.86) + CUP * 0.025 + (GAR ? 0 : race * 0.02)) * car.spd;
+  if (car.cpu) { v *= ((GAR ? 0.86 : 0.82) + CUP * 0.0125 + (GAR ? 0 : race * 0.012)) * car.spd; // 1.23: antes 0,9/0,86 + 0,025·copa + 0,02·carrera
     const hs = cars.filter((q) => !q.cpu && q.alive); /* goma elástica suave: la CPU se acerca o afloja según el humano */
-    if (hs.length && !GAR) { const h = hs.reduce((a, b) => (b.prog > a.prog ? b : a)); v *= 1 + clamp((h.prog - car.prog) / 2500, -0.07, 0.08); } }
+    if (hs.length && !GAR) { const h = hs.reduce((a, b) => (b.prog > a.prog ? b : a)); v *= 1 + clamp((h.prog - car.prog) / 2500, -0.1, 0.06); } }
   return v;
 }
 function drive(car, dt) {

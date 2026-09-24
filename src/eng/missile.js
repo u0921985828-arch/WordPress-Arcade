@@ -7,8 +7,8 @@ let cities, bases, missiles, booms, inter, score, wave, left, spawnT, cur, tm, b
 function reset() { cities = [80, 150, 200, 280, 330, 400].map((x, i) => ({ x, alive: true, v: i })); bases = [{ x: 30, ammo: 10, a: -1.57 }, { x: 240, ammo: 10, a: -1.57 }, { x: 450, ammo: 10, a: -1.57 }];
   missiles = []; booms = []; inter = []; smoke = []; score = 0; wave = 0; tm = 0; endT = 0; cur = { x: 240, y: 160 }; lastP = { x: -1, y: -1 }; bonus = null; nextWave(); }
 /* Dificultad 0→1 por oleada (máximo en la 10): número de misiles, velocidad de caída y cadencia. */
-const DF = () => Math.min(1, (wave - 1) / 9), lerp = (a, b, q) => a + (b - a) * q;
-function nextWave() { wave++; left = Math.round(lerp(8, 30, DF())); spawnT = 2; bases.forEach((b) => (b.ammo = 10)); banner = 1.8; }
+const DF = () => Math.min(1, (wave - 1) / 13.5), /* 1.23: más fácil */ lerp = (a, b, q) => a + (b - a) * q;
+function nextWave() { wave++; left = Math.round(lerp(7, 25, DF())); spawnT = 2; bases.forEach((b) => (b.ammo = 10)); banner = 1.8; }
 reset(); k.show(CFG.title, 'Toca el cielo para lanzar un interceptor: explota donde tocaste. Teclado: flechas para apuntar y A para disparar. Protege las ciudades.');
 
 /* ---------- gráficos cacheados */
@@ -69,15 +69,15 @@ k.run((dt) => {
   if (!endT && !bonus) { if (k.ptr.hit && k.ptr.y < GY - 10) fire(k.ptr.x, k.ptr.y); if (k.hit.has('a')) fire(cur.x, cur.y); }
   for (const b of bases) { const ta = Math.atan2(cur.y - (GY - 14), cur.x - b.x); if (b.ammo > 0) b.a += (ta - b.a) * Math.min(1, dt * 8); }
   spawnT -= dt;
-  if (left > 0 && spawnT <= 0 && !endT) { left--; spawnT = k.rnd(0.5, 1.7) * lerp(1.3, 0.55, DF()); spawnMissile(k.rnd(0, 480), 0, lerp(24, 80, DF()), wave >= 3 && Math.random() < Math.min(0.4, 0.1 + wave * 0.04)); }
+  if (left > 0 && spawnT <= 0 && !endT) { left--; spawnT = k.rnd(0.5, 1.7) * lerp(1.62, 0.69, DF()); spawnMissile(k.rnd(0, 480), 0, lerp(19, 68, DF()), wave >= 3 && Math.random() < Math.min(0.32, 0.08 + wave * 0.03)); }
   for (const m of missiles) { const a = Math.atan2(GY + 5 - m.y, m.tx - m.x); m.x += Math.cos(a) * m.sp * dt; m.y += Math.sin(a) * m.sp * dt;
     if (m.split && m.y > 110 + (m.sx % 70)) { m.split = false; const n = k.ri(2, 3); for (let i = 0; i < n; i++) spawnMissile(m.x, m.y, m.sp, false); m.dead = true; k.sfx('pop'); k.burst(m.x, m.y, '#ff9a9a', 6, 60); }
     if (m.y >= GY) { m.dead = true; k.sfx('explode'); k.shake(6); booms.push({ x: m.x, y: GY, r: 0, t: 0, enemy: 1 });
-      for (const q of cities) if (q.alive && Math.abs(q.x - m.x) < 22) { q.alive = false; k.burst(q.x, GY - 12, '#ff9a3c', 20, 160); k.flash('rgba(255,90,60,.25)'); }
-      for (const q of bases) if (Math.abs(q.x - m.x) < 22 && q.ammo) { q.ammo = 0; k.burst(q.x, GY - 10, '#ffd23d', 14, 140); } } }
+      for (const q of cities) if (q.alive && Math.abs(q.x - m.x) < 19) { q.alive = false; k.burst(q.x, GY - 12, '#ff9a3c', 20, 160); k.flash('rgba(255,90,60,.25)'); }
+      for (const q of bases) if (Math.abs(q.x - m.x) < 19 && q.ammo) { q.ammo = 0; k.burst(q.x, GY - 10, '#ffd23d', 14, 140); } } }
   for (const i of inter) { const a = Math.atan2(i.ty - i.y, i.tx - i.x); i.x += Math.cos(a) * 360 * dt; i.y += Math.sin(a) * 360 * dt; if (Math.hypot(i.tx - i.x, i.ty - i.y) < 8) { i.dead = true; k.sfx('explode'); booms.push({ x: i.tx, y: i.ty, r: 0, t: 0 }); } }
   for (const b of booms) { b.t += dt; b.r = Math.sin(Math.min(1, b.t / 1.2) * Math.PI) * 32; if (b.t > 1.2) b.dead = true;
-    if (!b.enemy) for (const m of missiles) if (!m.dead && Math.hypot(m.x - b.x, m.y - b.y) < b.r) { m.dead = true; const pts = m.split ? 50 : 25; score += pts; k.burst(m.x, m.y, '#ffe9a8', 10); k.float(`+${pts}`, m.x, m.y - 10, '#fff27a'); booms.push({ x: m.x, y: m.y, r: 0, t: 0 }); } }
+    if (!b.enemy) for (const m of missiles) if (!m.dead && Math.hypot(m.x - b.x, m.y - b.y) < b.r * 1.2) { m.dead = true; const pts = m.split ? 50 : 25; score += pts; k.burst(m.x, m.y, '#ffe9a8', 10); k.float(`+${pts}`, m.x, m.y - 10, '#fff27a'); booms.push({ x: m.x, y: m.y, r: 0, t: 0 }); } }
   missiles = missiles.filter((m) => !m.dead); inter = inter.filter((i) => !i.dead); booms = booms.filter((b) => !b.dead);
   if (!endT && !cities.some((q) => q.alive)) { endT = 1.4; k.sfx('hurt'); }
   if (!endT && !bonus && !left && !missiles.length && !booms.length && !inter.length) {

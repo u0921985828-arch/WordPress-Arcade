@@ -14,7 +14,7 @@ function label(s, x, y, size, col, align, base) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = base || 'top';
   c.lineJoin = 'round'; c.lineWidth = size / 4 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
 }
-let LV = 0; try { LV = clamp(+localStorage.getItem('cpu:' + CFG.id) || 0, 0, 5); } catch (e) { /* sin almacenamiento */ }
+let LV = 0; try { LV = clamp(+localStorage.getItem('cpu:' + CFG.id) || 0, 0, 9); } catch (e) { /* sin almacenamiento */ }
 const NS = 4, ROUND_T = 60, WINS = 2, HP = 5, RELOAD = 1.8, BALL_V = 265, BALL_T = 0.9, VMAX = 92, R_SHIP = 14, CN = ['roja', 'azul', 'amarilla', 'verde'];
 /* Velocidad según el ángulo entre el rumbo y hacia donde sopla el viento (0 = de popa, π = de proa) */
 const POLAR = [[0, 0.74], [0.6, 0.86], [1.2, 0.98], [1.6, 1], [2.0, 0.86], [2.3, 0.6], [2.5, 0.2], [Math.PI, 0.1]];
@@ -85,7 +85,7 @@ function chestSprite() {
 /* ---------- Estado ---------- */
 let ships, balls, chests, fx, wakes, wind, windT, windTo, roundN, roundT, phase, phT, chestT, lastMsg, msgT, cdPend = false, streaks, bestOf;
 const spawnPts = () => [[62, 64, 0.6], [W - 62, H - 64, 0.6 + Math.PI], [W - 62, 64, Math.PI - 0.6], [62, H - 64, -0.6]].map(([x, y, a]) => ({ x, y, a: PORT ? a + 0.4 : a }));
-const skill = () => clamp(0.35 + LV * 0.12 + (roundN - 1) * 0.05, 0.3, 0.98);
+const skill = () => clamp(0.245 + LV * 0.06 + (roundN - 1) * 0.03, 0.2, 0.85); /* 1.23: más fácil (antes 0,35 + 0,12/victoria, tope 0,98) */
 function mkShip(p) { const hu = k.human(p); return { p, col: k.pcol(p), cpu: !hu, name: hu ? (k.party ? 'J' + (p + 1) : 'Tú') : 'CPU', x: 0, y: 0, a: 0, v: 0, vx: 0, vy: 0, hp: HP, rl: 0, rr: 0, pts: 0, total: 0, wins: 0, dead: 0, inv: 0, hurtT: 0, tack: 0, tackT: 0, goal: null, goalT: 0, react: 0, sail: 0, bump: 0 }; }
 function place(s, i) { const sp = spawnPts()[i]; Object.assign(s, { x: sp.x, y: sp.y, a: sp.a, v: 20, vx: 0, vy: 0, hp: HP, dead: 0, inv: 3, rl: 0.5, rr: 0.5 }); }
 function newRound() {
@@ -109,7 +109,7 @@ function sailF(s) { return polar(wrapA(s.a - wind)); }
 function steerTo(s, tgt, dt) { const da = wrapA(tgt - s.a), rate = 1.7 * (0.4 + 0.6 * Math.min(1, s.v / 50)); s.a += clamp(da, -rate * dt, rate * dt); }
 function fire(s, side) {
   const key = side < 0 ? 'rl' : 'rr'; if (s[key] > 0 || s.dead) return false;
-  s[key] = RELOAD; const fa = s.a + side * Math.PI / 2, fx0 = Math.cos(s.a), fy0 = Math.sin(s.a), vx = Math.cos(s.a) * s.v, vy = Math.sin(s.a) * s.v;
+  s[key] = s.cpu ? RELOAD * 1.33 : RELOAD; const fa = s.a + side * Math.PI / 2, fx0 = Math.cos(s.a), fy0 = Math.sin(s.a), vx = Math.cos(s.a) * s.v, vy = Math.sin(s.a) * s.v;
   for (const off of [-9, 0, 9]) { const a = fa + (Math.random() - 0.5) * 0.08, px = s.x + fx0 * off + Math.cos(fa) * 11, py = s.y + fy0 * off + Math.sin(fa) * 11;
     balls.push({ x: px, y: py, vx: Math.cos(a) * BALL_V + vx * 0.8, vy: Math.sin(a) * BALL_V + vy * 0.8, t: BALL_T + Math.random() * 0.08, owner: s });
     for (let n = 0; n < 4; n++) fx.push({ x: px, y: py, vx: Math.cos(fa) * 40 + (Math.random() - 0.5) * 30, vy: Math.sin(fa) * 40 + (Math.random() - 0.5) * 30, t: 0.7, max: 0.7, r: 4 + Math.random() * 4, col: '#e9e6f2', smoke: 1 }); }
@@ -168,7 +168,7 @@ function sink(s, by) {
   if (by) { by.pts += 2; k.float('+2 ¡Hundido!', by.x, by.y - 24, by.col); }
   k.float(`${s.name === 'Tú' ? '¡Te hunden!' : s.name + ' a pique'}`, s.x, s.y - 10, '#fff');
 }
-function hurt(s, by, n) { if (s.inv > 0 || s.dead) return; s.hp -= n; s.hurtT = 0.3; if (!s.cpu) { k.sfx('hurt'); k.flash('rgba(255,80,80,.25)'); } else k.sfx('hit'); if (s.hp <= 0) sink(s, by); }
+function hurt(s, by, n) { if (s.inv > 0 || s.dead) return; s.hp -= n; s.hurtT = 0.3; if (!s.cpu) { k.sfx('hurt'); k.flash('rgba(255,80,80,.25)'); } else k.sfx('hit'); if (s.hp <= 0) sink(s, by); else if (!s.cpu && !k.party) s.inv = 1.5; /* 1.23: respiro tras recibir daño */ }
 
 /* ---------- Bucle ---------- */
 function update(dt) {
@@ -223,7 +223,7 @@ function endRound() {
   if (mx >= WINS || roundN >= 4) {
     phase = 'end';
     const rows = ships.map((s) => ({ p: s.p, score: s.wins * 1000 + s.total, name: s.cpu ? 'CPU ' + CN[s.p] : s.name })), champ = ships.slice().sort((a, b) => b.wins * 1000 + b.total - (a.wins * 1000 + a.total))[0];
-    if (!k.party || !champ.cpu) { LV = clamp(LV + (champ.cpu ? (k.party ? 0 : -1) : 1), 0, 5); try { localStorage.setItem('cpu:' + CFG.id, LV); } catch (e) { /* sin almacenamiento */ } }
+    if (!k.party || !champ.cpu) { LV = clamp(LV + (champ.cpu ? (k.party ? 0 : -1) : 1), 0, 9); try { localStorage.setItem('cpu:' + CFG.id, LV); } catch (e) { /* sin almacenamiento */ } }
     if (!k.party) k.best(CFG.id, ships[0].total);
     const head = !k.party && !champ.cpu ? '¡Eres el rey de los mares!' : champ.cpu ? `¡Gana la CPU ${CN[champ.p]}!` : null;
     setTimeout(() => k.podium(rows, Object.assign({ fmt: (n) => `${Math.floor(n / 1000)} ronda${Math.floor(n / 1000) === 1 ? '' : 's'} · ${n % 1000} pts`, noTie: true }, head ? { head } : {})), 1400);

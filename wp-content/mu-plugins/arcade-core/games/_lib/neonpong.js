@@ -44,7 +44,7 @@ function renderArena() {
 function newPad(side) { return { y: FH / 2, vy: 0, h: 70, th: 70, longT: 0, shield: false, hitT: 0, side }; }
 function serve() { balls = []; serveT = 0.9; }
 function launch() {
-  const a = k.rnd(-0.45, 0.45), v = 250 + Math.min(rival - 1, 8) * 14;
+  const a = k.rnd(-0.45, 0.45), v = 200 + Math.min(rival - 1, 12) * 11; // 1.23: más fácil (250→200)
   balls.push({ x: FW / 2, y: FH / 2 + k.rnd(-40, 40), vx: Math.cos(a) * v * serveDir, vy: Math.sin(a) * v, spin: 0, last: null, trail: [], rot: 0, smash: 0 });
   k.sfx('jump');
 }
@@ -66,17 +66,18 @@ function grant(side, kind) {
 }
 
 /* ---------- IA ---------- */
+const LV = () => Math.min(9, 1 + (rival - 1) * 0.67); // 1.23: la IA sube de nivel más despacio
 function aiTarget() {
   let best = null, bt = 1e9;
   for (const b of balls) if (b.vx > 0) { const tt = (AX - PWID / 2 - BR - b.x) / b.vx; if (tt < bt) { bt = tt; best = b; } }
   if (!best) return FH / 2 + Math.sin(t * 0.8) * 20;
-  const L = Math.min(rival, 9);
-  if (best.x < FW * Math.max(0.12, 0.55 - L * 0.05)) return pad.a.y + (FH / 2 - pad.a.y) * 0.02;
+  const L = LV();
+  if (best.x < FW * Math.max(0.12, 0.62 - L * 0.055)) return pad.a.y + (FH / 2 - pad.a.y) * 0.02;
   // predicción con rebotes (sin efecto) + error que baja con el nivel + apuntar con el borde en niveles altos
   const span = FH - 2 * BR; let yy = best.y + best.vy * bt - BR; yy = ((yy % (2 * span)) + 2 * span) % (2 * span); if (yy > span) yy = 2 * span - yy;
   return yy + BR + aiErr + aiAim * pad.a.h * 0.32;
 }
-function rollAI() { const L = Math.min(rival, 9); aiErr = k.rnd(-1, 1) * Math.max(10, 78 - L * 8); aiAim = L >= 3 ? (pad.p.y < FH / 2 ? -1 : 1) * k.rnd(0.3, 1) : 0; }
+function rollAI() { const L = LV(); aiErr = k.rnd(-1, 1) * Math.max(14, 100 - L * 9); aiAim = L >= 3 ? (pad.p.y < FH / 2 ? -1 : 1) * k.rnd(0.3, 1) : 0; }
 
 /* ---------- física ---------- */
 function hitPad(b, p, px, dir) {
@@ -84,7 +85,7 @@ function hitPad(b, p, px, dir) {
   if (!(dir > 0 ? b.vx < 0 && b.x <= plane && prevX >= plane - 30 : b.vx > 0 && b.x >= plane && prevX <= plane + 30)) return;
   if (Math.abs(b.y - p.y) > p.h / 2 + BR) return;
   const o = k.clamp((b.y - p.y) / (p.h / 2), -1, 1), spd = Math.hypot(b.vx, b.vy), smash = Math.abs(p.vy) > 650;
-  const nv = Math.min(600 + Math.min(rival - 1, 8) * 32, spd * 1.045 + (smash ? 90 : 0)), a = o * 1.0;
+  const nv = Math.min(510 + Math.min(rival - 1, 12) * 22, spd * 1.045 + (smash ? 90 : 0)), a = o * 1.0;
   b.vx = Math.cos(a) * nv * dir; b.vy = Math.sin(a) * nv; b.x = plane; b.last = p.side;
   b.spin = k.clamp(p.vy / 1500, -0.7, 0.7); b.smash = smash ? 1 : 0; p.hitT = 0.18;
   const [sx, sy] = S(b.x, b.y); k.burst(sx, sy, COL[p.side], smash ? 16 : 8, smash ? 220 : 120);
@@ -119,7 +120,7 @@ function update(dt) {
   const kd = (k.held.has('down') || (PORT && k.held.has('right')) ? 1 : 0) - (k.held.has('up') || (PORT && k.held.has('left')) ? 1 : 0);
   P.y += kd * 440 * dt;
   // IA
-  const A = pad.a, ay = A.y, L = Math.min(rival, 9), aiSp = Math.min(720, 230 + L * 62), tgt = aiTarget();
+  const A = pad.a, ay = A.y, L = LV(), aiSp = Math.min(610, 160 + L * 50), tgt = aiTarget();
   A.y += k.clamp(tgt - A.y, -aiSp * dt, aiSp * dt);
   for (const p of [P, A]) {
     p.y = k.clamp(p.y, p.h / 2 + 8, FH - p.h / 2 - 8); p.vy = (p.y - (p === P ? oy : ay)) / Math.max(dt, 0.001);
