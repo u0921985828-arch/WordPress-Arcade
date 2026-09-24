@@ -482,6 +482,8 @@
   var trap = { armed: false, key: 0 };
   function arm() {
     if (trap.armed || S.leaving) return;
+    var ua = navigator.userActivation; // sin gesto real Chrome la saltaría: esperamos al siguiente
+    if (ua && !ua.isActive) return;
     try { history.pushState({ pt: 1 }, '', location.href); trap.armed = true; } catch (e) { /* nada */ }
   }
   window.addEventListener('popstate', function () {
