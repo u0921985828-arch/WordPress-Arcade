@@ -270,6 +270,8 @@ function blocksGame() {
   }
   window.__rj = { get grid() { return grid; }, get tray() { return tray; }, get score() { return score; }, fits: (i, x, y) => !!tray[i] && fits(tray[i], x, y), get kb() { return kb; }, get daily() { return daily; } };
   reset();
+  // tablero de muestra detrás de la pantalla de inicio (se vacía al empezar: reset() en la transición ready→play)
+  for (let y = 3; y < N; y++) for (let x = 0; x < N; x++) if ((x * 7 + y * 3) % 5 && !(y < 6 && x > 4) && x !== 7) grid[y][x] = PAL[(((x / 3) | 0) + ((y / 2) | 0) * 3) % PAL.length];
   k.show(CFG.title || 'Bloques 10×10', 'Arrastra las piezas al tablero. Completa filas o columnas para borrarlas y encadena rachas. Si ninguna pieza cabe, se acaba. Teclado: flechas mueven, A coloca, B cambia de pieza.<br>Toca para jugar');
   dailyBtn();
   k.run((dt) => {

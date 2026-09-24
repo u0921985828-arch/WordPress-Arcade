@@ -10,8 +10,16 @@ GAMES = [
         cfg=dict(mode='party', hud='bl', help='Minigolf por turnos para 1–4. ← → gira la flecha (↑ ↓ ajuste fino), mantén A y suelta cuando la fuerza sea la justa. En el móvil, arrastra hacia atrás. Si caes al agua, +1 golpe.'),
         pad=dict(d='8', a='Golpe'),
         mp=(1, 4),
-        desc=['x ' * 150],
-        tips=['a', 'b'],
+        desc=[
+            'Minigolf Party es un recorrido de nueve hoyos locos pensado para jugar en compañía: molinos con aspas que giran y te devuelven la bola si llegas a destiempo, cintas transportadoras que la arrastran de lado, rampas de madera que la hacen saltar por encima de los estanques, setas rebotadoras y trampas de arena. Cada hoyo se genera de nuevo en cada partida y siempre tiene un camino seco hasta la bandera, así que las rampas son un atajo arriesgado, no una obligación. Todos los hoyos son par 3 y hay un máximo de seis golpes, para que nadie se quede atascado.',
+            'Pueden jugar de una a cuatro personas por turnos. En la tele, cada jugador usa su móvil como mando: gira la flecha con el joystick, ajusta fino con arriba y abajo, mantén A mientras el indicador de fuerza sube y baja, y suelta en el momento justo. En el móvil basta con arrastrar hacia atrás, como un tirachinas, y en el ordenador sirven las flechas y la barra espaciadora. Las plazas libres las ocupa la CPU, que calcula sus golpes con la misma física que tú y afina la puntería cada vez que le ganas.',
+            'Tras cada hoyo aparece la tarjeta con los golpes de todos, y al final gana quien menos haya sumado, con un podio para presumir. Es corto, se entiende a la primera y siempre deja con ganas de la revancha.',
+        ],
+        tips=[
+            'Fíjate en el giro del molino: suelta el golpe justo cuando el hueco entre aspas vaya a pasar por tu línea.',
+            'Las rampas solo te hacen saltar si entras de frente y con algo de fuerza; si no llegas, rodea el estanque.',
+            'Un golpe suave cerca del hoyo entra solo: la copa atrae la bola cuando va despacio.',
+        ],
         players='1–4 jugadores',
     ),
     dict(
@@ -23,8 +31,16 @@ GAMES = [
         cfg=dict(mode='turnos', hud='bl', help='Bolos por turnos con marcador oficial. ← → coloca la bola, ↑ ↓ elige el efecto y mantén A: suelta cuando la barra de fuerza esté en verde.'),
         pad=dict(d='8', a='Tirar'),
         mp=(1, 4),
-        desc=['x '*150],
-        tips=['a', 'b'],
+        desc=[
+            'Bolera del Barrio es una partida de bolos de las de toda la vida, con su pista de madera encerada, sus diez bolos y el marcador oficial de diez frames: plenos, semiplenos y la décima entrada con bolas extra. La diferencia es que aquí se juega por turnos entre amigos, de uno a cuatro, cada uno con su color y su propia hoja de puntos a la vista, igual que en la pantalla de una bolera de verdad.',
+            'Con el mando, el joystick a izquierda y derecha coloca la bola en la línea de salida, arriba y abajo eligen el efecto y, al mantener A, una barra de fuerza sube y baja: suelta en la zona verde para un tiro limpio, porque en la zona roja la bola sale algo torcida. Una línea discontinua te enseña la curva que va a trazar. En el móvil también puedes arrastrar la bola para colocarla y deslizar hacia arriba para lanzar. Si faltan jugadores, la CPU ocupa su sitio y busca el hueco entre los bolos con una precisión que mejora cuando le ganas.',
+            'Lo mejor es la tensión de la última entrada: un pleno a tiempo puede darle la vuelta a la partida. Cada jugador tira su frame completo y pasa el turno, así que siempre hay alguien mirando y animando.',
+        ],
+        tips=[
+            'Busca el hueco entre el primer bolo y el de su lado: entrar un poco en ángulo tumba muchos más bolos que ir de frente.',
+            'El efecto se nota al final de la pista; si usas mucho, sal desde el lado contrario.',
+            'Para un semipleno, recoloca la bola frente a los bolos que quedan y tira con fuerza media.',
+        ],
         players='1–4 jugadores',
     ),
     dict(
@@ -36,8 +52,15 @@ GAMES = [
         cfg=dict(mode='versus', hud='bl', help='Tanda de 5 penaltis por cabeza y muerte súbita. Chutas: mantén una dirección y deja A pulsado para cargar; suelta en la franja verde. Paras: mantén hacia dónde te lanzas cuando el rival golpea.'),
         pad=dict(d='8', a='Chutar'),
         mp=(1, 2),
-        desc=['x '*150],
-        tips=['a', 'b'],
+        desc=[
+            'Penaltis Cara a Cara es una tanda de penaltis a dos: primero chuta uno y para el otro, y en el siguiente lanzamiento se cambian los papeles. Cada jugador tira cinco penaltis y, si la tanda acaba empatada, se pasa a muerte súbita hasta que alguien falle. El marcador con los círculos de cada tirador cuenta goles y fallos, y la tanda termina en cuanto uno ya no puede alcanzar al otro, como en un partido de verdad.',
+            'Para chutar, mantén el joystick hacia la zona de la portería que quieras, arriba para tirar por alto, y deja A pulsado: la barra de fuerza sube y baja, y si sueltas en rojo el balón puede irse por encima del larguero. Para parar, mantén la dirección hacia la que quieres lanzarte justo cuando el rival golpea. En la tele nadie ve la elección del otro, así que cuentan los nervios y el engaño. En el móvil puedes deslizar para chutar y tocar un lado de la portería para tirarte. Si juegas solo, la CPU hace de rival, aprende tus costumbres y mejora cuando le ganas.',
+            'Es rápido, directo y muy de piques: una tanda dura un par de minutos y siempre acaba con alguien pidiendo la revancha.',
+        ],
+        tips=[
+            'No chutes siempre al mismo lado: el portero rival, humano o CPU, acaba leyendo tus costumbres.',
+            'Un tiro flojo es fácil de parar; busca la franja verde de la barra de fuerza para el golpe ideal.',
+        ],
         players='1–2 jugadores',
     ),
     dict(
@@ -46,7 +69,7 @@ GAMES = [
         tags=['tablero', 'estrategia', 'clasico', 'vector'],
         orient='auto', aspect='4:3', inputs='TKMG',
         engine='board',
-        cfg=dict(mode='four', help='Deja caer fichas por las columnas y conecta 4 en horizontal, vertical o diagonal. ← → o joystick eligen columna; A o ↓ la sueltan; en el móvil, toca la columna.'),
+        cfg=dict(mode='four', hud='tr', help='Deja caer fichas por las columnas y conecta 4 en horizontal, vertical o diagonal. ← → o joystick eligen columna; A o ↓ la sueltan; en el móvil, toca la columna.'),
         pad=dict(d='h', a='Soltar'),
         mp=(1, 2),
         desc=[

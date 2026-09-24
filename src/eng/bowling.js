@@ -161,7 +161,7 @@ function resetT() { seats = k.players(nPl()); PL = seats.map((q) => ({ p: q.p, f
 function loadT(i) { cur = i; const q = PL[i]; frames = q.frames; strikes = q.st; spares = q.sp; aimX = q.ax; hookS = q.hk; roll = 0; rackPins(); standing = 10; setBall(); state = 'intro'; introT = 1.2; pw = 0; pwOn = false; aimT = 0; plan = null; }
 function saveT() { const q = PL[cur]; q.st = strikes; q.sp = spares; q.ax = aimX; q.hk = hookS; }
 function nextPlayer() { saveT(); let n = cur + 1; if (n >= PL.length) { n = 0; frame++; } if (frame >= 10) return finishT(); loadT(n); }
-k.onParty = () => { if (TURN && PL.length) seats = k.players(PL.length); };
+k.onParty = () => { if (!TURN) return; if (k.st === 'ready' || !PL.length) resetT(); else seats = k.players(PL.length); }; // antes de empezar se recuentan las plazas
 const nmB = (i) => (seats[i].cpu ? 'CPU' : String(seats[i].name).slice(0, 8));
 function scoreOf(fr) { const sv = frames; frames = fr; const r = score(); frames = sv; return r; }
 function finishT() { k.st = 'over'; state = 'done'; const rows = PL.map((q, i) => ({ p: q.p, score: scoreOf(q.frames).pop() || 0 })); const hum = seats.filter((q) => !q.cpu);

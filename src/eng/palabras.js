@@ -6,7 +6,7 @@
  *  'sopa'  Sopa de Letras: rejilla generada con 8 palabras de una categoría; arrastra para marcar. Las direcciones crecen con el nivel.
  * Datos propios con fetch diferido: ../_data/palabras5-es.txt y ../_data/categorias-es.json. Se compara sin tildes; la Ñ es letra. */
 const MODE = CFG.mode || 'daily', OUT = ART.OUT, TAU = 6.2832;
-const LAND = innerWidth > innerHeight * 1.05;
+const LAND = innerWidth >= innerHeight * 0.98;
 const W = LAND ? 800 : 450, H = LAND ? 450 : 800;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: MODE === 'hang' ? '#1d2b4a' : MODE === 'sopa' ? '#1c2342' : '#171c36' }), c = k.ctx;
 const FONT = (s, wt) => `${wt || 800} ${s}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
@@ -191,7 +191,7 @@ const D = (() => {
     if (k.hit.has('b')) del();
   }
   function onKey(e) {
-    if (k.st !== 'play' || k.paused || !SOL || e.ctrlKey || e.metaKey || e.altKey) return false;
+    if (!e.isTrusted || k.st !== 'play' || k.paused || !SOL || e.ctrlKey || e.metaKey || e.altKey) return false;
     if (S.phase === 'done') return false;
     const key = e.key || '';
     if (key.length === 1 && /[a-zñáéíóúü]/i.test(key)) { typeL(norm(key)); S.showCur = false; return true; }
@@ -250,14 +250,20 @@ const D = (() => {
       st.h.forEach((v, i) => { const by = yy + i * (bh + gap), bw = 28 + (w - 90) * (v / hMax), hi = won && i === S.rows.length - 1; txt(String(i + 1), x + 24, by + bh / 2, 16, '#fff', 'center', 900); c.fillStyle = hi ? '#4caf62' : '#5b5f78'; ART.rr(c, x + 40, by, bw, bh, 6); c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke(); txt(String(v), x + 40 + bw - 12, by + bh / 2 + 1, 15, '#fff', 'center', 900); });
       yy += 6 * (bh + gap) + 4;
       txt('Nueva palabra en ' + countdown(), x + w / 2, yy + 10, 17, '#fff', 'center', 800);
-    } else { txt('Partida de práctica: no cuenta para la racha.', x + w / 2, yy + 20, 16, '#cfc8ff', 'center', 700); }
+    } else {
+      const st = stats(), l1 = 'Partida de práctica: no cuenta para la racha.';
+      txt(l1, x + w / 2, yy + 20, fitSize(l1, w - 24, 16, 11, 700), '#cfc8ff', 'center', 700);
+      outlined(won ? S.rows.length + '/6' : 'X/6', x + w / 2, yy + 80, 54, won ? '#7cf7a0' : '#ffb0b0', 'center', 7);
+      txt('Racha diaria: ' + st.s + ' · Mejor: ' + st.m, x + w / 2, yy + 140, 17, '#fff', 'center', 800);
+      txt('Nueva palabra del día en ' + countdown(), x + w / 2, yy + 170, 16, '#cfc8ff', 'center', 700);
+    }
     const br = btnRects(), lab = ['Compartir', S.practice ? 'Otra palabra' : 'Practicar'];
     br.forEach((r, i) => { panel(r[0], r[1], r[2], r[3], 14, i ? '#6e62f5' : '#3fa55a', { lw: 3 }); outlined(lab[i], r[0] + r[2] / 2, r[1] + r[3] / 2, 21, '#fff', 'center', 4); if (S.btn === i && S.doneT > 1.1) { c.save(); c.lineWidth = 4; c.strokeStyle = '#ffd166'; ART.rr(c, r[0] - 5, r[1] - 5, r[2] + 10, r[3] + 10, 17); c.stroke(); c.restore(); } });
     c.restore();
   }
   function draw() {
     const t = performance.now() / 1000;
-    c.drawImage(backdrop('#232a52', '#0f1228'), 0, 0);
+    c.drawImage(backdrop('#232a52', '#0f1228', 12), 0, 0);
     /* cabecera */
     const title = !S.started ? CFG.title : S.practice ? 'Práctica' : 'Palabra del Día nº ' + (S.day + 1);
     if (LAND) { outlined(title, L.kx + (L.kw * 10 + L.kg * 9) / 2, 48, fitSize(title, 390, 30, 16, 900), '#ffd166', 'center', 6); txt(S.started ? `Intento ${Math.min(6, S.rows.length + 1)} de 6` : 'Cinco letras, seis intentos', L.kx + (L.kw * 10 + L.kg * 9) / 2, 88, 18, '#cfc8ff', 'center', 700); }
@@ -326,7 +332,7 @@ const HG = (() => {
     }
   }
   function cpuChoice() {
-    const w = W0(), L2 = lvl(), smart = Math.random() < Math.min(0.9, 0.42 + L2 * 0.06);
+    const w = W0(), L2 = lvl(), smart = Math.random() < Math.min(0.85, 0.25 + L2 * 0.07);
     if (smart) {
       const wrong = [...guessed].filter((ch) => !w.n.includes(ch));
       const cand = CATS[w.cat].map(norm).filter((x) => x.length === w.n.length && [...x].every((ch, i) => (guessed.has(w.n[i]) ? ch === w.n[i] : !guessed.has(ch))) && !wrong.some((ch) => x.includes(ch)));
@@ -342,7 +348,7 @@ const HG = (() => {
     if (humTop) SAVE('cpu:' + CFG.id, Math.min(8, lvl() + 1));
     if (!k.party) k.best(CFG.id, seats[0].score);
     if (k.privOK) for (const q of seats) if (!q.cpu) k.priv(q.p, null);
-    k.podium(rows, { go: `${k.party ? '' : 'Tu récord: ' + k.best(CFG.id, 0) + '<br>'}Toca para otra partida` });
+    k.podium(rows, { head: humTop && !k.party ? '¡Has ganado!' : undefined, go: `${k.party ? '' : 'Tu récord: ' + k.best(CFG.id, 0) + '<br>'}Toca para otra partida` });
   }
   function update(dt) {
     if (!CATS) return;
@@ -367,7 +373,7 @@ const HG = (() => {
     if (s.p === 0 && k.ptr.hit) for (let i = 0; i < 27; i++) if (inR(keyRect(i), k.ptr.x, k.ptr.y)) { cursorShown = false; pickL(ALPHA[i]); break; }
   }
   function onKey(e) {
-    if (k.st !== 'play' || k.paused || !words || phase !== 'turn' || e.ctrlKey || e.metaKey || e.altKey) return false;
+    if (!e.isTrusted || k.st !== 'play' || k.paused || !words || phase !== 'turn' || e.ctrlKey || e.metaKey || e.altKey) return false;
     const s = seats[turn]; if (s.cpu || s.p !== 0 || k.party) return false;
     const key = e.key || '';
     if (key.length === 1 && /[a-zñáéíóúü]/i.test(key)) { pickL(norm(key)); cursorShown = false; return true; }
@@ -423,7 +429,7 @@ const HG = (() => {
     const rx = gx + bw - 6, sw = happy ? 0 : Math.sin(t * 2) * 3;
     if (m >= 4 && !happy) { c.strokeStyle = OUT; c.lineWidth = 6; c.beginPath(); c.moveTo(rx, top + 12); c.quadraticCurveTo(rx + sw, top + 40, rx + sw, top + ah * 0.2); c.stroke(); c.strokeStyle = '#d9b77a'; c.lineWidth = 3; c.stroke(); }
     c.restore();
-    const col = sample || (seats && seats[turn] ? k.pcol(seats[turn].p) : '#6e62f5');
+    const col = sample || '#4fa3e0';
     if (happy) { const jump = Math.abs(Math.sin(t * 6)) * s * 0.9; figure(ax + aw * 0.72, gy - s * 2.1 - jump, s, 4, 'happy', t, col); }
     else if (m >= 5) figure(rx + sw, top + ah * 0.2 + s * 0.55, s, m - 4, m >= MAXM ? 'lost' : m >= 7 ? 'worry' : 'calm', t, col);
     /* marcador de fallos */
@@ -443,9 +449,10 @@ const HG = (() => {
     list.forEach((s, i) => {
       const x = cx0 + i * (gw + 8), on = !ready && phase === 'turn' && turn === i, col = k.pcol(s.p);
       panel(x, cy0 + (on ? -3 : 0), gw, ch, 12, on ? ART.dark(col, 0.2) : '#2a2f5a', { stroke: on ? '#fff' : OUT, lw: on ? 3.5 : 3 });
-      c.beginPath(); c.arc(x + 18, cy0 + ch / 2 + (on ? -3 : 0), 9, 0, TAU); c.fillStyle = col; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
-      outlined(s.name, x + 32, cy0 + ch / 2 + (on ? -3 : 0), fitSize(s.name, gw - 80, 18, 12, 900), '#fff', 'left', 4);
-      outlined(String(s.score), x + gw - 10, cy0 + ch / 2 + (on ? -3 : 0), 20, '#ffd166', 'right', 4);
+      c.beginPath(); c.arc(x + 17, cy0 + (gw >= 150 ? ch / 2 : 15) + (on ? -3 : 0), 8, 0, TAU); c.fillStyle = col; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
+      const oy = on ? -3 : 0;
+      if (gw >= 150) { outlined(s.name, x + 32, cy0 + ch / 2 + oy, fitSize(s.name, gw - 80, 18, 12, 900), '#fff', 'left', 4); outlined(String(s.score), x + gw - 10, cy0 + ch / 2 + oy, 20, '#ffd166', 'right', 4); }
+      else { outlined(s.name, x + 30, cy0 + 15 + oy, fitSize(s.name, gw - 36, 17, 11, 900), '#fff', 'left', 4); outlined(String(s.score), x + gw / 2 + 10, cy0 + 35 + oy, 19, '#ffd166', 'center', 4); }
       if (on && s.cpu) { const d = Math.floor(t * 3) % 3; for (let j = 0; j < 3; j++) { c.fillStyle = j === d ? '#fff' : 'rgba(255,255,255,.4)'; c.beginPath(); c.arc(x + gw / 2 - 8 + j * 8, cy0 + ch + 6, 3, 0, TAU); c.fill(); } }
     });
     /* ilustración */
@@ -623,4 +630,4 @@ addEventListener('keydown', (e) => { if (M.onKey(e)) { e.preventDefault(); e.sto
 M.reset();
 k.show(CFG.title, M.intro);
 k.run((dt) => { if (!k.gate(M.reset)) return; M.update(dt); }, () => M.draw());
-addEventListener('resize', () => { clearTimeout(window.__ot); window.__ot = setTimeout(() => { if ((innerWidth > innerHeight * 1.05) !== LAND && (k.st !== 'play' || MODE === 'daily')) location.reload(); }, 400); });
+addEventListener('resize', () => { clearTimeout(window.__ot); window.__ot = setTimeout(() => { if ((innerWidth >= innerHeight * 0.98) !== LAND && (k.st !== 'play' || MODE === 'daily')) location.reload(); }, 400); });

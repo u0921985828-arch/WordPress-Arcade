@@ -6,7 +6,7 @@
  * Puntos: acierto 100 + hasta 100 por rapidez (la última pregunta vale doble); en Verdad o Bulo el fallo resta 50.
  * CPU: acierta según la dificultad de la pregunta y mejora con las victorias humanas guardadas en localStorage (cpu:<id>). */
 const TF = CFG.mode === 'tf', OUT = ART.OUT, TAU = 6.2832;
-const LAND = innerWidth > innerHeight * 1.05;
+const LAND = innerWidth >= innerHeight * 0.98;
 const W = LAND ? 800 : 450, H = LAND ? 450 : 800;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: TF ? '#14233a' : '#1b1640' }), c = k.ctx;
 const FONT = (s, wt) => `${wt || 800} ${s}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
@@ -108,7 +108,8 @@ function finish() {
   const me = seat[0]; if (!k.party) k.best(CFG.id, me.score);
   if (k.privOK) for (const s of seat) if (hum(s.p)) k.priv(s.p, null);
   const aciertos = k.party ? '' : ` · Aciertos: ${me.ok}/${NQ}`;
-  k.podium(rows, { go: `${k.party ? '' : 'Tu récord: ' + k.best(CFG.id, 0) + aciertos + '<br>'}Toca para otra ronda` });
+  const srt = rows.slice().sort((a, b) => b.score - a.score), solo1 = !k.party && srt[0].p === 0 && (srt.length < 2 || srt[1].score < srt[0].score);
+  k.podium(rows, { head: solo1 ? '¡Has ganado!' : undefined, go: `${k.party ? '' : 'Tu récord: ' + k.best(CFG.id, 0) + aciertos + '<br>'}Toca para otra ronda` });
 }
 function optRect(i) { return TF ? L.tfo(i) : L.opt(i); }
 
@@ -163,7 +164,7 @@ k.run((dt) => {
     if (pt > dur || skip) { if (qi >= NQ - 1) { phase = 'end'; finish(); } else beginQ(); }
   }
 }, draw);
-addEventListener('resize', () => { clearTimeout(window.__ot); window.__ot = setTimeout(() => { if ((innerWidth > innerHeight * 1.05) !== LAND && k.st !== 'play') location.reload(); }, 400); });
+addEventListener('resize', () => { clearTimeout(window.__ot); window.__ot = setTimeout(() => { if ((innerWidth >= innerHeight * 0.98) !== LAND && k.st !== 'play') location.reload(); }, 400); });
 
 /* ---------- Dibujo ---------- */
 let bgC = null;
@@ -283,7 +284,7 @@ function draw() {
     panel(cx0, cy0, cw, ch, 20, '#f6f1ff');
     outlined(CFG.title, W / 2, cy0 + ch * 0.38, LAND ? 40 : 34, '#ffd36b', 'center', 7);
     c.font = FONT(18, 700); c.textAlign = 'center'; c.fillStyle = OUT; c.fillText(!DATA ? 'Cargando preguntas…' : TF ? '¿Verdad o bulo?' : 'Seis categorías · diez preguntas', W / 2, cy0 + ch * 0.66);
-    for (let i = 0; i < (TF ? 2 : 4); i++) { const [x, y, w, h] = optRect(i); panel(x, y, w, h, 16, TF ? (i ? '#d9534f' : '#3fa55a') : '#2d2a5c'); if (TF) { (i ? cross : check)(x + w / 2, y + h * 0.4, 44, '#fff'); outlined(i ? 'BULO' : 'VERDAD', x + w / 2, y + h * 0.76, 30, '#fff', 'center', 6); } else { const bx = x + (LAND ? 30 : 24), by = LAND ? y + h / 2 : y + 24; c.beginPath(); c.arc(bx, by, 18, 0, TAU); c.fillStyle = OPC[i]; c.fill(); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke(); outlined(LET[i], bx, by + 1, 20, '#fff', 'center', 4); } }
+    for (let i = 0; i < (TF ? 2 : 4); i++) { const [x, y, w, h] = optRect(i); panel(x, y, w, h, 16, TF ? (i ? '#d9534f' : '#3fa55a') : '#2d2a5c'); if (TF) { (i ? cross : check)(x + w / 2, y + h * 0.4, 44, '#fff'); outlined(i ? 'BULO' : 'VERDAD', x + w / 2, y + h * 0.76, 30, '#fff', 'center', 6); } else { const bx = x + (LAND ? 30 : 24), by = LAND ? y + h / 2 : y + 24; c.beginPath(); c.arc(bx, by, 18, 0, TAU); c.fillStyle = OPC[i]; c.fill(); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke(); outlined(LET[i], bx, by + 1, 20, '#fff', 'center', 4); const smp = ['Geografía', 'Historia', 'Ciencia', 'Arte y cultura'][i]; if (LAND) textBlock(smp, x + 58, y + 6, w - 70, h - 12, L.of, 14, '#fff', 800, 'left'); else textBlock(smp, x + 10, y + 40, w - 20, h - 48, L.of, 13, '#fff', 800); } }
     (seat || []).forEach((s, i) => lectern(i, s, t));
     return;
   }

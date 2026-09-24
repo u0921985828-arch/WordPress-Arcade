@@ -385,8 +385,10 @@ function landX(yLevel) { // dónde cruzará el balón la altura yLevel al bajar
 function voleyHit(b, spike, over, aimX) {
   const s = b.team ? 1 : -1, other = -s; touches[b.team]++; touches[1 - b.team] = 0; lastTouch = b; ball.held = false;
   if (touches[b.team] > 3) return point(1 - b.team, '¡Cuatro toques!');
-  const [bx, by] = [ball.x, ball.y];
-  if (spike) { const tx = NET + other * (60 + Math.random() * 180) + (aimX || 0) * 60, T0 = Math.abs(tx - bx) / 520; let vy = (GROUND - 20 - by - 0.5 * GRAV_V * T0 * T0) / T0; ball.vx = (tx - bx) / T0; ball.vy = Math.max(vy, -80); k.sfx('shoot'); k.shake(5); k.float('¡Remate!', bx, by - 20, '#ffd166'); k.burst(bx, by, '#fff', 14, 200); return; }
+  const [bx, by] = [ball.x, ball.y], wasSpike = ball.spk; ball.spk = false;
+  if (Math.random() < (wasSpike ? (b.ctl >= 0 ? 0.3 : 0.5 - 0.28 * skill) : b.ctl >= 0 ? 0 : 0.06 - 0.04 * skill)) { // recepción de un remate: a veces el balón sale rebotado sin control
+    ball.vx = k.rnd(-1, 1) * 220 + s * 60; ball.vy = -k.rnd(180, 320); k.sfx('hit'); k.float('¡Uy!', bx, by - 20, '#fff'); return; }
+  if (spike) { ball.spk = true; const tx = NET + other * (60 + Math.random() * 180) + (aimX || 0) * 60, T0 = Math.abs(tx - bx) / 600; let vy = (GROUND - 20 - by - 0.5 * GRAV_V * T0 * T0) / T0; ball.vx = (tx - bx) / T0; ball.vy = Math.max(vy, -80); k.sfx('shoot'); k.shake(5); k.float('¡Remate!', bx, by - 20, '#ffd166'); k.burst(bx, by, '#fff', 14, 200); return; }
   let tx, apex;
   if (over || touches[b.team] >= 3) { tx = NET + other * (70 + Math.random() * 200) + (aimX || 0) * 70; apex = NET_TOP - 90 - Math.random() * 40; }
   else if (touches[b.team] === 1) { tx = NET + s * 110; apex = NET_TOP - 110; }
@@ -413,7 +415,7 @@ function stepVoley(dt) {
     else if (phase === 'play' || phase === 'serve') { const r = aiVoley(b, dt); mv = r.mv; jump = r.jump; b.wantOver = r.over; b.aim = 0; }
     const spd = b.ctl >= 0 ? 235 : 190 + 45 * skill;
     b.vx += (mv * spd - b.vx) * Math.min(1, (b.air ? 5 : 14) * dt);
-    if (jump && !b.air && b !== (phase === 'serve' ? srvP : null)) { b.vy = -480; b.air = true; k.sfx('jump'); }
+    if (jump && !b.air && b !== (phase === 'serve' ? srvP : null)) { b.vy = -520; b.air = true; k.sfx('jump'); }
     b.vy += 1300 * dt; b.x += b.vx * dt; b.y += b.vy * dt; if (b.y >= GROUND) { if (b.air) k.burst(b.x, GROUND, '#f3dca0', 6, 60); b.y = GROUND; b.vy = 0; b.air = false; }
     b.x = clamp(b.x, x0, x1); b.anim += Math.abs(b.vx) * dt * 0.05;
     if (phase === 'serve' && b === srvP) b.x = NET + s * 285;
@@ -426,7 +428,7 @@ function stepVoley(dt) {
   if (bl.y < 20 && bl.vy < 0) bl.vy *= -0.5;
   // toques
   for (const b of B) { if (b === lastTouch) continue; const hx = b.x, hy = b.y - 46, d = hyp(bl.x - hx, bl.y - hy);
-    if (d < 22 + bl.r) { const spike = b.air && bl.y < NET_TOP + 20 && Math.abs(b.x - NET) < 150 && (b.ctl >= 0 ? true : b.spikeI); voleyHit(b, spike, b.wantOver, b.aim); break; } }
+    if (d < 22 + bl.r) { const spike = b.air && bl.y < NET_TOP + 30 && Math.abs(b.x - NET) < 150 && (b.ctl >= 0 ? true : b.spikeI); voleyHit(b, spike, b.wantOver, b.aim); break; } }
   // suelo / fuera
   if (bl.y >= GROUND - bl.r) { const inL = bl.x > 8 && bl.x < NET, inR = bl.x > NET && bl.x < W - 8;
     if (inL || inR) point(inL ? 1 : 0); else point(lastTouch ? 1 - lastTouch.team : 0, '¡Fuera!'); bl.y = GROUND - bl.r; bl.vy = -bl.vy * 0.4; bl.vx *= 0.5; }
@@ -435,21 +437,21 @@ function stepVoley(dt) {
 function aiVoley(b, dt) {
   const s = b.team ? 1 : -1, mates = B.filter((o) => o.team === b.team), mate = mates.find((o) => o !== b);
   b.think = (b.think || 0) - dt;
-  if (b.think <= 0) { b.think = lerp(0.3, 0.08, skill); const lx = landX(GROUND - 46); b.px = lx + k.rnd(-1, 1) * (1 - skill) * 30; }
+  if (b.think <= 0) { b.think = lerp(0.3, 0.08, skill); const lx = landX(GROUND - 46); b.px = lx + k.rnd(-1, 1) * (1 - skill) * (ball.spk ? 70 : touches[1 - b.team] >= 3 ? 48 : 30); }
   const mySide = (x) => (b.team ? x > NET : x < NET);
   let tx = NET + s * (b.i ? 80 : 200), jump = false; b.spikeI = false;
   if (phase === 'play' && mySide(b.px)) {
     const cand = mates.filter((o) => o !== lastTouch).sort((p, q) => Math.abs(p.x - b.px) - Math.abs(q.x - b.px))[0];
     if (cand === b) { tx = b.px + s * 6;
       if (touches[b.team] === 2 && Math.abs(b.px - NET) < 140 && Math.random() < 0.35 + skill * 0.55) { b.spikeI = true; const tUp = 0.36; // salta para rematar
-        if (ball.vy > -60 && Math.abs(ball.x - b.x) < 60 && ball.y < GROUND - 130 && ball.y > NET_TOP - 150 && !b.air) jump = true; tx = b.px + s * 14; }
+        const T = 0.3, py = ball.y + ball.vy * T + 0.5 * GRAV_V * T * T, pxx = ball.x + ball.vx * T; if (!b.air && py > NET_TOP - 34 && py < NET_TOP + 22 && ball.vy > -120 && Math.abs(pxx - b.x) < 40) jump = true; tx = b.px + s * 14; }
     } else tx = touches[b.team] === 0 ? NET + s * 60 : NET + s * 150;
   } else if (phase === 'play' && lastTouch && lastTouch.team === b.team) tx = NET + s * (b === lastTouch ? 170 : 80);
   const dx = tx - b.x; return { mv: Math.abs(dx) < 5 ? 0 : clamp(dx / 30, -1, 1), jump, over: touches[b.team] >= 2 };
 }
 
 /* ---------- Fútbol cabezón ---------- */
-const CG = { x: 56, bar: 226 }; // portería: ancho y altura del larguero
+const CG = { x: 56, bar: 250 }; // portería: ancho y altura del larguero
 function stepHead(dt) {
   const bl = ball;
   for (const b of B) {
@@ -468,14 +470,14 @@ function stepHead(dt) {
       if (d < 20 + bl.r || over) { b.kicked = true; const sup = b.sup >= 1;
         if (sup) { bl.vx = s * 900; bl.vy = -60; bl.fire = 1.3; b.sup = 0; k.sfx('explode'); k.shake(8); k.float('¡Superdisparo!', bl.x, bl.y - 26, '#ff9f5a'); }
         else if (over) { bl.vx = s * 640; bl.vy = 160; k.sfx('shoot'); k.float('¡Chilena!', bl.x, bl.y - 26, '#ffd166'); k.shake(4); }
-        else { bl.vx = s * k.rnd(460, 560) + b.vx * 0.3; bl.vy = -k.rnd(260, 380); k.sfx('hit'); }
+        else { bl.vx = s * k.rnd(320, 440) + b.vx * 0.3; bl.vy = -k.rnd(300, 440); k.sfx('hit'); }
         b.sup = Math.min(1, (b.sup || 0) + (sup ? 0 : 0.16)); lastTouch = b; k.burst(bl.x, bl.y, '#fff', 10, 150); } }
   }
   // choque entre jugadores
   if (B.length === 2) { const [p, q] = B, dx = q.x - p.x; if (Math.abs(dx) < 40 && Math.abs(p.y - q.y) < 60) { const o = (40 - Math.abs(dx)) / 2 * Math.sign(dx || 1); p.x -= o; q.x += o; } }
   // balón
   bl.fire = Math.max(0, bl.fire - dt); bl.vy += (bl.fire > 0 ? 200 : 900) * dt; bl.x += bl.vx * dt; bl.y += bl.vy * dt; bl.spin += bl.vx * dt * 0.05; bl.vx *= 1 - 0.15 * dt;
-  if (bl.y > GROUND - bl.r) { bl.y = GROUND - bl.r; if (bl.vy > 80) k.sfx('click'); bl.vy = -bl.vy * 0.72; bl.vx *= 0.94; if (Math.abs(bl.vy) < 40) bl.vy = 0; }
+  if (bl.y > GROUND - bl.r) { bl.y = GROUND - bl.r; if (bl.vy > 80) k.sfx('click'); bl.vy = -bl.vy * 0.72; bl.vx *= 0.94; if (Math.abs(bl.vy) < 40) { bl.vy = 0; bl.vx *= 1 - 0.9 * dt; } }
   if (bl.y < 34 + bl.r) { bl.y = 34 + bl.r; bl.vy = Math.abs(bl.vy) * 0.8; }
   for (const side of [0, 1]) { // larguero y fondo por encima
     const gx0 = side ? W - CG.x : 0, gx1 = side ? W : CG.x;
@@ -489,13 +491,18 @@ function stepHead(dt) {
         if (bl.fire > 0 && lastTouch && lastTouch.team !== b.team) { b.st = 1; b.vx = atk(lastTouch.team) * 300; k.sfx('hurt'); k.float('¡Aturdido!', b.x, b.y - 90, '#ff9f5a'); bl.fire = 0; } } }
   }
   const sp = hyp(bl.vx, bl.vy); if (sp > 950) { bl.vx *= 950 / sp; bl.vy *= 950 / sp; }
-  if (bl.y > CG.bar + 4 && bl.x + bl.r < CG.x - 4) goal(1); else if (bl.y > CG.bar + 4 && bl.x - bl.r > W - CG.x + 4) goal(0);
+  if (phase !== 'play') { if (bl.x < CG.x) bl.vx *= 1 - 4 * dt, bl.x = Math.max(bl.x, bl.r); } // celebración: el balón se queda en la red
+  else if (bl.y > CG.bar + 4 && bl.x + bl.r < CG.x - 4) goal(1); else if (bl.y > CG.bar + 4 && bl.x - bl.r > W - CG.x + 4) goal(0);
   bl.x = clamp(bl.x, bl.r, W - bl.r);
 }
 function aiHead(b, dt) {
   const s = atk(b.team), bl = ball, ownG = b.team ? W - CG.x : CG.x; b.think = (b.think || 0) - dt;
   if (b.think <= 0) { b.think = lerp(0.28, 0.07, skill); b.tx = bl.x + bl.vx * 0.2 - s * 26; if ((bl.x - b.x) * s < -10) b.tx = bl.x - s * 40; // el balón a su espalda: vuelve
-    if ((bl.x - ownG) * s < 150 && bl.vx * s < 0) b.tx = Math.min(Math.max(bl.x - s * 30, CG.x + 20), W - CG.x - 20); b.tx += k.rnd(-1, 1) * (1 - skill) * 20; }
+    if ((bl.x - ownG) * s < 150 && bl.vx * s < 0) b.tx = Math.min(Math.max(bl.x - s * 30, CG.x + 20), W - CG.x - 20);
+    if (bl.vx * s < -170 && (b.x - ownG) * s > 40 && Math.random() < 0.5 + skill * 0.5) b.tx = ownG + s * 36; // disparo hacia mi portería: vuelvo a taparla
+    const foe = B.find((o) => o.team !== b.team); // el rival llega antes al balón (y lo tiene de cara): me repliego a tapar la portería
+    if (foe && Math.abs(foe.x - bl.x) + 10 < Math.abs(b.x - bl.x) && (bl.x - foe.x) * s < 10 && Math.random() < 0.45 + skill * 0.5) b.tx = lerp(ownG + s * 40, bl.x, 0.22);
+    b.tx += k.rnd(-1, 1) * (1 - skill) * 20; }
   const dx = b.tx - b.x, mv = Math.abs(dx) < 6 ? 0 : clamp(dx / 24, -1, 1);
   const near = Math.abs(bl.x - b.x) < 70, jump = near && bl.y < b.y - 80 && bl.y > b.y - 200 && bl.vy > -100 && Math.random() < 0.3 + skill * 0.6;
   const kick = hyp(bl.x - (b.x + s * 26), bl.y - (b.y - 14)) < 34 + skill * 6 && Math.random() < 0.4 + skill * 0.5 || (b.y < GROUND - 30 && bl.y < b.y - 62 && Math.abs(bl.x - b.x) < 40 && Math.random() < skill * 0.5);

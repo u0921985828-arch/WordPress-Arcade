@@ -396,6 +396,8 @@ function draw() {
 
 window.__td = { get P() { return P; }, get round() { return round; } };
 reset();
+// pozos de muestra detrás de la pantalla de inicio (la partida real empieza con reset() al pasar de ready a play)
+P.forEach((q, i) => { const T = 'IJLOSTZ'; for (let y = R - 9 + i * 2; y < R; y++) for (let x = 0; x < COLS; x++) if (x !== (y * 3 + i * 4) % COLS && (y > R - 4 || (x * 5 + y + i) % 4)) q.board[y][x] = y >= R - 2 + i ? 'G' : T[(((x / 2) | 0) + y + i) % 7]; });
 k.show(CFG.title || 'Tetra Duelo', 'Borra varias líneas a la vez para mandar basura al pozo rival. Gana dos rondas. ← → mover · ↓ bajar · ↑ dejar caer · A girar (Z al revés) · B reserva. En pantalla: arrastra, toca para girar y desliza abajo.<br>Toca para jugar');
-k.run(update, draw);
+k.run((dt) => { const was = k.st; update(dt); if (was === 'ready' && k.st === 'play') reset(); }, draw);
 addEventListener('resize', () => { clearTimeout(window.__ot); window.__ot = setTimeout(() => { if ((innerHeight >= innerWidth) !== PORT && k.st !== 'play') location.reload(); }, 400); });

@@ -602,12 +602,13 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     if (humWin) k.best(CFG.id, lv + 1);
     if (MODE === 'chinchon') {
       const rows = S.score.map((v, p) => ({ p, name: label(p), score: p === S.winner ? Math.min(v, -1000 + v) : v }));
-      k.podium(rows, { asc: true, head: S.chinchon ? `¡Chinchón de ${label(S.winner)}!` : `¡Gana ${label(S.winner)}!`, fmt: (v) => (v < -500 ? `${v + 1000} pts · gana` : `${v} pts${v > S.target ? ' · eliminado' : ''}`) });
+      k.podium(rows, { asc: true, head: S.chinchon ? (!k.party && S.winner === 0 ? '¡Chinchón! Has ganado' : `¡Chinchón de ${label(S.winner)}!`) : winHead(label(S.winner)), fmt: (v) => (v < -500 ? `${v + 1000} pts · gana` : `${v} pts${v > S.target ? ' · eliminado' : ''}`) });
     } else if (teamed()) {
       const sc = MODE === 'mus' ? S.score : S.games;
-      k.podium([0, 1, 2, 3].map((p) => ({ p, name: label(p), score: sc[p % 2] + (p % 2 === S.winner ? 0.001 : 0) })), { head: `¡Gana ${tname(S.winner)}!`, fmt: (v) => { const f = Math.floor(v); return `${f} ${MODE === 'mus' ? (f === 1 ? 'piedra' : 'piedras') : f === 1 ? 'juego' : 'juegos'}`; }, noTie: true });
-    } else k.podium([0, 1].map((p) => ({ p, name: label(p), score: S.games[p] })), { head: `¡Gana ${label(S.winner)}!`, fmt: (v) => `${v} juego${v === 1 ? '' : 's'}` });
+      k.podium([0, 1, 2, 3].map((p) => ({ p, name: label(p), score: sc[p % 2] + (p % 2 === S.winner ? 0.001 : 0) })), { head: !k.party ? (S.winner === 0 ? '¡Ganamos!' : '¡Ganan ellos!') : `¡Ganan ${tname(S.winner)}!`, fmt: (v) => { const f = Math.floor(v); return `${f} ${MODE === 'mus' ? (f === 1 ? 'piedra' : 'piedras') : f === 1 ? 'juego' : 'juegos'}`; }, noTie: true });
+    } else k.podium([0, 1].map((p) => ({ p, name: label(p), score: S.games[p] })), { head: winHead(label(S.winner)), fmt: (v) => `${v} juego${v === 1 ? '' : 's'}` });
   }
+  const winHead = (nm) => (nm === 'Tú' ? '¡Has ganado!' : `¡Gana ${nm}!`);
   const seatXY = (p) => PL[seatOf(p)];
   const teamXY = (tm) => (teamed() ? seatXY(tm) : seatXY(tm));
 
@@ -820,7 +821,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       const tx = DECK[0] + (PORT ? 112 : 34), ty = DECK[1] + (PORT ? -10 : 60); label2('Triunfo', tx, ty, 14, '#fff3c4'); sym(c, S.ts, tx, ty + 22, 9); }
     if (MODE === 'chinchon') { label2('Mazo', STOCK[0], STOCK[1] + 72, 14, '#fff3c4'); label2('Descarte', PILE[0], PILE[1] + 72, 14, '#fff3c4'); }
     if (MODE === 'mus') {
-      const L = S.phase === 'lance' || S.phase === 'reveal' ? S.L : -1, names = ['Grande', 'Chica', 'Pares', S.punto ? 'Punto' : 'Juego'], bw = PORT ? 108 : 118, x0 = CX - (bw * 4 + 18) / 2, y0 = CY - 44;
+      const L = S.phase === 'lance' || S.phase === 'reveal' ? S.L : -1, names = ['Grande', 'Chica', 'Pares', S.punto ? 'Punto' : 'Juego'], bw = PORT ? 108 : 118, x0 = CX - (bw * 4 + 18) / 2, y0 = CY + (PORT ? 14 : -44);
       names.forEach((nm, i) => { const r = S.res[i], on = i === L && S.phase === 'lance', x = x0 + i * (bw + 6);
         ART.rr(c, x, y0, bw, 88, 14); c.fillStyle = on ? 'rgba(255,243,196,.95)' : 'rgba(10,30,20,.55)'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = on ? OUT : 'rgba(255,255,255,.18)'; c.stroke();
         label2(nm, x + bw / 2, y0 + 20, 16, on ? '#ffd166' : '#fff');
@@ -900,9 +901,9 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
   }
   /* Portada / menú: abanico de cartas sobre el tapete */
   function drawShowcase() {
-    const ids = MODE === 'brisca' ? [0, 29, 12, 38, 27] : MODE === 'mus' ? [9, 19, 29, 2] : [23, 24, 25, 26, 27, 28, 29], n = ids.length, cy = ui === 'setup' && k.st === 'play' ? (PORT ? 190 : 72) : CY + 10, w = ui === 'setup' && k.st === 'play' ? (PORT ? 70 : 52) : PORT ? 118 : 118;
+    const ids = MODE === 'brisca' ? [0, 29, 12, 38, 27] : MODE === 'mus' ? [9, 19, 29, 2] : [23, 24, 25, 26, 27, 28, 29], n = ids.length, cy = ui === 'setup' && k.st === 'play' ? (PORT ? 190 : 72) : CY + 10, w = ui === 'setup' && k.st === 'play' ? (PORT ? 70 : 52) : PORT ? 150 : 172;
     ids.forEach((id, i) => { const a = (i - (n - 1) / 2) * 0.2 + Math.sin(t * 1.3 + i) * 0.02; const x = CX + Math.sin(a) * w * 2.4, y = cy + (1 - Math.cos(a)) * w * 2.4 + (ui === 'setup' && k.st === 'play' ? 0 : -10); card(id, x, y, w, a, true); });
-    if (MODE === 'brisca' && k.st === 'ready') card(33, CX - 330 * (PORT ? 0.4 : 1), CY + 40, 90, Math.PI / 2 - 0.1, true);
+    if (MODE === 'brisca' && k.st === 'ready') card(33, PORT ? CX : CX - 380, PORT ? CY + 330 : CY + 30, 110, Math.PI / 2 - 0.1, true);
     if (k.st !== 'play' || ui !== 'setup') return;
     const R = setupRects(); ART.rr(c, R.x0, R.top + 5, R.pw, R.go.y + R.go.h + 20 - R.top, 20); c.fillStyle = OUT; c.fill(); ART.rr(c, R.x0, R.top, R.pw, R.go.y + R.go.h + 20 - R.top, 20); ART.fillOut(c, 'rgba(18,22,40,.94)', 3);
     label2(CFG.title, CX, R.top + 32, 26, '#ffd166');
@@ -912,7 +913,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     label2(k.party ? 'Joystick: elegir · A: cambiar / repartir' : 'Toca o usa flechas y Espacio', CX, g.y + g.h + 22, 13, '#cfe8d8');
     if (k.party && humans().length) label2(`Jugáis ${humans().length} con móvil · la CPU rellena el resto`, CX, R.top - 20, 15, '#fff3c4');
   }
-  window.__bj = { BJ, W, H, get S() { return S; }, get ui() { return ui; }, get hits() { return HITS; }, get foc() { return foc; }, get kbd() { return kbd; }, get finished() { return finished; } }; // para pruebas
+  window.__bj = { BJ, W, H, get S() { return S; }, get ui() { return ui; }, get hits() { return HITS; }, get foc() { return foc; }, get kbd() { return kbd; }, get sel() { return sel; }, get finished() { return finished; } }; // para pruebas
   k.run(update, draw);
   k.show(CFG.title, CFG.help);
 })();
