@@ -328,7 +328,7 @@ function drawPlayer(q) {
   ART.shadow(c, x + 1, y + 12, 11, 0.3);
   c.save(); c.translate(x, y + 4 - bob); c.scale(1 + sq, 1 - sq); bodyAt(q, 0, 0, 1); c.restore();
   c.globalAlpha = 1;
-  label(q.name === 'Tú' ? 'TÚ' : q.name === 'CPU' ? 'CPU' : q.name, x, y - 30 - bob, 11, q.col);
+  label(q.name === 'Tú' ? 'TÚ' : q.name === 'CPU' ? 'CPU' : q.name, x, y - 30 - bob - (k.party ? 4 : 0), k.party ? 18 : 11, q.col);
 }
 function bodyAt(q, x, y, live) {
   const col = q.col, [dx, dy] = q.dir, step = q.mv ? Math.sin(q.anim * 14) : 0;
@@ -375,14 +375,14 @@ function draw() {
   const gr = c.createLinearGradient(0, 0, 0, TOP); gr.addColorStop(0, '#3b2d5c'); gr.addColorStop(1, '#2a1f45'); c.fillStyle = gr; c.fillRect(0, 0, W, TOP);
   const cw = 92; pl.forEach((q, i) => { const x = 6 + i * (cw + 4) + (i >= 2 ? 72 : 0);
     ART.rr(c, x, 6, cw, 34, 10); c.fillStyle = q.alive ? 'rgba(26,21,48,.9)' : 'rgba(26,21,48,.45)'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = q.col; c.stroke();
-    label(q.name === 'Tú' ? 'TÚ' : q.name, x + 8, 17, 13, q.alive ? q.col : '#8a82a6', 'left');
+    label(q.name === 'Tú' ? 'TÚ' : q.name, x + 8, 17, k.party ? 18 : 13, q.alive ? q.col : '#8a82a6', 'left');
     for (let s = 0; s < RU.wins; s++) { c.fillStyle = s < q.wins ? '#ffd166' : 'rgba(255,255,255,.15)'; ART.glint(c, x + cw - 12 - s * 14, 17, 6, c.fillStyle); }
-    c.drawImage(itemIcon('r'), x + 6, 26, 12, 12); label('' + q.range, x + 24, 32, 11, '#fff'); c.drawImage(itemIcon('b'), x + 34, 26, 12, 12); label('' + q.max, x + 52, 32, 11, '#fff');
+    c.drawImage(itemIcon('r'), x + 6, 26, 12, 12); label('' + q.range, x + 24, 32, k.party ? 14 : 11, '#fff'); c.drawImage(itemIcon('b'), x + 34, 26, 12, 12); label('' + q.max, x + 52, 32, k.party ? 14 : 11, '#fff');
     if (q.kick) c.drawImage(itemIcon('k'), x + 62, 26, 12, 12); if (q.spd > RU.speed + 0.1) c.drawImage(itemIcon('s'), x + 76, 26, 12, 12); });
   const left = Math.max(0, RU.round - rT); label(sudden ? '¡YA!' : `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 232, 23, 18, sudden ? '#ff5f7a' : left < 10 ? '#ffd166' : '#fff');
   if (msgT > 0 || endT) { const m = endT ? (pl.filter((q) => q.alive).length === 1 ? `¡${pl.find((q) => q.alive).name === 'Tú' ? 'Aguantas' : pl.find((q) => q.alive).name + ' aguanta'}!` : '¡Nadie en pie!') : msg;
     c.globalAlpha = endT ? 1 : Math.min(1, msgT * 2); c.font = '900 26px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const mw = c.measureText(m).width + 40;
     ART.rr(c, W / 2 - mw / 2, TOP + RO * T / 2 - 26, mw, 52, 14); c.fillStyle = 'rgba(26,21,48,.88)'; c.fill(); c.lineWidth = 3; c.strokeStyle = '#ffd166'; c.stroke(); label(m, W / 2, TOP + RO * T / 2, 26, '#fff'); c.globalAlpha = 1; }
-  if (fast) label('Te han eliminado · la ronda termina a toda prisa', W / 2, H - 14, 13, '#ffd166');
-  if (k.st === 'play' && rT < 3 && !k.counting()) label('Ronda ' + round, W / 2, TOP + 22, 16, '#fff');
+  if (fast) label('Te han eliminado · la ronda termina a toda prisa', W / 2, H - 14, k.party ? 18 : 13, '#ffd166');
+  if (k.st === 'play' && rT < 3 && !k.counting()) label('Ronda ' + round, W / 2, TOP + 22, 20, '#fff');
 }
