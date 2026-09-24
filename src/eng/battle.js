@@ -3,7 +3,7 @@
 const OUT = ART.OUT, R2 = 6.2832, W = 480, H = 640;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#0e2238' }), c = k.ctx, N = 10, S = 34;
 const SHIPS = [5, 4, 3, 3, 2], NAMES = ['Portaaviones', 'Acorazado', 'Crucero', 'Submarino', 'Destructor'];
-const EX = 70, EY = 66, MX = 26, MY = 470, MS = 16;
+const EX = 70, EY = 76, MX = 26, MY = 474, MS = 16; // EY deja las letras de columna fuera de los botones de pausa/sonido
 let mine, theirs, myShips, theirShips, myShots, aiShots, turn, msg, aiT, targets, wins, placing, shells, fxs, cur, kbd, fired, aim, tt = 0, bgCv, msgT, lastAim;
 
 function fleet() {
@@ -85,7 +85,7 @@ function bake() {
   g.strokeStyle = 'rgba(120,230,210,.12)'; g.lineWidth = 1.5; for (let r = 1; r <= 3; r++) { g.beginPath(); g.arc(EX + N * S / 2, EY + N * S / 2, r * N * S / 6.5, 0, R2); g.stroke(); }
   g.fillStyle = 'rgba(255,255,255,.2)'; for (let i = 0; i < 4; i++) g.fillRect([EX - 4, EX + N * S, EX - 4, EX + N * S][i], [EY - 4, EY - 4, EY + N * S, EY + N * S][i], 4, 4);
   g.font = '800 12px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#8fc6e0';
-  for (let i = 0; i < N; i++) { g.fillText('ABCDEFGHIJ'[i], EX + i * S + S / 2, EY - 18); g.fillText(String(i + 1), EX - 22, EY + i * S + S / 2); }
+  for (let i = 0; i < N; i++) { g.fillText('ABCDEFGHIJ'[i], EX + i * S + S / 2, EY - 15); g.fillText(String(i + 1), EX - 22, EY + i * S + S / 2); }
   // mar propio
   ART.rr(g, MX - 5, MY - 5, N * MS + 10, N * MS + 10, 8); ART.fillOut(g, '#2c3e55', 2.5);
   gr = g.createLinearGradient(0, MY, 0, MY + N * MS); gr.addColorStop(0, '#2a7fb8'); gr.addColorStop(1, '#1d5f92'); g.fillStyle = gr; g.fillRect(MX, MY, N * MS, N * MS);

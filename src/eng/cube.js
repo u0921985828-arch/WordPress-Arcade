@@ -67,7 +67,7 @@ function after() { // se evalúa al terminar la animación de rodar
   if (st.o === 0 && st.x === goal[0] && st.y === goal[1]) { st.won = true; score += level * (100 + Math.max(0, 200 - (moves - par) * 20)); fall = 0.01; k.sfx('coin'); } }
 k.run((dt) => {
   t += dt; if (!k.gate(reset)) return; lastMove += dt;
-  if (fall > 0) { fall += dt; if (fall > 0.9) { if (st.won) { level++; k.st = 'over'; k.show('¡Dentro!', `${moves} movimientos (mínimo ${par}) · ${score} puntos<br>Toca para el nivel ${level}`); } else k.lose(CFG.id, score, 'El bloque cayó', `Nivel ${level}`); } return; }
+  if (fall > 0) { fall += dt; if (fall > 0.9) { if (st.won) { level++; k.st = 'over'; k.sfx('win'); k.confetti(); k.show(moves <= par ? '¡Perfecto!' : '¡Dentro!', `${moves} movimientos (mínimo ${par}) · ${score} puntos<br>Toca para el nivel ${level}`); } else k.lose(CFG.id, score, 'El bloque cayó', NREC(score) + `Nivel ${level}`); } return; }
   let d = ['up', 'down', 'left', 'right'].find((q) => k.hit.has(q));
   if (!d && k.ptr.up) { const dx = k.ptr.x - k.ptr.sx, dy = k.ptr.y - k.ptr.sy, m = Math.max(Math.abs(dx), Math.abs(dy));
     if (m * k.scale > 24) d = Math.min(Math.abs(dx), Math.abs(dy)) > 0.3 * m ? (dx > 0 ? (dy > 0 ? 'right' : 'up') : (dy > 0 ? 'down' : 'left')) : k.swipe; }
@@ -89,3 +89,6 @@ k.run((dt) => {
   label(`Movimientos ${moves}`, 14, 44, 15, '#fff'); label(`Mínimo ${par}`, 626, 44, 15, '#b8b6e0', 'right');
 });
 function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
+
+/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.lose lo actualice) */
+function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }

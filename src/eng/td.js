@@ -166,8 +166,8 @@ function panelHit(px, py) { if (px < PX && py < BB) return -2; if (inR(waveR(), 
 /* botones flotantes sobre la casilla seleccionada */
 function popup() {
   if (!sel) return []; const [cx, cy] = center(sel), tw = towerAt(...sel), up = cy - CELL * 0.6 - 26 < OY + 2 || (PORT && cy - CELL * 0.6 - 26 < 95), y = up ? cy + CELL * 0.6 + 4 : cy - CELL * 0.6 - 26;
-  if (tw) { const bw = 84, x0 = k.clamp(cx - bw - 3, 4, PX - bw * 2 - 10); return [{ id: 'up', x: x0, y, w: bw, h: 24, txt: tw.lv >= 3 ? 'Máx.' : 'Mejorar', cost: tw.lv >= 3 ? null : upCost(tw), on: tw.lv < 3 && gold >= upCost(tw) }, { id: 'sell', x: x0 + bw + 6, y, w: bw, h: 24, txt: 'Vender', cost: sellVal(tw), on: true, red: true }]; }
-  if (grid[sel[1]][sel[0]] !== 0) return []; const bw = 92, x0 = k.clamp(cx - bw / 2, 4, PX - bw - 4);
+  if (tw) { const bw = 94, x0 = k.clamp(cx - bw - 3, 4, PX - bw * 2 - 10); return [{ id: 'up', x: x0, y, w: bw, h: 24, txt: tw.lv >= 3 ? 'Máx.' : 'Mejorar', cost: tw.lv >= 3 ? null : upCost(tw), on: tw.lv < 3 && gold >= upCost(tw) }, { id: 'sell', x: x0 + bw + 6, y, w: bw, h: 24, txt: 'Vender', cost: sellVal(tw), on: true, red: true }]; }
+  if (grid[sel[1]][sel[0]] !== 0) return []; const bw = 106, x0 = k.clamp(cx - bw / 2, 4, PX - bw - 4);
   return [{ id: 'build', x: x0, y, w: bw, h: 24, txt: 'Construir', cost: TOWERS[pick].cost, on: preview && preview.ok && gold >= TOWERS[pick].cost }];
 }
 

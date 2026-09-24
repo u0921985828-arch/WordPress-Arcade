@@ -48,7 +48,7 @@ function whack(i) {
 k.run((dt) => {
   tm += dt; lvlT -= dt; if (mallet) { mallet.t += dt; if (mallet.t > 0.28) mallet = null; }
   for (let i = 0; i < 16; i++) { const q = cells[i]; if (q && q.hit) q.hit += dt; }
-  if (!k.gate(reset)) return; time -= dt; if (time <= 0) { time = 0; return k.lose(CFG.id, score, '¡Tiempo!', `Nivel ${lvl}`); }
+  if (!k.gate(reset)) return; time -= dt; if (time <= 0) { time = 0; return k.lose(CFG.id, score, '¡Tiempo!', NREC(score) + `Nivel ${lvl}`); }
   if (score > 1500 && N === 3) { N = 4; cells = Array(16).fill(null); lvl = 2; lvlT = 1.6; sel = 5; boardCv = board(4); k.sfx('win'); k.confetti(); }
   spawnT -= dt; if (spawnT <= 0) { spawnT = Math.max(0.28, 0.8 - (60 - time) * 0.009); const free = [...Array(N * N).keys()].filter((i) => !cells[i]); if (free.length) { const i = k.pick(free); const bomb = Math.random() < 0.18, gold = !bomb && Math.random() < 0.1; const life = Math.max(0.55, 1.4 - (60 - time) * 0.012) * (gold ? 0.6 : 1); cells[i] = { life, max: life, bomb, gold, age: 0, hit: 0 }; } }
   for (let i = 0; i < N * N; i++) { const q = cells[i]; if (!q) continue; q.age += dt; q.life -= dt; if (q.life <= 0) { if (!q.bomb && !q.hit) combo = 0; cells[i] = null; } }
@@ -104,3 +104,6 @@ k.run((dt) => {
   label(`Nivel ${lvl}`, 16, 104, 14, '#eaffea'); if (combo >= 5) label(`Combo x${Math.min(5, 1 + Math.floor(combo / 5))}`, 344, 104, 16, '#fff27a', 'right');
   if (lvlT > 0) { const s = lvlT > 1.4 ? 0.5 + (1.6 - lvlT) * 2.5 : 1; c.save(); c.translate(180, 150); c.scale(s, s); label('¡Nivel 2! Cuadrícula 4×4', 0, 0, 22, '#fff27a', 'center', 'middle'); c.restore(); }
 });
+
+/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.lose/k.end lo actualicen) */
+function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }

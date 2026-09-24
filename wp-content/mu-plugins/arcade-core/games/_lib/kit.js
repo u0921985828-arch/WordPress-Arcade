@@ -155,7 +155,13 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-acti
     k.ri = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
     k.pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
     k.shuffle = (arr) => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
-    k.end = (id, score, head, extra) => (tell('arcade:over', { score }), k.show(head || 'Fin', `${extra ? extra + ' · ' : ''}Puntos: ${score} · Récord ${k.best(id, score)}<br>Toca para jugar otra vez`));
+    k.end = (id, score, head, extra) => {
+      let prev = 0; try { prev = +localStorage.getItem('best:' + id) || 0; } catch (e) {}
+      const best = k.best(id, score), rec = score > 0 && score > prev && prev > 0;
+      tell('arcade:over', { score });
+      if (rec) { k.confetti(); k.sfx('win'); }
+      return k.show(head || 'Fin', `${rec ? '<b style="color:#ffd166">¡Nuevo récord!</b><br>' : ''}${extra ? extra + ' · ' : ''}Puntos: ${score} · Récord ${best}<br>Toca para jugar otra vez`);
+    };
     k.rect = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); };
     k.circle = (x, y, r, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill(); };
     k.rrect = (x, y, w, h, r, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); ctx.fill(); };

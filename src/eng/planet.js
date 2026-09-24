@@ -34,7 +34,7 @@ k.run((dt) => {
       if (d < q.r + 8) { p.on = q; p.a = Math.atan2(p.y - q.y, p.x - q.x); k.sfx('pop'); land = 0.25; k.burst(p.x - cam, p.y, `hsl(${q.hue},80%,75%)`, 10, 100);
         if (q !== p.from) { const idx = planets.indexOf(q); if (idx > best) { const gain = (idx - best) * 50; score += gain; k.float(idx - best > 1 ? `¡Salto x${idx - best}! +${gain}` : `+${gain}`, p.x - cam, p.y - 30, '#7cf7a0'); best = idx; } } p.vx = p.vy = 0; break; } }
     p.x += p.vx * dt; p.y += p.vy * dt; if (Math.random() < 0.6) jet.push({ x: p.x, y: p.y, vx: -p.vx * 0.2 + k.rnd(-20, 20), vy: -p.vy * 0.2 + k.rnd(-20, 20), l: 0.4, c: '#9fe8ff' });
-    if (p.y < -400 || p.y > 760 || p.x < cam - 300) return k.lose(CFG.id, score, 'Perdido en el espacio', `${best} planetas`); }
+    if (p.y < -400 || p.y > 760 || p.x < cam - 300) return k.lose(CFG.id, score, 'Perdido en el espacio', NREC(score) + `${best} planetas`); }
   for (const g of gems) if (!g.got && Math.hypot(g.x - p.x, g.y - p.y) < 20) { g.got = true; score += 25; k.sfx('coin'); k.burst(g.x - cam, g.y, '#f2d15c', 12); k.float('+25', g.x - cam, g.y - 16, '#f2d15c'); }
   cam += (p.x - 220 - cam) * Math.min(1, dt * 2);
   if (best >= planets.length - 5) { const l = planets[planets.length - 1]; let x = l.x; for (let i = 0; i < 20; i++) { x += k.rnd(180, 260); const q = mkPlanet(x, k.rnd(90, 290), k.rnd(26, 50), k.ri(0, 360), 1); planets.push(q); gems.push({ x: q.x, y: q.y - q.r - 60, got: false }); } }
@@ -68,3 +68,6 @@ function astronaut() { const ang = p.on ? p.a + Math.PI / 2 : Math.atan2(p.vy, p
   const arm = air ? -0.9 : Math.sin(ph + Math.PI) * 0.5; c.save(); c.translate(3, -5); c.rotate(arm); ART.rr(c, -2, 0, 4, 8, 2); ART.fillOut(c, '#e8ecf6', 1.6); c.restore();
   if (air) { c.fillStyle = '#ffb347'; c.beginPath(); c.ellipse(-8, 6 + Math.random() * 2, 2.5, 5 + Math.random() * 3, 0, 0, 6.283); c.fill(); }
   c.restore(); }
+
+/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.lose/k.end lo actualicen) */
+function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }

@@ -5,10 +5,10 @@ const k = Kit({ w: 360, h: 640, title: CFG.title, bg: HK ? '#1c2447' : '#10263f'
 const GOAL = 110, TO = 7, RAIL = 12, TX0 = 24, TX1 = 336, NETY = 320, PYME = 580, PYAI = 60;
 /* franja superior libre para pausa/sonido: la mesa se dibuja a escala SCL bajo ella (sx/sy: mesa → pantalla) */
 const TOP = 40, SCL = (640 - TOP) / 640, OXT = 180 * (1 - SCL), sx = (x) => OXT + x * SCL, sy = (y) => TOP + y * SCL;
-let me, ai, puck, sMe, sAi, serveT, rally, trail, goalT, goalMe, tm, bounceMk, server;
+let me, ai, puck, sMe, sAi, serveT, rally, trail, goalT, goalMe, tm, bounceMk, server, aiOff = 0;
 function serverIsMe() { const tot = sMe + sAi; return (sMe >= 10 && sAi >= 10 ? tot : Math.floor(tot / 2)) % 2 === 0; }
 function serve(dir) {
-  trail = []; rally = 0; bounceMk = null;
+  trail = []; rally = 0; bounceMk = null; aiOff = 0;
   if (HK) { puck = { x: 180, y: 320, vx: k.rnd(-120, 120), vy: dir * 60, r: 16, bz: 0 }; serveT = 1; return; }
   server = serverIsMe(); const d = server ? -1 : 1, p = server ? me : ai; // la pelota sale de la raqueta de quien saca
   puck = { x: p.x, y: server ? PYME - 14 : PYAI + 14, vx: k.rnd(-90, 90), vy: d * 300, r: 9, from: server ? PYME : PYAI, bounced: false }; serveT = 0.9;
@@ -19,7 +19,7 @@ function goal(forMe) {
   if (forMe) sMe++; else sAi++; goalT = 1.3; goalMe = forMe;
   k.burst(sx(puck.x), sy(k.clamp(puck.y, 10, 630)), forMe ? '#7cf7a0' : '#ff5f5f', 26, 220); k.sfx(forMe ? 'coin' : 'hurt'); k.shake(forMe ? 4 : 7); if (!forMe) k.flash('rgba(255,70,90,.25)');
   const TGT = HK ? TO : 11, fin = (sMe >= TGT || sAi >= TGT) && (HK || Math.abs(sMe - sAi) >= 2);
-  if (fin) { k.st = 'over'; k.best(CFG.id, sMe > sAi ? sMe - sAi : 0); k.show(sMe > sAi ? '¡Ganaste!' : 'Perdiste', `${sMe} – ${sAi}<br>Toca para la revancha`); if (sMe < sAi) k.sfx('lose'); return; }
+  if (fin) { k.st = 'over'; const mg = sMe > sAi ? sMe - sAi : 0, nr = NREC(mg), b = k.best(CFG.id, mg); k.show(sMe > sAi ? '¡Ganaste!' : 'Perdiste', `${nr}${sMe} – ${sAi} · Mejor victoria: ${b ? '+' + b : '—'}<br>Toca para la revancha`); if (sMe < sAi) k.sfx('lose'); else { k.sfx('win'); k.confetti(); } return; }
   if (!HK) { if (sMe >= 10 && sAi >= 10 && sMe === sAi) k.float('Iguales', 180, sy(360), '#fff27a'); else if (Math.max(sMe, sAi) >= 10 && Math.abs(sMe - sAi) >= 1) k.float(sMe > sAi ? 'Punto de partido' : 'Punto de partido CPU', 180, sy(360), '#fff27a'); }
   serve(forMe ? -1 : 1);
 }
@@ -86,7 +86,7 @@ k.run((dt) => {
   if (k.held.has('left')) me.x -= 400 * dt; if (k.held.has('right')) me.x += 400 * dt; if (HK) { if (k.held.has('up')) me.y -= 400 * dt; if (k.held.has('down')) me.y += 400 * dt; }
   me.x = k.clamp(me.x, HK ? RAIL + me.r : TX0 + 16, 360 - (HK ? RAIL + me.r : TX0 + 16)); me.y = HK ? k.clamp(me.y, 320 + me.r * 0.7, 628 - me.r) : PYME;
   // IA
-  const tx = puck.vy < 0 || !HK ? puck.x : 180, ty = HK ? (puck.y < 320 && puck.vy < 80 ? puck.y - 20 : 90) : PYAI;
+  const tx = puck.vy < 0 || !HK ? puck.x - (HK ? 0 : aiOff) : 180, ty = HK ? (puck.y < 320 && puck.vy < 80 ? puck.y - 20 : 90) : PYAI;
   const sp = (HK ? 330 : 280) * lvl; ai.x += k.clamp(tx - ai.x, -sp * dt, sp * dt); ai.y += k.clamp(ty - ai.y, -sp * dt, sp * dt);
   ai.x = k.clamp(ai.x, HK ? RAIL + ai.r : TX0 + 16, 360 - (HK ? RAIL + ai.r : TX0 + 16)); ai.y = HK ? k.clamp(ai.y, RAIL + ai.r, 300) : PYAI;
   if (serveT > 0) { serveT -= dt; if (!HK) { const p = server ? me : ai; puck.x = p.x; } return; }
@@ -99,7 +99,7 @@ k.run((dt) => {
       for (const m of [me, ai]) { const dx = puck.x - m.x, dy = puck.y - m.y, d = Math.hypot(dx, dy); if (d < m.r + puck.r && d > 0) { const nx = dx / d, ny = dy / d; puck.x = m.x + nx * (m.r + puck.r); puck.y = m.y + ny * (m.r + puck.r); const mvx = (m.x - m.px) / dt, mvy = (m.y - m.py) / dt; const rv = (puck.vx - mvx) * nx + (puck.vy - mvy) * ny;
         if (rv < 0) { puck.vx -= 1.9 * rv * nx; puck.vy -= 1.9 * rv * ny; k.sfx('hit'); puck.bz = 0.2; if (-rv > 500) k.burst(sx(puck.x - nx * puck.r), sy(puck.y - ny * puck.r), '#fff', 6, 120); }
         const spd = Math.hypot(puck.vx, puck.vy); if (spd > 900) { puck.vx *= 900 / spd; puck.vy *= 900 / spd; } } } }
-    else { for (const [p, dir] of [[me, -1], [ai, 1]]) { const py = p === me ? PYME : PYAI; if (Math.sign(puck.vy) === -dir && Math.abs(puck.y - py) < 10 && Math.abs(puck.x - p.x) < p.w / 2 + puck.r) { rally++; k.sfx('hit'); const spd = Math.min(820, Math.hypot(puck.vx, puck.vy) * 1.05); const off = (puck.x - p.x) / (p.w / 2), spin = (p.x - p.px) / dt * 0.25; puck.vx = off * spd * 0.7 + spin; puck.vy = dir * Math.sqrt(Math.max(1, spd * spd - puck.vx * puck.vx * 0.5)); puck.y = py + dir * 11; puck.from = py; puck.bounced = false; k.burst(sx(puck.x), sy(py), '#fff', 5, 90); if (rally > 0 && rally % 10 === 0) k.float(`Rally ${rally}`, 180, sy(360), '#fff27a'); } }
+    else { for (const [p, dir] of [[me, -1], [ai, 1]]) { const py = p === me ? PYME : PYAI; if (Math.sign(puck.vy) === -dir && Math.abs(puck.y - py) < 10 && Math.abs(puck.x - p.x) < p.w / 2 + puck.r) { rally++; k.sfx('hit'); if (p === me) aiOff = k.rnd(-34, 34) * (Math.random() < 0.1 + Math.min(0.35, rally * 0.02) ? 1.9 : 1); /* la CPU apunta a un lado (devuelve con ángulo) y a veces calcula mal */ const spd = Math.min(820, Math.hypot(puck.vx, puck.vy) * 1.05); const off = (puck.x - p.x) / (p.w / 2), spin = (p.x - p.px) / dt * 0.25; puck.vx = off * spd * 0.7 + spin; puck.vy = dir * Math.sqrt(Math.max(1, spd * spd - puck.vx * puck.vx * 0.5)); puck.y = py + dir * 11; puck.from = py; puck.bounced = false; k.burst(sx(puck.x), sy(py), '#fff', 5, 90); if (rally > 0 && rally % 10 === 0) k.float(`Rally ${rally}`, 180, sy(360), '#fff27a'); } }
       const tot = Math.abs(PYME - PYAI); if (!puck.bounced && Math.abs(puck.y - puck.from) / tot > 0.72) { puck.bounced = true; bounceMk = { x: puck.x, y: puck.y, t: 0.35 }; k.sfx('click'); }
       if (puck.y < 0) return goal(true); if (puck.y > 640) return goal(false); } }
   if (puck.bz) puck.bz = Math.max(0, puck.bz - dt);
@@ -141,3 +141,6 @@ k.run((dt) => {
   c.restore();
   label(HK ? 'A 7 goles' : 'A 11 puntos', 12, 13, 12, HK ? '#cfd8ff' : '#cfe3ff');
 });
+
+/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.best lo actualice) */
+function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }

@@ -99,7 +99,7 @@ function piece(p, ox, oy, s, o) {
 }
 function draw() {
   if (!bgCv) bgCv = renderBg(); c.drawImage(bgCv, 0, 0, W, H);
-  label(CFG.title, 16, 13, 19, '#ffd23d'); label(`Nivel ${level}`, 16, 40, 14, '#cfd6ff');
+  label(CFG.title, 14, 13, 17, '#ffd23d'); label(`Nivel ${level}`, 16, 40, 14, '#cfd6ff');
   label(`${score}`, W - 18, 12, 22, '#fff', 'right'); label(`Piezas ${pieces.filter((p) => p.bx !== null).length}/${pieces.length}`, W - 18, 40, 14, '#cfd6ff', 'right');
   const dp = drag && drag.moved ? drag.p : kbs ? kbs.p : null;
   if (dp) { const [gx, gy] = kbs ? [kbs.gx, kbs.gy] : dropPos(dp); if (kbs || (gx > -pw(dp) && gy > -ph(dp) && gx < N && gy < N)) piece(dp, OX + gx * S, OY + gy * S, S, { ghost: fits(dp, gx, gy) ? '#7cf7a0' : '#ff5f5f' }); }

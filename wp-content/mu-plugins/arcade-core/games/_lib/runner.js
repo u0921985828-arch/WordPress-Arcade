@@ -26,7 +26,7 @@ function die() {
   k.burst(PX + p.w / 2, p.y + (port || cave ? 0 : p.h / 2), '#fff', 22, 240);
 }
 function finish() {
-  const extra = port ? `${passed} troncos · ${got} monedas` : cave ? `${metres()} m · ${mines} minas` : `${metres()} m · ${got} monedas`;
+  const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`, extra = port ? `${pl(passed, 'tronco')} · ${pl(got, 'moneda')}` : cave ? `${metres()} m · ${pl(mines, 'mina')}` : `${metres()} m · ${pl(got, 'moneda')}`;
   k.lose(CFG.id, total(), 'Fin', extra);
 }
 /* ---------- Generación de tramos (jump / double / gravity) ---------- */

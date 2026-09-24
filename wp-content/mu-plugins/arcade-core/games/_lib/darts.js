@@ -39,7 +39,7 @@ function land() { const { x, y } = fly; fly = null; const [pts, lbl, dbl] = scor
   k.sfx(pts ? 'hit' : 'hurt'); k.shake(2); k.burst(x, y, pts >= 40 ? '#f2d15c' : '#fff', pts >= 40 ? 14 : 6, 70);
   if (left - pts < 0 || left - pts === 1 || (left - pts === 0 && !dbl)) { msg = '¡Pasado! Turno anulado'; msgC = '#ff9a9a'; msgT = 1.4; left = turnStart; navigator.vibrate && navigator.vibrate(60); turnT = 1.1; return; }
   left -= pts; msg = pts ? (pts >= 50 ? `¡${lbl}!` : lbl.startsWith('T') ? `¡Triple ${lbl.slice(1)}!` : lbl.startsWith('D') ? `Doble ${lbl.slice(1)}` : lbl) : 'Fuera'; msgC = pts >= 40 ? '#f2d15c' : '#fff'; msgT = 0.9; if (pts) k.float(`-${pts}`, x, y - 16, '#fff6a8');
-  if (left === 0) { k.st = 'over'; k.confetti(); const b = k.best(CFG.id, Math.max(1, 100 - darts)); k.show('¡Checkout!', `501 en ${darts} dardos · Récord ${b}<br>Toca para jugar otra vez`); return; }
+  if (left === 0) { k.st = 'over'; k.confetti(); const sc = Math.max(1, 100 - darts), nr = NREC(sc), b = k.best(CFG.id, sc); k.show('¡Checkout!', `${nr}501 en ${darts} dardos · Récord ${b}<br>Toca para jugar otra vez`); return; }
   if (turn.length >= 3) turnT = 1; }
 k.run((dt) => {
   t += dt; msgT -= dt; for (const d of thrown) d.s = Math.min(1, d.s + dt * 8); if (!k.gate(reset)) return;
@@ -83,3 +83,6 @@ function drawDart(x, y, s, a) {
 }
 function miniDart(x, y, on) { c.save(); c.globalAlpha = on ? 0.9 : 0.25; c.translate(x - 14, y); c.rotate(-0.1); c.strokeStyle = '#c7ccd8'; c.lineWidth = 2; c.beginPath(); c.moveTo(0, 0); c.lineTo(8, 0); c.stroke(); c.strokeStyle = '#9aa2b5'; c.lineWidth = 5; c.beginPath(); c.moveTo(8, 0); c.lineTo(18, 0); c.stroke(); c.fillStyle = '#ff4d6d'; c.beginPath(); c.moveTo(20, 0); c.lineTo(30, -6); c.lineTo(28, 0); c.lineTo(30, 6); c.closePath(); c.fill(); c.restore(); c.globalAlpha = 1; }
 function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
+
+/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.best lo actualice) */
+function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }

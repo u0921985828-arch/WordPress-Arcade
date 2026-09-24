@@ -61,7 +61,7 @@ k.run((dt) => {
   const cue = balls.find((b) => b.n === 0);
   if (strike) { strike.t += dt; if (strike.t >= 0.12) { cue.vx = Math.cos(strike.a) * strike.p * 1500; cue.vy = Math.sin(strike.a) * strike.p * 1500; k.sfx(strike.p > 0.7 ? 'shoot' : 'hit'); if (strike.p > 0.8) k.shake(3); strike = null; } return; }
   if (!moving()) { balls.forEach((b) => { b.vx = b.vy = 0; });
-    if (!balls.some((b) => b.n > 0) && !sinking.length) { rack++; k.st = 'over'; const b = k.best(CFG.id, Math.max(1, 200 - shots * 5)); k.show('¡Mesa limpia!', `${shots} tiros · Récord ${b}<br>Toca para otra partida`); return; }
+    if (!balls.some((b) => b.n > 0) && !sinking.length) { rack++; k.st = 'over'; const sc = Math.max(1, 200 - shots * 5), nr = NREC(sc), b = k.best(CFG.id, sc); k.show('¡Mesa limpia!', `${nr}${shots} tiros · Récord ${b}<br>Toca para otra partida`); return; }
     if (!cue) { let y = 480; while (balls.some((b) => Math.hypot(b.x - 180, b.y - y) < BR * 2 + 1)) y += 6; balls.unshift({ n: 0, x: 180, y, vx: 0, vy: 0, rot: 0, pop: 0 }); return; }
     if (k.ptr.hit) aiming = true;
     if (aiming && k.ptr.up) { aiming = false; const dx = k.ptr.sx - k.ptr.x, dy = k.ptr.sy - k.ptr.y, p = Math.min(1, Math.hypot(dx, dy) / 150); if (p > 0.05) { kAng = Math.atan2(dy, dx); shoot(kAng, p); } }
@@ -108,3 +108,6 @@ k.run((dt) => {
 function drawBall(n, x, y, rot, s) { const sz = 24 * s; c.save(); c.translate(x, y); c.save(); c.rotate(rot); c.drawImage(sprites[n], -sz / 2, -sz / 2, sz, sz); c.restore(); c.drawImage(shade, -sz / 2, -sz / 2, sz, sz); c.restore(); }
 function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
 function panel(x, y, w, h) { ART.rr(c, x, y, w, h, 10); c.fillStyle = 'rgba(26,21,48,.72)'; c.fill(); c.lineWidth = 2; c.strokeStyle = 'rgba(255,255,255,.14)'; c.stroke(); }
+
+/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.best lo actualice) */
+function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }

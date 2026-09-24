@@ -94,7 +94,7 @@ k.run((dt) => {
   t += dt; msgT -= dt; for (const o of bumpers) o.p = Math.max(0, o.p - dt * 4);
   if (!k.gate(reset)) return;
   if (state === 'sink') { ball.s = Math.max(0, ball.s - dt * 4); stT -= dt;
-    if (stT <= 0) { if (holeN >= 9) { const diff = total - pars; k.st = 'over'; const b = k.best(CFG.id, Math.max(0, 100 - diff * 5)); k.show(diff <= 0 ? '¡Recorrido completado!' : 'Recorrido completado', `${total} golpes (${diff > 0 ? '+' : ''}${diff} sobre par) · Récord ${b}<br>Toca para jugar otra vez`); return; }
+    if (stT <= 0) { if (holeN >= 9) { const diff = total - pars; k.st = 'over'; const sc = Math.max(0, 100 - diff * 5), nr = NREC(sc), b = k.best(CFG.id, sc); k.show(diff <= 0 ? '¡Recorrido completado!' : 'Recorrido completado', `${nr}${total} golpes (${diff > 0 ? '+' : ''}${diff} sobre par) · Récord ${b}<br>Toca para jugar otra vez`); return; }
       holeN++; genHole(); place(); ball.s = 0; state = 'intro'; stT = 0.5; k.sfx('start'); } return; }
   if (state === 'intro') { stT -= dt; ball.s = Math.min(1, 1 - stT / 0.5); if (stT <= 0) { ball.s = 1; state = 'aim'; } return; }
   if (state === 'splash') { stT -= dt; if (stT <= 0) { ball.x = lastPos[0]; ball.y = lastPos[1]; ball.vx = ball.vy = 0; ball.a = 1; k.sfx('pop'); k.burst(ball.x, ball.y + OY, '#fff', 8, 60);
@@ -153,3 +153,6 @@ k.run((dt) => {
 });
 function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
 function panel(x, y, w, h) { ART.rr(c, x, y, w, h, 10); c.fillStyle = 'rgba(26,21,48,.72)'; c.fill(); c.lineWidth = 2; c.strokeStyle = 'rgba(255,255,255,.14)'; c.stroke(); }
+
+/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.best lo actualice) */
+function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }

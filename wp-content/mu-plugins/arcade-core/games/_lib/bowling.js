@@ -78,7 +78,7 @@ function evaluate() {
 }
 function next() {
   const mode = pendMode;
-  if (mode === 'end') { const total = score().pop() || 0; k.st = 'over'; k.end(CFG.id, total, total >= 200 ? '¡Partidón!' : 'Partida terminada', `${strikes} strikes · ${spares} spares`); return; }
+  if (mode === 'end') { const total = score().pop() || 0; k.st = 'over'; k.end(CFG.id, total, total >= 200 ? '¡Partidón!' : 'Partida terminada', NREC(total) + `${strikes} strikes · ${spares} spares`); return; }
   if (mode === 'next') { frame++; roll = 0; rackPins(); standing = 10; }
   else if (mode === 'rerack') { roll++; rackPins(); standing = 10; }
   else { roll++; pins = pins.filter((p) => !(p.down || p.gone)); pins.forEach((p) => { p.vx = p.vy = 0; }); }
@@ -144,3 +144,6 @@ function hud() {
 function marks(f, fr) { return fr.map((v, i) => { const fresh = i === 0 || (f === 9 && (i === 1 ? fr[0] === 10 : fr[0] === 10 ? fr[1] === 10 : fr[0] + fr[1] === 10));
   return fresh ? (v === 10 ? 'X' : v ? String(v) : '-') : fr[i - 1] + v === 10 ? '/' : v ? String(v) : '-'; }); }
 function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
+
+/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.lose/k.end lo actualicen) */
+function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }

@@ -52,10 +52,12 @@ function move(dn) {
   } else { hist.push(JSON.stringify([pl, boxes])); k.sfx('click'); }
   pl = [nx, ny]; moves++;
 }
+// caja fuera de marca en una esquina de muros: ya no se puede resolver
+function stuck() { const w = (x, y) => wall.has(K(x, y)); return boxes.some((q) => !onG(q) && (w(q[0] - 1, q[1]) || w(q[0] + 1, q[1])) && (w(q[0], q[1] - 1) || w(q[0], q[1] + 1))); }
 function solved() { return ICE ? pl[0] === exitC[0] && pl[1] === exitC[1] : boxes.every(onG); }
 function win() {
   const gain = Math.max(50, 400 - moves * (ICE ? 25 : 5)) * level; total += gain; winT = 1.6; k.best(CFG.id, total);
-  winStars = ICE ? (moves <= par ? 3 : moves <= par + 2 ? 2 : 1) : 3; k.sfx('win'); k.confetti(); k.float('+' + gain, W / 2, H / 2 + 60, '#ffd23d');
+  winStars = ICE ? (moves <= par ? 3 : moves <= par + 2 ? 2 : 1) : 3; k.sfx('win'); k.confetti(); k.float('+' + gain, W / 2, H / 2 + 90, '#ffd23d');
 }
 function undo() { if (!ICE && hist.length) { const [p2, b2] = JSON.parse(hist.pop()); pl = p2; boxes = b2; moves++; k.sfx('click'); } }
 function restart() { if (ICE) { pl = JSON.parse(init)[0]; pr = [...pl]; trail = []; moves = 0; } else { const [p2, b2] = JSON.parse(init); if (moves) hist.push(JSON.stringify([pl, boxes])); pl = p2; boxes = b2; moves++; } k.sfx('pop'); }
@@ -178,6 +180,7 @@ function draw() {
   label(`${total}`, W - 14, 10, 20, '#ffd23d', 'right');
   if (ICE) label(`Mínimo ${par}`, W - 14, 34, 14, '#b6ffcc', 'right'); else label(`Cajas ${boxes.filter(onG).length}/${boxes.length}`, W - 14, 34, 14, '#ffd9a0', 'right');
   for (const b of BTN) btn(b[0], b[1], b[2]);
+  if (!ICE && !winT && !moving() && stuck()) { ART.rr(c, W / 2 - 130, BY - 34, 260, 28, 12); ART.fillOut(c, 'rgba(34,28,66,.92)', 2); label('Caja atascada: deshaz o reinicia', W / 2, BY - 28, 15, '#ffd23d', 'center'); }
   if (winT > 0) { const p = Math.min(1, (1.6 - winT) * 5), sc = p < 1 ? 0.6 + p * 0.5 - Math.sin(p * 3.14) * 0.1 : 1; c.save(); c.translate(W / 2, H / 2 - 20); c.scale(sc, sc);
     ART.rr(c, -150, -58, 300, 116, 22); ART.fillOut(c, 'rgba(34,28,66,.94)', 3); label('¡Nivel superado!', 0, -44, 28, '#7cf7a0', 'center');
     for (let i = 0; i < 3; i++) star(-44 + i * 44, 20, i < winStars ? 15 : 12, i < winStars && p > i * 0.3);

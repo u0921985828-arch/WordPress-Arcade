@@ -191,7 +191,7 @@ function drawMines() {
   // presión larga: anillo de progreso
   if (k.ptr.down && !longDone && pressT > 0.08 && !done) { c.strokeStyle = '#fff'; c.lineWidth = 4; c.lineCap = 'round'; c.beginPath(); c.arc(k.ptr.x, k.ptr.y - 34, 14, -Math.PI / 2, -Math.PI / 2 + R2 * Math.min(1, pressT / 0.38)); c.stroke(); }
   ART.rr(c, OX, OY, N * S, N * S, 6); c.strokeStyle = OUT; c.lineWidth = 3; c.stroke(); cursorBox(cur[0], cur[1]);
-  if (boom && boom.t < 0.6) { c.globalAlpha = 1 - boom.t / 0.6; c.fillStyle = '#ffd23d'; c.beginPath(); c.arc(boom.x, boom.y, 20 + boom.clk * 160, 0, R2); c.fill(); c.globalAlpha = 1; }
+  if (boom && boom.t < 0.6) { c.globalAlpha = 1 - boom.t / 0.6; c.fillStyle = '#ffd23d'; c.beginPath(); c.arc(boom.x, boom.y, 20 + boom.t * 160, 0, R2); c.fill(); c.globalAlpha = 1; }
   const by = OY + N * S + 12, yy = key3d(W / 2 - 110, by, 220, 42, flagMode ? '#ff6b7a' : '#6e62f5', k.ptr.down && k.ptr.y > by - 4);
   if (flagMode) flagIcon(W / 2 - 80, yy + 21, 0.85); else shovelIcon(W / 2 - 80, yy + 21);
   label(flagMode ? 'Modo bandera' : 'Modo excavar', W / 2 + 12, yy + 11, 18, '#fff', 'center');

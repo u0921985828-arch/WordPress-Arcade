@@ -105,7 +105,8 @@ function draw() {
   if (!running && !done) { c.globalAlpha = 0.5 + Math.sin(clk * 5) * 0.3; c.strokeStyle = '#ff8a3d'; c.lineWidth = 2; c.setLineDash([4, 4]); c.beginPath(); c.arc(ball.x, ball.y, ball.r + 7, 0, R2); c.stroke(); c.setLineDash([]); c.globalAlpha = 1; }
   // HUD
   label(`Nivel ${level}`, land ? 12 : 44, 10, 18, '#fff');
-  const ix = land ? 12 : 44, iy = 38; ART.rr(c, ix + 20, iy + 2, 90, 12, 6); ART.fillOut(c, '#fff', 2); c.fillStyle = ink / maxInk < 0.2 ? '#ff5f5f' : '#3b5bdb'; if (ink > 1) { ART.rr(c, ix + 22, iy + 4, 86 * ink / maxInk, 8, 4); c.fill(); }
+  // en vertical, la tinta va a la derecha: el centro superior es de pausa/sonido
+  const ix = land ? 12 : W - 116, iy = 38; ART.rr(c, ix + 20, iy + 2, 90, 12, 6); ART.fillOut(c, '#fff', 2); c.fillStyle = ink / maxInk < 0.2 ? '#ff5f5f' : '#3b5bdb'; if (ink > 1) { ART.rr(c, ix + 22, iy + 4, 86 * ink / maxInk, 8, 4); c.fill(); }
   ART.rr(c, ix, iy - 2, 14, 18, 3); ART.fillOut(c, '#3b5bdb', 2); ART.rr(c, ix + 3, iy - 7, 8, 6, 2); ART.fillOut(c, '#c7ccd8', 1.5);
   label(`${score}`, land ? W - 230 : W - 12, land ? 18 : 10, 18, '#ffd23d', 'right');
   for (const b of BTNS) { const [id, x, y, w, h] = b, pr = k.ptr.down && btnAt(k.ptr.x, k.ptr.y) === id && !stroke, yy = y + (pr ? 2 : 0);

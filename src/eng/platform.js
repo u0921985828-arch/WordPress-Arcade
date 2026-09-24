@@ -84,11 +84,11 @@ function die(col) {
 }
 function finish() {
   if (M === 'barrels') {
-    lives--; if (lives <= 0) return k.lose(CFG.id, score, 'Sin vidas', `Nivel ${level} · ${got} monedas`);
+    lives--; if (lives <= 0) return k.lose(CFG.id, score, 'Sin vidas', `Nivel ${level} · ${got} moneda${got === 1 ? "" : "s"}`);
     p = mkP(4 * T, (MH - 1) * T - 26); barrels = []; bT = 1.4; dead = 0; bonus = 3000 + (level - 1) * 500; intro = 1; return;
   }
   const m = Math.floor(height() / 3.2);
-  k.lose(CFG.id, Math.floor(score), 'Fin', `${m} m · ${got} monedas`);
+  k.lose(CFG.id, Math.floor(score), { ninja: 'Fin de la escalada', hopper: '¡Te caíste!', lava: '¡Te alcanzó la lava!' }[M] || 'Fin', `${m} m · ${got} moneda${got === 1 ? "" : "s"}`);
 }
 function coinGet(co, oy) { co.got = true; got++; score += port ? 25 : 10; k.sfx('coin'); k.burst(co.x, co.y - oy, '#ffc928', 8, 90); k.float(port ? '+25' : '+10', co.x, co.y - oy - 12, '#ffc928'); }
 
@@ -385,7 +385,7 @@ function drawBarrels() {
   // HUD
   for (let i = 0; i < 3; i++) ART.heart(c, 14 + i * 20, 12, 1, i < lives);
   label(`${score}`, 8, 22, 16, '#fff');
-  label(`Bonus ${Math.round(bonus / 100) * 100}`, W / 2 + 44, 4, 12, '#ffc928');
+  label(`Bonus ${Math.round(bonus / 100) * 100}`, W - 92, 5, 12, bonus < 1000 ? '#ff9a5c' : '#ffc928', 'right'); // lejos de pausa/sonido
   label(`Nivel ${level}`, 8, 42, 11, 'rgba(255,255,255,.9)');
   if (intro > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, intro * 2); ART.rr(c, W / 2 - 100, H / 2 - 34, 200, 60, 16); ART.fillOut(c, 'rgba(26,21,48,.85)', 2); label(`Nivel ${level}`, W / 2, H / 2 - 26, 26, '#fff', 'center'); label('¡Llega a la bandera!', W / 2, H / 2 + 4, 13, '#ffc928', 'center'); c.globalAlpha = 1; }
 }

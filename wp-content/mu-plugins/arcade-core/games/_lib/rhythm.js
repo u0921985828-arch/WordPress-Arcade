@@ -75,7 +75,7 @@ k.run((dt) => {
     else if (!n || bd > 0.3) { hp -= 3; if (combo >= 10) k.sfx('hurt'); combo = 0; setJudge('FALLO', '#ff5f7a'); } }
   for (const n of notes) if (!n.hit && !n.miss && t - n.time > 0.16) { n.miss = true; hp -= 9; miss(); }
   notes = notes.filter((n) => t - n.time < 0.6); beats = beats.filter((b) => t - b < 0.3);
-  if (hp <= 0) { hp = 0; return k.lose(CFG.id, score, 'Te perdiste el ritmo', `${Math.floor(t)} s · Precisión ${acc()} % · Combo máx. ${maxCombo}`); }
+  if (hp <= 0) { hp = 0; return k.lose(CFG.id, score, 'Te perdiste el ritmo', NREC(score) + `${Math.floor(t)} s · Precisión ${acc()} % · Combo máx. ${maxCombo}`); }
 }, () => {
   c.drawImage(BG, 0, 0, 360, 640);
   const bp = (t * bpm / 60) % 1, pulse = t > 0 ? Math.pow(1 - bp, 3) : 0;
@@ -109,3 +109,6 @@ k.run((dt) => {
   const bw = 96, bx = 348 - bw; ART.rr(c, bx, 52, bw, 12, 6); c.fillStyle = '#1b1438'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
   const hw = Math.max(0, hp) / 100 * (bw - 4); if (hw > 1) { ART.rr(c, bx + 2, 54, hw, 8, 4); c.fillStyle = hp > 60 ? '#7cf7a0' : hp > 30 ? '#f2d15c' : '#ff5f7a'; c.fill(); c.fillStyle = 'rgba(255,255,255,.45)'; c.fillRect(bx + 5, 55, Math.max(0, hw - 6), 2); }
 });
+
+/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.lose/k.end lo actualicen) */
+function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }

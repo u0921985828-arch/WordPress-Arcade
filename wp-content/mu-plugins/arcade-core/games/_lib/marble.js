@@ -54,8 +54,8 @@ k.run((dt) => {
   if (k.ptr.down) { tx = k.clamp((k.ptr.x - k.ptr.sx) / 60, -1, 1); ty = k.clamp((k.ptr.y - k.ptr.sy) / 60, -1, 1); }
   ax += (tx - ax) * Math.min(1, dt * 10); ay += (ty - ay) * Math.min(1, dt * 10);
   if (sink) { sink.t += dt; ball.x += (sink.x - ball.x) * Math.min(1, dt * 10); ball.y += (sink.y - ball.y) * Math.min(1, dt * 10);
-    if (sink.t > 0.6) { if (sink.goal) { score += Math.max(50, 500 - Math.floor(t) * 5) * level; level++; k.st = 'over'; k.show('¡Meta!', `${score} puntos<br>Toca para el nivel ${level}`); }
-      else { lives--; if (lives <= 0) return k.lose(CFG.id, score, 'La canica cayó', `Nivel ${level}`); spawnBall(); } } return; }
+    if (sink.t > 0.6) { if (sink.goal) { score += Math.max(50, 500 - Math.floor(t) * 5) * level; level++; k.st = 'over'; k.sfx('win'); k.confetti(); k.show('¡Meta!', `${score} puntos<br>Toca para el nivel ${level}`); }
+      else { lives--; if (lives <= 0) return k.lose(CFG.id, score, 'La canica cayó', NREC(score) + `Nivel ${level}`); spawnBall(); } } return; }
   const steps = Math.max(3, Math.ceil(Math.hypot(ball.vx, ball.vy) * dt / (ball.r * 0.4)));
   for (let s = 0; s < steps; s++) { const h = dt / steps; ball.vx = (ball.vx + ax * 900 * h) * (1 - 0.8 * h); ball.vy = (ball.vy + ay * 900 * h) * (1 - 0.8 * h); ball.x += ball.vx * h; ball.y += ball.vy * h; collide(); }
   const sp = Math.hypot(ball.vx, ball.vy); ball.rot += sp * dt / ball.r; if (sp > 250 && Math.random() < 0.5) trail.push({ x: ball.x, y: ball.y, l: 0.35 }); for (const q of trail) q.l -= dt; trail = trail.filter((q) => q.l > 0);
@@ -90,3 +90,6 @@ k.run((dt) => {
   else if (!gyro && t < 4 && k.st === 'play') { c.globalAlpha = Math.min(1, 4 - t); label('Arrastra para inclinar', 240, 600, 18, '#fff', 'center'); c.globalAlpha = 1; }
 });
 function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
+
+/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.lose/k.end lo actualicen) */
+function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }

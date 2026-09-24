@@ -59,7 +59,7 @@ k.run((dt) => {
   for (const b of bases) if (b.kick) b.kick = Math.max(0, b.kick - dt);
   if (!k.gate(reset)) return;
   banner -= dt; if (bonus) { bonus.t -= dt; if (bonus.t <= 0) { bonus = null; nextWave(); } }
-  if (endT) { endT -= dt; if (endT <= 0) return k.lose(CFG.id, score, 'Ciudades destruidas', `Oleada ${wave}`); }
+  if (endT) { endT -= dt; if (endT <= 0) return k.lose(CFG.id, score, 'Ciudades destruidas', NREC(score) + `Oleada ${wave}`); }
   // mira: puntero o flechas
   if (k.ptr.x !== lastP.x || k.ptr.y !== lastP.y) { cur.x = k.ptr.x; cur.y = k.ptr.y; lastP = { x: k.ptr.x, y: k.ptr.y }; }
   const sp = 260 * dt; if (k.held.has('left')) cur.x -= sp; if (k.held.has('right')) cur.x += sp; if (k.held.has('up')) cur.y -= sp; if (k.held.has('down')) cur.y += sp;
@@ -110,3 +110,6 @@ k.run((dt) => {
   if (banner > 0 && !bonus) { const p = 1.8 - banner, s = p < 0.2 ? 0.4 + p * 3.5 : 1.1; c.save(); c.translate(240, 150); c.scale(s, s); c.globalAlpha = Math.min(1, banner / 0.3); label(`Oleada ${wave}`, 0, 0, 34, '#fff27a', 'center', 'middle'); if (wave >= 3) label('Cuidado: misiles que se dividen', 0, 30, 13, '#ffb0b0', 'center', 'middle'); c.restore(); c.globalAlpha = 1; }
   if (bonus) { const p = 2.2 - bonus.t; c.globalAlpha = Math.min(1, bonus.t / 0.3); label('¡Oleada superada!', 240, 110, 28, '#7cf7a0', 'center', 'middle'); if (p > 0.3) label(`Ciudades: +${bonus.cb}`, 240, 146, 16, '#fff', 'center', 'middle'); if (p > 0.6) label(`Munición: +${bonus.ab}`, 240, 168, 16, '#fff', 'center', 'middle'); c.globalAlpha = 1; }
 });
+
+/* ¿la puntuación supera el récord guardado? (se consulta antes de que k.lose/k.end lo actualicen) */
+function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && s > 0) { k.confetti(); return '¡Nuevo récord! · '; } return ''; }
