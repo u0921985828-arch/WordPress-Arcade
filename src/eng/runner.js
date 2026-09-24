@@ -231,7 +231,7 @@ function ground() {
   for (let i = i0; i < i0 + W / T + 3; i++) {
     if (holeAt(i)) continue; const sx = Math.round(i * T - cam), L = holeAt(i - 1), R = holeAt(i + 1);
     ART.tile(c, TH, 'ground', sx, FLOOR, T, { top: true, left: L, right: R }); ART.tile(c, TH, 'ground', sx, FLOOR + T, T, { left: L, right: R });
-    if (grav0) { c.save(); c.translate(0, CEIL); c.scale(1, -1); ART.tile(c, TH, 'ground', sx, 0, T, { top: true }); ART.tile(c, TH, 'ground', sx, T, T, {}); c.restore(); }
+    if (grav0) { c.save(); c.translate(0, CEIL); c.scale(1, -1); ART.tile(c, TH, 'ground', sx, 0, T, { top: true, flat: true }); ART.tile(c, TH, 'ground', sx, T, T, {}); c.restore(); }
   }
 }
 function draw() {

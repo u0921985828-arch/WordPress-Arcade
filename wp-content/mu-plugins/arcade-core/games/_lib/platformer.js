@@ -14,6 +14,7 @@ const tileAt = (x, y) => { const tx = Math.floor(x / T), ty = Math.floor(y / T);
 function gen() {
   const lv = Math.min(1, (level - 1) / 8); MW = 62 + Math.min(level, 12) * 16; map = Array.from({ length: MH }, () => Array(MW).fill(0)); enemies = []; coins = []; anchors = []; decos = [];
   const col = (x, h) => { for (let y = MH - h; y < MH; y++) if (x >= 0 && x < MW) map[y][x] = 1; };
+  const spare = []; // tramos aptos sin enemigo: garantizan un mínimo por nivel
   let x = 0, h = 3; for (; x < 7; x++) col(x, h);
   for (let i = 3; i < 7; i++) coins.push({ x: (i + 0.5) * T, y: (MH - h - 1) * T - 6 - Math.sin((i - 3) / 3 * Math.PI) * 26 }); // arranque con algo que recoger
   if (!A.swing) decos.push({ x: 1.5 * T, y: (MH - h) * T });
@@ -38,11 +39,13 @@ function gen() {
       else if (Math.random() < 0.22) coins.push({ x: (x + i + 0.5) * T, y: (MH - nh - 1) * T - 6 });
       else if (Math.random() < 0.12 && !A.swing) decos.push({ x: (x + i + 0.5) * T, y: (MH - nh) * T });
     }
-    if (CFG.enemies && seg >= 5 && x > 12 && Math.random() < CFG.enemies * (0.55 + 0.45 * lv)) enemies.push({ x: (x + 1) * T, y: (MH - nh) * T - 24, w: 26, h: 24, vx: (55 + 55 * lv) * k.pick([-1, 1]), min: x * T, max: (x + seg) * T - 26, alive: true, fly: TH.enemy === 'bird' });
+    const foe = () => ({ x: (x + 1) * T, y: (MH - nh) * T - 24, w: 26, h: 24, vx: (55 + 55 * lv) * k.pick([-1, 1]), min: x * T, max: (x + seg) * T - 26, alive: true, fly: TH.enemy === 'bird' });
+    if (CFG.enemies && seg >= 5 && x > 12) { if (Math.random() < CFG.enemies * (0.55 + 0.45 * lv)) enemies.push(foe()); else spare.push(foe()); }
     if (Math.random() < 0.22 && !A.swing && seg >= 4) { const py = MH - nh - 4; for (let i = 1; i < 4; i++) if (map[py] && !map[py][x + i]) map[py][x + i] = 2; for (let i = 1; i < 4; i++) coins.push({ x: (x + i + 0.5) * T, y: (py - 1) * T + 10 }); }
     x += seg; h = nh;
     if (!check && x > MW / 2) check = { x: (x - 2) * T, y: (MH - h) * T, on: false };
   }
+  if (CFG.enemies) { k.shuffle(spare); while (enemies.length < 2 + Math.round(2 * lv) && spare.length) enemies.push(spare.pop()); }
   for (; x < MW; x++) col(x, h); flag = { x: (MW - 5) * T, y: (MH - h) * T };
   spawn = { x: 3 * T, y: (MH - 3) * T - 40 };
 }

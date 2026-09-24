@@ -135,7 +135,7 @@ def main():
         cfg = dict(cfg); cfg.setdefault('help', ''); cfg['title'] = titles[slug]; cfg['id'] = slug
         if slug in PAD: cfg['pad'] = PAD[slug]
         d = GAMES_DIR / slug; d.mkdir(parents=True, exist_ok=True)
-        (d / 'index.html').write_text(TPL.format(title=titles[slug], cfg=json.dumps(cfg, ensure_ascii=False), eng=eng, ev=hashlib.md5((ENG_DIR / f'{eng}.js').read_bytes()).hexdigest()[:8], deps=''.join(f'<script src="../_lib/{d}.js?v=8"></script>' for d in deps_of(eng))), encoding='utf-8')
+        (d / 'index.html').write_text(TPL.format(title=titles[slug], cfg=json.dumps(cfg, ensure_ascii=False), eng=eng, ev=hashlib.md5((ENG_DIR / f'{eng}.js').read_bytes()).hexdigest()[:8], deps=''.join(f'<script src="../_lib/{d}.js?v=9"></script>' for d in deps_of(eng))), encoding='utf-8')
     total = len([p for p in GAMES_DIR.iterdir() if (p / 'index.html').exists()])
     print(f'{len(G)} juegos generados + {len(STANDALONE)} independientes = {total} carpetas; {len(engines)} motores')
 

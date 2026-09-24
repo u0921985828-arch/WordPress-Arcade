@@ -288,7 +288,8 @@ const ART = (() => {
         const top = th.top, topD = th.topD, band = (y0, amp, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(0, -1); g.lineTo(T, -1); for (let x = T; x >= 0; x -= 2) g.lineTo(x, y0 + (snow ? Math.max(0, Math.sin(x / T * TAU * 2 + 0.5)) * amp * 1.4 : Math.abs(Math.sin(x / T * Math.PI * 3)) * amp)); g.closePath(); g.fill(); };
         band(9, 4, alpha(OUT, 0.35)); band(8, 4, topD); band(6, 3, top);
         g.fillStyle = alpha('#ffffff', snow ? 0.8 : 0.3); g.fillRect(0, 0, T, 2);
-        if (snow) { g.fillStyle = '#ffffff'; [[0.2, 2.2], [0.62, 3], [0.9, 1.8]].forEach(([a, r]) => { g.beginPath(); g.arc(a * T, 0, r, Math.PI, 0); g.fill(); }); g.fillStyle = alpha('#9fd0ff', 0.9); [[0.35, 4], [0.8, 3]].forEach(([a, b]) => g.fillRect(a * T, b, 1.2, 1.2)); }
+        if (e.flat) { /* sin mechones: techos volteados (gravity-flip) */ }
+        else if (snow) { g.fillStyle = '#ffffff'; [[0.2, 2.2], [0.62, 3], [0.9, 1.8]].forEach(([a, r]) => { g.beginPath(); g.arc(a * T, 0, r, Math.PI, 0); g.fill(); }); g.fillStyle = alpha('#9fd0ff', 0.9); [[0.35, 4], [0.8, 3]].forEach(([a, b]) => g.fillRect(a * T, b, 1.2, 1.2)); }
         else { const blade = (x, h, lean) => { g.beginPath(); g.moveTo(x - 1.6, 1); g.quadraticCurveTo(x + lean * 0.4, -h * 0.5, x + lean, -h); g.quadraticCurveTo(x + lean * 0.2, -h * 0.4, x + 1.6, 1); g.fill(); };
           g.fillStyle = topD; [[0.12, 5, -2], [0.2, 6.5, 1], [0.55, 4.5, -1.5], [0.63, 6, 2], [0.7, 4, 3], [0.9, 5, -1]].forEach(([a, h, l]) => blade(a * T + 0.8, h, l));
           g.fillStyle = top; [[0.12, 4.2, -2], [0.2, 5.6, 1], [0.55, 3.8, -1.5], [0.63, 5.2, 2], [0.9, 4.2, -1]].forEach(([a, h, l]) => blade(a * T, h, l));
@@ -309,7 +310,7 @@ const ART = (() => {
   function tile(c, th, kind, x, y, T, edges) {
     edges = edges || {};
     if (kind === 'ground') {
-      const key = 'g' + (edges.top ? 'T' : '') + (edges.left ? 'L' : '') + (edges.right ? 'R' : '');
+      const key = 'g' + (edges.top ? 'T' : '') + (edges.left ? 'L' : '') + (edges.right ? 'R' : '') + (edges.flat ? 'F' : '');
       const img = tileCanvas(c, th, key, T, T + OV, (g) => groundTile(g, th, T, edges));
       c.drawImage(img, x, y - OV, T, T + OV); return;
     }
