@@ -191,6 +191,11 @@ final class Arcade_SEO {
 			$desc = sprintf( 'Juega gratis a %s, juego de %s online sin descargas. %s', get_the_title( $id ), strtolower( $l[0] ), $desc );
 			$img = Arcade_Core::thumb( $id, 'large' ); $title = get_the_title( $id ) . ' — ' . $brand;
 			$ld = array( '@context' => 'https://schema.org', '@type' => 'VideoGame', 'name' => get_the_title( $id ), 'url' => get_permalink( $id ), 'image' => $img, 'description' => $desc, 'genre' => $l[0], 'gamePlatform' => array( 'Navegador web', 'Móvil', 'PC' ), 'applicationCategory' => 'Game', 'operatingSystem' => 'Any', 'inLanguage' => 'es', 'isAccessibleForFree' => true, 'publisher' => array( '@type' => 'Organization', 'name' => $brand ), 'offers' => array( '@type' => 'Offer', 'price' => '0', 'priceCurrency' => 'EUR' ) );
+			$mp = class_exists( 'Arcade_Party' ) ? Arcade_Party::players( get_post_field( 'post_name', $id ) ) : null;
+			if ( $mp ) { // numberOfPlayers y playMode para los multijugador
+				$ld['numberOfPlayers'] = array( '@type' => 'QuantitativeValue', 'minValue' => 1, 'maxValue' => $mp[1] );
+				$ld['playMode']        = array( 'SinglePlayer', 'MultiPlayer' );
+			}
 		} elseif ( is_tax( 'game_genre' ) ) {
 			$t = get_queried_object(); $l = Arcade_Portal::LABELS[ $t->slug ] ?? array( $t->name );
 			$title = 'Juegos de ' . $l[0] . ' gratis — ' . $brand; $desc = sprintf( 'Los mejores juegos de %s gratis online: sin descargas, en móvil y PC.', strtolower( $l[0] ) ); $img = '';

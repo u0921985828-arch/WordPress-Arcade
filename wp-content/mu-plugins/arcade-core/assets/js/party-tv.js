@@ -225,7 +225,18 @@
       var all = (j.games || []).filter(function (g) { return g.keys; });
       var mp = all.filter(function (g) { return g.mp; }), solo = all.filter(function (g) { return !g.mp; });
       S.sections = [];
-      if (mp.length) S.sections.push({ title: 'Multijugador', sub: 'Hasta 4 en la misma pantalla', games: mp, mp: true });
+      // Multijugador por familias (con muchos juegos, una sola rejilla sería eterna de recorrer con el mando).
+      var FAM = [['Fiesta', 'Minijuegos y empujones', ['party']], ['Deportes', 'Partidos y duelos', ['sports-casual', '3d-webgl']],
+        ['Carreras', 'Karts y rallies', ['racing']], ['Mesa y cartas', 'Parchís, oca, baraja española', ['strategy-cards']],
+        ['Trivia y palabras', 'Preguntas y letras', ['trivia', 'puzzle']], ['Acción y arcade', 'Arenas, tanques y plataformas', ['arcade', 'platformer']]];
+      var used = {};
+      FAM.forEach(function (f) {
+        var gs = mp.filter(function (g) { return !used[g.slug] && f[2].indexOf(g.g) >= 0; });
+        gs.forEach(function (g) { used[g.slug] = 1; });
+        if (gs.length) S.sections.push({ title: f[0], sub: f[1], games: gs, mp: true });
+      });
+      var rest = mp.filter(function (g) { return !used[g.slug]; });
+      if (rest.length) S.sections.push({ title: 'Multijugador', sub: 'Hasta 4 en la misma pantalla', games: rest, mp: true });
       S.sections.push({ title: mp.length ? 'Para un jugador' : 'Juegos', sub: 'Juega con el mando del móvil (J1)', games: solo });
       renderGrid();
     }).catch(function () { ui.grid.innerHTML = '<p class="pt-empty">No se pudo cargar la lista de juegos.</p>'; });
@@ -367,6 +378,7 @@
     if (!d || !S.frame || e.source !== S.frame.contentWindow) return;
     if (d.type === 'arcade:hello') { S.ready = true; post(playersMsg()); }
     // Mensaje privado a un solo móvil (mano de cartas, rol secreto…): nunca se pinta en la tele.
+    else if (d.type === 'arcade:adbreak') adBreakGame();
     else if (d.type === 'arcade:priv' && d.p >= 0 && d.p < 4) { S.priv[d.p] = d.data ? 1 : 0; send(d.p | 0, { t: 'priv', d: d.data || null }); }
   });
   function clearPriv() { Object.keys(S.priv).forEach(function (p) { if (S.priv[p]) send(+p, { t: 'priv', d: null }); }); S.priv = {}; }
@@ -397,6 +409,24 @@
       return;
     }
     try { window.adBreak({ type: 'next', name: 'tele-lobby', beforeAd: before, afterAd: done, adBreakDone: done }); } catch (e) { done(); }
+  }
+
+  // Pausa publicitaria entre rondas (p. ej. cada 3 minijuegos de la ruleta): el juego se pausa y sigue después.
+  function adBreakGame() {
+    var h5 = C.h5, now = Date.now();
+    if (!h5 || !S.game || S.ad || (S.lastAd && now - S.lastAd < h5.freq * 1000) || now - S.gameT0 < 45000) return;
+    var real = typeof window.adBreak === 'function';
+    if (!real && !h5.preview) return;
+    S.lastAd = now;
+    var done = function () { if (!S.ad) return; S.ad = false; document.body.classList.remove('pt-adon'); broadcastPad(); var o = $('.pt-adprev'); if (o) o.remove(); post({ type: 'arcade:resume' }); };
+    var before = function () { S.ad = true; document.body.classList.add('pt-adon'); stopRepeat(); releaseAll(null, true); broadcastPad(); post({ type: 'arcade:pause' }); };
+    if (!real) {
+      before();
+      document.body.appendChild(el('div', 'pt-adprev', '<div class="pt-card"><span class="pt-kick">Publicidad</span><p>Pausa publicitaria (vista previa)</p></div>'));
+      setTimeout(done, 3000);
+      return;
+    }
+    try { window.adBreak({ type: 'next', name: 'tele-ronda', beforeAd: before, afterAd: done, adBreakDone: done }); } catch (e) { done(); }
   }
 
   /* ================================================================ Menú */

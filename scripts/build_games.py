@@ -130,10 +130,11 @@ TPL = '''<!doctype html>
 def main():
     titles = {wx.slugify(it[0]): it[0] for items in wx.CATALOG.values() for it in items}
     inp = {wx.slugify(it[0]): (it[3], it[5]) for items in wx.CATALOG.values() for it in items}
+    genre = {wx.slugify(it[0]): g for g, items in wx.CATALOG.items() for it in items}
     # Catálogo ampliado (scripts/catalog/o*.py): se funde con G/PAD/MP y genera games/catalog.json para el plugin.
     new = cat.load(); cat.check(new, titles, wx.slugify); newcat = []
     for g in new:
-        s = wx.slugify(g['title']); titles[s] = g['title']; inp[s] = (g['orient'], g['inputs'])
+        s = wx.slugify(g['title']); titles[s] = g['title']; genre[s] = g['genre']; inp[s] = (g['orient'], g['inputs'])
         G[s] = (g['engine'], g['cfg'])
         if g.get('pad'): PAD[s] = g['pad']
         if g.get('mp'): MP[s] = tuple(g['mp'])
@@ -156,7 +157,7 @@ def main():
         if slug in MP: cfg['mp'] = list(MP[slug])
         d = GAMES_DIR / slug; d.mkdir(parents=True, exist_ok=True)
         (d / 'index.html').write_text(TPL.format(title=titles[slug], cfg=json.dumps(cfg, ensure_ascii=False), eng=eng, ev=hashlib.md5((ENG_DIR / f'{eng}.js').read_bytes()).hexdigest()[:8], deps=''.join(f'<script src="../_lib/{d}.js?v=9"></script>' for d in deps_of(eng))), encoding='utf-8')
-    party = [dict(slug=s, title=titles[s], orient=inp[s][0], keys=any(c in inp[s][1] for c in 'KG') or s in MP, mp=list(MP[s]) if s in MP else None, pad=PAD.get(s))
+    party = [dict(slug=s, title=titles[s], g=genre[s], orient=inp[s][0], keys=any(c in inp[s][1] for c in 'KG') or s in MP, mp=list(MP[s]) if s in MP else None, pad=PAD.get(s))
              for s in sorted(titles, key=lambda x: titles[x].lower())]
     (GAMES_DIR / 'party.json').write_text(json.dumps(dict(games=party), ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     (GAMES_DIR / 'catalog.json').write_text(json.dumps(dict(games=newcat), ensure_ascii=False, separators=(',', ':')), encoding='utf-8')

@@ -282,7 +282,7 @@ export class ArcadePlayer {
     // Pausas publicitarias (Ad Placement API de AdSense, si el portal la activa).
     addEventListener('message', (e) => {
       if (!this.iframe || e.source !== this.iframe.contentWindow || !e.data) return;
-      if (e.data.type === 'arcade:restart') this._adBreak('next');
+      if (e.data.type === 'arcade:restart' || e.data.type === 'arcade:adbreak') this._adBreak('next');
       else if (e.data.type === 'arcade:hello') this._hello(e.data);
       else if (e.data.type === 'arcade:pad') { this.padSpec = e.data.pad || false; this.gameAR = e.data.w / e.data.h || 0; this._dropPad(); this._syncPad(); }
     }, sig);
