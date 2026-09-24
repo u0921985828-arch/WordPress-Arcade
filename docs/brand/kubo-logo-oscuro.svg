@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 672 200" width="672" height="200"><defs>
+<linearGradient id="gt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b3acff"/><stop offset="1" stop-color="#8d84ff"/></linearGradient>
+<linearGradient id="gl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7c71ff"/><stop offset="1" stop-color="#6e62f5"/></linearGradient>
+<linearGradient id="gr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5146d6"/><stop offset="1" stop-color="#3f35b8"/></linearGradient>
+</defs><g stroke="#1a1530" stroke-width="7.0" stroke-linejoin="round">
+<polygon points="100.0,30.0 160.6,65.0 100.0,100.0 39.4,65.0" fill="url(#gt)"/>
+<polygon points="39.4,65.0 100.0,100.0 100.0,170.0 39.4,135.0" fill="url(#gl)"/>
+<polygon points="100.0,100.0 160.6,65.0 160.6,135.0 100.0,170.0" fill="url(#gr)"/>
+</g>
+<polygon points="120.0,108.0 120.0,138.8 143.6,109.8" fill="#fff" stroke="#fff" stroke-width="4.0" stroke-linejoin="round"/>
+<path d="M52.0,70.0 L96.0,44.0" stroke="#fff" stroke-opacity=".55" stroke-width="6.0" stroke-linecap="round"/><g fill="none" stroke="#ffffff" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+<path d="M230 60V170M288 100L233 140M256 124L290 170"/>
+<path transform="translate(14 0)" d="M322 100V136Q322 170 351 170Q380 170 380 136V100M380 100V170"/>
+<path d="M448 60V170"/><circle cx="481" cy="135" r="35"/>
+<circle cx="600" cy="135" r="35"/></g></svg>

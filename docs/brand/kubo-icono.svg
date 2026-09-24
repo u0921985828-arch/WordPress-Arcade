@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><defs>
+<linearGradient id="gt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b3acff"/><stop offset="1" stop-color="#8d84ff"/></linearGradient>
+<linearGradient id="gl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7c71ff"/><stop offset="1" stop-color="#6e62f5"/></linearGradient>
+<linearGradient id="gr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5146d6"/><stop offset="1" stop-color="#3f35b8"/></linearGradient>
+</defs><rect width="512" height="512" rx="112" fill="#14122a"/><g transform="translate(6 0)"><g stroke="#1a1530" stroke-width="18.2" stroke-linejoin="round">
+<polygon points="250.0,76.0 407.6,167.0 250.0,258.0 92.4,167.0" fill="url(#gt)"/>
+<polygon points="92.4,167.0 250.0,258.0 250.0,440.0 92.4,349.0" fill="url(#gl)"/>
+<polygon points="250.0,258.0 407.6,167.0 407.6,349.0 250.0,440.0" fill="url(#gr)"/>
+</g>
+<polygon points="302.0,278.9 302.0,359.0 363.4,283.5" fill="#fff" stroke="#fff" stroke-width="10.4" stroke-linejoin="round"/>
+<path d="M125.2,180.0 L239.6,112.4" stroke="#fff" stroke-opacity=".55" stroke-width="15.6" stroke-linecap="round"/></g></svg>
