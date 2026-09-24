@@ -8,7 +8,7 @@ let ac, notes, beats, t, bpm, score, combo, maxCombo, hp, nextBeat, beatN, flash
 function audio() { if (k.muted()) return; if (!ac) try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} if (ac && ac.state === 'suspended') ac.resume(); }
 function tone(freq, dur, type, vol, when) { if (!ac || k.muted()) return; const w0 = when || ac.currentTime, o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.value = freq; g.gain.setValueAtTime(vol, w0); g.gain.exponentialRampToValueAtTime(0.001, w0 + dur); o.connect(g).connect(ac.destination); o.start(w0); o.stop(w0 + dur + 0.02); }
 function kick(when) { if (!ac || k.muted()) return; const o = ac.createOscillator(), g = ac.createGain(); o.frequency.setValueAtTime(140, when); o.frequency.exponentialRampToValueAtTime(40, when + 0.15); g.gain.setValueAtTime(0.5, when); g.gain.exponentialRampToValueAtTime(0.001, when + 0.2); o.connect(g).connect(ac.destination); o.start(when); o.stop(when + 0.22); }
-function reset() { notes = []; beats = []; rings = []; t = 0; bpm = 100; score = 0; combo = 0; maxCombo = 0; hp = 100; nextBeat = 1.5; beatN = 0; flash = [0, 0, 0, 0]; judge = ''; judgeT = 0; judgeC = '#fff'; root = 220; accSum = 0; accN = 0; dead = 0; }
+function reset() { notes = []; beats = []; rings = []; t = 0; bpm = 100; score = 0; combo = 0; maxCombo = 0; hp = 100; nextBeat = 2.6; beatN = 0; flash = [0, 0, 0, 0]; judge = ''; judgeT = 0; judgeC = '#fff'; root = 220; accSum = 0; accN = 0; dead = 0; }
 reset(); k.show(CFG.title, 'Toca cada carril cuando la nota cruce el anillo. Teclado: D F J K o flechas. Encadena combos para multiplicar y no dejes que se vacíe la barra.');
 /* Entrada propia: varias teclas o dedos a la vez (el kit solo guarda un puntero) */
 const KEYMAP = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3, ArrowLeft: 0, ArrowDown: 1, ArrowUp: 2, ArrowRight: 3 };
@@ -57,11 +57,12 @@ function label(s, x, y, size, col, align, base) {
 k.run((dt) => {
   judgeT -= dt; flash = flash.map((f) => Math.max(0, f - dt * 4)); rings.forEach((r) => (r.t += dt)); rings = rings.filter((r) => r.t < 0.4);
   if (!k.gate(reset)) { pressed.length = 0; return; }
-  audio(); t += dt; bpm = Math.min(170, 100 + t * 0.8); const beat = 60 / bpm, travel = (HITY + 40) / SPEED;
-  while (nextBeat < t + travel) { const at = nextBeat; beatN++; beats.push(at); if (ac) kick(ac.currentTime + Math.max(0, at - t)); const r = Math.random(), dens = Math.min(0.9, 0.45 + t / 200);
+  /* dificultad continua: d 0→1 en 200 s (≈3,3 min). 88→165 ppm, densidad 0,4→0,9; corcheas desde 25 s y acordes desde 60 s, ambos con entrada gradual */
+  audio(); t += dt; const d = Math.min(1, t / 200), e = d; bpm = 88 + 77 * e; const beat = 60 / bpm, travel = (HITY + 40) / SPEED;
+  while (nextBeat < t + travel) { const at = nextBeat; beatN++; beats.push(at); if (ac) kick(ac.currentTime + Math.max(0, at - t)); const r = Math.random(), dens = 0.4 + 0.5 * e;
     if (r < dens) notes.push({ lane: k.ri(0, 3), time: at, pitch: k.pick(SCALE) });
-    if (t > 20 && Math.random() < dens * 0.4) notes.push({ lane: k.ri(0, 3), time: at + beat / 2, pitch: k.pick(SCALE) });
-    if (t > 40 && Math.random() < 0.15) { const l = k.ri(0, 2); notes.push({ lane: l, time: at, pitch: 0 }, { lane: l + 1, time: at, pitch: 7 }); }
+    if (at > 25 && Math.random() < dens * 0.4 * Math.min(1, (at - 25) / 40)) notes.push({ lane: k.ri(0, 3), time: at + beat / 2, pitch: k.pick(SCALE) });
+    if (at > 60 && Math.random() < 0.15 * Math.min(1, (at - 60) / 60)) { const l = k.ri(0, 2); notes.push({ lane: l, time: at, pitch: 0 }, { lane: l + 1, time: at, pitch: 7 }); }
     nextBeat += beat; }
   // quita notas duplicadas en el mismo carril y momento
   const seen = {}; notes = notes.filter((n) => { const key = n.lane + ':' + Math.round(n.time * 100); if (seen[key]) return false; seen[key] = 1; return true; });
@@ -73,7 +74,7 @@ k.run((dt) => {
       rings.push({ lane, t: 0, col: COLS[lane], big: j[3] === 1 }); k.burst(lane * LW + LW / 2, HITY, j[3] === 1 ? '#fff27a' : COLS[lane], j[3] === 1 ? 14 : 8, 170);
       if (combo % 50 === 0) { k.float(`¡${combo} COMBO!`, 180, 300, '#fff27a'); k.sfx('coin'); } else if (combo % 10 === 0 && combo <= 30) k.float(`x${mult()}`, 180, 300, '#fff27a'); }
     else if (!n || bd > 0.3) { hp -= 3; if (combo >= 10) k.sfx('hurt'); combo = 0; setJudge('FALLO', '#ff5f7a'); } }
-  for (const n of notes) if (!n.hit && !n.miss && t - n.time > 0.16) { n.miss = true; hp -= 9; miss(); }
+  for (const n of notes) if (!n.hit && !n.miss && t - n.time > 0.16) { n.miss = true; hp -= 6 + 3 * Math.min(1, t / 200); miss(); }
   notes = notes.filter((n) => t - n.time < 0.6); beats = beats.filter((b) => t - b < 0.3);
   if (hp <= 0) { hp = 0; return k.lose(CFG.id, score, 'Te perdiste el ritmo', `${Math.floor(t)} s · Precisión ${acc()} % · Combo máx. ${maxCombo}`); }
 }, () => {

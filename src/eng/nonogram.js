@@ -8,7 +8,8 @@ function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Ma
 const clue = (line) => { const r = []; let n = 0; for (const v of line) { if (v) n++; else if (n) { r.push(n); n = 0; } } if (n) r.push(n); return r.length ? r : [0]; };
 function build() {
   const d = new Date(); seedR = CFG.daily ? mulberry(d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate() + puzzle * 7919) : Math.random;
-  sol = Array.from({ length: N }, () => Array.from({ length: N }, () => seedR() < 0.58));
+  const fill = Math.max(0.58, 0.7 - puzzle * 0.03); /* primeros puzzles más llenos (bloques largos, más fáciles de deducir) */
+  sol = Array.from({ length: N }, () => Array.from({ length: N }, () => seedR() < fill));
   for (const r of sol) for (let x = 0; x < N >> 1; x++) r[N - 1 - x] = r[x]; // simetría especular: el resultado parece un dibujo
   grid = Array.from({ length: N }, () => Array(N).fill(0)); rows = sol.map(clue); cols = sol[0].map((_, x) => clue(sol.map((r) => r[x]))); solved = false;
   tm = 0; revT = 0; paint = undefined; axis = null; cur = [0, 0]; rowOk = rows.map(() => false); colOk = cols.map(() => false); pulse = { r: rows.map(() => 0), c: cols.map(() => 0) };

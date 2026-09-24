@@ -13,18 +13,18 @@ function sudokuGen() { const b = Array(81).fill(0); const ok = (i, v) => { const
   const fillB = (i) => { if (i === 81) return true; for (const v of k.shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9])) if (ok(i, v)) { b[i] = v; if (fillB(i + 1)) return true; b[i] = 0; } return false; }; fillB(0); return b; }
 function build() {
   done = false; t = 0; sel = null; first = true; flagMode = false; moves = 0; boom = null; doneT = 0; fx = []; longDone = false;
-  if (M === 'sudoku') { N = 9; S = 48; sol = sudokuGen(); const holes = 38 + Math.min(16, level * 3); g = [...sol]; k.shuffle([...Array(81).keys()]).slice(0, holes).forEach((i) => (g[i] = 0)); given = g.map((v) => v > 0); calcConf(); }
+  if (M === 'sudoku') { N = 9; S = 48; sol = sudokuGen(); const holes = Math.min(54, 30 + (level - 1) * 3); /* nivel 1: 30 huecos → 54 en el nivel 9 */ g = [...sol]; k.shuffle([...Array(81).keys()]).slice(0, holes).forEach((i) => (g[i] = 0)); given = g.map((v) => v > 0); calcConf(); }
   if (M === 'mines') { N = 9; S = 48; g = Array.from({ length: 81 }, () => ({ mine: false, open: false, flag: false, n: 0, ot: 0 })); }
   // luces: se parte de todo apagado y se aplican pulsaciones aleatorias → siempre resoluble
-  if (M === 'lights') { N = 5; S = 80; g = Array(25).fill(false); for (let i = 0; i < 4 + level * 2; i++) toggle(k.ri(0, 4), k.ri(0, 4)); if (g.every((v) => !v)) toggle(2, 2); glow = g.map((v) => (v ? 1 : 0)); }
+  if (M === 'lights') { N = 5; S = 80; g = Array(25).fill(false); k.shuffle([...Array(25).keys()]).slice(0, Math.min(13, 2 + level)).forEach((i) => toggle(i % 5, Math.floor(i / 5))); /* nivel 1: 3 toques distintos */ if (g.every((v) => !v)) toggle(2, 2); glow = g.map((v) => (v ? 1 : 0)); }
   // tuberías: árbol de expansión desde la fuente y giro aleatorio de cada pieza → siempre resoluble
-  if (M === 'pipes') { N = Math.min(8, 5 + Math.floor(level / 2)); S = Math.floor(432 / N); g = Array.from({ length: N * N }, () => ({ c: [0, 0, 0, 0], r: 0, ra: 0 })); src = [Math.floor(N / 2), Math.floor(N / 2)];
+  if (M === 'pipes') { N = Math.min(8, 4 + Math.floor(level / 2)); /* nivel 1: 4×4 */ S = Math.floor(432 / N); g = Array.from({ length: N * N }, () => ({ c: [0, 0, 0, 0], r: 0, ra: 0 })); src = [Math.floor(N / 2), Math.floor(N / 2)];
     const seen = new Set([src.join()]), st = [src];
     while (st.length) { const cur2 = st[Math.floor(Math.random() * st.length)]; const opts = DD.map((d, i) => [i, cur2[0] + d[0], cur2[1] + d[1]]).filter(([, x, y]) => inb(x, y) && !seen.has(x + ',' + y)); if (!opts.length) { st.splice(st.indexOf(cur2), 1); continue; } const [i, x, y] = k.pick(opts); g[cur2[1] * N + cur2[0]].c[i] = 1; g[y * N + x].c[(i + 2) % 4] = 1; seen.add(x + ',' + y); st.push([x, y]); }
     for (const cell of g) { const r = k.ri(0, 3); for (let i = 0; i < r; i++) cell.c.unshift(cell.c.pop()); } }
   // 15: movimientos aleatorios desde la posición resuelta → siempre resoluble
   if (M === 'slide') { N = 4; S = 104; g = [...Array(15).keys()].map((i) => i + 1).concat(0);
-    do { for (let i = 0; i < 300; i++) { const e = g.indexOf(0), ex = e % 4, ey = Math.floor(e / 4); const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [ex + dx, ey + dy]).filter(([x, y]) => inb(x, y)); const [x, y] = k.pick(nb); g[e] = g[y * 4 + x]; g[y * 4 + x] = 0; } } while (g.every((v, i) => v === (i === 15 ? 0 : i + 1)));
+    do { let pe = -1; for (let i = 0, nm = Math.min(300, 14 + (level - 1) * 30); i < nm; i++) { const e = g.indexOf(0), ex = e % 4, ey = Math.floor(e / 4); const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [ex + dx, ey + dy]).filter(([x, y]) => inb(x, y) && y * 4 + x !== pe); const [x, y] = k.pick(nb); g[e] = g[y * 4 + x]; g[y * 4 + x] = 0; pe = e; } } while (g.every((v, i) => v === (i === 15 ? 0 : i + 1)));
     rp = []; g.forEach((v, i) => (rp[v] = [i % 4, Math.floor(i / 4)])); }
   OX = Math.floor((W - N * S) / 2); anim = Array(N * N).fill(0); cur = [Math.floor(N / 2), Math.floor(N / 2)]; boardCv = null;
 }
@@ -58,6 +58,7 @@ function setNum(n) {
   else if (n) for (const u of unitsOf(sel)) if (u.every((j) => g[j] && !conf.has(j))) { fx.push({ cells: u, t: 0.7, col: 'rgba(124,247,160,' }); k.sfx('coin'); }
   solvedCheck();
 }
+function nMines() { return 8 + Math.min(10, Math.floor(((level || 1) - 1) * 1.5)); } /* 8 minas en el nivel 1 → 18 en el 8 */
 function reset() { if (level === undefined || lost) { level = 1; score = 0; lost = false; } build(); }
 addEventListener('keydown', (e) => { if (M !== 'sudoku') return; const m = /^(Digit|Numpad)([0-9])$/.exec(e.code); if (m) keyNum = +m[2]; else if (e.code === 'Backspace' || e.code === 'Delete') keyNum = 0; });
 level = undefined; reset(); k.show(CFG.title, CFG.help);
@@ -70,7 +71,7 @@ function minesTap(cx, cy, flag) {
     let f = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(cx + dx, cy + dy) && g[(cy + dy) * N + cx + dx].flag) f++;
     if (f === cl.n) { k.sfx('click'); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(cx + dx, cy + dy) && !done) openCell(cx + dx, cy + dy, 1); } }
   else if (!cl.open && !cl.flag) {
-    if (first) { first = false; const safe = new Set(); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(cx + dx, cy + dy)) safe.add((cy + dy) * N + cx + dx); const cand = k.shuffle([...Array(81).keys()].filter((i) => !safe.has(i))); cand.slice(0, 10 + Math.min(8, level * 2)).forEach((i) => (g[i].mine = true)); g.forEach((q, i) => { const x = i % N, y = Math.floor(i / N); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(x + dx, y + dy) && g[(y + dy) * N + x + dx].mine) q.n++; }); }
+    if (first) { first = false; const safe = new Set(); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(cx + dx, cy + dy)) safe.add((cy + dy) * N + cx + dx); const cand = k.shuffle([...Array(81).keys()].filter((i) => !safe.has(i))); cand.slice(0, nMines()).forEach((i) => (g[i].mine = true)); g.forEach((q, i) => { const x = i % N, y = Math.floor(i / N); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(x + dx, y + dy) && g[(y + dy) * N + x + dx].mine) q.n++; }); }
     k.sfx('click'); openCell(cx, cy, 0); }
   if (!done) solvedCheck();
 }
@@ -142,7 +143,7 @@ function hud() {
   label(CFG.title, 16, 13, 19, '#ffd23d'); label(`Nivel ${level || 1}`, 16, 40, 14, '#cfd6ff');
   const tt = Math.floor(t), ts = `${Math.floor(tt / 60)}:${String(tt % 60).padStart(2, '0')}`; clock(W - 86, 24); label(ts, W - 18, 12, 22, '#fff', 'right');
   let sub = `Puntos ${score}`;
-  if (M === 'mines') sub = `Minas ${10 + Math.min(8, (level || 1) * 2) - g.filter((q) => q.flag).length}`;
+  if (M === 'mines') sub = `Minas ${nMines() - g.filter((q) => q.flag).length}`;
   if (M === 'lights') sub = `Toques ${moves} · Luces ${g.filter(Boolean).length}`;
   if (M === 'pipes') sub = `Conectadas ${litN}/${N * N}`;
   if (M === 'slide') sub = `Movimientos ${moves}`;

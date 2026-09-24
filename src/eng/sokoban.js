@@ -7,13 +7,13 @@ let N, wall, goals, boxes, pl, level, moves, hist, exitC, total, par, init;
 let S, OX, OY, boardCv, bgCv, pr, boxR, face = 1, walkT = 0, t = 0, queued = null, holdT = 0, bump = null, trail = [], winT = 0, winStars = 0, pushT = 0;
 const K = (x, y) => x + ',' + y, rnd = (s) => { const x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 function genPush() {
-  N = 7 + Math.min(3, Math.floor(level / 3)); const nb = Math.min(5, 2 + Math.floor(level / 2));
+  N = 7 + Math.min(3, Math.floor(level / 3)); const nb = Math.min(5, 1 + Math.floor(level / 2)); /* nivel 1: 1 caja; 2-3: 2; … 8+: 5 */
   for (let tries = 0; tries < 200; tries++) {
     wall = new Set(); for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (x === 0 || y === 0 || x === N - 1 || y === N - 1 || Math.random() < 0.12) wall.add(K(x, y));
     const free = []; for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) if (!wall.has(K(x, y))) free.push([x, y]); if (free.length < nb + 6) continue;
     k.shuffle(free); goals = free.slice(0, nb); boxes = goals.map((g) => [...g]); pl = [...free[nb]];
     // retroceso: el jugador camina y "tira" de las cajas; cada tirón es un empuje válido al revés
-    for (let i = 0; i < 400 + level * 60; i++) { const d = D[k.pick(Object.keys(D))], nx = pl[0] + d[0], ny = pl[1] + d[1]; if (wall.has(K(nx, ny)) || boxes.some((b) => b[0] === nx && b[1] === ny)) continue;
+    for (let i = 0, nw = Math.min(400 + level * 60, 60 + level * 70); i < nw; i++) { /* pocos pasos al principio → cajas cerca de sus marcas */ const d = D[k.pick(Object.keys(D))], nx = pl[0] + d[0], ny = pl[1] + d[1]; if (wall.has(K(nx, ny)) || boxes.some((b) => b[0] === nx && b[1] === ny)) continue;
       const behind = boxes.find((b) => b[0] === pl[0] - d[0] && b[1] === pl[1] - d[1]); const pull = behind && Math.random() < 0.7; const op = [...pl]; pl = [nx, ny]; if (pull) { behind[0] = op[0]; behind[1] = op[1]; } }
     const onGoal = boxes.filter((b) => goals.some((g) => g[0] === b[0] && g[1] === b[1])).length; if (onGoal <= Math.max(0, nb - 2) && onGoal < nb) return;
   }
@@ -26,7 +26,7 @@ function genIce() {
     pl = [k.ri(1, N - 2), k.ri(1, N - 2)]; if (wall.has(K(...pl))) continue; exitC = [k.ri(1, N - 2), k.ri(1, N - 2)]; if (wall.has(K(...exitC))) continue;
     const seen = new Map([[K(...pl), 0]]), q = [pl]; let found = -1;
     while (q.length) { const cur = q.shift(), dd = seen.get(K(...cur)); if (cur[0] === exitC[0] && cur[1] === exitC[1]) { found = dd; break; } for (const d of Object.values(D)) { const e = slideEnd(cur[0], cur[1], d), ke = K(...e); if (!seen.has(ke)) { seen.set(ke, dd + 1); q.push(e); } } }
-    if (found >= Math.min(9, 3 + level)) { par = found; return; }
+    if (found >= Math.min(9, 1 + level) && (level >= 6 || found <= 3 + level * 2 || tries > 300)) { par = found; return; } /* nivel 1: 2-5 deslizamientos */
   }
 }
 function build() {

@@ -2,7 +2,7 @@
  * Damas: captura obligatoria, multisalto y la coronación termina el turno. Reversi con pasar turno.
  * Tablero de madera cacheado, fichas con bisel, deslizamientos/saltos, volteo escalonado y jugadas válidas marcadas. */
 const M = CFG.mode, W = 480, H = 560, OUT = ART.OUT, k = Kit({ w: W, h: H, title: CFG.title, bg: '#2a1a12' }), c = k.ctx, N = 8, S = 54, OX = 24, OY = 72;
-let quiet = 0, b, turn, sel, moves, wins, thinking, msg, chain, at = 0, anims = [], flipA = {}, animEnd = 0, pend = null, last = null, cur = null, kbd = false;
+let quiet = 0, lvl = 0, b, turn, sel, moves, wins, thinking, msg, chain, at = 0, anims = [], flipA = {}, animEnd = 0, pend = null, last = null, cur = null, kbd = false;
 const DIRS8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 const inb = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
 function build() { b = Array.from({ length: N }, () => Array(N).fill(0));
@@ -14,7 +14,12 @@ function rMoves(bd, p) { const m = []; for (let y = 0; y < N; y++) for (let x = 
 const W8 = [[100, -20, 10, 5, 5, 10, -20, 100], [-20, -50, -2, -2, -2, -2, -50, -20], [10, -2, 1, 1, 1, 1, -2, 10], [5, -2, 1, 0, 0, 1, -2, 5], [5, -2, 1, 0, 0, 1, -2, 5], [10, -2, 1, 1, 1, 1, -2, 10], [-20, -50, -2, -2, -2, -2, -50, -20], [100, -20, 10, 5, 5, 10, -20, 100]];
 function rEval(bd) { let s = 0; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) s += bd[y][x] === 2 ? W8[y][x] : bd[y][x] === 1 ? -W8[y][x] : 0; return s + (rMoves(bd, 2).length - rMoves(bd, 1).length) * 3; }
 function rPlay(bd, m, p) { const nb = bd.map((r) => [...r]); nb[m.y][m.x] = p; for (const [x, y] of m.f) nb[y][x] = p; return nb; }
-function rAI() { let best = null, bv = -1e9; for (const m of k.shuffle(rMoves(b, 2))) { const nb = rPlay(b, m, 2); const rep = rMoves(nb, 1); let worst = rep.length ? 1e9 : rEval(nb); for (const r of rep) worst = Math.min(worst, rEval(rPlay(nb, r, 1))); if (worst > bv) { bv = worst; best = m; } } return best; }
+/* Nivel de la IA (sube al ganar, baja al perder): 0 = voraz 1 jugada con despistes, 1 = 2 jugadas con algún despiste, 2+ = 2 jugadas sin fallos */
+const AIERR = [0.35, 0.15, 0];
+function rAI() { const ms = rMoves(b, 2); if (!ms.length) return null; const L = Math.min(lvl, 2);
+  if (Math.random() < AIERR[L]) return k.pick(ms);
+  if (L === 0) { let best = null, bv = -1e9; for (const m of k.shuffle(ms)) { const v = rEval(rPlay(b, m, 2)); if (v > bv) { bv = v; best = m; } } return best; }
+  let best = null, bv = -1e9; for (const m of k.shuffle(ms)) { const nb = rPlay(b, m, 2); const rep = rMoves(nb, 1); let worst = rep.length ? 1e9 : rEval(nb); for (const r of rep) worst = Math.min(worst, rEval(rPlay(nb, r, 1))); if (worst > bv) { bv = worst; best = m; } } return best; }
 /* ---- Damas ---- */
 function cMoves(bd, p) { const jumps = [], steps = []; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const v = bd[y][x]; if (!v || owner(v) !== p) continue; const king = v > 2, dirs = king ? [[1, 1], [-1, 1], [1, -1], [-1, -1]] : p === 1 ? [[1, -1], [-1, -1]] : [[1, 1], [-1, 1]];
     for (const [dx, dy] of dirs) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; if (!bd[ny][nx]) steps.push({ x, y, nx, ny }); else if (owner(bd[ny][nx]) !== p && inb(nx + dx, ny + dy) && !bd[ny + dy][nx + dx]) jumps.push({ x, y, nx: nx + dx, ny: ny + dy, cap: [nx, ny] }); } } return jumps.length ? jumps : steps; }
@@ -27,10 +32,13 @@ function cSeqs(bd, p) { const ms = cMoves(bd, p); if (!ms.length || !ms[0].cap) 
   ms.forEach((m) => ext(bd, m, [])); return out; }
 function cSearch(bd, p, depth, al, be) { const ss = cSeqs(bd, p); if (!ss.length) return p === 2 ? -100 - depth : 100 + depth; if (!depth) return cEval(bd);
   for (const q of ss) { const v = cSearch(q.bd, 3 - p, depth - 1, al, be); if (p === 2) al = Math.max(al, v); else be = Math.min(be, v); if (al >= be) break; } return p === 2 ? al : be; }
-function cAI() { let best = null, bv = -1e9; for (const q of k.shuffle(cSeqs(b, 2))) { const v = cSearch(q.bd, 1, 4, bv, 1e9); if (v > bv) { bv = v; best = q; } } return best; }
+/* Damas: profundidad 1 → 4 según el nivel y probabilidad de despiste (jugada legal al azar, respeta la captura obligatoria) */
+const CDEP = [1, 2, 3, 4], CERR = [0.3, 0.15, 0.05, 0];
+function cAI() { const ss = cSeqs(b, 2); if (!ss.length) return null; const L = Math.min(lvl, 3); if (Math.random() < CERR[L]) return k.pick(ss);
+  let best = null, bv = -1e9; for (const q of k.shuffle(ss)) { const v = cSearch(q.bd, 1, CDEP[L], bv, 1e9); if (v > bv) { bv = v; best = q; } } return best; }
 function reset() { if (wins === undefined) wins = 0; build(); }
 function finish() { let me = 0, ai = 0; for (const r of b) for (const v of r) { if (owner(v) === 1 || (M === 'reversi' && v === 1)) me++; if (owner(v) === 2) ai++; }
-  const won = M === 'reversi' ? me > ai : !cMoves(b, 2).length; if (won) wins++; k.st = 'over'; k.show(won ? '¡Ganaste!' : me === ai && M === 'reversi' ? 'Empate' : 'Perdiste', `${M === 'reversi' ? `${me} – ${ai} · ` : `Piezas: tú ${me}, IA ${ai} · `}Victorias seguidas: ${wins} · Récord ${k.best(CFG.id, wins)}<br>Toca para jugar otra vez`); if (!won) { wins = 0; k.sfx('lose'); } }
+  const won = M === 'reversi' ? me > ai : !cMoves(b, 2).length; if (won) { wins++; lvl++; } else if (!(M === 'reversi' && me === ai)) lvl = Math.max(0, lvl - 1); k.st = 'over'; k.show(won ? '¡Ganaste!' : me === ai && M === 'reversi' ? 'Empate' : 'Perdiste', `${M === 'reversi' ? `${me} – ${ai} · ` : `Piezas: tú ${me}, IA ${ai} · `}Victorias seguidas: ${wins} · Récord ${k.best(CFG.id, wins)}<br>Toca para jugar otra vez`); if (!won) { wins = 0; k.sfx('lose'); } }
 /* ---- Animaciones ---- */
 const cx = (x) => OX + x * S + S / 2, cy = (y) => OY + y * S + S / 2;
 function animMove(v, path, caps) { const step = 0.26, t0 = Math.max(at, animEnd); anims.push({ v, path, caps, t0, step, hide: path[path.length - 1] }); animEnd = t0 + step * (path.length - 1); return t0; }
@@ -130,7 +138,7 @@ function draw() {
   if (idle && sel) for (const q of legal) if (q.x === sel[0] && q.y === sel[1]) { c.fillStyle = q.cap ? 'rgba(255,120,120,.85)' : 'rgba(255,226,122,.85)'; c.beginPath(); c.arc(cx(q.nx), cy(q.ny), 9 + Math.sin(now * 5) * 1.5, 0, 6.283); c.fill(); c.strokeStyle = OUT; c.lineWidth = 2; c.stroke(); }
   if (kbd && cur && k.st === 'play') { c.strokeStyle = '#5ce1e6'; c.lineWidth = 3; c.setLineDash([6, 4]); c.strokeRect(OX + cur[0] * S + 3, OY + cur[1] * S + 3, S - 6, S - 6); c.setLineDash([]); }
   // HUD
-  label(CFG.title, 16, 12, 20, '#ffe27a'); label(`Victorias ${wins}`, W - 16, 14, 15, '#fff', 'right');
+  label(CFG.title, 16, 12, 20, '#ffe27a'); label(`Victorias ${wins}`, W - 16, 14, 15, '#fff', 'right'); label(`IA nivel ${Math.min(lvl, M === 'reversi' ? 2 : 3) + 1}`, W - 16, 36, 12, '#cfd6ff', 'right');
   const my = OY + N * S + 18; let me = 0, ai = 0; for (const r of b) for (const v of r) { if (owner(v) === 1) me++; if (owner(v) === 2) ai++; }
   piece(1, 36, my + 12, 0.5, 0.5); label(`Tú ${me}`, 52, my + 3, 16, '#fff'); piece(2, W - 36, my + 12, 0.5, 0.5); label(`IA ${ai}`, W - 52, my + 3, 16, '#fff', 'right');
   const tc = turn === 1 ? '#7cf7a0' : '#ffb0e0'; label(turn === 2 && !busy() ? 'La IA piensa' + '.'.repeat(1 + Math.floor(now * 3) % 3) : msg, W / 2, my + 4, 15, msg === 'Captura obligatoria' ? '#ff8a9a' : tc, 'center');

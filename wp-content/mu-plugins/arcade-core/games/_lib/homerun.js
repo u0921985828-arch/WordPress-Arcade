@@ -4,7 +4,8 @@ const OUT = ART.OUT, R2 = 6.2832;
 const k = Kit({ w: 360, h: 640, title: CFG.title, bg: '#0b1238' }), c = k.ctx;
 const PY = 292, ZY = 552, WALL = 206, HX = 150, HY = 548, BAT = 92;
 let ball, swing, outs, hrs, total, msg, msgT, msgD = 1, msgC, wait, hit, pitchN, trail, streak, fw, tm, outMarks;
-function pitch() { pitchN++; const sp = k.rnd(0.9, 1.5) * (1 + Math.min(0.5, pitchN * 0.02)); const curve = k.rnd(-40, 40) * Math.min(1, pitchN / 5); ball = { t: 0, sp, curve, x: 180, y: PY, s: 0.3, live: true, spin: 0 }; swing = 0; hit = null; trail = []; k.sfx('click'); }
+/* dificultad por lanzamiento: d 0→1 en 30 lanzamientos. Velocidad media 0,78→1,65 (antes 1,2→1,8 al 10.º), la variación y el efecto crecen con d */
+function pitch() { pitchN++; const d = Math.min(1, (pitchN - 1) / 30), e = d * d * (3 - 2 * d) * 0.6 + d * 0.4; const sp = (0.78 + 0.87 * e) * (1 + k.rnd(-1, 1) * (0.04 + 0.2 * e)); const curve = k.rnd(-40, 40) * Math.min(1, (pitchN - 1) / 12); ball = { t: 0, sp, curve, x: 180, y: PY, s: 0.3, live: true, spin: 0 }; swing = 0; hit = null; trail = []; k.sfx('click'); }
 function reset() { outs = 0; hrs = 0; total = 0; msg = ''; msgT = 0; msgC = '#fff'; wait = 1.2; pitchN = 0; ball = null; hit = null; swing = 0; trail = []; streak = 0; fw = []; tm = 0; outMarks = []; }
 reset(); k.show(CFG.title, 'Toca (o pulsa A) para batear cuando la bola entre en la zona de strike. Buen momento = jonrón. 10 eliminaciones y se acaba.');
 function say(s, col, d) { msg = s; msgC = col; msgT = msgD = d || 1.2; }

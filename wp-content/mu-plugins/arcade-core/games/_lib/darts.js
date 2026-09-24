@@ -49,7 +49,7 @@ k.run((dt) => {
   hold = k.ptr.down || aDown; holdT = hold ? holdT + dt : 0;
   if (k.ptr.down) { aim.bx = k.ptr.x; aim.by = k.ptr.y - 80; }
   aim.bx = k.clamp(aim.bx, 20, 340); aim.by = k.clamp(aim.by, 90, 440);
-  const fat = Math.max(0, holdT - 2.2) * 0.6, amp = 34 * (hold ? Math.min(1.3, 0.42 + fat) : 1);
+  const fat = Math.max(0, holdT - 2.2) * 0.6, amp = (24 + 10 * Math.min(1, darts / 15)) * (hold ? Math.min(1.3, 0.42 + fat) : 1);
   aim.x = aim.bx + Math.sin(t * 2.3) * amp + Math.sin(t * 5.1) * amp * 0.3; aim.y = aim.by + Math.cos(t * 1.9) * amp + Math.sin(t * 4.3) * amp * 0.3;
   if (k.ptr.up || (prevA && !aDown)) release(); prevA = aDown;
 }, () => {

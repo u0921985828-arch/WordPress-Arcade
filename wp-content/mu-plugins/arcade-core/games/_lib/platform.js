@@ -40,7 +40,7 @@ function genMore() {
     while (genY > cam - H) {
       // ruta planificada (cruces y dobles saltos): los pinchos nunca tapan sus puntos de agarre → siempre hay camino
       while (planY > genY - 700) { const same = Math.random() < 0.35; if (!same) planSide = -planSide; planY -= same ? 118 : 92; plan.push({ side: planSide, y0: planY - 8, y1: planY + 30 + 28 }); }
-      const d = diff(genY), gap = k.rnd(70 - d * 5, 150 - d * 60), h = k.ri(40, 60 + Math.round(d * 50));
+      const d = diff(genY), gap = k.rnd(95 - d * 30, 175 - d * 85), h = k.ri(40, 50 + Math.round(d * 60));
       genY -= gap + h; const free = (s) => !plan.some((q) => q.side === s && q.y1 > genY && q.y0 < genY + h);
       let side = k.pick([-1, 1]); if (!free(side)) side = -side; if (free(side)) enemies.push({ side, y: genY, h });
       if (Math.random() < 0.55) coins.push({ x: W / 2 + k.rnd(-50, 50), y: genY + h + gap / 2 });
@@ -136,8 +136,8 @@ function upBarrels(dt, L, R, U, D, kx) {
   if (intro > 0) return;
   // lanzador y barriles
   throwT -= dt; bT -= dt;
-  if (bT <= 0) { bT = Math.max(1.15, 3 - level * 0.25) * k.rnd(0.8, 1.25); throwT = 0.45; k.sfx('pop'); barrels.push({ x: W - 78, y: fyRow(5) * T - 16, w: 16, h: 16, vy: 0, dir: -1, a: 0, blue: level >= 2 && Math.random() < 0.18 + level * 0.03, seen: new Set(), ground: true }); }
-  const spd = Math.min(175, 88 + level * 12);
+  if (bT <= 0) { bT = Math.max(1.2, 3.6 - (level - 1) * 0.28) * k.rnd(0.8, 1.25); throwT = 0.45; k.sfx('pop'); barrels.push({ x: W - 78, y: fyRow(5) * T - 16, w: 16, h: 16, vy: 0, dir: -1, a: 0, blue: level >= 3 && Math.random() < Math.min(0.4, 0.12 + level * 0.03), seen: new Set(), ground: true }); }
+  const spd = Math.min(170, 78 + (level - 1) * 11.5);
   for (const b of barrels) {
     const bcx = b.x + 8;
     if (b.lad) { b.y += 100 * dt; b.a += dt * 3; if (b.y + 16 >= b.lad.y1) { b.y = b.lad.y1 - 16; b.lad = null; b.ground = true; b.dir = floorDir(Math.round((MH - 1 - (b.y + 16) / T) / 3)); } }
@@ -147,7 +147,7 @@ function upBarrels(dt, L, R, U, D, kx) {
       if (b.ground && !was) { b.dir = floorDir(Math.round((MH - 1 - (b.y + 16) / T) / 3)); k.shake(1.5); }
       b.x = k.clamp(b.x, 0, W - 16);
       const j = Math.round((MH - 1 - (b.y + 16) / T) / 3);
-      if (b.ground && j > 0) for (const l of ladders) if (l.y0 === b.y + 16 && (bcx - l.x) * (b.x + 8 - l.x) <= 0 && !b.seen.has(l)) { b.seen.add(l); if (b.blue || Math.random() < 0.18 + level * 0.05) { b.lad = l; b.x = l.x - 8; } }
+      if (b.ground && j > 0) for (const l of ladders) if (l.y0 === b.y + 16 && (bcx - l.x) * (b.x + 8 - l.x) <= 0 && !b.seen.has(l)) { b.seen.add(l); if (b.blue || Math.random() < Math.min(0.55, 0.12 + (level - 1) * 0.05)) { b.lad = l; b.x = l.x - 8; } }
       if (b.ground && j === 0 && b.x > W - 52) { b.dead = true; drumT = 0.6; k.burst(W - 30, H - T - 36, '#ffb13d', 10, 120); }
     }
     if (Math.abs(b.x + 8 - (p.x + p.w / 2)) < 12 && Math.abs(b.y + 8 - (p.y + p.h / 2)) < 17) return die('#ffb13d');
@@ -177,7 +177,7 @@ function upNinja(dt, J) {
     if (near === e.side && p.y + p.h - 5 > e.y && p.y + 5 < e.y + e.h) return die('#dfe6f2'); }
   for (const f of foes) { f.x += f.vx * dt; if (f.x < WALL + 16 || f.x > W - WALL - 16) f.vx *= -1; if (Math.abs(f.x - p.x - p.w / 2) < 16 && Math.abs(f.y + Math.sin(t * 3 + f.ph) * 8 - p.y - p.h / 2) < 17) return die('#ff9a3d'); }
   for (const co of coins) if (!co.got && Math.abs(co.x - p.x - p.w / 2) < 18 && Math.abs(co.y - p.y - p.h / 2) < 20) coinGet(co, cam);
-  diffT += dt; const auto = hiY < startY - 600 ? Math.min(45, (startY - hiY - 600) / 60) : 0;
+  diffT += dt; const auto = hiY < startY - 800 ? Math.min(45, 8 + (startY - hiY - 800) / 250) : 0;
   const tgt = p.y - H * 0.6; cam = Math.min(cam - auto * dt, cam + (tgt - cam) * Math.min(1, dt * 5));
   score = height() + got * 25; prune(); genMore();
   if (p.y > cam + H + 10) { k.sfx('hurt'); dead = 0.5; p.vy = 0; }
@@ -227,7 +227,7 @@ function upVert(dt, J, kx) {
   const tgt = p.y - H * (hop ? 0.42 : 0.5); if (tgt < cam) cam += (tgt - cam) * Math.min(1, dt * 6);
   score = Math.max(score, height() + got * 25);
   if (!hop) {
-    diffT += dt; lava -= (diffT < 2 ? 4 : Math.min(95, 20 + (diffT - 2) * 0.75)) * dt; lava = Math.min(lava, cam + H + 50);
+    diffT += dt; const lq = Math.min(1, Math.max(0, diffT - 3) / 210); lava -= (diffT < 3 ? 4 : 14 + 76 * lq * lq * (3 - 2 * lq)) * dt; lava = Math.min(lava, cam + H + 50);
     if (Math.random() < dt * 14) fx.push({ x: Math.random() * W, y: lava, vx: k.rnd(-12, 12), vy: -k.rnd(30, 70), t: 0, max: k.rnd(1, 2), k: 'ember' });
     if (Math.random() < dt * 5) fx.push({ x: Math.random() * W, y: lava + k.rnd(8, 30), vx: 0, vy: 0, t: 0, max: 0.7, k: 'bubble', r: k.rnd(3, 7) });
     if (p.y + p.h > lava + 6) return die('#ffb13d');

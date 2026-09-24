@@ -6,9 +6,9 @@ const k = Kit({ w: W, h: H, title: CFG.title, bg: '#f4efe4' }), c = k.ctx;
 let stuckT = 0, level, score, segs, userSegs, ink, maxInk, ball, running, cup, stroke, fixed, goalX, done, t, strokes = [], path = [], ghost = [], clk = 0, doneT = 0, bgCv, pathT = 0, failT = 0;
 function build() {
   segs = []; userSegs = []; strokes = []; path = []; ghost = []; running = false; stroke = null; done = false; t = 0; doneT = 0; bgCv = null;
-  if (M === 'funnel') { maxInk = 700; const bx = k.rnd(60, 300); ball = { x: bx, y: 86, vx: 0, vy: 0, r: 11, sx: bx, sy: 86, a: 0 }; cup = { x: k.rnd(50, 310), y: 548 };
-    for (let i = 0; i < 1 + level; i++) { const w = k.rnd(50, 120), x = k.rnd(20, 340 - w), y = k.rnd(160, 470); segs.push([x, y, x + w, y + k.rnd(-20, 20)]); } }
-  else { maxInk = 360 + 20 * Math.max(0, 6 - level); const gap = Math.min(300, 120 + level * 25), lx = 180, rx = lx + gap, ly = 240, ry = 240 + k.ri(-40, 30);
+  if (M === 'funnel') { maxInk = 700 + 50 * Math.max(0, 4 - level); const bx = k.rnd(60, 300), reach = Math.min(260, 60 + level * 40); ball = { x: bx, y: 86, vx: 0, vy: 0, r: 11, sx: bx, sy: 86, a: 0 }; cup = { x: k.clamp(bx + k.rnd(-reach, reach), 50, 310), y: 548 }; /* copa cerca de la bola al principio */
+    for (let i = 0; i < Math.min(7, level); i++) { const w = k.rnd(50, 120), x = k.rnd(20, 340 - w), y = k.rnd(160, 470); segs.push([x, y, x + w, y + k.rnd(-20, 20)]); } }
+  else { maxInk = 360 + 20 * Math.max(0, 6 - level); const gap = Math.min(300, 100 + (level - 1) * 25), lx = 180, rx = lx + gap, ly = 240, ry = 240 + k.ri(-40, 30);
     segs.push([0, ly, lx, ly], [lx, ly, lx, H], [rx, ry, rx, H], [rx, ry, W, ry]); ball = { x: 30, y: ly - 14, vx: 0, vy: 0, r: 13, sx: 30, sy: ly - 14, a: 0 }; goalX = W - 50; fixed = { ly, ry, lx, rx }; }
   ink = maxInk;
 }

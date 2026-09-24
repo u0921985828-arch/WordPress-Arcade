@@ -6,11 +6,15 @@ const W = port ? 360 : 640, H = port ? 640 : 360, T = 32;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: cave ? '#120c20' : TH.sky[0] }), c = k.ctx;
 const FLOOR = H - 64, CEIL = 64, PX = port ? 110 : 150;
 const G = 1500, JUMP = 560, JUMP2 = 520, CUT = 200, COYOTE = 0.08, BUFFER = 0.12;
+/* Curva de dificultad según distancia: arranca a ~65 % y llega al máximo hacia los 3 min de buen juego.
+ * V0/VMAX en px/s; DIST = px recorridos para dificultad 1 (vel. lineal en distancia → subida suave al principio). */
+const V0 = cave ? 160 : grav0 ? 170 : 175, VMAX = cave ? 400 : grav0 ? 420 : dbl ? 490 : 470, DIST = cave ? 46000 : 52000;
+const lvlOf = () => Math.min(1, cam / DIST), speedOf = () => V0 + (VMAX - V0) * lvlOf();
 let p, obs, coins, holes, decos, cav, bullets, rings, t, cam, speed, bonus, got, nx, jumps, grav, gs, dead, hover, coy, buf, sq, passed, mines, wing;
 function reset() {
   p = { y: port || cave ? H / 2 : FLOOR - 28, vy: 0, w: 18, h: 28, on: true, rot: 0 };
   obs = []; coins = []; holes = []; decos = []; bullets = []; rings = []; cav = [];
-  t = 0; cam = 0; speed = port ? 150 : cave ? 240 : 260; bonus = 0; got = 0; jumps = 0; grav = 1; gs = 1; dead = 0; hover = port || cave; coy = 0; buf = 0; sq = 0; passed = 0; mines = 0; wing = 0;
+  t = 0; cam = 0; speed = port ? 140 : V0; bonus = 0; got = 0; jumps = 0; grav = 1; gs = 1; dead = 0; hover = port || cave; coy = 0; buf = 0; sq = 0; passed = 0; mines = 0; wing = 0;
   nx = port ? W + 60 : cave ? W : 22;
   if (cave) for (let x = -40; x <= W + 60; x += 20) cav.push({ x, top: 60, bot: H - 60, cr: Math.random() < 0.1 });
   if (!port && !cave) for (let i = 1; i < 20; i += k.ri(3, 6)) decos.push({ x: i * T + 16, s: Math.random() });
@@ -33,27 +37,27 @@ function finish() {
 function spikes(at, n, top) { for (let i = 0; i < n; i++) obs.push({ k: 'spike', x: (at + i) * T, top }); }
 function coinArc(at, n, hgt, base) { for (let i = 0; i < n; i++) coins.push({ x: (at + i + 0.5) * T, y: (base || FLOOR - 26) - Math.sin((i + 0.5) / n * Math.PI) * hgt }); }
 function pattern() {
-  const x0 = nx, lvl = Math.min(1, t / 80); let len = 1;
+  const x0 = nx, lvl = lvlOf(); let len = 1;
   if (grav0) {
-    const top = Math.random() < 0.5, n = k.ri(1, 2 + Math.round(lvl * 2));
+    const top = Math.random() < 0.5, n = k.ri(1, 1 + Math.round(lvl * 3));
     spikes(x0, n, top); for (let i = 0; i < n; i++) coins.push({ x: (x0 + i + 0.5) * T, y: top ? FLOOR - 16 : CEIL + 16 });
-    len = n; if (Math.random() < 0.3 + lvl * 0.3) { const g = Math.ceil(speed * 0.75 / T) + 1, m = k.ri(1, 3); spikes(x0 + n + g, m, !top); len += g + m; }
+    len = n; if (Math.random() < 0.15 + lvl * 0.45) { const g = Math.ceil(speed * (1.05 - lvl * 0.3) / T) + 1, m = k.ri(1, lvl < 0.3 ? 2 : 3); spikes(x0 + n + g, m, !top); len += g + m; }
   } else {
     const r = Math.random();
-    if (r < 0.26) { const n = k.ri(1, dbl ? 4 : 2 + (lvl > 0.3)); spikes(x0, n); coinArc(x0 - 1, n + 2, 70 + n * 8); len = n; }
+    if (r < 0.26) { const n = k.ri(1, dbl ? 2 + (lvl > 0.2) + (lvl > 0.5) : 2 + (lvl > 0.3)); spikes(x0, n); coinArc(x0 - 1, n + 2, 70 + n * 8); len = n; }
     else if (r < 0.46) {
-      const hgt = Math.random() < 0.3 + lvl * 0.35 ? 2 : 1, n = k.ri(1, 3), tail = Math.random() < 0.3 + lvl * 0.3 ? k.ri(1, 2) : 0;
+      const hgt = Math.random() < 0.12 + lvl * 0.5 ? 2 : 1, n = k.ri(1, lvl < 0.15 ? 2 : 3), tail = Math.random() < 0.15 + lvl * 0.45 ? k.ri(1, lvl < 0.3 ? 1 : 2) : 0;
       for (let i = 0; i < n; i++) { for (let j = 0; j < hgt; j++) obs.push({ k: 'crate', x: (x0 + i) * T, y: FLOOR - (j + 1) * T }); coins.push({ x: (x0 + i + 0.5) * T, y: FLOOR - hgt * T - 22 }); }
       spikes(x0 + n, tail); len = n + tail;
-    } else if (r < 0.64) { const n = k.ri(2, dbl ? 5 : Math.min(4, 2 + Math.floor(speed / 150))); holes.push({ a: x0, b: x0 + n }); coinArc(x0 - 1, n + 2, 90); len = n; }
+    } else if (r < 0.64) { const n = k.ri(2, Math.min(dbl ? 5 : 4, 2 + Math.floor((speed - 150) / (dbl ? 80 : 110)))); holes.push({ a: x0, b: x0 + n }); coinArc(x0 - 1, n + 2, 90); len = n; }
     else if (r < 0.82) {
       const high = dbl && Math.random() < 0.45, kind = TH.enemy;
-      obs.push({ k: 'foe', x: (x0 + 2) * T, y: high ? FLOOR - 96 : FLOOR - 26, w: 28, h: 26, vx: high ? -30 : -60, kind, ph: Math.random() * 6 });
+      obs.push({ k: 'foe', x: (x0 + 2) * T, y: high ? FLOOR - 96 : FLOOR - 26, w: 28, h: 26, vx: (high ? -30 : -60) * (0.5 + lvl * 0.5), kind, ph: Math.random() * 6 });
       if (high) coinArc(x0, 5, 0, FLOOR - 20); len = 3;
     } else { const n = k.ri(5, 8), mid = Math.random() < 0.4 + lvl * 0.3; for (let i = 0; i < n; i++) coins.push({ x: (x0 + i + 0.5) * T, y: mid && Math.abs(i - n / 2) < 1 ? FLOOR - 90 : FLOOR - 20 }); if (mid) spikes(x0 + Math.floor(n / 2) - 1, 2); len = n; }
   }
   if (!grav0 && Math.random() < 0.5) decos.push({ x: (x0 + len + 2) * T + 16, s: Math.random() });
-  nx = x0 + len + Math.ceil(speed * k.rnd(0.6, 1.05) / T) + 2;
+  passed++; nx = x0 + len + Math.ceil(speed * (k.rnd(0.6, 1.05) + (1 - lvl) * 0.55 + (passed % 12 === 0 ? 1.2 : 0)) / T) + 2;
 }
 /* ---------- Actualización ---------- */
 k.run((dt) => {
@@ -64,21 +68,21 @@ k.run((dt) => {
   if (hover) { if (act() || held()) hover = false; else { p.y = H / 2 + Math.sin(t * 4) * 8; p.vy = 0; cam += 60 * dt; return; } }
   const px = cam + PX;
   if (port) {
-    speed = Math.min(230, 150 + passed * 1.5);
+    const d = Math.min(1, passed / 90); speed = 140 + 90 * d;
     if (act()) { p.vy = -380; k.sfx('jump'); }
     p.vy += 1200 * dt; p.y += p.vy * dt; if (p.y < 14) { p.y = 14; p.vy = 0; }
     p.rot = k.clamp(p.vy / 650, -0.45, 1.3);
     if (p.y + 12 > FLOOR) { p.y = FLOOR - 12; return die(); }
     if (nx < cam + W + 80) {
-      const gap = Math.max(138, 190 - passed * 1.6), y = k.rnd(90, FLOOR - 70 - gap);
-      obs.push({ k: 'log', x: nx, gy: y, gap, mv: passed > 12 ? Math.min(45, (passed - 10) * 2) * (Math.random() < 0.5 ? -1 : 1) : 0, ph: Math.random() * 6 });
+      const gap = 200 - 62 * d, y = k.rnd(90, FLOOR - 70 - gap);
+      obs.push({ k: 'log', x: nx, gy: y, gap, mv: passed > 15 ? Math.min(45, (passed - 15) * 1.2) * (Math.random() < 0.5 ? -1 : 1) : 0, ph: Math.random() * 6 });
       if (Math.random() < 0.55) coins.push({ x: nx + 64 + 73, y: y + gap / 2 + k.rnd(-30, 30) });
-      nx += 210;
+      nx += 235 - 25 * d;
     }
   } else if (cave) {
-    speed = Math.min(420, speed + dt * 5);
+    speed = speedOf(); const lv = lvlOf();
     const hold = held(); p.vy += (hold ? -900 : 700) * dt; p.vy = k.clamp(p.vy, -300, 350); p.y += p.vy * dt; p.thr = hold;
-    while (cav[cav.length - 1].x < cam + W + 40) { const l = cav[cav.length - 1], gap = Math.max(130, 220 - t * 2), top = k.clamp(l.top + k.rnd(-24, 24), 20, H - gap - 20); cav.push({ x: l.x + 20, top, bot: top + gap, cr: Math.random() < 0.1 }); }
+    while (cav[cav.length - 1].x < cam + W + 40) { const l = cav[cav.length - 1], gap = 235 - 105 * lv, rough = 14 + 10 * lv, top = k.clamp(l.top + k.rnd(-rough, rough), 20, H - gap - 20); cav.push({ x: l.x + 20, top, bot: top + gap, cr: Math.random() < 0.1 }); }
     while (cav[1].x < cam - 40) cav.shift();
     const s = cav.find((q) => q.x <= px && q.x + 20 > px); if (s && (p.y - 8 < s.top || p.y + 8 > s.bot)) return die();
     if (Math.floor(t * 5) !== Math.floor((t - dt) * 5)) bullets.push({ x: px + 16, y: p.y });
@@ -86,10 +90,10 @@ k.run((dt) => {
     if (nx < cam + W + 40) {
       const l = cav[cav.length - 1]; obs.push({ k: 'mine', x: nx, y: k.rnd(l.top + 24, l.bot - 24), hp: 2, hit: 0, ph: Math.random() * 6 });
       if (Math.random() < 0.45) coins.push({ x: nx + 120, y: (l.top + l.bot) / 2, gem: true });
-      nx += speed * k.rnd(1, 2);
+      nx += speed * (k.rnd(1, 2) + (1 - lv) * 0.7);
     }
   } else {
-    speed = Math.min(grav0 ? 460 : 520, speed + dt * 5);
+    speed = speedOf();
     while (nx * T < cam + W + 120) pattern();
     if (grav0) {
       coy = p.on ? COYOTE : coy - dt; buf = act() ? BUFFER : buf - dt;

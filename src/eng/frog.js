@@ -19,7 +19,7 @@ const LANE = {
 const VW = { truck: 2.4, car: 1.25, racer: 1.3, dozer: 1.5 };
 const CARCOL = ['#ff6b6b', '#5ce1e6', '#f2d15c', '#b98cff', '#ffa94d'];
 function build() {
-  lanes = []; const sp = 1 + (level - 1) * 0.15, dive = Math.min(0.75, 0.3 + level * 0.1);
+  lanes = []; const lv = Math.min(1, (level - 1) / 8), sp = 0.8 + 0.8 * lv, dive = 0.15 + 0.55 * lv; // nivel 1 suave → máximo en el nivel 9
   for (const r in LANE) {
     const [type, dir, v, len] = LANE[r], river = type === 'log' || type === 'turtle', L = { type, dir, sp: v * sp, items: [], river };
     const gap = () => (river ? k.ri(2, 3) : k.ri(2, 4) + (level < 3 ? 1 : 0)) * S, first = LO + k.rnd(0, 80); let x = first;

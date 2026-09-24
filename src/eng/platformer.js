@@ -12,16 +12,16 @@ function label(s, x, y, size, col, align) {
 }
 const tileAt = (x, y) => { const tx = Math.floor(x / T), ty = Math.floor(y / T); if (tx < 0 || tx >= MW) return 1; if (ty < 0 || ty >= MH) return 0; return map[ty][tx]; };
 function gen() {
-  MW = 70 + level * 18; map = Array.from({ length: MH }, () => Array(MW).fill(0)); enemies = []; coins = []; anchors = []; decos = [];
+  const lv = Math.min(1, (level - 1) / 8); MW = 62 + Math.min(level, 12) * 16; map = Array.from({ length: MH }, () => Array(MW).fill(0)); enemies = []; coins = []; anchors = []; decos = [];
   const col = (x, h) => { for (let y = MH - h; y < MH; y++) if (x >= 0 && x < MW) map[y][x] = 1; };
   let x = 0, h = 3; for (; x < 7; x++) col(x, h);
   for (let i = 3; i < 7; i++) coins.push({ x: (i + 0.5) * T, y: (MH - h - 1) * T - 6 - Math.sin((i - 3) / 3 * Math.PI) * 26 }); // arranque con algo que recoger
   if (!A.swing) decos.push({ x: 1.5 * T, y: (MH - h) * T });
   while (x < MW - 10) {
-    let nh = A.swing ? k.clamp(h + k.ri(-2, 1), 2, 7) : k.clamp(h + k.ri(-2, 3), 2, 8); // en balanceo la isla siguiente no sube más de 1 casilla
+    let nh = A.swing ? k.clamp(h + k.ri(-2, 1), 2, 7) : k.clamp(h + k.ri(-2, lv < 0.25 ? 2 : 3), 2, 8); // en balanceo la isla siguiente no sube más de 1 casilla
     const r = Math.random();
-    if (A.swing || r < 0.3) {
-      const gw = A.swing ? k.ri(5, 7) : A.dash && Math.random() < 0.35 ? k.ri(5, 6) : k.ri(2, 4);
+    if (A.swing || r < 0.18 + lv * 0.14) {
+      const gw = A.swing ? k.ri(5, lv < 0.25 ? 6 : 7) : A.dash && Math.random() < 0.2 + lv * 0.2 ? k.ri(5, 6) : k.ri(2, lv < 0.25 ? 3 : 4);
       if (A.grapple || A.swing) anchors.push({ x: (x + gw / 2) * T, y: (MH - Math.max(h, nh) - 5) * T }); // anilla sobre la orilla más alta
       for (let i = 0; i < gw; i += 2) coins.push({ x: (x + i + 0.5) * T, y: (MH - h - 3) * T - Math.sin(i / gw * Math.PI) * T * 1.5 });
       x += gw;
@@ -34,11 +34,11 @@ function gen() {
     const seg = A.swing ? k.ri(2, 4) : k.ri(4, 9);
     for (let i = 0; i < seg; i++) {
       col(x + i, nh);
-      if (CFG.spikes && i > 0 && i < seg - 1 && x > 10 && Math.random() < CFG.spikes) map[MH - nh - 1][x + i] = 3;
+      if (CFG.spikes && i > 0 && i < seg - 1 && x > 10 && Math.random() < CFG.spikes * (0.4 + 0.6 * lv)) map[MH - nh - 1][x + i] = 3;
       else if (Math.random() < 0.22) coins.push({ x: (x + i + 0.5) * T, y: (MH - nh - 1) * T - 6 });
       else if (Math.random() < 0.12 && !A.swing) decos.push({ x: (x + i + 0.5) * T, y: (MH - nh) * T });
     }
-    if (CFG.enemies && seg >= 5 && x > 12 && Math.random() < CFG.enemies) enemies.push({ x: (x + 1) * T, y: (MH - nh) * T - 24, w: 26, h: 24, vx: 70 + level * 6, min: x * T, max: (x + seg) * T - 26, alive: true, fly: TH.enemy === 'bird' });
+    if (CFG.enemies && seg >= 5 && x > 12 && Math.random() < CFG.enemies * (0.55 + 0.45 * lv)) enemies.push({ x: (x + 1) * T, y: (MH - nh) * T - 24, w: 26, h: 24, vx: (55 + 55 * lv) * k.pick([-1, 1]), min: x * T, max: (x + seg) * T - 26, alive: true, fly: TH.enemy === 'bird' });
     if (Math.random() < 0.22 && !A.swing && seg >= 4) { const py = MH - nh - 4; for (let i = 1; i < 4; i++) if (map[py] && !map[py][x + i]) map[py][x + i] = 2; for (let i = 1; i < 4; i++) coins.push({ x: (x + i + 0.5) * T, y: (py - 1) * T + 10 }); }
     x += seg; h = nh;
     if (!check && x > MW / 2) check = { x: (x - 2) * T, y: (MH - h) * T, on: false };
