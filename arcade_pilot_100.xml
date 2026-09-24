@@ -5,7 +5,7 @@
 	<title>Arcade Portal</title>
 	<link>https://example.com</link>
 	<description>Pilot catalog: 100 HTML5 games</description>
-	<pubDate>Tue, 22 Sep 2026 22:54:46 +0000</pubDate>
+	<pubDate>Thu, 24 Sep 2026 05:44:09 +0000</pubDate>
 	<language>es-ES</language>
 	<wp:wxr_version>1.2</wp:wxr_version>
 	<wp:base_site_url>https://example.com</wp:base_site_url>
@@ -652,7 +652,7 @@
 <!-- /wp:paragraph -->
 
 <!-- wp:paragraph -->
-<p>Controles: teclado, mando. Orientación recomendada: landscape.</p>
+<p>Controles: teclado, mando. Orientación recomendada: auto.</p>
 <!-- /wp:paragraph -->]]></content:encoded>
 		<excerpt:encoded><![CDATA[Lunar Lander: juego Arcade para navegador. Controles: teclado, mando.]]></excerpt:encoded>
 		<wp:post_id>1013</wp:post_id>
@@ -676,8 +676,8 @@
 		<category domain="game_tag" nicename="thrust"><![CDATA[thrust]]></category>
 		<category domain="game_tag" nicename="vector"><![CDATA[vector]]></category>
 		<wp:postmeta><wp:meta_key><![CDATA[_game_embed_url]]></wp:meta_key><wp:meta_value><![CDATA[/wp-content/uploads/arcade/games/lunar-lander/index.html]]></wp:meta_value></wp:postmeta>
-		<wp:postmeta><wp:meta_key><![CDATA[_game_orientation]]></wp:meta_key><wp:meta_value><![CDATA[landscape]]></wp:meta_value></wp:postmeta>
-		<wp:postmeta><wp:meta_key><![CDATA[_game_aspect_ratio]]></wp:meta_key><wp:meta_value><![CDATA[16:9]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_game_orientation]]></wp:meta_key><wp:meta_value><![CDATA[auto]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_game_aspect_ratio]]></wp:meta_key><wp:meta_value><![CDATA[fill]]></wp:meta_value></wp:postmeta>
 		<wp:postmeta><wp:meta_key><![CDATA[_game_tech_engine]]></wp:meta_key><wp:meta_value><![CDATA[canvas]]></wp:meta_value></wp:postmeta>
 		<wp:postmeta><wp:meta_key><![CDATA[_game_input_methods]]></wp:meta_key><wp:meta_value><![CDATA[keyboard,gamepad]]></wp:meta_value></wp:postmeta>
 	</item>
@@ -2834,7 +2834,7 @@
 <!-- /wp:paragraph -->
 
 <!-- wp:paragraph -->
-<p>Controles: táctil, ratón. Orientación recomendada: landscape.</p>
+<p>Controles: táctil, ratón. Orientación recomendada: auto.</p>
 <!-- /wp:paragraph -->]]></content:encoded>
 		<excerpt:encoded><![CDATA[Tower Guard: juego Strategy/Cards para navegador. Controles: táctil, ratón.]]></excerpt:encoded>
 		<wp:post_id>1067</wp:post_id>
@@ -2857,8 +2857,8 @@
 		<category domain="game_tag" nicename="waves"><![CDATA[waves]]></category>
 		<category domain="game_tag" nicename="pixel-art"><![CDATA[pixel-art]]></category>
 		<wp:postmeta><wp:meta_key><![CDATA[_game_embed_url]]></wp:meta_key><wp:meta_value><![CDATA[/wp-content/uploads/arcade/games/tower-guard/index.html]]></wp:meta_value></wp:postmeta>
-		<wp:postmeta><wp:meta_key><![CDATA[_game_orientation]]></wp:meta_key><wp:meta_value><![CDATA[landscape]]></wp:meta_value></wp:postmeta>
-		<wp:postmeta><wp:meta_key><![CDATA[_game_aspect_ratio]]></wp:meta_key><wp:meta_value><![CDATA[16:9]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_game_orientation]]></wp:meta_key><wp:meta_value><![CDATA[auto]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_game_aspect_ratio]]></wp:meta_key><wp:meta_value><![CDATA[fill]]></wp:meta_value></wp:postmeta>
 		<wp:postmeta><wp:meta_key><![CDATA[_game_tech_engine]]></wp:meta_key><wp:meta_value><![CDATA[phaser]]></wp:meta_value></wp:postmeta>
 		<wp:postmeta><wp:meta_key><![CDATA[_game_input_methods]]></wp:meta_key><wp:meta_value><![CDATA[touch,mouse]]></wp:meta_value></wp:postmeta>
 	</item>
@@ -2874,7 +2874,7 @@
 <!-- /wp:paragraph -->
 
 <!-- wp:paragraph -->
-<p>Controles: táctil, ratón. Orientación recomendada: landscape.</p>
+<p>Controles: táctil, ratón. Orientación recomendada: auto.</p>
 <!-- /wp:paragraph -->]]></content:encoded>
 		<excerpt:encoded><![CDATA[Maze Defense: juego Strategy/Cards para navegador. Controles: táctil, ratón.]]></excerpt:encoded>
 		<wp:post_id>1068</wp:post_id>
@@ -2897,8 +2897,8 @@
 		<category domain="game_tag" nicename="maze-building"><![CDATA[maze-building]]></category>
 		<category domain="game_tag" nicename="vector"><![CDATA[vector]]></category>
 		<wp:postmeta><wp:meta_key><![CDATA[_game_embed_url]]></wp:meta_key><wp:meta_value><![CDATA[/wp-content/uploads/arcade/games/maze-defense/index.html]]></wp:meta_value></wp:postmeta>
-		<wp:postmeta><wp:meta_key><![CDATA[_game_orientation]]></wp:meta_key><wp:meta_value><![CDATA[landscape]]></wp:meta_value></wp:postmeta>
-		<wp:postmeta><wp:meta_key><![CDATA[_game_aspect_ratio]]></wp:meta_key><wp:meta_value><![CDATA[16:9]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_game_orientation]]></wp:meta_key><wp:meta_value><![CDATA[auto]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_game_aspect_ratio]]></wp:meta_key><wp:meta_value><![CDATA[fill]]></wp:meta_value></wp:postmeta>
 		<wp:postmeta><wp:meta_key><![CDATA[_game_tech_engine]]></wp:meta_key><wp:meta_value><![CDATA[phaser]]></wp:meta_value></wp:postmeta>
 		<wp:postmeta><wp:meta_key><![CDATA[_game_input_methods]]></wp:meta_key><wp:meta_value><![CDATA[touch,mouse]]></wp:meta_value></wp:postmeta>
 	</item>
@@ -2914,7 +2914,7 @@
 <!-- /wp:paragraph -->
 
 <!-- wp:paragraph -->
-<p>Controles: táctil, ratón. Orientación recomendada: landscape.</p>
+<p>Controles: táctil, ratón. Orientación recomendada: auto.</p>
 <!-- /wp:paragraph -->]]></content:encoded>
 		<excerpt:encoded><![CDATA[Hex Defense: juego Strategy/Cards para navegador. Controles: táctil, ratón.]]></excerpt:encoded>
 		<wp:post_id>1069</wp:post_id>
@@ -2937,8 +2937,8 @@
 		<category domain="game_tag" nicename="hex-grid"><![CDATA[hex-grid]]></category>
 		<category domain="game_tag" nicename="vector"><![CDATA[vector]]></category>
 		<wp:postmeta><wp:meta_key><![CDATA[_game_embed_url]]></wp:meta_key><wp:meta_value><![CDATA[/wp-content/uploads/arcade/games/hex-defense/index.html]]></wp:meta_value></wp:postmeta>
-		<wp:postmeta><wp:meta_key><![CDATA[_game_orientation]]></wp:meta_key><wp:meta_value><![CDATA[landscape]]></wp:meta_value></wp:postmeta>
-		<wp:postmeta><wp:meta_key><![CDATA[_game_aspect_ratio]]></wp:meta_key><wp:meta_value><![CDATA[16:9]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_game_orientation]]></wp:meta_key><wp:meta_value><![CDATA[auto]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_game_aspect_ratio]]></wp:meta_key><wp:meta_value><![CDATA[fill]]></wp:meta_value></wp:postmeta>
 		<wp:postmeta><wp:meta_key><![CDATA[_game_tech_engine]]></wp:meta_key><wp:meta_value><![CDATA[phaser]]></wp:meta_value></wp:postmeta>
 		<wp:postmeta><wp:meta_key><![CDATA[_game_input_methods]]></wp:meta_key><wp:meta_value><![CDATA[touch,mouse]]></wp:meta_value></wp:postmeta>
 	</item>
@@ -2954,7 +2954,7 @@
 <!-- /wp:paragraph -->
 
 <!-- wp:paragraph -->
-<p>Controles: táctil, teclado, ratón. Orientación recomendada: landscape.</p>
+<p>Controles: táctil, teclado, ratón. Orientación recomendada: auto.</p>
 <!-- /wp:paragraph -->]]></content:encoded>
 		<excerpt:encoded><![CDATA[Micro Tactics: juego Strategy/Cards para navegador. Controles: táctil, teclado, ratón.]]></excerpt:encoded>
 		<wp:post_id>1070</wp:post_id>
@@ -2977,8 +2977,8 @@
 		<category domain="game_tag" nicename="tactics"><![CDATA[tactics]]></category>
 		<category domain="game_tag" nicename="pixel-art"><![CDATA[pixel-art]]></category>
 		<wp:postmeta><wp:meta_key><![CDATA[_game_embed_url]]></wp:meta_key><wp:meta_value><![CDATA[/wp-content/uploads/arcade/games/micro-tactics/index.html]]></wp:meta_value></wp:postmeta>
-		<wp:postmeta><wp:meta_key><![CDATA[_game_orientation]]></wp:meta_key><wp:meta_value><![CDATA[landscape]]></wp:meta_value></wp:postmeta>
-		<wp:postmeta><wp:meta_key><![CDATA[_game_aspect_ratio]]></wp:meta_key><wp:meta_value><![CDATA[4:3]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_game_orientation]]></wp:meta_key><wp:meta_value><![CDATA[auto]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_game_aspect_ratio]]></wp:meta_key><wp:meta_value><![CDATA[fill]]></wp:meta_value></wp:postmeta>
 		<wp:postmeta><wp:meta_key><![CDATA[_game_tech_engine]]></wp:meta_key><wp:meta_value><![CDATA[phaser]]></wp:meta_value></wp:postmeta>
 		<wp:postmeta><wp:meta_key><![CDATA[_game_input_methods]]></wp:meta_key><wp:meta_value><![CDATA[touch,keyboard,mouse]]></wp:meta_value></wp:postmeta>
 	</item>
@@ -2994,7 +2994,7 @@
 <!-- /wp:paragraph -->
 
 <!-- wp:paragraph -->
-<p>Controles: táctil, ratón. Orientación recomendada: landscape.</p>
+<p>Controles: táctil, ratón. Orientación recomendada: auto.</p>
 <!-- /wp:paragraph -->]]></content:encoded>
 		<excerpt:encoded><![CDATA[Hex Skirmish: juego Strategy/Cards para navegador. Controles: táctil, ratón.]]></excerpt:encoded>
 		<wp:post_id>1071</wp:post_id>
@@ -3017,8 +3017,8 @@
 		<category domain="game_tag" nicename="hex-grid"><![CDATA[hex-grid]]></category>
 		<category domain="game_tag" nicename="pixel-art"><![CDATA[pixel-art]]></category>
 		<wp:postmeta><wp:meta_key><![CDATA[_game_embed_url]]></wp:meta_key><wp:meta_value><![CDATA[/wp-content/uploads/arcade/games/hex-skirmish/index.html]]></wp:meta_value></wp:postmeta>
-		<wp:postmeta><wp:meta_key><![CDATA[_game_orientation]]></wp:meta_key><wp:meta_value><![CDATA[landscape]]></wp:meta_value></wp:postmeta>
-		<wp:postmeta><wp:meta_key><![CDATA[_game_aspect_ratio]]></wp:meta_key><wp:meta_value><![CDATA[16:9]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_game_orientation]]></wp:meta_key><wp:meta_value><![CDATA[auto]]></wp:meta_value></wp:postmeta>
+		<wp:postmeta><wp:meta_key><![CDATA[_game_aspect_ratio]]></wp:meta_key><wp:meta_value><![CDATA[fill]]></wp:meta_value></wp:postmeta>
 		<wp:postmeta><wp:meta_key><![CDATA[_game_tech_engine]]></wp:meta_key><wp:meta_value><![CDATA[godot_web]]></wp:meta_value></wp:postmeta>
 		<wp:postmeta><wp:meta_key><![CDATA[_game_input_methods]]></wp:meta_key><wp:meta_value><![CDATA[touch,mouse]]></wp:meta_value></wp:postmeta>
 	</item>

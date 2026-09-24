@@ -2,13 +2,14 @@
  * 9 hoyos, par 3, máximo 8 golpes por hoyo. Arrastra hacia atrás (desde cualquier punto) o flechas + A. Vista previa del primer tramo del tiro. */
 const M = CFG.mode, OUT = ART.OUT, R2 = 6.2832, W = 360, H = 640, T = 30, COLS = 12, ROWS = 20, OY = 22, MAXS = 8, PAR = 3;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: M === 'island' ? '#1d6fb3' : '#23402b' }), c = k.ctx;
+const TOPR = 2; // primera fila jugable: la franja superior queda libre para el marcador (la bandera no se tapa)
 let grid, ball, hole, tee, holeN, strokes, total, pars, aiming, sunkT, lastPos, bumpers, sand, card, state, stT, course, kAng, kPow, kb, t = 0, msg, msgT, lastBump = 0;
 function genHole() {
   for (let tries = 0; tries < 100; tries++) {
     grid = Array.from({ length: ROWS }, () => Array(COLS).fill(0)); bumpers = []; sand = new Set();
     const rooms = []; let cx = k.ri(2, 8), cy = 16; const nr = k.ri(3, 4);
-    for (let i = 0; i < nr; i++) { const w = k.ri(3, 5), h = k.ri(3, 5); const x = k.clamp(cx - Math.floor(w / 2), 1, COLS - 1 - w), y = k.clamp(cy - Math.floor(h / 2), 1, ROWS - 1 - h); rooms.push([x, y, w, h]); for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) grid[yy][xx] = 1;
-      const [nx, ny] = [k.clamp(cx + k.ri(-5, 5), 2, COLS - 3), k.clamp(cy - k.ri(4, 6), 2, ROWS - 3)]; const sx = Math.sign(nx - cx), sy = Math.sign(ny - cy); let x2 = cx, y2 = cy; while (x2 !== nx) { grid[y2][x2] = grid[y2][x2 + 1] = 1; x2 += sx; } while (y2 !== ny) { grid[y2][x2] = grid[y2][x2 + 1 < COLS ? x2 + 1 : x2] = 1; y2 += sy; } cx = nx; cy = ny; }
+    for (let i = 0; i < nr; i++) { const w = k.ri(3, 5), h = k.ri(3, 5); const x = k.clamp(cx - Math.floor(w / 2), 1, COLS - 1 - w), y = k.clamp(cy - Math.floor(h / 2), TOPR, ROWS - 1 - h); rooms.push([x, y, w, h]); for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) grid[yy][xx] = 1;
+      const [nx, ny] = [k.clamp(cx + k.ri(-5, 5), 2, COLS - 3), k.clamp(cy - k.ri(4, 6), TOPR, ROWS - 3)]; const sx = Math.sign(nx - cx), sy = Math.sign(ny - cy); let x2 = cx, y2 = cy; while (x2 !== nx) { grid[y2][x2] = grid[y2][x2 + 1] = 1; x2 += sx; } while (y2 !== ny) { grid[y2][x2] = grid[y2][x2 + 1 < COLS ? x2 + 1 : x2] = 1; y2 += sy; } cx = nx; cy = ny; }
     const first = rooms[0], last = rooms[rooms.length - 1]; tee = [(first[0] + first[2] / 2) * T, (first[1] + first[3] - 0.7) * T]; hole = [(last[0] + last[2] / 2) * T, (last[1] + 0.8) * T];
     if (Math.hypot(tee[0] - hole[0], tee[1] - hole[1]) < 200) continue;
     for (let i = 0; i < 1 + Math.floor(holeN / 3); i++) { const r = k.pick(rooms.slice(1, -1).length ? rooms.slice(1, -1) : rooms); const bx = (r[0] + k.rnd(1, r[2] - 1)) * T, by = (r[1] + k.rnd(1, r[3] - 1)) * T; if (Math.hypot(bx - hole[0], by - hole[1]) > 60 && Math.hypot(bx - tee[0], by - tee[1]) > 60) bumpers.push({ x: bx, y: by, r: 14, p: 0 }); }

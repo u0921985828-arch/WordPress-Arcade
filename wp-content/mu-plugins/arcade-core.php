@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Arcade Core
  * Description: CPT "game", taxonomías, meta de juego y reproductor lazy para el portal arcade.
- * Version:     1.13.0
+ * Version:     1.14.0
  * Author:      Arcade Team
  *
  * Instalar: copiar este archivo + la carpeta /arcade-core/ en wp-content/mu-plugins/.
@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
 
 final class Arcade_Core {
 
-	const VERSION      = '1.13.0';
+	const VERSION      = '1.14.0';
 	const ORIENTATIONS = array( 'portrait', 'landscape', 'auto' );
 	const RATIOS       = array( '16:9', '4:3', '1:1', 'fill' );
 	const ENGINES      = array( 'canvas', 'phaser', 'threejs', 'godot_web', 'construct' );
@@ -180,8 +180,20 @@ final class Arcade_Core {
 			}
 		}
 		self::ensure_home_page();
+		self::adaptive_games();
 		flush_rewrite_rules( false );
 		update_option( 'arcade_core_version', self::VERSION, false );
+	}
+
+	/** Juegos que ya eligen lienzo vertical u horizontal según la pantalla: sin forzar orientación. */
+	private static function adaptive_games() {
+		foreach ( array( 'lunar-lander', 'tower-guard', 'maze-defense', 'hex-defense', 'micro-tactics', 'hex-skirmish' ) as $slug ) {
+			$p = get_page_by_path( $slug, OBJECT, 'game' );
+			if ( $p && 'landscape' === get_post_meta( $p->ID, '_game_orientation', true ) ) {
+				update_post_meta( $p->ID, '_game_orientation', 'auto' );
+				update_post_meta( $p->ID, '_game_aspect_ratio', 'fill' );
+			}
+		}
 	}
 
 	/** Crea la página "Juegos" con [arcade_grid] y la pone de portada si la portada era el blog. */

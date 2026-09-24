@@ -30,7 +30,7 @@ G = {
  'tunnel-digger': ('maze', dict(mode='digger', bg='#1a120b', help=f'{SW} para excavar. Recoge todas las gemas, evita a los bichos y tira rocas para aplastarlos.')),
  'cave-flyer': ('runner', dict(mode='cave', pal=['#5ce1e6', '#ff5fa2', '#3b2a55'], help='Mantén pulsado (o A) para subir y suelta para bajar. Disparas solo: dos impactos por mina. Recoge los cristales.')),
  'territory': ('gridmover', dict(mode='territory', help=f'{SW} para salir de tu zona y cerrar áreas. Si una chispa toca tu estela, pierdes. Conquista el 75 %.')),
- 'barrel-climb': ('platform', dict(mode='barrels', help='← → moverse, ↑/A saltar (atraviesas las vigas desde abajo). Esquiva los barriles y llega arriba.')),
+ 'barrel-climb': ('platform', dict(mode='barrels', help='← → moverse, A saltar, ↑ ↓ en las escaleras (atraviesas las vigas desde abajo). Esquiva los barriles y llega a la bandera.')),
  'wing-tap': ('runner', dict(mode='flap', theme='meadow', help='Toca para aletear y pasa entre los troncos. Las monedas suman un punto extra.')),
  # ---------- Puzzle ----------
  '2048-classic': ('g2048', dict()), '2048-hex': ('g2048', dict(hex=True)),
@@ -55,7 +55,7 @@ G = {
  'crypt-crawler': ('topdown', dict(mode='crypt', help='Muévete y acércate: tu espada golpea sola (o con A). Limpia la sala, sal por la puerta y elige una mejora. Jefe cada 5 salas.')),
  'slime-arena': ('topdown', dict(mode='arena', land=False, help='Arrastra para moverte; disparas solo. Los slimes grandes se dividen. Tras cada oleada eliges una mejora.')),
  'blade-leap': ('platformer', dict(theme='night', abil=dict(sword=True), enemies=0.6, spikes=0.08, help='← → correr, ↑/A saltar, B o toque: espada. Corta a los espectros o salta sobre ellos.')),
- 'ninja-ascent': ('platform', dict(mode='ninja', help='Toca para saltar a la pared contraria. Evita los pinchos y sube lo más alto que puedas.')),
+ 'ninja-ascent': ('platform', dict(mode='ninja', help='Toca para saltar a la pared contraria; toca en el aire para un doble salto que te devuelve a la misma pared. Evita los pinchos y los pájaros.')),
  'rope-swing': ('platformer', dict(theme='sky', abil=dict(swing=True), enemies=0.25, help='Corres solo entre islas flotantes. Mantén pulsado para engancharte a la anilla y suelta para salir disparado.')),
  'gravity-flip': ('runner', dict(mode='gravity', theme='factory', help='Toca para invertir la gravedad (desde el suelo o el techo) y esquiva los pinchos.')),
  'cloud-hopper': ('platform', dict(mode='hopper', bg='#7ec8ff', pal=dict(sky='#7ec8ff', ground='#fff', top='#ffffff', p='#ff5fa2', spike='#f00', enemy='#fa0', coin='#f2d15c'), help='Rebotas solo. Mantén el lado izquierdo o derecho de la pantalla para moverte.')),

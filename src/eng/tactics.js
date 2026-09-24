@@ -1,9 +1,14 @@
 /* Tácticas por turnos contra la IA con arte propio. CFG.hex = false (cuadrícula) | true (hexágonos)
  * Tablero en relieve cacheado, unidades por clase (caballero, arquera, mago), movimiento animado, flechas y hechizos, turno de la IA visible. */
-const HEX = !!CFG.hex, OUT = ART.OUT, R2 = 6.2832, W = 640, H = 480;
+/* disposición: vertical (móvil de pie) = tablero arriba y panel abajo, los bandos de abajo (tú) a arriba (IA); horizontal = panel lateral */
+const PORT = innerHeight > innerWidth, HEX = !!CFG.hex, OUT = ART.OUT, R2 = 6.2832, W = PORT ? 400 : 640, H = PORT ? 720 : 480;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#1d2036' }), c = k.ctx;
-const COLS = HEX ? 11 : 10, ROWS = 8, S = HEX ? 26 : 46, OX = 14, OY = HEX ? 46 : 48, DEP = 6; // S: lado (cuadrícula) o radio (hex); DEP: grosor del relieve
-const PX = 486; // panel lateral
+const COLS = PORT ? (HEX ? 9 : 8) : HEX ? 11 : 10, ROWS = PORT ? (HEX ? 9 : 10) : 8, S = HEX ? (PORT ? 27 : 26) : 46, DEP = 6; // S: lado (cuadrícula) o radio (hex); DEP: grosor del relieve
+const OX = PORT ? (HEX ? 11 : 16) : 14, OY = PORT ? 70 : HEX ? 46 : 48; // en vertical, margen para que las cabezas de la fila 0 no queden bajo pausa/sonido
+const PX = PORT ? W : 486, PY = PORT ? 562 : H; // panel lateral (horizontal) o inferior (vertical)
+/* coordenadas de bando: a = avance desde tu lado (0) hacia la IA, b = lateral */
+const LONG = PORT ? ROWS : COLS, SIDE = PORT ? COLS : ROWS, P = (a, b) => (PORT ? [b, ROWS - 1 - a] : [a, b]);
+const endR = () => (PORT ? { x: 282, y: PY + 70, w: 110, h: 74 } : { x: PX + 4, y: H - 58, w: W - PX - 12, h: 44 });
 const TYPES = { K: { n: 'Caballero', hp: 12, atk: 5, mv: 3, rg: 1, col: '#5ca8ff' }, A: { n: 'Arquera', hp: 8, atk: 4, mv: 3, rg: 3, col: '#5bc85a' }, M: { n: 'Mago', hp: 7, atk: 6, mv: 2, rg: 2, col: '#b98cff' } };
 const AICOL = { K: '#e0564a', A: '#ff9a3d', M: '#c0527a' };
 let units, rocks, sel, turn, level, score, reach, aiT, log, aiQueue = [], aiStep, aiFocus, projs, banner, cur, kbd, boardCv, tt = 0, endT;
@@ -21,14 +26,14 @@ const inRange = (a, b) => range(a, b) <= TYPES[a.t].rg;
 function cellAt(px, py) { let best = null, bd = HEX ? S * 0.95 : S * 0.72; for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) { const [cx, cy] = pos(x, y), d = HEX ? Math.hypot(px - cx, py - cy) : Math.max(Math.abs(px - cx), Math.abs(py - cy)) * 1.41; if (d < bd) { bd = d; best = [x, y]; } } return best; }
 
 function build() {
-  rocks = new Set(); for (let i = 0; i < 8 + level; i++) rocks.add(k.ri(2, COLS - 3) + ',' + k.ri(0, ROWS - 1));
+  rocks = new Set(); for (let i = 0; i < 8 + level; i++) rocks.add(P(k.ri(2, LONG - 3), k.ri(0, SIDE - 1)).join());
   const mk = (t, x, y, team) => ({ t, x, y, team, hp: TYPES[t].hp + (team === 'ai' ? level - 1 : 0), max: TYPES[t].hp + (team === 'ai' ? level - 1 : 0), moved: false, acted: false, face: team === 'me' ? 1 : -1, hf: 0, ph: Math.random() * 6 });
-  units = [mk('K', 0, 2, 'me'), mk('A', 0, 4, 'me'), mk('M', 0, 6, 'me'), mk('K', COLS - 1, 1, 'ai'), mk('K', COLS - 1, 5, 'ai'), mk('A', COLS - 1, 3, 'ai')];
-  if (level > 1) units.push(mk('M', COLS - 1, 7, 'ai')); if (level > 3) units.push(mk('A', COLS - 2, 0, 'ai'));
+  units = [mk('K', ...P(0, 2), 'me'), mk('A', ...P(0, 4), 'me'), mk('M', ...P(0, 6), 'me'), mk('K', ...P(LONG - 1, 1), 'ai'), mk('K', ...P(LONG - 1, 5), 'ai'), mk('A', ...P(LONG - 1, 3), 'ai')];
+  if (level > 1) units.push(mk('M', ...P(LONG - 1, 7), 'ai')); if (level > 3) units.push(mk('A', ...P(LONG - 2, 0), 'ai'));
   units.forEach((u) => rocks.delete(u.x + ',' + u.y));
   // que ninguna unidad quede encerrada entre rocas
   const me = units[0], dd = dists(me.x, me.y, (x, y) => !rocks.has(x + ',' + y)); for (const u of units) if (dd[u.x + ',' + u.y] === undefined) { nbs(u.x, u.y).forEach(([x, y]) => rocks.delete(x + ',' + y)); }
-  turn = 'me'; sel = null; reach = null; log = 'Tu turno: elige una unidad'; projs = []; aiQueue = []; aiStep = 0; aiFocus = null; endT = 0; cur = [0, 2]; kbd = false;
+  turn = 'me'; sel = null; reach = null; log = 'Tu turno: elige una unidad'; projs = []; aiQueue = []; aiStep = 0; aiFocus = null; endT = 0; cur = P(0, 2); kbd = false;
   banner = { txt: 'Batalla ' + level, t: 1.4 }; bake();
 }
 function reset() { if (!level || k.st === 'over' && !units.some((u) => u.team === 'me' && u.hp > 0)) { level = 1; score = 0; } build(); }
@@ -72,6 +77,8 @@ function aiThink(u) {
 }
 
 level = 0; reset();
+/* al girar el móvil fuera de partida se recarga con la otra disposición */
+addEventListener('resize', () => { clearTimeout(window.__ot); window.__ot = setTimeout(() => { if ((innerHeight > innerWidth) !== PORT && k.st !== 'play') location.reload(); }, 400); });
 k.show(CFG.title, 'Toca una unidad tuya, luego una casilla azul para mover o un enemigo en rojo para atacar. «Fin turno» cuando acabes. Teclado: flechas, A y X.');
 
 k.run((dt) => {
@@ -102,7 +109,7 @@ k.run((dt) => {
   if (k.hit.has('a')) { kbd = true; tapCell(cur.slice()); }
   if (k.hit.has('b')) endTurn();
   if (!k.ptr.hit) return; kbd = false;
-  if (k.ptr.x > PX + 4 && k.ptr.y > H - 64) return endTurn();
+  { const r = endR(); if (k.ptr.x > r.x - 4 && k.ptr.x < r.x + r.w + 4 && k.ptr.y > r.y - 6 && k.ptr.y < r.y + r.h + 6) return endTurn(); }
   const cell = cellAt(k.ptr.x, k.ptr.y); if (cell) cur = cell; tapCell(cell);
 }, draw);
 
@@ -133,7 +140,8 @@ function bake() {
     if (rnd(x * 7 + y * 3 + level) < 0.55) { g.beginPath(); g.moveTo(px - 16 * s, py + 9 * s); g.quadraticCurveTo(px - 17 * s, py - 12 * s, px - 2 * s, py - 15 * s); g.quadraticCurveTo(px + 16 * s, py - 12 * s, px + 16 * s, py + 9 * s); g.closePath(); ART.fillOut(g, '#8f8ca6', 2.5); g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(px - 6 * s, py - 7 * s, 5 * s, 3 * s, -0.4, 0, R2); g.fill(); g.strokeStyle = 'rgba(26,21,48,.4)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(px + 3 * s, py - 8 * s); g.lineTo(px + 7 * s, py + 3 * s); g.stroke(); }
     else { g.save(); g.translate(px, py + 10 * s); g.scale(0.62 * s, 0.62 * s); ART.deco(g, { deco: 'tree', near: '#3f9e4a' }, 0, 0, 32, 0); g.restore(); } }
   // panel lateral y barra superior
-  ART.rr(g, PX + 4, OY - 4, W - PX - 12, H - OY - 72, 12); ART.fillOut(g, '#262a4c', 2.5); ART.rr(g, PX + 8, OY, W - PX - 20, 18, 8); g.fillStyle = 'rgba(255,255,255,.06)'; g.fill();
+  if (PORT) { ART.rr(g, 8, PY, 266, H - PY - 8, 12); ART.fillOut(g, '#262a4c', 2.5); ART.rr(g, 12, PY + 4, 258, 18, 8); g.fillStyle = 'rgba(255,255,255,.06)'; g.fill(); }
+  else { ART.rr(g, PX + 4, OY - 4, W - PX - 12, H - OY - 72, 12); ART.fillOut(g, '#262a4c', 2.5); ART.rr(g, PX + 8, OY, W - PX - 20, 18, 8); g.fillStyle = 'rgba(255,255,255,.06)'; g.fill(); }
   gr = g.createLinearGradient(0, 0, 0, 34); gr.addColorStop(0, 'rgba(0,0,0,.35)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, 34);
 }
 /* soldado por clase; team 'me' humano, 'ai' trasgo */
@@ -204,9 +212,11 @@ function draw() {
     if (p.kind === 'A') { const a = Math.atan2(p.ey - p.sy - Math.cos(q * Math.PI) * 26 * Math.PI, p.ex - p.sx); c.save(); c.translate(x, y); c.rotate(a); c.strokeStyle = OUT; c.lineWidth = 3.5; c.beginPath(); c.moveTo(-10, 0); c.lineTo(6, 0); c.stroke(); c.strokeStyle = '#f4efe6'; c.lineWidth = 1.6; c.stroke(); c.beginPath(); c.moveTo(9, 0); c.lineTo(3, -3.5); c.lineTo(3, 3.5); c.closePath(); ART.fillOut(c, '#c7d0da', 1); c.restore(); }
     else { c.fillStyle = 'rgba(210,170,255,.35)'; c.beginPath(); c.arc(x, y, 11, 0, R2); c.fill(); for (let i = 1; i < 4; i++) { const q2 = Math.max(0, q - i * 0.06); c.globalAlpha = 0.5 - i * 0.12; c.beginPath(); c.arc(p.sx + (p.ex - p.sx) * q2, p.sy + (p.ey - p.sy) * q2 - Math.sin(q2 * Math.PI) * 8, 5 - i, 0, R2); c.fillStyle = '#e6d4ff'; c.fill(); } c.globalAlpha = 1; c.beginPath(); c.arc(x, y, 5.5, 0, R2); ART.fillOut(c, '#f4ecff', 2); } }
   // HUD
-  label('Batalla ' + level, 14, 20, 20, '#f2d15c'); label(score + ' pts', PX - 8, 20, 17, '#fff', 'right');
+  label('Batalla ' + level, 14, 20, 20, '#f2d15c'); label(score + ' pts', PX - (PORT ? 14 : 8), 20, 17, '#fff', 'right');
+  const info = sel || (hov && at(...hov)) || (aiFocus && turn === 'ai' && aiFocus.hp > 0 ? aiFocus : null);
+  if (PORT) return drawPanelV(info);
   // panel: ficha de la unidad
-  const info = sel || (hov && at(...hov)) || (aiFocus && turn === 'ai' && aiFocus.hp > 0 ? aiFocus : null), cx = PX + (W - PX - 8) / 2;
+  const cx = PX + (W - PX - 8) / 2;
   if (info) { const T = TYPES[info.t], me = info.team === 'me';
     label(me ? 'Tu unidad' : 'Rival', cx, OY + 5, 11, me ? '#9fd0ff' : '#ff9a9a', 'center');
     drawUnit(info, cx, OY + 92, 1.35, 1); label(T.n, cx, OY + 112, 16, '#fff', 'center');
@@ -223,6 +233,30 @@ function draw() {
   if (on) { ART.rr(c, PX + 8, H - 55, W - PX - 20, 16, 8); c.fillStyle = 'rgba(255,255,255,.25)'; c.fill(); }
   label(turn === 'me' ? 'Fin turno' : 'IA…', PX + 4 + (W - PX - 12) / 2, H - 36, 16, on ? '#fff' : '#b8b2d0', 'center');
   // aviso de turno
-  if (banner) { const q = banner.t, a = Math.min(1, q / 0.25, (1.4 - q) / 0.15 + 0.3), sc = 1 + Math.max(0, q - 1.1) * 0.6; c.save(); c.globalAlpha = Math.max(0, a); c.translate(PX / 2, H / 2 - 10); c.scale(sc, sc);
+  drawBanner();
+}
+function drawBanner() {
+  if (banner) { const q = banner.t, a = Math.min(1, q / 0.25, (1.4 - q) / 0.15 + 0.3), sc = 1 + Math.max(0, q - 1.1) * 0.6; c.save(); c.globalAlpha = Math.max(0, a); c.translate(PX / 2, PORT ? (OY + PY) / 2 - 10 : H / 2 - 10); c.scale(sc, sc);
     ART.rr(c, -120, -28, 240, 56, 16); ART.fillOut(c, banner.red ? '#8a2b3a' : '#2d4a8a', 3); label(banner.txt, 0, 1, 26, '#fff', 'center'); c.restore(); }
+}
+/* panel inferior (vertical): ficha de unidad a la izquierda, turno y botón a la derecha */
+function drawPanelV(info) {
+  const x0 = 8, y0 = PY;
+  if (info) { const T = TYPES[info.t], me = info.team === 'me';
+    label(me ? 'Tu unidad' : 'Rival', x0 + 14, y0 + 13, 11, me ? '#9fd0ff' : '#ff9a9a');
+    if (me && turn === 'me') label(info.acted ? 'Ya ha actuado' : info.moved ? 'Puede atacar' : 'Lista', x0 + 252, y0 + 13, 11, info.acted ? '#8b91a1' : '#7cf06a', 'right');
+    drawUnit(info, x0 + 50, y0 + 118, 1.4, 1); label(T.n, x0 + 100, y0 + 40, 17, '#fff');
+    hpBar(info, x0 + 117, y0 + 58); label(`${Math.max(0, info.hp)} / ${info.max} PV`, x0 + 142, y0 + 61, 12, '#d8d0f0');
+    [['Ataque', T.atk], ['Movim.', T.mv], ['Alcance', T.rg]].forEach(([n, v], i) => { const y = y0 + 86 + i * 22; ART.rr(c, x0 + 96, y - 9, 158, 18, 7); c.fillStyle = 'rgba(255,255,255,.07)'; c.fill(); label(n, x0 + 104, y, 12, '#cfd3ff'); label(String(v), x0 + 246, y, 14, '#ffd23d', 'right'); }); }
+  else { const mine = units.filter((u) => u.team === 'me' && u.hp > 0), foes = units.filter((u) => u.team === 'ai' && u.hp > 0);
+    label('Tuyas', x0 + 14, y0 + 13, 11, '#9fd0ff'); mine.forEach((u, i) => drawUnit(u, x0 + 34 + i * 40, y0 + 76, 0.8, u.acted && turn === 'me' ? 0.5 : 1));
+    label('Rivales', x0 + 14, y0 + 88, 11, '#ff9a9a'); foes.forEach((u, i) => drawUnit(u, x0 + 34 + i * 38, y0 + 146, 0.8, 1)); }
+  label(log, W / 2, PY - 14, 14, '#e6e2ff', 'center');
+  label(turn === 'me' ? 'Tu turno' : 'Turno rival', 337, PY + 22, 15, turn === 'me' ? '#9fd0ff' : '#ff9a9a', 'center');
+  const mine = units.filter((u) => u.team === 'me' && u.hp > 0), left = mine.filter((u) => !u.acted).length;
+  if (turn === 'me') label(`${left} por actuar`, 337, PY + 44, 11, '#cfd3ff', 'center');
+  const r = endR(), on = turn === 'me' && !busy(); ART.rr(c, r.x, r.y, r.w, r.h, 14); ART.fillOut(c, on ? '#5bc85a' : '#4a4466', 2.5);
+  if (on) { ART.rr(c, r.x + 4, r.y + 3, r.w - 8, 20, 8); c.fillStyle = 'rgba(255,255,255,.25)'; c.fill(); }
+  label(turn === 'me' ? 'Fin turno' : 'IA…', r.x + r.w / 2, r.y + r.h / 2 + 1, 17, on ? '#fff' : '#b8b2d0', 'center');
+  drawBanner();
 }

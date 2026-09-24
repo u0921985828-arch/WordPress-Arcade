@@ -3,6 +3,8 @@
 const M = CFG.mode, HK = M === 'hockey', OUT = ART.OUT, R2 = 6.2832;
 const k = Kit({ w: 360, h: 640, title: CFG.title, bg: HK ? '#1c2447' : '#10263f' }), c = k.ctx;
 const GOAL = 110, TO = 7, RAIL = 12, TX0 = 24, TX1 = 336, NETY = 320, PYME = 580, PYAI = 60;
+/* franja superior libre para pausa/sonido: la mesa se dibuja a escala SCL bajo ella (sx/sy: mesa → pantalla) */
+const TOP = 40, SCL = (640 - TOP) / 640, OXT = 180 * (1 - SCL), sx = (x) => OXT + x * SCL, sy = (y) => TOP + y * SCL;
 let me, ai, puck, sMe, sAi, serveT, rally, trail, goalT, goalMe, tm, bounceMk, server;
 function serverIsMe() { const tot = sMe + sAi; return (sMe >= 10 && sAi >= 10 ? tot : Math.floor(tot / 2)) % 2 === 0; }
 function serve(dir) {
@@ -15,10 +17,10 @@ function reset() { me = { x: 180, y: HK ? 560 : PYME, px: 180, py: 560, r: HK ? 
 reset(); k.show(CFG.title, HK ? 'Mueve tu mazo con el dedo (o flechas) y marca en la portería de arriba. Gana quien llegue a 7.' : 'Mueve la raqueta con el dedo (o flechas). Golpea en movimiento para dar efecto. Partido a 11 puntos con 2 de diferencia; el saque cambia cada 2 puntos.');
 function goal(forMe) {
   if (forMe) sMe++; else sAi++; goalT = 1.3; goalMe = forMe;
-  k.burst(puck.x, k.clamp(puck.y, 10, 630), forMe ? '#7cf7a0' : '#ff5f5f', 26, 220); k.sfx(forMe ? 'coin' : 'hurt'); k.shake(forMe ? 4 : 7); if (!forMe) k.flash('rgba(255,70,90,.25)');
+  k.burst(sx(puck.x), sy(k.clamp(puck.y, 10, 630)), forMe ? '#7cf7a0' : '#ff5f5f', 26, 220); k.sfx(forMe ? 'coin' : 'hurt'); k.shake(forMe ? 4 : 7); if (!forMe) k.flash('rgba(255,70,90,.25)');
   const TGT = HK ? TO : 11, fin = (sMe >= TGT || sAi >= TGT) && (HK || Math.abs(sMe - sAi) >= 2);
   if (fin) { k.st = 'over'; k.best(CFG.id, sMe > sAi ? sMe - sAi : 0); k.show(sMe > sAi ? '¡Ganaste!' : 'Perdiste', `${sMe} – ${sAi}<br>Toca para la revancha`); if (sMe < sAi) k.sfx('lose'); return; }
-  if (!HK) { if (sMe >= 10 && sAi >= 10 && sMe === sAi) k.float('Iguales', 180, 360, '#fff27a'); else if (Math.max(sMe, sAi) >= 10 && Math.abs(sMe - sAi) >= 1) k.float(sMe > sAi ? 'Punto de partido' : 'Punto de partido CPU', 180, 360, '#fff27a'); }
+  if (!HK) { if (sMe >= 10 && sAi >= 10 && sMe === sAi) k.float('Iguales', 180, sy(360), '#fff27a'); else if (Math.max(sMe, sAi) >= 10 && Math.abs(sMe - sAi) >= 1) k.float(sMe > sAi ? 'Punto de partido' : 'Punto de partido CPU', 180, sy(360), '#fff27a'); }
   serve(forMe ? -1 : 1);
 }
 
@@ -80,7 +82,7 @@ k.run((dt) => {
   if (!k.gate(reset)) return;
   const lvl = 0.55 + (sMe + sAi) * 0.03;
   me.px = me.x; me.py = me.y; ai.px = ai.x; ai.py = ai.y;
-  if (k.ptr.down) { me.x += (k.ptr.x - me.x) * Math.min(1, dt * 25); if (HK) me.y += (k.ptr.y - me.y) * Math.min(1, dt * 25); }
+  if (k.ptr.down) { const qx = (k.ptr.x - OXT) / SCL, qy = (k.ptr.y - TOP) / SCL; me.x += (qx - me.x) * Math.min(1, dt * 25); if (HK) me.y += (qy - me.y) * Math.min(1, dt * 25); }
   if (k.held.has('left')) me.x -= 400 * dt; if (k.held.has('right')) me.x += 400 * dt; if (HK) { if (k.held.has('up')) me.y -= 400 * dt; if (k.held.has('down')) me.y += 400 * dt; }
   me.x = k.clamp(me.x, HK ? RAIL + me.r : TX0 + 16, 360 - (HK ? RAIL + me.r : TX0 + 16)); me.y = HK ? k.clamp(me.y, 320 + me.r * 0.7, 628 - me.r) : PYME;
   // IA
@@ -95,14 +97,15 @@ k.run((dt) => {
       if (puck.y < RAIL + puck.r) { if (inGoal) return goal(true); puck.vy = Math.abs(puck.vy); puck.y = RAIL + puck.r; k.sfx('click'); }
       if (puck.y > 628 - puck.r) { if (inGoal) return goal(false); puck.vy = -Math.abs(puck.vy); puck.y = 628 - puck.r; k.sfx('click'); }
       for (const m of [me, ai]) { const dx = puck.x - m.x, dy = puck.y - m.y, d = Math.hypot(dx, dy); if (d < m.r + puck.r && d > 0) { const nx = dx / d, ny = dy / d; puck.x = m.x + nx * (m.r + puck.r); puck.y = m.y + ny * (m.r + puck.r); const mvx = (m.x - m.px) / dt, mvy = (m.y - m.py) / dt; const rv = (puck.vx - mvx) * nx + (puck.vy - mvy) * ny;
-        if (rv < 0) { puck.vx -= 1.9 * rv * nx; puck.vy -= 1.9 * rv * ny; k.sfx('hit'); puck.bz = 0.2; if (-rv > 500) k.burst(puck.x - nx * puck.r, puck.y - ny * puck.r, '#fff', 6, 120); }
+        if (rv < 0) { puck.vx -= 1.9 * rv * nx; puck.vy -= 1.9 * rv * ny; k.sfx('hit'); puck.bz = 0.2; if (-rv > 500) k.burst(sx(puck.x - nx * puck.r), sy(puck.y - ny * puck.r), '#fff', 6, 120); }
         const spd = Math.hypot(puck.vx, puck.vy); if (spd > 900) { puck.vx *= 900 / spd; puck.vy *= 900 / spd; } } } }
-    else { for (const [p, dir] of [[me, -1], [ai, 1]]) { const py = p === me ? PYME : PYAI; if (Math.sign(puck.vy) === -dir && Math.abs(puck.y - py) < 10 && Math.abs(puck.x - p.x) < p.w / 2 + puck.r) { rally++; k.sfx('hit'); const spd = Math.min(820, Math.hypot(puck.vx, puck.vy) * 1.05); const off = (puck.x - p.x) / (p.w / 2), spin = (p.x - p.px) / dt * 0.25; puck.vx = off * spd * 0.7 + spin; puck.vy = dir * Math.sqrt(Math.max(1, spd * spd - puck.vx * puck.vx * 0.5)); puck.y = py + dir * 11; puck.from = py; puck.bounced = false; k.burst(puck.x, py, '#fff', 5, 90); if (rally > 0 && rally % 10 === 0) k.float(`Rally ${rally}`, 180, 360, '#fff27a'); } }
+    else { for (const [p, dir] of [[me, -1], [ai, 1]]) { const py = p === me ? PYME : PYAI; if (Math.sign(puck.vy) === -dir && Math.abs(puck.y - py) < 10 && Math.abs(puck.x - p.x) < p.w / 2 + puck.r) { rally++; k.sfx('hit'); const spd = Math.min(820, Math.hypot(puck.vx, puck.vy) * 1.05); const off = (puck.x - p.x) / (p.w / 2), spin = (p.x - p.px) / dt * 0.25; puck.vx = off * spd * 0.7 + spin; puck.vy = dir * Math.sqrt(Math.max(1, spd * spd - puck.vx * puck.vx * 0.5)); puck.y = py + dir * 11; puck.from = py; puck.bounced = false; k.burst(sx(puck.x), sy(py), '#fff', 5, 90); if (rally > 0 && rally % 10 === 0) k.float(`Rally ${rally}`, 180, sy(360), '#fff27a'); } }
       const tot = Math.abs(PYME - PYAI); if (!puck.bounced && Math.abs(puck.y - puck.from) / tot > 0.72) { puck.bounced = true; bounceMk = { x: puck.x, y: puck.y, t: 0.35 }; k.sfx('click'); }
       if (puck.y < 0) return goal(true); if (puck.y > 640) return goal(false); } }
   if (puck.bz) puck.bz = Math.max(0, puck.bz - dt);
   trail.push([puck.x, puck.y]); if (trail.length > 10) trail.shift();
 }, () => {
+  c.fillStyle = HK ? '#1c2447' : '#0c1d33'; c.fillRect(0, 0, 360, 640); c.save(); c.translate(OXT, TOP); c.scale(SCL, SCL);
   c.drawImage(TABLE, 0, 0, 360, 640);
   if (HK) {
     // luz de gol en la portería
@@ -133,7 +136,8 @@ k.run((dt) => {
   const bx = HK ? 20 : 4, by = 282; ART.rr(c, bx, by, 38, 76, 10); c.fillStyle = 'rgba(26,21,48,.78)'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke(); c.fillStyle = 'rgba(255,255,255,.2)'; c.fillRect(bx + 6, by + 38, 26, 2);
   const pop = (mine) => (goalT > 0.9 && goalMe === mine ? 1 + (goalT - 0.9) * 1.2 : 1);
   for (const [v, y, col, mine] of [[sAi, by + 20, HK ? '#ff6b6b' : '#c9cbe0', false], [sMe, by + 57, HK ? '#6fb0ff' : '#ff8a8a', true]]) { c.save(); c.translate(bx + 19, y); const s = pop(mine); c.scale(s, s); label(v, 0, 0, 24, col, 'center', 'middle'); c.restore(); }
-  label(HK ? 'A 7 goles' : 'A 11 puntos', 12, HK ? 18 : 14, 12, HK ? '#cfd8ff' : '#cfe3ff');
   if (goalT > 0 && k.st === 'play') { const p = 1.3 - goalT, s = p < 0.18 ? 0.4 + p / 0.18 * 0.8 : 1.2 - Math.min(0.2, (p - 0.18)); c.save(); c.translate(180, goalMe ? 250 : 400); c.scale(s, s); c.globalAlpha = Math.min(1, goalT / 0.3);
     label(HK ? (goalMe ? '¡GOL!' : 'Gol rival') : (goalMe ? '¡Punto!' : 'Punto CPU'), 0, 0, goalMe ? 44 : 30, goalMe ? '#7cf7a0' : '#ff7a8a', 'center', 'middle'); c.restore(); c.globalAlpha = 1; }
+  c.restore();
+  label(HK ? 'A 7 goles' : 'A 11 puntos', 12, 13, 12, HK ? '#cfd8ff' : '#cfe3ff');
 });

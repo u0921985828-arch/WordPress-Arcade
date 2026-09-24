@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **100 juegos propios** (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Subdominio temporal: **falta dominio propio** y cambiar el título "My Blog".
-- Versión actual del plugin: **1.13.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.14.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -68,11 +68,12 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
 - `raycast.js` (crystal-labyrinth: texturas, cristales con z-buffer, portal, minimapa; farol con aceite como límite), `frog.js` (tortugas que bucean, mosca bonus, 4 vehículos), `gridmover.js` (neon-trails con estelas neón cacheadas; territory con chispas destruibles al encerrarlas). Gridmover 480×520.
 - Puzzles y cartas (fase 4): `cards.js` (cartas cacheadas con figuras dibujadas, vuelo interpolado, arrastre, pista, autocompletar; Pyramid/TriPeaks terminan sin jugadas), `mahjong.js` (fichas en relieve con símbolos dibujados, 3 disposiciones, barajado con colocación inversa), `dice.js`, `board.js` (damas/reversi animados), `g2048`, `match3` (gemas con forma por color), `colorsort` (bolas), `flow`, `lasers`, `nonogram`, `sokoban` (hielo con mínimo BFS), `logic` (buscaminas con acorde), `poly` (tangram), `rope` (niveles verificados por simulador), `drawphys`, `td` (4 torres, panel lateral, hex real), `tactics` (unidades animadas, IA visible), `battle` (radar, IA que sigue impactos).
 - Deportes, 3D y arcade (fase 5): `road` (carretera pintada de lejos a cerca con niebla, semáforo, rivales que esquivan; lanes con filas regeneradas y carril libre garantizado), `stack`, `marble` (agujeros solo si el BFS mantiene la meta alcanzable, 3 canicas), `cube` (bloque 3D real; generador sin salida de emergencia, verificado con 5000 niveles), `drone`, `planet`, `golf` (vista previa, búnkeres, tarjeta de 9 hoyos), `penalty` (efecto y portero con alcance limitado), `bowling` (física bola/bolos, marcador oficial), `hoop` (red con muelles, aro móvil en racha), `darts` (sugerencia de cierre), `pool` (bola fantasma, bandeja), `rhythm` (multitoque, valoraciones), `homerun`, `whack`, `paddle` (saque alterno en ping pong), `breakout` (4 diseños, subpasos), `lander` (plataforma plana completa, x3), `missile` (MIRV desde oleada 3).
+- `platform.js` (barrel-climb vigas, escaleras ↑↓ y barriles con aros; ninja-ascent con doble salto y pinchos sobre ruta garantizada; cloud-hopper y lava-escape con generación infinita, nubes/salientes especiales y lava animada).
+- Lienzo adaptable: `td`, `tactics` y `lander` eligen disposición vertical si `innerHeight > innerWidth` (recargan al girar fuera de partida); en el catálogo van con orientación `auto` y `fill` (`adaptive_games()` migra las entradas ya publicadas). `golf` reserva franja superior (`TOPR`) y `paddle` deja 40 px libres arriba para pausa/sonido.
 - Caché de motores: `?v=` = hash md5 del motor (automático en build_games.py); `kit.js` y `art.js` siguen con `?v=N` manual.
 - Todos los motores cargan `art.js` (`deps_of` en build_games.py).
 
-**Pendientes de rehacer (funcionan y están auditados, pero con gráficos simples)**, en este orden acordado:
-6. `platform.js` sigue usándose para barrel-climb, ninja-ascent, cloud-hopper, lava-escape (portarlos a arte ART)
+Todos los motores generados están rehechos con arte ART.
 
 ## Reglas ya aplicadas (no romper)
 Spider 2 palos (104 cartas); FreeCell con supermovimiento (celdas+1)·2^columnas; Klondike robo 1; Pyramid 2 reciclados; TriPeaks con K-A circular; dardos 501 con cierre en doble o bull; ping pong a 11 con 2 de diferencia; air hockey a 7; damas: captura obligatoria, multisalto y la coronación termina el turno; bolos con puntuación oficial de 10 frames; minigolf par 3 y máximo 8 golpes; póker de dados con ranking español; Tetra con bolsa de 7, pieza fantasma y límite de 15 reinicios del bloqueo; Pac-Man sin fantasmas comestibles tras morir; invulnerabilidad al reaparecer en laberintos.
@@ -87,7 +88,7 @@ python3 scripts/thumbs.py 0/1 <slug…> # regenerar miniaturas tras cambios visu
 bash scripts/test-wp.sh               # WordPress local para probar el portal
 bash scripts/package.sh               # zip instalable en dist/
 ```
-- Tras cambiar un motor o kit, **sube la versión de caché** `?v=N` en la plantilla `TPL` de `build_games.py` (y en los 5 independientes) y la `VERSION` del plugin (cabecera y constante).
+- Tras cambiar `kit.js` o `art.js`, **sube la versión de caché** `?v=N` en la plantilla `TPL` de `build_games.py` (y en los 5 independientes); los motores se versionan solos por hash. Sube siempre la `VERSION` del plugin (cabecera y constante).
 - Verifica siempre: `node --check`, `php -l`, prueba Playwright del juego tocado, captura visual. "audit: no reacciona" suele ser falso positivo en juegos de tablero: comprueba con jugadas dirigidas.
 - Cuidado con gestos rápidos: si `ptr.hit` y `ptr.up` llegan en el mismo frame, trata el arrastre por distancia a `sx/sy` (ya corregido en tangram).
 - En este entorno las peticiones HTTPS desde PHP pueden fallar por certificados; en el WP de pruebas se desactiva con un mu-plugin (`https_ssl_verify` false). No hace falta en producción.
