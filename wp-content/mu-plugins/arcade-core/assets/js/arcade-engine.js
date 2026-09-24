@@ -129,41 +129,44 @@ const CSS = `
 @keyframes arcade-rot{0%,25%{transform:rotate(0)}65%,100%{transform:rotate(-90deg)}}
 /* Mando virtual en su propia franja, fuera del juego: abajo en vertical, a los lados en horizontal.
    El iframe se encoge y el juego se reescala dentro (sin tapar nada con los pulgares). */
-.arcade-player.has-pad{--pad-h:clamp(150px,25vh,220px);--pad-w:clamp(132px,20vw,200px);--dpad:clamp(118px,30vmin,164px);--abtn:clamp(58px,15vmin,76px);background:#0b0d12}
+.arcade-player.has-pad{--pad-h:clamp(190px,27vh,240px);--pad-w:clamp(132px,20vw,200px);--stick:clamp(120px,32vmin,168px);--abtn:clamp(74px,20vmin,96px);background:#0b0d12}
 .arcade-player.has-pad:not(.pad-side) iframe{height:calc(100% - var(--pad-h))}
-.arcade-player.has-pad:not(.pad-side) .arcade-bar{top:calc(100% - var(--pad-h) + 10px);right:50%;transform:translateX(50%)}
+.arcade-player.has-pad:not(.pad-side) .arcade-bar{top:auto;bottom:calc(6px + env(safe-area-inset-bottom,0px));right:50%;transform:translateX(50%)}
+.arcade-player.has-pad:not(.pad-side) .arcade-bar button{min-width:34px;height:30px;opacity:.8}
 .arcade-player.has-pad:not(.pad-side) .arcade-bar button{background:#1d2230;border-color:rgba(255,255,255,.1)}
 .arcade-player.has-pad.pad-side iframe{left:var(--pad-w);width:calc(100% - 2 * var(--pad-w))}
-.arcade-player.has-pad.pad-side{--dpad:min(calc(var(--pad-w) - 18px),42vh);--abtn:clamp(54px,15vh,70px)}
-.arcade-pad{position:absolute;inset:auto 0 0 0;height:var(--pad-h);z-index:6;display:flex;justify-content:space-between;align-items:center;pointer-events:none;box-sizing:border-box;
-  padding:0 calc(18px + env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) calc(18px + env(safe-area-inset-left,0px));
+.arcade-player.has-pad.pad-side{--stick:min(calc(var(--pad-w) - 14px),44vh);--abtn:clamp(66px,19vh,86px)}
+.arcade-pad{position:absolute;inset:auto 0 0 0;height:var(--pad-h);z-index:6;display:flex;box-sizing:border-box;
+  padding:0 env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);
   background:linear-gradient(180deg,#151924,#0b0d12);border-top:1px solid rgba(255,255,255,.07)}
-.pad-side .arcade-pad{inset:0;height:auto;padding:0;background:none;border:0}
-.pad-side .arcade-pad>*{width:var(--pad-w);display:flex;align-items:center;justify-content:center}
-.pad-side .arcade-pad::before,.pad-side .arcade-pad::after{content:"";position:absolute;top:0;bottom:0;width:var(--pad-w);background:linear-gradient(90deg,#151924,#0b0d12);z-index:-1}
-.pad-side .arcade-pad::before{left:0;border-right:1px solid rgba(255,255,255,.07)}
-.pad-side .arcade-pad::after{right:0;transform:scaleX(-1);border-right:1px solid rgba(255,255,255,.07)}
-.arcade-dpad{position:relative;width:var(--dpad);aspect-ratio:1;flex:none;border-radius:50%;background:radial-gradient(circle,#1d2230 0 30%,#171b26 31%);border:1px solid rgba(255,255,255,.12);box-shadow:0 6px 16px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.06);pointer-events:auto;touch-action:none}
-.pad-side .arcade-dpad{width:var(--dpad);flex:none}
-.arcade-dpad span{position:absolute;width:30%;height:30%;border-radius:8px;background:#2a3040;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
-.arcade-dpad span::after{content:"";position:absolute;inset:0;margin:auto;width:0;height:0;border:7px solid transparent}
-.arcade-dpad [data-dir=up]{top:6%;left:35%}.arcade-dpad [data-dir=down]{bottom:6%;left:35%}
-.arcade-dpad [data-dir=left]{left:6%;top:35%}.arcade-dpad [data-dir=right]{right:6%;top:35%}
-.arcade-dpad [data-dir=up]::after{border-bottom-color:#aab0bf;margin-top:18%}.arcade-dpad [data-dir=down]::after{border-top-color:#aab0bf;margin-bottom:18%}
-.arcade-dpad [data-dir=left]::after{border-right-color:#aab0bf;margin-left:18%}.arcade-dpad [data-dir=right]::after{border-left-color:#aab0bf;margin-right:18%}
-.arcade-dpad.h{aspect-ratio:auto;width:calc(var(--dpad) * 1.3);height:calc(var(--dpad) * .58);border-radius:999px;background:#171b26}
-.pad-side .arcade-dpad.h{width:var(--dpad);height:calc(var(--dpad) * .62)}
-.arcade-dpad.h [data-dir]{top:10%;height:80%;width:44%;border-radius:999px}
-.arcade-dpad.h [data-dir=left]{left:4%}.arcade-dpad.h [data-dir=right]{right:4%;left:auto}
-.arcade-dpad.h [data-dir=up],.arcade-dpad.h [data-dir=down]{display:none}
-.arcade-btns{display:flex;gap:14px;align-items:flex-end;pointer-events:auto}
-.pad-side .arcade-btns{flex-direction:column-reverse;align-items:center;gap:16px}
-.arcade-btn{width:var(--abtn);aspect-ratio:1;flex:none;border-radius:50%;border:1px solid rgba(255,255,255,.14);background:#2a3040;color:#e6e8ef;font:800 1.1rem system-ui,sans-serif;box-shadow:0 6px 14px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.1);touch-action:none;padding:0}
-.arcade-btn.lbl{font:700 .72rem/1.1 system-ui,sans-serif}
+.pad-side .arcade-pad{inset:0;height:auto;padding:0;background:none;border:0;justify-content:space-between;pointer-events:none}
+/* Zonas táctiles amplias: toda la mitad izquierda es joystick y toda la derecha son botones (gana el más cercano). */
+.arcade-padl,.arcade-padr{position:relative;flex:1;min-width:0;touch-action:none;pointer-events:auto}
+.arcade-padl:empty{display:none}
+.pad-side .arcade-padl,.pad-side .arcade-padr{flex:none;width:var(--pad-w);height:100%;background:linear-gradient(90deg,#151924,#0b0d12)}
+.pad-side .arcade-padl{border-right:1px solid rgba(255,255,255,.07)}
+.pad-side .arcade-padr{background:linear-gradient(270deg,#151924,#0b0d12);border-left:1px solid rgba(255,255,255,.07)}
+.pad-side .arcade-padl:empty{display:block}
+.arcade-stick{position:absolute;left:50%;top:50%;width:var(--stick);height:var(--stick);margin:calc(var(--stick) / -2) 0 0 calc(var(--stick) / -2);border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,.03) 0 40%,rgba(255,255,255,.07) 41%);border:2px solid rgba(255,255,255,.14);opacity:.55;transition:opacity .15s;pointer-events:none}
+.arcade-stick.h{height:calc(var(--stick) * .5);margin-top:calc(var(--stick) / -4);border-radius:999px}
+.arcade-stick.live{opacity:1;transition:none}
+.arcade-stick:not(.h)::before,.arcade-stick:not(.h)::after{display:none}
+.arcade-stick::before,.arcade-stick::after{content:"";position:absolute;top:50%;margin-top:-6px;border:6px solid transparent}
+.arcade-stick::before{left:7px;border-right-color:rgba(255,255,255,.35)}.arcade-stick::after{right:7px;border-left-color:rgba(255,255,255,.35)}
+.arcade-knob{position:absolute;left:50%;top:50%;width:44%;height:44%;margin:-22% 0 0 -22%;border-radius:50%;background:#2f3648;border:1px solid rgba(255,255,255,.18);box-shadow:0 6px 14px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.12)}
+.arcade-stick.h .arcade-knob{width:calc(var(--stick) * .44);height:calc(var(--stick) * .44);margin:calc(var(--stick) * -.22) 0 0 calc(var(--stick) * -.22)}
+.arcade-stick.live .arcade-knob{background:#6e62f5}
+.arcade-btns{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:18px;pointer-events:none}
+.arcade-btns.two{justify-content:flex-end;padding-right:22px}
+.arcade-padl:empty+.arcade-padr .arcade-btns.two{justify-content:center;padding:0}
+.pad-side .arcade-btns{flex-direction:column-reverse;justify-content:center;padding:0}
+.arcade-btn{width:var(--abtn);height:var(--abtn);flex:none;border-radius:50%;border:1px solid rgba(255,255,255,.14);background:#2a3040;color:#e6e8ef;font:800 1.2rem system-ui,sans-serif;box-shadow:0 6px 14px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.1);padding:0;pointer-events:none;transition:transform .06s}
+.arcade-btn.lbl{font:700 .8rem/1.1 system-ui,sans-serif}
 .arcade-btn[data-btn=a]{background:#6e62f5;border-color:rgba(255,255,255,.2);color:#fff;box-shadow:0 6px 16px rgba(110,98,245,.35),inset 0 1px 0 rgba(255,255,255,.2)}
-.arcade-btns.two .arcade-btn[data-btn=a]{margin-bottom:30px}
-.pad-side .arcade-btns.two .arcade-btn[data-btn=a]{margin:0 0 0 22px}.pad-side .arcade-btns.two .arcade-btn[data-btn=b]{margin-right:22px}
-.arcade-dpad span.on{background:#6e62f5}.arcade-btn.on{filter:brightness(1.35);transform:scale(.94)}
+.arcade-btns.two .arcade-btn[data-btn=a]{margin-bottom:34px}
+.pad-side .arcade-btns.two .arcade-btn[data-btn=a]{margin:0 0 0 18px}.pad-side .arcade-btns.two .arcade-btn[data-btn=b]{margin:0 18px 0 0}
+.arcade-btn.on{filter:brightness(1.35);transform:scale(.92)}
 @media (prefers-reduced-motion:reduce){.arcade-rotate i{animation:none;transform:rotate(-90deg)}}
 `;
 
@@ -434,6 +437,7 @@ export class ArcadePlayer {
     if (!this.pad) return;
     this._releaseAll();
     this._padAc?.abort();
+    this._stickReset = this._btnsReset = null;
     this.pad.remove();
     this.pad = null;
     this.root.classList.remove('has-pad', 'pad-side');
@@ -448,7 +452,7 @@ export class ArcadePlayer {
     // Si el juego avisa de su proporción, la franja aprovecha justo el margen que le sobra (con un mínimo cómodo).
     const cl = (v, a, b) => Math.round(Math.max(a, Math.min(b, v)));
     this.root.style.setProperty('--pad-w', ar && side ? cl((r.width - r.height * ar) / 2, 124, 200) + 'px' : '');
-    this.root.style.setProperty('--pad-h', ar && !side ? cl(r.height - r.width / ar, 150, 280) + 'px' : '');
+    this.root.style.setProperty('--pad-h', ar && !side ? cl(r.height - r.width / ar, 190, 280) + 'px' : '');
   }
 
   _buildPad() {
@@ -456,70 +460,112 @@ export class ArcadePlayer {
     const opt = { passive: false, signal: this._padAc.signal };
     const spec = this.padSpec || { d: '8', a: 'A', b: 'B' };
     const esc = (t) => String(t).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
-    const btn = (n) => spec[n] ? `<button type="button" class="arcade-btn${String(spec[n]).length > 1 ? ' lbl' : ''}" data-btn="${n}">${esc(spec[n])}</button>` : '';
-    const two = spec.a && spec.b;
+    const btn = (n) => spec[n] ? `<button type="button" tabindex="-1" class="arcade-btn${String(spec[n]).length > 1 ? ' lbl' : ''}" data-btn="${n}">${esc(spec[n])}</button>` : '';
+    const onlyH = spec.d === 'h';
     const pad = (this.pad = document.createElement('div'));
     pad.className = 'arcade-pad';
     pad.setAttribute('aria-hidden', 'true');
     pad.innerHTML =
-      '<div class="arcade-padl">' + (spec.d ? `<div class="arcade-dpad${spec.d === 'h' ? ' h' : ''}"><span data-dir="up"></span><span data-dir="down"></span><span data-dir="left"></span><span data-dir="right"></span></div>` : '') + '</div>' +
-      `<div class="arcade-padr"><div class="arcade-btns${two ? ' two' : ''}">${btn('b')}${btn('a')}</div></div>`;
+      '<div class="arcade-padl">' + (spec.d ? `<div class="arcade-stick${onlyH ? ' h' : ''}"><i class="arcade-knob"></i></div>` : '') + '</div>' +
+      `<div class="arcade-padr"><div class="arcade-btns${spec.a && spec.b ? ' two' : ''}">${btn('b')}${btn('a')}</div></div>`;
     this.root.append(pad);
     this.root.classList.add('has-pad');
     this._padLayout();
 
-    // D-pad: un único dedo, 8 direcciones, zona muerta central.
-    const dpad = pad.querySelector('.arcade-dpad');
-    const onlyH = spec.d === 'h';
-    if (dpad) {
-    const arms = Object.fromEntries([...dpad.children].map((s) => [s.dataset.dir, s]));
-    let tid = null;
-    let dirs = new Set();
-    const apply = (next) => {
-      for (const d of dirs) if (!next.has(d)) { this._key(d, false); arms[d].classList.remove('on'); }
-      for (const d of next) if (!dirs.has(d)) { this._key(d, true); arms[d].classList.add('on'); }
-      dirs = next;
-    };
-    const track = (t) => {
-      const r = dpad.getBoundingClientRect();
-      const dx = t.clientX - (r.left + r.width / 2);
-      const dy = t.clientY - (r.top + r.height / 2);
-      if (onlyH) return apply(new Set(Math.abs(dx) < r.width * 0.08 ? [] : [dx < 0 ? 'left' : 'right']));
-      if (Math.hypot(dx, dy) < r.width * 0.14) return apply(new Set());
-      apply(new Set(OCTANTS[Math.round(Math.atan2(dy, dx) / (Math.PI / 4))]));
-    };
-    const find = (e) => [...e.changedTouches].find((t) => t.identifier === tid);
-    dpad.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      if (tid !== null) return;
-      const t = e.changedTouches[0];
-      tid = t.identifier;
-      track(t);
-      navigator.vibrate?.(6);
-    }, opt);
-    dpad.addEventListener('touchmove', (e) => { e.preventDefault(); const t = find(e); if (t) track(t); }, opt);
-    const endD = (e) => { e.preventDefault(); if (find(e)) { tid = null; apply(new Set()); } };
-    dpad.addEventListener('touchend', endD, opt);
-    dpad.addEventListener('touchcancel', endD, opt);
+    // Joystick flotante: aparece donde apoyas el pulgar (en toda la zona izquierda) y la base
+    // te sigue si arrastras más allá del borde, así no hace falta mirar dónde está.
+    const zl = pad.querySelector('.arcade-padl'), stick = zl.querySelector('.arcade-stick');
+    if (stick) {
+      const knob = stick.firstElementChild;
+      let tid = null, cx = 0, cy = 0, dirs = new Set();
+      const apply = (next) => {
+        for (const d of dirs) if (!next.has(d)) this._key(d, false);
+        for (const d of next) if (!dirs.has(d)) this._key(d, true);
+        if (next.size && !dirs.size) navigator.vibrate?.(5);
+        dirs = next;
+      };
+      const place = (x, y) => {
+        const z = zl.getBoundingClientRect(), r = stick.offsetWidth / 2, rh = stick.offsetHeight / 2;
+        cx = Math.max(z.left + r * 0.6, Math.min(z.right - r * 0.6, x));
+        cy = Math.max(z.top + rh * 0.6, Math.min(z.bottom - rh * 0.6, y));
+        stick.style.left = cx - z.left + 'px'; stick.style.top = cy - z.top + 'px';
+      };
+      const track = (t) => {
+        const R = stick.offsetWidth * 0.36;
+        let dx = t.clientX - cx, dy = onlyH ? 0 : t.clientY - cy;
+        const m = Math.hypot(dx, dy);
+        if (m > R * 1.25) { // la base sigue al dedo
+          const z = zl.getBoundingClientRect(), k = (m - R * 1.25) / m;
+          cx += dx * k; cy += dy * k;
+          stick.style.left = cx - z.left + 'px'; stick.style.top = cy - z.top + 'px';
+          dx = t.clientX - cx; dy = onlyH ? 0 : t.clientY - cy;
+        }
+        const d = Math.hypot(dx, dy), s = d > R ? R / d : 1;
+        knob.style.transform = `translate(${dx * s}px,${dy * s}px)`;
+        if (d < R * 0.3) return apply(new Set());
+        if (onlyH) return apply(new Set([dx < 0 ? 'left' : 'right']));
+        apply(new Set(OCTANTS[Math.round(Math.atan2(dy, dx) / (Math.PI / 4))]));
+      };
+      const reset = () => {
+        tid = null; apply(new Set());
+        stick.classList.remove('live'); knob.style.transform = '';
+        stick.style.left = stick.style.top = '';
+      };
+      const find = (e) => [...e.changedTouches].find((t) => t.identifier === tid);
+      zl.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (tid !== null) return;
+        const t = e.changedTouches[0];
+        tid = t.identifier;
+        stick.classList.add('live');
+        place(t.clientX, t.clientY);
+        track(t);
+      }, opt);
+      zl.addEventListener('touchmove', (e) => { e.preventDefault(); const t = find(e); if (t) track(t); }, opt);
+      const end = (e) => { e.preventDefault(); if (find(e)) reset(); };
+      zl.addEventListener('touchend', end, opt);
+      zl.addEventListener('touchcancel', end, opt);
+      this._stickReset = reset;
     }
 
-    // Botones A/B: multitáctil, se liberan cuando se levanta el último dedo.
-    for (const btn of pad.querySelectorAll('.arcade-btn')) {
-      const name = btn.dataset.btn;
-      const ids = new Set();
-      btn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        const was = ids.size;
-        for (const t of e.changedTouches) ids.add(t.identifier);
-        if (!was) { this._key(name, true); btn.classList.add('on'); navigator.vibrate?.(8); }
-      }, opt);
-      const endB = (e) => {
-        e.preventDefault();
-        for (const t of e.changedTouches) ids.delete(t.identifier);
-        if (!ids.size) { this._key(name, false); btn.classList.remove('on'); }
+    // Botones: toda la zona derecha es táctil; cada dedo pulsa el botón más cercano
+    // y puede deslizarse de uno a otro (saltar y atacar sin levantar el pulgar).
+    const zr = pad.querySelector('.arcade-padr'), btns = [...zr.querySelectorAll('.arcade-btn')];
+    if (btns.length) {
+      const owner = new Map(); // touch id → botón
+      const count = new Map(btns.map((b) => [b, 0]));
+      const nearest = (t) => {
+        let best = null, bd = Infinity;
+        for (const b of btns) {
+          const r = b.getBoundingClientRect(), d = Math.hypot(t.clientX - (r.left + r.width / 2), t.clientY - (r.top + r.height / 2));
+          if (d < bd) { bd = d; best = b; }
+        }
+        return best;
       };
-      btn.addEventListener('touchend', endB, opt);
-      btn.addEventListener('touchcancel', endB, opt);
+      const press = (b, on) => {
+        const n = count.get(b) + (on ? 1 : -1);
+        count.set(b, Math.max(0, n));
+        if (on && n === 1) { this._key(b.dataset.btn, true); b.classList.add('on'); navigator.vibrate?.(8); }
+        if (!on && n <= 0) { this._key(b.dataset.btn, false); b.classList.remove('on'); }
+      };
+      const set = (t) => {
+        const was = owner.get(t.identifier), now = nearest(t);
+        if (was === now) return;
+        if (was) press(was, false);
+        owner.set(t.identifier, now); press(now, true);
+      };
+      // Sin joystick, la columna izquierda también pulsa (p. ej. «Subir» con cualquier pulgar).
+      for (const z of stick ? [zr] : [zr, zl]) {
+      z.addEventListener('touchstart', (e) => { e.preventDefault(); for (const t of e.changedTouches) set(t); }, opt);
+      z.addEventListener('touchmove', (e) => { e.preventDefault(); for (const t of e.changedTouches) if (owner.has(t.identifier)) set(t); }, opt);
+      const end = (e) => {
+        e.preventDefault();
+        for (const t of e.changedTouches) { const b = owner.get(t.identifier); if (b) { owner.delete(t.identifier); press(b, false); } }
+      };
+      z.addEventListener('touchend', end, opt);
+      z.addEventListener('touchcancel', end, opt);
+      }
+      this._btnsReset = () => { owner.clear(); for (const b of btns) count.set(b, 0); };
     }
   }
 
@@ -552,6 +598,8 @@ export class ArcadePlayer {
   _releaseAll() {
     for (const name of [...this.pressed]) this._key(name, false);
     this.pad?.querySelectorAll('.on').forEach((el) => el.classList.remove('on'));
+    this._btnsReset?.();
+    if (this.pad) this._stickReset?.();
   }
 }
 
