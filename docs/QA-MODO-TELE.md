@@ -48,18 +48,19 @@ En una tele lenta, casi todo el retraso se debe a que el juego tarda en pintar c
 
 ## 4. Sesión larga de 20 minutos
 
-Datos en `long.json` del directorio de QA:
+Resultados de la prueba (sesión real de 20 min, 2 mandos):
 
-| Medida | Inicio | Final |
+| Medida | Inicio | Final (20 min: 12,3 en partida, 7,2 en lobby) |
 |---|---|---|
-| JSHeap de la tele (tras GC) | 1,41 MB | *ver abajo* |
-| Nodos DOM de la tele | 478 | |
-| JSHeap de cada mando | 0,75 MB | |
-| Peticiones REST de la tele, lobby | 30/min (cada 2 s; cada 4 s tras 5 min sin cambios) | |
-| Peticiones REST de la tele, en partida | 10/min (cada 6 s) | |
-| Peticiones REST de los mandos conectados | 0/min (todo va por WebRTC) | |
+| JSHeap de la tele (tras GC) | 1,41 MB | 1,63 MB |
+| Nodos DOM de la tele / listeners | 478 / 34 | 491 / 35 |
+| iframes en la tele | 1 | 1 (sin huérfanos) |
+| JSHeap de cada mando | 0,75 MB | 2,07 MB (ya 1,99 MB a los 2,5 min: escalón único al abrir el primer juego, no crece) |
+| Peticiones REST de la tele, lobby | | 20,8/min (cada 2 s; cada 4 s tras 5 min sin cambios) |
+| Peticiones REST de la tele, en partida | | 9,8/min (cada 6 s) |
+| Peticiones REST de los mandos conectados | | 0/min (todo va por WebRTC) |
 
-<!-- LONG -->
+Sin fugas apreciables, sin errores JS ni PHP, 0 respuestas 503. Antes el lobby sondeaba cada 1 s (≈58/min); se bajó a 2 s.
 
 ## 5. Smart TV (agentes Tizen 6 y webOS, sin mando del móvil)
 
