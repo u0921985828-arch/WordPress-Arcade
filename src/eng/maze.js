@@ -120,7 +120,7 @@ function ghostPick(f) {
   if (!opts.length) opts = DIRS.filter((d) => walk(f.x + D[d][0], f.y + D[d][1]));
   if (f.scared) return k.pick(opts);
   const [tx, ty] = ghostTarget(f); let bd = null, bv = Infinity;
-  for (const d of opts) { const v = Math.hypot(f.x + D[d][0] - tx, f.y + D[d][1] - ty) + Math.random() * (level < 3 ? 1.2 : 0.4); if (v < bv) { bv = v; bd = d; } }
+  for (const d of opts) { const v = Math.hypot(f.x + D[d][0] - tx, f.y + D[d][1] - ty) + Math.random() * Math.max(0.4, 1.5 - (level - 1) * 0.2); if (v < bv) { bv = v; bd = d; } }
   return bd;
 }
 const cellX = (x) => BX + (x + 0.5) * S, cellY = (y) => BY + (y + 0.5) * S;
@@ -145,7 +145,7 @@ function updMuncher(dt) {
   if (stepEnt(pl, dt, (e) => { for (const d of [e.next, e.dir]) if (d && walk(e.x + D[d][0], e.y + D[d][1])) return d; return null; })) eatAt(pl.px, pl.py);
   if (clearT > 0) return;
   if (fright > 0 && (fright -= dt) <= 0) foes.forEach((f) => { f.scared = false; });
-  const base = Math.min(6.8, 4.4 + level * 0.3);
+  const base = Math.min(6.8, 4.1 + level * 0.3);
   for (const f of foes) {
     if (f.mode === 'house') { f.fx = f.x; f.fy = f.y + Math.sin(t * 7 + f.id) * 0.18; if ((f.rel -= dt) <= 0) f.mode = 'go'; }
     else { f.sp = f.mode === 'eyes' ? 12 : base * (f.scared ? 0.55 : 1); stepEnt(f, dt, ghostPick); }
@@ -162,8 +162,8 @@ const GEMC = ['#4fe3ff', '#ff5fa2', '#7cf78a', '#ffc53d'];
 function buildDigger() {
   N = 15; S = 32; BX = 0; BY = TOP; g = Array.from({ length: N }, () => Array(N).fill(2));
   for (let x = 0; x < N; x++) g[0][x] = 0; for (let y = 1; y < 4; y++) g[y][7] = 0;
-  const nf = Math.min(6, 1 + level), sp = Math.min(4.4, 2.3 + level * 0.25);
-  for (let i = 0; i < nf; i++) { const x = k.ri(2, N - 3), y = k.ri(5, N - 2); for (let j = -2; j <= 2; j++) g[y][x + j] = 0; const f = ent(x, y, sp); f.id = i; f.base = sp; f.gh = false; f.ghost = 0; f.gcd = k.rnd(5, 9); foes.push(f); }
+  const nf = Math.min(6, 1 + level), sp = Math.min(4.4, 2.2 + level * 0.25);
+  for (let i = 0; i < nf; i++) { const x = k.ri(2, N - 3), y = k.ri(5, N - 2); for (let j = -2; j <= 2; j++) g[y][x + j] = 0; const f = ent(x, y, sp); f.id = i; f.base = sp; f.gh = false; f.ghost = 0; f.gcd = k.rnd(5, 9) + Math.max(0, 4 - level * 2); foes.push(f); }
   const cells = []; for (let y = 3; y < N; y++) for (let x = 0; x < N; x++) if (g[y][x] === 2) cells.push([x, y]);
   k.shuffle(cells); for (let i = 0; i < 12 + level * 2 && cells.length; i++) { const [x, y] = cells.pop(); items.push({ x, y, t: 'gem', c: i % 4 }); }
   const nr = Math.min(8, 3 + level); for (const [x, y] of cells) { if (rocks.length >= nr) break;
@@ -231,7 +231,8 @@ function buildIso() {
   const cells = []; for (let y = 1; y < N; y++) for (let x = 1; x < N; x++) if (!g[y][x] && x + y > Math.max(4, N * 0.6) && !(x === exitC[0] && y === exitC[1])) cells.push([x, y]);
   k.shuffle(cells); for (let i = 0; i < need; i++) { const [x, y] = cells.pop(); items.push({ x, y, t: 'key' }); }
   if (DG) { const kinds = level >= 3 ? ['slime', 'ghost', 'knight'] : level >= 2 ? ['slime', 'ghost'] : ['slime'];
-    for (let i = 0; i < 3 + level && cells.length; i++) { const [x, y] = cells.pop(); const f = ent(x, y, Math.min(4, 2.2 + level * 0.25)); f.id = i; f.kind = kinds[i % kinds.length]; f.hp = f.max = f.kind === 'knight' ? 3 : 2; f.stun = 0; f.fl = 0; foes.push(f); } }
+    const dm = distMap(1, 1, walk), far = cells.filter(([x, y]) => (dm[x + ',' + y] || 0) >= 10), pool = far.length >= 3 ? far : cells; // lejos de la entrada
+    for (let i = 0; i < Math.min(11, 2 + level) && pool.length; i++) { const [x, y] = pool.pop(); if (pool !== cells) cells.splice(cells.findIndex((q) => q[0] === x && q[1] === y), 1); const f = ent(x, y, Math.min(4, 2 + level * 0.25)); f.id = i; f.kind = kinds[i % kinds.length]; f.hp = f.max = f.kind === 'knight' ? 3 : 2; f.stun = 1.5; f.fl = 0; foes.push(f); } }
   else for (let i = 0; i < 5 && cells.length; i++) { const [x, y] = cells.pop(); drops.push({ x, y, t: 'coin' }); }
   torches = []; if (DG) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (g[y][x] === 1 && rnd(x * 31 + y * 7 + level) < 0.07) { if (walk(x, y + 1)) torches.push([x, y, -1]); else if (walk(x + 1, y)) torches.push([x, y, 1]); }
   cam = { x: PX(1, 1), y: PY(1, 1) }; ready = 0; msg = `Nivel ${level}`; msgT = 1.6;

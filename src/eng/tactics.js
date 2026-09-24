@@ -27,9 +27,9 @@ function cellAt(px, py) { let best = null, bd = HEX ? S * 0.95 : S * 0.72; for (
 
 function build() {
   rocks = new Set(); for (let i = 0; i < 8 + level; i++) rocks.add(P(k.ri(2, LONG - 3), k.ri(0, SIDE - 1)).join());
-  const mk = (t, x, y, team) => ({ t, x, y, team, hp: TYPES[t].hp + (team === 'ai' ? level - 1 : 0), max: TYPES[t].hp + (team === 'ai' ? level - 1 : 0), moved: false, acted: false, face: team === 'me' ? 1 : -1, hf: 0, ph: Math.random() * 6 });
+  const mk = (t, x, y, team) => ({ t, x, y, team, hp: TYPES[t].hp + (team === 'ai' ? Math.min(8, level - 2) : 0), max: TYPES[t].hp + (team === 'ai' ? Math.min(8, level - 2) : 0), moved: false, acted: false, face: team === 'me' ? 1 : -1, hf: 0, ph: Math.random() * 6 });
   units = [mk('K', ...P(0, 2), 'me'), mk('A', ...P(0, 4), 'me'), mk('M', ...P(0, 6), 'me'), mk('K', ...P(LONG - 1, 1), 'ai'), mk('K', ...P(LONG - 1, 5), 'ai'), mk('A', ...P(LONG - 1, 3), 'ai')];
-  if (level > 1) units.push(mk('M', ...P(LONG - 1, 7), 'ai')); if (level > 3) units.push(mk('A', ...P(LONG - 2, 0), 'ai'));
+  if (level > 2) units.push(mk('M', ...P(LONG - 1, 7), 'ai')); if (level > 4) units.push(mk('A', ...P(LONG - 2, 0), 'ai'));
   units.forEach((u) => rocks.delete(u.x + ',' + u.y));
   // que ninguna unidad quede encerrada entre rocas
   const me = units[0], dd = dists(me.x, me.y, (x, y) => !rocks.has(x + ',' + y)); for (const u of units) if (dd[u.x + ',' + u.y] === undefined) { nbs(u.x, u.y).forEach(([x, y]) => rocks.delete(x + ',' + y)); }
@@ -68,6 +68,8 @@ function tapCell(cell) {
   sel = null; reach = null;
 }
 /* IA: una unidad cada vez, con foco visible */
+/* IA que mejora con la batalla: al principio a veces no remata al más débil (1: 45 % → 100 % en la 7). */
+function aiTarget(u) { const ok = units.filter((f) => f.team === 'me' && f.hp > 0 && inRange(u, f)); if (!ok.length) return null; return Math.random() < Math.min(1, 0.45 + (level - 1) * 0.1) ? ok.sort((a, b) => a.hp - b.hp)[0] : k.pick(ok); }
 function aiThink(u) {
   const foes = units.filter((q) => q.team === 'me' && q.hp > 0); if (!foes.length) return null;
   let tg = foes.filter((f) => inRange(u, f)).sort((a, b) => a.hp - b.hp)[0]; if (tg) return { tg };
@@ -98,7 +100,7 @@ k.run((dt) => {
     if (!u) { turn = 'me'; aiFocus = null; log = 'Tu turno'; banner = { txt: 'Tu turno', t: 1 }; units.forEach((q) => { q.moved = false; q.acted = false; }); return; }
     if (aiStep === 0) { aiFocus = u; aiStep = 1; aiT = 0.35; log = `${TYPES[u.t].n} rival piensa…`; }
     else if (aiStep === 1) { const pl = aiThink(u); aiStep = 2; aiT = 0.15; if (pl && pl.move) moveTo(u, pl.move[0], pl.move[1]); }
-    else { const foes = units.filter((q) => q.team === 'me' && q.hp > 0), tg = foes.filter((f) => inRange(u, f)).sort((a, b) => a.hp - b.hp)[0]; if (tg) attack(u, tg); aiQueue.shift(); aiStep = 0; aiT = 0.3; }
+    else { const tg = aiTarget(u); if (tg) attack(u, tg); aiQueue.shift(); aiStep = 0; aiT = 0.3; }
     return;
   }
   /* turno propio */

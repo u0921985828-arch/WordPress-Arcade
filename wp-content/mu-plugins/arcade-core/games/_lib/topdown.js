@@ -42,13 +42,16 @@ function place(minD, edge) {
   }
   return [p.x < W / 2 ? X1 - 40 : X0 + 40, p.y < H / 2 ? Y1 - 40 : Y0 + 40];
 }
+/* Curva de dificultad: 0 en la sala 1 → 1 hacia la sala 9 (suavizada). Velocidad, cadencia y balas enemigas escalan con ella. */
+const ramp = () => { const d = Math.min(1, (room - 1) / 8); return d * d * (3 - 2 * d); };
+const spK = () => 0.7 + 0.3 * ramp(), cdK = () => 1.6 - 0.6 * ramp(), bK = () => 0.8 + 0.2 * ramp();
 function pickType() { const f = TH.foes; if (M === 'zombie' && Math.random() < room * 0.02) return 'brute'; return k.pick(f); }
 function addFoe(type, x, y, boss) {
   const b = FOE[type], sc = 1 + (room - 1) * 0.12;
-  const f = { type, x, y, r: b[0] * (boss ? 2.1 : 1), hp: Math.round(b[1] * sc * (boss ? 10 : 1)), sp: b[2] * (boss ? 0.7 : 1), pts: b[3] * (boss ? 10 : 1), cd: k.rnd(0.9, 2), cd2: 1.5, a: 0, body: 0, kx: 0, ky: 0, fl: 0, ph: Math.random() * 6, boss, dash: 0, warn: 0, face: 1 };
+  const f = { type, x, y, r: b[0] * (boss ? 2.1 : 1), hp: Math.round(b[1] * sc * (boss ? 10 : 1)), sp: b[2] * (boss ? 0.7 : 1) * spK(), pts: b[3] * (boss ? 10 : 1), cd: k.rnd(0.9, 2) * cdK(), cd2: 1.5, a: 0, body: 0, kx: 0, ky: 0, fl: 0, ph: Math.random() * 6, boss, dash: 0, warn: 0, face: 1 };
   f.max = f.hp; foes.push(f); if (boss) bossF = f; return f;
 }
-function queue(type, boss, edge) { const [x, y] = place(boss ? 190 : 150, edge); pend.push({ type, x, y, t: 0.9 + (edge ? 0 : pend.length * 0.12), max: 0.9 + pend.length * 0.12, boss }); }
+function queue(type, boss, edge) { const [x, y] = place(boss ? 190 : 150, edge); const t0 = room === 1 && !edge ? 1.4 : 0.9; pend.push({ type, x, y, t: t0 + (edge ? 0 : pend.length * 0.12), max: t0 + pend.length * 0.12, boss }); }
 function buildRoom() {
   room++; walls = []; foes = []; shots = []; eshots = []; pend = []; drops = []; cleared = false; door = false; bossF = null; floorCv = null; clearT = 0;
   const isBoss = room % 5 === 0, nb = isBoss ? 2 : M === 'brawl' ? k.ri(0, 2) : M === 'arena' ? k.ri(1, 3) : k.ri(3, 6);
@@ -62,8 +65,8 @@ function buildRoom() {
   }
   quota = 0;
   if (isBoss) { queue(TH.boss, true); if (M === 'zombie') quota = 6; }
-  else if (M === 'zombie') { quota = 8 + room * 4; spawnT = 0.6; }
-  else { const n = tankM ? Math.min(5, 1 + Math.ceil(room / 2)) : M === 'arena' ? Math.min(10, 2 + room) : Math.min(14, 3 + room * 2); for (let i = 0; i < n; i++) queue(pickType()); }
+  else if (M === 'zombie') { quota = 6 + room * 4; spawnT = 1.5; }
+  else { const n = tankM ? Math.min(5, 1 + Math.ceil(room / 2)) : M === 'arena' ? Math.min(10, 2 + room) : Math.min(14, 3 + Math.round((room - 1) * 1.4)); for (let i = 0; i < n; i++) queue(pickType()); }
   msg = `${TH.label} ${room}${isBoss ? ' · Jefe' : ''}`; msgT = 1.8;
 }
 function reset() {
@@ -89,7 +92,7 @@ function kill(f) {
   if (Math.random() < (f.boss ? 1 : 0.45)) drops.push({ k: 'coin', x: f.x, y: f.y, t: 9, v: f.boss ? 50 : 10 });
   if (Math.random() < (f.boss ? 1 : 0.07)) drops.push({ k: 'heart', x: f.x + 10, y: f.y + 4, t: 9 });
 }
-function fire(f, a, spd) { eshots.push({ x: f.x + Math.cos(a) * f.r, y: f.y + Math.sin(a) * f.r, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, life: 3.5, b: tankM ? 1 : 0, r: f.boss ? 6 : 5 }); }
+function fire(f, a, spd) { spd *= bK(); eshots.push({ x: f.x + Math.cos(a) * f.r, y: f.y + Math.sin(a) * f.r, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, life: 3.5, b: tankM ? 1 : 0, r: f.boss ? 6 : 5 }); }
 function openChoice() {
   const pool = ['rate', 'dmg', 'speed', 'hp', 'heal'].concat(melee ? ['reach'] : ['multi', 'pierce']).filter((o) => !(o === 'multi' && upg.multi >= 3) && !(o === 'heal' && p.hp >= p.max));
   choice = { opts: k.shuffle(pool).slice(0, 3), sel: 1, t: 0 }; k.sfx('coin');
@@ -122,7 +125,7 @@ k.run((dt) => {
   // apariciones anunciadas
   for (const q of pend) { q.t -= dt; if (q.t <= 0) { q.done = 1; addFoe(q.type, q.x, q.y, q.boss); k.burst(q.x, q.y, '#b98cff', 10, 120); } }
   pend = pend.filter((q) => !q.done);
-  if (quota > 0) { spawnT -= dt; if (spawnT <= 0 && foes.length + pend.length < 10 + room * 2) { spawnT = Math.max(0.35, 1.3 - room * 0.08); quota--; queue(pickType(), false, true); } }
+  if (quota > 0) { spawnT -= dt; if (spawnT <= 0 && foes.length + pend.length < 10 + room * 2) { spawnT = Math.max(0.4, 1.7 - room * 0.12); quota--; queue(pickType(), false, true); } }
   // objetivo más cercano
   let near = null, nd = 1e9; for (const f of foes) { const d = Math.hypot(f.x - p.x, f.y - p.y); if (d < nd) { nd = d; near = f; } }
   p.aim = near && (melee || nd < 380) ? Math.atan2(near.y - p.y, near.x - p.x) : tankM ? p.body : p.a;
@@ -167,17 +170,17 @@ k.run((dt) => {
     const dx = p.x - f.x, dy = p.y - f.y, d = Math.hypot(dx, dy) || 1, a = Math.atan2(dy, dx); f.a = a; f.face = dx < 0 ? -1 : 1;
     let vx = 0, vy = 0; const ghost = f.type === 'ghost' || f.type === 'bat' || f.type === 'eye';
     if (f.boss && melee) {
-      if (f.dash > 0) { f.dash -= dt; vx = f.dvx; vy = f.dvy; if (f.dash <= 0) f.cd = 2.2; }
+      if (f.dash > 0) { f.dash -= dt; vx = f.dvx; vy = f.dvy; if (f.dash <= 0) f.cd = 2.2 * cdK(); }
       else if (f.warn > 0) { f.warn -= dt; if (f.warn <= 0) { f.dash = 0.5; f.dvx = Math.cos(a) * 440; f.dvy = Math.sin(a) * 440; k.sfx('jump'); } }
       else { vx = Math.cos(a) * f.sp; vy = Math.sin(a) * f.sp; if (f.cd <= 0) f.warn = 0.6; }
     } else if (f.boss) {
       vx = Math.cos(a) * f.sp * 0.6; vy = Math.sin(a) * f.sp * 0.6;
-      if (f.cd <= 0) { f.cd = 2.6; for (let i = 0; i < 12; i++) fire(f, i / 12 * R2 + t, 150); k.sfx('shoot'); }
-      if (f.cd2 <= 0) { f.cd2 = 1.3; for (let i = -1; i <= 1; i++) fire(f, a + i * 0.2, 210); }
+      if (f.cd <= 0) { f.cd = 2.6 * cdK(); for (let i = 0; i < 12; i++) fire(f, i / 12 * R2 + t, 150); k.sfx('shoot'); }
+      if (f.cd2 <= 0) { f.cd2 = 1.3 * cdK(); for (let i = -1; i <= 1; i++) fire(f, a + i * 0.2, 210); }
     } else if (RANGED[f.type]) {
       const want = f.type === 'tank' ? 200 : 170, dir = d > want ? 1 : d < want - 50 ? -1 : 0, st = Math.sin(t * 0.9 + f.ph) * 0.8;
       vx = (Math.cos(a) * dir + Math.cos(a + 1.57) * st) * f.sp; vy = (Math.sin(a) * dir + Math.sin(a + 1.57) * st) * f.sp;
-      if (f.cd <= 0 && d < 420) { f.cd = f.type === 'tank' ? 2 : f.type === 'ghost' ? 2.6 : 2.1; fire(f, a, f.type === 'tank' ? 230 : 200); if (tankM) f.recoil = 0.12; }
+      if (f.cd <= 0 && d < 420) { f.cd = (f.type === 'tank' ? 2 : f.type === 'ghost' ? 2.6 : 2.1) * cdK(); fire(f, a, f.type === 'tank' ? 230 : 200); if (tankM) f.recoil = 0.12; }
     } else {
       let s2 = f.sp; if (f.type === 'slime' || f.type === 'mini') s2 *= Math.sin(t * 5 + f.ph) > 0 ? 1.7 : 0.15;
       const wob = f.type === 'bat' ? Math.sin(t * 4 + f.ph) * 0.9 : 0; vx = Math.cos(a + wob) * s2; vy = Math.sin(a + wob) * s2;
