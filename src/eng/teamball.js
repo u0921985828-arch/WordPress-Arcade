@@ -155,7 +155,8 @@ function aiField(b, dt) {
   } else {
     const mates = B.filter((o) => o.team === b.team), chaser = mates.sort((p, q) => hyp(p.x - ball.x, p.y - ball.y) - hyp(q.x - ball.x, q.y - ball.y))[0];
     const teamHas = own && own.team === b.team;
-    if (teamHas) { tx = clamp(own.x + s * 140, 40, FW - 40); ty = own.y < FH / 2 ? FH * 0.72 : FH * 0.28; run = 0.85; }
+    if (teamHas) { // apoyo: por delante si el poseedor está en su campo; si ataca, se queda de cierre algo retrasado y abierto
+      const og = goalX(1 - b.team), adv = (own.x - og) * s; tx = adv < FW * 0.5 ? clamp(own.x + s * 130, 40, FW - 40) : clamp(own.x - s * (90 - 40 * skill), 40, FW - 40); ty = own.y < FH / 2 ? FH * 0.7 : FH * 0.3; run = 0.85; }
     else if (chaser === b || b.recv > 0 || (chaser.ctl >= 0 && hyp(b.x - ball.x, b.y - ball.y) < 60)) {
       const lead = own ? 0.15 : clamp(hyp(ball.vx, ball.vy) / 600, 0, 0.5); tx = ball.x + ball.vx * lead; ty = ball.y + ball.vy * lead;
       if (own && own.team !== b.team && hyp(own.x - b.x, own.y - b.y) < 42 && b.cd <= 0 && Math.random() < dt * (2 + skill * 6)) { b.a = Math.atan2(own.y - b.y, own.x - b.x); tackle(b); }
@@ -203,7 +204,7 @@ function stepField(dt) {
           else if (mate && mate.ctl < 0 && hyp(mate.x - ball.x, mate.y - ball.y) < hyp(b.x - ball.x, b.y - ball.y)) { mate.ctl = b.ctl; b.ctl = -1; k.sfx('click'); } }
       }
     } else { const r = aiField(b, dt); if (r) { dir = { x: r.x, y: r.y }; spd = r.sp; } }
-    if (b.chg >= 0) spd *= 0.6;
+    if (b.chg >= 0) spd *= 0.6; else if (ball.own === b) spd *= 0.86; // con el balón se corre algo menos
     moveWalker(b, dir && hyp(dir.x, dir.y) > 0.05 ? dir : null, dt, spd * (dir ? Math.min(1, hyp(dir.x, dir.y) + 0.2) : 1));
     if (dir && b.chg >= 0 && b.ctl >= 0) b.a = Math.atan2(dir.y, dir.x);
   }

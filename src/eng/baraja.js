@@ -525,7 +525,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
   const SPR = {}; let RES = 160;
   function spr(id) { const key = id + '@' + RES; if (SPR[key]) return SPR[key]; const w = RES, h = Math.round(w * 1.55), cv = document.createElement('canvas'); cv.width = w; cv.height = h; const g = cv.getContext('2d'); g.scale(w / 100, h / 155); if (id === 'back') drawBack(g); else drawFace(g, BJ.CARDS[id]); return (SPR[key] = cv); }
   const URL = {};
-  function cardURL(id) { if (URL[id]) return URL[id]; const cv = document.createElement('canvas'); cv.width = 96; cv.height = 149; const g = cv.getContext('2d'); g.scale(0.96, 149 / 155); drawFace(g, BJ.CARDS[id]); let u = cv.toDataURL('image/webp', 0.85); if (!/^data:image\/webp/.test(u)) u = cv.toDataURL('image/png'); return (URL[id] = u); }
+  function cardURL(id) { if (URL[id]) return URL[id]; const cv = document.createElement('canvas'); cv.width = 96; cv.height = 149; const g = cv.getContext('2d'); g.scale(0.96, 149 / 155); drawFace(g, BJ.CARDS[id]); let u = cv.toDataURL('image/webp', 0.72); if (!/^data:image\/webp/.test(u)) { /* Safari no codifica webp: JPEG con esquinas oscuras (PNG pesaría demasiado para el canal) */ const j = document.createElement('canvas'); j.width = 96; j.height = 149; const h = j.getContext('2d'); h.fillStyle = '#1a1530'; h.fillRect(0, 0, 96, 149); h.drawImage(cv, 0, 0); u = j.toDataURL('image/jpeg', 0.7); } return (URL[id] = u); }
   const setRes = () => { RES = Math.max(96, Math.min(230, Math.round(CW * k.scale * (devicePixelRatio || 1)))); };
   setRes(); addEventListener('resize', () => { setRes(); clearTimeout(window.__ot); window.__ot = setTimeout(() => { if ((innerHeight > innerWidth) !== PORT && k.st !== 'play') location.reload(); }, 400); });
 
@@ -912,7 +912,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     label2(k.party ? 'Joystick: elegir · A: cambiar / repartir' : 'Toca o usa flechas y Espacio', CX, g.y + g.h + 22, 13, '#cfe8d8');
     if (k.party && humans().length) label2(`Jugáis ${humans().length} con móvil · la CPU rellena el resto`, CX, R.top - 20, 15, '#fff3c4');
   }
-  window.__bj = { BJ, W, H, get S() { return S; }, get ui() { return ui; }, get hits() { return HITS; }, get foc() { return foc; }, get finished() { return finished; } }; // para pruebas
+  window.__bj = { BJ, W, H, get S() { return S; }, get ui() { return ui; }, get hits() { return HITS; }, get foc() { return foc; }, get kbd() { return kbd; }, get finished() { return finished; } }; // para pruebas
   k.run(update, draw);
   k.show(CFG.title, CFG.help);
 })();
