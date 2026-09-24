@@ -86,7 +86,7 @@ G = {
  'neon-drift': ('road', dict(mode='race', theme='neon', help='Acelera y gira fuerte para derrapar. Pisa las flechas cian para un turbo. 3 vueltas.')),
  'canyon-kart': ('road', dict(mode='race', theme='canyon', help='↑ acelerar, ← → girar, ↓ frenar. Salirte de la pista frena mucho. Usa los turbos. 3 vueltas.')),
  'mini-golf-3d': ('golf', dict(mode='walls')), 'putt-island': ('golf', dict(mode='island')),
- 'iso-maze': ('maze', dict(mode='iso', help='Desliza, arrastra o usa las flechas para moverte. Recoge las 3 llaves y sal por la baldosa verde.')),
+ 'iso-maze': ('maze', dict(mode='iso', help='Desliza, arrastra o usa las flechas para moverte. Recoge las 3 llaves y sal por la baldosa verde antes de que se acabe el tiempo.')),
  'crystal-labyrinth': ('raycast', dict()),
  'iso-dungeon-explorer': ('maze', dict(mode='dungeon', iso=['#2b2233', '#b07a55', '#7a4f35', '#5f3c28'], help='Flechas o arrastra para moverte; A o toca para dar un tajo a los monstruos vecinos. Recoge las 3 llaves y sal.')),
  'voxel-runner': ('road', dict(mode='lanes', theme='voxel', help='Desliza a los lados para cambiar de carril y hacia arriba (o toca) para saltar las barras.')),

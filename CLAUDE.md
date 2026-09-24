@@ -77,6 +77,7 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
 - Todos los motores cargan `art.js` (`deps_of` en build_games.py).
 
 Todos los motores generados están rehechos con arte ART.
+- QA 1.15 (bots por juego en 390×844 y 800×450): damas con alfa-beta prof. 4 y tablas a 40 movimientos; reversi con jugadas barajadas; avisos «Sin movimientos»/«Caja atascada» en color sort y sokoban; iso-maze con límite de tiempo; drone-flight con 3 primeros anillos fáciles; ping pong con CPU que falla; `k.end` muestra «¡Nuevo récord!» con confeti (paddle, golf, darts y pool lo hacen en su pantalla propia).
 
 ## Reglas ya aplicadas (no romper)
 Spider 2 palos (104 cartas); FreeCell con supermovimiento (celdas+1)·2^columnas; Klondike robo 1; Pyramid 2 reciclados; TriPeaks con K-A circular; dardos 501 con cierre en doble o bull; ping pong a 11 con 2 de diferencia; air hockey a 7; damas: captura obligatoria, multisalto y la coronación termina el turno; bolos con puntuación oficial de 10 frames; minigolf par 3 y máximo 8 golpes; póker de dados con ranking español; Tetra con bolsa de 7, pieza fantasma y límite de 15 reinicios del bloqueo; Pac-Man sin fantasmas comestibles tras morir; invulnerabilidad al reaparecer en laberintos.
