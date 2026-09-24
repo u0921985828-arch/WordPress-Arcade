@@ -244,7 +244,7 @@ function endRound() {
   if (win && win.wins >= WINS) {
     const hu = P.filter((q) => !q.cpu);
     if (hu.length === 1 && !win.cpu) lsSet('cpu:' + ID, Math.min(10, cpuLv + 1));
-    return k.podium(P.map((q) => ({ p: q.p, score: q.wins })), { fmt: (s) => s + (s === 1 ? ' ronda' : ' rondas'), head: `¡Gana ${win.cpu ? 'la CPU' : win.name === 'Tú' ? 'tu pozo' : win.name}!` });
+    return k.podium(P.map((q) => ({ p: q.p, score: q.wins })), { fmt: (s) => s + (s === 1 ? ' ronda' : ' rondas'), head: win.cpu ? '¡Gana la CPU!' : hu.length === 1 ? '¡Has ganado el duelo!' : `¡Gana ${win.name}!` });
   }
   startRound();
 }

@@ -138,7 +138,7 @@ function resolveAtk(f) {
     if (A.ang < 0) { dir = g.x >= f.x ? 1 : -1; ang = clamp(Math.atan2(f.y - g.y + 20, Math.abs(g.x - f.x) + 1), 0.35, 1.2); }
     if (giant) dmg = Math.round(dmg * 1.4);
     applyHit(g, f.p, dmg, base, gr, ang, dir, mul);
-    if (giant && --f.item.uses <= 0) { puff(f.x, f.y - 30, 14, '#fff', 200); f.item = null; k.float('¡Se rompió!', f.x, f.y - 70, '#fff'); }
+    if (giant && f.item && --f.item.uses <= 0) { puff(f.x, f.y - 30, 14, '#fff', 200); f.item = null; k.float('¡Se rompió!', f.x, f.y - 70, '#fff'); }
   }
 }
 function throwItem(f) {
