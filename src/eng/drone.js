@@ -1,9 +1,12 @@
 /* Drone Flight: atraviesa los anillos en 3D. Proyección en perspectiva (F / profundidad); el dron vuela en el plano z. */
 const k = Kit({ w: 640, h: 360, title: CFG.title, bg: '#0a1030' }), c = k.ctx, F = 300, OUT = ART.OUT;
+/* Dificultad: de 600 a 1400 u/s en ~3,5 min (suavizado); anillos más juntos, pequeños y desplazados con el progreso.
+ * Antes: 900 u/s + 8/s sin tope, separación 900→600 y radio 140→90 a los 80-100 s. */
+const V0 = 600, V1 = 1400, DIF = () => { const d = Math.min(1, t / 210); return d * d * (3 - 2 * d); };
 let d, rings, z, speed, score, lives, t, combo, parts, camX, camY, streaks, passed;
-function reset() { d = { x: 0, y: 0, vx: 0, vy: 0 }; rings = []; z = 0; speed = 900; score = 0; lives = 3; t = 0; combo = 0; parts = []; camX = 0; camY = -50; streaks = []; passed = 0;
+function reset() { d = { x: 0, y: 0, vx: 0, vy: 0 }; rings = []; z = 0; speed = V0; score = 0; lives = 3; t = 0; combo = 0; parts = []; camX = 0; camY = -50; streaks = []; passed = 0;
   // arranque justo: el primer anillo está frente al dron y los siguientes se separan poco a poco
-  let rz = 2600, rx = 0, ry = 0; for (let i = 0; i < 12; i++) { const sc = Math.min(1, i / 5); rx = k.clamp(rx + k.rnd(-260, 260) * sc, -500, 500); ry = k.clamp(ry + k.rnd(-160, 160) * sc, -260, 260); rings.push({ x: rx, y: ry, z: rz, r: i < 3 ? 170 : 140 }); rz += i < 3 ? 1100 : 900; } }
+  let rz = 2300, rx = 0, ry = 0; for (let i = 0; i < 12; i++) { const sc = Math.min(1, i / 5); rx = k.clamp(rx + k.rnd(-260, 260) * sc, -500, 500); ry = k.clamp(ry + k.rnd(-160, 160) * sc, -260, 260); rings.push({ x: rx, y: ry, z: rz, r: i < 3 ? 170 : 140 }); rz += i < 3 ? 1100 : 900; } }
 reset(); k.show(CFG.title, 'Guía el dron a través de los anillos. Arrastra o usa las flechas. Pasar cerca del centro da más puntos y encadena combos.');
 const mk = (w, h, f) => { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const g = cv.getContext('2d'); g.scale(2, 2); g.lineJoin = 'round'; f(g); return cv; };
 const rs = (s) => { const x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -18,7 +21,7 @@ function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"
 k.run((dt) => {
   for (const s of streaks) s.l -= dt; streaks = streaks.filter((s) => s.l > 0);
   if (!k.gate(reset)) return;
-  t += dt; speed += dt * 8; z += speed * dt;
+  t += dt; const e = DIF(); speed = V0 + (V1 - V0) * e; z += speed * dt;
   let ax = (k.held.has('right') ? 1 : 0) - (k.held.has('left') ? 1 : 0), ay = (k.held.has('down') ? 1 : 0) - (k.held.has('up') ? 1 : 0);
   if (k.ptr.down) { ax = k.clamp((k.ptr.x - k.ptr.sx) / 60, -1, 1); ay = k.clamp((k.ptr.y - k.ptr.sy) / 60, -1, 1); }
   d.vx += (ax * 900 - d.vx) * Math.min(1, dt * 4); d.vy += (ay * 700 - d.vy) * Math.min(1, dt * 4); d.x = k.clamp(d.x + d.vx * dt, -600, 600); d.y = k.clamp(d.y + d.vy * dt, -320, 320);
@@ -28,7 +31,7 @@ k.run((dt) => {
       k.burst(sx, sy, center ? '#f2d15c' : '#5ce1e6', center ? 24 : 12, 220); k.float(center ? `¡Centro! +${pts}` : `+${pts}`, sx, sy - 40, center ? '#f2d15c' : '#fff'); }
     else { combo = 0; lives--; r.miss = true; navigator.vibrate && navigator.vibrate(110); k.float('¡Fallo!', 320, 120, '#ff5f7a'); if (lives <= 0) return k.lose(CFG.id, score, 'Sin batería', `${passed} anillos`); } }
   for (const r of rings) if (r.pt) r.pt = Math.max(0, r.pt - dt);
-  rings = rings.filter((r) => r.z > z - 240); while (rings.length < 12) { const l = rings[rings.length - 1]; rings.push({ x: k.clamp(l.x + k.rnd(-300, 300), -520, 520), y: k.clamp(l.y + k.rnd(-180, 180), -270, 270), z: l.z + Math.max(600, 900 - t * 3), r: Math.max(90, 140 - t * 0.6) }); }
+  rings = rings.filter((r) => r.z > z - 240); while (rings.length < 12) { const l = rings[rings.length - 1]; const e2 = DIF(), sx = 150 + 130 * e2, sy = 90 + 80 * e2; rings.push({ x: k.clamp(l.x + k.rnd(-sx, sx), -520, 520), y: k.clamp(l.y + k.rnd(-sy, sy), -270, 270), z: l.z + 1050 - 250 * e2, r: 150 - 50 * e2 }); }
   if (Math.random() < dt * 20) { const a = Math.random() * 6.283; streaks.push({ a, r: 120 + Math.random() * 200, l: 0.25 }); }
 }, () => {
   c.drawImage(SKY, 0, 0, 640, 190); const mo = ((-camX * 0.08) % MW + MW) % MW - MW; c.drawImage(MTN, mo, 120, MW, 70); c.drawImage(MTN, mo + MW, 120, MW, 70);

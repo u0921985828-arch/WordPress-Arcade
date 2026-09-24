@@ -1,7 +1,9 @@
 /* Stack Tower 3D (isométrico): toca para soltar el bloque y apilarlo. Lo que sobresale se corta y cae. */
 const k = Kit({ w: 360, h: 640, title: CFG.title, bg: '#1b1f3b' }), c = k.ctx, OUT = ART.OUT;
+/* velocidad del bloque: 125 → 340 u/s de forma suave hasta el piso 40 (antes 150 + 6 por piso hasta 360) */
+const SPD = (n) => { const d = Math.min(1, n / 40); return 125 + 215 * d * d * (3 - 2 * d); };
 let blocks, cur, score, axis, dir, speed, perfect, falling, camY, hue, rings, t, flashB, best;
-function reset() { blocks = [{ x: 0, z: 0, w: 120, d: 120, y: 0, hue: 200 }]; score = 0; axis = 'x'; speed = 150; perfect = 0; falling = []; rings = []; camY = 0; hue = 200; t = 0; flashB = null; best = k.best(CFG.id, 0); spawn(); }
+function reset() { blocks = [{ x: 0, z: 0, w: 120, d: 120, y: 0, hue: 200 }]; score = 0; axis = 'x'; speed = SPD(0); perfect = 0; falling = []; rings = []; camY = 0; hue = 200; t = 0; flashB = null; best = k.best(CFG.id, 0); spawn(); }
 function spawn() { const top = blocks[blocks.length - 1]; axis = axis === 'x' ? 'z' : 'x'; hue = (hue + 12) % 360; cur = { x: axis === 'x' ? -180 : top.x, z: axis === 'z' ? -180 : top.z, w: top.w, d: top.d, y: top.y + 1, hue }; dir = 1; }
 reset(); k.show(CFG.title, 'Toca para soltar el bloque. Lo que sobresale se corta. Encadena encajes perfectos para que el bloque vuelva a crecer. ¡Apila lo más alto posible!');
 const ISO = (x, y, z) => [180 + (x - z) * 0.87, 470 - (x + z) * 0.5 - y * 24 + camY];
@@ -36,7 +38,7 @@ k.run((dt) => {
       if (overlap <= 0) { falling.push({ ...cur, vy: 0, vx: dir * speed * 0.6, ax: key, a: 1.6 }); cur = null; k.shake(6); return k.lose(CFG.id, score, 'Se cayó la torre', `${blocks.length - 1} pisos`); }
       const cut = { ...cur }; if (delta > 0) { cut[key] = cur[key] + overlap; cut[size] = delta; cur[size] = overlap; } else { cut[size] = -delta; cur[key] = top[key]; cur[size] = overlap; }
       falling.push({ ...cut, vy: 0, vx: Math.sign(delta) * 40, ax: key, a: 1.4 }); score += 1; k.sfx('pop'); k.shake(2); }
-    blocks.push({ ...cur }); flashB = { b: blocks[blocks.length - 1], g: 0.7 }; speed = Math.min(360, speed + 6); spawn();
+    blocks.push({ ...cur }); flashB = { b: blocks[blocks.length - 1], g: 0.7 }; speed = SPD(blocks.length - 1); spawn();
   }
 }, () => {
   const lvl = blocks.length, g = c.createLinearGradient(0, 0, 0, 640); g.addColorStop(0, `hsl(${(hue + 30) % 360} 45% ${Math.max(8, 30 - lvl * 0.4)}%)`); g.addColorStop(1, `hsl(${hue} 40% ${Math.max(14, 38 - lvl * 0.3)}%)`); c.fillStyle = g; c.fillRect(0, 0, 360, 640);

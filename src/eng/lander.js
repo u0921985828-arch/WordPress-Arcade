@@ -5,6 +5,9 @@ const OUT = ART.OUT, R2 = 6.2832;
 const PORT = innerHeight > innerWidth, W = PORT ? 360 : 640, H = PORT ? 640 : 360;
 const G0 = PORT ? 560 : 300, GMIN = PORT ? 400 : 175, GMAX = PORT ? 610 : 340; // relieve: altura inicial y límites
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#05060d' }), c = k.ctx;
+/* Dificultad por nivel: deriva inicial 25 % → 100 % (nivel 6), combustible 100 → 40, y márgenes de aterrizaje amplios al principio
+ * (vertical 52 → 40, horizontal 31 → 25 desde el nivel 4). Antes: deriva completa, 92 de combustible y márgenes 40/25 desde el nivel 1. */
+let VYL = 40, VXL = 25;
 let s, ground, pads, fuel, maxFuel, score, level, landed, crash, smoke, debris, terrCv, tm, lastPts;
 const rnd = (q) => { const x = Math.sin(q * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 function off(w, h, draw) { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const g = cv.getContext('2d'); g.scale(2, 2); draw(g); return cv; }
@@ -15,7 +18,8 @@ function build() {
   ground = []; let y = G0;
   for (let x = 0; x <= W; x += 20) { const p = pads.find((q) => x > q.x && x <= q.x + q.w); if (!p) y = k.clamp(y + k.rnd(-28, 28) + (y > GMAX - 20 ? -10 : 0), GMIN, GMAX); ground.push([x, y]); }
   for (const p of pads) { const py = ground[p.x / 20][1]; for (let i = p.x / 20; i <= (p.x + p.w) / 20; i++) ground[i][1] = py; p.y = py; }
-  s = { x: PORT ? 70 : 200, y: PORT ? 90 : 40, vx: PORT ? 30 : 40, vy: 0, a: 0, thr: false }; maxFuel = fuel = Math.max(40, 100 - level * 8); landed = 0; crash = 0; smoke = []; debris = [];
+  const v0 = Math.min(1, 0.25 + (level - 1) * 0.15); s = { x: PORT ? 70 : 200, y: PORT ? 90 : 40, vx: (PORT ? 30 : 40) * v0, vy: 0, a: 0, thr: false }; maxFuel = fuel = Math.max(40, 108 - level * 8);
+  VYL = Math.max(40, 52 - (level - 1) * 4); VXL = Math.max(25, 31 - (level - 1) * 2); landed = 0; crash = 0; smoke = []; debris = [];
   terrCv = off(W, H, (g) => {
     g.beginPath(); g.moveTo(0, H); ground.forEach(([x, yy]) => g.lineTo(x, yy)); g.lineTo(W, H); g.closePath();
     const gr = g.createLinearGradient(0, GMIN - 5, 0, H); gr.addColorStop(0, '#8d8fa8'); gr.addColorStop(1, '#3b3d56'); g.fillStyle = gr; g.fill();
@@ -85,7 +89,7 @@ k.run((dt) => {
     if (Math.random() < dt * 40) { const d = 24 + Math.random() * 8; smoke.push({ x: s.x - Math.sin(s.a) * d, y: s.y + Math.cos(s.a) * d, vx: -Math.sin(s.a) * 60 + k.rnd(-15, 15) + s.vx * 0.3, vy: Math.cos(s.a) * 60 + s.vy * 0.3, r: 3, t: 0.7 }); } }
   s.vy += 25 * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.x = (s.x + W) % W;
   if (s.y + 13 >= footY()) {
-    const p = pads.find((q) => s.x > q.x + 5 && s.x < q.x + q.w - 5), ok = p && s.vy < 40 && Math.abs(s.vx) < 25 && Math.abs(s.a) < 0.3;
+    const p = pads.find((q) => s.x > q.x + 5 && s.x < q.x + q.w - 5), ok = p && s.vy < VYL && Math.abs(s.vx) < VXL && Math.abs(s.a) < 0.3;
     if (ok) { const soft = s.vy < 15; lastPts = Math.round((100 + fuel * 5) * level * p.m * (soft ? 1.5 : 1)); score += lastPts; landed = 2; s.thr = false; s.y = p.y - 13; s.vy = 0; s.vx = 0; s.a = 0;
       k.sfx('win'); k.confetti(); k.burst(s.x, p.y, '#dfe6f2', 14, 90); k.float(`+${lastPts}`, s.x, s.y - 30, '#fff27a'); if (soft) k.float('¡Suave! x1,5', s.x, s.y - 52, '#7cf7a0'); }
     else { crash = 1.1; s.thr = false; k.burst(s.x, s.y, '#ffb347', 50, 240); k.burst(s.x, s.y, '#fff', 20, 160); k.sfx('explode'); k.shake(10); k.flash('rgba(255,160,60,.4)');
@@ -110,7 +114,7 @@ k.run((dt) => {
   label(`Nivel ${level}`, 12, 8, 14, '#cfd8ff'); label(score, 12, 26, 20, '#fff');
   ART.rr(c, 12, 54, 124, 12, 6); c.fillStyle = 'rgba(20,20,40,.8)'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke(); const fw = fuel / maxFuel * 120; if (fw > 1) { ART.rr(c, 14, 56, fw, 8, 4); c.fillStyle = fuel / maxFuel > 0.25 ? '#7cf7a0' : Math.sin(tm * 10) > 0 ? '#ff6b6b' : '#a33'; c.fill(); c.fillStyle = 'rgba(255,255,255,.4)'; c.fillRect(17, 57, Math.max(0, fw - 6), 2); }
   if (PORT) label('Combustible', 12, 70, 11, '#b8b6e0'); else label('Combustible', 140, 53, 11, '#b8b6e0');
-  const bv = s.vy > 40, bh = Math.abs(s.vx) > 25, ba = Math.abs(s.a) > 0.3;
+  const bv = s.vy > VYL, bh = Math.abs(s.vx) > VXL, ba = Math.abs(s.a) > 0.3;
   const row = (txt, v, bad, y) => { label(txt, W - (PORT ? 66 : 80), y, 11, '#b8b6e0', 'right'); label(v, W - (PORT ? 8 : 12), y - 2, 14, bad ? '#ff6b6b' : '#7cf7a0', 'right'); };
   row('Vertical', Math.round(s.vy), bv, 10); row('Horizontal', Math.round(Math.abs(s.vx)), bh, 28); row('Inclinación', `${Math.round(Math.abs(s.a) * 57)}°`, ba, 46);
   if (landed) { const p = 2 - landed, sc = p < 0.2 ? 0.5 + p * 3 : 1.1; c.save(); c.translate(W / 2, PORT ? 230 : 130); c.scale(sc, sc); label('¡Aterrizaje!', 0, 0, 34, '#fff27a', 'center', 'middle'); label(`+${lastPts}`, 0, 34, 20, '#fff', 'center', 'middle'); c.restore(); }

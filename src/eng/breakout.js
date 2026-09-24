@@ -4,6 +4,9 @@ const OUT = ART.OUT, R2 = 6.2832;
 const k = Kit({ w: 480, h: 360, title: CFG.title, bg: '#16122b' }), c = k.ctx;
 const COLS = ['#ff6b6b', '#ffa94d', '#f2d15c', '#7cf7a0', '#5ce1e6', '#b98cff'], TOP = 30, WL = 8, WR = 472, BW = 42, BH = 16;
 const PW = { W: ['#5ce1e6', 'PALA ANCHA'], M: ['#ff5fa2', 'MULTIBOLA'], S: ['#7cf7a0', 'BOLA LENTA'], V: ['#ff6b6b', '+1 VIDA'] };
+/* Velocidad de bola: saque 230 (nivel 1) → 350 (nivel 9); tope 400 → 560 según nivel; +1,5 % por golpe de pala.
+ * Antes: saque 315 y tope 560 ya en el nivel 1 (+2 % por golpe). */
+const BCAP = () => 400 + 160 * Math.min(1, (level - 1) / 8);
 let pad, pwD, balls, bricks, drops, score, lives, level, wide, shards, banner, tm;
 function build() {
   bricks = []; const rows = Math.min(6, 3 + level), pat = (level - 1) % 4;
@@ -69,14 +72,14 @@ k.run((dt) => {
   pad = k.clamp(pad, WL + pw / 2, WR - pw / 2);
   for (const br of bricks) br.fl = Math.max(0, br.fl - dt);
   for (const b of balls) {
-    if (b.stuck) { b.x = pad; b.y = 330; if (k.hit.has('a') || k.tap || k.hit.has('up')) { b.stuck = false; b.vx = k.rnd(-120, 120); b.vy = -300 - level * 15; k.sfx('shoot'); } continue; }
+    if (b.stuck) { b.x = pad; b.y = 330; if (k.hit.has('a') || k.tap || k.hit.has('up')) { b.stuck = false; b.vx = k.rnd(-100, 100); b.vy = -(230 + Math.min(8, level - 1) * 15); k.sfx('shoot'); } continue; }
     const steps = 3, h = dt / steps;
     for (let s = 0; s < steps && !b.dead; s++) {
       b.x += b.vx * h; b.y += b.vy * h;
       if (b.x < WL + 5 || b.x > WR - 5) { b.vx *= -1; b.x = k.clamp(b.x, WL + 5, WR - 5); }
       if (b.y < TOP + 5) { b.vy = Math.abs(b.vy); b.y = TOP + 5; }
       if (b.vy > 0 && b.y > 332 && b.y < 344 && Math.abs(b.x - pad) < pw / 2 + 5) {
-        const sp = Math.min(560, Math.hypot(b.vx, b.vy) * 1.02), a = (b.x - pad) / (pw / 2) * 1.05;
+        const sp = Math.min(BCAP(), Math.hypot(b.vx, b.vy) * 1.015), a = (b.x - pad) / (pw / 2) * 1.05;
         b.vx = Math.sin(a) * sp; b.vy = -Math.cos(a) * sp; b.y = 331; k.sfx('click'); k.burst(b.x, 336, '#5ce1e6', 4, 80);
       }
       for (const br of bricks) if (!br.dead && b.x > br.x - 5 && b.x < br.x + 45 && b.y > br.y - 5 && b.y < br.y + 21) {

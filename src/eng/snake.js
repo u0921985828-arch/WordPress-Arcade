@@ -116,7 +116,7 @@ function reset() {
   dir = PORT ? 'up' : 'right'; const d = DIRS[dir], sx = PORT ? Math.floor(COLS / 2) : 6, sy = PORT ? ROWS - 6 : Math.floor(ROWS / 2);
   snake = []; for (let i = 0; i < 4; i++) snake.push({ x: sx - d[0] * i, y: sy - d[1] * i });
   prev = snake.map((s) => ({ x: s.x - d[0], y: s.y - d[1] }));
-  step = 0.15; acc = step * 0.999; foods = []; rocks = [];
+  step = 1 / 4.5; acc = step * 0.999; foods = []; rocks = [];
   buildLevel(); spawnFood('apple');
 }
 
@@ -184,7 +184,9 @@ function update(dt) {
   input();
   for (let i = foods.length - 1; i >= 0; i--) { const f = foods[i]; if (f.max && (f.life -= dt) <= 0) { k.burst(cx(f.x), cy(f.y), '#fff', 8, 80); foods.splice(i, 1); } }
   slowT = Math.max(0, slowT - dt);
-  step = Math.max(0.062, 0.15 - (level - 1) * 0.011 - eaten * 0.0012) * (slowT > 0 ? 1.45 : 1);
+  /* velocidad continua por manzanas comidas: 4,5 casillas/s al empezar → 11,5 hacia la manzana 64 (nivel 9) */
+  const dq = Math.min(1, eatenTotal / 64);
+  step = 1 / (4.5 + 7 * dq) * (slowT > 0 ? 1.45 : 1);
   for (const b of bulges) b.d += dt / step; bulges = bulges.filter((b) => b.d < snake.length + 1);
   acc += dt; if (acc >= step) { acc -= step; if (acc > step) acc = 0; tick(); }
 }

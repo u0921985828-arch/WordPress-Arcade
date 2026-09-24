@@ -12,13 +12,16 @@ const DD = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 function build() {
   NX = Math.min(14, 8 + level); NY = Math.min(9, 5 + Math.floor(level / 2));
   // Se repite hasta encontrar un nivel resoluble (BFS); tras 300 intentos se relaja la distancia mínima
+  /* recorrido mínimo del nivel en una franja creciente: 5-8 (nivel 1), 6-9, 8-11 … hasta 14-17 desde el nivel 7 (antes ≥7 y la meta más lejana posible)
+   * y tablero más lleno al principio (56 % → 35 %) */
+  const LO = Math.min(14, 3 + Math.round(level * 1.5)), HI = LO + 3;
   for (let tries = 0; ; tries++) {
-    tiles = new Set(); let x = 1, y = Math.floor(NY / 2); const target = Math.floor(NX * NY * (0.5 - Math.min(0.15, level * 0.02)));
+    tiles = new Set(); let x = 1, y = Math.floor(NY / 2); const target = Math.floor(NX * NY * (0.56 - Math.min(0.21, level * 0.03)));
     while (tiles.size < target) { tiles.add(x + ',' + y); const d = k.pick([[1, 0], [1, 0], [0, 1], [0, -1], [-1, 0]]); x = k.clamp(x + d[0], 0, NX - 1); y = k.clamp(y + d[1], 0, NY - 1); if (Math.random() < 0.3) tiles.add(k.clamp(x + 1, 0, NX - 1) + ',' + y); }
     const start = { x: 1, y: Math.floor(NY / 2), o: 0 }; if (!ok(start)) continue;
     const K = (s) => s.x + ',' + s.y + ',' + s.o, seen = new Map([[K(start), 0]]), q = [start]; let far = null, fd = 0;
-    while (q.length) { const s = q.shift(), d = seen.get(K(s)); if (s.o === 0 && d > fd && d >= 4) { far = s; fd = d; } for (const dd of Object.values(DD)) { const n = roll(s, dd); if (ok(n) && !seen.has(K(n))) { seen.set(K(n), d + 1); q.push(n); } } }
-    if (far && fd >= (tries < 300 ? Math.min(14, 5 + level * 2) : 4)) { st = start; goal = [far.x, far.y]; par = fd; break; }
+    while (q.length) { const s = q.shift(), d = seen.get(K(s)); if (s.o === 0 && d > fd && d >= 4 && (tries >= 300 || d <= HI)) { far = s; fd = d; } for (const dd of Object.values(DD)) { const n = roll(s, dd); if (ok(n) && !seen.has(K(n))) { seen.set(K(n), d + 1); q.push(n); } } }
+    if (far && fd >= (tries < 300 ? LO : 4)) { st = start; goal = [far.x, far.y]; par = fd; break; }
   }
   moves = 0; fall = 0; anim = null; queue = null; lastMove = 0; layout(); bake();
 }

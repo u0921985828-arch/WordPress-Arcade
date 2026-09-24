@@ -16,7 +16,11 @@ function shade(r) { const R = Math.ceil(r * 1.6); return mk(R * 2, R * 2, (g) =>
     g.fillStyle = 'rgba(10,5,30,.35)'; g.beginPath(); g.rect(cx - r, cy - r, r * 2, r * 2); g.arc(cx - r * 0.22, cy - r * 0.22, r * 1.02, 0, 6.283); g.fill('evenodd'); g.restore();
     g.beginPath(); g.arc(cx, cy, r, 0, 6.283); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke(); g.fillStyle = 'rgba(255,255,255,.45)'; g.beginPath(); g.ellipse(cx - r * 0.45, cy - r * 0.5, r * 0.18, r * 0.09, -0.7, 0, 6.283); g.fill(); }); }
 const mkPlanet = (x, y, r, hue, i) => { const q = { x, y, r, hue, kind: i === 0 ? 0 : k.ri(0, 2), rot: k.rnd(-0.4, 0.4), ring: Math.random() < 0.2 }; q.img = skin(q); q.lit = shade(r); return q; };
-function genPlanets() { planets = [mkPlanet(120, 200, 50, 200, 0)]; let x = 120; for (let i = 0; i < 60; i++) { x += k.rnd(170, 260); planets.push(mkPlanet(x, k.rnd(90, 290), k.rnd(28, 55), k.ri(0, 360), i + 1)); } gems = planets.slice(1).map((q) => ({ x: q.x + k.rnd(-60, 60), y: q.y - q.r - k.rnd(40, 80), got: false })); }
+/* Dificultad por planeta alcanzado (i): al principio planetas grandes, cercanos y a altura parecida; hacia el 40 más pequeños, lejanos y dispersos.
+ * El astronauta camina más deprisa con el progreso (menos margen para elegir el momento del salto). Antes: todo fijo desde el primer salto. */
+const ez = (i) => { const d = Math.min(1, i / 40); return d * d * (3 - 2 * d); };
+function nextPlanet(l, i) { const e = ez(i), x = l.x + k.rnd(150 + 30 * e, 200 + 70 * e), y = k.clamp(l.y + k.rnd(-1, 1) * (50 + 110 * e), 90, 290), r = k.rnd(42 - 16 * e, 56 - 6 * e); return mkPlanet(x, y, r, k.ri(0, 360), i); }
+function genPlanets() { planets = [mkPlanet(120, 200, 50, 200, 0)]; for (let i = 0; i < 60; i++) planets.push(nextPlanet(planets[i], i + 1)); gems = planets.slice(1).map((q) => ({ x: q.x + k.rnd(-60, 60), y: q.y - q.r - k.rnd(40, 80), got: false })); }
 function reset() { genPlanets(); p = { on: planets[0], a: -Math.PI / 2, x: 0, y: 0, vx: 0, vy: 0 }; cam = 0; score = 0; t = 0; best = 0; jet = []; walkT = 0; land = 0; }
 /* Fondo: nebulosa y 3 capas de estrellas en lienzos repetibles */
 const BW = 1280, NEB = mk(BW, 360, (g) => { const gr = g.createLinearGradient(0, 0, 0, 360); gr.addColorStop(0, '#070818'); gr.addColorStop(1, '#140a2e'); g.fillStyle = gr; g.fillRect(0, 0, BW, 360);
@@ -28,7 +32,7 @@ reset(); k.show(CFG.title, 'Tu astronauta camina solo por el planeta. Toca para 
 k.run((dt) => {
   for (const j of jet) { j.x += j.vx * dt; j.y += j.vy * dt; j.l -= dt; } jet = jet.filter((j) => j.l > 0); land = Math.max(0, land - dt);
   if (!k.gate(reset)) return; t += dt;
-  if (p.on) { const q = p.on; p.a += dt * 180 / q.r; walkT += dt; p.x = q.x + Math.cos(p.a) * (q.r + 8); p.y = q.y + Math.sin(p.a) * (q.r + 8);
+  if (p.on) { const q = p.on; p.a += dt * (120 + 70 * ez(best)) / q.r; walkT += dt; p.x = q.x + Math.cos(p.a) * (q.r + 8); p.y = q.y + Math.sin(p.a) * (q.r + 8);
     if (k.ptr.hit || k.hit.has('a') || k.hit.has('up')) { const nx = Math.cos(p.a), ny = Math.sin(p.a); p.vx = nx * 340; p.vy = ny * 340; p.on = null; p.from = q; k.sfx('jump'); for (let i = 0; i < 10; i++) jet.push({ x: p.x, y: p.y, vx: -nx * k.rnd(40, 140) + k.rnd(-40, 40), vy: -ny * k.rnd(40, 140) + k.rnd(-40, 40), l: 0.5, c: '#ffd9a0' }); } }
   else { for (const q of planets) { if (Math.abs(q.x - p.x) > 500) continue; const dx = q.x - p.x, dy = q.y - p.y, d2 = dx * dx + dy * dy, d = Math.sqrt(d2); const f = q.r * q.r * (q === p.from ? 40 : 230) / d2; p.vx += dx / d * f * dt; p.vy += dy / d * f * dt;
       if (d < q.r + 8) { p.on = q; p.a = Math.atan2(p.y - q.y, p.x - q.x); k.sfx('pop'); land = 0.25; k.burst(p.x - cam, p.y, `hsl(${q.hue},80%,75%)`, 10, 100);
@@ -37,7 +41,7 @@ k.run((dt) => {
     if (p.y < -400 || p.y > 760 || p.x < cam - 300) return k.lose(CFG.id, score, 'Perdido en el espacio', `${best} planetas`); }
   for (const g of gems) if (!g.got && Math.hypot(g.x - p.x, g.y - p.y) < 20) { g.got = true; score += 25; k.sfx('coin'); k.burst(g.x - cam, g.y, '#f2d15c', 12); k.float('+25', g.x - cam, g.y - 16, '#f2d15c'); }
   cam += (p.x - 220 - cam) * Math.min(1, dt * 2);
-  if (best >= planets.length - 5) { const l = planets[planets.length - 1]; let x = l.x; for (let i = 0; i < 20; i++) { x += k.rnd(180, 260); const q = mkPlanet(x, k.rnd(90, 290), k.rnd(26, 50), k.ri(0, 360), 1); planets.push(q); gems.push({ x: q.x, y: q.y - q.r - 60, got: false }); } }
+  if (best >= planets.length - 5) { const l = planets[planets.length - 1]; for (let i = 0; i < 20; i++) { const q = nextPlanet(planets[planets.length - 1], planets.length); planets.push(q); gems.push({ x: q.x, y: q.y - q.r - 60, got: false }); } }
 }, () => {
   wrap(NEB, -cam * 0.05); wrap(STARS[0], -cam * 0.1); wrap(STARS[1], -cam * 0.2); wrap(STARS[2], -cam * 0.35);
   c.save(); c.translate(-cam, 0);

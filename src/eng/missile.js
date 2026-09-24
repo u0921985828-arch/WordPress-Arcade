@@ -6,7 +6,9 @@ const k = Kit({ w: 480, h: 360, title: CFG.title, bg: '#0b0c22' }), c = k.ctx;
 let cities, bases, missiles, booms, inter, score, wave, left, spawnT, cur, tm, banner, bonus, endT, smoke, lastP;
 function reset() { cities = [80, 150, 200, 280, 330, 400].map((x, i) => ({ x, alive: true, v: i })); bases = [{ x: 30, ammo: 10, a: -1.57 }, { x: 240, ammo: 10, a: -1.57 }, { x: 450, ammo: 10, a: -1.57 }];
   missiles = []; booms = []; inter = []; smoke = []; score = 0; wave = 0; tm = 0; endT = 0; cur = { x: 240, y: 160 }; lastP = { x: -1, y: -1 }; bonus = null; nextWave(); }
-function nextWave() { wave++; left = 8 + wave * 3; spawnT = 1.5; bases.forEach((b) => (b.ammo = 10)); banner = 1.8; }
+/* Dificultad 0→1 por oleada (máximo en la 10): número de misiles, velocidad de caída y cadencia. */
+const DF = () => Math.min(1, (wave - 1) / 9), lerp = (a, b, q) => a + (b - a) * q;
+function nextWave() { wave++; left = Math.round(lerp(8, 30, DF())); spawnT = 2; bases.forEach((b) => (b.ammo = 10)); banner = 1.8; }
 reset(); k.show(CFG.title, 'Toca el cielo para lanzar un interceptor: explota donde tocaste. Teclado: flechas para apuntar y A para disparar. Protege las ciudades.');
 
 /* ---------- gráficos cacheados */
@@ -67,7 +69,7 @@ k.run((dt) => {
   if (!endT && !bonus) { if (k.ptr.hit && k.ptr.y < GY - 10) fire(k.ptr.x, k.ptr.y); if (k.hit.has('a')) fire(cur.x, cur.y); }
   for (const b of bases) { const ta = Math.atan2(cur.y - (GY - 14), cur.x - b.x); if (b.ammo > 0) b.a += (ta - b.a) * Math.min(1, dt * 8); }
   spawnT -= dt;
-  if (left > 0 && spawnT <= 0 && !endT) { left--; spawnT = k.rnd(0.4, 1.6) / (1 + wave * 0.1); spawnMissile(k.rnd(0, 480), 0, 30 + wave * 6, wave >= 3 && Math.random() < Math.min(0.4, 0.1 + wave * 0.04)); }
+  if (left > 0 && spawnT <= 0 && !endT) { left--; spawnT = k.rnd(0.5, 1.7) * lerp(1.3, 0.55, DF()); spawnMissile(k.rnd(0, 480), 0, lerp(24, 80, DF()), wave >= 3 && Math.random() < Math.min(0.4, 0.1 + wave * 0.04)); }
   for (const m of missiles) { const a = Math.atan2(GY + 5 - m.y, m.tx - m.x); m.x += Math.cos(a) * m.sp * dt; m.y += Math.sin(a) * m.sp * dt;
     if (m.split && m.y > 110 + (m.sx % 70)) { m.split = false; const n = k.ri(2, 3); for (let i = 0; i < n; i++) spawnMissile(m.x, m.y, m.sp, false); m.dead = true; k.sfx('pop'); k.burst(m.x, m.y, '#ff9a9a', 6, 60); }
     if (m.y >= GY) { m.dead = true; k.sfx('explode'); k.shake(6); booms.push({ x: m.x, y: GY, r: 0, t: 0, enemy: 1 });

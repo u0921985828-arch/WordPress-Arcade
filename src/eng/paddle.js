@@ -5,6 +5,9 @@ const k = Kit({ w: 360, h: 640, title: CFG.title, bg: HK ? '#1c2447' : '#10263f'
 const GOAL = 110, TO = 7, RAIL = 12, TX0 = 24, TX1 = 336, NETY = 320, PYME = 580, PYAI = 60;
 /* franja superior libre para pausa/sonido: la mesa se dibuja a escala SCL bajo ella (sx/sy: mesa → pantalla) */
 const TOP = 40, SCL = (640 - TOP) / 640, OXT = 180 * (1 - SCL), sx = (x) => OXT + x * SCL, sy = (y) => TOP + y * SCL;
+/* CPU: empieza floja (0,5) y mejora con los puntos jugados del partido (+0,4 como máximo) y con cada victoria tuya (+0,04, hasta 5).
+ * Si te saca 3 o más puntos afloja un poco. Antes: 0,55 + 0,03 por punto sin tope (1,15 al final de un partido largo). */
+let CPU = 0; try { CPU = Math.min(5, +localStorage.getItem('cpu:' + CFG.id) || 0); } catch (e) { /* sin almacenamiento */ }
 let me, ai, puck, sMe, sAi, serveT, rally, trail, goalT, goalMe, tm, bounceMk, server, aiOff = 0;
 function serverIsMe() { const tot = sMe + sAi; return (sMe >= 10 && sAi >= 10 ? tot : Math.floor(tot / 2)) % 2 === 0; }
 function serve(dir) {
@@ -19,7 +22,7 @@ function goal(forMe) {
   if (forMe) sMe++; else sAi++; goalT = 1.3; goalMe = forMe;
   k.burst(sx(puck.x), sy(k.clamp(puck.y, 10, 630)), forMe ? '#7cf7a0' : '#ff5f5f', 26, 220); k.sfx(forMe ? 'coin' : 'hurt'); k.shake(forMe ? 4 : 7); if (!forMe) k.flash('rgba(255,70,90,.25)');
   const TGT = HK ? TO : 11, fin = (sMe >= TGT || sAi >= TGT) && (HK || Math.abs(sMe - sAi) >= 2);
-  if (fin) { k.st = 'over'; const mg = sMe > sAi ? sMe - sAi : 0, nr = NREC(mg), b = k.best(CFG.id, mg); k.show(sMe > sAi ? '¡Ganaste!' : 'Perdiste', `${nr}${sMe} – ${sAi} · Mejor victoria: ${b ? '+' + b : '—'}<br>Toca para la revancha`); if (sMe < sAi) k.sfx('lose'); else { k.sfx('win'); k.confetti(); } return; }
+  if (fin) { k.st = 'over'; const mg = sMe > sAi ? sMe - sAi : 0, nr = NREC(mg), b = k.best(CFG.id, mg); k.show(sMe > sAi ? '¡Ganaste!' : 'Perdiste', `${nr}${sMe} – ${sAi} · Mejor victoria: ${b ? '+' + b : '—'}<br>Toca para la revancha`); if (sMe < sAi) k.sfx('lose'); else { k.sfx('win'); k.confetti(); CPU = Math.min(5, CPU + 1); try { localStorage.setItem('cpu:' + CFG.id, CPU); } catch (e) { /* sin almacenamiento */ } } return; }
   if (!HK) { if (sMe >= 10 && sAi >= 10 && sMe === sAi) k.float('Iguales', 180, sy(360), '#fff27a'); else if (Math.max(sMe, sAi) >= 10 && Math.abs(sMe - sAi) >= 1) k.float(sMe > sAi ? 'Punto de partido' : 'Punto de partido CPU', 180, sy(360), '#fff27a'); }
   serve(forMe ? -1 : 1);
 }
@@ -80,7 +83,7 @@ function ballH() { if (!puck || puck.from === undefined) return 0; const tot = M
 k.run((dt) => {
   tm += dt; goalT -= dt; if (bounceMk) { bounceMk.t -= dt; if (bounceMk.t <= 0) bounceMk = null; }
   if (!k.gate(reset)) return;
-  const lvl = 0.55 + (sMe + sAi) * 0.03;
+  const lvl = 0.5 + CPU * 0.04 + Math.min(0.4, (sMe + sAi) * (HK ? 0.035 : 0.022)) - (sAi - sMe >= 3 ? 0.08 : 0);
   me.px = me.x; me.py = me.y; ai.px = ai.x; ai.py = ai.y;
   if (k.ptr.down) { const qx = (k.ptr.x - OXT) / SCL, qy = (k.ptr.y - TOP) / SCL; me.x += (qx - me.x) * Math.min(1, dt * 25); if (HK) me.y += (qy - me.y) * Math.min(1, dt * 25); }
   if (k.held.has('left')) me.x -= 400 * dt; if (k.held.has('right')) me.x += 400 * dt; if (HK) { if (k.held.has('up')) me.y -= 400 * dt; if (k.held.has('down')) me.y += 400 * dt; }

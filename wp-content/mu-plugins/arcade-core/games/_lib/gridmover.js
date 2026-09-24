@@ -46,18 +46,21 @@ function paintOwn() {
 }
 
 /* ---------- Rondas ---------- */
+/* Dificultad 0→1 por ronda (máximo en la 9): paso de las motos, visión de la IA, número y velocidad de chispas. */
+const DF = () => Math.min(1, (round - 1) / 8), lerp = (a, b, q) => a + (b - a) * q;
+const STEP = () => TRAILS ? lerp(0.11, 0.05, DF()) : 0.065;
 function newRound() {
   g = Array.from({ length: N }, () => Array(N).fill(0)); acc = 0; count = 2.4; between = 0; dying = 0; booms = []; freshT = 0; respawn = 0; tc.clearRect(0, 0, 480, 480); hc.clearRect(0, 0, 480, 480);
   if (TRAILS) {
-    bikes = [{ x: 10, y: 30, d: 'right', col: COL[1], id: 1, alive: true, me: true }, { x: 50, y: 30, d: 'left', col: COL[2], id: 2, alive: true }, { x: 30, y: 8, d: 'down', col: COL[3], id: 3, alive: true }, { x: 30, y: 52, d: 'up', col: COL[4], id: 4, alive: true }].slice(0, 2 + Math.min(2, round - 1));
+    bikes = [{ x: 10, y: 36, d: 'right', col: COL[1], id: 1, alive: true, me: true }, { x: 50, y: 24, d: 'left', col: COL[2], id: 2, alive: true }, { x: 30, y: 8, d: 'down', col: COL[3], id: 3, alive: true }, { x: 30, y: 52, d: 'up', col: COL[4], id: 4, alive: true }].slice(0, 2 + Math.min(2, round - 1));
     bikes.forEach((b) => { g[b.y][b.x] = b.id; b.px = b.x; b.py = b.y; stamp(b.x, b.y, b.x, b.y, b.col); });
   } else {
     for (let y = 21; y < 27; y++) for (let x = 21; x < 27; x++) g[y][x] = 1;
     bikes = [{ x: 23, y: 26, px: 23, py: 26, d: null, ld: null, me: true, alive: true, trail: [] }];
-    sparks = Array.from({ length: 1 + round }, () => newSpark()); pct = 36 / (N * N) * 100; paintOwn(); fc.clearRect(0, 0, 480, 480);
+    sparks = Array.from({ length: Math.min(6, 1 + Math.floor(round / 2)) }, () => newSpark()); pct = 36 / (N * N) * 100; paintOwn(); fc.clearRect(0, 0, 480, 480);
   }
 }
-function newSpark() { const me = bikes && bikes[0]; for (let i = 0; i < 60; i++) { const x = k.rnd(2, N - 2), y = k.rnd(2, N - 2); if (g[Math.floor(y)][Math.floor(x)]) continue; if (me && Math.hypot(x - me.x, y - me.y) < 14) continue; const v = 7 * (1 + round * 0.08); return { x, y, vx: k.pick([-1, 1]) * k.rnd(0.7, 1.2) * v, vy: k.pick([-1, 1]) * k.rnd(0.7, 1.2) * v, tail: [] }; } return { x: 2, y: 2, vx: 6, vy: 6, tail: [] }; }
+function newSpark() { const me = bikes && bikes[0]; for (let i = 0; i < 60; i++) { const x = k.rnd(2, N - 2), y = k.rnd(2, N - 2); if (g[Math.floor(y)][Math.floor(x)]) continue; if (me && Math.hypot(x - me.x, y - me.y) < 14) continue; const v = lerp(5, 11, DF()); return { x, y, vx: k.pick([-1, 1]) * k.rnd(0.7, 1.2) * v, vy: k.pick([-1, 1]) * k.rnd(0.7, 1.2) * v, tail: [] }; } return { x: 2, y: 2, vx: 6, vy: 6, tail: [] }; }
 function reset() { score = 0; round = 1; newRound(); }
 reset(); k.show(CFG.title, CFG.help);
 
@@ -88,7 +91,7 @@ k.run((dt) => {
   if (want) { const back = TRAILS ? OPP[me.nd || me.d] : me.trail.length ? OPP[me.nd || me.ld] : null; if (want !== back) me.nd = want; }
   goT = Math.max(0, goT - dt);
   if (count > 0) { const c0 = Math.ceil(count / 0.8); count -= dt; const c1 = Math.ceil(count / 0.8); if (c1 !== c0) k.sfx(c1 > 0 ? 'click' : 'start'); if (count > 0) return; acc = 0; goT = 0.6; }
-  const step = TRAILS ? Math.max(0.042, 0.072 - round * 0.004) : 0.065;
+  const step = STEP(), look = Math.round(lerp(60, 300, DF())), noise = lerp(10, 4, DF());
   if (!TRAILS) {
     for (const s of sparks) {
       s.tail.unshift([s.x, s.y]); if (s.tail.length > 7) s.tail.pop();
@@ -106,7 +109,7 @@ k.run((dt) => {
     if (TRAILS) {
       for (const b of bikes) { if (!b.alive) continue; b.px = b.x; b.py = b.y;
         if (b.me) { if (b.nd) { b.d = b.nd; b.nd = null; } }
-        else { const opts = Object.keys(D).filter((d) => d !== OPP[b.d]).map((d) => { const nx = b.x + D[d][0], ny = b.y + D[d][1]; return [d, free(nx, ny) ? space(nx, ny, 250) + (d === b.d ? 3 : 0) + Math.random() * 4 : -1]; }); opts.sort((a, z) => z[1] - a[1]); b.d = opts[0][0]; }
+        else { const opts = Object.keys(D).filter((d) => d !== OPP[b.d]).map((d) => { const nx = b.x + D[d][0], ny = b.y + D[d][1]; return [d, free(nx, ny) ? space(nx, ny, look) + (d === b.d ? 3 : 0) + Math.random() * noise : -1]; }); opts.sort((a, z) => z[1] - a[1]); b.d = opts[0][0]; }
         b.nx = b.x + D[b.d][0]; b.ny = b.y + D[b.d][1]; }
       for (const b of bikes) if (b.alive) { if (!free(b.nx, b.ny) || bikes.some((o) => o !== b && o.alive && o.nx === b.nx && o.ny === b.ny)) b.alive = false; }
       for (const b of bikes) if (b.alive) { b.x = b.nx; b.y = b.ny; g[b.y][b.x] = b.id; stamp(b.px, b.py, b.x, b.y, b.col); }
@@ -148,7 +151,7 @@ function hudTop() {
 }
 function draw() {
   c.drawImage(BG, 0, 0, W, H);
-  const fr = count > 0 || between || dying ? 1 : Math.min(1, acc / (TRAILS ? Math.max(0.042, 0.072 - round * 0.004) : 0.065));
+  const fr = count > 0 || between || dying ? 1 : Math.min(1, acc / STEP());
   if (TRAILS) {
     c.drawImage(haloCv, 0, TOP, 480, 480); c.drawImage(trailCv, 0, TOP, 480, 480);
     for (const b of bikes) if (b.alive) bike(b, fr);
