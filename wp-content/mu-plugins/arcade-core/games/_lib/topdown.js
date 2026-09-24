@@ -305,17 +305,17 @@ function coopParty() {
   for (const h of HE) { h.cpu = pl[h.pl].cpu; h.name = h.cpu ? 'CPU' : pl[h.pl].name; h.ai = null; if (lobby) lobby.ready[HE.indexOf(h)] = h.cpu; }
   for (const q of pl) if (!q.cpu && !HE.some((h) => h.pl === q.p)) { const h = mkHero(q, CK[q.p]); h.x = X0 + 40; h.y = H / 2; h.inv = 2; HE.push(h); if (lobby) lobby.ready.push(false); k.float('¡' + h.name + ' se une!', h.x + 30, h.y - 30, h.col); }
   HE.sort((a, b) => a.pl - b.pl); if (lobby) lobby.ready = HE.map((h) => h.cpu);
-  hpMul = 1 + 0.3 * (HE.length - 1);
+  hpMul = 1 + 0.35 * (HE.length - 1);
 }
 function formation() { const n = HE.length; HE.forEach((h, i) => { h.x = X0 + 36 + (i % 2) * 18; h.y = H / 2 + (i - (n - 1) / 2) * 30; h.kx = h.ky = 0; }); }
 function coopRoom() {
   TH.boss = (room + 1) % 10 === 0 ? 'skel' : 'eye'; p = { x: X0 + 40, y: H / 2, r: 11 };
   buildRoom(); const n = HE.length;
   if (room % 5 === 0) { for (let i = 1; i < n; i++) queue(k.pick(['bat', 'skel'])); }
-  else { const extra = Math.round(pend.length * 0.45 * (n - 1)); for (let i = 0; i < extra; i++) queue(pickType()); }
+  else { const extra = Math.round(pend.length * 0.6 * (n - 1)); for (let i = 0; i < extra; i++) queue(pickType()); }
   formation();
 }
-function coopStart() { hpMul = 1 + 0.3 * (HE.length - 1); HE.forEach((h) => { const C = CLS[h.cls]; h.hp = h.max = C.hp; h.sk = 2; }); lobby = null; coopRoom(); k.count(3); }
+function coopStart() { hpMul = 1 + 0.35 * (HE.length - 1); HE.forEach((h) => { const C = CLS[h.cls]; h.hp = h.max = C.hp; h.sk = 2; }); lobby = null; coopRoom(); k.count(3); }
 function lobbyUpdate(dt) {
   lobby.t -= dt;
   HE.forEach((h, i) => {

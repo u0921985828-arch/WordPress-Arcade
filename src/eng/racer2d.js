@@ -7,7 +7,7 @@
  * las victorias guardadas en localStorage (cup:<id>). Superficies: agua (poco agarre), tierra/harina/serrín/barro
  * (frena) y aceite (trompo). Siempre corren 4 coches: humanos según las plazas de la tele y CPU en el resto. */
 const M = CFG.mode || 'mesa', OUT = ART.OUT, TAU = Math.PI * 2, GAR = M === 'garaje', ITEMS = M === 'patio';
-const PORT = innerHeight > innerWidth, W = PORT ? 405 : 720, H = PORT ? 720 : 405;
+const PORT = innerHeight > innerWidth, W = PORT ? 405 : 720, H = PORT ? 720 : 405, Z = PORT ? 1.15 : 1, VW = W / Z, VH = H / Z; /* Z: zoom de cámara (vista en unidades del mundo VW×VH) */
 const MD = {
   mesa: { hw: 52, off: 0.74, offGrip: 6, bg: '#3a2a2a', car: 'coche', haz: ['agua', 'harina', 'aceite'], obs: ['taza', 'naranja', 'galleta', 'salero'] },
   garaje: { hw: 56, off: 0.72, offGrip: 6.5, bg: '#2a2d35', car: 'bolido', haz: ['aceite', 'agua', 'serrin'], obs: ['ruedas', 'cono', 'bidon', 'ruedas'] },
@@ -229,7 +229,7 @@ function grid(anchorI, list) {
 function startRace() {
   T = buildTrack(GAR ? (Math.floor(Math.random() * 3)) : race);
   skids = []; parts = []; shots = []; puddles = []; finishOrder = []; raceT = 0; phase = 'run'; phT = 0;
-  const order = GAR ? cars : cars.slice().sort((a, b) => (race === 0 ? (a.cpu - b.cpu) || a.p - b.p : a.pts - b.pts)); /* en la copa sale delante quien va último */
+  const order = GAR ? cars.slice() : cars.slice().sort((a, b) => (race === 0 ? (a.cpu - b.cpu) || a.p - b.p : a.pts - b.pts)); /* en la copa sale delante quien va último */
   grid(0, order.reverse());
   cars.forEach((car) => { car.prog = car.i === 0 ? 0 : -(T.N - car.i) * T.sp; car.fin = 0; car.item = null; car.lapShown = 0; car.alive = car.inMatch; car.gain = 0; car.avoid = {}; });
   const lead = cars[0]; cam = { x: lead.x, y: lead.y, ix: 0, iy: 0 };
@@ -271,7 +271,7 @@ const spinOut = (car, t) => { if (car.spin > 0 || car.z > 0.05) return; car.spin
 function humanInput(car) {
   let tgt = null, thr = 0; const d = k.pdir(car.p);
   if (d.x || d.y) { tgt = Math.atan2(d.y, d.x); thr = 1; }
-  if (!k.party && car.p === 0 && k.ptr.down) { const sx = car.x - cam.x + W / 2, sy = car.y - cam.y + H / 2, dx = k.ptr.x - sx, dy = k.ptr.y - sy; if (dx * dx + dy * dy > 144) { tgt = Math.atan2(dy, dx); thr = 1; } }
+  if (!k.party && car.p === 0 && k.ptr.down) { const px = sx(car.x), py = sy(car.y), dx = k.ptr.x - px, dy = k.ptr.y - py; if (dx * dx + dy * dy > 144) { tgt = Math.atan2(dy, dx); thr = 1; } }
   if (k.pheld(car.p, 'a')) { thr = 1; if (tgt === null) tgt = car.a; }
   const hb = !ITEMS && k.pheld(car.p, 'b');
   if (ITEMS && k.phit(car.p, 'b')) useItem(car);
@@ -301,7 +301,7 @@ function cpuInput(car, dt) {
 }
 function vmax(car) {
   let v = 255 * pace();
-  if (car.cpu) { v *= (0.86 + CUP * 0.025 + (GAR ? 0 : race * 0.02)) * car.spd;
+  if (car.cpu) { v *= ((GAR ? 0.9 : 0.86) + CUP * 0.025 + (GAR ? 0 : race * 0.02)) * car.spd;
     const hs = cars.filter((q) => !q.cpu && q.alive); /* goma elástica suave: la CPU se acerca o afloja según el humano */
     if (hs.length && !GAR) { const h = hs.reduce((a, b) => (b.prog > a.prog ? b : a)); v *= 1 + clamp((h.prog - car.prog) / 2500, -0.07, 0.08); } }
   return v;
@@ -313,7 +313,7 @@ function drive(car, dt) {
   else inp = car.cpu ? cpuInput(car, dt) : humanInput(car);
   const sf = surface(car);
   if (sf.k === 'aceite' && car.lastSurf !== 'aceite') spinOut(car, 0.6);
-  if (sf.k === 'charco' && car.lastSurf !== 'charco') { spinOut(car, 0.9); if (!car.cpu) k.float('¡Charco!', car.x - cam.x + W / 2, car.y - cam.y + H / 2 - 24, '#e2d4ff'); }
+  if (sf.k === 'charco' && car.lastSurf !== 'charco') { spinOut(car, 0.9); if (!car.cpu) k.float('¡Charco!', sx(car.x), sy(car.y) - 24, '#e2d4ff'); }
   if (sf.k === 'agua' && car.lastSurf !== 'agua') { for (let i = 0; i < 8; i++) addPart(car.x, car.y, '#bfeaff', 60, 0.5, 2.5); }
   car.lastSurf = sf.k;
   if (car.spin > 0) { car.spin -= dt; car.a += car.spinDir * 10 * dt; inp.thr = 0; inp.tgt = null; }
@@ -402,16 +402,16 @@ function camTarget() {
 }
 function updCam(dt, snap) {
   const t = camTarget(); if (!t) return;
-  const la = GAR ? 0.5 : 0.32, ax = t.x + clamp(t.vx * la, -W * 0.3, W * 0.3), ay = t.y + clamp(t.vy * la, -H * 0.3, H * 0.3), f = snap ? 1 : Math.min(1, dt * (GAR ? 3.2 : 4.5));
+  const la = GAR ? 0.5 : 0.32, ax = t.x + clamp(t.vx * la, -VW * 0.3, VW * 0.3), ay = t.y + clamp(t.vy * la, -VH * 0.3, VH * 0.3), f = snap ? 1 : Math.min(1, dt * (GAR ? 3.2 : 4.5));
   cam.x += (ax - cam.x) * f; cam.y += (ay - cam.y) * f;
-  if (GAR) { const q = clamp((roundT - 9) / 14, 0, 1); cam.ix = lerp(cam.ix, q * 0.3 * W, Math.min(1, dt * 2)); cam.iy = lerp(cam.iy, q * 0.3 * H, Math.min(1, dt * 2)); }
+  if (GAR) { const q = clamp((roundT - 9) / 14, 0, 1); cam.ix = lerp(cam.ix, q * 0.3 * VW, Math.min(1, dt * 2)); cam.iy = lerp(cam.iy, q * 0.3 * VH, Math.min(1, dt * 2)); }
 }
-const inView = (car, m) => { const x0 = cam.x - W / 2 + cam.ix, x1 = cam.x + W / 2 - cam.ix, y0 = cam.y - H / 2 + cam.iy, y1 = cam.y + H / 2 - cam.iy; return car.x > x0 - m && car.x < x1 + m && car.y > y0 - m && car.y < y1 + m; };
+const inView = (car, m) => { const x0 = cam.x - VW / 2 + cam.ix, x1 = cam.x + VW / 2 - cam.ix, y0 = cam.y - VH / 2 + cam.iy, y1 = cam.y + VH / 2 - cam.iy; return car.x > x0 - m && car.x < x1 + m && car.y > y0 - m && car.y < y1 + m; };
 function respawnAt(car, i, hold) {
   const s = T.S[((i % T.N) + T.N) % T.N], off = clamp(car.d, -0.3, 0.3) * 0; Object.assign(car, { x: s.x + s.nx * off, y: s.y + s.ny * off, a: s.a, vx: Math.cos(s.a) * 40, vy: Math.sin(s.a) * 40, fall: 0, spin: 0, bubble: 0, ghost: 1.4, hold: hold || 0 });
   const oldI = car.i; car.i = ((i % T.N) + T.N) % T.N; let ds = car.i * T.sp - car.s; if (ds < -T.L / 2) ds += T.L; if (ds > T.L / 2) ds -= T.L; car.prog += ds; car.s = car.i * T.sp; void oldI;
 }
-function sx(x) { return x - cam.x + W / 2; } function sy(y) { return y - cam.y + H / 2; }
+function sx(x) { return (x - cam.x) * Z + W / 2; } function sy(y) { return (y - cam.y) * Z + H / 2; }
 
 /* ---------- Bucle ---------- */
 function update(dt) {
@@ -474,10 +474,13 @@ function nextRace() {
   race++; startRace();
 }
 function finish(rows, champ) {
+  const CN = ['roja', 'azul', 'amarilla', 'verde']; rows.forEach((r) => { const car = cars.find((q) => q.p === r.p); if (car && car.cpu) r.name = 'CPU ' + CN[r.p]; });
   const hw = champ && !champ.cpu;
   if (!k.party || hw) { CUP = clamp(CUP + (hw ? 1 : k.party ? 0 : -1), 0, 5); try { localStorage.setItem('cup:' + CFG.id, CUP); } catch (e) { /* sin almacenamiento */ } }
   if (!k.party) k.best(CFG.id, rows.find((q) => q.p === 0).score);
-  k.podium(rows, { fmt: (n) => `${n} punto${n === 1 ? '' : 's'}`, noTie: false });
+  const tie = rows.filter((q) => q.score === champ.pts).length > 1;
+  const head = tie ? null : !champ.cpu && !k.party ? (GAR ? '¡Rey del garaje!' : '¡La copa es tuya!') : champ.cpu ? `¡Gana la CPU ${CN[champ.p]}!` : null;
+  k.podium(rows, Object.assign({ fmt: (n) => `${n} punto${n === 1 ? '' : 's'}` }, head ? { head } : {}));
 }
 
 /* ---------- Circuito Garaje: rondas por cámara ---------- */
@@ -492,7 +495,7 @@ function garageRules() {
     const w = left[0] || lastWin; if (left[0]) { w.pts++; lastWin = w; k.float('+1', sx(w.x), sy(w.y) - 28, w.col); if (!w.cpu) k.sfx('win'); }
     cars.forEach((q) => { if (q.pts <= 0 && q.inMatch) { q.inMatch = false; q.alive = false; } });
     const inM = cars.filter((q) => q.inMatch);
-    if (inM.some((q) => q.pts >= 6) || inM.length <= 1 || round >= 10) { const rows = cars.map((q) => ({ p: q.p, score: Math.max(0, q.pts), name: q.name })), champ = cars.slice().sort((a, b) => b.pts - a.pts)[0]; phase = 'gap'; phT = 1e9; setTimeout(() => finish(rows, champ), 900); return; }
+    if (inM.some((q) => q.pts >= 6) || inM.length <= 1 || round >= 10 || !inM.some((q) => !q.cpu)) { const rows = cars.map((q) => ({ p: q.p, score: Math.max(0, q.pts), name: q.name })), champ = cars.slice().sort((a, b) => b.pts - a.pts)[0]; phase = 'gap'; phT = 1e9; setTimeout(() => finish(rows, champ), 900); return; }
     phase = 'gap'; phT = 1.6; msg = w ? `¡Punto para ${w.name === 'Tú' ? 'ti' : w.name}!` : 'Ronda nula'; msgT = 1.6;
   }
 }
@@ -512,11 +515,11 @@ function newRound() {
 
 /* ---------- Dibujo ---------- */
 function drawWorld() {
-  const x0 = cam.x - W / 2, y0 = cam.y - H / 2;
-  c.save(); c.translate(-Math.round(x0 * 2) / 2, -Math.round(y0 * 2) / 2);
-  c.fillStyle = PT.ground; c.fillRect(x0, y0, W, H);
+  const x0 = cam.x - VW / 2, y0 = cam.y - VH / 2;
+  c.save(); c.scale(Z, Z); c.translate(-Math.round(x0 * 2) / 2, -Math.round(y0 * 2) / 2);
+  c.fillStyle = PT.ground; c.fillRect(x0, y0, VW, VH);
   if (M === 'mesa') {
-    c.fillStyle = 'rgba(30,20,30,.45)'; c.fillRect(x0, y0, W, H);
+    c.fillStyle = 'rgba(30,20,30,.45)'; c.fillRect(x0, y0, VW, VH);
     const tb = T.table; c.fillStyle = 'rgba(20,10,20,.4)'; rr(c, tb.x0 + 14, tb.y0 + 20, tb.x1 - tb.x0, tb.y1 - tb.y0, 26); c.fill();
     rr(c, tb.x0 - 6, tb.y0 - 6, tb.x1 - tb.x0 + 12, tb.y1 - tb.y0 + 12, 28); c.fillStyle = '#8a5530'; c.fill(); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke();
     rr(c, tb.x0, tb.y0, tb.x1 - tb.x0, tb.y1 - tb.y0, 24); c.fillStyle = PT.table; c.fill();
@@ -538,14 +541,14 @@ function drawWorld() {
   { const s = T.S[0]; c.save(); c.translate(s.x, s.y); c.rotate(s.a); const n = Math.round(hw * 2 / 8); for (let r = 0; r < 2; r++) for (let q = 0; q < n; q++) { c.fillStyle = (q + r) % 2 ? '#1a1530' : '#fff'; c.fillRect(-8 + r * 8, -hw + q * (hw * 2 / n), 8, hw * 2 / n); } c.restore(); }
   /* marcas de derrape */
   c.strokeStyle = 'rgba(30,20,30,.28)'; c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); for (const s of skids) { c.moveTo(s[0], s[1]); c.lineTo(s[2], s[3]); } c.stroke();
-  for (const h of T.haz) { if (Math.abs(h.x - cam.x) > W / 2 + 60 || Math.abs(h.y - cam.y) > H / 2 + 60) continue; const sp = hazSprite(h.type, h.r, h.seed); c.drawImage(sp, h.x - h.r * 1.3, h.y - h.r * 1.3, h.r * 2.6, h.r * 2.6); }
+  for (const h of T.haz) { if (Math.abs(h.x - cam.x) > VW / 2 + 60 || Math.abs(h.y - cam.y) > VH / 2 + 60) continue; const sp = hazSprite(h.type, h.r, h.seed); c.drawImage(sp, h.x - h.r * 1.3, h.y - h.r * 1.3, h.r * 2.6, h.r * 2.6); }
   for (const p of puddles) { const sp = hazSprite('charco', p.r, p.seed); c.globalAlpha = Math.min(1, p.t / 1.5); c.drawImage(sp, p.x - p.r * 1.3, p.y - p.r * 1.3, p.r * 2.6, p.r * 2.6); c.globalAlpha = 1; }
   const tt = performance.now() / 1000;
   for (const b of T.boxes) { if (b.t > 0) { const q = 1 - b.t / 3; if (q < 0.6) continue; c.globalAlpha = (q - 0.6) / 0.4; }
     c.save(); c.translate(b.x, b.y); c.rotate(Math.sin(tt * 2 + b.x) * 0.25); const bs = 1 + Math.sin(tt * 4 + b.y) * 0.06; c.scale(bs, bs);
     shadow(c, 2, 12, 11, 0.25); rr(c, -11, -11, 22, 22, 5); const g = c.createLinearGradient(-11, -11, 11, 11); g.addColorStop(0, '#ffd166'); g.addColorStop(0.5, '#ff7ab8'); g.addColorStop(1, '#6e62f5'); c.fillStyle = g; c.fill(); c.lineWidth = 2.2; c.strokeStyle = OUT; c.stroke();
     c.font = '900 15px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 3; c.strokeText('?', 0, 1); c.fillStyle = '#fff'; c.fillText('?', 0, 1); c.restore(); c.globalAlpha = 1; }
-  for (const o of T.obst) { if (Math.abs(o.x - cam.x) > W / 2 + 50 || Math.abs(o.y - cam.y) > H / 2 + 50) continue; shadow(c, o.x + 4, o.y + 6, o.r * 1.05, 0.25); c.save(); c.translate(o.x, o.y); c.rotate(o.rot); c.drawImage(obsSprite(o.type, o.r), -o.r * 1.5, -o.r * 1.5, o.r * 3, o.r * 3); c.restore(); }
+  for (const o of T.obst) { if (Math.abs(o.x - cam.x) > VW / 2 + 50 || Math.abs(o.y - cam.y) > VH / 2 + 50) continue; shadow(c, o.x + 4, o.y + 6, o.r * 1.05, 0.25); c.save(); c.translate(o.x, o.y); c.rotate(o.rot); c.drawImage(obsSprite(o.type, o.r), -o.r * 1.5, -o.r * 1.5, o.r * 3, o.r * 3); c.restore(); }
   for (const p of parts) { c.globalAlpha = Math.min(1, p.life / p.max * 1.6) * 0.85; c.fillStyle = p.col; c.beginPath(); c.arc(p.x, p.y, p.r, 0, TAU); c.fill(); } c.globalAlpha = 1;
   const list = cars.filter((q) => q.alive || (GAR && q.inMatch && phase !== 'run')).filter((q) => q.inMatch).sort((a, b) => a.z - b.z || a.y - b.y);
   for (const car of list) drawCar(car, tt);
@@ -579,14 +582,13 @@ function drawMini() {
 const ORD = (n) => n + '.º';
 function drawHUD() {
   if (GAR) {
-    const inM = cars.filter((q) => q.inMatch || q.pts <= 0), bw = PORT ? 92 : 128, gap = 6, tw = inM.length * bw + (inM.length - 1) * gap; let x = PORT ? 8 : (W - tw) / 2 - 60;
-    if (PORT) x = (W - tw) / 2;
-    for (const car of inM) { const y = PORT ? 8 : 8; rr(c, x, y, bw, 30, 9); c.fillStyle = car.inMatch ? 'rgba(20,16,36,.72)' : 'rgba(20,16,36,.35)'; c.fill(); c.lineWidth = 2; c.strokeStyle = car.alive ? car.col : OUT; c.stroke();
-      label(car.name, x + 7, y + 7, PORT ? 12 : 14, car.col); for (let i = 0; i < 6; i++) { const px = x + (PORT ? 38 : 48) + i * (PORT ? 8.5 : 12.5), py = y + 15; c.beginPath(); c.arc(px, py, PORT ? 3 : 4.2, 0, TAU); c.fillStyle = i < car.pts ? car.col : 'rgba(255,255,255,.14)'; c.fill(); c.lineWidth = 1.2; c.strokeStyle = OUT; c.stroke(); }
-      if (!car.alive && car.inMatch && phase === 'run') { c.strokeStyle = '#ff5a5f'; c.lineWidth = 3; c.beginPath(); c.moveTo(x + 4, y + 26); c.lineTo(x + bw - 4, y + 4); c.stroke(); }
-      x += bw + gap; }
-    if (!PORT) drawMini();
-    if (cam.ix > 2) { /* la cámara se estrecha: franjas de peligro */ c.fillStyle = 'rgba(10,6,20,.55)'; c.fillRect(0, 0, cam.ix, H); c.fillRect(W - cam.ix, 0, cam.ix, H); c.fillRect(cam.ix, 0, W - cam.ix * 2, cam.iy); c.fillRect(cam.ix, H - cam.iy, W - cam.ix * 2, cam.iy); c.strokeStyle = '#ffc93c'; c.lineWidth = 3; c.setLineDash([12, 8]); c.strokeRect(cam.ix, cam.iy, W - cam.ix * 2, H - cam.iy * 2); c.setLineDash([]); }
+    const bw = 124; let y = 8;
+    for (const car of cars) { const x = 8; rr(c, x, y, bw, 28, 9); c.fillStyle = car.inMatch ? 'rgba(20,16,36,.72)' : 'rgba(20,16,36,.35)'; c.fill(); c.lineWidth = 2; c.strokeStyle = car.alive && car.inMatch ? car.col : OUT; c.stroke();
+      label(car.cpu ? 'CPU' : car.name, x + 7, y + 6, 14, car.col); for (let i = 0; i < 6; i++) { const px = x + 50 + i * 12, py = y + 14; c.beginPath(); c.arc(px, py, 4.2, 0, TAU); c.fillStyle = i < car.pts ? car.col : 'rgba(255,255,255,.14)'; c.fill(); c.lineWidth = 1.2; c.strokeStyle = OUT; c.stroke(); }
+      if (!car.alive && phase === 'run' || !car.inMatch) { c.strokeStyle = '#ff5a5f'; c.lineWidth = 3; c.beginPath(); c.moveTo(x + 4, y + 24); c.lineTo(x + bw - 4, y + 4); c.stroke(); }
+      y += 32; }
+    drawMini();
+    if (cam.ix > 2) { /* la cámara se estrecha: franjas de peligro */ const ix = cam.ix * Z, iy = cam.iy * Z; c.fillStyle = 'rgba(10,6,20,.55)'; c.fillRect(0, 0, ix, H); c.fillRect(W - ix, 0, ix, H); c.fillRect(ix, 0, W - ix * 2, iy); c.fillRect(ix, H - iy, W - ix * 2, iy); c.strokeStyle = '#ffc93c'; c.lineWidth = 3; c.setLineDash([12, 8]); c.strokeRect(ix, iy, W - ix * 2, H - iy * 2); c.setLineDash([]); }
     label(`Ronda ${round}`, 10, H - 30, 18, '#fff');
   } else {
     const r = ranking(), hs = cars.filter((q) => !q.cpu), laps = LAPS();

@@ -2,12 +2,25 @@
 
 GAMES = [
     dict(
+        title='Bolera del Barrio',
+        genre='sports-casual',
+        tags=['bolos', 'turnos', 'fisica', 'vector'],
+        orient='landscape', aspect='16:9', inputs='TKG',
+        engine='bowling',
+        cfg=dict(mode='turnos', hud='bl', help='Bolos por turnos con marcador oficial. ← → coloca la bola, ↑ ↓ elige el efecto y mantén A: suelta cuando la barra de fuerza esté en verde.'),
+        pad=dict(d='8', a='Tirar'),
+        mp=(1, 4),
+        desc=['x '*150],
+        tips=['a', 'b'],
+        players='1–4 jugadores',
+    ),
+    dict(
         title='Penaltis Cara a Cara',
         genre='sports-casual',
         tags=['futbol', 'penaltis', 'versus', 'vector'],
         orient='landscape', aspect='16:9', inputs='TKG',
         engine='penalty',
-        cfg=dict(mode='versus', help='Tanda de 5 penaltis por cabeza y muerte súbita. Chutas: mantén una dirección y deja A pulsado para cargar; suelta en la franja verde. Paras: mantén hacia dónde te lanzas cuando el rival golpea.'),
+        cfg=dict(mode='versus', hud='bl', help='Tanda de 5 penaltis por cabeza y muerte súbita. Chutas: mantén una dirección y deja A pulsado para cargar; suelta en la franja verde. Paras: mantén hacia dónde te lanzas cuando el rival golpea.'),
         pad=dict(d='8', a='Chutar'),
         mp=(1, 2),
         desc=['x '*150],

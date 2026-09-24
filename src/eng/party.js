@@ -154,8 +154,8 @@ function mgAnvil() {
       if (a.t < 0.55) { c.strokeStyle = `rgba(255,90,95,${0.5 + 0.5 * Math.sin(t * 30)})`; c.lineWidth = 3; c.beginPath(); c.ellipse(a.x, a.y, a.R + 4, (a.R + 4) * 0.55, 0, 0, TAU); c.stroke(); } }
     const ents = [];
     for (const q of ps) ents.push({ y: q.y, f: () => {
-      if (q.out >= 0) { c.globalAlpha = 0.9; guy(q.p, q.x, q.y, 1.4, { face: q.face, state: 'fall', squash: 0.72 }); c.globalAlpha = 1; for (let i = 0; i < 3; i++) { const a = t * 4 + i * 2.1; star(q.x + Math.cos(a) * 20, q.y - 14 + Math.sin(a) * 6, 5); } }
-      else { guy(q.p, q.x, q.y, 1.4, { face: q.face, state: q.mv ? 'run' : 'idle' }); tagDraw(q.p, q.x, q.y - 66); } } });
+      if (q.out >= 0) { c.globalAlpha = 0.9; guy(q.p, q.x, q.y, 1.55, { face: q.face, state: 'fall', squash: 0.72 }); c.globalAlpha = 1; for (let i = 0; i < 3; i++) { const a = t * 4 + i * 2.1; star(q.x + Math.cos(a) * 20, q.y - 14 + Math.sin(a) * 6, 5); } }
+      else { guy(q.p, q.x, q.y, 1.55, { face: q.face, state: q.mv ? 'run' : 'idle' }); tagDraw(q.p, q.x, q.y - 72); } } });
     for (const l of land) ents.push({ y: l.y + 0.5, f: () => { const s = l.R / 30; c.globalAlpha = Math.min(1, l.t / 0.3); c.drawImage(ANVIL, l.x - 40 * s, l.y - 52 * s, 80 * s, 58 * s); c.globalAlpha = 1; } });
     ents.sort((a, b) => a.y - b.y).forEach((e) => e.f());
     for (const a of an) { const hgt = a.t * 560; if (hgt < 470) { const s = a.R / 30; c.drawImage(ANVIL, a.x - 40 * s, a.y - hgt - 52 * s, 80 * s, 58 * s); } }
@@ -222,7 +222,7 @@ function mgDuel(o) {
     c.fillStyle = '#6b4329'; c.fillRect(392, 150, 16, 140); c.strokeStyle = OUT; c.lineWidth = 2.5; c.strokeRect(392, 150, 16, 140);
     c.save(); c.translate(400, 140); const sc = big ? 1 + Math.max(0, 0.25 - (st === 'go' ? gT : 0)) : 1; c.scale(sc, sc);
     panel(-170, -58, 340, 116, 16, '#c98a4b', 3.5); c.fillStyle = 'rgba(0,0,0,.12)'; for (let i = -1; i < 2; i++) c.fillRect(-160, i * 36 - 3, 320, 3);
-    if (cue) label(cue, 0, 2, big ? 64 : 38, cue === '¡YA!' ? '#ffd166' : big ? '#ffe6a0' : '#fff'); c.restore();
+    if (cue) label(cue, 0, 2, big ? 64 : 38, big ? '#ffd166' : '#fff'); c.restore();
     if (o.roul) label(`Duelo ${d} de ${draws}`, 400, 272, 20, '#fff');
     // vaqueros
     for (const q of [...ps].sort((a, b) => a.y - b.y)) {
@@ -285,7 +285,7 @@ function mgMash() {
       over = true; endT = 1.4; const v = (q) => (q.fin >= 0 ? 1e6 - q.fin : q.d); m.rank = ps.map((q) => ps.filter((o) => v(o) > v(q) + 1e-9).length);
     }
     if (over && (endT -= dt) <= 0) m.done = true;
-    cam += (clamp(lead - 440, 0, D - 540) - cam) * Math.min(1, dt * 5);
+    cam += (clamp(lead - 370, 0, D - 540) - cam) * Math.min(1, dt * 5);
   };
   m.draw = () => {
     ART.background(c, TH.meadow, W, 200, cam * 0.6, 0, t);
@@ -298,9 +298,9 @@ function mgMash() {
     for (const q of ps) {
       const x = clamp(110 + q.d - cam, 26, W - 20), y = LY[q.p] + 20;
       guy(q.p, x, y, 1.35, { face: 1, state: q.stun > 0 ? 'fall' : q.v > 40 ? 'run' : 'idle', t: q.v > 40 ? q.d / 150 : t });
-      tagDraw(q.p, x - 34, y - 32);
+      tagDraw(q.p, x, y - 66);
       if (q.fin >= 0) label(`${m.rankOf(q)}.º`, x + 30, y - 28, 22, '#ffd166');
-      if (q.fbT > 0) label(q.fb, x + 10, y - 60, 18, q.fb[1] === 'B' ? '#7cf7a0' : '#ff8a8a');
+      if (q.fbT > 0) label(q.fb, x + 60, y - 50, 18, q.fb[1] === 'B' ? '#7cf7a0' : '#ff8a8a');
       // medidor de ritmo (derecha)
       const gx = 624, gy = y - 34, gw = 150; panel(gx - 4, gy - 4, gw + 8 + 52, 38, 10, 'rgba(26,21,48,.78)', 2.5);
       const zx = (r) => gx + clamp(r / 2, 0, 1) * gw;
@@ -360,23 +360,23 @@ function mgTug() {
     for (const d of drops) { c.strokeStyle = `rgba(160,120,80,${d.t})`; c.lineWidth = 2; c.beginPath(); c.arc(d.x, 386, (0.6 - d.t) * 20, 0, TAU); c.stroke(); }
     for (const x of [400 - L, 400 + L]) { c.fillStyle = 'rgba(255,255,255,.5)'; c.fillRect(x - 2, 360, 4, 20); }
     // cuerda
-    const xl = px(2) - 14, xr = px(3) + 14, ry = 342;
+    const xl = px(2) - 16, xr = px(3) + 16, ry = 338;
     c.lineCap = 'round'; c.strokeStyle = OUT; c.lineWidth = 11; c.beginPath(); c.moveTo(xl, ry); c.quadraticCurveTo(400 + X, ry + 10, xr, ry); c.stroke();
     c.strokeStyle = '#d8b27a'; c.lineWidth = 6.5; c.stroke(); c.strokeStyle = '#a07a45'; c.setLineDash([6, 8]); c.lineWidth = 3; c.stroke(); c.setLineDash([]);
     c.beginPath(); c.moveTo(400 + X - 8, ry + 2); c.lineTo(400 + X + 8, ry + 2); c.lineTo(400 + X, ry + 26); c.closePath(); ART.fillOut(c, '#ff5a5f', 2.2);
     for (const q of ps) {
       const x = px(q.p), f = -dir(q.p), lean = dir(q.p) * (0.28 + (q.flash > 0 ? 0.12 : 0));
-      c.save(); c.translate(x, 372); c.rotate(lean); guy(q.p, 0, 0, 1.4, { face: f, state: q.stun > 0 ? 'fall' : 'idle' }); c.restore();
-      tagDraw(q.p, x, 290);
+      c.save(); c.translate(x, 372); c.rotate(lean); guy(q.p, 0, 0, 1.6, { face: f, state: q.stun > 0 ? 'fall' : 'idle' }); c.restore();
+      tagDraw(q.p, x, 278);
     }
     // compás: aro que se cierra sobre el nudo
     const fr = ph - Math.floor(ph), cx = 400, cy = 118;
     panel(cx - 120, cy - 64, 240, 128, 22, 'rgba(26,21,48,.55)', 2.5);
     c.beginPath(); c.arc(cx, cy, 24, 0, TAU); ART.fillOut(c, beatF > 0.5 ? '#ffe6a0' : '#ffd166', 3);
     label('A', cx, cy + 1, 22, '#fff', 'center', 4);
-    c.strokeStyle = '#fff'; c.lineWidth = 5; c.globalAlpha = 0.35 + 0.65 * fr; c.beginPath(); c.arc(cx, cy, 24 + 64 * (1 - fr), 0, TAU); c.stroke(); c.globalAlpha = 1;
-    if (beatF > 0) { c.strokeStyle = `rgba(255,209,102,${beatF})`; c.lineWidth = 4; c.beginPath(); c.arc(cx, cy, 30 + (1 - beatF) * 20, 0, TAU); c.stroke(); }
-    label(`${tag(0)} + ${tag(2)}`, 100, 420, 22, col(0)); label(`${tag(1)} + ${tag(3)}`, 700, 420, 22, col(1));
+    c.strokeStyle = '#fff'; c.lineWidth = 5; c.globalAlpha = 0.35 + 0.65 * fr; c.beginPath(); c.arc(cx, cy, 24 + 36 * (1 - fr), 0, TAU); c.stroke(); c.globalAlpha = 1;
+    if (beatF > 0) { c.strokeStyle = `rgba(255,209,102,${beatF})`; c.lineWidth = 4; c.beginPath(); c.arc(cx, cy, 28 + (1 - beatF) * 14, 0, TAU); c.stroke(); }
+    label(`${tag(0)} + ${tag(2)}`, 150, 118, 24, col(0)); label(`${tag(1)} + ${tag(3)}`, 650, 118, 24, col(1));
     label(`${Math.max(0, Math.ceil(32 - T))} s`, 400, 430, 20, '#fff');
   };
   return m;
@@ -487,10 +487,10 @@ function mgClock() {
     c.beginPath(); c.arc(cx, cy, R, 0, TAU); ART.fillOut(c, '#f5f1e6', 5);
     for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * TAU / 10; c.strokeStyle = OUT; c.lineWidth = 3; c.beginPath(); c.moveTo(cx + Math.cos(a) * (R - 16), cy + Math.sin(a) * (R - 16)); c.lineTo(cx + Math.cos(a) * (R - 5), cy + Math.sin(a) * (R - 5)); c.stroke(); }
     ART.rr(c, cx - 14, cy - R - 22, 28, 18, 5); ART.fillOut(c, '#c3ccd4', 3);
-    if (vis) { const a = -Math.PI / 2 + (T % 10) / 10 * TAU; c.strokeStyle = '#ff5a5f'; c.lineWidth = 5; c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(a) * (R - 18), cy + Math.sin(a) * (R - 18)); c.stroke(); label(st === 'reveal' ? 'Objetivo 7,00 s' : T.toFixed(2).replace('.', ',') + ' s', cx, cy + 36, 22, '#1a1530', 'center', 1); }
+    if (vis) { const a = -Math.PI / 2 + (T % 10) / 10 * TAU; c.strokeStyle = '#ff5a5f'; c.lineWidth = 5; c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(a) * (R - 18), cy + Math.sin(a) * (R - 18)); c.stroke(); if (st !== 'reveal') label(T.toFixed(2).replace('.', ',') + ' s', cx, cy + 36, 22, '#1a1530', 'center', 1); }
     else { c.beginPath(); c.arc(cx, cy, R - 6, 0, TAU); ART.fillOut(c, '#6e62f5', 3); label('?', cx, cy, 80, '#fff'); }
     c.beginPath(); c.arc(cx, cy, 7, 0, TAU); ART.fillOut(c, '#1a1530', 1);
-    label(st === 'run' ? (T < 3 ? 'Fíjate en el ritmo…' : 'Pulsa A a los 7 segundos') : 'Resultado', 400, 305, 26, '#fff');
+    label(st === 'run' ? (T < 3 ? 'Fíjate en el ritmo…' : 'Pulsa A a los 7 segundos') : 'Objetivo: 7,00 s', 400, 305, 26, st === 'run' ? '#fff' : '#ffd166');
     for (const q of ps) { const x = 100 + q.p * 200, y = 380;
       panel(x - 86, y - 36, 172, 70, 14, 'rgba(26,21,48,.85)', 3); c.strokeStyle = col(q.p); c.lineWidth = 4; ART.rr(c, x - 80, y - 30, 160, 58, 10); c.stroke();
       tagDraw(q.p, x, y - 40);
@@ -515,22 +515,22 @@ function mgNeedle() {
       q.aT += dt; q.ph += dt * TAU * q.f; q.x = Math.sin(q.ph);
       if (over) continue;
       const pr = cpu(q.p) ? q.aT > 0.6 && Math.abs(q.x) < q.thr : A(q.p);
-      if (pr) { q.stopT = T; const s = Math.round(100 * (1 - Math.abs(q.x))); q.res.push(s); k.float('+' + s, 400 + q.x * 250, 118 + q.p * 78, s >= 90 ? '#7cf7a0' : '#fff'); if (!cpu(q.p)) k.sfx(s >= 90 ? 'coin' : 'pop'); }
+      if (pr) { q.stopT = T; const s = Math.round(100 * (1 - Math.abs(q.x))); q.res.push(s); k.float('+' + s, 400 + q.x * 240, 118 + q.p * 78, s >= 90 ? '#7cf7a0' : '#fff'); if (!cpu(q.p)) k.sfx(s >= 90 ? 'coin' : 'pop'); }
     }
     if (!over && (ps.every((q) => q.att >= 3) || T > 30)) { over = true; endT = 1.6; k.sfx('coin'); m.rank = ps.map((q) => ps.filter((o) => tot(o) > tot(q)).length); }
     if (over && (endT -= dt) <= 0) m.done = true;
   };
   m.draw = () => {
     ART.background(c, TH.snow, W, H, 0, 0, t);
-    for (const q of ps) { const y = 130 + q.p * 78, x0 = 150, x1 = 650, cx = 400;
+    for (const q of ps) { const y = 130 + q.p * 78, x0 = 160, x1 = 640, cx = 400;
       panel(40, y - 30, 720, 60, 14, 'rgba(26,21,48,.8)', 3);
-      tagDraw(q.p, 90, y + 2);
+      tagDraw(q.p, 80, y + 2);
       c.fillStyle = '#5a5570'; c.fillRect(x0, y - 12, x1 - x0, 24);
       c.fillStyle = '#ffd166'; c.fillRect(cx - 125, y - 12, 250, 24); c.fillStyle = '#5fbf45'; c.fillRect(cx - 62, y - 12, 124, 24); c.fillStyle = '#fff'; c.fillRect(cx - 12, y - 12, 24, 24);
       c.strokeStyle = OUT; c.lineWidth = 2.5; c.strokeRect(x0, y - 12, x1 - x0, 24);
-      const nx = cx + q.x * 250; c.fillStyle = col(q.p); c.beginPath(); c.moveTo(nx, y - 16); c.lineTo(nx - 9, y - 28); c.lineTo(nx + 9, y - 28); c.closePath(); ART.fillOut(c, col(q.p), 2); c.fillStyle = OUT; c.fillRect(nx - 2, y - 16, 4, 32);
-      label(String(tot(q)), 715, y + 1, 24, m.rank && m.rank[q.p] === 0 ? '#7cf7a0' : '#fff');
-      label(`${Math.min(3, q.att + (q.stopT >= 0 && q.att < 3 ? 1 : 0))}/3`, x0 - 10, y + 1, 18, '#9a93c4', 'right');
+      const nx = cx + q.x * 240; c.fillStyle = col(q.p); c.beginPath(); c.moveTo(nx, y - 16); c.lineTo(nx - 9, y - 28); c.lineTo(nx + 9, y - 28); c.closePath(); ART.fillOut(c, col(q.p), 2); c.fillStyle = OUT; c.fillRect(nx - 2, y - 16, 4, 32);
+      label(String(tot(q)), 710, y + 1, 24, m.rank && m.rank[q.p] === 0 ? '#7cf7a0' : '#fff');
+      label(`${Math.min(3, q.att + (q.stopT >= 0 && q.att < 3 ? 1 : 0))}/3`, 136, y + 1, 18, '#c9c3ef', 'center');
     }
     label('¡Para la aguja en el centro!', 400, 60, 28, '#fff');
   };
@@ -590,9 +590,9 @@ k.run((dt) => {
 }, () => {
   const board = MODE === 'roulette' && (k.st === 'ready' || phase === 'board');
   if (board && (k.st === 'ready' || !G || round === 0)) ART.background(c, TH.night, W, H, 0, 0, t); else G.draw();
-  if (!demo) hud();
   if (board) drawBoard();
-  else if (!demo && k.st === 'play') {
+  if (!demo) hud();
+  if (!board && !demo && k.st === 'play') {
     if (phase === 'intro' || (phase === 'play' && k.counting())) banner();
     if (phase === 'result' && res) {
       panel(200, 150, 400, 110, 20, 'rgba(26,21,48,.88)', 4);
@@ -634,7 +634,7 @@ function drawBoard() {
   for (let i = 0; i < 8; i++) {
     const a0 = wRot + i * seg - Math.PI / 2;
     c.beginPath(); c.moveTo(cx, cy); c.arc(cx, cy, R, a0, a0 + seg); c.closePath(); c.fillStyle = WCOL[i]; c.fill(); c.strokeStyle = OUT; c.lineWidth = 3; c.stroke();
-    c.save(); c.translate(cx, cy); c.rotate(a0 + seg / 2); label(SHORT[KEYS[i]], R * 0.6, 0, 18, '#fff', 'center', 4); c.restore();
+    const am = a0 + seg / 2, flip = Math.cos(am) < 0; c.save(); c.translate(cx, cy); c.rotate(flip ? am + Math.PI : am); label(SHORT[KEYS[i]], flip ? -R * 0.6 : R * 0.6, 0, 18, '#fff', 'center', 4); c.restore();
   }
   c.beginPath(); c.arc(cx, cy, R, 0, TAU); c.lineWidth = 6; c.strokeStyle = OUT; c.stroke();
   c.beginPath(); c.arc(cx, cy, 24, 0, TAU); ART.fillOut(c, '#f5f1e6', 3); star(cx, cy, 13);
@@ -642,6 +642,6 @@ function drawBoard() {
   if (k.st === 'ready') { label('Ruleta de Minijuegos', 200, 150, 30, '#fff'); for (let i = 0; i < 8; i++) label(SHORT[KEYS[i]], 110 + (i % 2) * 180, 205 + Math.floor(i / 2) * 44, 22, WCOL[i]); return; }
   label(`Ronda ${round + 1} de ${RULE.rounds}`, 200, 78, 26, '#ffd166');
   const order = [0, 1, 2, 3].sort((a, b) => score[b] - score[a]), mx = Math.max(1, ...score);
-  order.forEach((p, i) => { const y = 130 + i * 58; panel(30, y - 22, 340, 46, 12, 'rgba(26,21,48,.9)', 2.5); tagDraw(p, 70, y + 1); ART.rr(c, 110, y - 9, 190 * score[p] / mx + 4, 18, 8); ART.fillOut(c, col(p), 2); label(String(score[p]), 356, y + 1, 24, '#fff', 'right'); });
+  order.forEach((p, i) => { const y = 130 + i * 58; panel(30, y - 22, 340, 46, 12, 'rgba(26,21,48,.9)', 2.5); tagDraw(p, 70, y + 1); if (score[p]) { ART.rr(c, 110, y - 9, 190 * score[p] / mx, 18, 8); ART.fillOut(c, col(p), 2); } label(String(score[p]), 356, y + 1, 24, '#fff', 'right'); });
   if (phT < 1 && seq && seq[round]) { panel(400, 390, 380, 50, 14, 'rgba(26,21,48,.92)', 3); label('Siguiente: ' + NAMES[seq[round]], 590, 415, 22, '#fff'); }
 }

@@ -1,16 +1,17 @@
 /* Bowling Flick con arte propio: pista de madera en perspectiva con cámara que sigue la bola, bolos con física (masa, choques entre bolos, caída animada).
  * Arrastra a los lados para colocar la bola y desliza hacia arriba para lanzar: la velocidad del gesto da fuerza y un desliz curvo da efecto.
  * Teclado: ← → colocar, ↑ ↓ ángulo, A lanzar. 10 frames con puntuación oficial (strike, spare y décimo frame con bolas extra). */
-const OUT = ART.OUT, R2 = 6.2832, W = 360, H = 640;
+const TURN = CFG.mode === 'turnos', OUT = ART.OUT, R2 = 6.2832, W = TURN ? 640 : 360, H = TURN ? 360 : 640, PCX = W / 2;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#1a1230' }), c = k.ctx;
-const LANE_W = 62, GUT = 13, LANE_L = 1800, PIT = 1660, BR = 11, PR = 6, PH = 38, F = 520, HY = 96, BASE = 610, SC = 2.45, PS = 2.6;
+const LANE_W = 62, GUT = 13, LANE_L = 1800, PIT = 1660, BR = 11, PR = 6, PH = 38, F = 520, HY = TURN ? 66 : 96, BASE = TURN ? 352 : 610, SC = TURN ? 1.7 : 2.45, PS = 2.6;
 let pins, ball, frames, frame, roll, state, standing, msg, msgT, msgC, aimX, aimA, cam, t = 0, kb, path, downT, strikes, spares, sweepT, pinSpr, ballSpr;
+let PL = [], seats = [], cur = 0, pw = 0, pwOn = false, pwT = 0, hookS = 0, introT = 0, aimT = 0, plan = null, lvlB = 0; // modo por turnos
 function rackPins() { pins = []; const rows = [[0], [-1, 1], [-2, 0, 2], [-3, -1, 1, 3]]; let id = 0; rows.forEach((r, i) => r.forEach((x) => pins.push({ id: id++, x: x * 15, y: 1500 + i * 26, vx: 0, vy: 0, down: false, gone: false, tilt: 0, fd: x ? Math.sign(x) : k.pick([-1, 1]), wob: 0, a: 1 }))); }
 function setBall() { ball = { x: aimX || 0, y: 30, vx: 0, vy: 0, hook: 0, rolling: false, gutter: false, rot: 0, a: 1 }; state = 'aim'; path = []; }
-function reset() { frames = []; frame = 0; roll = 0; aimX = 0; aimA = 0; cam = 0; kb = false; standing = 10; strikes = 0; spares = 0; rackPins(); setBall(); msg = ''; msgT = 0; }
+function reset() { frames = []; frame = 0; roll = 0; aimX = 0; aimA = 0; cam = 0; kb = false; standing = 10; strikes = 0; spares = 0; rackPins(); setBall(); msg = ''; msgT = 0; if (TURN) resetT(); }
 function score() { const r = frames.flat(); let s = 0, i = 0; const out = []; for (let f = 0; f < 10; f++) { if (r[i] === undefined) break; if (r[i] === 10) { if (r[i + 2] === undefined) break; s += 10 + r[i + 1] + r[i + 2]; i++; } else { if (r[i + 1] === undefined) break; if (r[i] + r[i + 1] === 10) { if (r[i + 2] === undefined) break; s += 10 + r[i + 2]; } else s += r[i] + r[i + 1]; i += 2; } out.push(s); } return out; }
 /* ---------- Proyección en perspectiva con cámara ---------- */
-const P = (x, y, z) => { const s = F / (F + Math.max(-F * 0.6, y - cam)); return [180 + x * s * SC, HY + (BASE - HY) * s - (z || 0) * s * SC, s]; };
+const P = (x, y, z) => { const s = F / (F + Math.max(-F * 0.6, y - cam)); return [PCX + x * s * SC, HY + (BASE - HY) * s - (z || 0) * s * SC, s]; };
 /* ---------- Sprites cacheados a 2× ---------- */
 function sprite(w, h, fn) { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const g = cv.getContext('2d'); g.scale(2, 2); fn(g); return cv; }
 function buildSprites() {
@@ -24,18 +25,20 @@ function buildSprites() {
     g.beginPath(); g.arc(32, 32, r, 0, R2); g.lineWidth = 2.5; g.strokeStyle = OUT; g.stroke(); g.fillStyle = 'rgba(255,255,255,.75)'; g.beginPath(); g.ellipse(22, 20, 7, 4.5, -0.6, 0, R2); g.fill(); });
 }
 buildSprites(); reset();
-k.show(CFG.title, 'Arrastra la bola a los lados para colocarla y desliza hacia arriba para lanzar: cuanto más rápido, más fuerte; un desliz curvo le da efecto. Teclado: ← → colocar, ↑ ↓ ángulo, A lanzar. 10 frames con puntuación oficial.');
+if (TURN) k.show(CFG.title, 'Bolos por turnos para 1–4 con marcador oficial. Joystick ← → coloca la bola, ↑ ↓ elige el efecto y mantén A: suelta cuando la barra de fuerza esté en verde. En el móvil también puedes arrastrar y deslizar hacia arriba.'); else k.show(CFG.title, 'Arrastra la bola a los lados para colocarla y desliza hacia arriba para lanzar: cuanto más rápido, más fuerte; un desliz curvo le da efecto. Teclado: ← → colocar, ↑ ↓ ángulo, A lanzar. 10 frames con puntuación oficial.');
 function launch(vy, ang, hook) { ball.vy = vy; ball.vx = Math.tan(ang) * vy + k.rnd(-12, 12); /* la pista nunca es perfecta */ ball.hook = hook; ball.rolling = true; state = 'roll'; k.sfx('shoot'); k.shake(2); }
 k.run((dt) => {
   t += dt; msgT -= dt; if (!k.gate(reset)) return;
+  if (TURN && turnAim(dt)) return;
   if (state === 'aim') { cam += (0 - cam) * Math.min(1, dt * 5);
     const bs = P(ball.x, ball.y)[2];
     if (k.ptr.hit) { path = []; downT = t; }
-    if (k.ptr.down) { path.push([k.ptr.x, k.ptr.y]); const dx = k.ptr.x - k.ptr.sx, dy = k.ptr.y - k.ptr.sy; if (k.ptr.sy > 430 && Math.abs(dy) < 28 && Math.abs(dx) > 6) { aimX = k.clamp((k.ptr.x - 180) / (bs * SC), -LANE_W + BR, LANE_W - BR); ball.x = aimX; path.moving = true; } }
+    if (k.ptr.down) { path.push([k.ptr.x, k.ptr.y]); const dx = k.ptr.x - k.ptr.sx, dy = k.ptr.y - k.ptr.sy; if (k.ptr.sy > H * 0.67 && Math.abs(dy) < 28 && Math.abs(dx) > 6) { aimX = k.clamp((k.ptr.x - PCX) / (bs * SC), -LANE_W + BR, LANE_W - BR); ball.x = aimX; path.moving = true; } }
     if (k.ptr.up) { const dx = k.ptr.x - k.ptr.sx, dy = k.ptr.sy - k.ptr.y;
       if (dy > 60 && !path.moving) { const L = Math.hypot(dx, dy), dur = Math.max(0.06, t - downT); let dev = 0; for (const [x, y] of path) { const d = ((x - k.ptr.sx) * -dy - (y - k.ptr.sy) * dx) / L; if (Math.abs(d) > Math.abs(dev)) dev = d; }
         launch(k.clamp(L / dur * 1.25, 650, 1750), k.clamp(Math.atan2(dx, dy) * 0.28, -0.12, 0.12), k.clamp(dev * 4, -170, 170)); }
       path = []; }
+    if (TURN) return;
     if (k.held.has('left')) { aimX = Math.max(-LANE_W + BR, aimX - 70 * dt); ball.x = aimX; kb = true; } if (k.held.has('right')) { aimX = Math.min(LANE_W - BR, aimX + 70 * dt); ball.x = aimX; kb = true; }
     if (k.held.has('up')) { aimA = Math.max(-0.08, aimA - 0.08 * dt); kb = true; } if (k.held.has('down')) { aimA = Math.min(0.08, aimA + 0.08 * dt); kb = true; }
     if (k.hit.has('a')) launch(1350, aimA, 0);
@@ -68,7 +71,7 @@ function evaluate() {
   const up = pins.filter((p) => !(p.down || p.gone)).length, pts = standing - up; frames[frame] = frames[frame] || []; frames[frame].push(pts); const fr = frames[frame];
   const strike = pts === 10 && standing === 10, spare = !strike && standing < 10 && up === 0;
   msg = strike ? '¡STRIKE!' : spare ? '¡SPARE!' : pts === 0 ? (ball.gutter ? 'Canal' : 'Cero') : `${pts} ${pts === 1 ? 'bolo' : 'bolos'}`; msgC = strike || spare ? '#f2d15c' : '#fff'; msgT = 1.3;
-  if (strike) { strikes++; k.sfx('win'); k.confetti(); k.shake(6); k.flash('rgba(255,240,180,.35)'); } else if (spare) { spares++; k.sfx('coin'); k.burst(180, 260, '#f2d15c', 24, 200); } else if (pts > 0) k.sfx('pop');
+  if (strike) { strikes++; k.sfx('win'); k.confetti(); k.shake(6); k.flash('rgba(255,240,180,.35)'); } else if (spare) { spares++; k.sfx('coin'); k.burst(PCX, TURN ? 150 : 260, '#f2d15c', 24, 200); } else if (pts > 0) k.sfx('pop');
   let mode = 'keep';
   if (frame < 9) mode = fr[0] === 10 || fr.length === 2 ? 'next' : 'keep';
   else if (fr.length === 3) mode = 'end';
@@ -78,6 +81,7 @@ function evaluate() {
 }
 function next() {
   const mode = pendMode;
+  if (TURN && (mode === 'end' || mode === 'next')) return nextPlayer();
   if (mode === 'end') { const total = score().pop() || 0; k.st = 'over'; k.end(CFG.id, total, total >= 200 ? '¡Partidón!' : 'Partida terminada', `${strikes} strikes · ${spares} spares`); return; }
   if (mode === 'next') { frame++; roll = 0; rackPins(); standing = 10; }
   else if (mode === 'rerack') { roll++; rackPins(); standing = 10; }
@@ -122,13 +126,15 @@ function draw() {
     c.save(); c.translate(x, y); const tilt = o.tilt * (Math.PI / 2) * o.fd + Math.sin(t * 30) * o.wob * 0.08; c.rotate(tilt); if (o.down) c.translate(0, o.tilt * 4 * s * SC); c.drawImage(pinSpr, -20 * sc, -102 * sc, 40 * sc, 104 * sc); c.restore(); c.globalAlpha = 1;
   }
   // guía de lanzamiento
-  if (state === 'aim') { const [bx, by, bs] = P(ball.x, ball.y); let ang = aimA; if (k.ptr.down && !path.moving) { const dx = k.ptr.x - k.ptr.sx, dy = k.ptr.sy - k.ptr.y; if (dy > 20) ang = k.clamp(Math.atan2(dx, dy) * 0.28, -0.12, 0.12); }
+  if (TURN) guideT();
+  else if (state === 'aim') { const [bx, by, bs] = P(ball.x, ball.y); let ang = aimA; if (k.ptr.down && !path.moving) { const dx = k.ptr.x - k.ptr.sx, dy = k.ptr.sy - k.ptr.y; if (dy > 20) ang = k.clamp(Math.atan2(dx, dy) * 0.28, -0.12, 0.12); }
     if (kb || (k.ptr.down && !path.moving)) { c.fillStyle = 'rgba(255,255,255,.75)'; for (let i = 1; i < 16; i++) { const yy = ball.y + i * 90, [x, y, s] = P(ball.x + Math.tan(ang) * i * 90, yy); if (yy > 1480) break; c.globalAlpha = 1 - i / 16; c.beginPath(); c.arc(x, y, 3 * s * SC / 2, 0, R2); c.fill(); } c.globalAlpha = 1; }
     if (!k.ptr.down && !kb) { const e = (t % 1.5) / 1.5; c.globalAlpha = 1 - e; c.strokeStyle = '#fff'; c.lineWidth = 3; c.lineCap = 'round'; const yy = by - 40 - e * 90; c.beginPath(); c.moveTo(bx, by - 40); c.lineTo(bx, yy); c.moveTo(bx - 8, yy + 9); c.lineTo(bx, yy); c.lineTo(bx + 8, yy + 9); c.stroke(); c.globalAlpha = 1;
       label('← arrastra →', bx, by + 30, 12, 'rgba(255,255,255,.8)', 'center'); } }
   hud();
 }
 function hud() {
+  if (TURN) return hudT();
   const sc = score(); ART.rr(c, 4, 4, W - 8, 56, 8); c.fillStyle = 'rgba(12,8,24,.85)'; c.fill(); c.lineWidth = 2; c.strokeStyle = '#6e62f5'; c.stroke();
   for (let f = 0; f < 10; f++) { const w = f === 9 ? 46 : 32.5, x = 8 + f * 33.7, cur = f === frame && k.st === 'play'; ART.rr(c, x, 8, w - 2, 48, 5); c.fillStyle = cur ? 'rgba(242,209,92,.22)' : 'rgba(255,255,255,.07)'; c.fill(); if (cur) { c.strokeStyle = '#f2d15c'; c.lineWidth = 1.5; c.stroke(); }
     const fr = frames[f] || [], n = f === 9 ? 3 : 2, bw = (w - 2) / n; for (let i = 0; i < n; i++) { const v = fr[i]; const bx = x + i * bw; c.strokeStyle = 'rgba(255,255,255,.18)'; c.lineWidth = 1; c.strokeRect(bx + 1.5, 10, bw - 3, 16); if (v === undefined) continue;
@@ -144,3 +150,74 @@ function hud() {
 function marks(f, fr) { return fr.map((v, i) => { const fresh = i === 0 || (f === 9 && (i === 1 ? fr[0] === 10 : fr[0] === 10 ? fr[1] === 10 : fr[0] + fr[1] === 10));
   return fresh ? (v === 10 ? 'X' : v ? String(v) : '-') : fr[i - 1] + v === 10 ? '/' : v ? String(v) : '-'; }); }
 function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
+
+/* ================= Bolera del Barrio (CFG.mode 'turnos') =================
+ * 1–4 jugadores por turnos con el marcador oficial de cada uno: cada jugador tira su frame completo y pasa el turno.
+ * Mando: ← → posición, ↑ ↓ efecto (−3..3, la bola engancha en el último tramo), A mantenido = barra de fuerza (se suelta para tirar; en rojo la bola sale torcida).
+ * La CPU rellena plazas: calcula la posición para entrar en el hueco 1-3 según efecto y fuerza, con un error que baja con su nivel (cpu:<id>). */
+const LSB = 'cpu:' + CFG.id; try { lvlB = +localStorage.getItem(LSB) || 0; } catch (e) {}
+function nPl() { if (!k.party) return 2; return Math.max(2, ...k.party.map((q) => q.p + 1)); }
+function resetT() { seats = k.players(nPl()); PL = seats.map((q) => ({ p: q.p, frames: [], st: 0, sp: 0, ax: 0, hk: 0 })); frame = 0; loadT(0); }
+function loadT(i) { cur = i; const q = PL[i]; frames = q.frames; strikes = q.st; spares = q.sp; aimX = q.ax; hookS = q.hk; roll = 0; rackPins(); standing = 10; setBall(); state = 'intro'; introT = 1.2; pw = 0; pwOn = false; aimT = 0; plan = null; }
+function saveT() { const q = PL[cur]; q.st = strikes; q.sp = spares; q.ax = aimX; q.hk = hookS; }
+function nextPlayer() { saveT(); let n = cur + 1; if (n >= PL.length) { n = 0; frame++; } if (frame >= 10) return finishT(); loadT(n); }
+k.onParty = () => { if (TURN && PL.length) seats = k.players(PL.length); };
+const nmB = (i) => (seats[i].cpu ? 'CPU' : String(seats[i].name).slice(0, 8));
+function scoreOf(fr) { const sv = frames; frames = fr; const r = score(); frames = sv; return r; }
+function finishT() { k.st = 'over'; state = 'done'; const rows = PL.map((q, i) => ({ p: q.p, score: scoreOf(q.frames).pop() || 0 })); const hum = seats.filter((q) => !q.cpu);
+  if (hum.length === 1) { const best = rows.slice().sort((a, b) => b.score - a.score)[0]; lvlB = seats[best.p].cpu ? Math.max(0, lvlB - 1) : Math.min(6, lvlB + 1); try { localStorage.setItem(LSB, lvlB); } catch (e) {} }
+  k.podium(rows, { fmt: (v) => `${v} puntos` }); }
+function launchT(p) { pwOn = false; const vy = 700 + p * 1000; launch(vy, 0, hookS * 45); if (p > 0.88) ball.vx += k.rnd(-1, 1) * (p - 0.88) * 320; plan = null; }
+function turnAim(dt) {
+  if (state === 'intro') { cam += (0 - cam) * Math.min(1, dt * 5); introT -= dt; if (introT <= 0) state = 'aim'; return true; }
+  if (state !== 'aim') return false;
+  cam += (0 - cam) * Math.min(1, dt * 5); aimT += dt;
+  if (seats[cur].cpu) { cpuBowl(dt); return true; }
+  const p = seats[cur].p;
+  if (k.pheld(p, 'left')) { aimX = Math.max(-LANE_W + BR, aimX - 70 * dt); ball.x = aimX; } if (k.pheld(p, 'right')) { aimX = Math.min(LANE_W - BR, aimX + 70 * dt); ball.x = aimX; }
+  if (k.phit(p, 'up')) { hookS = Math.min(3, hookS + 1); k.sfx('click'); } if (k.phit(p, 'down')) { hookS = Math.max(-3, hookS - 1); k.sfx('click'); }
+  if (k.pheld(p, 'a')) { if (!pwOn) { pwOn = true; pwT = 0; k.sfx('click'); } pwT += dt; const u = (pwT * 0.7) % 2; pw = u < 1 ? u : 2 - u; }
+  else if (pwOn) { launchT(pw); return true; }
+  if (aimT > 15) { launchT(pwOn ? pw : 0.6); return true; }
+  return !!k.party; // en local el puntero (arrastrar y deslizar) sigue funcionando
+}
+function cpuBowl(dt) {
+  if (!plan) { const hk = k.pick([-2, -1, 0, 1, 2, lvlB > 2 ? 2 : 1]), p = k.clamp(0.66 + (Math.random() - 0.5) * Math.max(0.1, 0.4 - lvlB * 0.04), 0.35, 0.86), vy = 700 + p * 1000, T = (1500 - 750) / vy;
+    const tgt = (hk >= 0 ? 1 : -1) * 9, x0 = tgt - 0.5 * hk * 45 * T * T + k.rnd(-1, 1) * Math.max(4, 17 - lvlB * 2); plan = { x0: k.clamp(x0, -LANE_W + BR, LANE_W - BR), hk, p, t: 0, st: 0 }; }
+  plan.t += dt; const d = plan.x0 - aimX; if (Math.abs(d) > 1) { aimX += Math.sign(d) * Math.min(Math.abs(d), 70 * dt); ball.x = aimX; }
+  if (hookS !== plan.hk && (plan.st += dt) > 0.25) { plan.st = 0; hookS += Math.sign(plan.hk - hookS); k.sfx('click'); }
+  if (Math.abs(d) <= 1 && hookS === plan.hk && plan.t > 1) { pwOn = true; pw = Math.min(plan.p, pw + dt * 0.8); if (pw >= plan.p) launchT(plan.p); }
+}
+/* trayectoria prevista: recta hasta la marca de 750 y luego engancha (x = x0 + ½·efecto·t²) */
+function guideT() { if (state !== 'aim' || k.st !== 'play') return; const p = pwOn ? pw : 0.6, vy = 700 + p * 1000, hk = hookS * 45, col = k.pcol(PL[cur].p);
+  for (let i = 1; i < 30; i++) { const y = ball.y + i * 50; if (y > 1490) break; const tt = Math.max(0, (y - 750) / vy), x = aimX + 0.5 * hk * tt * tt; if (Math.abs(x) > LANE_W) break; const [px, py, s] = P(x, y); c.globalAlpha = 0.9 - i / 36; c.beginPath(); c.arc(px, py, Math.max(1.5, 3.2 * s * SC / 2), 0, R2); ART.fillOut(c, col, 1); }
+  c.globalAlpha = 1; }
+function hudT() {
+  // tarjeta del jugador en turno
+  const q = PL[cur], col = k.pcol(q.p), sc = score(); ART.rr(c, 4, 4, W - 8, 50, 8); c.fillStyle = 'rgba(12,8,24,.88)'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = col; c.stroke();
+  label(nmB(cur), 12, 8, 18, col); label(String(sc.length ? sc[sc.length - 1] : 0), 12, 30, 16, '#fff');
+  for (let f = 0; f < 10; f++) { const w = f === 9 ? 62 : 52, x = 92 + f * 53, now = f === frame && k.st === 'play'; ART.rr(c, x, 8, w - 2, 42, 5); c.fillStyle = now ? ART.alpha(col, 0.25) : 'rgba(255,255,255,.07)'; c.fill(); if (now) { c.strokeStyle = col; c.lineWidth = 1.5; c.stroke(); }
+    const fr = frames[f] || [], n = f === 9 ? 3 : 2, bw = (w - 2) / n, mk = marks(f, fr); for (let i = 0; i < n; i++) { const bx = x + i * bw; c.strokeStyle = 'rgba(255,255,255,.18)'; c.lineWidth = 1; c.strokeRect(bx + 1.5, 10, bw - 3, 17); if (fr[i] === undefined) continue;
+      c.font = '800 13px ui-rounded,system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = mk[i] === 'X' ? '#ff5fa2' : mk[i] === '/' ? '#5ce1e6' : '#fff'; c.fillText(mk[i], bx + bw / 2, 19); }
+    if (sc[f] !== undefined) label(String(sc[f]), x + (w - 2) / 2, 30, 15, '#f2d15c', 'center'); else label(String(f + 1), x + (w - 2) / 2, 32, 11, 'rgba(255,255,255,.35)', 'center'); }
+  // clasificación
+  const rows = PL.map((pl, i) => ({ i, s: i === cur ? (sc[sc.length - 1] || 0) : scoreOf(pl.frames).pop() || 0 }));
+  ART.rr(c, 6, 62, 150, 12 + rows.length * 30, 10); c.fillStyle = 'rgba(12,8,24,.75)'; c.fill();
+  rows.forEach((r, j) => { const y = 68 + j * 30, cc = k.pcol(PL[r.i].p), me = r.i === cur; if (me) { ART.rr(c, 9, y - 1, 144, 28, 8); c.fillStyle = ART.alpha(cc, 0.3); c.fill(); }
+    c.beginPath(); c.arc(24, y + 13, 8, 0, R2); ART.fillOut(c, cc, 2); label(nmB(r.i), 38, y + 4, 16, me ? '#fff' : '#d8d4f0'); label(String(r.s), 146, y + 4, 16, '#f2d15c', 'right'); });
+  // bolos en pie
+  ART.rr(c, W - 74, 62, 66, 58, 8); c.fillStyle = 'rgba(12,8,24,.75)'; c.fill(); const ids = new Set(pins.filter((p) => !p.down && !p.gone).map((p) => p.id)); const L = [[0, 0], [-1, 1], [1, 1], [-2, 2], [0, 2], [2, 2], [-3, 3], [-1, 3], [1, 3], [3, 3]];
+  L.forEach(([x, r], i) => { const px = W - 41 + x * 7, py = 110 - r * 12.5; c.beginPath(); c.arc(px, py, 4.6, 0, R2); c.fillStyle = ids.has(i) ? '#fff' : 'rgba(255,255,255,.15)'; c.fill(); c.lineWidth = 1.2; c.strokeStyle = OUT; c.stroke(); });
+  label(`Frame ${Math.min(10, frame + 1)} · Bola ${roll + 1}`, W - 10, 124, 13, '#e6e1ff', 'right');
+  // efecto y fuerza
+  if (state === 'aim' && k.st === 'play') { const bx = W - 60, by = 170; ART.rr(c, bx - 34, by - 10, 88, 176, 10); c.fillStyle = 'rgba(12,8,24,.75)'; c.fill();
+    label('Efecto', bx + 10, by - 4, 13, '#e6e1ff', 'center'); c.strokeStyle = OUT; c.lineWidth = 6; c.lineCap = 'round'; const cv = hookS * 7; c.beginPath(); c.moveTo(bx + 10, by + 50); c.quadraticCurveTo(bx + 10, by + 26, bx + 10 + cv, by + 16); c.stroke(); c.strokeStyle = hookS ? '#5ce1e6' : '#fff'; c.lineWidth = 3; c.stroke();
+    label(hookS ? `${hookS > 0 ? '→' : '←'} ${Math.abs(hookS)}` : 'recto', bx + 10, by + 54, 14, '#fff', 'center');
+    const px = bx - 2, py = by + 76, ph = 78; ART.rr(c, px - 2, py - 2, 28, ph + 4, 6); c.fillStyle = 'rgba(0,0,0,.5)'; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
+    c.fillStyle = 'rgba(95,211,95,.4)'; c.fillRect(px + 2, py + ph * (1 - 0.88), 20, ph * 0.43); c.fillStyle = 'rgba(255,77,94,.45)'; c.fillRect(px + 2, py, 20, ph * 0.12);
+    const hh = ph * pw; c.fillStyle = pw > 0.88 ? '#ff4d5e' : pw >= 0.45 ? '#5fd35f' : '#ffd166'; c.fillRect(px + 5, py + ph - hh, 14, hh); label('Fuerza', px + 34, py + ph - 12, 11, '#fff', 'left'); }
+  if (state === 'aim' && k.st === 'play' && !seats[cur].cpu && frame === 0 && aimT < 4) label(k.party ? '← → posición · ↑ ↓ efecto · mantén A' : '← → posición · ↑ ↓ efecto · mantén A (o desliza)', PCX, H - 26, 14, '#fff', 'center');
+  if (state === 'intro' && k.st === 'play') { const e = Math.min(1, (1.2 - introT) / 0.2); c.save(); c.translate(PCX, 190); c.scale(0.7 + 0.3 * e, 0.7 + 0.3 * e); c.globalAlpha = Math.min(1, introT / 0.25); ART.rr(c, -140, -34, 280, 68, 16); c.fillStyle = 'rgba(26,21,48,.85)'; c.fill(); c.lineWidth = 3; c.strokeStyle = col; c.stroke();
+    label(`Turno de ${nmB(cur)}`, 0, -28, 26, col, 'center'); label(`Frame ${frame + 1}`, 0, 4, 18, '#fff', 'center'); c.restore(); c.globalAlpha = 1; }
+  if (msgT > 0) { const e = Math.min(1, (1.3 - msgT) / 0.16), s = 0.5 + 0.5 * e + Math.sin(e * Math.PI) * 0.25; c.save(); c.translate(PCX, 190); c.scale(s, s); c.globalAlpha = Math.min(1, msgT / 0.3); label(msg, 0, -22, msg.length > 8 ? 32 : 40, msgC, 'center'); c.restore(); c.globalAlpha = 1; }
+}
