@@ -46,7 +46,8 @@ final class Arcade_Portal {
 	/** /manifest.webmanifest: el portal se puede instalar como app en el móvil. */
 	public static function manifest() {
 		$path = wp_parse_url( isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '', PHP_URL_PATH ); // phpcs:ignore
-		if ( '/manifest.webmanifest' !== $path ) {
+		$base = rtrim( (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH ), '/' ); // WordPress en subcarpeta
+		if ( $base . '/manifest.webmanifest' !== $path ) {
 			return;
 		}
 		$img = plugins_url( 'assets/img/', __FILE__ );

@@ -481,7 +481,9 @@ const HG = (() => {
     if (msgT > 0 && lastMsg) { c.save(); c.globalAlpha = Math.min(1, msgT * 3); const [ax, ay, aw] = L.art; c.font = FONT(18, 900); const mw = Math.min(aw - 20, c.measureText(lastMsg).width + 30); panel(ax + aw / 2 - mw / 2, ay + 12, mw, 36, 18, '#f4f0ff', { drop: 3 }); txt(lastMsg, ax + aw / 2, ay + 31, fitSize(lastMsg, mw - 16, 18, 12, 900), OUT, 'center', 900); c.restore(); }
     if (cur && wi === 0 && !cur.cpu && guessed.size < 3) { const tip = k.party ? 'Joystick: letra · A: elegir' : 'Toca una letra (o escríbela)'; txt(tip, L.art[0] + L.art[2] / 2, L.art[1] + L.art[3] - 40, 15, OUT, 'center', 800); }
   }
-  k.onParty = () => { if (MODE === 'hang' && k.st !== 'play') reset(); };
+  k.onParty = () => { if (MODE !== 'hang') return; if (k.st !== 'play' || !seats) return reset();
+    /* en partida: la CPU ocupa el sitio de quien se va (y lo devuelve si vuelve) */
+    for (const s of seats) { const h = k.human(s.p); if (s.cpu !== h) continue; const q = k.party && k.party.find((x) => x.p === s.p); s.cpu = !h; s.name = h ? (q && q.name) || (k.party ? 'J' + (s.p + 1) : 'Tú') : 'CPU'; if (words && phase === 'turn' && seats[turn] === s) startTurn(); } };
   return { st: () => ({ seats, words, wi, phase, turn, miss, guessed }), reset, update, draw, onKey, intro: 'Adivina la palabra letra a letra antes de que se complete el dibujo. Acertar suma 10 por letra y repites turno; completar la palabra da 30 más. Cinco palabras por partida.' };
 })();
 

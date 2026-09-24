@@ -36,10 +36,11 @@ k.run((dt) => {
   if (p.on) { const q = p.on; p.a += dt * (96 + 60 * ez(best)) / q.r; walkT += dt; p.x = q.x + Math.cos(p.a) * (q.r + 8); p.y = q.y + Math.sin(p.a) * (q.r + 8);
     if (k.ptr.hit || k.hit.has('a') || k.hit.has('up')) { const nx = Math.cos(p.a), ny = Math.sin(p.a); p.vx = nx * 340; p.vy = ny * 340; p.on = null; p.from = q; k.sfx('jump'); for (let i = 0; i < 10; i++) jet.push({ x: p.x, y: p.y, vx: -nx * k.rnd(40, 140) + k.rnd(-40, 40), vy: -ny * k.rnd(40, 140) + k.rnd(-40, 40), l: 0.5, c: '#ffd9a0' }); } }
   else { for (const q of planets) { if (Math.abs(q.x - p.x) > 500) continue; const dx = q.x - p.x, dy = q.y - p.y, d2 = dx * dx + dy * dy, d = Math.sqrt(d2); const f = q.r * q.r * (q === p.from ? 40 : 230) / d2; p.vx += dx / d * f * dt; p.vy += dy / d * f * dt;
-      if (d < q.r + 8) { p.on = q; p.a = Math.atan2(p.y - q.y, p.x - q.x); k.sfx('pop'); land = 0.25; k.burst(p.x - cam, p.y, `hsl(${q.hue},80%,75%)`, 10, 100);
+      if (d < q.r + 8) { p.on = q; p.air = 0; p.a = Math.atan2(p.y - q.y, p.x - q.x); k.sfx('pop'); land = 0.25; k.burst(p.x - cam, p.y, `hsl(${q.hue},80%,75%)`, 10, 100);
         if (q !== p.from) { const idx = planets.indexOf(q); if (idx > best) { const gain = (idx - best) * 50; score += gain; k.float(idx - best > 1 ? `¡Salto x${idx - best}! +${gain}` : `+${gain}`, p.x - cam, p.y - 30, '#7cf7a0'); best = idx; } } p.vx = p.vy = 0; break; } }
     p.x += p.vx * dt; p.y += p.vy * dt; if (Math.random() < 0.6) jet.push({ x: p.x, y: p.y, vx: -p.vx * 0.2 + k.rnd(-20, 20), vy: -p.vy * 0.2 + k.rnd(-20, 20), l: 0.4, c: '#9fe8ff' });
-    if (p.y < -400 || p.y > 760 || p.x < cam - 300) return k.lose(CFG.id, score, 'Perdido en el espacio', `${best} planetas`); }
+    p.air = (p.air || 0) + dt; /* órbita cerrada sin tocar planeta: no puede durar para siempre */
+    if (p.y < -400 || p.y > 760 || p.x < cam - 300 || p.air > 9) return k.lose(CFG.id, score, 'Perdido en el espacio', `${best} planetas`); }
   for (const g of gems) if (!g.got && Math.hypot(g.x - p.x, g.y - p.y) < 24) { g.got = true; score += 25; k.sfx('coin'); k.burst(g.x - cam, g.y, '#f2d15c', 12); k.float('+25', g.x - cam, g.y - 16, '#f2d15c'); }
   cam += (p.x - 220 - cam) * Math.min(1, dt * 2);
   if (best >= planets.length - 5) { const l = planets[planets.length - 1]; for (let i = 0; i < 20; i++) { const q = nextPlanet(planets[planets.length - 1], planets.length); planets.push(q); gems.push({ x: q.x, y: q.y - q.r - 60, got: false }); } }

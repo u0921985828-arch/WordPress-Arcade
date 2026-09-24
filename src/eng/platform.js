@@ -105,7 +105,12 @@ k.run((dt) => {
   upVert(dt, J, kx);
 }, draw);
 
-function landTiles(o, dt) { // vigas de un solo sentido: se atraviesan desde abajo
+function landTiles(o, dt) { // vigas de un solo sentido: se atraviesan desde abajo (subpasos: a pocos FPS la caída supera el grosor de la viga)
+  const n = Math.min(4, Math.ceil(Math.abs(o.vy) * dt / 10)) || 1;
+  if (n === 1 || o.vy < 0) return landTiles1(o, dt);
+  for (let i = 0; i < n; i++) { landTiles1(o, dt / n); if (o.ground) return; }
+}
+function landTiles1(o, dt) {
   const oldB = o.y + o.h; o.y += o.vy * dt; o.ground = false; if (o.vy < 0) return;
   for (const xx of [o.x + 2, o.x + o.w - 2]) { const v = tileAt(xx, o.y + o.h); if (v === 1 || v === 2) { const top = Math.floor((o.y + o.h) / T) * T; if (oldB <= top + 2) { o.y = top - o.h; o.vy = 0; o.ground = true; return; } } }
 }

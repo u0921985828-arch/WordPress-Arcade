@@ -5,7 +5,17 @@ const COL = ['#ff5f5f', '#4cc3ff', '#ffd23d', '#5fe08a', '#b77cff', '#ff9a3d', '
 let tubes, sel, level, moves, done, hist, pour, fly, hidden, wob, liftA, init, winT, kc, kbd, fullT;
 const BR = 19, SL = 44, TW = 54, TH = CAP * SL + 18;
 function build() { const n = Math.min(9, 3 + Math.floor((level - 1) * 2 / 3)); /* 1.23: nivel 1-2: 3 colores, sube más despacio */ const all = []; for (let i = 0; i < n; i++) for (let j = 0; j < CAP; j++) all.push(i); k.shuffle(all); tubes = []; for (let i = 0; i < n; i++) tubes.push(all.slice(i * CAP, i * CAP + CAP)); tubes.push([], []); if (level <= 3) tubes.push([]); /* 1.23: tubo vacío extra al principio */ sel = null; moves = 0; done = false; hist = []; if (tubes.every((t) => !t.length || (t.length === CAP && t.every((v) => v === t[0])))) build();
+  if (!csOk(tubes) && ++csTry < 40) return build(); csTry = 0;
   init = JSON.stringify(tubes); fly = []; hidden = tubes.map(() => 0); wob = tubes.map(() => 0); fullT = tubes.map(() => 0); liftA = 0; winT = 0; kc = 0; }
+/* 1.23: el barajado aleatorio podía dar tableros sin solución → búsqueda en profundidad acotada antes de aceptarlo */
+let csTry = 0;
+function csOk(T) { const full = (x) => x.length === CAP && x.every((v) => v === x[0]), seen = new Set(); let n = 0;
+  const dfs = (t) => { if (t.every((x) => !x.length || full(x))) return true; if (++n > 40000) return false; const key = t.map((x) => x.join('')).sort().join('|'); if (seen.has(key)) return false; seen.add(key);
+    for (let a = 0; a < t.length; a++) { const A = t[a]; if (!A.length || full(A)) continue; const top = A[A.length - 1]; let run = 0; for (let i = A.length - 1; i >= 0 && A[i] === top; i--) run++;
+      for (let b = 0; b < t.length; b++) { const B = t[b]; if (a === b || B.length >= CAP || (B.length && B[B.length - 1] !== top) || (!B.length && run === A.length)) continue;
+        const t2 = t.map((x) => x.slice()); for (let i = Math.min(run, CAP - B.length); i > 0; i--) t2[b].push(t2[a].pop()); if (dfs(t2)) return true; } }
+    return false; };
+  return dfs(T.map((x) => x.slice())); }
 function layout(i) { const n = tubes.length, rows = n > 6 ? 2 : 1, perRow = Math.ceil(n / rows), row = Math.floor(i / perRow), inRow = Math.min(perRow, n - row * perRow), col = i - row * perRow, sp = Math.min(80, 460 / perRow);
   return [W / 2 - (inRow - 1) * sp / 2 + col * sp - TW / 2, rows === 1 ? 250 : 138 + row * 250, TW, TH]; }
 const slot = (i, j) => { const [x, y] = layout(i); return [x + TW / 2, y + TH - 9 - BR - j * SL]; };

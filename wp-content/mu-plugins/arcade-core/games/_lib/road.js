@@ -38,7 +38,7 @@ function reset() { buildTrack(); pos = 0; speed = 0; px = 0; py = 0; pvy = 0; la
   cd = M === 'race' ? 2.4 : 0; lastHit = null; skyX = 0; dist = 0; nextRow = 50; rowN = 0; coins = 0; fx = []; driftT = 0; bump = 0; lean = 0; hitT = 0; inv = 0;
   maxSpeed = M === 'race' ? (TH === 'neon' ? 13000 : TH === 'canyon' ? 10500 : 12000) : 5200;
   const cols = ['#ff6b6b', '#f2d15c', '#5ce1e6', '#b98cff', '#ffa94d', '#7cf7a0'];
-  cars = M === 'race' ? cols.map((col, i) => { const z = PLZ + (Math.floor(i / 2) + 1) * SEG * 3; return { z, dist: z, x: i % 2 ? 0.45 : -0.45, tx: i % 2 ? 0.45 : -0.45, base: maxSpeed * (0.58 + CUP * 0.0125 + (5 - i) * 0.03), sp: 0, col, img: TH === 'canyon' ? kartSpr(col, k.pick(['#fff', '#1a1530', '#f2d15c'])) : carSpr(col) }; }) : [];
+  cars = M === 'race' ? cols.map((col, i) => { const z = PLZ + (Math.floor(i / 2) + 1) * SEG * 3; return { z, dist: z, x: i % 2 ? 0.45 : -0.45, tx: i % 2 ? 0.45 : -0.45, base: maxSpeed * (0.62 + CUP * 0.0175 + (5 - i) * 0.035), sp: 0, col, img: TH === 'canyon' ? kartSpr(col, k.pick(['#fff', '#1a1530', '#f2d15c'])) : carSpr(col) }; }) : [];
   if (M === 'lanes') { speed = vmax = LV0 * maxSpeed; placeRows(); }
   if (M === 'race' && CUP) k.float(`Copa ${CUP + 1}: rivales más rápidos`, W / 2, H * 0.3, '#f2d15c');
 }

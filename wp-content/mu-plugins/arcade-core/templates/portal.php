@@ -190,7 +190,7 @@ elseif ( is_tax() || is_post_type_archive( 'game' ) || is_search() ) :
 	<header class="ax-head" style="--c:<?php echo esc_attr( $c ?: '#6e62f5' ); ?>">
 		<div><span class="ax-kicker"><?php echo esc_html( $kick ); ?></span><h1><?php echo esc_html( $h ); ?></h1><p><?php echo $desc ? esc_html( $desc ) . ' ' : ''; ?><b><?php echo (int) $wp_query->post_count; ?> juegos</b></p></div>
 		<?php if ( $wp_query->post_count > 6 && ! is_search() ) : ?>
-			<div class="ax-sort" role="group" aria-label="Ordenar"><button type="button" class="on" data-sort="pop">Populares</button><button type="button" data-sort="az">A-Z</button><button type="button" data-sort="new">Nuevos</button></div>
+			<div class="ax-sort" role="group" aria-label="Ordenar"><button type="button" data-sort="pop">Populares</button><button type="button" class="on" data-sort="az">A-Z</button><button type="button" data-sort="new">Nuevos</button></div>
 		<?php endif; ?>
 	</header>
 	<?php if ( have_posts() ) : ?>

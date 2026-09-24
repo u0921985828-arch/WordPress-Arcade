@@ -32,7 +32,7 @@ function gravity() {
     for (let y = w; y >= 0; y--) { b[y][x] = rnd(); off[y][x] = (w + 1) * S + 20; vel[y][x] = 0; } }
   clearing = null; check = true;
 }
-function reshuffle() { k.float('Sin jugadas: nuevo tablero', 240, OY + N * S / 2, '#fff38a'); k.sfx('explode'); fill(); check = true; }
+function reshuffle() { hint = null; idle = 0; k.float('Sin jugadas: nuevo tablero', 240, OY + N * S / 2, '#fff38a'); k.sfx('explode'); fill(); check = true; }
 function reset() { score = 0; level = 1; moves = 30; target = 650; prevT = 0; time = 135; combo = 0; fill(); sel = null; clearing = null; swapA = null; check = true; cur = [3, 3]; kbd = false; idle = 0; hint = null; comboT = 0; lvlT = 0; queued = null; }
 
 /* ---------- Gráficos cacheados ---------- */

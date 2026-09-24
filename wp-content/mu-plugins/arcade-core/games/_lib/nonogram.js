@@ -20,7 +20,7 @@ function check() {
   // líneas recién completadas: destello y sonido
   for (let y = 0; y < N; y++) { const ok = rowDone(y); if (ok && !rowOk[y]) { pulse.r[y] = 1; k.sfx('coin'); } rowOk[y] = ok; }
   for (let x = 0; x < N; x++) { const ok = colDone(x); if (ok && !colOk[x]) { pulse.c[x] = 1; k.sfx('coin'); } colOk[x] = ok; }
-  const ok = rowOk.every(Boolean) && colOk.every(Boolean); if (ok) { solved = true; revT = 0.001; k.sfx('win'); }
+  const ok = rowOk.every(Boolean) && colOk.every(Boolean); if (ok) { solved = true; revT = 0.001; k.best(CFG.id, puzzle + 1); /* 1.23: récord = puzzles resueltos */ k.sfx('win'); }
 }
 function reset() { if (puzzle === undefined) puzzle = 0; else puzzle++; build(); if (!tool) tool = 1; }
 function setCell(x, y) { if (grid[y][x] === paint) return; if (paint === 0 ? grid[y][x] !== from : grid[y][x] !== 0) return; grid[y][x] = paint; check(); }

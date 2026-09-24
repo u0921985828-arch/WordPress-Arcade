@@ -85,7 +85,7 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
     k.pdir = (p) => ({ x: (k.pheld(p, 'right') ? 1 : 0) - (k.pheld(p, 'left') ? 1 : 0), y: (k.pheld(p, 'down') ? 1 : 0) - (k.pheld(p, 'up') ? 1 : 0) });
     k.priv = (p, data) => { if (k.privOK) tell('arcade:priv', { p, data: data || null }); };
     k.podium = (rows, o) => {
-      o = o || {}; const r = rows.slice().sort((a, b) => (o.asc ? a.score - b.score : b.score - a.score)), top = r[0], pl = k.players(Math.max(k.mpMax, r.length));
+      o = o || {}; if (!rows || !rows.length) rows = [{ p: 0, score: 0 }]; const r = rows.slice().sort((a, b) => (o.asc ? a.score - b.score : b.score - a.score)), top = r[0], pl = k.players(Math.max(k.mpMax, r.length));
       const nm = (x) => x.name || (pl[x.p] && pl[x.p].name) || 'J' + (x.p + 1);
       const tie = r.length > 1 && r[1].score === top.score && !o.noTie;
       const body = r.map((x, i) => `<span style="display:inline-block;min-width:1.4em;color:${k.pcol(x.p)}">${i + 1}.</span><b style="color:${k.pcol(x.p)}">${nm(x)}</b> · ${o.fmt ? o.fmt(x.score) : x.score}`).join('<br>');
@@ -145,7 +145,9 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
       let body = s || '', go = 'Toca para jugar';
       const m = body.match(/<br>\s*(Toca[^<]*)$/i); if (m) { go = m[1]; body = body.slice(0, m.index); }
       const rec = k.st === 'ready' ? (() => { const b = k.best(CFGID, 0); return b ? `<div class="rec">Mejor puntuación: ${b}</div>` : ''; })() : '';
-      ov.innerHTML = `<div class="card"><h1>${t}</h1>${body ? `<p>${body}</p>` : ''}${rec}<div class="go">${k.party ? '<span class="ka">A</span>' : ''}${(g2 => g2.charAt(0).toUpperCase() + g2.slice(1))(go.replace(/^Toca para /i, ''))}</div></div>`;
+      const html = `<div class="card"><h1>${t}</h1>${body ? `<p>${body}</p>` : ''}${rec}<div class="go">${k.party ? '<span class="ka">A</span>' : ''}${(g2 => g2.charAt(0).toUpperCase() + g2.slice(1))(go.replace(/^Toca para /i, ''))}</div></div>`;
+      if (k.paused) { ovSaved = { html, win: false }; return; } /* en pausa: se enseña al continuar */
+      ov.innerHTML = html;
       ov.classList.remove('hide', 'win');
       if (k.st !== 'ready' && !k._losing && /^¡/.test(t)) { k.sfx('win'); k.confetti(); }
     };
@@ -200,7 +202,14 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
     }
     /* ---------- Pausa ---------- */
     k.paused = false;
-    const setPause = (on) => { if (on && k.st !== 'play') return; k.paused = on; bp.innerHTML = on ? IC.r : IC.p; if (on) { k.sfx('click'); ov.innerHTML = `<div class="card"><h1>Pausa</h1><div class="go">${k.party ? '<span class="ka">A</span>' : ''}Continuar</div></div>`; ov.classList.remove('hide', 'win'); } else { ov.classList.add('hide'); k.held.clear(); } };
+    /* La tarjeta de pausa guarda la que hubiera (p. ej. «¡2048!» en plena partida) y la devuelve al continuar. */
+    let ovSaved = null;
+    const setPause = (on) => {
+      if (on && (k.st !== 'play' || k.paused)) return;
+      k.paused = on; bp.innerHTML = on ? IC.r : IC.p;
+      if (on) { ovSaved = ov.classList.contains('hide') ? null : { html: ov.innerHTML, win: ov.classList.contains('win') }; k.sfx('click'); ov.innerHTML = `<div class="card"><h1>Pausa</h1><div class="go">${k.party ? '<span class="ka">A</span>' : ''}Continuar</div></div>`; ov.classList.remove('hide', 'win'); }
+      else { if (ovSaved) { ov.innerHTML = ovSaved.html; ov.classList.toggle('win', ovSaved.win); ov.classList.remove('hide'); } else ov.classList.add('hide'); ovSaved = null; k.held.clear(); }
+    };
     bp.addEventListener('pointerdown', (e) => { e.stopPropagation(); setPause(!k.paused); });
     document.addEventListener('visibilitychange', () => { if (document.hidden) setPause(true); });
     /* Puente con el portal: avisa de inicio/fin de partida (pausas publicitarias) y obedece pausa/reanudar. */
@@ -218,7 +227,7 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
       if ('pad' in C) hi.pad = C.pad;
       if (C.mp) hi.mp = C.mp;
       tell('arcade:hello', hi); }
-    k.hide = () => ov.classList.add('hide');
+    k.hide = () => { if (k.paused) ovSaved = null; else ov.classList.add('hide'); };
     k.best = (id, score) => {
       let b = 0; try { b = +localStorage.getItem('best:' + id) || 0; if (score > b) { b = score; localStorage.setItem('best:' + id, b); } } catch (e) { b = Math.max(b, score); }
       return b;
@@ -273,13 +282,16 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
       ctx.fillStyle = color || '#f5f1e6'; ctx.font = `700 ${size || 18}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
       ctx.textAlign = align || 'left'; ctx.textBaseline = 'top'; ctx.fillText(s, x, y);
     };
+    /* Al terminar la partida, 0,45 s sin aceptar «otra vez»: un toque que ya iba de camino no se salta la pantalla final. */
+    let stSeen = k.st;
+    const stWatch = () => { if (k.st !== stSeen) { if (k.st === 'over') lockT = Math.max(lockT, performance.now() + 450); stSeen = k.st; } };
     k.run = (update, draw) => {
       let last = performance.now();
       function frame(t) {
         const dt = Math.min(0.05, (t - last) / 1000); last = t;
         poll();
         if (k.paused) { if (k.ptr.hit || k.hit.has('a') || k.hit.has('pause') || PADS.some((q) => q && q.hit.has('a'))) { setPause(false); if (k.ptr.down) k._skipUp = true; } }
-        else { if (k.hit.has('pause') && k.st === 'play') setPause(true); else update(dt); }
+        else { if (k.hit.has('pause') && k.st === 'play') setPause(true); else { stWatch(); update(dt); stWatch(); } }
         const sx = shakeA ? (Math.random() - 0.5) * shakeA * 2 : 0, sy = shakeA ? (Math.random() - 0.5) * shakeA * 2 : 0; shakeA = Math.max(0, shakeA - dt * 30);
         ctx.save(); ctx.translate(sx, sy); draw(); ctx.restore(); if (!k.paused) cdTick(dt); cdDraw(); fx(k.paused ? 0 : dt);
         k.hit.clear(); for (const q of PADS) if (q) q.hit.clear(); k.ptr.hit = false; k.ptr.up = false; k.swipe = null; k.tap = false;

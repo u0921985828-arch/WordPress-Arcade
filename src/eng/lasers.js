@@ -2,6 +2,7 @@
  * Generador: se traza primero el camino con espejos (solución garantizada) y luego se desordenan.
  * Emisor con carcasa, espejos enmarcados que giran animados, bloques de piedra, rayo con brillo y receptor que se ilumina. */
 const W = 480, H = 560, OUT = ART.OUT, k = Kit({ w: W, h: H, title: CFG.title, bg: '#0e1226' }), c = k.ctx;
+const later = (fn, ms) => setTimeout(function f() { if (k.paused) setTimeout(f, 150); else fn(); }, ms); /* 1.23: la pantalla final espera si el juego está en pausa */
 let N, S, OX, OY = 112, grid, emit, target, level, done, beam, score, taps, cur, kbd, hitT, boardCv, sparkT;
 const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 function reflect(d, m) { const [dx, dy] = DIRS[d]; const nd = m === 1 ? [-dy, -dx] : [dy, dx]; return DIRS.findIndex((q) => q[0] === nd[0] && q[1] === nd[1]); }
@@ -25,7 +26,7 @@ function build() {
 function reset() { if (!level) { level = 1; score = 0; } build(); }
 function rotate(x, y) { const cl = grid[y] && grid[y][x]; if (!cl || !cl.m) return; cl.m = 3 - cl.m; cl.ang += Math.PI / 2; cl.p = 1; taps++; beam = trace(); k.sfx('click');
   if (beam.hit) { done = true; const bonus = Math.max(0, 50 - taps * 5); score += 100 * level + bonus; const rec = k.best(CFG.id, score); hitT = 0.001; const [tx, ty] = P(target); k.burst(tx, ty, '#7cf7a0', 24, 200); k.sfx('coin'); k.flash('rgba(124,247,160,.25)');
-    setTimeout(() => { k.st = 'over'; k.show('¡Objetivo alcanzado!', `Nivel ${level} · ${taps} giros · ${score} puntos · Récord ${rec}<br>Toca para el siguiente`); level++; }, 900); } }
+    later(() => { k.st = 'over'; k.show('¡Objetivo alcanzado!', `Nivel ${level} · ${taps} giros · ${score} puntos · Récord ${rec}<br>Toca para el siguiente`); level++; }, 900); } }
 const P = ([x, y]) => [OX + x * S + S / 2, OY + y * S + S / 2];
 
 /* ---------- Gráficos ---------- */

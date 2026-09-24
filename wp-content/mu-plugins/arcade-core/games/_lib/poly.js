@@ -2,6 +2,7 @@
  * Arte propio: bandeja de madera con casillas hundidas, piezas con bisel que se levantan al arrastrar, vista previa y encaje con "clic". */
 const W = 480, H = 640, OUT = ART.OUT, R2 = 6.2832;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#1a1630' }), c = k.ctx;
+const later = (fn, ms) => setTimeout(function f() { if (k.paused) setTimeout(f, 150); else fn(); }, ms); /* 1.23: la pantalla final espera si el juego está en pausa */
 const COL = ['#ff6b6b', '#5ce1e6', '#ffd23d', '#7cf7a0', '#b98cff', '#ffa94d', '#ff9ad5', '#6c8cff'];
 let TS = 26, N, S, OX, OY = 84, pieces, level, drag, done, score, mask, bgCv, t = 0, doneT = 0, kbs = null, moves = 0;
 function build() {
@@ -24,8 +25,8 @@ const fits = (p, gx, gy) => { const occ = occupied(p); return p.sh.every(([x, y]
 function reset() { if (!level) { level = 1; score = 0; } build(); }
 reset(); k.show(CFG.title, 'Arrastra las piezas al cuadrado hasta llenarlo. Toca una pieza para girarla. Teclado: A coge / suelta, flechas mueven, B gira.');
 function snap(p) { p.pop = 1; moves++; k.sfx('pop'); const cx = OX + (p.bx + pw(p) / 2) * S, cy = OY + (p.by + ph(p) / 2) * S; k.burst(cx, cy, p.col, 10, 110); checkDone(); }
-function checkDone() { if (pieces.every((q) => q.bx !== null) && !done) { done = true; doneT = 0; const gain = 150 * level; score += gain; k.float('+' + gain, W / 2, OY + N * S + 40, '#ffd23d');
-  setTimeout(() => { k.st = 'over'; k.show('¡Encajado!', `Nivel ${level} · ${score} puntos<br>Toca para el siguiente`); level++; }, 900); } }
+function checkDone() { if (pieces.every((q) => q.bx !== null) && !done) { done = true; doneT = 0; const gain = 150 * level; score += gain; k.best(CFG.id, score); k.float('+' + gain, W / 2, OY + N * S + 40, '#ffd23d');
+  later(() => { k.st = 'over'; k.show('¡Encajado!', `Nivel ${level} · ${score} puntos<br>Toca para el siguiente`); level++; }, 900); } }
 function dropPos(p) { return [Math.round((k.ptr.x - OX) / S - 0.5 - (pw(p) - 1) / 2), Math.round((k.ptr.y - OY) / S - 0.5 - (ph(p) - 1) / 2)]; }
 
 k.run((dt) => {

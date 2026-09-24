@@ -4,6 +4,7 @@
 const M = CFG.mode, W = 480, H = 600, OUT = ART.OUT, R2 = 6.2832;
 const BG = { sudoku: ['#2d3a5c', '#161f35'], mines: ['#2f4a3a', '#15241c'], lights: ['#2a2350', '#110d24'], pipes: ['#23374f', '#0f1b2b'], slide: ['#4a3426', '#20150e'] }[M];
 const k = Kit({ w: W, h: H, title: CFG.title, bg: BG[1] }), c = k.ctx;
+const later = (fn, ms) => setTimeout(function f() { if (k.paused) setTimeout(f, 150); else fn(); }, ms); /* 1.23: la pantalla final espera si el juego está en pausa */
 let lost = false, g, N, S, OX = 24, OY = 90, sel, score, level, t, done, flagMode, first, sol, given, src;
 let clk = 0, litN = 0, padHit = 0, downIn = false, skipSw = false, cur = [0, 0], kb = false, anim, fx = [], moves = 0, bgCv, boardCv, keyNum = null, pressT = 0, longDone = false, boom = null, doneT = 0, conf = new Set(), rp, glow;
 const inb = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
@@ -35,7 +36,7 @@ function openCell(x, y, depth) {
   if (cl.mine) { done = true; lost = true; cl.boom = true; boom = { x: OX + (x + 0.5) * S, y: OY + (y + 0.5) * S, t: 0 };
     let n = 0; g.forEach((q, i) => { if (q.mine && !q.open) { q.open = true; q.ot = clk + 0.25 + (n++) * 0.06; } });
     k.sfx('explode'); k.shake(12); k.flash('rgba(255,120,60,.55)'); k.burst(boom.x, boom.y, '#ff9a3d', 30, 260); k.burst(boom.x, boom.y, '#3a3346', 16, 180);
-    setTimeout(() => k.lose(CFG.id, score, '¡Boom!', `Nivel ${level}`), 1500); return; }
+    later(() => k.lose(CFG.id, score, '¡Boom!', `Nivel ${level}`), 1500); return; }
   if (!cl.n) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(x + dx, y + dy)) openCell(x + dx, y + dy, (depth || 0) + 1);
 }
 function solvedCheck() {
@@ -45,9 +46,9 @@ function solvedCheck() {
   if (M === 'lights') ok = g.every((v) => !v);
   if (M === 'pipes') ok = lit().size === N * N;
   if (M === 'slide') ok = g.every((v, i) => v === (i === 15 ? 0 : i + 1));
-  if (ok && !done) { done = true; doneT = 0; const gain = Math.max(50, 1000 - Math.floor(t) * 3) * level; score += gain; k.sfx('coin'); k.float('+' + gain, W / 2, OY + N * S / 2 + 56, '#ffd23d');
+  if (ok && !done) { done = true; doneT = 0; const gain = Math.max(50, 1000 - Math.floor(t) * 3) * level; score += gain; k.best(CFG.id, score); k.sfx('coin'); k.float('+' + gain, W / 2, OY + N * S / 2 + 56, '#ffd23d');
     if (M === 'mines') g.forEach((q) => { if (q.mine) q.flag = true; });
-    setTimeout(() => { k.st = 'over'; k.show('¡Resuelto!', `Nivel ${level} · Tiempo ${Math.floor(t)} s${moves ? ' · ' + moves + ' movimientos' : ''} · Puntos ${score}<br>Toca para el siguiente`); level++; }, 1100); }
+    later(() => { k.st = 'over'; k.show('¡Resuelto!', `Nivel ${level} · Tiempo ${Math.floor(t)} s${moves ? ' · ' + moves + ' movimientos' : ''} · Puntos ${score}<br>Toca para el siguiente`); level++; }, 1100); }
 }
 function validSudoku() { for (let i = 0; i < 9; i++) { const r = new Set(), cc = new Set(), b = new Set(); for (let j = 0; j < 9; j++) { r.add(g[i * 9 + j]); cc.add(g[j * 9 + i]); b.add(g[(Math.floor(i / 3) * 3 + Math.floor(j / 3)) * 9 + (i % 3) * 3 + j % 3]); } if (r.size < 9 || cc.size < 9 || b.size < 9) return false; } return true; }
 const unitsOf = (i) => { const r = Math.floor(i / 9), cc = i % 9, br = r - r % 3, bc = cc - cc % 3; return [[...Array(9).keys()].map((j) => r * 9 + j), [...Array(9).keys()].map((j) => j * 9 + cc), [...Array(9).keys()].map((j) => (br + Math.floor(j / 3)) * 9 + bc + j % 3)]; };

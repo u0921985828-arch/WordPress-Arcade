@@ -210,8 +210,9 @@
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { ui.menu.addEventListener(ev, function () { ui.menu.classList.remove('on'); key('menu', false); }); });
   document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   // iOS Safari ignora user-scalable=no: se bloquean a mano pellizco, doble toque y arrastre de la página
-  // (salvo en la tarjeta del código, donde hay que poder escribir).
-  function inForm(e) { return ui.over.classList.contains('show') && e.target.closest && e.target.closest('.pd-card'); }
+  // (salvo en la tarjeta del código, donde hay que poder escribir, y en el panel privado: sin esto el toque
+  // no genera «click» y no se podía elegir carta/respuesta ni desplazar la lista).
+  function inForm(e) { var c = e.target.closest ? e.target : null; return c && ((ui.over.classList.contains('show') && c.closest('.pd-card')) || c.closest('.pd-priv.show')); }
   ['gesturestart', 'gesturechange', 'dblclick'].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); }, { passive: false }); });
   ['touchstart', 'touchmove'].forEach(function (ev) {
     document.addEventListener(ev, function (e) { if (!inForm(e) && e.cancelable) e.preventDefault(); }, { passive: false });

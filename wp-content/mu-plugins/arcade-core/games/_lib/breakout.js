@@ -79,7 +79,7 @@ k.run((dt) => {
       if (b.x < WL + 5 || b.x > WR - 5) { b.vx *= -1; b.x = k.clamp(b.x, WL + 5, WR - 5); }
       if (b.y < TOP + 5) { b.vy = Math.abs(b.vy); b.y = TOP + 5; }
       if (b.vy > 0 && b.y > 332 && b.y < 344 && Math.abs(b.x - pad) < pw / 2 + 8) {
-        const sp = Math.min(BCAP(), Math.hypot(b.vx, b.vy) * 1.015), a = (b.x - pad) / (pw / 2) * 1.05;
+        const sp = Math.min(BCAP(), Math.hypot(b.vx, b.vy) * 1.015), a = k.clamp((b.x - pad) / (pw / 2) * 1.05, -1.1, 1.1); /* con el margen ampliado no sale casi horizontal */
         b.vx = Math.sin(a) * sp; b.vy = -Math.cos(a) * sp; b.y = 331; k.sfx('click'); k.burst(b.x, 336, '#5ce1e6', 4, 80);
       }
       for (const br of bricks) if (!br.dead && b.x > br.x - 5 && b.x < br.x + 45 && b.y > br.y - 5 && b.y < br.y + 21) {

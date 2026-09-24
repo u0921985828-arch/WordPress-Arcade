@@ -2,7 +2,7 @@
 const k = Kit({ w: 360, h: 640, title: CFG.title, bg: '#1b1f3b' }), c = k.ctx, OUT = ART.OUT;
 /* velocidad del bloque: 125 → 340 u/s de forma suave hasta el piso 40 (antes 150 + 6 por piso hasta 360) */
 const SPD = (n) => { const d = Math.min(1, n / 60); return 100 + 190 * d * d * (3 - 2 * d); }; // 1.23: más fácil (antes 125→340 hasta el piso 40)
-let blocks, cur, score, axis, dir, speed, perfect, falling, camY, hue, rings, t, flashB, best;
+let liveT = 0, blocks, cur, score, axis, dir, speed, perfect, falling, camY, hue, rings, t, flashB, best;
 function reset() { blocks = [{ x: 0, z: 0, w: 120, d: 120, y: 0, hue: 200 }]; score = 0; axis = 'x'; speed = SPD(0); perfect = 0; falling = []; rings = []; camY = 0; hue = 200; t = 0; flashB = null; best = k.best(CFG.id, 0); spawn(); }
 function spawn() { const top = blocks[blocks.length - 1]; axis = axis === 'x' ? 'z' : 'x'; hue = (hue + 12) % 360; cur = { x: axis === 'x' ? -180 : top.x, z: axis === 'z' ? -180 : top.z, w: top.w, d: top.d, y: top.y + 1, hue }; dir = 1; }
 reset(); k.show(CFG.title, 'Toca para soltar el bloque. Lo que sobresale se corta. Encadena encajes perfectos para que el bloque vuelva a crecer. ¡Apila lo más alto posible!');
@@ -26,9 +26,9 @@ k.run((dt) => {
   for (const f of falling) { f.vy += 26 * dt; f.y -= f.vy * dt; f[f.ax] += f.vx * dt; f.a -= dt * 0.7; } falling = falling.filter((f) => f.a > 0);
   for (const r of rings) r.t += dt * 1.6; rings = rings.filter((r) => r.t < 1); if (flashB) { flashB.g -= dt * 3; if (flashB.g <= 0) flashB = null; }
   camY += (Math.max(0, (blocks.length - 7) * 24) - camY) * Math.min(1, dt * 5);
-  if (!k.gate(reset)) return;
+  if (!k.gate(reset)) { liveT = 0; return; } liveT += dt;
   cur[axis] += dir * speed * dt; if (cur[axis] > 180) dir = -1; if (cur[axis] < -180) dir = 1;
-  if (k.ptr.hit || k.hit.has('a') || k.hit.has('up')) {
+  if ((k.ptr.hit || k.hit.has('a') || k.hit.has('up')) && liveT > 0.3) { /* el 2.º toque de un doble toque en «Jugar otra vez» no suelta el bloque */
     const top = blocks[blocks.length - 1], key = axis, size = axis === 'x' ? 'w' : 'd', delta = cur[key] - top[key];
     const [bx, by] = ISO(cur.x + cur.w / 2, cur.y + 1, cur.z + cur.d / 2);
     if (Math.abs(delta) < 6) { cur[key] = top[key]; perfect++; score += 2; rings.push({ b: { ...cur }, t: 0 }); k.sfx(perfect > 2 ? 'win' : 'coin'); k.burst(bx, by, '#fff', 16, 140);

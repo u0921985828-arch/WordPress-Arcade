@@ -32,7 +32,7 @@ function cSeqs(bd, p) { const ms = cMoves(bd, p); if (!ms.length || !ms[0].cap) 
   ms.forEach((m) => ext(bd, m, [])); return out; }
 function cSearch(bd, p, depth, al, be) { const ss = cSeqs(bd, p); if (!ss.length) return p === 2 ? -100 - depth : 100 + depth; if (!depth) return cEval(bd);
   for (const q of ss) { const v = cSearch(q.bd, 3 - p, depth - 1, al, be); if (p === 2) al = Math.max(al, v); else be = Math.min(be, v); if (al >= be) break; } return p === 2 ? al : be; }
-/* Damas: profundidad 1 → 4 según el nivel y probabilidad de despiste (jugada legal al azar, respeta la captura obligatoria) */
+/* Damas: profundidad 0 → 3 según el nivel y probabilidad de despiste (jugada legal al azar, respeta la captura obligatoria) */
 const CDEP = [0, 1, 2, 3], CERR = [0.4, 0.25, 0.12, 0.04]; // 1.23: más fácil (antes prof. 1-4, despiste 0.3→0); nivel 0 = voraz 1 jugada
 function cAI() { const ss = cSeqs(b, 2); if (!ss.length) return null; const L = Math.min(lvl | 0, 3); if (Math.random() < CERR[L]) return k.pick(ss);
   let best = null, bv = -1e9; for (const q of k.shuffle(ss)) { const v = cSearch(q.bd, 1, CDEP[L], bv, 1e9); if (v > bv) { bv = v; best = q; } } return best; }

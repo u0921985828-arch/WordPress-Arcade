@@ -3,6 +3,7 @@
 const M = CFG.mode, land = M === 'bridge', OUT = ART.OUT, R2 = 6.2832;
 const W = land ? 640 : 360, H = land ? 360 : 640;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#f4efe4' }), c = k.ctx;
+const later = (fn, ms) => setTimeout(function f() { if (k.paused) setTimeout(f, 150); else fn(); }, ms); /* 1.23: la pantalla final espera si el juego está en pausa */
 let stuckT = 0, level, score, segs, userSegs, ink, maxInk, ball, running, cup, stroke, fixed, goalX, done, t, strokes = [], path = [], ghost = [], clk = 0, doneT = 0, bgCv, pathT = 0, failT = 0;
 function build() {
   segs = []; userSegs = []; strokes = []; path = []; ghost = []; running = false; stroke = null; done = false; t = 0; doneT = 0; bgCv = null;
@@ -49,8 +50,8 @@ k.run((dt) => {
   // atascada: si apenas se mueve durante 1,5 s, se reinicia el intento
   stuckT = Math.hypot(ball.vx, ball.vy) < 12 ? stuckT + dt : 0; if (t > 12 || stuckT > 1.5) fail();
 }, draw);
-function win() { k.sfx('coin'); done = true; doneT = 0; const gain = Math.round(100 + ink / maxInk * 200) * level; score += gain; k.burst(ball.x, ball.y, '#ffd23d', 24, 160); k.float('+' + gain, ball.x, ball.y - 30, '#ffd23d');
-  setTimeout(() => { k.st = 'over'; k.show('¡Conseguido!', `Nivel ${level} · ${score} puntos<br>Toca para el siguiente`); level++; }, 1000); }
+function win() { k.sfx('coin'); done = true; doneT = 0; const gain = Math.round(100 + ink / maxInk * 200) * level; score += gain; k.best(CFG.id, score); k.burst(ball.x, ball.y, '#ffd23d', 24, 160); k.float('+' + gain, ball.x, ball.y - 30, '#ffd23d');
+  later(() => { k.st = 'over'; k.show('¡Conseguido!', `Nivel ${level} · ${score} puntos<br>Toca para el siguiente`); level++; }, 1000); }
 function fail() { k.sfx('hurt'); failT = 1.2; stuckT = 0; stop(); }
 
 /* ---------- Dibujo ---------- */

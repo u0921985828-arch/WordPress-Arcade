@@ -56,7 +56,13 @@ function build() { check = null; checks = []; inv = 0; go = 0; gen(); p = mkP(sp
 function reset() { if (RACE) return raceNew(); level = 1; lives = 4; score = 0; coinsGot = 0; build(); }
 function die() { if (dead || inv > 0) return; dead = 1.1; p.vy = -600; k.sfx('hurt'); k.shake(8); k.flash('rgba(255,60,80,.35)'); }
 function respawn() { lives--; if (lives <= 0) return k.lose(CFG.id, score, 'Sin vidas', `Nivel ${level} · ${coinsGot} moneda${coinsGot === 1 ? '' : 's'}`); const s = check && check.on ? { x: check.x, y: check.y - 40 } : spawn; p = mkP(s); rope = null; dead = 0; dashT = 0; inv = 1.6; }
+/* subpasos: a pocos FPS (dt hasta 0,05 s) una caída a 1100 px/s recorre 55 px y atravesaría tablones de 1 casilla */
 function collide(o, dt) {
+  const n = Math.min(4, Math.ceil(Math.max(Math.abs(o.vx), Math.abs(o.vy)) * dt / 20)) || 1;
+  if (n === 1) return collide1(o, dt);
+  let g = false, wl = 0; for (let i = 0; i < n; i++) { collide1(o, dt / n); g = g || o.ground; wl = wl || o.wall; } o.ground = g; o.wall = wl;
+}
+function collide1(o, dt) {
   o.x += o.vx * dt; o.wall = 0;
   for (const yy of [o.y + 2, o.y + o.h / 2, o.y + o.h - 2]) for (const xx of [o.x, o.x + o.w]) if (tileAt(xx, yy) === 1) {
     if (o.vx > 0 || xx === o.x + o.w) { o.x = Math.floor(xx / T) * T - o.w - 0.01; o.wall = 1; } else { o.x = Math.floor(xx / T) * T + T + 0.01; o.wall = -1; } o.vx = 0; }

@@ -232,7 +232,7 @@ k.run((dt) => {
   for (const b of bullets) {
     if (b.k === 'ball') { b.t += dt; if (b.t >= b.dur) { b.dead = true; for (const f of foes) if (!f.dead && Math.hypot(f.x - b.ex, f.y - b.ey) < b.splash) damage(f, b.dmg); fxs.push({ k: 'ring', x: b.ex, y: b.ey, r: b.splash, life: 0.3, max: 0.3, col: '#ffb13d' }); k.burst(b.ex, b.ey, '#ffb13d', 10, 130); k.burst(b.ex, b.ey, '#6b5a4a', 6, 70); } continue; }
     if (b.tg.dead) { b.dead = true; continue; }
-    const a = Math.atan2(b.tg.y - 6 * SC - b.y, b.tg.x - b.x); b.a = a; b.x += Math.cos(a) * b.sp * dt; b.y += Math.sin(a) * b.sp * dt;
+    const a = Math.atan2(b.tg.y - 6 * SC - b.y, b.tg.x - b.x), st = Math.min(b.sp * dt, Math.hypot(b.tg.x - b.x, b.tg.y - 6 * SC - b.y)); b.a = a; b.x += Math.cos(a) * st; b.y += Math.sin(a) * st; /* sin pasarse del blanco (con dt alto oscilaba) */
     if (Math.hypot(b.tg.x - b.x, b.tg.y - 6 * SC - b.y) < 9) { b.dead = true; damage(b.tg, b.dmg);
       if (b.slow) { b.tg.slow = b.slow; fxs.push({ k: 'ring', x: b.tg.x, y: b.tg.y - 6, r: 16, life: 0.25, max: 0.25, col: '#bff0ff' }); k.burst(b.tg.x, b.tg.y - 6, '#bff0ff', 5, 60); }
       else k.burst(b.x, b.y, '#fff2c9', 4, 60); }

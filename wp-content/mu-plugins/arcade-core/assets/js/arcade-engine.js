@@ -127,6 +127,8 @@ const CSS = `
 .arcade-player:-webkit-full-screen{width:100%;height:100%;max-width:none;border-radius:0;aspect-ratio:auto}
 .arcade-rotate{position:absolute;inset:0;z-index:9;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;background:var(--g-dark);color:#fff;font:600 1rem/1.4 system-ui,sans-serif;text-align:center}
 .arcade-player.needs-rotate .arcade-rotate{display:flex}
+/* El aviso de girar no tapa el menú: siempre se puede salir del juego sin girar el móvil. */
+.arcade-player.needs-rotate .arcade-bar{z-index:11}
 .arcade-rotate i{width:44px;height:76px;border:4px solid currentColor;box-shadow:0 4px 0 var(--g-ink);border-radius:10px;animation:arcade-rot 1.8s ease-in-out infinite}
 .arcade-rotate[data-want="portrait"] i{animation-direction:reverse}
 @keyframes arcade-rot{0%,25%{transform:rotate(0)}65%,100%{transform:rotate(-90deg)}}
@@ -379,6 +381,8 @@ export class ArcadePlayer {
     this.bar.append(b);
     this.fsBtn = null;
 
+    const wasOpen = this.menu?.classList.contains('open');
+    this.menu?.remove(); // el juego se recargó (p. ej. al girar) y vuelve a saludar: un solo menú
     const m = (this.menu = document.createElement('div'));
     m.className = 'arcade-menu';
     m.setAttribute('role', 'dialog');
@@ -398,6 +402,7 @@ export class ArcadePlayer {
     }, sig);
     m.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); this._closeMenu(); } }, sig);
     this.root.append(m);
+    if (wasOpen) { this._menuLabels(); m.classList.add('open'); }
   }
 
   _menuLabels() {
@@ -556,6 +561,8 @@ export class ArcadePlayer {
     const need = this._needsPad();
     if (need && !this.pad) this._buildPad();
     else if (!need && this.pad) this._dropPad();
+    else return;
+    this._placeUI(); // con o sin franja del mando, el botón de menú cambia de sitio
   }
 
   _dropPad() {

@@ -1,6 +1,7 @@
 /* Mahjong Solitaire: empareja fichas libres iguales. Disposiciones por nivel generadas por colocación inversa (siempre resolubles).
  * Fichas gruesas con cara y lateral cacheadas, símbolos dibujados, pistas, combos y barajado resoluble cuando no quedan parejas. */
 const W = 640, H = 480, OUT = ART.OUT, k = Kit({ w: W, h: H, title: CFG.title, bg: '#0f3a33' }), c = k.ctx;
+const later = (fn, ms) => setTimeout(function f() { if (k.paused) setTimeout(f, 150); else fn(); }, ms); /* 1.23: la pantalla final espera si el juego está en pausa */
 const TW = 44, TH = 56, DX = 6, DY = 7, OX = (W - 12 * TW) / 2, OY = 76, NT = 27;
 /* 0-8 caracteres 1-9 · 9-14 círculos 1-6 · 15-19 bambúes 1-5 · 20-23 vientos E S O N · 24-26 dragones rojo, verde y blanco */
 const SUITC = (t) => (t < 9 ? '#d5303e' : t < 15 ? '#2d6fd0' : t < 20 ? '#2a9a5a' : t < 24 ? '#22306e' : ['#d5303e', '#2a9a5a', '#2d6fd0'][t - 24]);
@@ -31,7 +32,7 @@ function build() {
 function moves() { const fr = tiles.filter((q) => free(q, tiles)); for (let i = 0; i < fr.length; i++) for (let j = i + 1; j < fr.length; j++) if (fr[i].t === fr[j].t) return [fr[i], fr[j]]; return null; }
 /* Barajado que conserva la garantía: se reasignan los tipos restantes con colocación inversa */
 function reshuffle() { const types = []; const cnt = {}; tiles.forEach((q) => (cnt[q.t] = (cnt[q.t] || 0) + 1)); for (const ty in cnt) for (let i = 0; i < cnt[ty] / 2; i++) types.push(+ty);
-  const nt = assign(tiles, types); if (nt) { tiles = nt; sel = null; hint = null; dirty = true; } }
+  const nt = assign(tiles, types); if (nt) { tiles = nt; sel = null; hint = null; dirty = true; } else k.lose(CFG.id, score, 'Sin parejas libres', `Nivel ${level}`); /* 1.23: si no se puede barajar, fin (antes se quedaba atascado) */ }
 function reset() { if (!level || (k.st === 'over' && !done)) { level = 1; score = 0; } build(); }
 const sx = (q) => OX + q.x * TW - q.z * DX, sy = (q) => OY + q.y * TH - q.z * DY;
 function pick(px, py) { const order = [...tiles].sort((a, b) => b.z - a.z || b.y - a.y || b.x - a.x); return order.find((q) => px > sx(q) && px < sx(q) + TW - 2 && py > sy(q) && py < sy(q) + TH - 2); }
@@ -41,8 +42,8 @@ function tap(tl) {
     tiles = tiles.filter((q) => q !== sel && q !== tl); dirty = true; combo = comboT > 0 ? combo + 1 : 1; comboT = 4; const pts = 20 * Math.min(combo, 5); score += pts;
     const mx = (sx(sel) + sx(tl)) / 2 + TW / 2, my = (sy(sel) + sy(tl)) / 2 + TH / 2; for (const q of [sel, tl]) fly.push({ q, x: sx(q), y: sy(q), mx: mx - TW / 2, my: my - TH / 2, a: 0 });
     k.float(combo > 1 ? `Combo x${combo} +${pts}` : `+${pts}`, mx, my - 30, combo > 1 ? '#ffb0e0' : '#ffe27a'); k.sfx(combo > 2 ? 'coin' : 'pop'); sel = null; hint = null;
-    if (!tiles.length) { done = true; const bonus = Math.max(100, 1000 - Math.floor(t) * 2); score += bonus; setTimeout(() => { k.st = 'over'; k.show('¡Tablero limpio!', `Nivel ${level} (${NAMES[(level - 1) % 3]}) · Bonus de tiempo ${bonus} · ${score} puntos · Récord ${k.best(CFG.id, score)}<br>Toca para el siguiente tablero`); level++; }, 700); }
-    else if (!moves()) { if (shuf > 0) { shuf--; setTimeout(() => { reshuffle(); k.float('Sin parejas: barajando', W / 2, H / 2, '#fff'); k.sfx('shoot'); }, 450); } else setTimeout(() => k.lose(CFG.id, score, 'Sin parejas libres', `Nivel ${level}`), 450); }
+    if (!tiles.length) { done = true; const bonus = Math.max(100, 1000 - Math.floor(t) * 2); score += bonus; later(() => { k.st = 'over'; k.show('¡Tablero limpio!', `Nivel ${level} (${NAMES[(level - 1) % 3]}) · Bonus de tiempo ${bonus} · ${score} puntos · Récord ${k.best(CFG.id, score)}<br>Toca para el siguiente tablero`); level++; }, 700); }
+    else if (!moves()) { if (shuf > 0) { shuf--; later(() => { reshuffle(); k.float('Sin parejas: barajando', W / 2, H / 2, '#fff'); k.sfx('shoot'); }, 450); } else later(() => k.lose(CFG.id, score, 'Sin parejas libres', `Nivel ${level}`), 450); }
   } else if (sel && sel !== tl) { sel = tl; k.sfx('click'); }
   else { sel = sel === tl ? null : tl; k.sfx('click'); }
 }

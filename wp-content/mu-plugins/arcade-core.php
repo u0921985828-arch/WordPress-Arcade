@@ -180,6 +180,20 @@ final class Arcade_Core {
 		if ( get_option( 'arcade_core_version' ) === self::VERSION ) {
 			return;
 		}
+		// Una sola petición hace la actualización: con visitas simultáneas, sync_catalog() duplicaría juegos (slug-2).
+		// INSERT IGNORE es atómico (add_option() no: hace ON DUPLICATE KEY UPDATE); el bloqueo caduca a los 5 min.
+		global $wpdb;
+		$lock = (int) $wpdb->get_var( "SELECT option_value FROM {$wpdb->options} WHERE option_name = 'arcade_core_upgrading'" );
+		if ( $lock && time() - $lock < 300 ) {
+			return;
+		}
+		if ( $lock ) {
+			$wpdb->delete( $wpdb->options, array( 'option_name' => 'arcade_core_upgrading' ) );
+		}
+		$wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES ('arcade_core_upgrading', %s, 'no')", (string) time() ) );
+		if ( 1 !== (int) $wpdb->rows_affected ) {
+			return;
+		}
 		foreach ( array( 'game_genre' => self::GENRES, 'control_profile' => self::PROFILES ) as $tax => $terms ) {
 			foreach ( $terms as $slug => $name ) {
 				if ( ! term_exists( $slug, $tax ) ) {
@@ -193,6 +207,7 @@ final class Arcade_Core {
 		delete_transient( 'arcade_index' );
 		flush_rewrite_rules( false );
 		update_option( 'arcade_core_version', self::VERSION, false );
+		$wpdb->delete( $wpdb->options, array( 'option_name' => 'arcade_core_upgrading' ) );
 	}
 
 	/**

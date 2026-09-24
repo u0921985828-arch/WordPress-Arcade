@@ -258,7 +258,7 @@ function updItems(dt, live) {
     }
     for (const g of F) { if (!vuln(g) || (g.p === s.from && s.safe > 0) || s.life <= 0) continue;
       if (hurt(g, s.x, s.y - (s.type === 'ball' ? 0 : 0), s.type === 'ball' ? 16 : 13)) {
-        if (s.type === 'bomb') { s.life = 0; explode(s); break; }
+        if (s.type === 'bomb') { s.life = 0; s.boom = true; explode(s); break; }
         applyHit(g, s.from, 9, 210, 3.0, 0.55, Math.sign(s.vx) || 1, 1); s.vx = -s.vx * 0.4; s.vy = -260; s.from = g.p; s.safe = 0.3; s.life = Math.min(s.life, 0.8); }
     }
     if (s.type === 'bomb' && s.life <= 0 && !s.boom) { s.boom = true; explode(s); }

@@ -46,7 +46,8 @@ const nameOf = (b) => (b.ctl < 0 ? 'CPU' : k.party ? 'J' + (b.ctl + 1) : 'TÚ');
 const humanTeam = () => { const h = B.filter((b) => b.ctl >= 0).map((b) => b.team); return h.length && h.every((x) => x === h[0]) ? h[0] : -1; };
 const atk = (tm) => (tm === 0 ? 1 : -1); // sentido de ataque en x
 /* Ventaja amable: un equipo solo de CPU que gana de 2 o más a un equipo con humanos afloja un poco (partidos igualados) */
-function ease(b) { if (!score || B.some((o) => o.team === b.team && o.ctl >= 0) || !B.some((o) => o.team !== b.team && o.ctl >= 0)) return 1; const lead = score[b.team] - score[1 - b.team]; return lead >= 1 ? clamp(1 - 0.1 * lead, 0.62, 1) : 1; } // 1.23: afloja desde 1 gol de ventaja
+function ease(b) { if (!score || B.some((o) => o.team === b.team && o.ctl >= 0) || !B.some((o) => o.team !== b.team && o.ctl >= 0)) return 1; const lead = score[b.team] - score[1 - b.team]; return lead >= 1 ? clamp(1 - 0.12 * lead, 0.5, 1) : 1; } // 1.23: afloja desde 1 gol de ventaja
+const weakCpu = (b) => b.ctl < 0 && !B.some((o) => o.team === b.team && o.ctl >= 0); // 1.23: CPU rival (el compañero CPU de un humano juega como antes)
 
 /* ---------------- Configuración por modo ---------------- */
 const M = {
@@ -131,7 +132,7 @@ function doShot(b, dir, power) {
   const gx = goalX(b.team), gy = FH / 2; let ax = dir ? dir.x : Math.cos(b.a), ay = dir ? dir.y : Math.sin(b.a);
   const tx = gx - ball.x, ty = gy - ball.y, td = hyp(tx, ty) || 1;
   if ((ax * tx + ay * ty) / td > Math.cos(0.7)) { // ayuda de puntería: hacia un palo del lado al que apuntas
-    const side = (ay - ty / td) >= 0 ? 1 : -1, py = gy + side * M.gw * 0.3 + (b.ctl < 0 ? k.rnd(-1, 1) * (1 - skill) * M.gw * 0.7 : 0), px = gx, pd = hyp(px - ball.x, py - ball.y) || 1;
+    const side = (ay - ty / td) >= 0 ? 1 : -1, py = gy + side * M.gw * 0.3 + (b.ctl < 0 ? k.rnd(-1, 1) * (1 - skill) * M.gw * (weakCpu(b) ? 0.7 * (3 - 2 * ease(b)) : 0.5) : 0), px = gx, pd = hyp(px - ball.x, py - ball.y) || 1;
     ax = lerp(ax, (px - ball.x) / pd, 0.7); ay = lerp(ay, (py - ball.y) / pd, 0.7); const m = hyp(ax, ay); ax /= m; ay /= m; }
   const sp = lerp(M.shot[0], M.shot[1], power); release(b, ax * sp, ay * sp); k.sfx(power > 0.7 ? 'shoot' : 'hit'); if (power > 0.8) { k.shake(4); k.float('¡Cañonazo!', ...V(ball.x, ball.y - 14), '#ffd166'); }
 }
@@ -147,7 +148,7 @@ function lineClear(b, gx) { // ¿hay hueco? ningún rival cerca de la línea de 
     return B.every((o) => { if (o.team === b.team) return true; const q = clamp(((o.x - b.x) * dx + (o.y - b.y) * dy) / L, 0, 1); return hyp(b.x + dx * q - o.x, b.y + dy * q - o.y) > M.r + 16; }); });
 }
 function aiField(b, dt) {
-  const own = ball.own, mate = nearestMate(b), sp = M.spd * (0.8 + 0.2 * skill) * ease(b), gx = goalX(b.team), s = atk(b.team);
+  const own = ball.own, mate = nearestMate(b), sp = M.spd * (weakCpu(b) ? 0.72 + 0.28 * skill : 0.8 + 0.2 * skill) * ease(b), gx = goalX(b.team), s = atk(b.team);
   let tx = b.x, ty = b.y, run = 1;
   b.think = (b.think || 0) - dt;
   if (own === b) {
@@ -155,7 +156,7 @@ function aiField(b, dt) {
     const foeAhead = foe && hyp(foe.x - b.x, foe.y - b.y) < 70 && (foe.x - b.x) * s > -5;
     if (b.chg >= 0) { b.chg += dt; if (b.chg >= b.chgT) { doShot(b, null, clamp(b.chg / 0.8, 0.35, 1)); b.chg = -1; } }
     else if (b.passReq > 0 && mate) { doPass(b, mate); b.passReq = 0; }
-    else if (dg < (MODE === 'hockey' ? 210 : 200) && Math.abs(b.y - FH / 2) < 150 && b.think <= 0 && (lineClear(b, gx) || dg < 60 || Math.random() < 0.08) && Math.random() < ease(b) * 1.1 - 0.1) { b.chg = 0; b.chgT = lerp(0.2, 0.55, dg / 260) + k.rnd(0, 0.15); b.a = Math.atan2(FH / 2 - b.y, gx - b.x); }
+    else if (dg < (MODE === 'hockey' ? 210 : 200) && Math.abs(b.y - FH / 2) < 150 && b.think <= 0 && (lineClear(b, gx) || dg < 60 || Math.random() < 0.08) && Math.random() < (weakCpu(b) ? (ease(b) ** 2 * 1.1 - 0.1) * (0.6 + 0.4 * skill) : ease(b) * 1.1 - 0.1)) { b.chg = 0; b.chgT = lerp(0.2, 0.55, dg / 260) + k.rnd(0, 0.15); b.a = Math.atan2(FH / 2 - b.y, gx - b.x); }
     else if (foeAhead && mate && b.think <= 0 && (mate.x - b.x) * s > -40 && !B.some((o) => o.team !== b.team && hyp(o.x - mate.x, o.y - mate.y) < 45) && Math.random() < 0.5 + skill * 0.4) { doPass(b, mate); }
     else { tx = gx; ty = FH / 2 + (b.y < FH / 2 ? -30 : 30); if (foeAhead) ty = b.y + (foe.y > b.y ? -90 : 90); }
     if (b.think <= 0) b.think = lerp(0.5, 0.15, skill);
@@ -232,11 +233,11 @@ function stepField(dt) {
     if (walls(ball, ball.r, M.rest) && hyp(ball.vx, ball.vy) > 120) { k.sfx('click'); }
     const v = hyp(ball.vx, ball.vy);
     for (const q of B) { if (q === ball.nt || q.st > 0) continue; const dx = ball.x - q.x, dy = ball.y - q.y, d = hyp(dx, dy);
-      const keeper = Math.abs(q.x - goalX(1 - q.team)) < 90 && q.y > GY0 - 30 && q.y < GY1 + 30, reach = M.r + ball.r + 3 + (keeper ? (q.ctl < 0 ? 4 + 14 * skill : 18) : 0); // el que guarda la portería llega más lejos (estirada)
+      const keeper = Math.abs(q.x - goalX(1 - q.team)) < 90 && q.y > GY0 - 30 && q.y < GY1 + 30, reach = M.r + ball.r + 3 + (keeper ? (weakCpu(q) ? 4 + 14 * skill : 18) : 0); // el que guarda la portería llega más lejos (estirada)
       if (d < reach) {
         const rel = hyp(ball.vx - q.vx, ball.vy - q.vy);
         if (keeper && d > M.r + ball.r + 3) { const [sx, sy] = V(q.x, q.y); k.float('¡Parada!', sx, sy - 20, TEAM[q.team].col); }
-        if (rel < (MODE === 'hockey' ? 330 : 280) * (keeper ? (q.ctl < 0 ? 1.15 + 0.45 * skill : 1.6) : 1) || q.slide > 0) { ball.own = q; q.chg = -1; lastTouch = q; if (q.recv > 0) q.recv = 0; k.sfx('click'); break; }
+        if (rel < (MODE === 'hockey' ? 330 : 280) * (keeper ? (weakCpu(q) ? 1.15 + 0.45 * skill : 1.6) : 1) || q.slide > 0) { ball.own = q; q.chg = -1; lastTouch = q; if (q.recv > 0) q.recv = 0; k.sfx('click'); break; }
         const nx = dx / (d || 1), ny = dy / (d || 1), vn = ball.vx * nx + ball.vy * ny; if (vn < 0) { ball.vx -= 1.6 * vn * nx; ball.vy -= 1.6 * vn * ny; ball.vx *= 0.6; ball.vy *= 0.6; } ball.x = q.x + nx * reach; ball.y = q.y + ny * reach; lastTouch = q; k.sfx('hit');
       } }
     if (v < 0.5) { ball.vx = ball.vy = 0; }

@@ -44,7 +44,7 @@ function roundReset(q) {
   q.board = Array.from({ length: R }, () => Array(COLS).fill(null));
   q.rng = mulberry(seed); q.bag = []; q.queue = [fromBag(q), fromBag(q), fromBag(q)]; q.hold = null; q.holdUsed = false;
   q.combo = -1; q.b2b = false; q.inc = []; q.alive = true; q.dieT = 0; q.clearing = null; q.clearT = 0; q.sent = 0; q.lines = 0;
-  q.das = 0; q.dasT = 0; q.pops = []; q.lockFx = null; q.rowFx = null; q.shake = 0; q.ai = null; q.warn = 0;
+  q.das = 0; q.dasT = 0; q.overflow = false; q.pops = []; q.lockFx = null; q.rowFx = null; q.shake = 0; q.ai = null; q.warn = 0;
   nextPiece(q);
 }
 function fromBag(q) { if (!q.bag.length) { q.bag = Object.keys(SHAPES); for (let i = q.bag.length - 1; i > 0; i--) { const j = Math.floor(q.rng() * (i + 1)); [q.bag[i], q.bag[j]] = [q.bag[j], q.bag[i]]; } } return q.bag.pop(); }
@@ -105,7 +105,7 @@ function lockPiece(q) {
 function attack(q, full, ts, cu) {
   const n = full.length; let a = 0, name = '';
   if (ts === 'full') { a = [0, 2, 4, 6][n]; name = ['T-GIRO', 'T-GIRO SIMPLE', 'T-GIRO DOBLE', 'T-GIRO TRIPLE'][n]; }
-  else if (ts === 'mini') { a = [0, 0, 1][n] || 1; name = 'MINI T-GIRO'; }
+  else if (ts === 'mini') { a = [0, 0, 1][n] || 0; name = 'MINI T-GIRO'; }
   else { a = [0, 0, 1, 2, 4][n]; name = ['', '', 'DOBLE', 'TRIPLE', '¡CUATRO!'][n]; }
   const hard = n === 4 || (ts && n > 0);
   if (n > 0) {

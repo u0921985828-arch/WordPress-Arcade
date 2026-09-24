@@ -64,13 +64,15 @@ function beginQ() {
 function onAsk() {
   phase = 'ask'; pt = 0; const q = curQ();
   const base = TF ? [0, 0.66, 0.6, 0.55][q.d] : [0, 0.52, 0.38, 0.26][q.d]; // 1.23: CPU acierta menos (antes 0.74/0.62/0.5 y 0.72/0.52/0.36; en V/F nunca bajo 0.55)
-  for (const s of seat) {
-    if (hum(s.p)) continue;
-    const pc = Math.min(0.85, base + CPU * 0.015 + k.rnd(-0.05, 0.05));
-    s.cpuPick = Math.random() < pc ? q.right : k.pick([...Array(q.n).keys()].filter((i) => i !== q.right));
-    s.cpuT = k.rnd(TF ? 1.8 : 3, TQ * (0.55 + Math.random() * 0.3));
-  }
+  for (const s of seat) if (!hum(s.p)) cpuPlan(s, q, base);
   if (k.privOK) for (const s of seat) if (hum(s.p)) k.priv(s.p, { title: `${TF ? 'Afirmación' : 'Pregunta'} ${qi + 1}/${NQ}`, text: q.t, items: optLabels(q).map((lb, i) => ({ v: i, label: TF ? lb : LET[i], sub: TF ? '' : lb, col: TF ? (i ? '#ff6b6b' : '#6fd66f') : OPC[i] })) });
+}
+/* Respuesta y tiempo de la CPU (también si alguien se va a mitad de pregunta y la CPU ocupa su sitio) */
+function cpuPlan(s, q, base) {
+  if (base == null) base = TF ? [0, 0.66, 0.6, 0.55][q.d] : [0, 0.52, 0.38, 0.26][q.d];
+  const pc = Math.min(0.85, base + CPU * 0.015 + k.rnd(-0.05, 0.05));
+  s.cpuPick = Math.random() < pc ? q.right : k.pick([...Array(q.n).keys()].filter((i) => i !== q.right));
+  s.cpuT = Math.max(pt + 1, k.rnd(TF ? 1.8 : 3, TQ * (0.55 + Math.random() * 0.3)));
 }
 function optLabels(q) { return TF ? ['Verdad', 'Bulo'] : q.opts; }
 function lock(s, i) {
@@ -151,7 +153,7 @@ k.run((dt) => {
         if (k.phit(s.p, 'a') && s.sel >= 0) lock(s, s.sel);
         else if (k.phit(s.p, 'a') && s.sel < 0) { s.sel = 0; k.sfx('click'); }
         if (s.p === 0 && !k.party && k.ptr.hit) for (let i = 0; i < q.n; i++) { const [x, y, w, h] = optRect(i); if (k.ptr.x >= x && k.ptr.x <= x + w && k.ptr.y >= y && k.ptr.y <= y + h) { lock(s, i); break; } }
-      } else if (pt >= s.cpuT) lock(s, s.cpuPick);
+      } else { if (s.cpuPick < 0) cpuPlan(s, q); if (pt >= s.cpuT) lock(s, s.cpuPick); }
     });
     const left = TQ - pt;
     if (left < 3.5 && Math.ceil(left) !== tickN) { tickN = Math.ceil(left); if (tickN > 0) k.sfx('tick'); }

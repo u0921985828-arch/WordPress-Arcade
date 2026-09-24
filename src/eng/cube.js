@@ -20,8 +20,8 @@ function build() {
     while (tiles.size < target) { tiles.add(x + ',' + y); const d = k.pick([[1, 0], [1, 0], [0, 1], [0, -1], [-1, 0]]); x = k.clamp(x + d[0], 0, NX - 1); y = k.clamp(y + d[1], 0, NY - 1); if (Math.random() < 0.3) tiles.add(k.clamp(x + 1, 0, NX - 1) + ',' + y); }
     const start = { x: 1, y: Math.floor(NY / 2), o: 0 }; if (!ok(start)) continue;
     const K = (s) => s.x + ',' + s.y + ',' + s.o, seen = new Map([[K(start), 0]]), q = [start]; let far = null, fd = 0;
-    while (q.length) { const s = q.shift(), d = seen.get(K(s)); if (s.o === 0 && d > fd && d >= 4 && (tries >= 300 || d <= HI)) { far = s; fd = d; } for (const dd of Object.values(DD)) { const n = roll(s, dd); if (ok(n) && !seen.has(K(n))) { seen.set(K(n), d + 1); q.push(n); } } }
-    if (far && fd >= (tries < 300 ? LO : 4)) { st = start; goal = [far.x, far.y]; par = fd; break; }
+    while (q.length) { const s = q.shift(), d = seen.get(K(s)); if (s.o === 0 && d > fd && d >= (tries < 2000 ? 4 : 2) && (tries >= 300 || d <= HI)) { far = s; fd = d; } for (const dd of Object.values(DD)) { const n = roll(s, dd); if (ok(n) && !seen.has(K(n))) { seen.set(K(n), d + 1); q.push(n); } } }
+    if (far && fd >= (tries < 300 ? LO : tries < 2000 ? 4 : 2)) { /* tope: tras 2000 intentos acepta cualquier meta alcanzable */ st = start; goal = [far.x, far.y]; par = fd; break; }
   }
   moves = 0; fall = 0; anim = null; queue = null; lastMove = 0; layout(); bake();
 }
