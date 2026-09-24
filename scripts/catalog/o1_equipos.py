@@ -60,12 +60,12 @@ GAMES = [
     dict(
         title='Vóley Playa', genre='sports-casual', tags=['voley', 'playa', 'equipos', 'versus', 'vector'],
         orient='landscape', aspect='16:9', inputs='TKG', engine='teamball', players='1–4 jugadores',
-        cfg=dict(hud='bl', mode='voley', help='Muévete a los lados con el joystick o las flechas; el toque es automático al llegar al balón. A salta: junto a la red, el toque en el aire es un remate. B pasa el balón directo al otro campo. Máximo tres toques por equipo. Partido a 11 puntos con 2 de diferencia.'),
+        cfg=dict(hud='bl', mode='voley', help='Muévete a los lados con el joystick o las flechas; el toque es automático al llegar al balón. A salta: junto a la red, el toque en el aire es un remate. B pasa el balón directo al otro campo. Máximo tres toques por equipo. Partido a 7 puntos con 2 de diferencia.', pts=7),
         pad=dict(d='h', a='Saltar', b='Pasar'), mp=(1, 4),
         desc=[
             'Vóley Playa se juega de lado, con la arena caliente, el mar al fondo y una red que separa a dos parejas decididas a no dejar caer el balón. Recibir, colocar y rematar: tres toques como máximo por equipo y un cuarto que es falta. Los puntos se ganan como en la playa de verdad, con saques, carreras desesperadas y algún remate que deja marca en la arena.',
-            'Te mueves a izquierda y derecha y el toque sale solo cuando llegas debajo del balón, así que lo importante es leer dónde cae. A salta; si estás pegado a la red y tocas en el aire, el golpe se convierte en un remate hacia abajo. B manda el balón directo al campo contrario cuando no quieres arriesgar. Quien gana el punto saca; el partido se juega a 11 con dos de diferencia.',
-            'En el móvil basta con el joystick horizontal y dos botones; en el teclado, flechas, Espacio y X; en la tele, hasta cuatro amigos por parejas. Si falta alguien, la CPU coloca y remata por ti y va afinando con cada derrota. Engancha porque cada punto dura segundos y siempre hay una jugada que repetir.',
+            'Te mueves a izquierda y derecha y el toque sale solo cuando llegas debajo del balón, así que lo importante es leer dónde cae. A salta; si estás pegado a la red y tocas en el aire, el golpe se convierte en un remate hacia abajo. B manda el balón directo al campo contrario cuando no quieres arriesgar. Quien gana el punto saca; el partido se juega a 7 con dos de diferencia.',
+            'En el móvil basta con el joystick horizontal y dos botones; en el teclado, flechas, Espacio y X; en la tele, hasta cuatro amigos por parejas. Si falta alguien, la CPU coloca y remata por ti y va afinando con cada derrota. Engancha porque cada punto dura segundos, un partido entero cabe en tres minutos y siempre hay una jugada que repetir.',
         ],
         tips=['Deja que tu compañero reciba y coloca el segundo toque cerca de la red para rematar en el tercero.',
               'Contra un remate, retrocede un paso: el balón baja rápido y lejos.'],

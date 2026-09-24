@@ -152,7 +152,7 @@ function aiField(b, dt) {
     const foeAhead = foe && hyp(foe.x - b.x, foe.y - b.y) < 70 && (foe.x - b.x) * s > -5;
     if (b.chg >= 0) { b.chg += dt; if (b.chg >= b.chgT) { doShot(b, null, clamp(b.chg / 0.8, 0.35, 1)); b.chg = -1; } }
     else if (b.passReq > 0 && mate) { doPass(b, mate); b.passReq = 0; }
-    else if (dg < (MODE === 'hockey' ? 240 : 200) && Math.abs(b.y - FH / 2) < 150 && b.think <= 0 && (lineClear(b, gx) || dg < 70 || Math.random() < 0.25)) { b.chg = 0; b.chgT = lerp(0.2, 0.55, dg / 260) + k.rnd(0, 0.15); b.a = Math.atan2(FH / 2 - b.y, gx - b.x); }
+    else if (dg < (MODE === 'hockey' ? 240 : 200) && Math.abs(b.y - FH / 2) < 150 && b.think <= 0 && (lineClear(b, gx) || dg < 60 || Math.random() < 0.08)) { b.chg = 0; b.chgT = lerp(0.2, 0.55, dg / 260) + k.rnd(0, 0.15); b.a = Math.atan2(FH / 2 - b.y, gx - b.x); }
     else if (foeAhead && mate && b.think <= 0 && (mate.x - b.x) * s > -40 && !B.some((o) => o.team !== b.team && hyp(o.x - mate.x, o.y - mate.y) < 45) && Math.random() < 0.5 + skill * 0.4) { doPass(b, mate); }
     else { tx = gx; ty = FH / 2 + (b.y < FH / 2 ? -30 : 30); if (foeAhead) ty = b.y + (foe.y > b.y ? -90 : 90); }
     if (b.think <= 0) b.think = lerp(0.5, 0.15, skill);
@@ -226,7 +226,7 @@ function stepField(dt) {
     if (walls(ball, ball.r, M.rest) && hyp(ball.vx, ball.vy) > 120) { k.sfx('click'); }
     const v = hyp(ball.vx, ball.vy);
     for (const q of B) { if (q === ball.nt || q.st > 0) continue; const dx = ball.x - q.x, dy = ball.y - q.y, d = hyp(dx, dy);
-      const keeper = Math.abs(q.x - goalX(1 - q.team)) < 90 && q.y > GY0 - 30 && q.y < GY1 + 30, reach = M.r + ball.r + 3 + (keeper ? 9 + (q.ctl < 0 ? 5 * skill : 5) : 0); // el que guarda la portería llega más lejos (estirada)
+      const keeper = Math.abs(q.x - goalX(1 - q.team)) < 90 && q.y > GY0 - 30 && q.y < GY1 + 30, reach = M.r + ball.r + 3 + (keeper ? 12 + (q.ctl < 0 ? 6 * skill : 6) : 0); // el que guarda la portería llega más lejos (estirada)
       if (d < reach) {
         const rel = hyp(ball.vx - q.vx, ball.vy - q.vy);
         if (keeper && d > M.r + ball.r + 3) { const [sx, sy] = V(q.x, q.y); k.float('¡Parada!', sx, sy - 20, TEAM[q.team].col); }
@@ -386,7 +386,7 @@ function voleyHit(b, spike, over, aimX) {
   const s = b.team ? 1 : -1, other = -s; touches[b.team]++; touches[1 - b.team] = 0; lastTouch = b; ball.held = false;
   if (touches[b.team] > 3) return point(1 - b.team, '¡Cuatro toques!');
   const [bx, by] = [ball.x, ball.y], wasSpike = ball.spk; ball.spk = false;
-  if (Math.random() < (wasSpike ? (b.ctl >= 0 ? 0.3 : 0.5 - 0.28 * skill) : b.ctl >= 0 ? 0 : 0.06 - 0.04 * skill)) { // recepción de un remate: a veces el balón sale rebotado sin control
+  if (Math.random() < (wasSpike ? (b.ctl >= 0 ? 0.3 : 0.55 - 0.3 * skill) : b.ctl >= 0 ? 0 : 0.1 - 0.06 * skill)) { // recepción de un remate: a veces el balón sale rebotado sin control
     ball.vx = k.rnd(-1, 1) * 220 + s * 60; ball.vy = -k.rnd(180, 320); k.sfx('hit'); k.float('¡Uy!', bx, by - 20, '#fff'); return; }
   if (spike) { ball.spk = true; const tx = NET + other * (60 + Math.random() * 180) + (aimX || 0) * 60, T0 = Math.abs(tx - bx) / 600; let vy = (GROUND - 20 - by - 0.5 * GRAV_V * T0 * T0) / T0; ball.vx = (tx - bx) / T0; ball.vy = Math.max(vy, -80);
     for (let it = 0; it < 10; it++) { const tn = (NET - bx) / ball.vx; if (tn <= 0 || by + ball.vy * tn + 0.5 * GRAV_V * tn * tn < NET_TOP - ball.r - 6) break; ball.vy -= 45; ball.vx *= 0.94; } /* que pase por encima de la red */ k.sfx('shoot'); k.shake(5); k.float('¡Remate!', bx, by - 20, '#ffd166'); k.burst(bx, by, '#fff', 14, 200); return; }
@@ -401,7 +401,8 @@ function point(tm, why) {
   if (phase !== 'play') return; score[tm]++; phase = 'goal'; phT = 1.6; msg = why || `Punto ${TEAM[tm].name}`; msgT = 1.6; k.sfx(why ? 'hurt' : 'coin'); k.burst(ball.x, Math.min(ball.y, GROUND - 6), TEAM[tm].col, 24, 200);
   if (serveTeam !== tm) { serveTeam = tm; serveIdx[tm]++; }
 }
-function voleyWon() { const a = score[0], b = score[1]; return (Math.max(a, b) >= 11 && Math.abs(a - b) >= 2) || Math.max(a, b) >= 15; }
+const PTS = CFG.pts || 7;
+function voleyWon() { const a = score[0], b = score[1]; return (Math.max(a, b) >= PTS && Math.abs(a - b) >= 2) || Math.max(a, b) >= PTS + 4; }
 function stepVoley(dt) {
   const srvP = ball.srv;
   if (phase === 'serve') {
@@ -696,7 +697,7 @@ function hud() {
   const g = c.createLinearGradient(0, 0, 0, 46); g.addColorStop(0, 'rgba(26,21,48,.95)'); g.addColorStop(1, 'rgba(26,21,48,.75)'); c.fillStyle = g; ART.rr(c, W / 2 - 150, 4, 300, 40, 12); c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
   for (const tm of [0, 1]) { const x = W / 2 + (tm ? 1 : -1) * 104; ART.rr(c, x - 40, 10, 80, 28, 9); c.fillStyle = TEAM[tm].col; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke(); label(TEAM[tm].name.toUpperCase(), x, 24, 14, '#fff'); }
   label(`${score[0]} – ${score[1]}`, W / 2, 20, 22, '#fff');
-  let sub; if (MODE === 'voley') sub = `a 11 · saca ${TEAM[serveTeam].name.toLowerCase()}`; else if (golden) sub = MODE === 'prisionero' ? 'bola de oro' : 'gol de oro'; else sub = `${MODE === 'prisionero' ? 'ronda ' + roundNo + ' · ' : ''}${Math.floor(Math.max(0, clock) / 60)}:${String(Math.floor(Math.max(0, clock) % 60)).padStart(2, '0')}`;
+  let sub; if (MODE === 'voley') sub = `a ${PTS} · saca ${TEAM[serveTeam].name.toLowerCase()}`; else if (golden) sub = MODE === 'prisionero' ? 'bola de oro' : 'gol de oro'; else sub = `${MODE === 'prisionero' ? 'ronda ' + roundNo + ' · ' : ''}${Math.floor(Math.max(0, clock) / 60)}:${String(Math.floor(Math.max(0, clock) % 60)).padStart(2, '0')}`;
   label(sub, W / 2, 37, 12, golden ? '#ffd166' : '#d8d0f0');
   if (msgT > 0 || phase === 'serve') { const m = phase === 'serve' && msgT <= 0 ? (ball.srv.ctl >= 0 ? `Saca ${nameOf(ball.srv)}: pulsa A` : '') : msg; if (m) {
     c.globalAlpha = Math.min(1, (msgT || 1) * 2); c.font = '900 26px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const mw = c.measureText(m).width + 40, my = SIDE ? 80 : H / 2 + (VERT ? -40 : 0);
