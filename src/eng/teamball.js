@@ -388,7 +388,8 @@ function voleyHit(b, spike, over, aimX) {
   const [bx, by] = [ball.x, ball.y], wasSpike = ball.spk; ball.spk = false;
   if (Math.random() < (wasSpike ? (b.ctl >= 0 ? 0.3 : 0.5 - 0.28 * skill) : b.ctl >= 0 ? 0 : 0.06 - 0.04 * skill)) { // recepción de un remate: a veces el balón sale rebotado sin control
     ball.vx = k.rnd(-1, 1) * 220 + s * 60; ball.vy = -k.rnd(180, 320); k.sfx('hit'); k.float('¡Uy!', bx, by - 20, '#fff'); return; }
-  if (spike) { ball.spk = true; const tx = NET + other * (60 + Math.random() * 180) + (aimX || 0) * 60, T0 = Math.abs(tx - bx) / 600; let vy = (GROUND - 20 - by - 0.5 * GRAV_V * T0 * T0) / T0; ball.vx = (tx - bx) / T0; ball.vy = Math.max(vy, -80); k.sfx('shoot'); k.shake(5); k.float('¡Remate!', bx, by - 20, '#ffd166'); k.burst(bx, by, '#fff', 14, 200); return; }
+  if (spike) { ball.spk = true; const tx = NET + other * (60 + Math.random() * 180) + (aimX || 0) * 60, T0 = Math.abs(tx - bx) / 600; let vy = (GROUND - 20 - by - 0.5 * GRAV_V * T0 * T0) / T0; ball.vx = (tx - bx) / T0; ball.vy = Math.max(vy, -80);
+    for (let it = 0; it < 10; it++) { const tn = (NET - bx) / ball.vx; if (tn <= 0 || by + ball.vy * tn + 0.5 * GRAV_V * tn * tn < NET_TOP - ball.r - 6) break; ball.vy -= 45; ball.vx *= 0.94; } /* que pase por encima de la red */ k.sfx('shoot'); k.shake(5); k.float('¡Remate!', bx, by - 20, '#ffd166'); k.burst(bx, by, '#fff', 14, 200); return; }
   let tx, apex;
   if (over || touches[b.team] >= 3) { tx = NET + other * (70 + Math.random() * 200) + (aimX || 0) * 70; apex = NET_TOP - 90 - Math.random() * 40; }
   else if (touches[b.team] === 1) { tx = NET + s * 110; apex = NET_TOP - 110; }
