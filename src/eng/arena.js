@@ -733,7 +733,8 @@ function info(x, y, w, h) {
 }
 function hints(x, y, w, h) {
   ART.rr(c, x, y, w, h, 14); c.fillStyle = 'rgba(34,28,70,.7)'; c.fill(); c.lineWidth = 2; c.strokeStyle = '#3d3470'; c.stroke();
-  MODES[M].hint.forEach((s, j) => { c.font = '700 15px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = j ? '#cfc8ff' : '#fff'; c.fillText(s, x + w / 2, y + h / 2 + (j - 1) * 24); });
+  MODES[M].hint.forEach((s, j) => { let fs = 16; do { c.font = `700 ${fs}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; } while (c.measureText(s).width > w - 14 && --fs > 10);
+    c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = j ? '#cfc8ff' : '#fff'; c.fillText(s, x + w / 2, y + h / 2 + (j - 1) * 26); });
 }
 function draw() {
   c.drawImage(BG, 0, 0, W, H);

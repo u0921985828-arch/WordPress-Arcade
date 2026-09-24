@@ -835,7 +835,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     for (let p = 0; p < S.n; p++) {
       const st = seatOf(p), [ax, ay] = PL[st], col = k.pcol(p), hum = isHum(p), nd = BJ.need(S), turn = nd && nd.p === p;
       let bx, by; if (st === 'b') { bx = PORT ? 70 : 90; by = viewer() === p && S.phase !== 'reveal' ? handTop - 26 : ay - 70; } else if (st === 't') { bx = ax - (PORT ? 150 : 170); by = ay; } else { bx = ax; by = ay - (PORT ? 86 : 80); }
-      if (st === 'b' && PORT && viewer() === p) { bx = 64; by = handTop - 28; }
+      if (st === 'b' && PORT && viewer() === p) { bx = 64; by = handTop - 118; }
       const w = 118, h = 42; if (turn) { c.globalAlpha = 0.35 + 0.25 * Math.sin(t * 6); ART.rr(c, bx - w / 2 - 5, by - h / 2 - 5, w + 10, h + 10, 16); c.fillStyle = col; c.fill(); c.globalAlpha = 1; }
       ART.rr(c, bx - w / 2, by - h / 2 + 3, w, h, 13); c.fillStyle = OUT; c.fill(); ART.rr(c, bx - w / 2, by - h / 2, w, h, 13); ART.fillOut(c, 'rgba(20,24,44,.92)', 2.5);
       circ(c, bx - w / 2 + 20, by, 13, col, 2.5); label2(hum ? (k.party ? 'J' + (p + 1) : '★') : 'IA', bx - w / 2 + 20, by + 1, 11, '#fff');
@@ -877,7 +877,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     }
   }
   function bubble(b) {
-    const [x0, y0] = PL[seatOf(b.p)], st = seatOf(b.p), x = st === 'l' ? x0 + 60 : st === 'r' ? x0 - 60 : x0 + (st === 't' ? 150 : 0), y = st === 'b' ? (viewer() === b.p ? handTop - 110 : y0 - 120) : st === 't' ? y0 + 70 : y0 - 10;
+    const [x0, y0] = PL[seatOf(b.p)], st = seatOf(b.p), x = st === 'l' ? x0 + 60 : st === 'r' ? x0 - 60 : x0 + (st === 't' ? 150 : 0), y = st === 'b' ? (viewer() === b.p ? handTop - (PORT ? 172 : 110) : y0 - 120) : st === 't' ? y0 + 70 : y0 - 10;
     const size = b.big ? 26 : 17; c.font = `800 ${size}px ${FONT}`; const w = c.measureText(b.txt).width + 28, h = size + 18, xx = Math.max(w / 2 + 6, Math.min(W - w / 2 - 6, x)), s = Math.min(1, (b.big ? 2.4 : 1.7) - b.t < 0.15 ? 0.6 + ((b.big ? 2.4 : 1.7) - b.t) * 2.6 : 1);
     c.save(); c.translate(xx, y); c.scale(s, s); c.globalAlpha = Math.min(1, b.t * 3);
     ART.rr(c, -w / 2, -h / 2, w, h, h / 2); ART.fillOut(c, b.big ? '#ff5a5f' : '#fff', 2.5); c.beginPath(); c.moveTo(-8, h / 2 - 1); c.lineTo(0, h / 2 + 9); c.lineTo(8, h / 2 - 1); c.fillStyle = b.big ? '#ff5a5f' : '#fff'; c.fill();

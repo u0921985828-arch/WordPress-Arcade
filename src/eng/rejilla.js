@@ -302,7 +302,7 @@ function jamGame() {
       }
     });
   }
-  const enc = (pos) => String.fromCharCode.apply(null, pos.map((p) => p + 48));
+  const enc = (pos) => { let s = 0; for (let i = pos.length - 1; i >= 0; i--) s = s * 8 + pos[i]; return s; };
   function explore(cars, start, cap) {
     const idx = new Map([[enc(start), 0]]), st = [start], adj = [];
     for (let i = 0; i < st.length; i++) {
@@ -312,7 +312,6 @@ function jamGame() {
     }
     return { st, adj };
   }
-  /* camino mínimo desde una posición (para la pista y el bot de prueba) */
   function solvePath(cars, start) {
     const par = new Map([[enc(start), null]]), q = [start];
     for (let h = 0; h < q.length && h < 200000; h++) {
@@ -321,39 +320,57 @@ function jamGame() {
     }
     return null;
   }
+  function fitsCar(cars, v, skip) { const o = occOf(cars.filter((_, i) => i !== skip), cars.filter((_, i) => i !== skip).map((w) => (w.h ? w.x : w.y))); for (let j = 0; j < v.len; j++) { const x = v.h ? v.x + j : v.x, y = v.h ? v.y : v.y + j; if (x >= N || y >= N || o[y * N + x] >= 0) return false; } return true; }
+  function randCar() { const len = Math.random() < 0.28 ? 3 : 2, h = Math.random() < 0.5; let y = k.ri(0, h ? N - 1 : N - len); if (h && y === EXIT) y = (y + k.ri(1, N - 1)) % N; return { x: k.ri(0, h ? N - len : N - 1), y, len, h }; }
   function randomLayout(n) {
-    const o = new Int8Array(36).fill(-1), cars = [], rx = k.ri(0, 2);
-    const put = (v) => { for (let j = 0; j < v.len; j++) { const x = v.h ? v.x + j : v.x, y = v.h ? v.y : v.y + j; if (x >= N || y >= N || o[y * N + x] >= 0) return false; } for (let j = 0; j < v.len; j++) { const x = v.h ? v.x + j : v.x, y = v.h ? v.y : v.y + j; o[y * N + x] = cars.length; } cars.push(v); return true; };
-    put({ x: rx, y: EXIT, len: 2, h: true });
-    for (let t2 = 0; t2 < n * 25 && cars.length < n + 1; t2++) {
-      const len = Math.random() < 0.28 ? 3 : 2, h = Math.random() < 0.5, x = k.ri(0, h ? N - len : N - 1), y = k.ri(0, h ? N - 1 : N - len);
-      if (h && y === EXIT) continue;   // un coche en el carril de salida nunca dejaría pasar al rojo
-      put({ x, y, len, h });
-    }
+    const cars = [{ x: k.ri(0, 2), y: EXIT, len: 2, h: true }];
+    for (let t2 = 0; t2 < n * 25 && cars.length < n + 1; t2++) { const v = randCar(); if (fitsCar(cars, v)) cars.push(v); }
     return cars;
   }
-  /* genera un nivel con solución mínima lo más cercana posible al objetivo (búsqueda en todo el espacio de estados) */
+  /* evalúa una disposición: explora todo su espacio de estados y elige la posición cuya solución mínima se acerca más al objetivo */
+  function evaluate(cars, target) {
+    const g = explore(cars, cars.map((v) => (v.h ? v.x : v.y)), 12000); if (!g) return null;
+    const dist = new Int16Array(g.st.length).fill(-1), q = [];
+    g.st.forEach((s, i) => { if (s[0] === N - 2) { dist[i] = 0; q.push(i); } });
+    if (!q.length) return null;
+    for (let h = 0; h < q.length; h++) for (const j of g.adj[q[h]]) if (dist[j] < 0) { dist[j] = dist[q[h]] + 1; q.push(j); }
+    let pick = -1, pd = 1e9;
+    for (let i = 0; i < dist.length; i++) { const e = Math.abs(dist[i] - target) + (dist[i] < target ? 0.5 : 0); if (dist[i] > 0 && e < pd) { pd = e; pick = i; } }
+    if (pick < 0) return null;
+    const p = g.st[pick]; return { err: pd, cars: cars.map((v, i) => ({ ...v, x: v.h ? p[i] : v.x, y: v.h ? v.y : p[i] })), min: dist[pick] };
+  }
+  /* genera un nivel: disposiciones al azar + ascenso de colina (añadir, quitar o recolocar vehículos) hacia el objetivo */
   function generate(target, n) {
     const t0 = performance.now(); let best = null;
-    for (let a = 0; a < 400; a++) {
-      const cars = randomLayout(n), start = cars.map((v) => (v.h ? v.x : v.y)), g = explore(cars, start, 30000);
-      if (!g) continue;
-      const dist = new Int32Array(g.st.length).fill(-1), q = [];
-      g.st.forEach((s, i) => { if (s[0] === N - 2) { dist[i] = 0; q.push(i); } });
-      if (!q.length) continue;
-      for (let h = 0; h < q.length; h++) for (const j of g.adj[q[h]]) if (dist[j] < 0) { dist[j] = dist[q[h]] + 1; q.push(j); }
-      let pick = -1, pd = 1e9;
-      for (let i = 0; i < dist.length; i++) { const e = Math.abs(dist[i] - target) + (dist[i] < target ? 0.5 : 0); if (dist[i] > 0 && e < pd) { pd = e; pick = i; } }
-      if (pick >= 0 && (!best || pd < best.err)) best = { err: pd, cars, pos: g.st[pick], min: dist[pick] };
-      if (best && (best.err === 0 || (performance.now() - t0 > 260 && best.min >= Math.min(target, 3)) || performance.now() - t0 > 900)) break;
+    while (!best || (best.err > 0 && performance.now() - t0 < 700)) {
+      let cur = evaluate(randomLayout(n), target); if (!cur) continue;
+      for (let it = 0; it < 40 && cur.err > 0 && performance.now() - t0 < 700; it++) {
+        const cs = cur.cars.map((v) => ({ ...v })), r = Math.random();
+        if ((r < 0.45 || cs.length < 4) && cs.length < 14) { const v = randCar(); if (!fitsCar(cs, v)) continue; cs.push(v); }
+        else if (r < 0.7 && cs.length > 3) cs.splice(k.ri(1, cs.length - 1), 1);
+        else { const i = k.ri(1, cs.length - 1), v = randCar(); if (!fitsCar(cs, v, i)) continue; cs[i] = v; }
+        const nx = evaluate(cs, target); if (nx && nx.err <= cur.err) cur = nx;
+      }
+      if (!best || cur.err < best.err) best = cur;
     }
-    return best;
+    return { cars: best.cars, pos: best.cars.map((v) => (v.h ? v.x : v.y)), min: best.min };
+  }
+  /* banco de niveles difíciles (mínimo 14–38), generado sin conexión con el mismo solucionador: 36 casillas + mínimo */
+  const BANK = "OJJDDFOGIIMFKGAAMHKGEEEHNL.CC.NL....14 .GGGFF..JIIIAAJ..E.KK..E.DHHHC.D.LLC14 FEEE..F.KKIHAA.GIH.J.GIHMJ.DDDMLLCC.14 EEEGGIKKCCFIHAA.F.H..MM.LJJ.DDL.....14 MMKKFHEE.LFHGAALF.GCCC..J..DNNJ..DII14 DD..C.LLL.C.F.AACJF.G..JIIGHH..KKEE.14 ...J.....JF..AAEFC...E.C.I.HHC.IGGDD14 ......LLEEHJGAA.HJG..C.JG.KCDDFFK.II14 .D.GGF.D.C.F.AAC.E.JJH.E...H.....II.15 CCCDDF.....F..AAH.KKIIH.LJJGEEL..GMM15 CLLFF.CGGHH.C.AAE.III.EK..J.EK..JDD.15 ..HH..J.CCCDJ.AAGDFFEEGD...LMMIIILKK15 KFFCD.K.GCD.AAGC....E.....EHHI..EJJI15 ..EHHKCCE.JK.FAAJK.FLL...FGGII.DDD..16 JHHIE.J.FIEKAAF..KGGGDD.......LL.CC.16 I.EED.I.F.D.AAFCGL..HCGL..H..L..JJKK16 ...IJJMM.ILGAA..LGEEEKKGCHHFFFC..DDD17 C.III.C.DGKKAADG...F.GHH.FEEJ.....J.17 ..D.....DC..AAGCILF.GHILFEEHI..KKJJ.17 IIEEEDFKK..DFAALJH..GLJH..GLCC......17 .........DIIJAAD..JG.DKKFG.EECFHHH.C17 ..DDDICCFFJIAA.LJIG..LKKG.EEHHG.MM..18 KFFGJJKM.GHH.MAA.ILEEE.IL.CDDD..C...18 ..NNMMJJGGICAA..ICDDDLI.F..L.KFHHEEK18 J..GG.J..KKHJAA.FHEEE.F...C.F.DDC.II19 I..HH.IJJJMMAA.G.DCKKGLDCE.GL..E.FFF19 FDDD..F.NNCHEAAICHE..ILLJJJI.MKK.GGM19 .II..CLLD..CAAD..CE.FJJJE.FGKKEHHG..19 ..FGGG..FLLH..FAAHKKJJ.H.CCDIIEEED..19 I.KEEEI.KFJJDAAFLCD...LC.MGGGC.M..HH19 DDDGEF..JGEFAAJ..KH....KH.IICC......20 .GGGJ...HDJMAAHDKMIICCKME..LL.E..FF.21 LHHCC.L.IIGDAA.KGDJJJKGD..FEEE..F...21 EEF.....FIIIGAAD.KG..DCKHHJJCK......21 HHGJJC..GE.C.AAE.C...ED..FKKD..FIII.21 ..CCC...HJJJAAHG..MMIGLL.DIEEF.DKK.F22 KIIDL.K.FDLCAAFHMCENNHMJE....JE.GGG.23 JLLMM.J..GIIAA.GDF.EEEDF..K.D.HHK.CC23 ..CCCFDDJ..FAAJ..FIMMEEEILLLGG..KKHH24 J.GGK.J.F.KCAAF..CDDDEECMMHHH..LLLII25 EJJIIIE.C...AAC.FH.KDDFH.KGGFLMMM..L25 GGG..HIICCCH..AA.J..FDDJE.FKLLEMMK..26 .FFDLLJCCDGMJ.AAGMJ.HNNM..HEIIKKKE..26 CNNMMJC.F..JAAFEHGDDDEHG...EKK.IIILL27 IIID..F..DC.F.AAC.KKE.C.LMEGG.LMJJHH27 C..JHHCLLJK.CAADK.MMIDKE..IFFE.GGNN.29 ..GHHHKKG.J.AAF.JDE.FMMDENNL.ICCCL.I30 NNEEELD.II.LDAAHJGDCCHJG..KFFFMMK...30 FFC..E..C..E..CAAEG..DHHGJJD...IID..36 CLLH..CJJH.GAAEH.G..EIIK..E..K.DD.FF38".split(' ').map((e) => ({ s: e.slice(0, 36), m: +e.slice(36) }));
+  function fromBank(target, level) {
+    const pool = BANK.filter((e) => Math.abs(e.m - target) <= 2), list = pool.length ? pool : BANK.filter((e) => e.m >= target - 2);
+    const e = (list.length ? list : BANK)[(level * 7 + k.ri(0, 99)) % (list.length || BANK.length)] || BANK[0], seen = {}, cars = [];
+    for (let c = 0; c < 36; c++) { const ch = e.s[c]; if (ch === '.' || seen[ch]) continue; seen[ch] = 1;
+      const x = c % N, y = (c / N) | 0, h = x + 1 < N && e.s[c + 1] === ch; let len = 1; while (len < 3 && e.s[h ? c + len : c + len * N] === ch) len++;
+      const v = { x, y, len, h }; if (ch === 'A') cars.unshift(v); else cars.push(v); }
+    const pos0 = cars.map((v) => (v.h ? v.x : v.y)), p = solvePath(cars, pos0);
+    return p ? { cars, pos: pos0, min: p.length } : null;
   }
   /* ---------- estado ---------- */
   let level, cars, pos, start, min, moves, hist, drag, sel, cur, grab, kbMode, t = 0, winT, won, scored, hintUsed, hint, stars, shake = [], bump = 0, total;
   const tgt = (lv) => Math.min(24, 2 + Math.round((lv - 1) * 1.35)), ncars = (lv) => Math.min(13, 4 + Math.floor(lv * 0.7));
   function loadLevel() {
-    const g = generate(tgt(level), ncars(level));
+    const g = (tgt(level) >= 14 && fromBank(tgt(level), level)) || generate(tgt(level), ncars(level));
     let ci = 0; cars = g.cars.map((v, i) => ({ ...v, col: i === 0 ? RED : COLS[(ci++ + level * 3) % COLS.length], seed: Math.random() }));
     pos = g.pos.slice(); start = pos.slice(); min = g.min; moves = 0; hist = []; drag = null; sel = 0; cur = { x: pos[0], y: EXIT }; grab = false; winT = 0; won = false; scored = false; hintUsed = false; hint = null;
     cars.forEach((v, i) => { v.vis = pos[i]; v.pop = -i * 0.04; });
