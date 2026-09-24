@@ -61,7 +61,7 @@ function autoStep() {
   src.sort((a, b) => a[0].r - b[0].r); for (const [cd, from] of src) { const f = canFound(cd); if (f >= 0) { doMove([cd], from, { t: 'found', i: f }); return true; } } return false;
 }
 function win() { done = true; auto = false; score += 500; startCascade(); }
-function finishWin() { casc = null; k.st = 'over'; k.show('¡Ganaste!', `${moves} movimientos · ${fmt(time)} · ${score} puntos · Récord ${k.best(CFG.id, score)}<br>Toca para una partida nueva`); }
+function finishWin() { casc = null; k.st = 'over'; k.show('¡Ganaste!', `${moves} movimiento${moves === 1 ? "" : "s"} · ${fmt(time)} · ${score} puntos · Récord ${k.best(CFG.id, score)}<br>Toca para una partida nueva`); }
 function checkWin() { if (done) return; if (M === 'spider' && removed === 8) win(); if ((M === 'klondike' || M === 'freecell') && found.every((f) => f.length === 13)) win(); if (M === 'pyramid' && pyr.every((r) => r.every((q) => !q))) win(); if (M === 'tripeaks' && peaks.every((r) => r.every((q) => !q))) win(); }
 function pyrFree(r, j) { if (!pyr[r][j]) return false; if (r === 6) return true; return !pyr[r + 1][j] && !pyr[r + 1][j + 1]; }
 function peakFree(r, j) { if (!peaks[r][j]) return false; if (r === 3) return true; const cov = r === 0 ? [2 * j, 2 * j + 1] : r === 1 ? [j + Math.floor(j / 2), j + Math.floor(j / 2) + 1] : [j, j + 1]; return cov.every((q) => !peaks[r + 1][q]); }
@@ -334,7 +334,7 @@ k.run((dt) => {
   if (!k.gate(reset)) return;
   if (done) { if (casc) { stepCascade(dt); if (casc.end || k.ptr.hit || k.hit.has('a')) finishWin(); } return; }
   time += dt; newAsk = Math.max(0, newAsk - dt); spawnQ = Math.max(0, spawnQ - dt); if (hintT > 0 && (hintT -= dt) <= 0) hintR = null;
-  if (stuckT > 0 && (stuckT -= dt) <= 0) { k.lose(CFG.id, score, 'Sin movimientos', `${moves} movimientos`); return; }
+  if (stuckT > 0 && (stuckT -= dt) <= 0) { k.lose(CFG.id, score, 'Sin movimientos', `${moves} movimiento${moves === 1 ? "" : "s"}`); return; }
   if (auto) { autoT -= dt; if (autoT <= 0) { autoT = 0.09; if (!autoStep()) auto = false; } return; }
   /* 1.23: más fácil — pista automática tras 15 s sin tocar */
   if (k.ptr.down || k.held.size) idleH = 0; else if ((idleH += dt) > 15 && !hintR && !stuckT) { idleH = -30; const h = findHint(); if (h && h[0]) { hintR = h.filter(Boolean); hintT = 2.4; } }
