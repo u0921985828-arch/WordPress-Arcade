@@ -76,7 +76,7 @@ k.run((dt) => {
   for (const p of smoke) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 1 - dt * 2; p.vy *= 1 - dt * 2; p.t -= dt; p.r += dt * 10; } smoke = smoke.filter((p) => p.t > 0);
   for (const d of debris) { d.x += d.vx * dt; d.y += d.vy * dt; d.vy += 30 * dt; d.a += d.va * dt; if (d.y > gy(k.clamp(d.x, 0, W))) { d.y = gy(k.clamp(d.x, 0, W)); d.vy *= -0.3; d.vx *= 0.6; d.va *= 0.5; } }
   if (!k.gate(reset)) return;
-  if (crash) { crash -= dt; if (crash <= 0) return k.lose('lunar-lander', score, 'Estrellado', `Nivel ${level}`); return; }
+  if (crash) { crash -= dt; if (crash <= 0) return k.lose(CFG.id, score, 'Estrellado', `Nivel ${level}`); return; }
   if (landed) { landed -= dt; if (landed <= 0) { level++; build(); } return; }
   if (k.held.has('left')) s.a -= 2.5 * dt; if (k.held.has('right')) s.a += 2.5 * dt;
   if (k.ptr.down) s.a += k.clamp((k.ptr.x - W / 2) / (W / 2) * 1.2 - s.a, -2.5 * dt, 2.5 * dt);

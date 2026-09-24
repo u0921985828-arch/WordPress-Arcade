@@ -48,7 +48,7 @@ function cross(x, y, s, col, lw) { c.strokeStyle = col; c.lineWidth = lw; c.line
 reset(); k.show(CFG.title, 'Rellena las casillas según las pistas: cada número es un bloque seguido de casillas pintadas. Elige Pintar o Marcar y toca o arrastra. Teclado: flechas, A pinta, B marca.');
 k.run((dt) => {
   pulse.r = pulse.r.map((v) => Math.max(0, v - dt * 2)); pulse.c = pulse.c.map((v) => Math.max(0, v - dt * 2));
-  if (revT) { revT += dt; if (revT > 1.8 && k.st === 'play') { k.st = 'over'; const mm = Math.floor(tm / 60), ss = String(Math.floor(tm % 60)).padStart(2, '0'); k.show('¡Resuelto!', `Tiempo ${mm}:${ss}<br>${CFG.daily ? 'Toca para el siguiente puzzle del día' : 'Toca para un nuevo puzzle'}`); } }
+  if (revT) { revT += dt; if (revT > 1.8 && k.st === 'play') { k.st = 'over'; const mm = Math.floor(tm / 60), ss = String(Math.floor(tm % 60)).padStart(2, '0'); k.show("¡Resuelto!", `Puzzle ${puzzle + 1} resuelto en ${mm}:${ss}<br>${CFG.daily ? 'Toca para el siguiente puzzle del día' : 'Toca para un nuevo puzzle'}`); } }
   if (!k.gate(reset) || solved) return;
   tm += dt;
   if (k.ptr.hit) { kbd = false; for (const b of TB) if (k.ptr.x > b.x && k.ptr.x < b.x + TBW && k.ptr.y > TBY - 4 && k.ptr.y < TBY + 40) { tool = b.t; k.sfx('click'); } }
@@ -66,7 +66,7 @@ k.run((dt) => {
   if (k.hit.has('b')) { kbd = true; press(cur[0], cur[1], 2); paint = undefined; }
 }, () => {
   if (!bgCv) bgCv = makeBg(); c.drawImage(bgCv, 0, 0, W, H);
-  label(CFG.title, 14, 12, 20, '#ffd23d');
+  label(CFG.title, 14, 13, CFG.title.length > 14 ? 17 : 18, '#ffd23d');
   c.font = '600 12px -apple-system,Segoe UI,Roboto,sans-serif'; c.textAlign = 'left'; c.textBaseline = 'top'; c.fillStyle = '#b9c3e8'; c.fillText(CFG.daily ? `Puzzle del día #${puzzle + 1} · ${N}×${N}` : `Puzzle ${puzzle + 1} · ${N}×${N}`, 15, 42);
   const mm = Math.floor(tm / 60), ss = String(Math.floor(tm % 60)).padStart(2, '0'); label(`${mm}:${ss}`, W - 16, 14, 22, '#fff', 'right');
   c.font = '800 11px ui-rounded,"Trebuchet MS",sans-serif'; c.textAlign = 'right'; c.fillStyle = '#b9c3e8'; c.fillText(`${rowOk.filter(Boolean).length + colOk.filter(Boolean).length}/${2 * N} líneas`, W - 16, 44);

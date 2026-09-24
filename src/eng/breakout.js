@@ -96,7 +96,7 @@ k.run((dt) => {
       else if (balls[0]) { const b = balls[0]; balls.push({ ...b, tr: [], vx: -b.vx || 150, vy: b.vy || -300, stuck: false }, { ...b, tr: [], vx: b.vx * 0.5 + 90, vy: b.vy || -300, stuck: false }); } }
     if (d.y > 370) d.dead = true; }
   drops = drops.filter((d) => !d.dead);
-  if (!balls.length) { k.shake(6); k.sfx('hurt'); if (--lives <= 0) return k.lose('brick-breaker', score, 'Sin bolas', `Nivel ${level}`); balls = [{ x: pad, y: 330, stuck: true, tr: [] }]; wide = 0; }
+  if (!balls.length) { k.shake(6); k.sfx('hurt'); if (--lives <= 0) return k.lose(CFG.id, score, 'Sin bolas', `Nivel ${level}`); balls = [{ x: pad, y: 330, stuck: true, tr: [] }]; wide = 0; }
   if (!bricks.length) { level++; score += 100 * level; k.sfx('win'); k.confetti(); build(); }
 }, () => {
   c.drawImage(BG, 0, 0, 480, 360);
@@ -109,7 +109,7 @@ k.run((dt) => {
   for (const b of balls) { b.tr.forEach(([x, y], i) => { c.globalAlpha = i / b.tr.length * 0.35; c.fillStyle = '#9fe8ff'; c.beginPath(); c.arc(x, y, 2 + i / b.tr.length * 3, 0, R2); c.fill(); }); c.globalAlpha = 1;
     c.beginPath(); c.arc(b.x, b.y, 5.5, 0, R2); ART.fillOut(c, '#fff', 2); c.fillStyle = '#9fe8ff'; c.beginPath(); c.arc(b.x + 1.2, b.y + 1.2, 2.2, 0, R2); c.fill(); }
   // HUD
-  label(score, 12, 3, 17, '#fff'); label(`Nivel ${level}`, 386, 5, 13, '#cfc8ff', 'right');
+  label(score, 12, 3, 17, '#fff'); label(`Nivel ${level}`, 446 - lives * 24, 5, 13, '#cfc8ff', 'right');
   for (let i = 0; i < lives; i++) { const x = 460 - i * 24; ART.rr(c, x - 9, 9, 18, 7, 3.5); ART.fillOut(c, '#dfe6f2', 1.8); c.fillStyle = '#ff5f7a'; c.fillRect(x - 8, 10.5, 4, 4); c.fillRect(x + 4, 10.5, 4, 4); }
   if (banner > 0) { const p = 1.6 - banner, s = p < 0.2 ? 0.4 + p * 3.5 : 1.1; c.save(); c.translate(240, 200); c.scale(s, s); c.globalAlpha = Math.min(1, banner / 0.3); label(`Nivel ${level}`, 0, 0, 34, '#fff27a', 'center', 'middle'); c.restore(); c.globalAlpha = 1; }
   if (k.st === 'play' && balls.some((b) => b.stuck) && banner <= 0 && Math.sin(tm * 5) > -0.3) label('Toca o pulsa A para lanzar', 240, 262, 14, '#e6e2ff', 'center', 'middle');

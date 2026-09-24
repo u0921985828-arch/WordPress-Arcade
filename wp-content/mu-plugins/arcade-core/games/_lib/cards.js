@@ -87,9 +87,13 @@ function findHint() {
       if (from.t === 'tab') { const above = tab[from.i][from.idx - 1]; s = !above ? (tab[i].length ? 3 : 0) : !above.up ? 6 : validRun([above, st[0]]) ? 0 : 2; }
       if (!tab[i].length) s = Math.min(s, M === 'klondike' ? s : 1);
       if (M === 'spider' && tab[i].length && tab[i][tab[i].length - 1].s === st[0].s) s += 1;
+      if (M === 'spider' && from.t === 'tab') { const ab = tab[from.i][from.idx - 1]; if (ab && ab.up && ab.r === st[0].r + 1) s = ab.s !== st[0].s && tab[i].length && tab[i][tab[i].length - 1].s === st[0].s ? 3 : 0; }
       if (s > bs) { bs = s; const col = tab[i]; best = [rc(st[0]), col.length ? rc(col[col.length - 1]) : slotR(SL.tab[i])]; } }
   }
   if (best) return best;
+  // FreeCell: sugiere liberar la carta más baja que quede a menos profundidad usando una celda
+  if (M === 'freecell' && cells.includes(null)) { let bi = -1, bv = 1e9; tab.forEach((col, i) => col.forEach((q, idx) => { const v = q.r * 3 + (col.length - 1 - idx) * 4; if (col.length > 1 && idx < col.length - 1 && v < bv) { bv = v; bi = i; } }));
+    if (bi >= 0) { const col = tab[bi]; return [rc(col[col.length - 1]), slotR(SL.cells[cells.indexOf(null)])]; } }
   if ((M === 'klondike' && (stock.length || waste.length)) || (M === 'spider' && stock.length)) return [slotR(SL.stock)];
   return null;
 }

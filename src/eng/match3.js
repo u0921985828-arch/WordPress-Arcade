@@ -4,7 +4,7 @@
 const W = 480, H = 640, OUT = ART.OUT, k = Kit({ w: W, h: H, title: CFG.title, bg: '#1d1538' }), c = k.ctx, N = 8, S = 56, OX = 16, OY = 146;
 const GEM = ['#ff4d6d', '#ffd23d', '#4fe08a', '#4cc3ff', '#b77cff', '#ff9a3d'];
 const TIMED = CFG.mode === 'time';
-let b, off, vel, sel, score, moves, target, level, time, busy, combo, clearing, swapA, check, cur, kbd, idle, hint, prevT, comboT, comboTxt, lvlT;
+let queued = null, b, off, vel, sel, score, moves, target, level, time, busy, combo, clearing, swapA, check, cur, kbd, idle, hint, prevT, comboT, comboTxt, lvlT;
 function rnd() { return k.ri(0, 5); }
 function fill() { b = []; for (let y = 0; y < N; y++) { b[y] = []; for (let x = 0; x < N; x++) { let v; do v = rnd(); while ((x > 1 && b[y][x - 1] === v && b[y][x - 2] === v) || (y > 1 && b[y - 1][x] === v && b[y - 2][x] === v)); b[y][x] = v; } }
   off = Array.from({ length: N }, (_, y) => Array.from({ length: N }, (_, x) => 60 + (N - y) * 44 + x * 10)); vel = Array.from({ length: N }, () => Array(N).fill(0)); }
@@ -33,7 +33,7 @@ function gravity() {
   clearing = null; check = true;
 }
 function reshuffle() { k.float('Sin jugadas: nuevo tablero', 240, OY + N * S / 2, '#fff38a'); k.sfx('explode'); fill(); check = true; }
-function reset() { score = 0; level = 1; moves = 25; target = 1500; prevT = 0; time = 90; combo = 0; fill(); sel = null; clearing = null; swapA = null; check = true; cur = [3, 3]; kbd = false; idle = 0; hint = null; comboT = 0; lvlT = 0; }
+function reset() { score = 0; level = 1; moves = 25; target = 1000; prevT = 0; time = 90; combo = 0; fill(); sel = null; clearing = null; swapA = null; check = true; cur = [3, 3]; kbd = false; idle = 0; hint = null; comboT = 0; lvlT = 0; queued = null; }
 
 /* ---------- Gráficos cacheados ---------- */
 function shape(v) {
@@ -91,6 +91,11 @@ k.run((dt) => {
   if (comboT > 0) comboT -= dt; if (lvlT > 0) lvlT -= dt;
   if (!k.gate(reset)) return;
   if (TIMED) { time -= dt; if (time <= 0) { time = 0; return k.lose(CFG.id, score, '¡Tiempo!'); } }
+  // el deslizamiento hecho mientras caen las gemas se guarda y se aplica al quedar quietas
+  const cell = (x, y) => [Math.floor((x - OX) / S), Math.floor((y - OY) / S)], inB = ([x, y]) => x >= 0 && y >= 0 && x < N && y < N;
+  if (k.ptr.hit) { const s0 = cell(k.ptr.sx, k.ptr.sy); drag = inB(s0) ? { s0, done: false } : null; kbd = false; }
+  const dx = k.ptr.x - k.ptr.sx, dy = k.ptr.y - k.ptr.sy, far = Math.hypot(dx, dy) > 20;
+  if (drag && !drag.done && (k.ptr.down || k.ptr.up) && far) { drag.done = true; queued = [drag.s0, Math.abs(dx) > Math.abs(dy) ? [drag.s0[0] + Math.sign(dx), drag.s0[1]] : [drag.s0[0], drag.s0[1] + Math.sign(dy)]]; }
   if (swapA) { swapA.t += dt / 0.16; if (swapA.t >= 1) { const s = swapA; swapA = null;
     if (!s.back) { const m = matches(); if (m.size) { combo = 0; startClear(m); } else { swap(s.a[0], s.a[1], s.b[0], s.b[1]); swapA = { a: s.a, b: s.b, t: 0, back: true }; if (!TIMED) moves++; k.sfx('hit'); } } } return; }
   if (clearing) { clearing.t += dt / 0.2; if (clearing.t >= 1) gravity(); return; }
@@ -99,12 +104,7 @@ k.run((dt) => {
   if (!TIMED) { if (score >= target) { level++; prevT = target; target = score + 1500 + level * 500; moves = 25; lvlT = 1.6; k.sfx('win'); k.confetti(); }
     else if (moves <= 0) return k.lose(CFG.id, score, 'Sin movimientos', `Nivel ${level}`); }
   idle += dt; if (idle > 6 && !hint) hint = findMove();
-  const cell = (x, y) => [Math.floor((x - OX) / S), Math.floor((y - OY) / S)], inB = ([x, y]) => x >= 0 && y >= 0 && x < N && y < N;
-  // táctil: arrastre (se dispara al superar el umbral) o dos toques
-  if (k.ptr.hit) { const s0 = cell(k.ptr.sx, k.ptr.sy); drag = inB(s0) ? { s0, done: false } : null; kbd = false; }
-  const dx = k.ptr.x - k.ptr.sx, dy = k.ptr.y - k.ptr.sy, far = Math.hypot(dx, dy) > 20;
-  const dir = () => Math.abs(dx) > Math.abs(dy) ? [drag.s0[0] + Math.sign(dx), drag.s0[1]] : [drag.s0[0], drag.s0[1] + Math.sign(dy)];
-  if (drag && !drag.done && (k.ptr.down || k.ptr.up) && far) { drag.done = true; trySwap(drag.s0, dir()); }
+  if (queued) { const q = queued; queued = null; trySwap(q[0], q[1]); return; }
   else if (drag && !drag.done && k.ptr.up) { const s0 = drag.s0; if (sel && Math.abs(sel[0] - s0[0]) + Math.abs(sel[1] - s0[1]) === 1) trySwap(sel, s0); else { sel = sel && sel[0] === s0[0] && sel[1] === s0[1] ? null : s0; k.sfx('click'); } }
   if (k.ptr.up) drag = null;
   // teclado: flechas mueven el cursor; A selecciona y la flecha siguiente intercambia
@@ -139,5 +139,5 @@ k.run((dt) => {
     if (cl) { c.globalAlpha = Math.sin(clearing.t * Math.PI) * 0.8; c.fillStyle = '#fff'; c.beginPath(); c.arc(X, Y, 20 * s + 4, 0, 6.283); c.fill(); c.globalAlpha = 1; } }
   c.restore();
   if (comboT > 0) { const a = Math.min(1, comboT / 0.3), sc = 1 + Math.max(0, comboT - 0.9) * 2; c.globalAlpha = a; label(comboTxt, W / 2, OY + N * S / 2 - 40, 38 * sc, '#ff9ad5', 'center', 'middle'); label(`Combo x${combo}`, W / 2, OY + N * S / 2, 20, '#fff', 'center', 'middle'); c.globalAlpha = 1; }
-  if (lvlT > 0) { c.globalAlpha = Math.min(1, lvlT / 0.3); label(`¡Nivel ${level}!`, W / 2, OY + N * S / 2 + 50, 40, '#ffd23d', 'center', 'middle'); label('+25 movimientos', W / 2, OY + N * S / 2 + 86, 18, '#fff', 'center', 'middle'); c.globalAlpha = 1; }
+  if (lvlT > 0) { c.globalAlpha = Math.min(1, lvlT / 0.3); label(`¡Nivel ${level}!`, W / 2, OY + N * S / 2 + 50, 40, '#ffd23d', 'center', 'middle'); label('25 movimientos', W / 2, OY + N * S / 2 + 86, 18, '#fff', 'center', 'middle'); c.globalAlpha = 1; }
 });

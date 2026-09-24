@@ -40,10 +40,10 @@ function whack(i) {
   if (!q || q.hit) { combo = 0; k.sfx('click'); return; }
   q.hit = 0.001; q.life = Math.min(q.life, 0.35);
   if (q.bomb) { score = Math.max(0, score - 100); time -= 3; combo = 0; k.burst(hx, hy - S * 0.2, '#ff9a3c', 24, 220); k.burst(hx, hy - S * 0.2, '#555', 12, 140); k.sfx('explode'); k.shake(9); k.flash('rgba(255,120,60,.35)'); k.float('-3 s', hx, hy - S * 0.5, '#ff6b6b'); navigator.vibrate && navigator.vibrate(120); return; }
-  combo++; const pts = (q.gold ? 50 : 10) * (1 + Math.floor(combo / 5)); score += pts; if (q.gold) time += 2;
+  combo++; const mul = Math.min(5, 1 + Math.floor(combo / 5)), pts = (q.gold ? 50 : 10) * mul; score += pts; if (q.gold) time += 2;
   k.burst(hx, hy - S * 0.25, q.gold ? '#f2d15c' : '#fff', 12, 180); k.sfx(q.gold ? 'coin' : 'hit'); k.shake(2);
   k.float(q.gold ? `+${pts}  +2 s` : `+${pts}`, hx, hy - S * 0.6, q.gold ? '#fff27a' : '#fff');
-  if (combo > 0 && combo % 5 === 0) k.float(`Combo x${1 + Math.floor(combo / 5)}`, 180, 176, '#fff27a');
+  if (combo > 0 && combo % 5 === 0 && combo <= 20) k.float(`Combo x${mul}`, 180, 176, '#fff27a');
 }
 k.run((dt) => {
   tm += dt; lvlT -= dt; if (mallet) { mallet.t += dt; if (mallet.t > 0.28) mallet = null; }
@@ -101,6 +101,6 @@ k.run((dt) => {
   const tl = Math.ceil(Math.max(0, time)), low = time < 10; const cx = 330, cy = 34; c.beginPath(); c.arc(cx, cy, 15, 0, R2); ART.fillOut(c, '#fff', 3); c.strokeStyle = OUT; c.lineWidth = 2.5; c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx, cy - 9); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(tm * 3) * 7, cy + Math.sin(tm * 3) * 7); c.stroke();
   label(`${tl}`, 308, 18, 30, low ? (Math.sin(tm * 12) > 0 ? '#ff5f5f' : '#fff') : '#fff', 'right');
   ART.rr(c, 16, 82, 328, 12, 6); c.fillStyle = 'rgba(26,21,48,.45)'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke(); const tw = Math.min(1, time / 60) * 324; if (tw > 2) { ART.rr(c, 18, 84, tw, 8, 4); c.fillStyle = low ? '#ff6b6b' : '#fff27a'; c.fill(); }
-  label(`Nivel ${lvl}`, 16, 104, 14, '#eaffea'); if (combo >= 5) label(`Combo x${1 + Math.floor(combo / 5)}`, 344, 104, 16, '#fff27a', 'right');
+  label(`Nivel ${lvl}`, 16, 104, 14, '#eaffea'); if (combo >= 5) label(`Combo x${Math.min(5, 1 + Math.floor(combo / 5))}`, 344, 104, 16, '#fff27a', 'right');
   if (lvlT > 0) { const s = lvlT > 1.4 ? 0.5 + (1.6 - lvlT) * 2.5 : 1; c.save(); c.translate(180, 150); c.scale(s, s); label('¡Nivel 2! Cuadrícula 4×4', 0, 0, 22, '#fff27a', 'center', 'middle'); c.restore(); }
 });

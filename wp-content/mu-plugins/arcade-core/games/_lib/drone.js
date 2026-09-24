@@ -2,7 +2,8 @@
 const k = Kit({ w: 640, h: 360, title: CFG.title, bg: '#0a1030' }), c = k.ctx, F = 300, OUT = ART.OUT;
 let d, rings, z, speed, score, lives, t, combo, parts, camX, camY, streaks, passed;
 function reset() { d = { x: 0, y: 0, vx: 0, vy: 0 }; rings = []; z = 0; speed = 900; score = 0; lives = 3; t = 0; combo = 0; parts = []; camX = 0; camY = -50; streaks = []; passed = 0;
-  let rz = 1500, rx = 0, ry = 0; for (let i = 0; i < 12; i++) { rx = k.clamp(rx + k.rnd(-260, 260), -500, 500); ry = k.clamp(ry + k.rnd(-160, 160), -260, 260); rings.push({ x: rx, y: ry, z: rz, r: 140 }); rz += 900; } }
+  // arranque justo: el primer anillo está frente al dron y los siguientes se separan poco a poco
+  let rz = 2600, rx = 0, ry = 0; for (let i = 0; i < 12; i++) { const sc = Math.min(1, i / 5); rx = k.clamp(rx + k.rnd(-260, 260) * sc, -500, 500); ry = k.clamp(ry + k.rnd(-160, 160) * sc, -260, 260); rings.push({ x: rx, y: ry, z: rz, r: i < 3 ? 170 : 140 }); rz += i < 3 ? 1100 : 900; } }
 reset(); k.show(CFG.title, 'Guía el dron a través de los anillos. Arrastra o usa las flechas. Pasar cerca del centro da más puntos y encadena combos.');
 const mk = (w, h, f) => { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const g = cv.getContext('2d'); g.scale(2, 2); g.lineJoin = 'round'; f(g); return cv; };
 const rs = (s) => { const x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -25,7 +26,7 @@ k.run((dt) => {
   for (const r of rings) if (!r.done && r.z < z) { r.done = true; r.pt = 0.5; const dist = Math.hypot(d.x - r.x, d.y - r.y), [sx, sy] = P(r.x, r.y, r.z);
     if (dist < r.r) { combo++; passed++; const center = dist < r.r * 0.35, pts = Math.round((center ? 100 : 50) * (1 + combo * 0.1)); score += pts; r.ok = true; k.sfx(center ? 'win' : 'coin');
       k.burst(sx, sy, center ? '#f2d15c' : '#5ce1e6', center ? 24 : 12, 220); k.float(center ? `¡Centro! +${pts}` : `+${pts}`, sx, sy - 40, center ? '#f2d15c' : '#fff'); }
-    else { combo = 0; lives--; r.miss = true; navigator.vibrate && navigator.vibrate(80); k.float('¡Fallo!', 320, 120, '#ff5f7a'); if (lives <= 0) return k.lose(CFG.id, score, 'Sin batería', `${passed} anillos`); } }
+    else { combo = 0; lives--; r.miss = true; navigator.vibrate && navigator.vibrate(110); k.float('¡Fallo!', 320, 120, '#ff5f7a'); if (lives <= 0) return k.lose(CFG.id, score, 'Sin batería', `${passed} anillos`); } }
   for (const r of rings) if (r.pt) r.pt = Math.max(0, r.pt - dt);
   rings = rings.filter((r) => r.z > z - 240); while (rings.length < 12) { const l = rings[rings.length - 1]; rings.push({ x: k.clamp(l.x + k.rnd(-300, 300), -520, 520), y: k.clamp(l.y + k.rnd(-180, 180), -270, 270), z: l.z + Math.max(600, 900 - t * 3), r: Math.max(90, 140 - t * 0.6) }); }
   if (Math.random() < dt * 20) { const a = Math.random() * 6.283; streaks.push({ a, r: 120 + Math.random() * 200, l: 0.25 }); }

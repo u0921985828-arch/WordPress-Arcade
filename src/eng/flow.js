@@ -3,7 +3,7 @@
  * Tuberías con contorno y brillo, extremos que laten al conectar, cursor de teclado y ola final al completar. */
 const W = 480, H = 580, OUT = ART.OUT, k = Kit({ w: W, h: H, title: CFG.title, bg: '#141a33' }), c = k.ctx;
 const COL = ['#ff5f5f', '#4cc3ff', '#ffd23d', '#5fe08a', '#b77cff', '#ff9a3d', '#ff8ad0', '#5a78ff', '#b8e05a', '#f2f2f2'];
-let N, S, OX, OY = 104, ends, paths, drag, level, score, done, cur, kbd, winT, conn, boardCv, bestL;
+let sol, N, S, OX, OY = 104, ends, paths, drag, level, score, done, cur, kbd, winT, conn, boardCv, bestL;
 function build() {
   N = Math.min(9, 5 + Math.floor((level - 1) / 2)); S = Math.floor(440 / N); OX = (480 - S * N) / 2; done = false;
   let path = []; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) path.push([y % 2 ? N - 1 - x : x, y]);
@@ -11,7 +11,7 @@ function build() {
     const nb = k.pick(nbs); const i = path.findIndex((p) => p[0] === nb[0] && p[1] === nb[1]); if (i < 0 || i === path.length - 2) continue; path = path.slice(0, i + 1).concat(path.slice(i + 1).reverse()); }
   const segs = []; let i = 0; const nCol = Math.min(COL.length, Math.max(3, Math.round(N * N / (N + 2))));
   while (i < path.length) { const remain = path.length - i, left = nCol - segs.length; let len = left <= 1 ? remain : k.ri(3, Math.max(3, Math.min(remain - 3 * (left - 1), Math.ceil(remain / left) + 3))); if (remain - len < 3 && remain - len > 0) len = remain; segs.push(path.slice(i, i + len)); i += len; }
-  ends = segs.map((s) => [s[0], s[s.length - 1]]); paths = segs.map(() => []);
+  sol = segs; ends = segs.map((s) => [s[0], s[s.length - 1]]); paths = segs.map(() => []);
   drag = null; cur = [0, 0]; winT = 0; conn = paths.map(() => 0); boardCv = null;
 }
 const K = (p) => p[0] + ',' + p[1];
@@ -62,7 +62,7 @@ function label(s, x, y, size, col, align, base) { c.font = `800 ${size}px ui-rou
 reset(); k.show(CFG.title, 'Arrastra desde un punto hasta el otro del mismo color. Las líneas no pueden cruzarse. Llena todo el tablero. Teclado: flechas y A.');
 k.run((dt) => {
   conn = conn.map((v) => Math.max(0, v - dt));
-  if (winT) { winT += dt; if (winT > 1.1 && k.st === 'play') { level++; k.st = 'over'; k.show('¡Perfecto!', `Nivel ${level - 1} completado · ${score} puntos<br>Toca para el siguiente`); } }
+  if (winT) { winT += dt; if (winT > 1.1 && k.st === 'play') { level++; k.st = 'over'; k.show('¡Perfecto!', `Nivel ${level - 1} completado · ${score} puntos · Récord ${bestL}<br>Toca para el siguiente`); } }
   if (!k.gate(reset) || done) return;
   const cell = [Math.floor((k.ptr.x - OX) / S), Math.floor((k.ptr.y - OY) / S)], inb = cell[0] >= 0 && cell[1] >= 0 && cell[0] < N && cell[1] < N;
   if (k.ptr.hit) { kbd = false; if (inb) grab(cell); }

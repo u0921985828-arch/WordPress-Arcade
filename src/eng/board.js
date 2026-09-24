@@ -2,30 +2,35 @@
  * Damas: captura obligatoria, multisalto y la coronación termina el turno. Reversi con pasar turno.
  * Tablero de madera cacheado, fichas con bisel, deslizamientos/saltos, volteo escalonado y jugadas válidas marcadas. */
 const M = CFG.mode, W = 480, H = 560, OUT = ART.OUT, k = Kit({ w: W, h: H, title: CFG.title, bg: '#2a1a12' }), c = k.ctx, N = 8, S = 54, OX = 24, OY = 72;
-let b, turn, sel, moves, wins, thinking, msg, chain, at = 0, anims = [], flipA = {}, animEnd = 0, pend = null, last = null, cur = null, kbd = false;
+let quiet = 0, b, turn, sel, moves, wins, thinking, msg, chain, at = 0, anims = [], flipA = {}, animEnd = 0, pend = null, last = null, cur = null, kbd = false;
 const DIRS8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 const inb = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
 function build() { b = Array.from({ length: N }, () => Array(N).fill(0));
   if (M === 'reversi') { b[3][3] = b[4][4] = 2; b[3][4] = b[4][3] = 1; } else for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if ((x + y) % 2) { if (y < 3) b[y][x] = 2; if (y > 4) b[y][x] = 1; }
-  turn = 1; sel = null; chain = null; msg = 'Tu turno'; anims = []; flipA = {}; animEnd = at; pend = null; last = null; thinking = 0; }
+  turn = 1; sel = null; chain = null; quiet = 0; msg = 'Tu turno'; anims = []; flipA = {}; animEnd = at; pend = null; last = null; thinking = 0; }
 /* ---- Reversi ---- */
 function flips(bd, x, y, p) { if (bd[y][x]) return []; const out = []; for (const [dx, dy] of DIRS8) { const line = []; let cx = x + dx, cy = y + dy; while (inb(cx, cy) && bd[cy][cx] === 3 - p) { line.push([cx, cy]); cx += dx; cy += dy; } if (line.length && inb(cx, cy) && bd[cy][cx] === p) out.push(...line); } return out; }
 function rMoves(bd, p) { const m = []; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const f = flips(bd, x, y, p); if (f.length) m.push({ x, y, f }); } return m; }
 const W8 = [[100, -20, 10, 5, 5, 10, -20, 100], [-20, -50, -2, -2, -2, -2, -50, -20], [10, -2, 1, 1, 1, 1, -2, 10], [5, -2, 1, 0, 0, 1, -2, 5], [5, -2, 1, 0, 0, 1, -2, 5], [10, -2, 1, 1, 1, 1, -2, 10], [-20, -50, -2, -2, -2, -2, -50, -20], [100, -20, 10, 5, 5, 10, -20, 100]];
 function rEval(bd) { let s = 0; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) s += bd[y][x] === 2 ? W8[y][x] : bd[y][x] === 1 ? -W8[y][x] : 0; return s + (rMoves(bd, 2).length - rMoves(bd, 1).length) * 3; }
 function rPlay(bd, m, p) { const nb = bd.map((r) => [...r]); nb[m.y][m.x] = p; for (const [x, y] of m.f) nb[y][x] = p; return nb; }
-function rAI() { let best = null, bv = -1e9; for (const m of rMoves(b, 2)) { const nb = rPlay(b, m, 2); const rep = rMoves(nb, 1); let worst = rep.length ? 1e9 : rEval(nb); for (const r of rep) worst = Math.min(worst, rEval(rPlay(nb, r, 1))); if (worst > bv) { bv = worst; best = m; } } return best; }
+function rAI() { let best = null, bv = -1e9; for (const m of k.shuffle(rMoves(b, 2))) { const nb = rPlay(b, m, 2); const rep = rMoves(nb, 1); let worst = rep.length ? 1e9 : rEval(nb); for (const r of rep) worst = Math.min(worst, rEval(rPlay(nb, r, 1))); if (worst > bv) { bv = worst; best = m; } } return best; }
 /* ---- Damas ---- */
 function cMoves(bd, p) { const jumps = [], steps = []; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const v = bd[y][x]; if (!v || owner(v) !== p) continue; const king = v > 2, dirs = king ? [[1, 1], [-1, 1], [1, -1], [-1, -1]] : p === 1 ? [[1, -1], [-1, -1]] : [[1, 1], [-1, 1]];
     for (const [dx, dy] of dirs) { const nx = x + dx, ny = y + dy; if (!inb(nx, ny)) continue; if (!bd[ny][nx]) steps.push({ x, y, nx, ny }); else if (owner(bd[ny][nx]) !== p && inb(nx + dx, ny + dy) && !bd[ny + dy][nx + dx]) jumps.push({ x, y, nx: nx + dx, ny: ny + dy, cap: [nx, ny] }); } } return jumps.length ? jumps : steps; }
 const owner = (v) => (v === 1 || v === 3 ? 1 : v === 2 || v === 4 ? 2 : 0);
 function cPlay(bd, m) { const nb = bd.map((r) => [...r]); let v = nb[m.y][m.x]; nb[m.y][m.x] = 0; if (m.cap) nb[m.cap[1]][m.cap[0]] = 0; if (v === 1 && m.ny === 0) v = 3; if (v === 2 && m.ny === N - 1) v = 4; nb[m.ny][m.nx] = v; return nb; }
-function cEval(bd) { let s = 0; for (const r of bd) for (const v of r) s += v === 2 ? 3 : v === 4 ? 5 : v === 1 ? -3 : v === 3 ? -5 : 0; return s; }
-function cSearch(bd, p, depth) { const ms = cMoves(bd, p); if (!ms.length) return p === 2 ? -100 : 100; if (!depth) return cEval(bd); let best = p === 2 ? -1e9 : 1e9; for (const m of ms) { const nb = cPlay(bd, m); const v = cSearch(nb, 3 - p, depth - 1); best = p === 2 ? Math.max(best, v) : Math.min(best, v); } return best; }
-function cAI() { const ms = cMoves(b, 2); let best = null, bv = -1e9; for (const m of k.shuffle(ms)) { const v = cSearch(cPlay(b, m), 1, 3); if (v > bv) { bv = v; best = m; } } return best; }
+function cEval(bd) { let s = 0; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const v = bd[y][x]; s += v === 2 ? 3 + y * 0.08 : v === 4 ? 5 : v === 1 ? -3 - (7 - y) * 0.08 : v === 3 ? -5 : 0; } return s; }
+/* Jugadas completas: los saltos encadenados cuentan como una sola jugada (la coronación la corta) */
+function cSeqs(bd, p) { const ms = cMoves(bd, p); if (!ms.length || !ms[0].cap) return ms.map((m) => ({ path: [m], bd: cPlay(bd, m) })); const out = [];
+  const ext = (b0, m, path) => { const man = b0[m.y][m.x] <= 2, nb = cPlay(b0, m), np = [...path, m], more = man && nb[m.ny][m.nx] > 2 ? [] : cMoves(nb, p).filter((q) => q.cap && q.x === m.nx && q.y === m.ny); if (!more.length) out.push({ path: np, bd: nb }); else more.forEach((q) => ext(nb, q, np)); };
+  ms.forEach((m) => ext(bd, m, [])); return out; }
+function cSearch(bd, p, depth, al, be) { const ss = cSeqs(bd, p); if (!ss.length) return p === 2 ? -100 - depth : 100 + depth; if (!depth) return cEval(bd);
+  for (const q of ss) { const v = cSearch(q.bd, 3 - p, depth - 1, al, be); if (p === 2) al = Math.max(al, v); else be = Math.min(be, v); if (al >= be) break; } return p === 2 ? al : be; }
+function cAI() { let best = null, bv = -1e9; for (const q of k.shuffle(cSeqs(b, 2))) { const v = cSearch(q.bd, 1, 4, bv, 1e9); if (v > bv) { bv = v; best = q; } } return best; }
 function reset() { if (wins === undefined) wins = 0; build(); }
 function finish() { let me = 0, ai = 0; for (const r of b) for (const v of r) { if (owner(v) === 1 || (M === 'reversi' && v === 1)) me++; if (owner(v) === 2) ai++; }
-  const won = M === 'reversi' ? me > ai : !cMoves(b, 2).length; if (won) wins++; k.st = 'over'; k.show(won ? '¡Ganaste!' : me === ai && M === 'reversi' ? 'Empate' : 'Perdiste', `${M === 'reversi' ? `${me} – ${ai} · ` : ''}Victorias seguidas: ${wins} · Récord ${k.best(CFG.id, wins)}<br>Toca para jugar otra vez`); if (!won) { wins = 0; k.sfx('lose'); } }
+  const won = M === 'reversi' ? me > ai : !cMoves(b, 2).length; if (won) wins++; k.st = 'over'; k.show(won ? '¡Ganaste!' : me === ai && M === 'reversi' ? 'Empate' : 'Perdiste', `${M === 'reversi' ? `${me} – ${ai} · ` : `Piezas: tú ${me}, IA ${ai} · `}Victorias seguidas: ${wins} · Récord ${k.best(CFG.id, wins)}<br>Toca para jugar otra vez`); if (!won) { wins = 0; k.sfx('lose'); } }
 /* ---- Animaciones ---- */
 const cx = (x) => OX + x * S + S / 2, cy = (y) => OY + y * S + S / 2;
 function animMove(v, path, caps) { const step = 0.26, t0 = Math.max(at, animEnd); anims.push({ v, path, caps, t0, step, hide: path[path.length - 1] }); animEnd = t0 + step * (path.length - 1); return t0; }
@@ -33,15 +38,15 @@ function animPlace(m, p) { const t0 = Math.max(at, animEnd); flipA[m.x + ',' + m
   let md = 0; m.f.forEach(([x, y]) => (md = Math.max(md, Math.abs(x - m.x), Math.abs(y - m.y)))); animEnd = t0 + 0.1 + md * 0.07 + 0.32; last = [m.x, m.y]; }
 const busy = () => at < animEnd;
 /* Movimiento del jugador en damas */
-function playerStep(m) { const v = b[m.y][m.x], wasMan = v === 1; const capV = m.cap ? b[m.cap[1]][m.cap[0]] : 0; b = cPlay(b, m); animMove(v, [[m.x, m.y], [m.nx, m.ny]], m.cap ? [[m.cap[0], m.cap[1], capV]] : []); last = [m.nx, m.ny];
+function playerStep(m) { const v = b[m.y][m.x], wasMan = v === 1; quiet = m.cap || wasMan ? 0 : quiet + 1; const capV = m.cap ? b[m.cap[1]][m.cap[0]] : 0; b = cPlay(b, m); animMove(v, [[m.x, m.y], [m.nx, m.ny]], m.cap ? [[m.cap[0], m.cap[1], capV]] : []); last = [m.nx, m.ny];
   k.sfx(m.cap ? 'hit' : 'click'); const crowned = wasMan && b[m.ny][m.nx] === 3; if (crowned) setTimeout(() => { k.sfx('coin'); k.float('¡Dama!', cx(m.nx), cy(m.ny) - 20, '#ffe27a'); k.burst(cx(m.nx), cy(m.ny), '#ffe27a', 14, 120); }, 260);
   const more = m.cap && !crowned && cMoves(b, 1).filter((q) => q.cap && q.x === m.nx && q.y === m.ny);
   if (more && more.length) { chain = [m.nx, m.ny]; sel = [m.nx, m.ny]; msg = 'Sigue saltando'; } else { chain = null; sel = null; turn = 2; msg = 'La IA piensa…'; if (!cMoves(b, 2).length) pend = 1; } }
 function aiTurn() {
   if (M === 'reversi') { const m = rAI(); if (m) { b = rPlay(b, m, 2); animPlace(m, 2); k.sfx('pop'); } turn = 1; if (!rMoves(b, 1).length) { if (!rMoves(b, 2).length) { pend = 1; return; } turn = 2; msg = 'No puedes mover: pasas'; k.float('Pasas turno', W / 2, OY + 4 * S, '#fff'); } else msg = 'Tu turno'; return; }
-  let m = cAI(); if (!m) { pend = 1; return; } const v0 = b[m.y][m.x], path = [[m.x, m.y]], caps = [];
-  const apply = (q) => { if (q.cap) caps.push([q.cap[0], q.cap[1], b[q.cap[1]][q.cap[0]]]); b = cPlay(b, q); path.push([q.nx, q.ny]); };
-  m.wasKing = b[m.y][m.x] === 4; apply(m); while (m.cap) { if (b[m.ny][m.nx] === 4 && m.ny === N - 1 && !m.wasKing) break; const more = cMoves(b, 2).filter((q) => q.cap && q.x === m.nx && q.y === m.ny); if (!more.length) break; const wk = m.wasKing; m = more[0]; m.wasKing = wk; apply(m); }
+  const q = cAI(); if (!q) { pend = 1; return; } const v0 = b[q.path[0].y][q.path[0].x], path = [[q.path[0].x, q.path[0].y]], caps = [];
+  for (const m of q.path) { if (m.cap) caps.push([m.cap[0], m.cap[1], b[m.cap[1]][m.cap[0]]]); b = cPlay(b, m); path.push([m.nx, m.ny]); }
+  quiet = caps.length || v0 === 2 ? 0 : quiet + 1;
   animMove(v0, path, caps); last = path[path.length - 1]; k.sfx(caps.length ? 'hit' : 'click'); turn = 1; if (!cMoves(b, 1).length) { pend = 1; return; } msg = 'Tu turno'; }
 function tapSquare(x, y) {
   if (M === 'reversi') { const m = rMoves(b, 1).find((q) => q.x === x && q.y === y); if (!m) { k.sfx('hit'); return; } b = rPlay(b, m, 1); animPlace(m, 1); k.sfx('pop'); if (m.f.length >= 4) k.float(`+${m.f.length}`, cx(x), cy(y) - 20, '#ffe27a');
@@ -55,6 +60,7 @@ k.run((dt) => {
   at += dt; if (!k.gate(reset)) return;
   if (busy()) return;
   if (pend) { pend = null; return finish(); }
+  if (M === 'checkers' && quiet >= 40) { quiet = 0; k.st = 'over'; k.show('Tablas', `40 jugadas sin capturas ni avances · Victorias seguidas: ${wins}<br>Toca para jugar otra vez`); return; }
   if (turn === 2) { thinking = (thinking || 0) + dt; if (thinking < 0.45) return; thinking = 0; return aiTurn(); }
   for (const d of ['left', 'right', 'up', 'down']) if (k.hit.has(d)) { if (!kbd || !cur) { kbd = true; cur = sel ? [...sel] : [3, 5]; } else { cur[0] = k.clamp(cur[0] + (d === 'left' ? -1 : d === 'right' ? 1 : 0), 0, 7); cur[1] = k.clamp(cur[1] + (d === 'up' ? -1 : d === 'down' ? 1 : 0), 0, 7); } }
   if (k.hit.has('a') && kbd && cur) tapSquare(cur[0], cur[1]);

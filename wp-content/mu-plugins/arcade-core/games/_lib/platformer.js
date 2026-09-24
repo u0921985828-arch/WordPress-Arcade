@@ -6,20 +6,26 @@ const k = Kit({ w: W, h: H, title: CFG.title, bg: TH.sky[0] }), c = k.ctx;
 /* Física ajustada a la escala de 32 px */
 const G = 2300, JUMP = 830, CUT = 350, RUN = A.swing ? 250 : 285, FALL = 1100, COYOTE = 0.09, BUFFER = 0.13;
 let map, MW, p, enemies, coins, anchors, decos, flag, check, cx = 0, cy = 0, level, lives, score, coinsGot, t, jumpBuf, coyote, rope, dashT, dashCd, swordT, dead, intro, landSq, spawn;
+function label(s, x, y, size, col, align) {
+  c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top';
+  c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = ART.OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
+}
 const tileAt = (x, y) => { const tx = Math.floor(x / T), ty = Math.floor(y / T); if (tx < 0 || tx >= MW) return 1; if (ty < 0 || ty >= MH) return 0; return map[ty][tx]; };
 function gen() {
   MW = 70 + level * 18; map = Array.from({ length: MH }, () => Array(MW).fill(0)); enemies = []; coins = []; anchors = []; decos = [];
   const col = (x, h) => { for (let y = MH - h; y < MH; y++) if (x >= 0 && x < MW) map[y][x] = 1; };
   let x = 0, h = 3; for (; x < 7; x++) col(x, h);
+  for (let i = 3; i < 7; i++) coins.push({ x: (i + 0.5) * T, y: (MH - h - 1) * T - 6 - Math.sin((i - 3) / 3 * Math.PI) * 26 }); // arranque con algo que recoger
+  if (!A.swing) decos.push({ x: 1.5 * T, y: (MH - h) * T });
   while (x < MW - 10) {
+    let nh = A.swing ? k.clamp(h + k.ri(-2, 1), 2, 7) : k.clamp(h + k.ri(-2, 3), 2, 8); // en balanceo la isla siguiente no sube más de 1 casilla
     const r = Math.random();
     if (A.swing || r < 0.3) {
       const gw = A.swing ? k.ri(5, 7) : A.dash && Math.random() < 0.35 ? k.ri(5, 6) : k.ri(2, 4);
-      if (A.grapple || A.swing) anchors.push({ x: (x + gw / 2) * T, y: (MH - h - 5) * T });
+      if (A.grapple || A.swing) anchors.push({ x: (x + gw / 2) * T, y: (MH - Math.max(h, nh) - 5) * T }); // anilla sobre la orilla más alta
       for (let i = 0; i < gw; i += 2) coins.push({ x: (x + i + 0.5) * T, y: (MH - h - 3) * T - Math.sin(i / gw * Math.PI) * T * 1.5 });
       x += gw;
     }
-    let nh = k.clamp(h + k.ri(-2, 3), 2, 8);
     if (A.wall && Math.random() < 0.3 && h < 5) { // chimenea para salto de pared
       nh = h + 5; for (let i = 0; i < 5; i++) col(x + i, h);
       for (let y = MH - nh - 1; y < MH - h - 3; y++) map[y][x + 1] = 1;
@@ -116,7 +122,7 @@ k.run((dt) => {
   c.restore();
   // HUD
   for (let i = 0; i < 3; i++) ART.heart(c, 22 + i * 24, 22, 1.25, i < lives);
-  ART.coin(c, 104, 22, 0, 8); k.text(`× ${coinsGot}`, 116, 13, 17, '#fff');
-  k.text(`${score}`, W - 12, 10, 20, '#fff', 'right'); k.text(`Nivel ${level}`, W - 12, 34, 13, 'rgba(255,255,255,.8)', 'right');
-  if (intro > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, intro); ART.rr(c, W / 2 - 110, H / 2 - 38, 220, 64, 18); c.fillStyle = 'rgba(26,21,48,.8)'; c.fill(); k.text(`Nivel ${level}`, W / 2, H / 2 - 30, 30, '#fff', 'center'); k.text(CFG.title, W / 2, H / 2 + 4, 14, '#ffc928', 'center'); c.globalAlpha = 1; }
+  ART.coin(c, 104, 22, 0, 8); label(`× ${coinsGot}`, 116, 13, 17, '#fff');
+  label(`${score}`, W - 12, 8, 22, '#fff', 'right'); label(`Nivel ${level}`, W - 12, 34, 13, '#ffc928', 'right');
+  if (intro > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, intro); ART.rr(c, W / 2 - 110, H / 2 - 38, 220, 64, 18); c.fillStyle = 'rgba(26,21,48,.8)'; c.fill(); label(`Nivel ${level}`, W / 2, H / 2 - 30, 30, '#fff', 'center'); label(CFG.title, W / 2, H / 2 + 4, 14, '#ffc928', 'center'); c.globalAlpha = 1; }
 });

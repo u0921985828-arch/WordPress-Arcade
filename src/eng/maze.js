@@ -245,6 +245,7 @@ function pickMon(f) {
   const nr = opts.filter((d) => d !== OPP[f.dir]); return nr.length ? k.pick(nr) : opts[0] || null;
 }
 const allKeys = () => items.every((q) => q.got);
+const isoLim = () => Math.round(40 + N * N * 0.3);
 function updIso(dt) {
   const hk = DIRS.find((d) => k.hit.has(d)); if (hk) pl.next = hk;
   invT -= dt; swordT -= dt; lvT += dt;
@@ -256,7 +257,11 @@ function updIso(dt) {
     if (dp) { drops.splice(drops.indexOf(dp), 1); if (dp.t === 'coin') { score += 50; k.sfx('coin'); k.float('+50', sx, sy - 44, '#ffe27a'); } else { lives = Math.min(5, lives + 1); k.sfx('pop'); k.float('+1', sx, sy - 44, '#ff7a8a'); } k.burst(sx, sy - 16, dp.t === 'coin' ? '#ffc928' : '#ff4d6d', 10); }
     if (x === exitC[0] && y === exitC[1] && allKeys()) { const bonus = Math.max(0, Math.round(90 - lvT)) * 5; score += 500 * level + bonus; clearT = 1.5; k.sfx('win'); k.confetti(); msg = bonus ? `¡Salida! +${bonus} por rapidez` : '¡Salida!'; msgT = 1.5; return; }
   }
-  if (!DG) return;
+  if (!DG) { // laberinto sin monstruos: límite de tiempo por nivel (si no, la partida no acababa ni guardaba récord)
+    const r = isoLim() - lvT; if (r < 10 && Math.ceil(r) !== Math.ceil(r + dt)) k.sfx('click');
+    if (r <= 0) { k.sfx('lose'); k.shake(5); return k.lose(CFG.id, score, 'Sin tiempo', `Nivel ${level}`); }
+    return;
+  }
   if ((k.hit.has('a') || tapped()) && swordT <= -0.05) {
     swordT = 0.3; k.sfx('shoot'); let hit = false;
     for (const f of foes) if (Math.hypot(f.fx - pl.fx, f.fy - pl.fy) <= 1.3) { hit = true; f.hp--; f.fl = 0.25; f.stun = 0.7; const [sx, sy] = scr(f.fx, f.fy);
@@ -447,7 +452,7 @@ function drawDigger() {
   hudScore();
   for (let i = 0; i < Math.max(0, lives); i++) ART.heart(c, W - 18 - i * 22, 17, 1.1, true);
   label(`Nivel ${level}`, W - 10, 28, 10, 'rgba(255,255,255,.85)', 'right');
-  c.drawImage(gemSprite(0), W / 2 + 46, 8, 20, 18); label(`${left}`, W / 2 + 68, 10, 14, '#fff');
+  c.drawImage(gemSprite(0), W - 150, 8, 20, 18); label(`${left}`, W - 128, 10, 14, '#fff');
   if (ready > 0 && k.st === 'play') banner('¡Listo!', (TOP + H) / 2 - 10, '#ffd23d');
 }
 
@@ -531,6 +536,7 @@ function drawIso() {
   items.forEach((q, i) => { c.globalAlpha = q.got ? 1 : 0.28; c.drawImage(keySprite(), 14 + i * 32, 49, 30, 16); c.globalAlpha = 1; });
   label(`Nivel ${level}`, W - 10, DG ? 28 : 8, DG ? 10 : 16, DG ? 'rgba(255,255,255,.85)' : '#fff', 'right');
   if (DG) for (let i = 0; i < Math.max(0, lives); i++) ART.heart(c, W - 18 - i * 22, 17, 1.1, true);
+  else { const r = Math.max(0, Math.ceil(isoLim() - lvT)); label(`${r} s`, W - 10, 30, 14, r <= 10 && Math.floor(t * 4) % 2 ? '#ff6b6b' : r <= 10 ? '#ffc928' : 'rgba(255,255,255,.85)', 'right'); }
   compass(open);
 }
 function drawExit(sx, sy, open) {

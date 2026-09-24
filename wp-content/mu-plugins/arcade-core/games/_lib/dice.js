@@ -2,7 +2,7 @@
  * Dados en relieve cacheados, tirada con saltos y giros, la banca tira a la vista y apuesta ajustable entre manos. */
 const W = 480, H = 640, OUT = ART.OUT, k = Kit({ w: W, h: H, title: CFG.title, bg: '#3b1d2e' }), c = k.ctx;
 const HANDS = ['Nada', 'Pareja', 'Doble pareja', 'Trío', 'Escalera', 'Full', 'Póker', 'Repóker'];
-let dice, held, rolls, chips, bet, bank, phase, msg, anim, nextBet, cur, kbd, bankShow, bankT, spin, face, result, dxs;
+let peak, hands, dice, held, rolls, chips, bet, bank, phase, msg, anim, nextBet, cur, kbd, bankShow, bankT, spin, face, result, dxs;
 function rank(d) { const cnt = [0, 0, 0, 0, 0, 0, 0]; d.forEach((v) => cnt[v]++); const cs = cnt.filter((v) => v).sort((a, b) => b - a), s = [...d].sort().join('');
   if (cs[0] === 5) return [7]; if (cs[0] === 4) return [6]; if (cs[0] === 3 && cs[1] === 2) return [5]; if (s === '12345' || s === '23456') return [4]; if (cs[0] === 3) return [3]; if (cs[0] === 2 && cs[1] === 2) return [2]; if (cs[0] === 2) return [1]; return [0]; }
 function tiebreak(d) { const cnt = [0, 0, 0, 0, 0, 0, 0]; d.forEach((v) => cnt[v]++); return [...d].sort((a, b) => cnt[b] - cnt[a] || b - a).reduce((s, v) => s * 7 + v, 0); }
@@ -11,12 +11,12 @@ function part(d) { const r = rank(d)[0]; if (r === 4 || r === 7 || r === 5) retu
 const PX = (i) => 76 + i * 82, PY = 330, PS = 68, BXs = (i) => 88 + i * 76, BYs = 150, BS = 54;
 function roll() { k.sfx('shoot'); for (let i = 0; i < 5; i++) if (!held[i]) { dice[i] = k.ri(1, 6); spin[i] = (Math.random() < 0.5 ? -1 : 1) * k.rnd(6, 11); dxs[i] = k.rnd(-40, 40); } rolls++; anim = 0.75; }
 function newRound() { dice = [1, 1, 1, 1, 1]; held = [false, false, false, false, false]; spin = [0, 0, 0, 0, 0]; dxs = [0, 0, 0, 0, 0]; face = [1, 1, 1, 1, 1]; rolls = 0; bet = Math.min(nextBet || 10, chips); nextBet = bet; bank = null; bankShow = null; result = 0; roll(); phase = 'player'; msg = 'Toca dados para guardarlos y vuelve a tirar'; cur = 5; }
-function reset() { chips = 100; nextBet = 10; newRound(); }
+function reset() { chips = 100; nextBet = 10; peak = 100; hands = 0; newRound(); }
 reset(); k.show(CFG.title, 'Consigue mejor jugada que la banca en 3 tiradas. Toca los dados para guardarlos. Empiezas con 100 fichas y eliges la apuesta entre manos. Flechas + A con teclado.');
 function bankPlay() { let d = [k.ri(1, 6), k.ri(1, 6), k.ri(1, 6), k.ri(1, 6), k.ri(1, 6)]; for (let r = 0; r < 2; r++) { const cnt = [0, 0, 0, 0, 0, 0, 0]; d.forEach((v) => cnt[v]++); const best = cnt.indexOf(Math.max(...cnt)); if (rank(d)[0] >= 4) break; d = d.map((v) => (v === best && cnt[best] > 1 ? v : k.ri(1, 6))); } return d; }
 function stand() { bank = bankPlay(); phase = 'bank'; bankT = 1.1; bankShow = [1, 1, 1, 1, 1]; msg = 'La banca tira…'; k.sfx('shoot'); }
 function settle() { const a = rank(dice)[0], b = rank(bank)[0]; const win = a > b || (a === b && tiebreak(dice) > tiebreak(bank)); const tie = a === b && tiebreak(dice) === tiebreak(bank);
-  const delta = tie ? 0 : win ? Math.round(bet * (1 + Math.max(0, a - 2) * 0.5)) : -bet; chips = Math.round(chips + delta); k.best(CFG.id, chips); result = tie ? 0 : win ? 1 : -1;
+  const delta = tie ? 0 : win ? Math.round(bet * (1 + Math.max(0, a - 2) * 0.5)) : -bet; chips = Math.round(chips + delta); hands++; peak = Math.max(peak, chips); k.best(CFG.id, chips); result = tie ? 0 : win ? 1 : -1;
   msg = tie ? 'Empate' : win ? `¡Ganas! ${HANDS[a]} contra ${HANDS[b]}` : `Pierdes: ${HANDS[a]} contra ${HANDS[b]}`; phase = 'done'; nextBet = Math.max(10, Math.min(nextBet, chips - (chips % 10) || 10));
   if (win) { k.sfx(a >= 5 ? 'win' : 'coin'); k.float(`+${delta}`, W - 70, 60, '#ffe27a'); k.burst(W - 60, 26, '#ffe27a', 14, 140); if (a >= 6) k.confetti(); } else if (!tie) { k.sfx('hurt'); k.float(`${delta}`, W - 70, 60, '#ff8a9a'); k.shake(4); } }
 const inBtn = (x, y, bx, by, bw, bh) => x > bx && x < bx + bw && y > by && y < by + bh;
@@ -30,7 +30,7 @@ k.run((dt) => {
     if (L || R) { kbd = true; nextBet = k.clamp(nextBet + (R ? 10 : -10), 10, Math.max(10, chips)); k.sfx('click'); return; }
     if (p.hit && inBtn(p.x, p.y, 120, 566, 44, 40)) { nextBet = Math.max(10, nextBet - 10); k.sfx('click'); return; }
     if (p.hit && inBtn(p.x, p.y, 316, 566, 44, 40)) { nextBet = Math.min(Math.max(10, chips), nextBet + 10); k.sfx('click'); return; }
-    if (p.hit || A) { if (chips <= 0) return k.lose(CFG.id, 0, 'Sin fichas'); newRound(); } return; }
+    if (p.hit || A) { if (chips <= 0) return k.lose(CFG.id, peak, 'Sin fichas', `${hands} manos · máximo ${peak} fichas`); newRound(); } return; }
   if (rolls >= 3 && anim === 0) return stand();
   if (anim > 0.2) return;
   // teclado: cursor sobre 5 dados + Tirar + Plantarse

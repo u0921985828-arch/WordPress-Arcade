@@ -15,8 +15,18 @@ function off(w, h, draw) { const cv = document.createElement('canvas'); cv.width
 const BG = off(480, 360, (g) => {
   let gr = g.createLinearGradient(0, 0, 0, 340); gr.addColorStop(0, '#070820'); gr.addColorStop(0.7, '#241a52'); gr.addColorStop(1, '#4a2b6a'); g.fillStyle = gr; g.fillRect(0, 0, 480, 360);
   for (let i = 0; i < 90; i++) { g.fillStyle = `rgba(255,255,255,${0.2 + rnd(i) * 0.7})`; g.fillRect(rnd(i + 1) * 480, rnd(i + 2) * 230, rnd(i + 3) < 0.1 ? 2 : 1.2, rnd(i + 3) < 0.1 ? 2 : 1.2); }
-  g.fillStyle = '#fff6d6'; g.beginPath(); g.arc(400, 60, 20, 0, R2); g.fill(); g.fillStyle = 'rgba(200,190,160,.5)'; for (const [x, y, r] of [[394, 54, 4], [406, 66, 3], [398, 70, 2.5]]) { g.beginPath(); g.arc(x, y, r, 0, R2); g.fill(); }
-  g.fillStyle = '#1d1640'; for (let x = 0; x < 480; x += 14) { const h = 20 + rnd(x) * 40; g.fillRect(x, 318 - h, 12, h + 20); }
+  // nebulosas y aurora suaves para que el cielo no quede vacío
+  for (const [x, y, r, col] of [[110, 90, 150, '120,80,255'], [330, 150, 170, '255,80,170'], [220, 40, 120, '60,190,255']]) { const ng = g.createRadialGradient(x, y, 0, x, y, r); ng.addColorStop(0, `rgba(${col},.16)`); ng.addColorStop(1, `rgba(${col},0)`); g.fillStyle = ng; g.fillRect(x - r, y - r, r * 2, r * 2); }
+  for (let b = 0; b < 3; b++) { g.beginPath(); for (let x = 0; x <= 480; x += 8) g.lineTo(x, 70 + b * 18 + Math.sin(x / 70 + b * 1.7) * 16 + Math.sin(x / 23 + b) * 4); for (let x = 480; x >= 0; x -= 8) g.lineTo(x, 104 + b * 18 + Math.sin(x / 70 + b * 1.7) * 16 + Math.sin(x / 31 + b) * 6);
+    const ag = g.createLinearGradient(0, 60 + b * 18, 0, 124 + b * 18); ag.addColorStop(0, 'rgba(92,225,230,0)'); ag.addColorStop(0.5, `rgba(${b === 1 ? '124,247,160' : '92,225,230'},.10)`); ag.addColorStop(1, 'rgba(92,225,230,0)'); g.fillStyle = ag; g.fill(); }
+  for (let i = 0; i < 6; i++) { const x = rnd(i + 20) * 480, y = rnd(i + 21) * 180 + 10; g.fillStyle = 'rgba(255,255,255,.9)'; g.fillRect(x - 3, y - 0.5, 7, 1); g.fillRect(x - 0.5, y - 3, 1, 7); }
+  const mg = g.createRadialGradient(400, 60, 10, 400, 60, 70); mg.addColorStop(0, 'rgba(255,246,214,.35)'); mg.addColorStop(1, 'rgba(255,246,214,0)'); g.fillStyle = mg; g.fillRect(330, 0, 140, 130);
+  g.fillStyle = '#fff6d6'; g.beginPath(); g.arc(400, 60, 20, 0, R2); g.fill(); g.lineWidth = 2; g.strokeStyle = OUT; g.stroke();
+  // montañas lejanas
+  g.fillStyle = '#2a1f5c'; g.beginPath(); g.moveTo(0, 300); for (let x = 0; x <= 480; x += 12) g.lineTo(x, 246 - Math.abs(Math.sin(x / 95)) * 44 - Math.sin(x / 29) * 7); g.lineTo(480, 300); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.07)'; g.beginPath(); for (let x = 0; x <= 480; x += 12) g.lineTo(x, 246 - Math.abs(Math.sin(x / 95)) * 44 - Math.sin(x / 29) * 7); for (let x = 480; x >= 0; x -= 12) g.lineTo(x, 252 - Math.abs(Math.sin(x / 95)) * 44 - Math.sin(x / 29) * 7); g.fill();
+  const hz = g.createLinearGradient(0, 240, 0, 320); hz.addColorStop(0, 'rgba(255,120,170,0)'); hz.addColorStop(1, 'rgba(255,120,170,.28)'); g.fillStyle = hz; g.fillRect(0, 240, 480, 80); g.fillStyle = 'rgba(200,190,160,.5)'; for (const [x, y, r] of [[394, 54, 4], [406, 66, 3], [398, 70, 2.5]]) { g.beginPath(); g.arc(x, y, r, 0, R2); g.fill(); }
+  g.fillStyle = '#1d1640'; for (let x = 0; x < 480; x += 14) { const h = 20 + rnd(x) * 40; g.fillRect(x, 318 - h, 12, h + 20); if (rnd(x + 7) > 0.7) { g.fillRect(x + 5, 318 - h - 8, 2, 8); g.fillStyle = '#ff5f7a'; g.fillRect(x + 4.5, 318 - h - 10, 3, 3); g.fillStyle = '#1d1640'; } }
   g.fillStyle = 'rgba(255,220,120,.25)'; for (let i = 0; i < 60; i++) g.fillRect(rnd(i + 40) * 480, 280 + rnd(i + 80) * 36, 2, 2);
   gr = g.createLinearGradient(0, GY, 0, 360); gr.addColorStop(0, '#5a3f7a'); gr.addColorStop(1, '#2b1f45'); g.fillStyle = gr; g.beginPath(); g.moveTo(0, 360); for (let x = 0; x <= 480; x += 10) g.lineTo(x, GY - Math.sin(x / 40) * 2); g.lineTo(480, 360); g.fill();
   g.strokeStyle = OUT; g.lineWidth = 2.5; g.beginPath(); for (let x = 0; x <= 480; x += 10) g.lineTo(x, GY - Math.sin(x / 40) * 2); g.stroke();
@@ -29,6 +39,7 @@ const CITY = [0, 1, 2].map((v) => off(40, 34, (g) => {
     for (let wy = y + 4; wy < 30; wy += 5) for (let wx = x + 3; wx < x + w - 3; wx += 4) { g.fillStyle = rnd(wx * 3 + wy + v) > 0.35 ? '#fff3a8' : 'rgba(26,21,48,.6)'; g.fillRect(wx, wy, 2, 2.5); } });
 }));
 const RUBBLE = off(40, 16, (g) => { g.beginPath(); g.moveTo(2, 16); g.lineTo(6, 8); g.lineTo(11, 11); g.lineTo(16, 4); g.lineTo(22, 10); g.lineTo(28, 6); g.lineTo(34, 12); g.lineTo(38, 16); g.closePath(); ART.fillOut(g, '#4a4060', 2); g.fillStyle = '#ff7a3d'; g.fillRect(14, 10, 3, 3); g.fillRect(26, 11, 3, 2); });
+const CLOUD = off(120, 40, (g) => { g.fillStyle = 'rgba(160,140,230,.16)'; for (const [x, y, r] of [[30, 26, 14], [52, 18, 18], [76, 22, 15], [96, 28, 11], [60, 30, 14]]) { g.beginPath(); g.arc(x, y, r, 0, R2); g.fill(); } });
 function label(s, x, y, size, col, align, base) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = base || 'top';
   c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
@@ -48,7 +59,7 @@ k.run((dt) => {
   for (const b of bases) if (b.kick) b.kick = Math.max(0, b.kick - dt);
   if (!k.gate(reset)) return;
   banner -= dt; if (bonus) { bonus.t -= dt; if (bonus.t <= 0) { bonus = null; nextWave(); } }
-  if (endT) { endT -= dt; if (endT <= 0) return k.lose('missile-guard', score, 'Ciudades destruidas', `Oleada ${wave}`); }
+  if (endT) { endT -= dt; if (endT <= 0) return k.lose(CFG.id, score, 'Ciudades destruidas', `Oleada ${wave}`); }
   // mira: puntero o flechas
   if (k.ptr.x !== lastP.x || k.ptr.y !== lastP.y) { cur.x = k.ptr.x; cur.y = k.ptr.y; lastP = { x: k.ptr.x, y: k.ptr.y }; }
   const sp = 260 * dt; if (k.held.has('left')) cur.x -= sp; if (k.held.has('right')) cur.x += sp; if (k.held.has('up')) cur.y -= sp; if (k.held.has('down')) cur.y += sp;
@@ -71,6 +82,9 @@ k.run((dt) => {
     const cb = cities.filter((q) => q.alive).length * 100, ab = bases.reduce((s, b) => s + b.ammo * 5, 0); score += cb + ab; bonus = { t: 2.2, cb, ab }; k.sfx('win'); }
 }, () => {
   c.drawImage(BG, 0, 0, 480, 360);
+  for (let i = 0; i < 3; i++) { const w = 120 + i * 40, x = ((tm * (6 + i * 4) + i * 190) % (480 + w)) - w; c.drawImage(CLOUD, x, 40 + i * 55, w, w / 3); }
+  // focos antiaéreos que barren el cielo
+  c.fillStyle = 'rgba(200,220,255,.05)'; for (const [x, ph] of [[115, 0], [365, 2]]) { const a = -1.57 + Math.sin(tm * 0.5 + ph) * 0.5; c.beginPath(); c.moveTo(x, GY - 4); c.lineTo(x + Math.cos(a - 0.05) * 420, GY - 4 + Math.sin(a - 0.05) * 420); c.lineTo(x + Math.cos(a + 0.05) * 420, GY - 4 + Math.sin(a + 0.05) * 420); c.fill(); }
   for (const p of smoke) { c.globalAlpha = Math.min(0.5, p.t * 0.4); c.fillStyle = '#6a6080'; c.beginPath(); c.arc(p.x, p.y, p.r, 0, R2); c.fill(); } c.globalAlpha = 1;
   for (const q of cities) { if (q.alive) c.drawImage(CITY[q.v % 3], q.x - 20, GY - 32, 40, 34); else c.drawImage(RUBBLE, q.x - 20, GY - 14, 40, 16); }
   // búnkeres con torreta y munición

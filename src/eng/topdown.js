@@ -146,10 +146,11 @@ k.run((dt) => {
   k._dt = dt;
   for (const s of shots) {
     s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; if (s.life <= 0) s.dead = true;
+    for (const f of foes) if (!s.dead && !f.dead && !s.hits.includes(f) && Math.hypot(s.x - f.x, s.y - f.y) < f.r + 4) { dmgFoe(f, upg.dmg, Math.atan2(s.vy, s.vx)); s.hits.push(f); if (s.pierce-- <= 0) s.dead = true; }
+    if (s.dead) continue;
     const w = wallAt(s.x, s.y, 3);
     if (w && w.hp) { s.dead = true; w.hp--; w.fl = 0.1; k.sfx('hit'); if (w.hp <= 0) { w.dead = true; k.burst(w.x + w.w / 2, w.y + w.h / 2, TH.top, 20, 200); k.sfx('explode'); score += 5; } }
     else if (rectHit(s.x, s.y, 3)) { if (s.b > 0) { s.b--; bounce(s); } else { s.dead = true; k.burst(s.x, s.y, '#fff', 3, 60); } }
-    for (const f of foes) if (!s.dead && !f.dead && !s.hits.includes(f) && Math.hypot(s.x - f.x, s.y - f.y) < f.r + 4) { dmgFoe(f, upg.dmg, Math.atan2(s.vy, s.vx)); s.hits.push(f); if (s.pierce-- <= 0) s.dead = true; }
   }
   for (const s of eshots) {
     s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; if (s.life <= 0) s.dead = true;
@@ -241,7 +242,7 @@ function renderVig() {
 }
 function lights() {
   if (!TH.light) return;
-  for (let x = 70; x < W - 40; x += 130) {
+  for (let x = 190; x < W - 120; x += 130) { // fuera de la zona del marcador
     const fl = 0.85 + Math.sin(t * 13 + x) * 0.08 + Math.sin(t * 7.3 + x * 2) * 0.07;
     c.globalAlpha = 0.09 * fl; c.fillStyle = TH.light === 'candle' ? '#b98cff' : '#ffb13d'; c.beginPath(); c.arc(x, Y0 + 6, 62 * fl, 0, R2); c.fill(); c.globalAlpha = 1;
     if (TH.light === 'torch') { ART.rr(c, x - 3, 14, 6, 16, 2); ART.fillOut(c, '#6b4329', 2); c.fillStyle = '#ff7a2d'; c.beginPath(); c.ellipse(x, 10, 5 * fl, 8 * fl, 0, 0, R2); c.fill(); c.fillStyle = '#ffd23d'; c.beginPath(); c.ellipse(x, 12, 2.6, 4.5 * fl, 0, 0, R2); c.fill(); }
@@ -394,7 +395,8 @@ function draw() {
   c.drawImage(vigCv, 0, 0, W, H);
   if (k.ptr.down && !choice) { c.strokeStyle = 'rgba(255,255,255,.3)'; c.lineWidth = 2; c.beginPath(); c.arc(k.ptr.sx, k.ptr.sy, 40, 0, R2); c.stroke(); k.circle(k.ptr.sx + k.clamp(k.ptr.x - k.ptr.sx, -40, 40), k.ptr.sy + k.clamp(k.ptr.y - k.ptr.sy, -40, 40), 14, 'rgba(255,255,255,.35)'); }
   // HUD
-  for (let i = 0; i < p.max; i++) ART.heart(c, 18 + i * 21, 19, 1.1, i < p.hp);
+  if (p.max <= 7) for (let i = 0; i < p.max; i++) ART.heart(c, 18 + i * 21, 19, 1.1, i < p.hp); // con muchas vidas, icono + número para no invadir el centro
+  else { ART.heart(c, 18, 19, 1.1, true); label(`${Math.max(0, p.hp)}/${p.max}`, 32, 10, 18, '#fff'); }
   coinIcon(W - 18, 19); label(`${score}`, W - 32, 10, 18, '#fff', 'right');
   label(`${TH.label} ${room}`, W - 14, Y1 + 1, 11, 'rgba(255,255,255,.85)', 'right');
   if (bossF && !bossF.dead) { const bw = Math.min(260, W - 160), x = W / 2 - bw / 2, y = Y1 + 3; c.fillStyle = OUT; c.fillRect(x - 2, y - 2, bw + 4, 12); c.fillStyle = '#5a1f2c'; c.fillRect(x, y, bw, 8); c.fillStyle = '#ff3b5c'; c.fillRect(x, y, bw * Math.max(0, bossF.hp) / bossF.max, 8); }

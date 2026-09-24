@@ -12,11 +12,14 @@ ENG_DIR = ROOT / 'src/eng'
 # Todos los motores cargan antes la librería de arte común (ART, src/eng/art.js)
 DEPS = {}
 deps_of = lambda e: DEPS.get(e, ['art'])
-STANDALONE = {'serpent-grid', 'neon-paddle', 'rock-belt', 'tetra-drop', 'tetra-drop-marathon'}
+STANDALONE = {'tetra-drop', 'tetra-drop-marathon'}
 
 SW = 'Desliza o usa las flechas'
 G = {
  # ---------- Arcade ----------
+ 'serpent-grid': ('snake', dict(help='Desliza o usa las flechas para girar; toca a un lado de la cabeza para girar hacia allí. Come para crecer y no choques.')),
+ 'neon-paddle': ('neonpong', dict(help='Arrastra o usa las flechas para mover tu pala. Mueve la pala al golpear para dar efecto. Gana a 7 y pasa al siguiente rival.')),
+ 'rock-belt': ('rocks', dict(help='Joystick a la izquierda para girar y acelerar; toca la derecha para disparar. Botón morado: hiperespacio.')),
  'starfall-defender': ('shooter', dict(mode='vertical', help='Arrastra para mover la nave; dispara sola. Esquiva las balas enemigas.')),
  'maze-muncher': ('maze', dict(mode='muncher', help=f'{SW} para comer todos los puntos. Las bolas grandes te dejan cazar fantasmas.')),
  'brick-breaker-dx': ('breakout', dict(help='')),
@@ -98,7 +101,7 @@ G = {
 
 TPL = '''<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{title}</title></head>
-<body><script>window.CFG={cfg};</script><script src="../_lib/kit.js?v=6"></script>{deps}<script src="../_lib/{eng}.js?v={ev}"></script></body></html>
+<body><script>window.CFG={cfg};</script><script src="../_lib/kit.js?v=7"></script>{deps}<script src="../_lib/{eng}.js?v={ev}"></script></body></html>
 '''
 
 def main():

@@ -95,10 +95,10 @@ k.run((dt) => {
 }, () => {
   c.drawImage(bgCv, 0, 0, W, H);
   // HUD: título a la izquierda y marcadores a la derecha (el centro es del kit)
-  label(CFG.title, 20, 56, 24, '#ffd84d'); c.font = '600 13px -apple-system,Segoe UI,Roboto,sans-serif'; c.fillStyle = '#c9bfe8'; c.textAlign = 'left'; c.fillText(HEX ? 'Une fichas iguales en 6 direcciones' : 'Une fichas iguales hasta 2048', 22, 92);
+  label(CFG.title, 20, 62, 24, '#ffd84d'); c.font = '600 13px -apple-system,Segoe UI,Roboto,sans-serif'; c.fillStyle = '#c9bfe8'; c.textAlign = 'left'; c.fillText(HEX ? 'Une fichas iguales en 6 direcciones' : 'Une fichas iguales hasta 2048', 22, 96);
   const box = (x, t, v) => { c.fillStyle = 'rgba(0,0,0,.3)'; ART.rr(c, x, 21, 84, 54, 12); c.fill(); ART.rr(c, x, 17, 84, 54, 12); ART.fillOut(c, '#54467a', 3);
     c.font = '800 11px ui-rounded,"Trebuchet MS",sans-serif'; c.textAlign = 'center'; c.textBaseline = 'top'; c.fillStyle = '#c9bfe8'; c.fillText(t, x + 42, 24); label(String(v), x + 42, 38, v > 99999 ? 18 : 22, '#fff', 'center'); };
-  box(290, 'PUNTOS', score); box(380, 'RÉCORD', Math.max(bestV, score));
+  box(302, 'PUNTOS', score); box(390, 'RÉCORD', Math.max(bestV, score));
   c.save(); c.translate(nudge[0], nudge[1]);
   const ease = (a) => 1 - (1 - a) * (1 - a);
   for (const gh of ghosts) { const a = ease(gh.a); if (gh.a >= 1) continue; const x = gh.from[0] + (gh.to[0] - gh.from[0]) * a, y = gh.from[1] + (gh.to[1] - gh.from[1]) * a; c.drawImage(tileSprite(gh.v), x - SP, y - SP, SP * 2, SP * 2); }

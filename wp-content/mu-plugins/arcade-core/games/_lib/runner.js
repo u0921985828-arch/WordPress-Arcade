@@ -198,7 +198,15 @@ function gem(x, y) { c.save(); c.translate(x, y + Math.sin(t * 3 + x) * 3); c.be
 function caveBg() {
   const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#1d1436'); g.addColorStop(0.5, '#2a1b47'); g.addColorStop(1, '#140d24'); c.fillStyle = g; c.fillRect(0, 0, W, H);
   const layer = (par, amp, base, col, seed) => { c.fillStyle = col; for (const top of [1, 0]) { c.beginPath(); c.moveTo(0, top ? 0 : H); for (let x = 0; x <= W + 20; x += 20) { const wx = x + cam * par, y = base + Math.sin(wx / 90 + seed) * amp + Math.sin(wx / 37 + seed * 2) * amp * 0.4; c.lineTo(x, top ? y : H - y); } c.lineTo(W, top ? 0 : H); c.fill(); } };
-  layer(0.15, 22, 70, '#261a42', 1); layer(0.35, 18, 44, '#2f2150', 4);
+  layer(0.15, 22, 70, '#261a42', 1);
+  // cristales gigantes lejanos (paralaje) con halo
+  for (let i = 0; i < 5; i++) {
+    const span = W + 260, x = ((i * 233 - cam * 0.22) % span + span) % span - 130, top = i % 2 === 0, h = 46 + (i * 37) % 40, y = top ? 40 : H - 40, d = top ? 1 : -1, col = PAL[i % 2];
+    const hg = c.createRadialGradient(x, y + d * h * 0.5, 0, x, y + d * h * 0.5, h); hg.addColorStop(0, col + '38'); hg.addColorStop(1, col + '00'); c.fillStyle = hg; c.fillRect(x - h, y + d * h * 0.5 - h, h * 2, h * 2);
+    c.globalAlpha = 0.55; for (const [ox, sc] of [[-14, 0.6], [12, 0.75], [0, 1]]) { const hh = h * sc, ww = 9 + sc * 6; c.beginPath(); c.moveTo(x + ox - ww, y - d * 6); c.lineTo(x + ox - ww * 0.7, y + d * hh * 0.75); c.lineTo(x + ox, y + d * hh); c.lineTo(x + ox + ww * 0.7, y + d * hh * 0.75); c.lineTo(x + ox + ww, y - d * 6); c.closePath(); c.fillStyle = col; c.fill(); c.lineWidth = 2; c.strokeStyle = '#1a1530'; c.stroke(); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(x + ox - 2, y + d * hh * 0.15, 2.5, d * hh * 0.55); }
+    c.globalAlpha = 1;
+  }
+  layer(0.35, 18, 44, '#2f2150', 4);
   c.globalAlpha = 0.5; for (let i = 0; i < 14; i++) { const x = ((i * 97 - cam * 0.25) % (W + 40) + W + 40) % (W + 40) - 20, y = 90 + ((i * 53) % 180); c.fillStyle = i % 2 ? PAL[0] : PAL[1]; c.globalAlpha = 0.25 + 0.2 * Math.sin(t * 2 + i); c.fillRect(x, y, 2, 2); } c.globalAlpha = 1;
 }
 function caveWalls() {

@@ -116,4 +116,5 @@ k.run((dt) => { if (pour) { pour.t -= dt; if (pour.t <= 0) pour = null; }
     const x = f.from[0] + (f.to[0] - f.from[0]) * e, y = (1 - e) * (1 - e) * f.from[1] + 2 * (1 - e) * e * top + e * e * f.to[1];
     c.drawImage(ballSprite(f.col), x - BR - 3, y - BR - 3, (BR + 3) * 2, (BR + 3) * 2); }
   BTN.forEach((bn) => button(bn, bn.id === 'undo' ? !hist.length : !moves));
+  if (!done && !fly.length && !tubes.some((_, i) => tubes.some((__, j) => canPour(i, j)))) label('Sin movimientos: deshaz o reinicia', W / 2, 560, 16, '#ffd23d', 'center');
 });

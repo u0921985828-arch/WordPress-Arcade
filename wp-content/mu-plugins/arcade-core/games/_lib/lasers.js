@@ -16,7 +16,7 @@ function build() {
       if (Math.random() < 0.35) { const nd = (d + (Math.random() < 0.5 ? 1 : 3)) % 4; const m = [1, 2].find((mm) => reflect(d, mm) === nd); grid[y][x].m = m; grid[y][x].fixed = true; d = nd; turns++; } }
     if (!ok) continue;
     for (let i = 0; i < N; i++) { const rx = k.ri(0, N - 1), ry = k.ri(0, N - 1); if (!used.has(rx + ',' + ry) && !(rx === target[0] && ry === target[1])) { if (Math.random() < 0.5) grid[ry][rx].m = k.ri(1, 2); else grid[ry][rx].block = true; } }
-    for (const row of grid) for (const cl of row) if (cl.m && Math.random() < 0.6) cl.m = 3 - cl.m;
+    for (const row of grid) for (const cl of row) { if (cl.fixed) cl.sol = cl.m; if (cl.m && Math.random() < 0.6) cl.m = 3 - cl.m; }
     if (!trace().hit) break;
   }
   for (const row of grid) for (const cl of row) if (cl.m) { cl.ang = cl.m === 1 ? -Math.PI / 4 : Math.PI / 4; cl.a = cl.ang; cl.p = 0; }
@@ -24,8 +24,8 @@ function build() {
 }
 function reset() { if (!level) { level = 1; score = 0; } build(); }
 function rotate(x, y) { const cl = grid[y] && grid[y][x]; if (!cl || !cl.m) return; cl.m = 3 - cl.m; cl.ang += Math.PI / 2; cl.p = 1; taps++; beam = trace(); k.sfx('click');
-  if (beam.hit) { done = true; const bonus = Math.max(0, 50 - taps * 5); score += 100 * level + bonus; k.best(CFG.id, score); hitT = 0.001; const [tx, ty] = P(target); k.burst(tx, ty, '#7cf7a0', 24, 200); k.sfx('coin'); k.flash('rgba(124,247,160,.25)');
-    setTimeout(() => { k.st = 'over'; k.show('¡Objetivo alcanzado!', `Nivel ${level} · ${taps} giros · ${score} puntos<br>Toca para el siguiente`); level++; }, 900); } }
+  if (beam.hit) { done = true; const bonus = Math.max(0, 50 - taps * 5); score += 100 * level + bonus; const rec = k.best(CFG.id, score); hitT = 0.001; const [tx, ty] = P(target); k.burst(tx, ty, '#7cf7a0', 24, 200); k.sfx('coin'); k.flash('rgba(124,247,160,.25)');
+    setTimeout(() => { k.st = 'over'; k.show('¡Objetivo alcanzado!', `Nivel ${level} · ${taps} giros · ${score} puntos · Récord ${rec}<br>Toca para el siguiente`); level++; }, 900); } }
 const P = ([x, y]) => [OX + x * S + S / 2, OY + y * S + S / 2];
 
 /* ---------- Gráficos ---------- */

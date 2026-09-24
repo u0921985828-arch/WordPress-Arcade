@@ -36,9 +36,9 @@ reset(); buildBg(); k.show(CFG.title, 'Desliza desde el balón hacia la porterí
 function shoot(tx, ty, curve) {
   ball.from = [ball.x, ball.gy]; ball.tx = tx; ball.ty = ty; ball.curve = curve; ball.e = 0; state = 'fly'; shots++; k.sfx('shoot');
   // el portero lee la dirección inicial (sin el efecto) y se lanza tras un pequeño retraso
-  const skill = Math.min(0.75, 0.2 + level * 0.07), px = tx - curve * 0.5, py = ty, guess = Math.random() < skill;
+  const skill = Math.min(0.75, 0.06 + level * 0.09), px = tx - curve * 0.5, py = ty, guess = Math.random() < skill;
   const ex = guess ? px + k.rnd(-1, 1) * (40 - Math.min(25, level * 3)) : 180 + k.pick([-1, 1, 0]) * k.rnd(40, 130), ey = guess ? py : k.rnd(GY + 30, GL - 20);
-  keeper.dir = Math.sign(ex - 180); keeper.tx = 180 + k.clamp(ex - 180, -40, 40); keeper.ta = Math.atan2(ex - keeper.tx, GL - ey) * (Math.abs(ex - 180) < 25 ? 0.2 : 1); keeper.ta = k.clamp(keeper.ta, -1.35, 1.35); keeper.delay = Math.max(0.05, 0.16 - level * 0.01); keeper.dive = 0;
+  keeper.dir = Math.sign(ex - 180); keeper.tx = 180 + k.clamp(ex - 180, -40, 40); keeper.ta = Math.atan2(ex - keeper.tx, GL - ey) * (Math.abs(ex - 180) < 25 ? 0.2 : 1); keeper.ta = k.clamp(keeper.ta, -1.35, 1.35); keeper.delay = Math.max(0.05, 0.22 - level * 0.02); keeper.dive = 0;
 }
 function result(kind) {
   state = 'after'; ball.wait = 1.4; msgT = 1.3;
@@ -67,7 +67,7 @@ k.run((dt) => {
   if (state === 'fly') { ball.e += dt * 2.3; const e = Math.min(1, ball.e), b = ball;
     b.x = b.from[0] + (b.tx - b.from[0]) * e + b.curve * (e * e * 0.5 + Math.sin(e * Math.PI) * 0.6); b.gy = b.from[1] + (GL + 2 - b.from[1]) * e;
     b.h = (GL - b.ty) * e + Math.sin(e * Math.PI) * 26; b.y = b.gy - 14 * (1 - e * 0.55) - Math.max(0, b.h); b.s = 1 - e * 0.55; b.rot += dt * 14;
-    if (ball.e >= 1) { const bx = b.x, by = b.y, a = keeper.a, kx = keeper.x, p0 = [kx + Math.sin(a) * 12, GL - Math.cos(a) * 12], R = Math.min(115, 94 + level * 3), p1 = [kx + Math.sin(a) * R, GL - Math.cos(a) * R];
+    if (ball.e >= 1) { const bx = b.x, by = b.y, a = keeper.a, kx = keeper.x, p0 = [kx + Math.sin(a) * 12, GL - Math.cos(a) * 12], R = Math.min(115, 84 + level * 4), p1 = [kx + Math.sin(a) * R, GL - Math.cos(a) * R];
       const vx = p1[0] - p0[0], vy = p1[1] - p0[1], u = k.clamp(((bx - p0[0]) * vx + (by - p0[1]) * vy) / (vx * vx + vy * vy), 0, 1), dk = Math.hypot(bx - p0[0] - vx * u, by - p0[1] - vy * u);
       const post = (Math.abs(bx - GX) < 7 || Math.abs(bx - GX - GW) < 7) && by > GY - 6 && by < GL || Math.abs(by - GY) < 6 && bx > GX - 6 && bx < GX + GW + 6;
       const inGoal = bx > GX + 6 && bx < GX + GW - 6 && by > GY + 6 && by < GL;
