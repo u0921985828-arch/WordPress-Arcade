@@ -46,7 +46,8 @@ addEventListener('keydown', (e) => { if (!e.repeat) RAW.add(e.code); });
 
 const fits = (t, r, x, y) => ROT[t][r].every(([cx, cy]) => { const X = x + cx, Y = y + cy; return X >= 0 && X < COLS && Y < R && (Y < 0 || !board[Y][X]); });
 const grounded = () => !fits(cur.t, cur.r, cur.x, cur.y + 1);
-const grav = () => Math.max(0.03, 0.8 * Math.pow(0.86, level - 1));   // segundos por fila
+/* segundos por fila: nivel 1 = 1,2 s (antes 0,8), curva continua con las líneas (sin saltos al subir de nivel); nivel 10 ≈ 0,26 s (antes 0,21), suelo 0,045 s */
+const grav = () => Math.max(0.045, 1.2 * Math.pow(0.845, START - 1 + lines / 10));
 function fromBag() { if (!bag.length) bag = k.shuffle(Object.keys(SHAPES)); return bag.pop(); }
 function ghostY() { let y = cur.y; while (fits(cur.t, cur.r, cur.x, y + 1)) y++; return y; }
 

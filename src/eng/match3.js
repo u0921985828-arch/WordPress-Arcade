@@ -33,7 +33,7 @@ function gravity() {
   clearing = null; check = true;
 }
 function reshuffle() { k.float('Sin jugadas: nuevo tablero', 240, OY + N * S / 2, '#fff38a'); k.sfx('explode'); fill(); check = true; }
-function reset() { score = 0; level = 1; moves = 25; target = 1000; prevT = 0; time = 90; combo = 0; fill(); sel = null; clearing = null; swapA = null; check = true; cur = [3, 3]; kbd = false; idle = 0; hint = null; comboT = 0; lvlT = 0; queued = null; }
+function reset() { score = 0; level = 1; moves = 25; target = 800; prevT = 0; time = 90; combo = 0; fill(); sel = null; clearing = null; swapA = null; check = true; cur = [3, 3]; kbd = false; idle = 0; hint = null; comboT = 0; lvlT = 0; queued = null; }
 
 /* ---------- Gráficos cacheados ---------- */
 function shape(v) {
@@ -101,7 +101,7 @@ k.run((dt) => {
   if (clearing) { clearing.t += dt / 0.2; if (clearing.t >= 1) gravity(); return; }
   if (settling) return;
   if (check) { const m = matches(); if (m.size) return startClear(m); check = false; combo = 0; if (!hasMove()) return reshuffle(); }
-  if (!TIMED) { if (score >= target) { level++; prevT = target; target = score + 1500 + level * 500; moves = 25; lvlT = 1.6; k.sfx('win'); k.confetti(); }
+  if (!TIMED) { if (score >= target) { level++; prevT = target; target = score + Math.min(3000, 800 + 275 * (level - 1)); moves = 25; lvlT = 1.6; k.sfx('win'); k.confetti(); }
     else if (moves <= 0) return k.lose(CFG.id, score, 'Sin movimientos', `Nivel ${level}`); }
   idle += dt; if (idle > 6 && !hint) hint = findMove();
   if (queued) { const q = queued; queued = null; trySwap(q[0], q[1]); return; }

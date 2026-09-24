@@ -3,10 +3,11 @@
  * Canasta limpia (sin tocar aro ni tablero) = +1 punto y +2 s. 60 segundos. */
 const OUT = ART.OUT, R2 = 6.2832, W = 360, H = 640, FLOOR = 578, BR = 13, RIM = 26, NC = 7, NR = 5;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#241a3a' }), c = k.ctx;
-let ball, hoop, score, time, streak, aim, msg, msgT, msgC, best, net, kAng, kPow, kb, t = 0, bgCv, ballSpr, fireT = 0, clankT = 0;
-function newBall() { ball = { x: k.rnd(50, 190), y: k.rnd(400, 520), vx: 0, vy: 0, fly: false, scored: false, prevY: 0, rot: 0, sp: 0, touched: false, bounces: 0, pop: 0, done: 0 }; ball.sx = ball.x; ball.sy = ball.y;
+let shotN = 0, ball, hoop, score, time, streak, aim, msg, msgT, msgC, best, net, kAng, kPow, kb, t = 0, bgCv, ballSpr, fireT = 0, clankT = 0;
+/* los primeros lanzamientos salen cerca del aro; la zona se abre hasta la completa hacia el 12.º */
+function newBall() { const d = Math.min(1, shotN++ / 12); ball = { x: k.rnd(190 - 140 * d, 190 - 10 * (1 - d)), y: k.rnd(440 - 40 * d, 480 + 40 * d), vx: 0, vy: 0, fly: false, scored: false, prevY: 0, rot: 0, sp: 0, touched: false, bounces: 0, pop: 0, done: 0 }; ball.sx = ball.x; ball.sy = ball.y;
   const dx = hoop.x - ball.x, hh = ball.y - hoop.y, a = 1.0, den = 2 * Math.cos(a) ** 2 * (dx * Math.tan(a) - hh); kAng = -a; kPow = den > 0 ? k.clamp(Math.sqrt(1300 * dx * dx / den) / 950 * 0.9, 0.2, 1) : 0.8; } /* el teclado parte de un tiro corto: hay que ajustarlo */
-function reset() { hoop = { x: 280, y: 230, vx: 0 }; score = 0; time = 60; streak = 0; best = 0; msg = ''; msgT = 0; kb = false; net = []; for (let j = 0; j < NR; j++) for (let i = 0; i < NC; i++) net.push({ i, j, dx: 0, dy: 0, vx: 0, vy: 0 }); newBall(); }
+function reset() { shotN = 0; hoop = { x: 280, y: 230, vx: 0 }; score = 0; time = 60; streak = 0; best = 0; msg = ''; msgT = 0; kb = false; net = []; for (let j = 0; j < NR; j++) for (let i = 0; i < NC; i++) net.push({ i, j, dx: 0, dy: 0, vx: 0, vy: 0 }); newBall(); }
 /* ---------- Cacheados: pabellón y balón ---------- */
 function buildArt() {
   bgCv = document.createElement('canvas'); bgCv.width = W * 2; bgCv.height = H * 2; const g = bgCv.getContext('2d'); g.scale(2, 2);
@@ -37,7 +38,7 @@ function throwBall(a, p) { ball.vx = Math.cos(a) * p * 950; ball.vy = Math.sin(a
 const rimL = () => [hoop.x - RIM, hoop.y], rimR = () => [hoop.x + RIM, hoop.y], BB = () => ({ x0: hoop.x + RIM + 8, x1: hoop.x + RIM + 20, y0: hoop.y - 92, y1: hoop.y + 14 });
 k.run((dt) => {
   t += dt; msgT -= dt; clankT -= dt; if (!k.gate(reset)) return; time -= dt; if (time <= 0) { time = 0; return k.lose(CFG.id, score, '¡Tiempo!', `Mejor racha x${best}`); }
-  if (streak >= 3) { if (!hoop.vx) hoop.vx = 45 + streak * 5; hoop.x += hoop.vx * dt; if (hoop.x > 300) { hoop.x = 300; hoop.vx = -Math.abs(hoop.vx); } if (hoop.x < 205) { hoop.x = 205; hoop.vx = Math.abs(hoop.vx); } } else { hoop.vx = 0; hoop.x += (280 - hoop.x) * Math.min(1, dt * 2); }
+  if (streak >= 3) { if (!hoop.vx) hoop.vx = 40; const hv = Math.min(95, 40 + (streak - 3) * 6); hoop.vx = Math.sign(hoop.vx) * hv; hoop.x += hoop.vx * dt; if (hoop.x > 300) { hoop.x = 300; hoop.vx = -Math.abs(hoop.vx); } if (hoop.x < 205) { hoop.x = 205; hoop.vx = Math.abs(hoop.vx); } } else { hoop.vx = 0; hoop.x += (280 - hoop.x) * Math.min(1, dt * 2); }
   stepNet(dt);
   ball.pop = Math.min(1, ball.pop + dt * 5);
   if (!ball.fly) {
@@ -101,7 +102,7 @@ function draw() {
   if (hot) { c.globalAlpha = 0.5 + Math.sin(t * 20) * 0.2; for (let i = 0; i < 6; i++) { const x = hoop.x - RIM + i * RIM * 0.4, hh = 8 + Math.sin(t * 17 + i * 2) * 4; c.fillStyle = i % 2 ? '#ffb13d' : '#ff5f2d'; c.beginPath(); c.moveTo(x - 4, hoop.y); c.quadraticCurveTo(x, hoop.y - hh * 2, x + 4, hoop.y); c.fill(); } c.globalAlpha = 1; }
   // guía de tiro
   let a = null, p = 0; if (!ball.fly && aim && k.ptr.down) { const dx = k.ptr.sx - k.ptr.x, dy = k.ptr.sy - k.ptr.y; p = Math.min(1, Math.hypot(dx, dy) / 160); if (p > 0.1) a = Math.atan2(dy, dx); } else if (!ball.fly && kb) { a = kAng; p = kPow; }
-  if (a !== null) { let x = ball.x, y = ball.y, vx = Math.cos(a) * p * 950, vy = Math.sin(a) * p * 950; for (let i = 0; i < 16; i++) { for (let j = 0; j < 3; j++) { vy += 1300 * 0.012; x += vx * 0.012; y += vy * 0.012; } c.globalAlpha = 1 - i / 18; c.beginPath(); c.arc(x, y, 4 - i * 0.12, 0, R2); ART.fillOut(c, '#fff', 1.5); } c.globalAlpha = 1;
+  if (a !== null) { let x = ball.x, y = ball.y, vx = Math.cos(a) * p * 950, vy = Math.sin(a) * p * 950; const dots = Math.round(24 - 8 * Math.min(1, shotN / 12)); for (let i = 0; i < dots; i++) { for (let j = 0; j < 3; j++) { vy += 1300 * 0.012; x += vx * 0.012; y += vy * 0.012; } c.globalAlpha = 1 - i / (dots + 2); c.beginPath(); c.arc(x, y, 4 - i * 0.12, 0, R2); ART.fillOut(c, '#fff', 1.5); } c.globalAlpha = 1;
     c.strokeStyle = OUT; c.lineWidth = 7; c.beginPath(); c.arc(ball.x, ball.y, 22, -Math.PI / 2, -Math.PI / 2 + p * R2); c.stroke(); c.strokeStyle = `hsl(${120 - p * 120} 90% 60%)`; c.lineWidth = 4; c.stroke(); }
   if (!ball.fly && !aim && !kb && score === 0 && time > 56) { const e = (t % 1.4) / 1.4; c.globalAlpha = 1 - e; c.fillStyle = '#fff'; c.beginPath(); c.arc(ball.x - 20 - e * 50, ball.y + 20 + e * 40, 9, 0, R2); c.fill(); c.globalAlpha = 1; }
   // HUD
