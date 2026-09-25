@@ -94,7 +94,7 @@ function newRound() {
 function reset() { mkPlayers(); round = 0; newRound(); }
 function eliminate(pl, txt) {
   if (!pl.alive) return; pl.alive = false; pl.out = rt; elimOrder.push(pl.i);
-  k.sfx('hurt'); k.float(txt || '¡Fuera!', vx(pl.x), vy(pl.y) - 26, pl.col); k.shake(4);
+  const ft = txt || '¡Fuera!'; k.sfx('hurt'); k.float(ft, fltX(ft, vx(pl.x)), clamp(vy(pl.y) - 26, SY + 14, SY + SH - 14), pl.col); k.shake(4);
 }
 function rankKey(pl) { const md = MODES[M]; if (MD.elim) return pl.alive ? 1e6 + (md.key ? md.key(pl) : 0) : pl.out * 100 + elimOrder.indexOf(pl.i); return md.key(pl); }
 function endRound() {
@@ -122,7 +122,8 @@ function human(pl) {
 }
 function inputs(pl, dt) { return pl.cpu ? MODES[M].ai(pl, pl.ai, skill(), dt) || { x: 0, y: 0 } : human(pl); }
 function spark(x, y, col, n, v) { k.burst(vx(x), vy(y), col, n || 8, v || 120); }
-function say(txt, x, y, col) { k.float(txt, vx(x), vy(y), col || '#fff'); }
+function fltX(txt, px) { c.font = '800 18px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const hw = c.measureText(String(txt)).width / 2 + 6; return clamp(px, hw, W - hw); }
+function say(txt, x, y, col) { k.float(txt, fltX(txt, vx(x)), clamp(vy(y), SY + 14, SY + SH - 14), col || '#fff'); }
 
 /* ================================================================ 1) Pulso de Titanes */
 const HEART = (col) => mk(34, 32, (q) => { q.beginPath(); q.moveTo(17, 29); q.bezierCurveTo(-2, 16, 3, 3, 17, 11); q.bezierCurveTo(31, 3, 36, 16, 17, 29); q.closePath(); q.fillStyle = col; q.fill(); q.lineWidth = 2.4; q.strokeStyle = OUT; q.stroke(); q.fillStyle = alpha('#fff', 0.5); q.beginPath(); q.ellipse(11, 12, 3.4, 2.2, -0.5, 0, TAU); q.fill(); });
@@ -411,7 +412,7 @@ const MODES = {
         const px = 0, py = -26 - sw * 6 + sw * 26;
         c.save(); c.translate(px, py); c.rotate(-0.5 + sw * 1.4); rr(c, -13, -9, 26, 18, 7); fillOut(c, '#fff3fb', 2.2); c.strokeStyle = alpha('#d8a8c8', 0.9); c.lineWidth = 1.5; c.beginPath(); c.moveTo(-9, -5); c.lineTo(9, -5); c.stroke(); c.restore();
         c.restore();
-        label(tagOf(pl), clamp(pl.x, 26, WW - 26), clamp(pl.y - pl.r - 16 - (pl.i % 2) * 14, 13, WH - 13), 14, pl.col);
+        label(tagOf(pl), clamp(pl.x, 26, WW - 26), clamp(pl.y - pl.r - 16 - (pl.i % 3) * 13, 13, WH - 13), 14, pl.col);
       }
     },
   },
@@ -525,7 +526,7 @@ const MODES = {
         puppet(pl.x, pl.y - 6, 1, pl.col, { face: pl.vx < 0 ? -1 : 1, hy: -20, hr: 9, belt: 1, shut: !!pl.stun,
           hands: pl.grab ? [[-13, -16], [13, -16]] : [[-11 + lean, 4], [11 + lean, 4]], feet: [[-6, 22], [6, 22]] });
         /* el nombre se contrarrota para leerse en horizontal y se escalona para que no se tapen entre sí */
-        c.save(); c.translate(pl.x, pl.y - 38 - (pl.i % 2) * 15); c.rotate(S.ga); label(tagOf(pl), 0, 0, 13 / GF, pl.col); c.restore();
+        c.save(); c.translate(pl.x, pl.y - 38 - (pl.i % 3) * 14); c.rotate(S.ga); label(tagOf(pl), 0, 0, 13 / GF, pl.col); c.restore();
         if (pl.grab) glint(c, pl.x, pl.y - 30, 4, '#9fd8f2');
       }
       c.restore();
@@ -626,7 +627,7 @@ const MODES = {
           hands: pl.push > 0 ? [[pl.face * 17, -6], [pl.face * 8, 2]] : air ? [[-11, -18], [11, -18]] : [[-10, run ? 2 + Math.sin(ph) * 5 : 4], [10, run ? 2 - Math.sin(ph) * 5 : 4]],
           feet: air ? [[-7, 16], [8, 18]] : run ? [[-6 + Math.sin(ph) * 8, 22 - Math.max(0, Math.sin(ph)) * 5], [6 - Math.sin(ph) * 8, 22 - Math.max(0, -Math.sin(ph)) * 5]] : [[-6, 22], [6, 22]] });
         /* la etiqueta no se sale por arriba y se escalona para que no se tapen entre ellas */
-        label(tagOf(pl), clamp(pl.x, 26, WW - 26), Math.max(13, pl.y - 48 - (pl.i % 2) * 14), 13, pl.col);
+        label(tagOf(pl), clamp(pl.x, 26, WW - 26), Math.max(13, pl.y - 48 - (pl.i % 3) * 13), 13, pl.col);
         if (pl.push > 0) for (let i = 0; i < 2; i++) glint(c, pl.x + pl.face * (22 + i * 8), pl.y - 14, 4, '#fff');
       }
       /* lava */

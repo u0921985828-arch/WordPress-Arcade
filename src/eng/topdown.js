@@ -390,10 +390,10 @@ function heroCpu(h, dt) {
   const [nf, nd] = nearFoe(h.x, h.y), lead = HE.find((o) => !o.cpu && !o.down) || HE.find((o) => !o.down && o !== h);
   let mx = 0, my = 0, sk = false, roll = false;
   for (const s of eshots) { const rx = h.x - s.x, ry = h.y - s.y, sp = Math.hypot(s.vx, s.vy) || 1, tt = (rx * s.vx + ry * s.vy) / (sp * sp); if (tt < 0 || tt > 0.5) continue; const ex = s.x + s.vx * tt - h.x, ey = s.y + s.vy * tt - h.y; if (Math.hypot(ex, ey) < 22) { const nx = -s.vy / sp, ny = s.vx / sp, sd = ex * nx + ey * ny > 0 ? -1 : 1; return [nx * sd, ny * sd, false, h.rollCd <= 0 && Math.random() < 0.04]; } }
-  if (CASTLE && cleared && !unlocked && plates.length) { const tg = plateFor(h);
-    if (tg) { const dx = tg.x - h.x, dy = tg.y - h.y, d = Math.hypot(dx, dy); return d > 9 ? [dx / d, dy / d, false, false] : [0, 0, false, false]; } }
   const dn = HE.filter((o) => o.down).sort((a, b) => Math.hypot(a.x - h.x, a.y - h.y) - Math.hypot(b.x - h.x, b.y - h.y))[0];
   if (dn && (nd > 60 || !nf) && Math.hypot(dn.x - h.x, dn.y - h.y) < 400) { const dx = dn.x - h.x, dy = dn.y - h.y, d = Math.hypot(dx, dy); if (d > 16) { mx = dx / d; my = dy / d; } if (h.cls === 'cleric' && h.sk <= 0 && d < 110) sk = true; return [mx, my, sk, false]; }
+  if (CASTLE && cleared && !unlocked && plates.length) { const tg = plateFor(h);
+    if (tg) { const dx = tg.x - h.x, dy = tg.y - h.y, d = Math.hypot(dx, dy); return d > 9 ? [dx / d, dy / d, false, false] : [0, 0, false, false]; } }
   if (nf) {
     const a = Math.atan2(nf.y - h.y, nf.x - h.x);
     if (C.melee) { if (nd > C.reach * upg.reach * 0.7 + nf.r) { mx = Math.cos(a); my = Math.sin(a); } else { mx = Math.cos(a + 1.57 * st.side) * 0.4; my = Math.sin(a + 1.57 * st.side) * 0.4; } }
@@ -598,6 +598,7 @@ function coopDraw() {
     const sk = Math.max(0, h.sk) / (CLS[h.cls].skcd * (h.skMul || 1)); ART.rr(c, x + 7, 24, pw - 14, 5, 2.5); c.fillStyle = 'rgba(255,255,255,.15)'; c.fill(); ART.rr(c, x + 7, 24, (pw - 14) * (1 - sk), 5, 2.5); c.fillStyle = sk <= 0 ? '#ffc928' : '#8a7fd8'; c.fill(); });
   coinIcon(W - 18, 19); label(`${score}`, W - 32, 10, 18, '#fff', 'right');
   label(`${TH.label} ${room}`, W - 14, Y1 + 1, 11, 'rgba(255,255,255,.85)', 'right');
+  if (CASTLE && cleared && !unlocked && plates.length) { const ht = 'Pisad las dos placas a la vez'; label(ht, W / 2, Y1 + 1, fitLab(ht, W - 260, 11), '#ffc928', 'center'); }
   if (bossF && !bossF.dead) { const bw = Math.min(260, W - 160), x = W / 2 - bw / 2, y = Y1 + 3; c.fillStyle = OUT; c.fillRect(x - 2, y - 2, bw + 4, 12); c.fillStyle = '#5a1f2c'; c.fillRect(x, y, bw, 8); c.fillStyle = '#ff3b5c'; c.fillRect(x, y, bw * Math.max(0, bossF.hp) / bossF.max, 8); }
   if (msgT > 0 && !choice) { c.globalAlpha = Math.min(1, msgT * 2); c.font = '800 22px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const mw = c.measureText(msg).width + 36; ART.rr(c, W / 2 - mw / 2, H / 2 - 64, mw, 40, 12); c.fillStyle = 'rgba(26,21,48,.82)'; c.fill(); label(msg, W / 2, H / 2 - 55, 22, '#ffc928', 'center'); c.globalAlpha = 1; }
   if (choice) {

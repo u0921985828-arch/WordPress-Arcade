@@ -695,7 +695,8 @@ function draw() {
     label(fitName((PAIR ? (i < 2 ? 'A·' : 'B·') : '') + (q.name === 'Tú' ? 'TÚ' : q.name), cw - 34, k.party ? 18 : 13), x + 8, 17, k.party ? 18 : 13, q.alive ? q.col : '#8a82a6', 'left');
     for (let s = 0; s < RU.wins; s++) { c.fillStyle = s < q.wins ? '#ffd166' : 'rgba(255,255,255,.15)'; ART.glint(c, x + cw - 12 - s * 14, 17, 6, c.fillStyle); }
     if (GHOST && q.ghost) { label('FANTASMA', x + 6, 32, k.party ? 13 : 11, '#a097ff', 'left'); return; }
-    if (UNICA) { label(hot && hot.car === q ? '¡LO LLEVAS!' : q.alive ? 'A SALVO' : 'FUERA', x + 6, 32, k.party ? 13 : 11, hot && hot.car === q ? '#ffd166' : q.alive ? '#a8cf3f' : '#8a82a6', 'left'); return; }
+    if (UNICA) { const ut = hot && hot.car === q ? '¡LO LLEVAS!' : q.alive ? 'A SALVO' : 'FUERA';
+      label(ut, x + 6, 32, fitSize(ut, cw - 12, k.party ? 13 : 11), hot && hot.car === q ? '#ffd166' : q.alive ? '#a8cf3f' : '#8a82a6', 'left'); return; }
     c.drawImage(itemIcon('r'), x + 6, 26, 12, 12); label('' + q.range, x + 24, 32, k.party ? 14 : 11, '#fff'); c.drawImage(itemIcon('b'), x + 34, 26, 12, 12); label('' + q.max, x + 52, 32, k.party ? 14 : 11, '#fff');
     if (PAINT) { ART.rr(c, x + 60, 26, 28, 12, 4); c.fillStyle = q.col; c.fill(); label(pct(i) + '%', x + 74, 32, k.party ? 13 : 10, '#fff'); }
     else { if (q.kick) c.drawImage(itemIcon('k'), x + 62, 26, 12, 12); if (q.spd > RU.speed + 0.1) c.drawImage(itemIcon('s'), x + 76, 26, 12, 12); } });

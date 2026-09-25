@@ -226,7 +226,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
         } else txt(`${this.total()} dados en juego`, W / 2, cy, 26, '#fff');
       }
       this.drawCtl();
-      if (msgT > 0) { const w2 = Math.min(W - 24, tw(msg, 17) + 34); c.globalAlpha = Math.min(1, msgT * 2); ART.rr(c, W / 2 - w2 / 2, (LAND ? 108 : 150) - 17, w2, 34, 17); c.fillStyle = 'rgba(8,14,26,.85)'; c.fill(); fit(msg, W / 2, LAND ? 108 : 150, 17, '#fff3c4', 'center', w2 - 16); c.globalAlpha = 1; }
+      if (msgT > 0) { const w2 = Math.min(W - 24, tw(msg, 17) + 34); c.globalAlpha = Math.min(1, msgT * 2); const my = LAND ? H - 24 : 150; ART.rr(c, W / 2 - w2 / 2, my - 17, w2, 34, 17); c.fillStyle = 'rgba(8,14,26,.92)'; c.fill(); fit(msg, W / 2, my, 17, '#fff3c4', 'center', w2 - 16); c.globalAlpha = 1; }   // abajo: durante el recuento no hay botones y no tapa a los jugadores
     },
     drawReveal(cy) {
       const r = S.res, n = S.n;
@@ -246,7 +246,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       const me = k.party ? -1 : 0, mine = S.phase === 'bid' && (k.party ? hum(S.cur) : S.cur === 0);
       const by = H - (LAND ? 108 : 190);
       if (!k.party && S.phase !== 'over') {
-        const dw = Math.min(34, (W - 40) / 5 - 6), y = H - (LAND ? 168 : 246);
+        const dw = Math.min(34, (W - 40) / 5 - 6), y = H - (LAND ? 156 : 246);
         txt('Tus dados', W / 2, y - 28, 14, '#cfe8d8');
         S.dice[0].forEach((v, j) => die(W / 2 + (j - (S.dice[0].length - 1) / 2) * (dw + 8), y, dw, v));
       }
@@ -255,12 +255,12 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       // Selector de cantidad y cara
       const bw = LAND ? 54 : 46, y = by;
       const qx = W / 2 - (LAND ? 190 : 150);
-      fit('Cantidad', qx, y - 26, 13, '#cfe8d8', 'center', 110);
+      fit('Cantidad', qx, y - 22, 13, '#cfe8d8', 'center', 110);
       pill(qx - bw - 26, y - 20, 34, 40, '#463ac4', '−', 24, '#fff'); hits.push({ x: qx - bw - 26, y: y - 20, w: 34, h: 40, v: 'q-' });
       txt(String(S.sel.q), qx, y, 34, '#ffd166');
       pill(qx + 26, y - 20, 34, 40, '#463ac4', '+', 24, '#fff'); hits.push({ x: qx + 26, y: y - 20, w: 34, h: 40, v: 'q+' });
       const fx = W / 2 + (LAND ? 30 : 10), fw = Math.min(30, (W / 2 - 40) / 6 - 4);
-      fit('Valor', fx + (fw + 4) * 2.5 + fw / 2, y - 26, 13, '#cfe8d8', 'center', 110);
+      fit('Valor', fx + (fw + 4) * 2.5 + fw / 2, y - 22, 13, '#cfe8d8', 'center', 110);
       for (let f = 1; f <= 6; f++) {
         const x = fx + (f - 1) * (fw + 4);
         if (S.sel.f === f) { rr(x - 3, y - fw / 2 - 3, fw + 6, fw + 6, 8, '#ffd166', 2); }
@@ -362,7 +362,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       fit(`Ronda ${S.round} de ${S.rounds}${S.round >= S.rounds ? ' · cofre doble' : ''}`, cx, cy - chh / 2 - 26, 16, '#fff3c4', 'center', W - 40);
       if (S.phase === 'reveal') fit(S.res.kind === 'todos' ? `A ${S.res.out[0]} monedas cada uno` : S.res.kind === 'nadie' ? 'Nadie se lleva nada' : 'Los que roban se reparten el cofre', cx, cy + chh / 2 + 28, 17, '#fff', 'center', W - 40);
       this.drawCtl();
-      if (msgT > 0) { const w2 = Math.min(W - 24, tw(msg, 18) + 34); c.globalAlpha = Math.min(1, msgT * 2); ART.rr(c, W / 2 - w2 / 2, (LAND ? 140 : 190) - 18, w2, 36, 18); c.fillStyle = 'rgba(8,14,26,.85)'; c.fill(); fit(msg, W / 2, LAND ? 140 : 190, 18, '#fff3c4', 'center', w2 - 16); c.globalAlpha = 1; }
+      if (msgT > 0) { const w2 = Math.min(W - 24, tw(msg, 18) + 34); c.globalAlpha = Math.min(1, msgT * 2); const my = LAND ? H - 26 : 190; ART.rr(c, W / 2 - w2 / 2, my - 18, w2, 36, 18); c.fillStyle = 'rgba(8,14,26,.92)'; c.fill(); fit(msg, W / 2, my, 18, '#fff3c4', 'center', w2 - 16); c.globalAlpha = 1; }   // solo sale en el recuento: abajo no hay botones
     },
     drawCtl() {
       hits = [];
@@ -521,7 +521,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
         for (let i = 0; i < S.nc; i++) { const x = W / 2 + (i - (S.nc - 1) / 2) * (cw2 + 6); circ(x, y - 30, cw2 / 2, PAL[i], 2.2); hits.push({ x: x - cw2 / 2, y: y - 30 - cw2 / 2, w: cw2, h: cw2, v: 'c' + i }); }
         pill(W / 2 - 80, y + 4, 160, 44, '#7cf7a0', 'Probar', 19); hits.push({ x: W / 2 - 80, y: y + 4, w: 160, h: 44, v: 'go' });
       } else if (k.party && S.phase === 'play') fit('Cada uno pone su combinación con el mando o el móvil', W / 2, H - 16, 14, '#cfe8d8', 'center', W - 24);
-      if (msgT > 0) { const w2 = Math.min(W - 24, tw(msg, 17) + 34); c.globalAlpha = Math.min(1, msgT * 2); ART.rr(c, W / 2 - w2 / 2, 42 - 17, w2, 34, 17); c.fillStyle = 'rgba(8,14,26,.85)'; c.fill(); fit(msg, W / 2, 42, 17, '#fff3c4', 'center', w2 - 16); c.globalAlpha = 1; }
+      if (msgT > 0) { const w2 = Math.min(W - 24, tw(msg, 17) + 34); c.globalAlpha = Math.min(1, msgT * 2); const my = H - (LAND ? 26 : 36); ART.rr(c, W / 2 - w2 / 2, my - 17, w2, 34, 17); c.fillStyle = 'rgba(8,14,26,.92)'; c.fill(); fit(msg, W / 2, my, 17, '#fff3c4', 'center', w2 - 16); c.globalAlpha = 1; }   // abajo: no pisa el titular ni el tablero
     },
   };
 

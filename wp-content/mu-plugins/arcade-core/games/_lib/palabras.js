@@ -869,7 +869,7 @@ const AN = (() => {
     if (k.human(top.p) && top.score > 0) SAVE('cpu:' + CFG.id, Math.min(8, lvl() + 1));
     const me = seats[0]; if (!k.party) k.best(CFG.id, me.score);
     const solo = !k.party && rows.length === 1;
-    k.podium(rows, { go: `${solo ? `Palabras: ${me.ok} · Récord ${k.best(CFG.id, 0)}<br>` : ''}Toca para otra partida` });
+    k.podium(rows, { head: solo ? 'Fin de las tandas' : undefined, go: `${solo ? `Palabras: ${me.ok} · Récord ${k.best(CFG.id, 0)}<br>` : ''}Toca para otra partida` });
   }
   function rackRect(i) { const n = letras.length, tot = n * L.rs + (n - 1) * 6; return [L.cx - tot / 2 + i * (L.rs + 6), L.ry, L.rs, L.rs]; }
   function wordRect(i) { const n = 7, tot = n * L.ws + (n - 1) * 5; return [L.cx - tot / 2 + i * (L.ws + 5), L.wy, L.ws, L.ws]; }
