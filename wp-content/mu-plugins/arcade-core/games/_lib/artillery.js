@@ -443,7 +443,7 @@ k.run((dt) => {
   }
   if (phase === 'start') { startTurn(); }
   if (phase === 'aim') {
-    if (!cur.alive) { phase = 'fly'; }
+    if (!cur.alive || (settled() && roundOver())) { phase = 'fly'; }
     else { controlAim(cur, dt); turnT -= dt; if (turnT <= 0 && phase === 'aim') { if (cur.chg && cur.power > 0.05) fire(cur); cur.rope = null; cur.air = !supported(cur); phase = 'fly'; say('¡Tiempo!', '#ff8a6a'); } }
   }
   physics(dt);

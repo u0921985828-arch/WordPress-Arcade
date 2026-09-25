@@ -220,7 +220,7 @@ function eightGame() {
   function autoAim() { const cue = cueB(); if (!cue) return; const tg = targets(cur); if (!tg.length) return; tg.sort((a, b) => Math.hypot(a.x - cue.x, a.y - cue.y) - Math.hypot(b.x - cue.x, b.y - cue.y)); kAng = Math.atan2(tg[0].y - cue.y, tg[0].x - cue.x); }
   function startTurn(inHand) {
     cpu = null; prevA = true; aiming = false; holdT = 0; pw = 0; bannerT = 1;
-    if (inHand) { let cue = cueB(); if (!cue) { cue = { n: 0, x: HX, y: MY, vx: 0, vy: 0, rot: 0 }; while (!freeSpot(cue.x, cue.y)) cue.x -= 6; balls.unshift(cue); } phase = 'place'; }
+    if (inHand) { let cue = cueB(); if (!cue) { cue = { n: 0, x: HX, y: MY, vx: 0, vy: 0, rot: 0 }; for (let g = 0; g < 200 && !freeSpot(cue.x, cue.y); g++) { cue.x = HX - (g % 20) * 6; cue.y = MY + (((g / 20) | 0) % 2 ? 1 : -1) * Math.ceil((g / 20 | 0) / 2) * 24; } balls.unshift(cue); } phase = 'place'; }
     else phase = 'aim';
     autoAim();
   }
@@ -291,9 +291,10 @@ function eightGame() {
     if (phase === 'place') {
       cue.x += d.x * 170 * dt; cue.y += d.y * 170 * dt;
       if (local && k.ptr.down) { cue.x = k.ptr.x; cue.y = k.ptr.y; }
-      cue.x = clamp(cue.x, TX + BR, TX + TW - BR); cue.y = clamp(cue.y, TY + BR, TY + TH - BR);
+      cue.x = clamp(cue.x, TX + BR + 1, TX + TW - BR - 1); cue.y = clamp(cue.y, TY + BR + 1, TY + TH - BR - 1);
       for (let it = 0; it < 8; it++) for (const b of balls) if (b.n && Math.hypot(b.x - cue.x, b.y - cue.y) < BR * 2 + 1) { const a = Math.atan2(cue.y - b.y, cue.x - b.x); cue.x = b.x + Math.cos(a) * (BR * 2 + 1.5); cue.y = b.y + Math.sin(a) * (BR * 2 + 1.5); }
-      const ok = () => { if (freeSpot(cue.x, cue.y)) { phase = 'aim'; prevA = true; k.sfx('click'); autoAim(); } };
+      const ok = () => { if (!freeSpot(cue.x, cue.y)) { let bx = 0, by = 0, bd = 1e9; for (let yy = TY + BR + 2; yy < TY + TH - BR - 1; yy += 4) for (let xx = TX + BR + 2; xx < TX + TW - BR - 1; xx += 4) { const dd = (xx - cue.x) ** 2 + (yy - cue.y) ** 2; if (dd < bd && freeSpot(xx, yy)) { bd = dd; bx = xx; by = yy; } } if (bd < 1e9) { cue.x = bx; cue.y = by; } }
+        if (freeSpot(cue.x, cue.y)) { phase = 'aim'; prevA = true; k.sfx('click'); autoAim(); } };
       if (!aDown) prevA = false; else if (!prevA) ok();
       if (local && k.ptr.up) ok();
       return;

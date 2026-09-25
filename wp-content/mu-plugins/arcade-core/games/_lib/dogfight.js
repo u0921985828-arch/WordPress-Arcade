@@ -47,7 +47,7 @@ let P = [], bullets = [], clouds = [], smoke = [], T = 0, rt = 0, round = 0, pha
 function mkPlayers() { P = k.players(4).map((q, i) => ({ i, p: q.p, col: q.color, name: q.cpu ? 'CPU ' + (i + 1) : q.name, cpu: q.cpu, pts: 0, wins: 0, kills: 0, gain: 0 })); }
 function syncPlayers() { const pl = k.players(4); P.forEach((x, i) => { x.cpu = pl[i].cpu; x.name = pl[i].cpu ? 'CPU ' + (i + 1) : pl[i].name; x.col = pl[i].color; }); }
 k.onParty = () => { if (k.st !== 'play') reset(); else syncPlayers(); };
-const START = [[90, 150, 0], [710, 150, Math.PI], [90, 250, 0], [710, 250, Math.PI]];
+const START = [[90, 130, 0], [710, 180, Math.PI], [90, 250, 0], [710, 300, Math.PI]];
 function newRound() {
   round++; rt = 0; phase = 'play'; cdPend = true; bullets = []; smoke = []; order = []; banner = null;
   P.forEach((pl, i) => { const [x, y, a] = START[i]; Object.assign(pl, { x, y, a, v: 170, sink: 0, hp: 6, alive: true, down: false, spin: 0, stall: false, cd: 0, heat: 0, hot: false, loopT: 0, loopCd: 0, loopDir: 1, hurt: 0, prop: 0, gain: 0, ai: { t: 0, tgt: null, want: a }, lastHit: -1, rk: 0 }); });

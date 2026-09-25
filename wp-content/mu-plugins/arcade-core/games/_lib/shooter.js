@@ -202,7 +202,7 @@ if (M === 'coop') {
   const coopWave = () => {
     wave++; foes = []; calm = wave === 1 ? 5 : 2.2; fox = 0; foy = 0; dirX = 1; divT = wave === 1 ? 7 : 3.5;
     const rows = Math.min(5, 3 + Math.floor((wave + 1) / 3)), cols = 8;
-    for (let r = 0; r < rows; r++) for (let i = 0; i < cols; i++) foes.push({ gx: 58 + i * 48, gy: 52 + r * 30, x: 0, y: 0, r: 12, hp: r === 0 && wave > 2 ? 2 : 1, pts: [30, 20, 20, 10, 10][r], kind: r < 1 ? 1 : r < 3 ? 0 : 2, fr: 0, dive: 0 });
+    for (let r = 0; r < rows; r++) for (let i = 0; i < cols; i++) foes.push({ gx: 58 + i * 48, gy: 66 + r * 30, x: 58 + i * 48, y: 66 + r * 30, r: 12, hp: r === 0 && wave > 2 ? 2 : 1, pts: [30, 20, 20, 10, 10][r], kind: r < 1 ? 1 : r < 3 ? 0 : 2, fr: 0, dive: 0 });
     if (wave === 1 || wave % 3 === 1) coopBunkers();
     for (const s of ships) if (s.down) { s.down = false; s.inv = 2; s.x = k.clamp(s.x, 20, W - 20); s.y = BOT - 14; }
     if (wave > 1) { reserve = Math.min(5, reserve + 1); shE = Math.min(100, shE + 35); }
@@ -323,7 +323,7 @@ if (M === 'coop') {
     c.fillStyle = shE >= 25 ? '#5ce1e6' : '#f0647e'; ART.rr(c, bx, 12, bw * shE / 100, 8, 4); c.fill(); c.fillStyle = 'rgba(255,255,255,.4)'; c.fillRect(bx + 3, 13, Math.max(0, bw * shE / 100 - 6), 1.5);
     c.fillStyle = 'rgba(12,10,24,.6)'; for (let i = 1; i < 4; i++) c.fillRect(bx + bw * i / 4 - 1, 12, 2, 8);
     label('Escudo', W / 2, 25, 11, '#bff6ff', 'center');
-    for (let i = 0; i < reserve; i++) ship(20 + i * 20, 62, 0.5, 0);
+    for (let i = 0; i < reserve; i++) ship(96 + i * 18, 40, 0.45, 0);
     if (bannerT > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, bannerT); label(banner, W / 2, H * 0.4, 28, '#fff', 'center'); c.globalAlpha = 1; }
   });
 }

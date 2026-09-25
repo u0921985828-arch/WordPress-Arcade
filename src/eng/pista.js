@@ -163,10 +163,10 @@ function nextAttempt() {
   if (tri >= TRIES) { res = PL.map((q) => { const v = q.tries.filter((x) => x != null); return v.length ? Math.max(...v) : null; }); award(res.map((v) => (v == null ? 0 : v)), false); return; }
   startAttempt();
 }
-function nextEvent() { ev++; if (ev >= EV.length) { k.st = 'over'; phase = 'done'; const hum = seats.filter((q) => !q.cpu);
+function nextEvent() { if (ev + 1 >= EV.length) { k.st = 'over'; phase = 'done'; const hum = seats.filter((q) => !q.cpu);
     if (hum.length === 1) { const top = Math.max(...total), hi = total.indexOf(top), humWin = !seats[hi].cpu && total.filter((v) => v === top).length === 1; LV = clamp(LV + (humWin ? 0.5 : -0.5), 0, 10); try { localStorage.setItem(LSK, LV); } catch (e) { /* sin almacenamiento */ } }
-    k.podium(PL.map((q, i) => ({ p: seats[i].p, score: total[i], name: nm(i) })), { fmt: (v) => `${v} puntos` }); return; }
-  startEvent(); }
+    k.podium(PL.map((q, i) => ({ p: seats[i].p, score: total[i], name: nm(i) })), { fmt: (v) => `${v} ${v === 1 ? 'punto' : 'puntos'}` }); return; }
+  ev++; startEvent(); }
 
 /* ---------------- Bucle ---------------- */
 function update(dt) {

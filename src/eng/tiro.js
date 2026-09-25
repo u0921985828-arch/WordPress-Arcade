@@ -157,7 +157,7 @@ function cpuPlan() {
 function petUpdate(dt) {
   throwerPose = Math.max(0, throwerPose - dt);
   if (st === 'intro') { stT -= dt; if (stT <= 0) { st = 'aim'; aimT = 0; charging = false; gauge = 0; } return; }
-  if (st === 'measure') { stT -= dt; if (stT <= 0) { if (pts.some((p) => p >= TARGET) || endN >= MAXE) return finish(PL.map((q, i) => ({ i, score: pts[i] })), (v) => `${v} puntos`); startEnd(); } return; }
+  if (st === 'measure') { stT -= dt; if (stT <= 0) { if (pts.some((p) => p >= TARGET) || endN >= MAXE) return finish(PL.map((q, i) => ({ i, score: pts[i] })), (v) => `${v} ${v === 1 ? 'punto' : 'puntos'}`); startEnd(); } return; }
   if (st === 'jack' || st === 'roll') { physics(dt); if (!moving()) { settleT += dt; if (settleT > 0.35) petAfterSettle(); } else settleT = 0; return; }
   if (st !== 'aim') return;
   aimT += dt; const p = seats[cur].p;
