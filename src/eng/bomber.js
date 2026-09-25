@@ -39,6 +39,11 @@ function label(s, x, y, size, col, align, base) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'center'; c.textBaseline = base || 'middle';
   c.lineJoin = 'round'; c.lineWidth = size / 4 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
 }
+function fitSize(s, maxW, size) { // baja el cuerpo de letra hasta que el texto cabe (medida real)
+  let z = size;
+  while (z > 10) { c.font = `900 ${z}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; if (c.measureText(s).width <= maxW) break; z -= 1; }
+  return z;
+}
 function fitName(s, maxW, size) { // recorta el rótulo si no cabe en la tarjeta (medida real)
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
   if (c.measureText(s).width <= maxW) return s;
@@ -696,8 +701,9 @@ function draw() {
   const left = Math.max(0, RU.round - rT); label(sudden ? '¡YA!' : `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 232, 23, 18, sudden ? '#ff5f7a' : left < 10 ? '#ffd166' : '#fff');
   if (msgT > 0 || endT) { const al = pl.filter((q) => q.alive);
     const m = endT && PAINT ? '¡Tiempo!' : endT && PAIR ? (al.length ? `¡Equipo ${team(al[0]) ? 'B' : 'A'}!` : '¡Nadie en pie!') : endT ? (al.length === 1 ? `¡${al[0].name === 'Tú' ? 'Aguantas' : al[0].name + ' aguanta'}!` : '¡Nadie en pie!') : msg;
-    c.globalAlpha = endT ? 1 : Math.min(1, msgT * 2); c.font = '900 26px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const mw = c.measureText(m).width + 40;
-    ART.rr(c, W / 2 - mw / 2, TOP + RO * T / 2 - 26, mw, 52, 14); c.fillStyle = 'rgba(26,21,48,.88)'; c.fill(); c.lineWidth = 3; c.strokeStyle = '#ffd166'; c.stroke(); label(m, W / 2, TOP + RO * T / 2, 26, '#fff'); c.globalAlpha = 1; }
-  if (fast) label('Te han eliminado · la ronda termina a toda prisa', W / 2, H - 14, k.party ? 18 : 13, '#ffd166');
+    c.globalAlpha = endT ? 1 : Math.min(1, msgT * 2);
+    const mz = fitSize(m, W - 64, 26), mw = Math.min(W - 16, c.measureText(m).width + 40), mh = mz + 26;
+    ART.rr(c, W / 2 - mw / 2, TOP + RO * T / 2 - mh / 2, mw, mh, 14); c.fillStyle = 'rgba(26,21,48,.88)'; c.fill(); c.lineWidth = 3; c.strokeStyle = '#ffd166'; c.stroke(); label(m, W / 2, TOP + RO * T / 2, mz, '#fff'); c.globalAlpha = 1; }
+  if (fast) { const ft = 'Te han eliminado · la ronda termina a toda prisa'; label(ft, W / 2, H - 14, fitSize(ft, W - 20, k.party ? 18 : 13), '#ffd166'); }
   if (k.st === 'play' && rT < 3 && !k.counting()) label('Ronda ' + round, W / 2, TOP + 22, 20, '#fff');
 }

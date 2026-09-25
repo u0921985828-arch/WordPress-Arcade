@@ -496,6 +496,7 @@ function updTej(dt) {
     nj.vy += TGRAV * dt;
     nj.x = Math.max(0, Math.min(W - nj.w, nj.x + nj.vx * dt));
     const oldY = nj.y; nj.y += nj.vy * dt; nj.ground = false;
+    if (nj.y - nj.h < TTOP + 4) { nj.y = TTOP + 4 + nj.h; if (nj.vy < 0) nj.vy = 0; } // techo: no salir de la zona de juego
     if (nj.vy >= 0) for (const r of ROOFS) {
       if (r.fall) continue;
       if (nj.x + nj.w > r.x + 1 && nj.x < r.x + r.w - 1 && oldY <= r.y + 2 && nj.y >= r.y) {
