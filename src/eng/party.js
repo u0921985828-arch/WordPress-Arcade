@@ -1787,7 +1787,7 @@ function mgPhoto() {
 
 /* 22. RELEVO DE CUBOS — cooperativo: llenad el barril pasándoos cubos sin derramarlos. */
 function mgRelay() {
-  const GY = 352, BD = [104, 252, 400, 548, 700], GOAL = 100, TL = 70, LITROS = 25;
+  const GY = 352, BD = [104, 252, 400, 548, 700], GOAL = 100, TL = 70, LITROS = 6;
   const m = { name: 'Relevo de Cubos', help: 'Cooperativo: muévete por tu tramo con ← →, coge el cubo con A y pásalo al siguiente. Mantén B para no derramar agua.', done: false, rank: null, teamHead: null };
   const ps = [0, 1, 2, 3].map((p) => ({ p, x: BD[p] + 30, v: 0, pv: 0, face: 1, bucket: null, liters: 0, aiT: 0, steady: false }));
   const bks = []; let T = 0, barrel = 0, spawnT = 1, over = false, endT = 0, spilled = 0, done = 0;

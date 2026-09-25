@@ -495,7 +495,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
         circ(cx + 16, cy + 16, 7, colOf(p), 2);
         fit(nameOf(p), cx + 28, cy + 16, 13.5, '#fff', 'left', bw - 90);
         fit(`${S.rows[p].length}/${S.tries}`, cx + bw - 10, cy + 16, 13, S.rows[p].length >= S.tries - 2 ? '#ff9a8a' : '#cfe8d8', 'right', 54);
-        const listY = cy + 32, rowH = Math.min(26, (bh - 40 - (S.done[p] || !hum(p) ? 0 : 30)) / Math.max(1, S.tries));
+        const listY = cy + 32, rowH = Math.min(26, (bh - 66 - (S.done[p] || !hum(p) ? 0 : 30)) / Math.max(1, S.tries));  // 26 px reservados abajo para el rótulo
         const pegR = Math.min(11, rowH * 0.36), stepX = Math.min(34, (bw - 80) / 4);
         const rowW = 4 * stepX + 32, rx = cx + Math.max(18, (bw - rowW) / 2);   // fila centrada de verdad en el panel
         S.rows[p].forEach((r, i) => {
@@ -510,6 +510,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
         } else if (S.done[p]) fit(S.rows[p].length && S.rows[p][S.rows[p].length - 1].ok === 4 ? '¡Clave rota!' : 'Sin intentos', cx + bw / 2, cy + bh - 16, 14, S.rows[p].length && S.rows[p][S.rows[p].length - 1].ok === 4 ? '#7cf7a0' : '#ff9a8a', 'center', bw - 20);
       }
       if (S.phase === 'reveal') {
+        c.fillStyle = 'rgba(8,12,24,.74)'; c.fillRect(0, 0, W, H);   // velo: el panel no se confunde con el tablero
         const pw = Math.min(W - 40, 340), y = H / 2 - 50;
         panel(W / 2 - pw / 2, y, pw, 100);
         fit(S.winner >= 0 ? `${nameOf(S.winner)} rompe la clave` : 'Nadie la ha roto', W / 2, y + 26, 18, '#ffd166', 'center', pw - 24);
