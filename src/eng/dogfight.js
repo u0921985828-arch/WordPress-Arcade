@@ -160,7 +160,7 @@ k.run((dt) => {
     for (const pl of P) if (pl.i !== b.own && pl.alive && !pl.down && b.t > 0 && hyp(wdx(b.x, pl.x), b.y - pl.y) < 12) { b.t = 0; if (pl.loopT > 0 && Math.random() < 0.7) continue; damage(pl, b.own, 0.5); } }
   bullets = bullets.filter((b) => b.t > 0 && b.y > -20);
   /* choque entre aviones */
-  for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) { const a = P[i], b = P[j]; if (!a.alive || !b.alive || a.down || b.down) continue; if (hyp(wdx(a.x, b.x), a.y - b.y) < 18 && rt > 5) { damage(a, j, 3); damage(b, i, 3); a.a += 0.8; b.a -= 0.8; k.shake(6); } }
+  for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) { const a = P[i], b = P[j]; if (!a.alive || !b.alive || a.down || b.down) continue; if (hyp(wdx(a.x, b.x), a.y - b.y) < 18 && rt > 5 && !(a.bump > T) && !(b.bump > T)) { damage(a, j, 2); damage(b, i, 2); a.bump = b.bump = T + 1.2; const up = a.y < b.y ? a : b, dn = up === a ? b : a; up.y -= 6; dn.y += 6; up.a = adiff(up.a - 0.9 * Math.sign(Math.cos(up.a) || 1)); dn.a = adiff(dn.a + 0.9 * Math.sign(Math.cos(dn.a) || 1)); k.shake(6); k.sfx('hurt'); } }
   const up = P.filter((pl) => pl.alive && !pl.down).length, falling = P.some((pl) => pl.alive && pl.down);
   if ((up <= 1 && !falling) || rt >= LEN) endRound();
 }, draw);
