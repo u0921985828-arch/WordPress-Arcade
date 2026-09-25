@@ -1768,7 +1768,7 @@ function mgPhoto() {
       guy(q.p, q.x, q.y, q.pose === 'down' ? 1.15 : 1.45, { face: q.face, state: st2, squash: q.pose === 'down' ? 0.24 : 0 });
       c.restore();
       if (q.pose === 'up') { c.strokeStyle = col(q.p); c.lineWidth = 5; c.lineCap = 'round'; c.beginPath(); c.moveTo(q.x - 9, q.y - 42); c.lineTo(q.x - 18, q.y - 62); c.moveTo(q.x + 9, q.y - 42); c.lineTo(q.x + 18, q.y - 62); c.stroke(); }
-      tagDraw(q.p, q.x, q.y - 78);
+      tagDraw(q.p, q.x, q.y - 78 - q.p * 9);
       if (st === 'flash' && q.got != null) fit(q.got ? '+' + q.got : '0', q.x, q.y - 104, 24, q.got === 2 ? '#ffd166' : q.got ? '#fff' : '#ff8a8a', 90);
     } }));
     ents.sort((a, b) => a.y - b.y).forEach((e) => e.f());

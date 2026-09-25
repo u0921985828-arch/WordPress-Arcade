@@ -404,3 +404,215 @@ function hud() {
   label(`${Math.floor(height() / 3.2)} m`, W - 12, 10, 18, '#fff', 'right');
   if (rec) label(`Récord ${rec}`, W - 12, 34, 12, 'rgba(255,255,255,.8)', 'right');
 }
+
+/* ================= TEJADOS NINJA (CFG.mode='tejados'): duelo de 1–4 sobre los tejados =================
+ * Los tejados se resquebrajan bajo los pies y acaban cayendo. A salta (doble salto), B lanza una estrella
+ * (tres seguidas y toca esperar). Quien recibe una estrella o cae al vacío queda fuera: el último en pie
+ * gana la ronda y quien antes llegue a 2 rondas, la partida. */
+var NJ = [], ROOFS = [], STARS = [], TFX = [], round_ = 1, roundT = 0, tOver = 0, tMsg = '', tMsgT = 0, tWin = 0;
+var TBOT = 46, TGRAV = 1500, TJUMP = 520, TSPD = 172, TSTAR = 330, TTOP = 34;
+try { tWin = Math.min(8, +localStorage.getItem('cpu:' + CFG.id) || 0); } catch (e) { /* sin almacenamiento */ }
+const tSkill = () => Math.min(0.8, 0.28 + tWin * 0.06);
+function tSeats() { return k.party ? Math.max(1, Math.max.apply(null, k.party.map((q) => q.p)) + 1) : Math.min(2, k.mpMax || 1); }
+function mkRoof(x, y, w) { return { x, y, w, crack: 0, fall: 0, vy: 0, base: y }; }
+function layout() {
+  ROOFS = [mkRoof(0, H - TBOT - 26, W)]; // calle: suelo firme que no se rompe
+  ROOFS[0].solid = true;
+  const rows = [H - TBOT - 96, H - TBOT - 166, H - TBOT - 232];
+  rows.forEach((y, r) => { let x = k.ri(6, 40);
+    while (x < W - 50) { const w = k.ri(62, 104); ROOFS.push(mkRoof(x, y, Math.min(w, W - 8 - x))); x += w + k.ri(38, 62); } });
+}
+function mkNinja(q, i, n) {
+  const sp = [0.16, 0.84, 0.38, 0.66][i % 4];
+  return { p: q.p, col: q.color, name: q.name, cpu: q.cpu, x: W * sp - 7, y: H - TBOT - 26, vx: 0, vy: 0, w: 14, h: 26,
+    face: i % 2 ? -1 : 1, ground: false, jumps: 0, ammo: 3, cd: 0, out: false, inv: 1.2, hurt: 0, wins: 0, think: 0.2 + i * 0.08, aim: 0, state: 'idle' };
+}
+function buildTej() {
+  t = 0; fx = []; STARS = []; TFX = []; roundT = 0; tOver = 0;
+  layout();
+  const seats = k.players(tSeats());
+  NJ = seats.map((q, i) => mkNinja(q, i, seats.length));
+  NJ.forEach((nj) => { const r = k.pick(ROOFS.filter((q) => !q.solid)) || ROOFS[0]; nj.x = r.x + r.w / 2 - 7; nj.y = r.y; });
+}
+function resetTej() { round_ = 1; NJ = []; buildTej(); NJ.forEach((q) => { q.wins = 0; }); }
+function roofUnder(nj) {
+  for (const r of ROOFS) { if (r.fall) continue;
+    if (nj.x + nj.w > r.x + 2 && nj.x < r.x + r.w - 2 && Math.abs(nj.y - r.y) < 2.5) return r; }
+  return null;
+}
+function tHit(nj, by) {
+  if (nj.out || nj.inv > 0) return;
+  nj.out = true; nj.hurt = 1; k.sfx('explode'); k.shake(6);
+  k.burst(nj.x + 7, nj.y - 12, nj.col, 18, 180);
+  if (by && !by.cpu) { tMsg = `${by.name} elimina a ${nj.name}`; tMsgT = 1.5; }
+  else if (!nj.cpu) { tMsg = `${nj.name} cae`; tMsgT = 1.3; }
+}
+function fireStar(nj) {
+  if (nj.ammo <= 0 || nj.cd > 0 || nj.out) return;
+  nj.ammo--; if (nj.ammo <= 0) nj.cd = 2.6;
+  STARS.push({ x: nj.x + 7 + nj.face * 10, y: nj.y - 14, vx: nj.face * TSTAR, vy: 0, own: nj, sp: 0, t: 0 });
+  if (!nj.cpu) k.sfx('shoot');
+}
+function cpuTej(nj, dt) {
+  nj.think -= dt; const sk = tSkill();
+  const foesL = NJ.filter((q) => q !== nj && !q.out);
+  const tgt = foesL.sort((a, b) => Math.hypot(a.x - nj.x, a.y - nj.y) - Math.hypot(b.x - nj.x, b.y - nj.y))[0];
+  const r = roofUnder(nj);
+  if (r && !r.solid && r.crack > 0.55 && nj.ground && Math.random() < 0.06) { nj.vy = -TJUMP; nj.jumps = 1; nj.ground = false; }
+  if (nj.think > 0) return;
+  nj.think = 0.3 - sk * 0.16 + Math.random() * 0.2;
+  if (!tgt) { nj.vx = 0; return; }
+  const dx = tgt.x - nj.x, dy = tgt.y - nj.y;
+  nj.face = dx >= 0 ? 1 : -1;
+  if (Math.abs(dy) < 18 && Math.abs(dx) < 300 && Math.random() < 0.35 + sk * 0.5) fireStar(nj);
+  if (Math.abs(dx) > 40) nj.vx = Math.sign(dx) * TSPD * (0.7 + sk * 0.3);
+  else nj.vx = -Math.sign(dx) * TSPD * 0.5;
+  if (dy < -30 && nj.jumps > 0 && Math.random() < 0.5 + sk * 0.4) { nj.vy = -TJUMP; nj.jumps--; nj.ground = false; }
+  // borde del tejado: salta para no caer
+  if (r && nj.ground && (nj.x < r.x + 4 && nj.vx < 0 || nj.x + nj.w > r.x + r.w - 4 && nj.vx > 0)) {
+    if (Math.random() < 0.55 + sk * 0.4) { nj.vy = -TJUMP; nj.jumps = 1; nj.ground = false; } else nj.vx = -nj.vx;
+  }
+}
+function updTej(dt) {
+  t += dt;
+  if (tMsgT > 0) tMsgT -= dt;
+  for (const f of TFX) { f.t += dt; f.x += f.vx * dt; f.y += f.vy * dt; f.vy += 900 * dt; }
+  TFX = TFX.filter((f) => f.t < f.max);
+  if (tOver > 0) { tOver -= dt; if (tOver <= 0) endRound(); return; }
+  roundT += dt;
+  for (const nj of NJ) {
+    if (nj.out) { nj.hurt = Math.max(0, nj.hurt - dt); continue; }
+    nj.inv -= dt; if (nj.cd > 0) { nj.cd -= dt; if (nj.cd <= 0) nj.ammo = 3; }
+    if (nj.cpu) cpuTej(nj, dt);
+    else {
+      const L = k.pheld(nj.p, 'left'), R = k.pheld(nj.p, 'right');
+      nj.vx = (R ? 1 : 0) * TSPD - (L ? 1 : 0) * TSPD;
+      if (nj.vx) nj.face = Math.sign(nj.vx);
+      if (k.phit(nj.p, 'a') || (!k.party && nj.p === 0 && (k.hit.has('up') || k.swipe === 'up'))) {
+        if (nj.jumps > 0) { nj.vy = -TJUMP; nj.jumps--; nj.ground = false; k.sfx('jump'); }
+      }
+      if (k.phit(nj.p, 'b') || (!k.party && nj.p === 0 && k.tap)) fireStar(nj);
+    }
+    nj.vy += TGRAV * dt;
+    nj.x = Math.max(-10, Math.min(W - nj.w + 10, nj.x + nj.vx * dt));
+    const oldY = nj.y; nj.y += nj.vy * dt; nj.ground = false;
+    if (nj.vy >= 0) for (const r of ROOFS) {
+      if (r.fall) continue;
+      if (nj.x + nj.w > r.x + 1 && nj.x < r.x + r.w - 1 && oldY <= r.y + 2 && nj.y >= r.y) {
+        nj.y = r.y; nj.vy = 0; nj.ground = true; nj.jumps = 2; break; }
+    }
+    nj.state = nj.ground ? (Math.abs(nj.vx) > 20 ? 'run' : 'idle') : nj.vy < 0 ? 'jump' : 'fall';
+    const r2 = nj.ground ? roofUnder(nj) : null;
+    if (r2 && !r2.solid) { r2.crack += dt * 0.42; if (r2.crack >= 1) { r2.fall = 0.01; k.sfx('hit'); } }
+    if (nj.y > H + 40) tHit(nj, null);
+  }
+  // tejados que se desploman y vuelven a aparecer
+  for (const r of ROOFS) { if (!r.fall) continue; r.fall += dt; r.vy += 900 * dt; r.y += r.vy * dt;
+    if (r.y > H + 80) { r.y = r.base; r.vy = 0; r.fall = 0; r.crack = 0; } }
+  // estrellas
+  for (const st of STARS) { st.t += dt; st.sp += dt * 22; st.x += st.vx * dt; st.y += st.vy * dt;
+    for (const nj of NJ) { if (nj.out || nj === st.own || nj.inv > 0) continue;
+      if (st.x > nj.x - 3 && st.x < nj.x + nj.w + 3 && st.y > nj.y - nj.h - 3 && st.y < nj.y + 3) { tHit(nj, st.own); st.t = 99; } }
+  }
+  STARS = STARS.filter((st) => st.t < 4 && st.x > -20 && st.x < W + 20);
+  const alive = NJ.filter((q) => !q.out);
+  if (alive.length <= (NJ.length > 1 ? 1 : 0) && tOver <= 0) {
+    if (alive[0]) { alive[0].wins++; k.confetti && !alive[0].cpu && k.confetti(); }
+    tOver = 1.5;
+  }
+}
+function endRound() {
+  const champ = NJ.slice().sort((a, b) => b.wins - a.wins)[0];
+  if (champ && champ.wins >= 2) {
+    if (!champ.cpu) { tWin++; try { localStorage.setItem('cpu:' + CFG.id, tWin); } catch (e) { /* sin almacenamiento */ } }
+    return k.podium(NJ.map((q) => ({ p: q.p, score: q.wins })), { fmt: (v) => v + (v === 1 ? ' ronda' : ' rondas') });
+  }
+  round_++;
+  const w = NJ.map((q) => q.wins);
+  layout(); STARS = []; roundT = 0; tOver = 0;
+  NJ.forEach((nj, i) => { const r = k.pick(ROOFS.filter((q) => !q.solid)) || ROOFS[0];
+    Object.assign(nj, { x: r.x + r.w / 2 - 7, y: r.y, vx: 0, vy: 0, out: false, inv: 1.2, hurt: 0, ammo: 3, cd: 0, jumps: 2, ground: true, wins: w[i] }); });
+  tMsg = `Ronda ${round_}`; tMsgT = 1.4;
+}
+/* ---------- Dibujo de los tejados ---------- */
+var tejBg = null;
+function tejSky() {
+  if (tejBg) return tejBg;
+  return (tejBg = mkCv(W, H, (g) => {
+    const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#120e2c'); gr.addColorStop(0.55, '#231a4a'); gr.addColorStop(1, '#3b2758');
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    g.fillStyle = 'rgba(255,240,200,.85)'; for (let i = 0; i < 46; i++) { const x = (i * 97) % W, y = (i * 53) % (H - 150);
+      g.globalAlpha = 0.25 + ((i * 7) % 10) / 14; g.fillRect(x, y, 2, 2); }
+    g.globalAlpha = 1;
+    g.beginPath(); g.arc(W - 62, 52, 22, 0, R2); g.fillStyle = '#ffe9b0'; g.fill();
+    g.fillStyle = 'rgba(20,14,44,.75)'; // siluetas de edificios al fondo
+    for (let x = -10; x < W + 20; x += 34) { const h2 = 60 + ((x * 37) % 90); g.fillRect(x, H - TBOT - h2, 30, h2);
+      g.fillStyle = 'rgba(255,220,140,.18)';
+      for (let wy = H - TBOT - h2 + 10; wy < H - TBOT - 14; wy += 16) for (let wx = x + 5; wx < x + 26; wx += 10) if ((wx + wy) % 3) g.fillRect(wx, wy, 5, 7);
+      g.fillStyle = 'rgba(20,14,44,.75)'; }
+  }));
+}
+function drawRoof(r) {
+  const y = r.y, cr = Math.min(1, r.crack);
+  c.save();
+  if (r.fall) c.globalAlpha = Math.max(0.15, 1 - (r.y - r.base) / 220);
+  c.beginPath(); ART.rr(c, r.x, y, r.w, r.solid ? 26 : 16, 4); ART.fillOut(c, r.solid ? '#4a3a63' : ART.mix('#7a5f8f', '#e0603d', cr * 0.7), 2.4);
+  c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(r.x + 3, y + 3, r.w - 6, 3);
+  for (let x = r.x + 8; x < r.x + r.w - 6; x += 14) { c.fillStyle = 'rgba(0,0,0,.2)'; c.fillRect(x, y + 6, 2, (r.solid ? 26 : 16) - 9); }
+  if (!r.solid && cr > 0.25) { c.strokeStyle = `rgba(30,16,16,${0.35 + cr * 0.5})`; c.lineWidth = 1.6 + cr;
+    for (let i = 0; i < 3; i++) { const bx = r.x + r.w * (0.25 + i * 0.25);
+      c.beginPath(); c.moveTo(bx, y + 1); c.lineTo(bx - 4 - cr * 4, y + 8); c.lineTo(bx + 3, y + 15); c.stroke(); } }
+  c.restore();
+}
+function drawNinja(nj) {
+  if (nj.out && nj.hurt <= 0) return;
+  const x = nj.x + nj.w / 2, y = nj.y;
+  c.save(); c.globalAlpha = nj.out ? nj.hurt : (nj.inv > 0 && Math.floor(t * 12) % 2 ? 0.4 : 1);
+  ART.hero(c, x, y, 0.92, { face: nj.face, state: nj.state, t, col: nj.col, squash: 0 });
+  c.globalAlpha = 1;
+  // banda de color sobre la cabeza para reconocer al jugador
+  c.beginPath(); ART.rr(c, x - 9, y - nj.h - 8, 18, 5, 2); ART.fillOut(c, nj.col, 1.6);
+  c.restore();
+}
+function drawStar(st) {
+  c.save(); c.translate(st.x, st.y); c.rotate(st.sp);
+  c.beginPath(); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, r = i % 2 ? 2.6 : 7; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+  c.closePath(); ART.fillOut(c, '#dfe6ff', 1.8); c.restore();
+}
+function tFit(s, max, size, min) {
+  let sz = size;
+  for (; sz > (min || 8); sz--) { c.font = `800 ${sz}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; if (c.measureText(s).width <= max) return [s, sz]; }
+  let out = s; while (out.length > 1) { out = out.slice(0, -1); if (c.measureText(out + '…').width <= max) return [out + '…', sz]; }
+  return [out, sz];
+}
+function drawTej() {
+  c.drawImage(tejSky(), 0, 0, W, H);
+  ROOFS.forEach(drawRoof);
+  STARS.forEach(drawStar);
+  NJ.forEach(drawNinja);
+  for (const f of TFX) { c.globalAlpha = 1 - f.t / f.max; c.fillStyle = f.col; c.fillRect(f.x, f.y, 3, 3); c.globalAlpha = 1; }
+  hudTej();
+  if (tMsgT > 0) { c.globalAlpha = Math.min(1, tMsgT * 3);
+    const [bt, bs] = tFit(tMsg, W - 60, 20, 12), bw = c.measureText(bt).width + 34;
+    c.beginPath(); ART.rr(c, W / 2 - bw / 2, H / 2 - 44, bw, 36, 12); ART.fillOut(c, '#171334', 2.5);
+    c.textBaseline = 'middle'; label(bt, W / 2, H / 2 - 26, bs, '#ffd24d', 'center'); c.textBaseline = 'top'; c.globalAlpha = 1; }
+}
+function hudTej() {
+  c.fillStyle = '#0c0a20'; c.fillRect(0, 0, W, TTOP);
+  c.fillStyle = 'rgba(255,255,255,.08)'; c.fillRect(0, TTOP - 2, W, 2);
+  const n = Math.max(1, NJ.length), cw = (W - 86) / n;
+  label(`Ronda ${round_}`, W - 10, 9, 14, '#fff', 'right');
+  NJ.forEach((nj, i) => {
+    const x = 8 + i * cw, inner = cw - 10;
+    c.globalAlpha = nj.out ? 0.42 : 1;
+    c.fillStyle = nj.col; ART.rr(c, x, 6, 8, 8, 3); c.fill(); c.lineWidth = 1.8; c.strokeStyle = OUT; c.stroke();
+    const [nm, ns] = tFit(String(nj.name), inner - 13, 12, 8);
+    label(nm, x + 12, 5, ns, '#fff');
+    for (let v = 0; v < 2; v++) { c.beginPath(); c.arc(x + 4 + v * 10, 23, 3.2, 0, R2); c.fillStyle = v < nj.wins ? '#ffd24d' : 'rgba(255,255,255,.18)'; c.fill(); c.lineWidth = 1.3; c.strokeStyle = OUT; c.stroke(); }
+    for (let v = 0; v < 3; v++) { c.fillStyle = v < nj.ammo ? '#dfe6ff' : 'rgba(255,255,255,.16)'; c.fillRect(x + 26 + v * 7, 20, 5, 5); }
+    c.globalAlpha = 1;
+  });
+}
+if (TEJ) k.onParty = () => { if (k.st === 'play' && NJ.length === tSeats()) { const seats = k.players(tSeats());
+    seats.forEach((q, i) => { if (NJ[i]) { NJ[i].cpu = q.cpu; NJ[i].name = q.name; NJ[i].col = q.color; } }); } else resetTej(); };
+if (TEJ) resetTej(); // el estado del duelo se crea tras declarar sus variables

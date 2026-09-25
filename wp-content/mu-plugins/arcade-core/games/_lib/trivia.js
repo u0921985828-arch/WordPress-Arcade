@@ -773,7 +773,7 @@ function NEWGAME() {
   /* ---------- Bucle ---------- */
   reset2();
   k.show(CFG.title, MAS ? 'Dos tarjetas, una magnitud: elige cuál gana. Acertar rápido suma más y las rachas dan puntos extra.'
-    : MAP ? 'Mueve tu chincheta por el mapa y clávala donde creas que está esa capital de provincia. Cuanto más cerca, más puntos.'
+    : MAP ? 'Mueve tu chincheta por el mapa y clávala donde creas que está la ciudad o el río. Cuanto más cerca, más puntos.'
       : BAN ? 'Una bandera dibujada trazo a trazo y cuatro países. Elige rápido: el tiempo también puntúa.'
         : 'Operaciones mentales contra el reloj. Elige el resultado correcto entre cuatro antes de que se acabe el tiempo.');
   k.run((dt) => {
