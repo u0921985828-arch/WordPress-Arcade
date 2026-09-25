@@ -795,7 +795,8 @@ const AB = (() => {
   k.onParty = () => {
     if (MODE !== 'abc') return;
     if (k.st !== 'play' || !seats) return reset();
-    const want = k.players(k.party ? Math.max(2, k.party.length) : 1);
+    /* Las plazas nunca se reducen en partida: quien se va lo sustituye la CPU. */
+    const want = k.players(Math.max(seats.length, k.party ? Math.max(2, k.party.length) : 1));
     seats = want.map((pl, i) => { const old = seats[i] || { score: 0, ok: 0, fail: 0 }; return { p: pl.p, name: pl.name, cpu: pl.cpu, score: old.score, ok: old.ok, fail: old.fail }; });
     if (turn >= seats.length) turn = 0;
   };
@@ -966,7 +967,8 @@ const AN = (() => {
   k.onParty = () => {
     if (MODE !== 'ana') return;
     if (k.st !== 'play' || !seats) return reset();
-    const want = k.players(k.party ? Math.max(2, k.party.length) : 1);
+    /* Las plazas nunca se reducen en partida: quien se va lo sustituye la CPU. */
+    const want = k.players(Math.max(seats.length, k.party ? Math.max(2, k.party.length) : 1));
     seats = want.map((pl, i) => { const old = seats[i] || { score: 0, ok: 0 }; return { p: pl.p, name: pl.name, cpu: pl.cpu, score: old.score, ok: old.ok }; });
     if (turn >= seats.length) { turn = 0; passTurn(); }
   };

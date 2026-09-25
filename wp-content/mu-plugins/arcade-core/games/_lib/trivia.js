@@ -427,7 +427,8 @@ function NEWGAME() {
       else if (op === '%') { const pc = k.pick([10, 20, 25, 50, 75]); a = pc; b = k.pick([40, 60, 80, 120, 160, 200, 240]); v = Math.round((pc * b) / 100); }
       else { a = big(3, 9); b = big(3, 9); const cc = big(2, 19); v = a * b + cc; t = `${a} × ${b} + ${cc}`; }
     }
-    if (!t) t = op === '%' ? `${a} % de ${b}` : `${a} ${op === '÷' ? '÷' : op} ${b}`;
+    /* La división se escribe con «:» (notación escolar española): el «÷» con contorno grueso se confunde con «+». */
+    if (!t) t = op === '%' ? `${a} % de ${b}` : `${a} ${op === '÷' ? ':' : op} ${b}`;
     const outs = new Set([v]), opts = [v];
     const near = [v + 1, v - 1, v + 10, v - 10, v + 2, v - 2, Math.round(v * 1.1), Math.round(v / 2), v + big(3, 9), v - big(3, 9)];
     for (const x of k.shuffle(near)) { if (opts.length >= 4) break; if (x > 0 && !outs.has(x)) { outs.add(x); opts.push(x); } }
