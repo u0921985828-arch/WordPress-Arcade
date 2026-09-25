@@ -354,7 +354,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
         else fit('pensando…', x + pw / 2, y, 13, '#cfe8d8', 'center', pw - 16);
       }
       // Cofre
-      const cx = W / 2, cy = LAND ? 252 : 330, cw = LAND ? 170 : 190, chh = LAND ? 88 : 104;
+      const cx = W / 2, cy = LAND ? 252 : 390, cw = LAND ? 170 : 190, chh = LAND ? 88 : 104;
       rr(cx - cw / 2, cy - chh / 2, cw, chh, 14, '#8b5a2b', 3);
       rr(cx - cw / 2, cy - chh / 2, cw, chh * 0.38, 12, '#a86b33', 2.5);
       rr(cx - 15, cy - chh / 2 + chh * 0.38 - 13, 30, 26, 7, '#ffc94d', 2.5);   // candado sobre la tapa, sin tapar la cifra
