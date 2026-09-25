@@ -38,6 +38,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
   const LAND = innerWidth >= innerHeight * 0.98;
   const W = LAND ? 800 : 450, H = LAND ? 450 : 800;
   const BG = { dados: '#20304a', reparto: '#16233e', codigo: '#1b1640' }[MODE];
+  const TOPB = LAND ? 50 : 12;   // franja libre arriba: en horizontal el botón de pausa del reproductor se pinta ahí
   const k = Kit({ w: W, h: H, title: CFG.title, bg: BG }), c = k.ctx, OUT = ART.OUT, TAU = 6.2832;
   const F = (s, w2) => `${w2 || 800} ${s}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
   const PAL = ['#ff6fb5', '#5b8cff', '#a8cf3f', '#ffc94d', '#a097ff', '#5ce1e6'];
@@ -198,7 +199,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       this.priv(true);
     },
     draw() {
-      const n = S.n, pw = Math.min(LAND ? 186 : 104, (W - 24 - (n - 1) * 8) / n), ph = LAND ? 84 : 92, y0 = 12;
+      const n = S.n, pw = Math.min(LAND ? 186 : 104, (W - 24 - (n - 1) * 8) / n), ph = LAND ? 84 : 92, y0 = TOPB;
       const x0 = (W - (n * pw + (n - 1) * 8)) / 2;
       for (let p = 0; p < n; p++) {
         const x = x0 + p * (pw + 8), on = S.cur === p && S.phase === 'bid';
@@ -212,7 +213,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
           for (let i = 0; i < S.left[p]; i++) cup(x + pw / 2 + (i - (S.left[p] - 1) / 2) * (sz + 3), y0 + ph - 26, sz);
         }
       }
-      const cy = LAND ? 176 : 250;
+      const cy = LAND ? 208 : 250;
       if (S.phase === 'reveal') this.drawReveal(cy);
       else {
         const b = S.bid;
@@ -339,7 +340,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     },
     pick2(p, v) { if (v === 'compartir' || v === 'robar') { this.choose(p, v); this.priv(true); } },
     draw() {
-      const n = S.n, pw = Math.min(LAND ? 180 : 104, (W - 24 - (n - 1) * 8) / n), ph = LAND ? 96 : 104, y0 = 12;
+      const n = S.n, pw = Math.min(LAND ? 180 : 104, (W - 24 - (n - 1) * 8) / n), ph = LAND ? 96 : 104, y0 = TOPB;
       const x0 = (W - (n * pw + (n - 1) * 8)) / 2;
       for (let p = 0; p < n; p++) {
         const x = x0 + p * (pw + 8);
@@ -353,7 +354,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
         else fit('pensando…', x + pw / 2, y, 13, '#cfe8d8', 'center', pw - 16);
       }
       // Cofre
-      const cx = W / 2, cy = LAND ? 236 : 330, cw = LAND ? 180 : 190, chh = LAND ? 96 : 104;
+      const cx = W / 2, cy = LAND ? 252 : 330, cw = LAND ? 170 : 190, chh = LAND ? 88 : 104;
       rr(cx - cw / 2, cy - chh / 2, cw, chh, 14, '#8b5a2b', 3);
       rr(cx - cw / 2, cy - chh / 2, cw, chh * 0.38, 12, '#a86b33', 2.5);
       rr(cx - 18, cy - 4, 36, 30, 8, '#ffc94d', 2.5);
@@ -483,9 +484,9 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     draw() {
       hits = [];
       const n = S.n, cols = n <= 2 ? n : LAND ? n : 2, rws = Math.ceil(n / cols);
-      const top = 58, botH = k.party ? 30 : LAND ? 96 : 130;
+      const top = TOPB + 46, botH = k.party ? 30 : LAND ? 96 : 130;
       const bw = (W - 16 - (cols - 1) * 8) / cols, bh = (H - top - botH - 12 - (rws - 1) * 8) / rws;
-      fit(k.party ? `Ronda ${S.round} de ${S.rounds} · ${S.nc} colores` : `Clave ${S.lvl} · ${S.nc} colores · ${S.tries} intentos`, W / 2, 24, 17, '#fff3c4', 'center', W - 30);
+      fit(k.party ? `Ronda ${S.round} de ${S.rounds} · ${S.nc} colores` : `Clave ${S.lvl} · ${S.nc} colores · ${S.tries} intentos`, W / 2, TOPB + 18, 17, '#fff3c4', 'center', W - 30);
       for (let p = 0; p < n; p++) {
         const cx = 8 + (p % cols) * (bw + 8), cy = top + Math.floor(p / cols) * (bh + 8);
         panel(cx, cy, bw, bh);

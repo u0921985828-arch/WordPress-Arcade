@@ -336,6 +336,7 @@ else (function () {
   const PAN = PORT ? { x: 10, y: H - PANH - 8, w: W - 20, h: PANH } : { x: W - PANW - 10, y: 10, w: PANW, h: H - 20 };
 
   let T = 0, phase = 'setup', msg = '', sub = '', banner = null, think = 0, pl = [], nSel = 2, anim = null;
+  let idleP = -1, idleT = 0;
   const humans = () => (k.party ? k.party.map((q) => q.p) : [0]);
   const isHum = (p) => (k.party ? k.party.some((q) => q.p === p) : p === 0);
   const label = (p) => { if (!isHum(p)) return (pl[p] && pl[p].name) || 'CPU'; if (!k.party) return 'Tú'; const q = k.party.find((x) => x.p === p); return (q && q.name) || 'J' + (p + 1); };
@@ -574,6 +575,9 @@ else (function () {
       return;
     }
     think = 0;
+    /* en la tele, si el jugador se despista 25 s, la partida sigue sola */
+    if (idleP !== p) { idleP = p; idleT = 0; } else idleT += dt;
+    if (k.party && idleT > 25) { idleT = 0; const m = DCH.aiPick(S, p, 1, Math.random); if (m) { say(`${label(p)} tarda: mueve la mesa`, '#ffc94d'); dPlay(m); return; } }
     if (!k.party && k.ptr.hit) { dTap(k.ptr.x, k.ptr.y, p); return; }
     /* mando: A recorre las canicas propias (solo las que pueden moverse), flechas eligen destino */
     const mine = dMine(S, p);

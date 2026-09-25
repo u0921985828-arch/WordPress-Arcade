@@ -1505,7 +1505,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     if (!k.party || k.privOK === false) {
       pill(bx, by, bw, bh, blocked ? '#8a8fa8' : S.slam ? '#7cf7a0' : '#ff5a5f', blocked ? 'Aún no…' : '¡BURRO!', 26, '#fff');
       bu.hits.push({ x: bx, y: by, w: bw, h: bh, v: 'slam' });
-      if (mineOn) label2('Toca una carta para pasarla · A golpea', CX, by + bh + 18, 12.5, '#cfe8d8');
+      if (mineOn) labelFit('Toca una carta para pasarla · A golpea', CX, by - 16, 12.5, '#cfe8d8', 'center', W - 40);
     }
     for (const b of bubbles) bubble(b);
     if (banner) { const al = Math.min(1, banner.t * 3); c.globalAlpha = al; c.font = `800 24px ${FONT}`; const w2 = Math.max(200, c.measureText(banner.txt).width + 52); pill(CX - w2 / 2, CY - 26, w2, 52, '#fff3c4', banner.txt, 24); c.globalAlpha = 1; }

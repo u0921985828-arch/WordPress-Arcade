@@ -127,6 +127,7 @@ else (function () {
 
   let S = null, phase = 'play', T = 0, sel = -1, msg = '', sub = '', think = 0, waitT = 0, waitFn = null;
   let anim = null, banner = null, pl = [], privSig = {}, privT = 0, endGlow = 0;
+  let idleP = -1, idleT = 0;
   const humans = () => (k.party ? k.party.map((q) => q.p) : [0]);
   const isHum = (p) => (k.party ? k.party.some((q) => q.p === p) : p === 0);
   const privMode = () => !!(k.party && k.privOK);
@@ -409,6 +410,9 @@ else (function () {
       waitT += dt; if (waitT > 1.1 || k.phit(p, 'a') || (!k.party && k.ptr.hit)) { waitT = 0; doPass(p); } return;
     }
     waitT = 0;
+    /* en la tele, si el jugador se despista 25 s, la mesa sigue sola */
+    if (idleP !== p) { idleP = p; idleT = 0; } else idleT += dt;
+    if (k.party && idleT > 25) { idleT = 0; const m = DOM.aiPick(S, p, lvl, Math.random); banner = { txt: `${label(p)} tarda: juega la mesa`, t: 1.6, col: '#ffc94d' }; if (m) doPlay(p, m.id, m.side); else doPass(p); return; }
     if (!k.party && k.ptr.hit && p === 0) { if (tapHand()) return; }
     keyPick(p);
   }
