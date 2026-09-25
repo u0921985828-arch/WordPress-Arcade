@@ -13,7 +13,7 @@ const lsSet = (key, v) => { try { localStorage.setItem(key, v); } catch (e) {} }
 const CPUK = 'cpu:' + CFG.id;
 let skill = 0.3, grid, items, fireT, fireD, bombs, pl, crumbs, round, rT, sudden, sudI, sudT, endT, msg, msgT, t = 0, SPIRAL, cdPend, fast;
 
-function mk(w, h, draw) { const r = Math.min(3, Math.max(2, Math.ceil((k.scale || 1) * (devicePixelRatio || 1)))), cv = document.createElement('canvas'); cv.width = w * r; cv.height = h * r; const q = cv.getContext('2d'); q.scale(r, r); q.lineJoin = 'round'; q.lineCap = 'round'; draw(q); return cv; }
+function mk(w, h, draw) { const r = Math.min(3, Math.max(2, Math.ceil((k.scale || 1) * Math.min(2, devicePixelRatio || 1)))), cv = document.createElement('canvas'); cv.width = w * r; cv.height = h * r; const q = cv.getContext('2d'); q.scale(r, r); q.lineJoin = 'round'; q.lineCap = 'round'; draw(q); return cv; }
 function label(s, x, y, size, col, align, base) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'center'; c.textBaseline = base || 'middle';
   c.lineJoin = 'round'; c.lineWidth = size / 4 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);

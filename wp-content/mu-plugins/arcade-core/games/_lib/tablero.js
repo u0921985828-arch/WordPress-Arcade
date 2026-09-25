@@ -195,7 +195,7 @@ else (function () {
   }
   let boardCv = null, boardKey = '';
   function boardCanvas() {
-    const res = Math.min(3, Math.max(1, k.scale * (devicePixelRatio || 1))), kk = res + '|' + (S && S.seats ? S.seats.join() + pl.map((q) => q.color).join() : '') + MODE;
+    const res = Math.min(3, Math.max(1, k.scale * Math.min(2, devicePixelRatio || 1))), kk = res + '|' + (S && S.seats ? S.seats.join() + pl.map((q) => q.color).join() : '') + MODE;
     if (boardCv && boardKey === kk) return boardCv;
     boardKey = kk; boardCv = document.createElement('canvas'); boardCv.width = Math.ceil(W * res); boardCv.height = Math.ceil(H * res);
     const g0 = boardCv.getContext('2d'); g0.scale(res, res); (OCA ? ocaBoard : parBoard)(g0); return boardCv;

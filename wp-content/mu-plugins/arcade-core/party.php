@@ -308,6 +308,26 @@ final class Arcade_Party {
 		return null;
 	}
 
+	/**
+	 * Límite de las peticiones con token (sondeos y respaldo, varias por segundo): quien se identifica bien
+	 * no escribe en la base de datos en cada petición; solo cuenta en memoria si hay caché de objetos
+	 * persistente. Los tokens erróneos sí cuentan como petición normal (evita probar tokens a ciegas).
+	 */
+	private static function authed( $kind, $res ) {
+		if ( is_wp_error( $res ) ) {
+			return self::limit( 'req' ) ?: $res;
+		}
+		if ( ! wp_using_ext_object_cache() ) {
+			return null;
+		}
+		list( $max, $win ) = self::LIMITS[ $kind ];
+		$max = (int) apply_filters( 'arcade_party_limit', $max, $kind );
+		$key = $kind . '_' . substr( md5( self::ip() ), 0, 16 ) . '_' . (int) floor( time() / $win );
+		wp_cache_add( $key, 0, 'arcade_rl', $win + 5 );
+		$n = (int) wp_cache_incr( $key, 1, 'arcade_rl' );
+		return $n > $max ? new WP_Error( 'arcade_party_limit', 'Demasiadas peticiones. Espera un poco.', array( 'status' => 429, 'retry' => 5 ) ) : null;
+	}
+
 	/** Respuesta sin caché (o el error con Retry-After). */
 	private static function out( $data, $status = 200 ) {
 		if ( is_wp_error( $data ) ) {
@@ -427,13 +447,10 @@ final class Arcade_Party {
 	 * de los que esperan respuesta. `live` son los mandos con canal abierto (mantienen su plaza).
 	 */
 	public static function poll( WP_REST_Request $req ) {
-		$e = self::limit( 'req' );
+		$hr = self::host_room( $req );
+		$e   = self::authed( 'req', $hr );
 		if ( $e ) {
 			return self::out( $e );
-		}
-		$hr = self::host_room( $req );
-		if ( is_wp_error( $hr ) ) {
-			return self::out( $hr );
 		}
 		list( $code, $room ) = $hr;
 		$now   = time();
@@ -487,13 +504,10 @@ final class Arcade_Party {
 
 	/** POST /party/CODE/answer {k, p, oid, sdp} → la tele responde al offer del mando p. */
 	public static function answer( WP_REST_Request $req ) {
-		$e = self::limit( 'req' );
+		$hr = self::host_room( $req );
+		$e   = self::authed( 'req', $hr );
 		if ( $e ) {
 			return self::out( $e );
-		}
-		$hr = self::host_room( $req );
-		if ( is_wp_error( $hr ) ) {
-			return self::out( $hr );
 		}
 		$code = $hr[0];
 		$p    = (int) $req->get_param( 'p' );
@@ -654,13 +668,10 @@ final class Arcade_Party {
 
 	/** POST /party/CODE/offer {p, tok, sdp} → el mando publica su offer (con todos los candidatos). */
 	public static function offer( WP_REST_Request $req ) {
-		$e = self::limit( 'req' );
+		$ps = self::pad_slot( $req );
+		$e   = self::authed( 'req', $ps );
 		if ( $e ) {
 			return self::out( $e );
-		}
-		$ps = self::pad_slot( $req );
-		if ( is_wp_error( $ps ) ) {
-			return self::out( $ps );
 		}
 		list( $code, $p, $s ) = $ps;
 		$sdp = self::sdp( $req );
@@ -681,13 +692,10 @@ final class Arcade_Party {
 
 	/** GET /party/CODE/answer?p=&tok=&oid= → el mando recoge el answer de la tele (null si aún no está). */
 	public static function get_answer( WP_REST_Request $req ) {
-		$e = self::limit( 'req' );
+		$ps = self::pad_slot( $req );
+		$e   = self::authed( 'req', $ps );
 		if ( $e ) {
 			return self::out( $e );
-		}
-		$ps = self::pad_slot( $req );
-		if ( is_wp_error( $ps ) ) {
-			return self::out( $ps );
 		}
 		list( $code, $p, $s ) = $ps;
 		$ans = get_transient( 'arcade_pans_' . $code . '_' . $p );
@@ -740,13 +748,10 @@ final class Arcade_Party {
 
 	/** POST /party/CODE/relay {p, tok, rl, a, m:[…]} → el mando envía y recoge lo que la tele le ha mandado. */
 	public static function relay( WP_REST_Request $req ) {
-		$e = self::limit( 'relay' );
+		$ps = self::pad_slot( $req );
+		$e   = self::authed( 'relay', $ps );
 		if ( $e ) {
 			return self::out( $e );
-		}
-		$ps = self::pad_slot( $req );
-		if ( is_wp_error( $ps ) ) {
-			return self::out( $ps );
 		}
 		list( $code, $p, $s ) = $ps;
 		$rl = preg_replace( '/[^a-z0-9]/', '', (string) $req->get_param( 'rl' ) );
@@ -767,13 +772,10 @@ final class Arcade_Party {
 
 	/** POST /party/CODE/hrelay {k, rl:{p:…}, a:{p:n}, m:{p:[…]}} → la tele envía a sus mandos de respaldo y recoge. */
 	public static function hrelay( WP_REST_Request $req ) {
-		$e = self::limit( 'relay' );
+		$hr = self::host_room( $req );
+		$e   = self::authed( 'relay', $hr );
 		if ( $e ) {
 			return self::out( $e );
-		}
-		$hr = self::host_room( $req );
-		if ( is_wp_error( $hr ) ) {
-			return self::out( $hr );
 		}
 		$code = $hr[0];
 		$rls  = (array) $req->get_param( 'rl' );

@@ -147,7 +147,8 @@
 
   // Joystick flotante: aparece donde apoyas el pulgar y la base sigue al dedo.
   function stick(onlyH) {
-    var zl = ui.l, st = $('.pd-stick', zl), knob = st.firstChild, id = null, cx = 0, cy = 0, dirs = [];
+    var zl = ui.l, st = $('.pd-stick', zl), knob = st.firstChild, id = null, cx = 0, cy = 0, dirs = [], zb = null, sw = 0, sh = 0, oct = 98;
+    // Medidas leídas una vez por toque: leerlas en cada pointermove forzaba un reflow.
     function apply(next) {
       dirs.forEach(function (d) { if (next.indexOf(d) < 0) key(d, false); });
       next.forEach(function (d) { if (dirs.indexOf(d) < 0) key(d, true); });
@@ -155,32 +156,35 @@
       dirs = next;
     }
     function place(x, y) {
-      var z = zl.getBoundingClientRect(), r = st.offsetWidth / 2, rh = st.offsetHeight / 2;
+      var z = zb, r = sw / 2, rh = sh / 2;
       cx = Math.max(z.left + r * 0.6, Math.min(z.right - r * 0.6, x));
       cy = Math.max(z.top + rh * 0.6, Math.min(z.bottom - rh * 0.6, y));
       st.style.left = cx - z.left + 'px'; st.style.top = cy - z.top + 'px';
     }
     function track(x, y) {
-      var R = st.offsetWidth * 0.36, dx = x - cx, dy = onlyH ? 0 : y - cy, m = Math.sqrt(dx * dx + dy * dy);
+      var R = sw * 0.36, dx = x - cx, dy = onlyH ? 0 : y - cy, m = Math.sqrt(dx * dx + dy * dy);
       if (m > R * 1.25) {
-        var z = zl.getBoundingClientRect(), k = (m - R * 1.25) / m;
+        var z = zb, k = (m - R * 1.25) / m;
         cx += dx * k; cy += dy * k;
         st.style.left = cx - z.left + 'px'; st.style.top = cy - z.top + 'px';
         dx = x - cx; dy = onlyH ? 0 : y - cy;
       }
       var d = Math.sqrt(dx * dx + dy * dy), s = d > R ? R / d : 1;
       knob.style.transform = 'translate(' + dx * s + 'px,' + dy * s + 'px)';
-      if (d < R * 0.3) return apply([]);
+      var o = d < R * 0.3 ? 99 : onlyH ? (dx < 0 ? 9 : 10) : Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
+      if (o === oct) return;
+      oct = o;
+      if (o === 99) return apply([]);
       if (onlyH) return apply([dx < 0 ? 'left' : 'right']);
-      apply(OCT[Math.round(Math.atan2(dy, dx) / (Math.PI / 4))].slice());
+      apply(OCT[o].slice());
     }
-    function reset() { id = null; apply([]); st.classList.remove('live'); knob.style.transform = ''; st.style.left = st.style.top = ''; }
+    function reset() { id = null; oct = 98; apply([]); st.classList.remove('live'); knob.style.transform = ''; st.style.left = st.style.top = ''; }
     on(zl, 'pointerdown', function (e) {
       e.preventDefault();
       if (id !== null) return;
       id = e.pointerId;
       try { zl.setPointerCapture(id); } catch (er) { /* nada */ }
-      st.classList.add('live'); place(e.clientX, e.clientY); track(e.clientX, e.clientY);
+      st.classList.add('live'); zb = zl.getBoundingClientRect(); sw = st.offsetWidth; sh = st.offsetHeight; place(e.clientX, e.clientY); track(e.clientX, e.clientY);
     });
     on(zl, 'pointermove', function (e) { if (e.pointerId === id) { e.preventDefault(); track(e.clientX, e.clientY); } });
     var end = function (e) { if (e.pointerId === id) { e.preventDefault(); reset(); } };
@@ -191,9 +195,11 @@
   function buttons(zones) {
     var bs = [].slice.call(ui.r.querySelectorAll('.pd-b')), owner = {}, count = {};
     bs.forEach(function (b) { count[b.dataset.b] = 0; });
+    var ctr = null; // centros leídos al apoyar el primer dedo (no en cada pointermove)
     function nearest(x, y) {
+      if (!ctr) ctr = bs.map(function (b) { var r = b.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
       var best = null, bd = Infinity;
-      bs.forEach(function (b) { var r = b.getBoundingClientRect(), d = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2)); if (d < bd) { bd = d; best = b; } });
+      for (var i = 0; i < bs.length; i++) { var d = Math.hypot(x - ctr[i][0], y - ctr[i][1]); if (d < bd) { bd = d; best = bs[i]; } }
       return best;
     }
     function press(b, down) {
@@ -208,7 +214,7 @@
       owner[e.pointerId] = now; press(now, true);
     }
     zones.forEach(function (z) {
-      on(z, 'pointerdown', function (e) { e.preventDefault(); try { z.setPointerCapture(e.pointerId); } catch (er) { /* nada */ } set(e); });
+      on(z, 'pointerdown', function (e) { e.preventDefault(); if (!Object.keys(owner).length) ctr = null; try { z.setPointerCapture(e.pointerId); } catch (er) { /* nada */ } set(e); });
       on(z, 'pointermove', function (e) { if (owner[e.pointerId]) { e.preventDefault(); set(e); } });
       var end = function (e) { var b = owner[e.pointerId]; if (b) { e.preventDefault(); delete owner[e.pointerId]; press(b, false); } };
       on(z, 'pointerup', end); on(z, 'pointercancel', end); on(z, 'lostpointercapture', end);

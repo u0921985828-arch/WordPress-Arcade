@@ -609,7 +609,8 @@ export class ArcadePlayer {
     const zl = pad.querySelector('.arcade-padl'), stick = zl.querySelector('.arcade-stick');
     if (stick) {
       const knob = stick.firstElementChild;
-      let tid = null, cx = 0, cy = 0, dirs = new Set();
+      let tid = null, cx = 0, cy = 0, dirs = new Set(), zb = null, sw = 0, sh = 0, oct = 98;
+      // Medidas de la zona y del joystick leídas una vez por toque: leerlas en cada touchmove forzaba un reflow.
       const apply = (next) => {
         for (const d of dirs) if (!next.has(d)) this._key(d, false);
         for (const d of next) if (!dirs.has(d)) this._key(d, true);
@@ -617,29 +618,32 @@ export class ArcadePlayer {
         dirs = next;
       };
       const place = (x, y) => {
-        const z = zl.getBoundingClientRect(), r = stick.offsetWidth / 2, rh = stick.offsetHeight / 2;
+        const z = zb, r = sw / 2, rh = sh / 2;
         cx = Math.max(z.left + r * 0.6, Math.min(z.right - r * 0.6, x));
         cy = Math.max(z.top + rh * 0.6, Math.min(z.bottom - rh * 0.6, y));
         stick.style.left = cx - z.left + 'px'; stick.style.top = cy - z.top + 'px';
       };
       const track = (t) => {
-        const R = stick.offsetWidth * 0.36;
+        const R = sw * 0.36;
         let dx = t.clientX - cx, dy = onlyH ? 0 : t.clientY - cy;
         const m = Math.hypot(dx, dy);
         if (m > R * 1.25) { // la base sigue al dedo
-          const z = zl.getBoundingClientRect(), k = (m - R * 1.25) / m;
+          const z = zb, k = (m - R * 1.25) / m;
           cx += dx * k; cy += dy * k;
           stick.style.left = cx - z.left + 'px'; stick.style.top = cy - z.top + 'px';
           dx = t.clientX - cx; dy = onlyH ? 0 : t.clientY - cy;
         }
         const d = Math.hypot(dx, dy), s = d > R ? R / d : 1;
         knob.style.transform = `translate(${dx * s}px,${dy * s}px)`;
-        if (d < R * 0.3) return apply(new Set());
+        const o = d < R * 0.3 ? 99 : onlyH ? (dx < 0 ? 9 : 10) : Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
+        if (o === oct) return;
+        oct = o;
+        if (o === 99) return apply(new Set());
         if (onlyH) return apply(new Set([dx < 0 ? 'left' : 'right']));
-        apply(new Set(OCTANTS[Math.round(Math.atan2(dy, dx) / (Math.PI / 4))]));
+        apply(new Set(OCTANTS[o]));
       };
       const reset = () => {
-        tid = null; apply(new Set());
+        tid = null; oct = 98; apply(new Set());
         stick.classList.remove('live'); knob.style.transform = '';
         stick.style.left = stick.style.top = '';
       };
@@ -650,6 +654,7 @@ export class ArcadePlayer {
         const t = e.changedTouches[0];
         tid = t.identifier;
         stick.classList.add('live');
+        zb = zl.getBoundingClientRect(); sw = stick.offsetWidth; sh = stick.offsetHeight;
         place(t.clientX, t.clientY);
         track(t);
       }, opt);
@@ -666,11 +671,13 @@ export class ArcadePlayer {
     if (btns.length) {
       const owner = new Map(); // touch id → botón
       const count = new Map(btns.map((b) => [b, 0]));
+      let ctr = null; // centros de los botones, leídos al apoyar el primer dedo (no en cada touchmove)
       const nearest = (t) => {
+        if (!ctr) ctr = btns.map((b) => { const r = b.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
         let best = null, bd = Infinity;
-        for (const b of btns) {
-          const r = b.getBoundingClientRect(), d = Math.hypot(t.clientX - (r.left + r.width / 2), t.clientY - (r.top + r.height / 2));
-          if (d < bd) { bd = d; best = b; }
+        for (let i = 0; i < btns.length; i++) {
+          const d = Math.hypot(t.clientX - ctr[i][0], t.clientY - ctr[i][1]);
+          if (d < bd) { bd = d; best = btns[i]; }
         }
         return best;
       };
@@ -688,7 +695,7 @@ export class ArcadePlayer {
       };
       // Sin joystick, la columna izquierda también pulsa (p. ej. «Subir» con cualquier pulgar).
       for (const z of stick ? [zr] : [zr, zl]) {
-      z.addEventListener('touchstart', (e) => { e.preventDefault(); for (const t of e.changedTouches) set(t); }, opt);
+      z.addEventListener('touchstart', (e) => { e.preventDefault(); if (!owner.size) ctr = null; for (const t of e.changedTouches) set(t); }, opt);
       z.addEventListener('touchmove', (e) => { e.preventDefault(); for (const t of e.changedTouches) if (owner.has(t.identifier)) set(t); }, opt);
       const end = (e) => {
         e.preventDefault();

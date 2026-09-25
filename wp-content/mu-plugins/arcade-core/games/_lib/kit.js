@@ -50,13 +50,13 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
     const k = { w, h, ctx, cv, held: new Set(), hit: new Set(), ptr: { x: w / 2, y: h / 2, down: false, hit: false, up: false }, swipe: null, tap: false, scale: 1 };
 
     function fit() {
-      const s = Math.min(innerWidth / w, innerHeight / h), dpr = devicePixelRatio || 1;
+      const s = Math.min(innerWidth / w, innerHeight / h), dpr = Math.min(2, devicePixelRatio || 1); // ×3 cuesta 2,25 veces más píxeles sin diferencia visible
       k.scale = s;
       cv.style.width = w * s + 'px'; cv.style.height = h * s + 'px';
       cv.width = Math.round(w * s * dpr); cv.height = Math.round(h * s * dpr);
       ctx.setTransform(s * dpr, 0, 0, s * dpr, 0, 0);
     }
-    addEventListener('resize', fit); fit();
+    addEventListener('resize', () => { fit(); pDrawn = 0; }); fit();
 
     const MAP = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', Space: 'a', Enter: 'a', KeyZ: 'a', KeyX: 'b', ShiftLeft: 'b', ShiftRight: 'b', KeyP: 'pause', Escape: 'pause' };
     const press = (n, down) => { if (!n) return; if (down) { if (!k.held.has(n)) k.hit.add(n); k.held.add(n); } else k.held.delete(n); };
@@ -127,9 +127,13 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
     addEventListener('contextmenu', (e) => e.preventDefault());
 
     let gpPrev = new Set();
+    /* Solo se consulta el mando físico si el navegador ha avisado de uno (getGamepads cada frame no es gratis). */
+    let gpOn = false;
+    addEventListener('gamepadconnected', () => { gpOn = true; });
     function poll() {
-      let gp = null; try { gp = [...(navigator.getGamepads ? navigator.getGamepads() : [])].find(Boolean); } catch (e) { /* bloqueado */ }
-      if (!gp) return;
+      if (!gpOn) return;
+      let gp = null; try { const l = navigator.getGamepads ? navigator.getGamepads() : []; for (let i = 0; i < l.length; i++) if (l[i]) { gp = l[i]; break; } } catch (e) { /* bloqueado */ }
+      if (!gp) { if (gpPrev.size) { for (const n of gpPrev) press(n, false); gpPrev = new Set(); } return; }
       const b = (i) => gp.buttons[i] && gp.buttons[i].pressed, ax = gp.axes[0] || 0, ay = gp.axes[1] || 0, now = new Set();
       if (b(12) || ay < -0.5) now.add('up'); if (b(13) || ay > 0.5) now.add('down');
       if (b(14) || ax < -0.5) now.add('left'); if (b(15) || ax > 0.5) now.add('right');
@@ -185,15 +189,16 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
     const vib = (ms) => { const d = Array.isArray(ms) ? ms[0] : ms; if (d <= 20) k.sfx('pop'); else if (d <= 45) k.sfx('coin'); else if (d <= 90) { k.sfx('hit'); k.shake(4); } else { k.sfx('hurt'); k.shake(8); k.flash('rgba(255,60,80,.35)'); } try { rawVib && rawVib(ms); } catch (e) {} return true; };
     try { Object.defineProperty(navigator, 'vibrate', { value: vib, configurable: true, writable: true }); } catch (e) {}
     /* ---------- Efectos: partículas, textos flotantes, temblor, destello ---------- */
-    const parts = [], floats = []; let shakeA = 0, flashC = null, flashT = 0;
-    k.burst = (x, y, col, n, spd) => { n = n || 12; spd = spd || 160; for (let i = 0; i < n && parts.length < 400; i++) { const a = Math.random() * 6.283, v = spd * (0.3 + Math.random()); parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.4 + Math.random() * 0.4, max: 0.8, col: col || '#fff', r: 1.5 + Math.random() * 2.5 }); } };
+    const parts = [], floats = [], pool = [];
+    const part = () => pool.pop() || {}; let shakeA = 0, flashC = null, flashT = 0;
+    k.burst = (x, y, col, n, spd) => { n = n || 12; spd = spd || 160; for (let i = 0; i < n && parts.length < 400; i++) { const a = Math.random() * 6.283, v = spd * (0.3 + Math.random()); const q = part(); q.x = x; q.y = y; q.vx = Math.cos(a) * v; q.vy = Math.sin(a) * v; q.life = 0.4 + Math.random() * 0.4; q.max = 0.8; q.col = col || '#fff'; q.r = 1.5 + Math.random() * 2.5; q.conf = false; parts.push(q); } };
     k.float = (txt, x, y, col) => floats.push({ txt: String(txt), x, y, col: col || '#fff', t: 0.9 });
     k.shake = (a) => { shakeA = Math.max(shakeA, a || 5); };
     k.flash = (col) => { flashC = col || 'rgba(255,255,255,.5)'; flashT = 0.25; };
-    k.confetti = (col, n) => { const cols = col ? [col, col, '#fff', col, '#ffd166'] : ['#f2d15c', '#ff5fa2', '#5ce1e6', '#7cf7a0', '#b98cff']; for (let i = 0; i < (n || 70) && parts.length < 600; i++) parts.push({ x: Math.random() * w, y: -10 - Math.random() * 40, vx: (Math.random() - 0.5) * 80, vy: 80 + Math.random() * 160, life: 1.6 + Math.random(), max: 2.6, col: cols[i % 5], r: 2 + Math.random() * 3, conf: true }); };
+    k.confetti = (col, n) => { const cols = col ? [col, col, '#fff', col, '#ffd166'] : ['#f2d15c', '#ff5fa2', '#5ce1e6', '#7cf7a0', '#b98cff']; for (let i = 0; i < (n || 70) && parts.length < 600; i++) { const q = part(); q.x = Math.random() * w; q.y = -10 - Math.random() * 40; q.vx = (Math.random() - 0.5) * 80; q.vy = 80 + Math.random() * 160; q.life = 1.6 + Math.random(); q.max = 2.6; q.col = cols[i % 5]; q.r = 2 + Math.random() * 3; q.conf = true; parts.push(q); } };
     function fx(dt) {
       for (const p of parts) { p.x += p.vx * dt; p.y += p.vy * dt; if (p.conf) p.vx += Math.sin(p.y / 20) * 20 * dt; else { p.vx *= 1 - 2 * dt; p.vy = p.vy * (1 - 2 * dt) + 240 * dt; } p.life -= dt; }
-      for (let i = parts.length - 1; i >= 0; i--) if (parts[i].life <= 0) parts.splice(i, 1);
+      for (let i = parts.length - 1; i >= 0; i--) if (parts[i].life <= 0) { const q = parts[i]; parts[i] = parts[parts.length - 1]; parts.pop(); if (pool.length < 600) pool.push(q); }
       for (const p of parts) { ctx.globalAlpha = Math.min(1, p.life / 0.3); ctx.fillStyle = p.col; if (p.conf) ctx.fillRect(p.x, p.y, p.r * 1.6, p.r); else { ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill(); } }
       ctx.globalAlpha = 1;
       for (let i = floats.length - 1; i >= 0; i--) { const f = floats[i]; f.t -= dt; f.y -= 40 * dt; if (f.t <= 0) { floats.splice(i, 1); continue; } ctx.globalAlpha = Math.min(1, f.t / 0.3); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.font = '800 18px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.strokeText(f.txt, f.x, f.y); ctx.fillStyle = f.col; ctx.fillText(f.txt, f.x, f.y); }
@@ -203,7 +208,7 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
     /* ---------- Pausa ---------- */
     k.paused = false;
     /* La tarjeta de pausa guarda la que hubiera (p. ej. «¡2048!» en plena partida) y la devuelve al continuar. */
-    let ovSaved = null;
+    let ovSaved = null, pDrawn = 0;
     const setPause = (on) => {
       if (on && (k.st !== 'play' || k.paused)) return;
       k.paused = on; bp.innerHTML = on ? IC.r : IC.p;
@@ -288,6 +293,8 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
     k.run = (update, draw) => {
       let last = performance.now();
       function frame(t) {
+        if (k.paused && pDrawn > 1) { poll(); if (!k.ptr.hit && !k.hit.size && !PADS.some((q) => q && q.hit.size)) { last = t; k.ptr.up = false; k.swipe = null; k.tap = false; requestAnimationFrame(frame); return; } }
+        pDrawn = k.paused ? pDrawn + 1 : 0;
         const dt = Math.min(0.05, (t - last) / 1000); last = t;
         poll();
         if (k.paused) { if (k.ptr.hit || k.hit.has('a') || k.hit.has('pause') || PADS.some((q) => q && q.hit.has('a'))) { setPause(false); if (k.ptr.down) k._skipUp = true; } }
