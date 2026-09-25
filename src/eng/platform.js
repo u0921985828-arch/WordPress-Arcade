@@ -494,7 +494,7 @@ function updTej(dt) {
       if (k.phit(nj.p, 'b') || (!k.party && nj.p === 0 && k.tap)) fireStar(nj);
     }
     nj.vy += TGRAV * dt;
-    nj.x = Math.max(-10, Math.min(W - nj.w + 10, nj.x + nj.vx * dt));
+    nj.x = Math.max(0, Math.min(W - nj.w, nj.x + nj.vx * dt));
     const oldY = nj.y; nj.y += nj.vy * dt; nj.ground = false;
     if (nj.vy >= 0) for (const r of ROOFS) {
       if (r.fall) continue;
@@ -568,10 +568,10 @@ function drawNinja(nj) {
   if (nj.out && nj.hurt <= 0) return;
   const x = nj.x + nj.w / 2, y = nj.y;
   c.save(); c.globalAlpha = nj.out ? nj.hurt : (nj.inv > 0 && Math.floor(t * 12) % 2 ? 0.4 : 1);
-  ART.hero(c, x, y, 0.92, { face: nj.face, state: nj.state, t, col: nj.col, squash: 0 });
+  ART.hero(c, x, y + 3, 0.92, { face: nj.face, state: nj.state, t, col: nj.col, squash: 0 });
   c.globalAlpha = 1;
   // banda de color sobre la cabeza para reconocer al jugador
-  c.beginPath(); ART.rr(c, x - 9, y - nj.h - 8, 18, 5, 2); ART.fillOut(c, nj.col, 1.6);
+  c.beginPath(); ART.rr(c, x - 9, y - nj.h - 6, 18, 5, 2); ART.fillOut(c, nj.col, 1.6);
   c.restore();
 }
 function drawStar(st) {
@@ -587,6 +587,8 @@ function tFit(s, max, size, min) {
 }
 function drawTej() {
   c.drawImage(tejSky(), 0, 0, W, H);
+  c.fillStyle = '#1b1338'; c.fillRect(0, H - TBOT, W, TBOT); // la calle, bajo los tejados
+  c.fillStyle = 'rgba(255,255,255,.05)'; for (let x = 10; x < W; x += 46) c.fillRect(x, H - TBOT + 20, 26, 3);
   ROOFS.forEach(drawRoof);
   STARS.forEach(drawStar);
   NJ.forEach(drawNinja);

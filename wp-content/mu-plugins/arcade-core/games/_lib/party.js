@@ -2336,7 +2336,7 @@ function banner() {
   if (small) { c.font = FONT(18, 700); wrap(G.help, 400, y, 580, 22, '#fff'); return; }
   const sub = seq ? `Ronda ${round} de ${RULE.rounds}` : RULE.to ? `${MODE === 'tug' ? 'Ronda' : 'Duelo'} ${round} · gana quien llegue a ${RULE.to}` : `Ronda ${round} de ${RULE.rounds}`;
   label(sub, 400, y - 48, 20, '#ffd166');
-  label(G.name, 400, y - 12, 36, '#fff');
+  label(G.name, 400, y - 18, 34, '#fff'); /* hueco para que la ayuda no toque el título */
   c.font = FONT(19, 700); wrap(G.help, 400, y + 36, 580, 23, '#e8e3ff');
 }
 function wrap(s, x, y, maxW, lh, fill) {

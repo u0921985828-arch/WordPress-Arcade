@@ -529,6 +529,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
   function reset() { hits = []; msg = ''; msgT = 0; sig = {}; G.reset(); }
   k.onParty = () => { if (k.st !== 'play') reset(); else { refreshNames(); sig = {}; if (G.priv) G.priv(true); } };
   k.onPick = (p, v) => { if (!S || k.st !== 'play') return; if (MODE === 'dados') DADOS.pick(p, v); else if (MODE === 'reparto') REPARTO.pick2(p, v); else CODIGO.pick2(p, v); };
+  reset();                           // tablero listo tras el fondo: la pantalla de inicio (y la miniatura) no sale vacía
   k.run((dt) => {
     if (!k.gate(reset)) return;
     if (!S) reset();

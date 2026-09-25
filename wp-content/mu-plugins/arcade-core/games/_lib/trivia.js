@@ -457,9 +457,9 @@ function NEWGAME() {
     if (MV) return MV;
     const [x, y, w, h] = LM.map, ww = (BB.lo1 - BB.lo0) * KX, hh = BB.la1 - BB.la0;
     const s = Math.min(w / ww, h / hh), dx = x + (w - ww * s) / 2, dy = y + (h - hh * s) / 2;
-    const ins = { w: Math.min(w * 0.36, 150), h: 0 }; ins.h = ins.w * 0.42;
-    ins.x = dx + 4; ins.y = dy + hh * s - ins.h - 4;
-    if (!LAND) { ins.x = x + 6; ins.y = y + h - ins.h - 6; }
+    /* El recuadro de Canarias va en la esquina del panel, nunca encima de la Península. */
+    const ins = { w: Math.min(w * (LAND ? 0.22 : 0.36), LAND ? 112 : 150), h: 0 }; ins.h = ins.w * 0.42;
+    ins.x = x + 6; ins.y = y + h - ins.h - 6;
     MV = { s, dx, dy, ww, hh, ins };
     return MV;
   }
