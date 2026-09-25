@@ -61,10 +61,12 @@ function tile(x, y, s, ch, stt, sy, big) {
 let SOL = null, VALID = null, CATS = null, LOADERR = false;
 const needW = MODE === 'daily', needC = MODE === 'hang' || MODE === 'sopa';
 let ROSCO = null, ANAG = null;
-if (MODE === 'abc') fetch('../_data/rosco-es.json').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((d) => { ROSCO = d; })
-  .catch(() => { LOADERR = true; ROSCO = { letras: 'ABC', r: { A: [{ d: 1, q: 'Insecto que fabrica miel.', a: ['abeja', 'abanico', 'almendra', 'ancla'] }], B: [{ d: 1, q: 'Embarcación pequeña de remos.', a: ['barca', 'bufanda', 'botella', 'bandeja'] }], C: [{ d: 1, q: 'Habitación donde se preparan las comidas.', a: ['cocina', 'cuadro', 'cortina', 'cuchara'] }] } }; });
-if (MODE === 'ana') fetch('../_data/anagramas-es.json').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((d) => { ANAG = d; })
-  .catch(() => { LOADERR = true; ANAG = { racks: [{ l: 'CAMINOS', w: ['CAMINOS', 'CAMINO', 'CASINO', 'MOSCA', 'MINAS', 'MANOS', 'MANO', 'SANO', 'CASO', 'COSA', 'SACO', 'CIMA'] }] }; });
+/* Cuando llegan los datos, si aún no se juega se rehace el tablero (si no, la pantalla se queda en «Cargando…»). */
+const ready = () => { try { if (window.__m && k.st !== 'play') window.__m.reset(); } catch (e) { } };
+if (MODE === 'abc') fetch('../_data/rosco-es.json').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((d) => { ROSCO = d; ready(); })
+  .catch(() => { LOADERR = true; ROSCO = { letras: 'ABC', r: { A: [{ d: 1, q: 'Insecto que fabrica miel.', a: ['abeja', 'abanico', 'almendra', 'ancla'] }], B: [{ d: 1, q: 'Embarcación pequeña de remos.', a: ['barca', 'bufanda', 'botella', 'bandeja'] }], C: [{ d: 1, q: 'Habitación donde se preparan las comidas.', a: ['cocina', 'cuadro', 'cortina', 'cuchara'] }] } }; ready(); });
+if (MODE === 'ana') fetch('../_data/anagramas-es.json').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((d) => { ANAG = d; ready(); })
+  .catch(() => { LOADERR = true; ANAG = { racks: [{ l: 'CAMINOS', w: ['CAMINOS', 'CAMINO', 'CASINO', 'MOSCA', 'MINAS', 'MANOS', 'MANO', 'SANO', 'CASO', 'COSA', 'SACO', 'CIMA'] }] }; ready(); });
 if (needW) fetch('../_data/palabras5-es.txt').then((r) => { if (!r.ok) throw new Error(r.status); return r.text(); }).then((t) => {
   let sec = ''; const sol = [], adm = [];
   for (const ln of t.split('\n')) { const s = ln.trim(); if (!s) continue; if (s[0] === '#') { if (/soluciones/.test(s)) sec = 's'; else if (/admitidas/.test(s)) sec = 'a'; continue; } if (sec === 's') sol.push(s); else if (sec === 'a') adm.push(s); }
