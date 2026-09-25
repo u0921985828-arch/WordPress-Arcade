@@ -799,7 +799,7 @@ const AB = (() => {
     seats = want.map((pl, i) => { const old = seats[i] || { score: 0, ok: 0, fail: 0 }; return { p: pl.p, name: pl.name, cpu: pl.cpu, score: old.score, ok: old.ok, fail: old.fail }; });
     if (turn >= seats.length) turn = 0;
   };
-  return { st: () => ({ letters, stt, idx, seats, turn, time, phase }), reset, update, draw, onKey, intro: 'Un rosco de 25 letras: una definición por letra y cuatro respuestas que empiezan igual. Tienes 150 segundos para dar la vuelta entera. Si no la sabes, pasapalabra y vuelves luego.' };
+  return { st: () => ({ letters, stt, idx, seats, turn, time, phase }), reset, update, draw, onKey, intro: 'Un rosco de 26 letras: una definición por letra y cuatro respuestas que empiezan igual. Tienes 150 segundos para dar la vuelta entera. Si no la sabes, pasapalabra y vuelves luego.' };
 })();
 
 /* ===================================================================================== */

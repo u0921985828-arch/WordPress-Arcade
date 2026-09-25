@@ -99,7 +99,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     alive() { return S.out.map((v, p) => p).filter((p) => !S.out[p]); },
     total() { return S.left.reduce((a, v, p) => a + (S.out[p] ? 0 : v), 0); },
     roll(st) {
-      for (let p = 0; p < S.n; p++) S.dice[p] = S.out[p] ? [] : Array.from({ length: S.left[p] }, () => 1 + k.ri(6)).sort((a, b) => a - b);
+      for (let p = 0; p < S.n; p++) S.dice[p] = S.out[p] ? [] : Array.from({ length: S.left[p] }, () => k.ri(1, 6)).sort((a, b) => a - b);
       S.bid = null; S.hist = []; S.res = null; S.phase = 'bid'; S.t = 0; S.think = 0;
       S.cur = S.out[st] ? this.alive()[0] : st; S.starter = S.cur;
       S.sel = { q: 1, f: 1 }; sig = {};
@@ -387,7 +387,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       S.nc = lv <= 1 ? 4 : lv === 2 ? 5 : 6;
       const rep = lv >= 3;
       const pool = [0, 1, 2, 3, 4, 5].slice(0, S.nc);
-      if (rep) S.code = Array.from({ length: 4 }, () => pool[k.ri(S.nc)]);
+      if (rep) S.code = Array.from({ length: 4 }, () => pool[k.ri(0, S.nc - 1)]);
       else { const sh = k.shuffle(pool.slice()); S.code = sh.slice(0, 4); }
       S.tries = lv <= 1 ? 10 : lv === 2 ? 10 : 9;
       S.rows = S.rows.map(() => []); S.guess = S.guess.map(() => [0, 0, 0, 0]); S.slot = S.slot.map(() => 0);
@@ -416,7 +416,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     aiGuess(p) {
       const rows = S.rows[p], pool = [0, 1, 2, 3, 4, 5].slice(0, S.nc);
       const ok = (g) => rows.every((r) => FAR.same(FAR.clue(r.g, g), { ok: r.ok, col: r.col }));
-      const rnd = () => Array.from({ length: 4 }, () => pool[k.ri(S.nc)]);
+      const rnd = () => Array.from({ length: 4 }, () => pool[k.ri(0, S.nc - 1)]);
       if (Math.random() > 0.35 + LVL * 0.18 && rows.length) return rnd();
       for (let i = 0; i < 400; i++) { const g = rnd(); if (ok(g)) return g; }
       return rnd();
