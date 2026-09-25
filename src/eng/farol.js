@@ -246,7 +246,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       const me = k.party ? -1 : 0, mine = S.phase === 'bid' && (k.party ? hum(S.cur) : S.cur === 0);
       const by = H - (LAND ? 108 : 190);
       if (!k.party && S.phase !== 'over') {
-        const dw = Math.min(34, (W - 40) / 5 - 6), y = H - (LAND ? 150 : 240);
+        const dw = Math.min(34, (W - 40) / 5 - 6), y = H - (LAND ? 168 : 246);
         txt('Tus dados', W / 2, y - 28, 14, '#cfe8d8');
         S.dice[0].forEach((v, j) => die(W / 2 + (j - (S.dice[0].length - 1) / 2) * (dw + 8), y, dw, v));
       }
@@ -260,7 +260,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       txt(String(S.sel.q), qx, y, 34, '#ffd166');
       pill(qx + 26, y - 20, 34, 40, '#463ac4', '+', 24, '#fff'); hits.push({ x: qx + 26, y: y - 20, w: 34, h: 40, v: 'q+' });
       const fx = W / 2 + (LAND ? 30 : 10), fw = Math.min(30, (W / 2 - 40) / 6 - 4);
-      fit('Valor', fx + (fw + 4) * 2.5, y - 26, 13, '#cfe8d8', 'center', 110);
+      fit('Valor', fx + (fw + 4) * 2.5 + fw / 2, y - 26, 13, '#cfe8d8', 'center', 110);
       for (let f = 1; f <= 6; f++) {
         const x = fx + (f - 1) * (fw + 4);
         if (S.sel.f === f) { rr(x - 3, y - fw / 2 - 3, fw + 6, fw + 6, 8, '#ffd166', 2); }
@@ -368,10 +368,10 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       hits = [];
       if (k.party) { if (S.phase === 'pick') fit('Cada uno elige en su móvil', W / 2, H - 40, 17, '#cfe8d8', 'center', W - 40); return; }
       if (S.phase !== 'pick' || S.pick[0]) { if (S.pick[0] && S.phase === 'pick') fit('Ya has elegido. Esperando a los demás…', W / 2, H - 46, 16, '#cfe8d8', 'center', W - 40); return; }
-      const bw = Math.min(190, (W - 48) / 2), y = H - (LAND ? 66 : 110);
+      const bw = Math.min(190, (W - 48) / 2), y = H - (LAND ? 84 : 110);
       pill(W / 2 - bw - 8, y, bw, 52, '#7cf7a0', 'Compartir', 19); hits.push({ x: W / 2 - bw - 8, y, w: bw, h: 52, v: 'compartir' });
       pill(W / 2 + 8, y, bw, 52, '#ff5a5f', 'Robar', 19, '#fff'); hits.push({ x: W / 2 + 8, y, w: bw, h: 52, v: 'robar' });
-      fit('Nadie ve tu decisión hasta el recuento', W / 2, y + 70, 13.5, '#cfe8d8', 'center', W - 40);
+      fit('Nadie ve tu decisión hasta el recuento', W / 2, y + 68, 13.5, '#cfe8d8', 'center', W - 40);
     },
   };
 
