@@ -85,7 +85,7 @@ function buildRoom() {
 }
 function reset() {
   if (COOP) return coopReset();
-  VS = BOUNCE ? k.players(4).map((q) => ({ pl: q.p, col: q.color, name: q.cpu ? 'CPU' : q.name, r: 11, wins: 0, kills: 0 })) : tankM && k.party && k.party.length >= 2 ? k.party.slice(0, 4).map((q) => ({ pl: q.p, col: k.pcol(q.p), name: 'J' + (q.p + 1), r: 11, wins: 0 })) : null;
+  VS = BOUNCE ? k.players(4).map((q) => ({ pl: q.p, col: q.color, name: q.name, r: 11, wins: 0, kills: 0 })) : tankM && k.party && k.party.length >= 2 ? k.party.slice(0, 4).map((q) => ({ pl: q.p, col: k.pcol(q.p), name: 'J' + (q.p + 1), r: 11, wins: 0 })) : null;
   p = { x: TH.door ? X0 + 40 : W / 2, y: H / 2, r: 11, hp: 6, max: 6, a: 0, aim: 0, inv: 0, kx: 0, ky: 0, mv: false, face: 1, body: 0, recoil: 0 };
   room = 0; score = 0; t = 0; cool = 0; swing = 0; kills = 0; choice = null; upg = { rate: 1, dmg: 1, speed: 1, multi: 1, pierce: 0, reach: 1 }; if (VS) vsRound(true); else buildRoom();
 }
@@ -159,7 +159,7 @@ function bounceCpu(q, dt, i) {
 function bounceEnd(champ) {
   if (!k.party) { const hu = VS.find((q) => q.pl === 0); cpuLv = Math.max(0, Math.min(5, cpuLv + (champ === hu ? 1 : -1))); try { localStorage.setItem('cpu:' + CFG.id, cpuLv); } catch (e) {} }
   const solo = !k.party, head = solo ? (champ.pl === 0 ? '¡Has ganado!' : 'Gana la CPU') : champ.cpu ? 'Gana la CPU' : `¡Gana ${champ.name}!`;
-  k.podium(VS.map((q) => ({ p: q.pl, score: q.wins, name: q.cpu ? 'CPU' : q.name })), { head, noTie: true, fmt: (n) => `${n} ronda${n === 1 ? '' : 's'}` });
+  k.podium(VS.map((q) => ({ p: q.pl, score: q.wins, name: q.name })), { head, noTie: true, fmt: (n) => `${n} ronda${n === 1 ? '' : 's'}` });
 }
 function vsRound(first) {
   vsR = first ? 1 : vsR + 1; room = vsR; vsBetween = 0; vsFreeze = 1.3; vsLast = null; vsT = 0; vsZ = 0;
@@ -260,7 +260,7 @@ function vsDraw() {
     c.beginPath(); r.pts.forEach((pt, j) => (j ? c.lineTo(pt[0], pt[1]) : c.moveTo(pt[0], pt[1]))); c.stroke(); c.restore();
     if (r.hit >= 0) { const o = VS[r.hit]; c.strokeStyle = q.col; c.lineWidth = 2.5; c.beginPath(); c.arc(o.x, o.y, 20 + Math.sin(t * 10) * 2, 0, R2); c.stroke(); }
   });
-  for (const q of [...VS].sort((a, b) => a.y - b.y)) { if (!q.alive || (q.inv > 0 && !vsFreeze && Math.floor(q.inv * 14) % 2)) continue; shadow(q.x, q.y + 10, 10); tankSprite(q.x, q.y, q.body, q.aim, q.col, q.recoil, q.mv); label(q.cpu ? 'CPU' : q.name, q.x, q.y - 34, 14, q.cpu ? '#e8e4f4' : q.col, 'center'); }
+  for (const q of [...VS].sort((a, b) => a.y - b.y)) { if (!q.alive || (q.inv > 0 && !vsFreeze && Math.floor(q.inv * 14) % 2)) continue; shadow(q.x, q.y + 10, 10); tankSprite(q.x, q.y, q.body, q.aim, q.col, q.recoil, q.mv); label(q.name, q.x, q.y - 34, 14, q.cpu ? '#e8e4f4' : q.col, 'center'); }
   for (const s of shots) {
     if (BOUNCE) { /* bola de energía del color del dueño con estela; parpadea en blanco cuando ya puede alcanzar a su dueño */
       c.lineCap = 'round'; for (let j = 2; j < s.tr.length; j += 2) { c.globalAlpha = (j / s.tr.length) * 0.5; c.strokeStyle = s.col; c.lineWidth = 2 + (j / s.tr.length) * 5; c.beginPath(); c.moveTo(s.tr[j - 2], s.tr[j - 1]); c.lineTo(s.tr[j], s.tr[j + 1]); c.stroke(); }
@@ -275,7 +275,7 @@ function vsDraw() {
   c.drawImage(vigCv, 0, 0, W, H);
   const pw = Math.min(150, (W - 20) / VS.length - 6);
   VS.forEach((q, i) => { const x = 10 + i * (pw + 6); ART.rr(c, x, 5, pw, 26, 9); c.fillStyle = q.alive ? 'rgba(26,21,48,.85)' : 'rgba(26,21,48,.45)'; c.fill(); c.lineWidth = 2; c.strokeStyle = q.col; c.stroke();
-    label(q.cpu ? 'CPU' : q.name, x + 8, 10, 14, q.alive ? q.col : '#77708f');
+    label(q.name, x + 8, 10, 14, q.alive ? q.col : '#77708f');
     if (BOUNCE) for (let h = 0; h < VSC.max; h++) { c.beginPath(); c.arc(x + 50 + h * 14, 18, 5, 0, R2); ART.fillOut(c, q.alive && h < VSC.max - shotsOf(i) ? q.col : '#3a3552', 1.8); }
     else for (let h = 0; h < VSHP; h++) ART.heart(c, x + 44 + h * 17, 18, 0.85, h < q.hp && q.alive); label(`${q.wins}`, x + pw - 8, 9, 16, '#ffc928', 'right'); });
   label(BOUNCE ? `Ronda ${vsR} · gana quien llegue a ${VSWIN}` : `A ${VSWIN} rondas`, W - 14, Y1 + 1, 11, 'rgba(255,255,255,.85)', 'right');
@@ -283,7 +283,7 @@ function vsDraw() {
 }
 k.onParty = () => {
   if (COOP) return coopParty();
-  if (BOUNCE) { if (k.st !== 'play') { reset(); return; } const pl = k.players(4); for (const q of VS) { q.cpu = pl[q.pl].cpu; q.name = q.cpu ? 'CPU' : pl[q.pl].name; q.ai = null; } return; }
+  if (BOUNCE) { if (k.st !== 'play') { reset(); return; } const pl = k.players(4); for (const q of VS) { q.cpu = pl[q.pl].cpu; q.name = pl[q.pl].name; q.ai = null; } return; }
   if (k.st !== 'play' || !VS) { if (k.st !== 'play') reset(); return; }
   for (const q of VS) { q.cpu = !inParty(q.pl); if (q.cpu) q.ai = null; }
   for (const x of k.party || []) if (VS.length < 4 && !VS.some((q) => q.pl === x.p)) VS.push({ pl: x.p, col: k.pcol(x.p), name: 'J' + (x.p + 1), r: 11, wins: 0, alive: false, hp: 0, cpu: false, x: -99, y: -99, body: 0, aim: 0 });
@@ -325,7 +325,7 @@ function plateFor(h) { // placa a la que se dirige una CPU: la libre, empezando 
   const out = free.find((q) => !q.inn); if (out) return out;
   return free.find((q) => q.inn && (gate ? gate.open : true)) || null;
 }
-function mkHero(q, cls) { return { pl: q.p, col: q.color, name: q.cpu ? 'CPU' : q.name, cpu: q.cpu, cls, x: X0 + 40, y: H / 2, r: 11, hp: CLS[cls].hp, max: CLS[cls].hp, inv: 0, kx: 0, ky: 0, mv: false, face: 1, a: 0, aim: 0, cool: 0, sk: 2, roll: 0, rollCd: 0, down: false, rev: 0, swing: 0, swingA: 0, ai: null, ph: Math.random() * 6 }; }
+function mkHero(q, cls) { return { pl: q.p, col: q.color, name: q.name, cpu: q.cpu, cls, x: X0 + 40, y: H / 2, r: 11, hp: CLS[cls].hp, max: CLS[cls].hp, inv: 0, kx: 0, ky: 0, mv: false, face: 1, a: 0, aim: 0, cool: 0, sk: 2, roll: 0, rollCd: 0, down: false, rev: 0, swing: 0, swingA: 0, ai: null, ph: Math.random() * 6 }; }
 function coopReset() {
   VS = null; room = 0; score = 0; t = 0; kills = 0; choice = null; fxs = []; hpMul = 1; upg = { rate: 1, dmg: 1, speed: 1, multi: 1, pierce: 0, reach: 1 };
   const pl = k.players(4), top = Math.max(1, ...pl.filter((q) => !q.cpu).map((q) => q.p + 1));
@@ -336,7 +336,7 @@ function coopReset() {
 function coopParty() {
   if (k.st !== 'play') { reset(); return; }
   const pl = k.players(4);
-  for (const h of HE) { h.cpu = pl[h.pl].cpu; h.name = h.cpu ? 'CPU' : pl[h.pl].name; h.ai = null; if (lobby) lobby.ready[HE.indexOf(h)] = h.cpu; }
+  for (const h of HE) { h.cpu = pl[h.pl].cpu; h.name = pl[h.pl].name; h.ai = null; if (lobby) lobby.ready[HE.indexOf(h)] = h.cpu; }
   for (const q of pl) if (!q.cpu && !HE.some((h) => h.pl === q.p)) { const h = mkHero(q, CK[q.p]); h.x = X0 + 40; h.y = H / 2; h.inv = 2; HE.push(h); if (lobby) lobby.ready.push(false); k.float('¡' + h.name + ' se une!', h.x + 30, h.y - 30, h.col); }
   HE.sort((a, b) => a.pl - b.pl); if (lobby) lobby.ready = HE.map((h) => h.cpu);
   hpMul = 1 + 0.35 * (HE.length - 1);
@@ -538,7 +538,7 @@ function coopHero(h) {
   if (h.inv > 0 && h.roll <= 0 && Math.floor(h.inv * 14) % 2) return;
   c.strokeStyle = h.col; c.lineWidth = 3; c.globalAlpha = 0.85; c.beginPath(); c.ellipse(h.x, h.y + 11, 14, 5.5, 0, 0, R2); c.stroke(); c.globalAlpha = 1;
   heroSprite(h, h.x, h.y, 0.72);
-  label(h.cpu ? 'CPU' : h.name, h.x, h.y - 40, 13, h.cpu ? '#e8e4f4' : h.col, 'center');
+  label(h.name, h.x, h.y - 40, 13, h.cpu ? '#e8e4f4' : h.col, 'center');
 }
 function drawPlate(q) {
   const on = q.on, r = 19;
@@ -564,7 +564,7 @@ function coopDraw() {
     HE.forEach((h, i) => {
       const x = x0 + i * (cw + 10), y = 70, C = CLS[h.cls], rd = lobby.ready[i];
       ART.rr(c, x, y, cw, 220, 16); c.fillStyle = rd ? '#262046' : '#1b1733'; c.fill(); c.lineWidth = 3; c.strokeStyle = h.col; c.stroke();
-      label(h.cpu ? 'CPU' : h.name, x + cw / 2, y + 10, 18, h.col, 'center');
+      label(h.name, x + cw / 2, y + 10, 18, h.col, 'center');
       heroSprite({ ...h, face: 1, mv: false, aim: -0.3, swing: 0, cool: 0 }, x + cw / 2, y + 88, 1.25);
       label(C.n, x + cw / 2, y + 118, 17, '#fff', 'center'); wrap(`A: ${C.sk}. ${C.skd}`, x + cw / 2, y + 142, cw - 16, 12, '#aab0bf');
       for (let j = 0; j < C.hp; j++) ART.heart(c, x + cw / 2 - (C.hp - 1) * 7 + j * 14, y + 186, 0.7, true);
@@ -593,7 +593,7 @@ function coopDraw() {
   /* marcador por héroe: vida, habilidad y color */
   const n = HE.length, pw = Math.min(140, (W - 110) / n - 6);
   HE.forEach((h, i) => { const x = 8 + i * (pw + 6); ART.rr(c, x, 4, pw, 30, 9); c.fillStyle = h.down ? 'rgba(80,20,40,.8)' : 'rgba(26,21,48,.85)'; c.fill(); c.lineWidth = 2; c.strokeStyle = h.col; c.stroke();
-    { const nm = h.cpu ? 'CPU' : h.name; label(nm, x + 7, 7, fitLab(nm, 40, 12), h.col); } const hs = Math.min(10, (pw - 50) / Math.max(1, h.max));
+    { const nm = h.name; label(nm, x + 7, 7, fitLab(nm, 40, 12), h.col); } const hs = Math.min(10, (pw - 50) / Math.max(1, h.max));
     for (let j = 0; j < h.max; j++) ART.heart(c, x + 50 + j * hs, 13, 0.55, j < h.hp);
     const sk = Math.max(0, h.sk) / (CLS[h.cls].skcd * (h.skMul || 1)); ART.rr(c, x + 7, 24, pw - 14, 5, 2.5); c.fillStyle = 'rgba(255,255,255,.15)'; c.fill(); ART.rr(c, x + 7, 24, (pw - 14) * (1 - sk), 5, 2.5); c.fillStyle = sk <= 0 ? '#ffc928' : '#8a7fd8'; c.fill(); });
   coinIcon(W - 18, 19); label(`${score}`, W - 32, 10, 18, '#fff', 'right');

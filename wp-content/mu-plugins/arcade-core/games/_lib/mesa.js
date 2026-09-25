@@ -339,8 +339,10 @@ else (function () {
   const LK = 'cpu:' + (CFG.id || MODE);
   let lvl = 0; try { lvl = +localStorage.getItem(LK) || 0; } catch (e) { /* sin almacenamiento */ }
 
-  const PANH = PORT ? 132 : 0, PANW = PORT ? 0 : 250;
-  const BD = PORT ? { x: 10, y: 10, w: W - 20, h: H - PANH - 26 } : { x: 10, y: 10, w: W - PANW - 30, h: H - 20 };
+  const PANH = PORT ? (MODE === 'damas' ? 78 : 132) : 0, PANW = PORT ? 0 : 250;
+  /* en horizontal no hay banda de letterbox: se deja sitio arriba para la pausa y el sonido del reproductor */
+  const TOPR = PORT ? 0 : 46;
+  const BD = PORT ? { x: 10, y: 10, w: W - 20, h: H - PANH - 26 } : { x: 10, y: TOPR, w: W - PANW - 30, h: H - TOPR - 10 };
   const PAN = PORT ? { x: 10, y: H - PANH - 8, w: W - 20, h: PANH } : { x: W - PANW - 10, y: 10, w: PANW, h: H - 20 };
 
   let T = 0, phase = 'setup', msg = '', sub = '', banner = null, think = 0, pl = [], nSel = 2, anim = null;
@@ -349,12 +351,18 @@ else (function () {
   const isHum = (p) => (k.party ? k.party.some((q) => q.p === p) : p === 0);
   const label = (p) => { if (!isHum(p)) return (pl[p] && pl[p].name) || 'CPU'; if (!k.party) return 'Tú'; const q = k.party.find((x) => x.p === p); return (q && q.name) || 'J' + (p + 1); };
   const humansMax = () => (k.party ? Math.max(...k.party.map((q) => q.p)) + 1 : 1);
+  /* ajusta el tamaño de fuente hasta que el texto quepa en `maxw` (devuelve el tamaño usado) */
+  function fitFont(txt, maxw, weight, size) {
+    let fs = size; c.font = FONT(weight, fs);
+    while (c.measureText(txt).width > maxw && fs > 9) { fs -= 1; c.font = FONT(weight, fs); }
+    return fs;
+  }
   const say = (txt, col, t) => { banner = { txt, col: col || '#ffd166', t: t || 1.6 }; };
 
   /* ---------------------------------------------- Ajedrez ---------------------------------------------- */
   const CHS = { S: null, sel: -1, moves: [], reps: {}, over: '', lastM: null, curX: 4, curY: 6, promo: null, hist: [] };
   const sqXY = (s, G, x0, y0, flip) => { let f = s & 7, r = s >> 4; if (flip) { f = 7 - f; r = 7 - r; } return [x0 + f * G + G / 2, y0 + r * G + G / 2]; };
-  function chGeo() { const G = Math.floor(Math.min(BD.w, BD.h - (PORT ? 0 : 0)) / 8); return { G, x0: BD.x + (BD.w - G * 8) / 2, y0: BD.y + (BD.h - G * 8) / 2 }; }
+  function chGeo() { const LB = 18; const G = Math.floor(Math.min(BD.w, BD.h - LB) / 8); return { G, x0: BD.x + (BD.w - G * 8) / 2, y0: BD.y + (BD.h - LB - G * 8) / 2 }; }
   const chFlip = () => k.party && !isHum(0) && isHum(1);
   function chReset() {
     CHS.S = CH.fromFen(CH.START); CHS.sel = -1; CHS.moves = []; CHS.reps = {}; CHS.over = ''; CHS.lastM = null; CHS.promo = null; CHS.hist = [];
@@ -390,7 +398,7 @@ else (function () {
     const S = CHS.S, side = chSide();
     if (phase !== 'play') return;
     msg = CH.inCheck(S) ? `${S.t === 'w' ? 'Blancas' : 'Negras'} en jaque` : `Juegan las ${S.t === 'w' ? 'blancas' : 'negras'}`;
-    sub = isHum(side) ? (CHS.promo ? 'Elige pieza de coronación' : CHS.sel >= 0 ? 'Toca el destino · A confirma' : 'Toca tu pieza · flechas y A con mando') : 'La CPU piensa…';
+    sub = isHum(side) ? (CHS.promo ? 'Elige pieza de coronación' : k.party ? (CHS.sel >= 0 ? 'Flechas: destino · A confirma · B cancela' : 'Flechas: mueve el cursor · A elige pieza') : (CHS.sel >= 0 ? 'Toca el destino · A confirma' : 'Toca tu pieza · flechas y A con mando')) : 'La CPU piensa…';
     if (!isHum(side)) {
       if (!think) think = 0.45 + Math.random() * 0.3;
       if ((think -= dt) <= 0) { think = 0; const m = CH.think(S, Math.min(4, lvl), Math.random); if (m) chMove(m); }
@@ -576,7 +584,7 @@ else (function () {
     if (!DS.anim && !DCH.moves(S, S.cur).length) { say(`${label(S.cur)} no puede mover: pasa`, '#ffc94d'); DCH.advance(S); DS.sel = -1; DS.moves = []; return; }
     const p = S.cur;
     msg = isHum(p) ? `${label(p)}: te toca` : `Juega ${label(p)}…`;
-    sub = isHum(p) ? (DS.sel >= 0 ? 'Toca el agujero de destino' : 'Toca una canica tuya · flechas y A con mando') : '';
+    sub = isHum(p) ? (k.party ? (DS.sel >= 0 ? 'Flechas: destino · A confirma · B cancela' : 'Flechas: elige canica · A la coge') : (DS.sel >= 0 ? 'Toca el agujero de destino' : 'Toca una canica tuya · flechas y A con mando')) : '';
     if (DS.anim) return;
     if (!isHum(p)) {
       if (!think) think = 0.4 + Math.random() * 0.3;
@@ -763,15 +771,17 @@ else (function () {
     if (MODE === 'ajedrez') { chDraw(); chPanel(); } else { dBoard(); dPanel(); }
     /* mensajes */
     const tx = PORT ? W / 2 : PAN.x + PAN.w / 2, ty = PORT ? PAN.y - 30 : PAN.y + PAN.h - 96;
+    const maxw = (PORT ? W : PAN.w) - 24;
     c.textAlign = 'center'; c.textBaseline = 'middle';
-    if (msg && phase !== 'setup') { c.font = FONT(900, PORT ? 19 : 19); c.lineWidth = 5; c.strokeStyle = OUT; c.strokeText(msg, tx, ty); c.fillStyle = '#fff'; c.fillText(msg, tx, ty); }
-    if (sub && phase !== 'setup') { c.font = FONT(700, PORT ? 14 : 14); c.lineWidth = 4; c.strokeStyle = OUT; c.strokeText(sub, tx, ty + 21); c.fillStyle = '#cfc4ee'; c.fillText(sub, tx, ty + 21); }
+    if (msg && phase !== 'setup') { fitFont(msg, maxw, 900, 19); c.lineWidth = 5; c.strokeStyle = OUT; c.strokeText(msg, tx, ty); c.fillStyle = '#fff'; c.fillText(msg, tx, ty); }
+    if (sub && phase !== 'setup') { fitFont(sub, maxw, 700, 14); c.lineWidth = 4; c.strokeStyle = OUT; c.strokeText(sub, tx, ty + 21); c.fillStyle = '#cfc4ee'; c.fillText(sub, tx, ty + 21); }
     if (banner) {
-      const y = BD.y + BD.h * 0.5;
-      c.save(); c.globalAlpha = Math.min(1, banner.t); c.font = FONT(900, PORT ? 34 : 40); c.textAlign = 'center'; c.textBaseline = 'middle';
-      const wt = c.measureText(banner.txt).width + 44;
-      ART.rr(c, W / 2 - wt / 2, y - 32, wt, 64, 16); c.fillStyle = ART.alpha('#1a1530', 0.85); c.fill(); c.lineWidth = 3; c.strokeStyle = banner.col; c.stroke();
-      c.fillStyle = banner.col; c.fillText(banner.txt, W / 2, y + 1); c.restore();
+      const y = BD.y + Math.max(46, BD.h * 0.2), cxb = BD.x + BD.w / 2;
+      c.save(); c.globalAlpha = Math.min(1, banner.t); c.textAlign = 'center'; c.textBaseline = 'middle';
+      const fs = fitFont(banner.txt, BD.w - 24, 900, PORT ? 34 : 40);
+      const wt = Math.min(BD.w - 8, c.measureText(banner.txt).width + 44);
+      ART.rr(c, cxb - wt / 2, y - fs / 2 - 15, wt, fs + 30, 16); c.fillStyle = ART.alpha('#1a1530', 0.85); c.fill(); c.lineWidth = 3; c.strokeStyle = banner.col; c.stroke();
+      c.fillStyle = banner.col; c.fillText(banner.txt, cxb, y + 1); c.restore();
     }
     if (phase === 'setup' && k.st === 'play') drawSetup();
   }

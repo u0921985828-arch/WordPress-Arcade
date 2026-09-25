@@ -121,7 +121,9 @@ else (function () {
   const HANDH = PORT ? 118 : 104;
   const PANW = PORT ? W - 24 : 246;
   const PANH = PORT ? 152 : H - 24;
-  const BD = PORT ? { x: 12, y: 12, w: W - 24, h: H - HANDH - PANH - 34 } : { x: 12, y: 12, w: W - PANW - 36, h: H - HANDH - 24 };
+  /* en horizontal no hay banda de letterbox: se deja sitio arriba para la pausa y el sonido del reproductor */
+  const TOPR = PORT ? 0 : 46;
+  const BD = PORT ? { x: 12, y: 12, w: W - 24, h: H - HANDH - PANH - 34 } : { x: 12, y: TOPR, w: W - PANW - 36, h: H - HANDH - TOPR - 12 };
   const PAN = PORT ? { x: 12, y: BD.y + BD.h + 10, w: PANW, h: PANH } : { x: W - PANW - 12, y: 12, w: PANW, h: PANH };
   const HND = { x: 12, y: H - HANDH - 6, w: (PORT ? W : W - PANW - 24) - 24, h: HANDH };
 
@@ -139,6 +141,12 @@ else (function () {
     S = DOM.create({ target: TARGET, lvl });
     pl = k.players(4); phase = 'play'; sel = -1; anim = null; banner = null; privSig = {}; think = 0; waitT = 0; endGlow = 0;
     msg = ''; sub = ''; drain();
+  }
+  /* ajusta el tamaño de fuente hasta que el texto quepa en `maxw` (devuelve el tamaño usado) */
+  function fitFont(txt, maxw, weight, size) {
+    let fs = size; c.font = FONT(weight, fs);
+    while (c.measureText(txt).width > maxw && fs > 9) { fs -= 1; c.font = FONT(weight, fs); }
+    return fs;
   }
   function wait(t, fn) { waitT = t; waitFn = fn; phase = 'wait'; }
 
@@ -207,13 +215,14 @@ else (function () {
      en el sentido de la fila y los dobles de pie. El tamaño es el mayor que cabe en el tablero. */
   function layout() {
     const n = S ? S.chain.length : 0; if (!n) return [];
+    const AH = BD.h - 58; /* franja inferior reservada para los mensajes */
     let L = PORT ? 108 : 120, per = 1, rows = 1;
     for (; L > 24; L -= 2) {
       per = Math.max(1, Math.floor((BD.w - 18) / L));
       rows = Math.ceil(n / per);
-      if (rows * L * 1.12 + 26 <= BD.h) break;
+      if (rows * L * 1.12 + 26 <= AH) break;
     }
-    const rh = L * 1.12, out = [], y0 = BD.y + (BD.h - rows * rh) / 2 + rh / 2;
+    const rh = L * 1.12, out = [], y0 = BD.y + (AH - rows * rh) / 2 + rh / 2;
     for (let i = 0; i < n; i++) {
       const r = Math.floor(i / per), col = i % per, cnt = Math.min(per, n - r * per), rev = r % 2 === 1;
       const x0 = BD.x + (BD.w - cnt * L) / 2, cc = rev ? cnt - 1 - col : col;
@@ -333,16 +342,18 @@ else (function () {
     }
   }
   function texts() {
-    const tx = BD.x + BD.w / 2, ty = BD.y + BD.h - 42;
+    const tx = BD.x + BD.w / 2, ty = BD.y + BD.h - 42, maxw = BD.w - 20;
     c.textAlign = 'center'; c.textBaseline = 'middle';
-    if (msg) { c.font = FONT(900, PORT ? 19 : 21); c.lineWidth = 5; c.strokeStyle = OUT; c.strokeText(msg, tx, ty); c.fillStyle = '#fff'; c.fillText(msg, tx, ty); }
-    if (sub) { c.font = FONT(700, PORT ? 15 : 16); c.lineWidth = 4; c.strokeStyle = OUT; c.strokeText(sub, tx, ty + 22); c.fillStyle = '#cfc4ee'; c.fillText(sub, tx, ty + 22); }
+    if (msg) { fitFont(msg, maxw, 900, PORT ? 19 : 21); c.lineWidth = 5; c.strokeStyle = OUT; c.strokeText(msg, tx, ty); c.fillStyle = '#fff'; c.fillText(msg, tx, ty); }
+    if (sub) { fitFont(sub, maxw, 700, PORT ? 15 : 16); c.lineWidth = 4; c.strokeStyle = OUT; c.strokeText(sub, tx, ty + 22); c.fillStyle = '#cfc4ee'; c.fillText(sub, tx, ty + 22); }
     if (banner && banner.t > 0) {
-      const a = Math.min(1, banner.t), y = BD.y + BD.h * 0.5;
-      c.save(); c.globalAlpha = a; c.font = FONT(900, PORT ? 30 : 36); c.textAlign = 'center'; c.textBaseline = 'middle';
-      const wth = c.measureText(banner.txt).width + 40;
-      ART.rr(c, W / 2 - wth / 2, y - 30, wth, 60, 16); c.fillStyle = ART.alpha('#1a1530', 0.86); c.fill(); c.lineWidth = 3; c.strokeStyle = banner.col; c.stroke();
-      c.fillStyle = banner.col; c.fillText(banner.txt, W / 2, y + 1); c.restore();
+      /* franja alta del tablero, centrada en el tablero (no en el lienzo) y ajustada al ancho */
+      const a = Math.min(1, banner.t), cx = BD.x + BD.w / 2, y = BD.y + Math.max(46, BD.h * 0.22);
+      c.save(); c.globalAlpha = a; c.textAlign = 'center'; c.textBaseline = 'middle';
+      const fs = fitFont(banner.txt, BD.w - 56, 900, PORT ? 30 : 36);
+      const wth = Math.min(BD.w - 8, c.measureText(banner.txt).width + 40), bh = fs + 26;
+      ART.rr(c, cx - wth / 2, y - bh / 2, wth, bh, 16); c.fillStyle = ART.alpha('#1a1530', 0.86); c.fill(); c.lineWidth = 3; c.strokeStyle = banner.col; c.stroke();
+      c.fillStyle = banner.col; c.fillText(banner.txt, cx, y + 1); c.restore();
     }
   }
   function draw() {
