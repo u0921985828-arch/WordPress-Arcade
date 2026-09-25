@@ -1368,9 +1368,10 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
   function bubble(b) {
     const [x0, y0] = PL[seatOf(b.p)], st = seatOf(b.p);
     let x = st === 'l' ? x0 + 60 : st === 'r' ? x0 - 60 : x0 + (st === 't' ? 150 : 0), y = st === 'b' ? (viewer() === b.p ? handTop - (PORT ? 172 : 110) : y0 - 120) : st === 't' ? y0 + 70 : y0 - 10;
-    if (SI || ES || BU) {                 // modos nuevos: el globo sale de la chapa del jugador, no del centro ni sobre sus cartas
+    if (SI || ES || BU) {                 // modos nuevos: el globo no tapa las cartas ni el rótulo de ayuda
       const [bxx, byy] = badgeXY(b.p);
-      if (st === 'b') x = bxx; else if (st !== 't') { x = bxx; y = byy - 36; }
+      if (st === 'l' || st === 'r') { x = bxx; y = byy - 36; }
+      else if (st === 'b' && viewer() === b.p) { if (BU) y = handTop - (PORT ? 230 : 152); else x = bxx; }
     }
     const size = b.big ? 26 : 17; c.font = `800 ${size}px ${FONT}`; const w = c.measureText(b.txt).width + 28, h = size + 18, xx = Math.max(w / 2 + 6, Math.min(W - w / 2 - 6, x)), s = Math.min(1, (b.big ? 2.4 : 1.7) - b.t < 0.15 ? 0.6 + ((b.big ? 2.4 : 1.7) - b.t) * 2.6 : 1);
     c.save(); c.translate(xx, y); c.scale(s, s); c.globalAlpha = Math.min(1, b.t * 3);
