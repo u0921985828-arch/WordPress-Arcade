@@ -485,10 +485,12 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       hits = [];
       const n = S.n, cols = n <= 2 ? n : LAND ? n : 2, rws = Math.ceil(n / cols);
       const top = TOPB + 46, botH = k.party ? 30 : LAND ? 96 : 130;
-      const bw = (W - 16 - (cols - 1) * 8) / cols, bh = (H - top - botH - 12 - (rws - 1) * 8) / rws;
+      let bw = (W - 16 - (cols - 1) * 8) / cols; const bh = (H - top - botH - 12 - (rws - 1) * 8) / rws;
+      if (n === 1 && LAND) bw = Math.min(bw, 460);   // en solitario el tablero no se estira a lo ancho
+      const px0 = (W - (cols * bw + (cols - 1) * 8)) / 2;
       fit(k.party ? `Ronda ${S.round} de ${S.rounds} · ${S.nc} colores` : `Clave ${S.lvl} · ${S.nc} colores · ${S.tries} intentos`, W / 2, TOPB + 18, 17, '#fff3c4', 'center', W - 30);
       for (let p = 0; p < n; p++) {
-        const cx = 8 + (p % cols) * (bw + 8), cy = top + Math.floor(p / cols) * (bh + 8);
+        const cx = px0 + (p % cols) * (bw + 8), cy = top + Math.floor(p / cols) * (bh + 8);
         panel(cx, cy, bw, bh);
         circ(cx + 16, cy + 16, 7, colOf(p), 2);
         fit(nameOf(p), cx + 28, cy + 16, 13.5, '#fff', 'left', bw - 90);

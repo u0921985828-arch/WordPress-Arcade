@@ -2260,7 +2260,9 @@ const COOP = { relay: 1, hotair: 1 }; /* oleada 3: dos minijuegos cooperativos c
 const KEYS = ['anvil', 'duel', 'mash', 'tug', 'balloons', 'arrows', 'clock', 'needle'], /* casillas de la ruleta (fijas) */ SHORT = { anvil: 'Yunques', duel: 'Duelo', mash: 'Carrera', tug: 'Cuerda', balloons: 'Globos', arrows: 'Flechas', clock: 'Reloj', needle: 'Diana' };
 const NAMES = { anvil: 'Lluvia de Yunques', duel: 'Duelo del Oeste', mash: 'Carrera Machacabotones', tug: 'Tira y Afloja', balloons: 'Cuenta Globos', arrows: 'Flechas de Memoria', clock: 'Reloj a Ciegas', needle: 'Diana Oscilante' };
 const WCOL = ['#6e62f5', '#ff5a5f', '#3fb6ea', '#ffd166', '#5fbf45', '#ff9ad5', '#f0842a', '#34b574'];
-const RULE = { anvil: { rounds: 3, pts: [3, 2, 1, 0] }, mash: { rounds: 3, pts: [3, 2, 1, 0] }, duel: { to: 5, pts: [1, 0, 0, 0] }, tug: { to: 2, pts: [1, 0, 0, 0] }, roulette: { rounds: 10, pts: [3, 2, 1, 0] } }[MODE] || { rounds: 3, pts: [3, 2, 1, 0] };
+const RULE = { anvil: { rounds: 3, pts: [3, 2, 1, 0] }, mash: { rounds: 3, pts: [3, 2, 1, 0] }, duel: { to: 5, pts: [1, 0, 0, 0] }, tug: { to: 2, pts: [1, 0, 0, 0] }, roulette: { rounds: 10, pts: [3, 2, 1, 0] },
+  /* modos largos (rondas de ~1 min): dos rondas para que la partida dure lo mismo que las demás */
+  egg: { rounds: 2, pts: [3, 2, 1, 0] }, relay: { rounds: 2, pts: [3, 2, 1, 0] }, hotair: { rounds: 2, pts: [3, 2, 1, 0] }, witch: { rounds: 2, pts: [3, 2, 1, 0] } }[MODE] || { rounds: 3, pts: [3, 2, 1, 0] };
 let G = null, gKey = MODE === 'roulette' ? 'anvil' : MODE, score = [0, 0, 0, 0], round = 0, seq = null, phase = 'intro', phT = 0, res = null, live = false, wRot = 0, wFrom = 0, wTo = 0;
 const matchN = () => round;
 function makeSeq() { const s = k.shuffle(KEYS.slice()); while (s.length < 10) { const x = k.pick(KEYS); if (x !== s[s.length - 1]) s.push(x); } return s; }
