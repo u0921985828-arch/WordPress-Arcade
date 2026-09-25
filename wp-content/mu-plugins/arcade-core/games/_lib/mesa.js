@@ -290,8 +290,16 @@ const DCH = (() => {
     S.cell[m.from] = -1; S.cell[m.to] = p; S.turns++;
     S.ev.push({ t: 'move', p, m });
     if (S.goal[p].every((i) => S.cell[i] === p)) { S.winner = p; S.ev.push({ t: 'end', p }); return { p, m, win: true }; }
-    S.cur = (S.cur + 1) % S.n;
+    advance(S);
     return { p, m };
+  }
+  /* pasa el turno saltándose a quien no tiene ninguna jugada (raro, pero no puede bloquear la partida) */
+  function advance(S) {
+    for (let i = 0; i < S.n; i++) {
+      S.cur = (S.cur + 1) % S.n;
+      if (moves(S, S.cur).length) return S.cur;
+    }
+    return S.cur;
   }
   const done = (S, p) => S.goal[p].filter((i) => S.cell[i] === p).length;
   /* progreso: distancia total de las canicas a las casillas de destino (menos es mejor) */
@@ -317,7 +325,7 @@ const DCH = (() => {
     }
     return best;
   }
-  return { BRD, R, ROWS, DIRS, SEATS, OPP, hexDist, create, moves, movesFrom, apply, done, score, aiPick, triOf, inGoal, dist };
+  return { BRD, R, ROWS, DIRS, SEATS, OPP, hexDist, create, moves, movesFrom, apply, advance, done, score, aiPick, triOf, inGoal, dist };
 })();
 
 if (typeof module === 'object' && module.exports) module.exports = { CH, DCH };
@@ -565,6 +573,7 @@ else (function () {
     const S = DS.S;
     if (DS.anim) { DS.anim.t += dt * DS.anim.sp; if (DS.anim.t >= DS.anim.path.length - 1) DS.anim = null; }
     if (S.winner >= 0) { if (!DS.anim) dEnd(); return; }
+    if (!DS.anim && !DCH.moves(S, S.cur).length) { say(`${label(S.cur)} no puede mover: pasa`, '#ffc94d'); DCH.advance(S); DS.sel = -1; DS.moves = []; return; }
     const p = S.cur;
     msg = isHum(p) ? `${label(p)}: te toca` : `Juega ${label(p)}…`;
     sub = isHum(p) ? (DS.sel >= 0 ? 'Toca el agujero de destino' : 'Toca una canica tuya · flechas y A con mando') : '';

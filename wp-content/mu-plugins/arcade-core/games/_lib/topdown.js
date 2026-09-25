@@ -545,7 +545,7 @@ function drawPlate(q) {
   c.beginPath(); c.ellipse(q.x, q.y + 3, r + 2, (r + 2) * 0.6, 0, 0, R2); c.fillStyle = 'rgba(0,0,0,.3)'; c.fill();
   c.beginPath(); c.ellipse(q.x, q.y + (on ? 2 : 0), r, r * 0.6, 0, 0, R2); ART.fillOut(c, on ? '#7cf7a0' : '#8f88ad', 2.5);
   c.beginPath(); c.ellipse(q.x, q.y + (on ? 2 : 0), r * 0.6, r * 0.36, 0, 0, R2); c.strokeStyle = on ? '#1a1530' : 'rgba(26,21,48,.55)'; c.lineWidth = 2; c.stroke();
-  if (!on) { c.globalAlpha = 0.45 + Math.sin(t * 5) * 0.2; c.strokeStyle = '#ffc928'; c.lineWidth = 2.5; c.beginPath(); c.ellipse(q.x, q.y, r + 5, (r + 5) * 0.6, 0, 0, R2); c.stroke(); c.globalAlpha = 1; }
+  if (!on && !unlocked) { c.globalAlpha = 0.45 + Math.sin(t * 5) * 0.2; c.strokeStyle = '#ffc928'; c.lineWidth = 2.5; c.beginPath(); c.ellipse(q.x, q.y, r + 5, (r + 5) * 0.6, 0, 0, R2); c.stroke(); c.globalAlpha = 1; }
 }
 function drawGate(w) {
   const x = w.x, y = w.y, hh = w.h, op = w.open;
