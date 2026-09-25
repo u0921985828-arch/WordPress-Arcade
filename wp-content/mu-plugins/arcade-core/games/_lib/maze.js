@@ -631,6 +631,8 @@ function gDrop(pl, amount, killer) {
 }
 function gPickCpu(pl) {
   const pass = (x, y) => gFree(x, y);
+  // 1.23: la CPU titubea y solo afina cuando lleva partidas ganadas
+  if (Math.random() > 0.5 + gSkill() * 0.45) return k.pick(DIRS.filter((d) => gFree(pl.x + D[d][0], pl.y + D[d][1]))) || null;
   if (pl.carry >= (3 + Math.round(gSkill() * 4)) || (GT < 12 && pl.carry > 0)) {
     const dm = distMap(gCart.x, gCart.y, pass); return gStep(pl, dm);
   }
