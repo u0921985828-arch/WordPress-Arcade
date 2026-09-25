@@ -148,11 +148,20 @@
       return r.json().catch(function () { return {}; }).then(function (j) { j = j || {}; j._status = r.status; return j; });
     });
   }
+  // Espera a los candidatos ICE (sin trickle): hasta completar o `ms`. Sale antes si ya hay un candidato de puente
+  // (TURN) o, sin TURN configurado, uno público (STUN): los que faltan no suelen aportar nada.
   function gathered(pc, ms) {
     return new Promise(function (res) {
       if (pc.iceGatheringState === 'complete') return res();
-      var t = setTimeout(res, ms);
-      pc.addEventListener('icegatheringstatechange', function () { if (pc.iceGatheringState === 'complete') { clearTimeout(t); res(); } });
+      var done = false, early = 0;
+      function fin() { if (!done) { done = true; clearTimeout(t); clearTimeout(early); res(); } }
+      var t = setTimeout(fin, ms);
+      pc.addEventListener('icegatheringstatechange', function () { if (pc.iceGatheringState === 'complete') fin(); });
+      pc.addEventListener('icecandidate', function (e) {
+        if (!e.candidate) { fin(); return; }
+        var c = e.candidate.candidate || '';
+        if (!early && (/ typ relay/.test(c) || (!C.relay && / typ srflx/.test(c)))) early = setTimeout(fin, 600);
+      });
     });
   }
   var ICO = {
@@ -704,14 +713,20 @@
     pc.setRemoteDescription({ type: 'offer', sdp: row.offer })
       .then(function () { return pc.createAnswer(); })
       .then(function (a) { return pc.setLocalDescription(a); })
-      .then(function () { return gathered(pc, 2500); })
+      .then(function () { return gathered(pc, 5000); })
       .then(function () {
         if (S.peers[p] !== peer) return null;
         return api('/' + S.code + '/answer', { method: 'POST', body: { k: S.k, p: p, oid: row.oid, sdp: pc.localDescription.sdp } });
       })
       .then(function (r) {
         if (r && r._status === 503) throw new Error('busy'); // se reintenta con el siguiente sondeo
-        // Si nunca llega a abrirse (red que no deja conectar), libera la plaza en la tele.
+        // Si nunca llega a abrirse (red que no deja conectar), avisa y libera la plaza en la tele.
+        setTimeout(function () {
+          if (S.peers[p] !== peer || peer.open) return;
+          S.stuck = (S.stuck || 0) + 1;
+          status('J' + (p + 1) + ' no consigue conectar' + (S.stuck > 1 ? ' (otra vez)' : '') + ': la red no deja la conexión directa. ' +
+            (C.relay ? 'Prueba con otra wifi o con datos móviles.' : 'Pon la tele y los móviles en la misma wifi (no la de invitados) o comparte datos desde un móvil y conéctalos todos ahí.'), true);
+        }, 18000);
         setTimeout(function () { if (S.peers[p] === peer && !peer.open) dropPeer(p); }, 25000);
         return r;
       })

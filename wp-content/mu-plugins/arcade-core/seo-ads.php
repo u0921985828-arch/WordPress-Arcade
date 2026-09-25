@@ -21,7 +21,7 @@ final class Arcade_SEO {
 	}
 
 	public static function opt( $k = null ) {
-		$o = wp_parse_args( (array) get_option( self::OPT, array() ), array( 'pub' => '', 'owner' => '', 'nif' => '', 'address' => '', 'email' => get_option( 'admin_email' ), 'slot' => '', 'slot_side' => '', 'h5' => '', 'adtest' => '', 'freq' => '120' ) );
+		$o = wp_parse_args( (array) get_option( self::OPT, array() ), array( 'pub' => '', 'owner' => '', 'nif' => '', 'address' => '', 'email' => get_option( 'admin_email' ), 'slot' => '', 'slot_side' => '', 'h5' => '', 'adtest' => '', 'freq' => '120', 'turn_id' => '', 'turn_token' => '', 'turn_urls' => '', 'turn_user' => '', 'turn_pass' => '' ) );
 		return $k ? $o[ $k ] : $o;
 	}
 
@@ -46,6 +46,14 @@ final class Arcade_SEO {
 		<tr><th>Anuncios dentro de los juegos</th><td><label><input type="checkbox" name="h5" value="1"<?php checked( $o['h5'], '1' ); ?>> Activar H5 Games Ads (anuncio al empezar y al reiniciar partida)</label><p class="description">Solicítalo antes en AdSense (programa «AdSense para juegos»). Se muestra como mucho uno cada:</p>
 		<select name="freq"><?php foreach ( array( '60' => '1 minuto', '120' => '2 minutos', '180' => '3 minutos', '300' => '5 minutos' ) as $v => $t ) { printf( '<option value="%s"%s>%s</option>', esc_attr( $v ), selected( $o['freq'], $v, false ), esc_html( $t ) ); } ?></select></td></tr>
 		<tr><th>Modo de prueba</th><td><label><input type="checkbox" name="adtest" value="1"<?php checked( $o['adtest'], '1' ); ?>> Anuncios de prueba (no cuentan impresiones). Desactívalo al publicar.</label><p class="description">Para ver dónde irán los anuncios sin tener AdSense aprobado, abre cualquier página con <code>?adpreview=1</code> estando identificado como administrador.</p></td></tr>
+		</table>
+		<h2>Modo tele: servidor TURN (recomendado)</h2>
+		<p class="description" style="max-width:720px">Los mandos se conectan directamente con la tele. En muchas redes (wifi con aislamiento de clientes, datos móviles, routers de operador) eso falla y los mandos se quedan en «Conectando…». Un servidor TURN hace de puente cuando no hay conexión directa. Cloudflare lo da gratis (1000 GB/mes): dash.cloudflare.com → Realtime → TURN Server → Create → copia el «Turn Token ID» y el «API Token».</p>
+		<table class="form-table">
+		<?php $f( 'turn_id', 'Cloudflare: Turn Token ID', 'a1b2c3d4e5f6…' ); ?>
+		<tr><th><label for="turn_token">Cloudflare: API Token</label></th><td><input class="regular-text" type="password" id="turn_token" name="turn_token" value="" placeholder="<?php echo $o['turn_token'] ? esc_attr( 'Guardado (déjalo vacío para mantenerlo)' ) : ''; ?>" autocomplete="off"><?php if ( $o['turn_token'] ) : ?><label style="margin-left:8px"><input type="checkbox" name="turn_clear" value="1"> Borrar</label><?php endif; ?><p class="description">Se guarda en el servidor; los móviles solo reciben credenciales temporales (24 h).</p></td></tr>
+		<?php $f( 'turn_urls', 'Otro TURN: URL(s) (opcional)', 'turn:turn.ejemplo.com:3478, turns:turn.ejemplo.com:443?transport=tcp', 'Solo si usas otro proveedor (Metered, Twilio…). Separa varias con comas.' ); $f( 'turn_user', 'Otro TURN: usuario', '' ); $f( 'turn_pass', 'Otro TURN: contraseña', '' ); ?>
+		<tr><th>Estado</th><td><?php echo esc_html( class_exists( 'Arcade_Party' ) ? Arcade_Party::turn_status() : '' ); ?></td></tr>
 		</table>
 		<p><label><input type="checkbox" name="make_pages" value="1"> Crear/actualizar los borradores de páginas legales (Aviso legal, Privacidad, Cookies, Contacto, Sobre nosotros)</label></p>
 		<?php submit_button( 'Guardar' ); ?></form>
@@ -85,7 +93,24 @@ final class Arcade_SEO {
 		$o['h5']        = empty( $_POST['h5'] ) ? '' : '1';
 		$o['adtest']    = empty( $_POST['adtest'] ) ? '' : '1';
 		$o['freq']      = in_array( $_POST['freq'] ?? '', array( '60', '120', '180', '300' ), true ) ? $_POST['freq'] : '120'; // phpcs:ignore
+		$o['turn_id']   = preg_replace( '/[^A-Za-z0-9_-]/', '', (string) wp_unslash( $_POST['turn_id'] ?? '' ) );
+		$tok            = trim( (string) wp_unslash( $_POST['turn_token'] ?? '' ) );
+		if ( ! empty( $_POST['turn_clear'] ) ) {
+			$o['turn_token'] = '';
+		} elseif ( '' !== $tok ) {
+			$o['turn_token'] = preg_replace( '/[^A-Za-z0-9_.\-]/', '', $tok );
+		}
+		$urls = array();
+		foreach ( preg_split( '/[\s,]+/', (string) wp_unslash( $_POST['turn_urls'] ?? '' ) ) as $u ) {
+			if ( preg_match( '#^turns?:[A-Za-z0-9.\-:]+(\?transport=(udp|tcp))?$#', $u ) ) {
+				$urls[] = $u;
+			}
+		}
+		$o['turn_urls'] = implode( ', ', $urls );
+		$o['turn_user'] = sanitize_text_field( wp_unslash( $_POST['turn_user'] ?? '' ) );
+		$o['turn_pass'] = sanitize_text_field( wp_unslash( $_POST['turn_pass'] ?? '' ) );
 		update_option( self::OPT, $o, false );
+		delete_transient( 'arcade_turn' );
 		$msg = 'Guardado.';
 		if ( ! empty( $_POST['make_pages'] ) ) {
 			self::make_pages();

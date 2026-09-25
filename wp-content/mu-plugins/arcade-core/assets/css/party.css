@@ -206,3 +206,53 @@ body.pt-pad{position:fixed;top:0;right:0;bottom:0;left:0;overscroll-behavior:non
 .pd-it small{font:600 .75rem/1.2 system-ui,sans-serif;opacity:.8}
 .pd-it[disabled]{opacity:.35}
 .pd-it.hit{transform:translateY(3px);box-shadow:0 1px 0 #1a1530}
+
+/* ============================================================ 1.25 · Tele en móvil o tableta pequeña */
+.pt-lobby{height:100vh;height:100dvh}
+.pt-phone .pt-btn{white-space:nowrap;font-size:.95em;padding:.8em 1em}
+.pt-or b{word-break:break-all}
+/* Vertical: QR a la izquierda, código a la derecha; los juegos ocupan el resto y se desplazan. */
+@media (max-aspect-ratio:1/1) and (max-width:1100px){
+  .pt-tv{font-size:14px;font-size:clamp(14px,2.2vw,20px)}
+  .pt-lobby{gap:.8em;padding:12px 12px 0;padding-top:max(12px,env(safe-area-inset-top))}
+  .pt-join{gap:.6em}
+  .pt-wm{height:1.7em}
+  .pt-qrbox{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto auto;column-gap:.9em;row-gap:.35em;align-items:center;text-align:left;padding:.8em}
+  .pt-qr{grid-row:1 / span 3;width:min(34vw,19vh);border-radius:10px}
+  .pt-step{font-size:.95em}
+  .pt-or{margin:0;font-size:.85em}
+  .pt-code{justify-self:start;font-size:2.2em;border-radius:12px}
+  .pt-players{gap:.4em}
+  .pt-pl{padding:.35em .2em;border-radius:12px;row-gap:.1em}
+  .pt-av{width:1.9em;height:1.9em;border-width:2px}
+  .pt-pl b{font-size:1em}
+  .pt-pl span:last-child{font-size:.75em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .pt-status:empty{display:none}
+  .pt-top{gap:.3em .8em;padding-bottom:.5em}
+  .pt-top h1{font-size:1.45em}
+  .pt-hint{font-size:.85em}
+  .pt-tv .pt-grid{grid-template-columns:repeat(auto-fill,minmax(10em,1fr));gap:.8em}
+  .pt-scroll{padding:.5em .6em calc(2em + env(safe-area-inset-bottom));margin:0 -.6em}
+  .pt-sec h2{font-size:1.1em;flex-wrap:wrap}
+  .pt-cell.on{transform:none}
+}
+/* Horizontal con poca altura (móvil tumbado): columna izquierda estrecha y compacta. */
+@media (min-aspect-ratio:1/1) and (max-height:560px){
+  .pt-tv{font-size:12px}
+  .pt-lobby{grid-template-columns:minmax(14em,30%) minmax(0,1fr);gap:1.2em;padding:10px max(12px,env(safe-area-inset-right)) 0 max(12px,env(safe-area-inset-left))}
+  .pt-join{gap:.6em;overflow-y:auto;scrollbar-width:none;padding-bottom:10px}
+  .pt-join::-webkit-scrollbar{display:none}
+  .pt-wm{height:1.6em}
+  .pt-qrbox{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:.8em;row-gap:.3em;align-items:center;text-align:left;padding:.7em}
+  .pt-qr{grid-row:1 / span 3;width:min(30vh,8.5em);border-radius:10px}
+  .pt-step{font-size:.95em}
+  .pt-or{margin:0;font-size:.85em}
+  .pt-code{justify-self:start;font-size:2em;border-radius:12px}
+  .pt-players{gap:.4em}
+  .pt-pl{padding:.35em .5em;border-radius:12px}
+  .pt-av{width:1.9em;height:1.9em;border-width:2px}
+  .pt-top{gap:.3em .8em;padding-bottom:.4em}
+  .pt-top h1{font-size:1.5em}
+  .pt-tv .pt-grid{grid-template-columns:repeat(auto-fill,minmax(10.5em,1fr));gap:.8em}
+  .pt-scroll{padding-bottom:calc(2em + env(safe-area-inset-bottom))}
+}

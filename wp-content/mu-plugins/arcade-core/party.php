@@ -21,8 +21,8 @@ final class Arcade_Party {
 	const COLORS   = array( '#ff5a5f', '#3fb6ea', '#ffd166', '#5fbf45' );
 	const LIMITS   = array( // tipo => [peticiones, ventana en s]
 		'create' => array( 6, 600 ),
-		'join'   => array( 20, 600 ),
-		'req'    => array( 240, 60 ),
+		'join'   => array( 60, 600 ),  // todos los móviles de una casa comparten IP (y cada reintento vuelve a unirse)
+		'req'    => array( 600, 60 ),
 	);
 
 	public static function boot() {
@@ -88,6 +88,89 @@ final class Arcade_Party {
 		}
 	}
 
+	/** Servidores ICE: STUN públicos y, si está configurado, TURN (puente cuando la red impide la conexión directa). */
+	public static function ice() {
+		$ice = array(
+			array( 'urls' => array( 'stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302' ) ),
+			array( 'urls' => 'stun:stun.cloudflare.com:3478' ),
+		);
+		$turn = self::turn();
+		if ( $turn ) {
+			$ice = array_merge( $ice, $turn );
+		}
+		return apply_filters( 'arcade_party_ice', $ice );
+	}
+
+	private static function opt( $k ) {
+		return class_exists( 'Arcade_SEO' ) ? (string) Arcade_SEO::opt( $k ) : '';
+	}
+
+	public static function has_turn() {
+		return (bool) self::turn();
+	}
+
+	/** TURN: credenciales temporales de Cloudflare (caché 12 h de 24 h de validez) o un servidor propio. */
+	private static function turn() {
+		static $memo = null;
+		if ( null !== $memo ) {
+			return $memo;
+		}
+		$memo = array();
+		$urls = array_filter( array_map( 'trim', explode( ',', self::opt( 'turn_urls' ) ) ) );
+		if ( $urls ) {
+			$memo[] = array( 'urls' => array_values( $urls ), 'username' => self::opt( 'turn_user' ), 'credential' => self::opt( 'turn_pass' ) );
+		}
+		$id  = self::opt( 'turn_id' );
+		$tok = self::opt( 'turn_token' );
+		if ( $id && $tok ) {
+			$cf = get_transient( 'arcade_turn' );
+			if ( ! is_array( $cf ) ) {
+				$cf  = array();
+				$res = wp_remote_post(
+					'https://rtc.live.cloudflare.com/v1/turn/keys/' . rawurlencode( $id ) . '/credentials/generate-ice-servers',
+					array(
+						'timeout' => 6,
+						'headers' => array( 'Authorization' => 'Bearer ' . $tok, 'Content-Type' => 'application/json' ),
+						'body'    => wp_json_encode( array( 'ttl' => DAY_IN_SECONDS ) ),
+					)
+				);
+				$code = is_wp_error( $res ) ? 0 : (int) wp_remote_retrieve_response_code( $res );
+				$j    = $code >= 200 && $code < 300 ? json_decode( wp_remote_retrieve_body( $res ), true ) : null;
+				$list = is_array( $j ) && isset( $j['iceServers'] ) ? $j['iceServers'] : array();
+				if ( isset( $list['urls'] ) ) {
+					$list = array( $list );
+				}
+				foreach ( (array) $list as $srv ) {
+					if ( empty( $srv['username'] ) || empty( $srv['credential'] ) ) {
+						continue; // los STUN ya van aparte
+					}
+					// Los navegadores bloquean el puerto 53: fuera esas URL.
+					$u = array_values( array_filter( (array) $srv['urls'], static function ( $x ) {
+						return is_string( $x ) && ! preg_match( '/:53(\?|$)/', $x );
+					} ) );
+					if ( $u ) {
+						$cf[] = array( 'urls' => $u, 'username' => (string) $srv['username'], 'credential' => (string) $srv['credential'] );
+					}
+				}
+				// Si falla, se reintenta en 5 min (sin bloquear cada carga de la tele).
+				set_transient( 'arcade_turn', $cf, $cf ? 12 * HOUR_IN_SECONDS : 5 * MINUTE_IN_SECONDS );
+				update_option( 'arcade_turn_err', $cf ? '' : ( is_wp_error( $res ) ? $res->get_error_message() : 'HTTP ' . $code ), false );
+			}
+			$memo = array_merge( $memo, $cf );
+		}
+		return $memo;
+	}
+
+	public static function turn_status() {
+		if ( ! self::opt( 'turn_urls' ) && ! ( self::opt( 'turn_id' ) && self::opt( 'turn_token' ) ) ) {
+			return 'Sin TURN: los mandos solo conectan si la red permite la conexión directa.';
+		}
+		if ( self::has_turn() ) {
+			return 'TURN activo: los mandos podrán conectar aunque la red bloquee la conexión directa.';
+		}
+		return 'No se pudieron obtener credenciales TURN (' . get_option( 'arcade_turn_err', '?' ) . '). Revisa el ID y el token.';
+	}
+
 	private static function render( $kind ) {
 		$asset = static function ( $rel ) {
 			return plugins_url( $rel, __FILE__ );
@@ -104,7 +187,8 @@ final class Arcade_Party {
 			'brand'  => $brand,
 			'logo'   => $asset( 'assets/img/kuboplay-logo.svg' ),
 			'colors' => self::COLORS,
-			'ice'    => array( array( 'urls' => 'stun:stun.l.google.com:19302' ) ),
+			'ice'    => self::ice(),
+			'relay'  => self::has_turn(),
 			'v'      => $v,
 		);
 		$ads = 'tv' === $kind ? self::ads() : array( 'head' => '' );

@@ -27,11 +27,20 @@
       return r.json().catch(function () { return {}; }).then(function (j) { j = j || {}; j._status = r.status; return j; });
     });
   }
+  // Espera a los candidatos ICE (sin trickle): hasta completar o `ms`. Sale antes si ya hay un candidato de puente
+  // (TURN) o, sin TURN configurado, uno público (STUN): los que faltan no suelen aportar nada.
   function gathered(pc, ms) {
     return new Promise(function (res) {
       if (pc.iceGatheringState === 'complete') return res();
-      var t = setTimeout(res, ms);
-      pc.addEventListener('icegatheringstatechange', function () { if (pc.iceGatheringState === 'complete') { clearTimeout(t); res(); } });
+      var done = false, early = 0;
+      function fin() { if (!done) { done = true; clearTimeout(t); clearTimeout(early); res(); } }
+      var t = setTimeout(fin, ms);
+      pc.addEventListener('icegatheringstatechange', function () { if (pc.iceGatheringState === 'complete') fin(); });
+      pc.addEventListener('icecandidate', function (e) {
+        if (!e.candidate) { fin(); return; }
+        var c = e.candidate.candidate || '';
+        if (!early && (/ typ relay/.test(c) || (!C.relay && / typ srflx/.test(c)))) early = setTimeout(fin, 600);
+      });
     });
   }
 
@@ -298,8 +307,26 @@
     teardown();
     S.retry++;
     var ms = Math.min(10000, 1000 * S.retry);
-    overlay('<span class="pd-spin"></span><h1>Reconectando…</h1><p>Comprueba que el móvil tiene wifi y que la tele sigue abierta en la página del modo tele.</p>');
+    overlay(retryMsg());
     setTimeout(function () { if (gen === S.gen) connect(); }, ms);
+  }
+
+  // Por qué falló el último intento: 'tv' (la tele no contestó) o 'net' (contestó pero la red no dejó conectar).
+  function retryMsg() {
+    var why = S.why; S.why = '';
+    if (why === 'tv') S.tvFail = (S.tvFail || 0) + 1;
+    if (why === 'net') S.netFail = (S.netFail || 0) + 1;
+    var h = '<span class="pd-spin"></span><h1>Reconectando…</h1>';
+    if (why === 'net' && S.netFail >= 2) {
+      var tips = ['Pon todos los móviles y la tele en la <b>misma wifi</b> (no la de invitados).',
+        'Si no funciona, desactiva la wifi y usa <b>datos móviles</b> en los mandos, o comparte datos desde un móvil y conecta ahí la tele y los mandos.',
+        'Usa <b>Chrome</b> o <b>Safari</b>: algunos navegadores (Brave, modo privado estricto) bloquean la conexión directa.'];
+      if (navigator.brave) tips.unshift('Estás usando <b>Brave</b>: desactiva los escudos (icono del león) o abre el enlace en Chrome.');
+      if (!C.relay) tips.push('Si eres el dueño de la web: activa el servidor TURN en Ajustes → Arcade.');
+      return h + '<p>La tele responde, pero <b>tu red no deja conectar</b> directamente con ella.</p><ul class="pd-tips"><li>' + tips.join('</li><li>') + '</li></ul>';
+    }
+    if (why === 'tv' && S.tvFail >= 2) return h + '<p><b>La tele no responde.</b> Comprueba que sigue abierta en la página del modo tele, con la pantalla encendida, y que el código es <b>' + esc(code) + '</b>.</p>';
+    return h + '<p>Comprueba que el móvil tiene conexión y que la tele sigue abierta en la página del modo tele.</p>';
   }
 
   function negotiate(gen) {
@@ -309,7 +336,7 @@
     var dc = S.dc = pc.createDataChannel('arcade', { ordered: false });
     dc.onopen = function () {
       if (gen !== S.gen) return;
-      S.open = true; S.retry = 0; S.rx = Date.now(); S.padSeq = -1;
+      S.open = true; S.retry = 0; S.rx = Date.now(); S.padSeq = -1; S.netFail = S.tvFail = 0;
       overlay('');
       send({ t: 'hi' });
       buzz(30);
@@ -328,13 +355,13 @@
       else if (d.t === 'priv') priv(d.d);
     };
     dc.onclose = function () { if (gen === S.gen) { S.open = false; releaseAll(); retry(gen); } };
-    var dead = function () { if (gen === S.gen && S.pc === pc) { S.open = false; releaseAll(); retry(gen); } };
+    var dead = function () { if (gen === S.gen && S.pc === pc) { if (!S.open) S.why = 'net'; S.open = false; releaseAll(); retry(gen); } };
     pc.onconnectionstatechange = function () { if (pc.connectionState === 'failed') dead(); };
     pc.oniceconnectionstatechange = function () { if (pc.iceConnectionState === 'failed') dead(); };
     var oid = 0;
     return pc.createOffer()
       .then(function (o) { return pc.setLocalDescription(o); })
-      .then(function () { return gathered(pc, 2500); })
+      .then(function () { return gathered(pc, 5000); })
       .then(function () { return api('/' + code + '/offer', { method: 'POST', body: { p: S.p, tok: S.tok, sdp: pc.localDescription.sdp } }); })
       .then(function (r) {
         if (gen !== S.gen) return null;
@@ -349,7 +376,7 @@
 
   function pollAnswer(gen, oid, t0) {
     if (gen !== S.gen) return null;
-    if (Date.now() - t0 > 25000) { retry(gen); return null; }
+    if (Date.now() - t0 > 25000) { S.why = 'tv'; retry(gen); return null; }
     return api('/' + code + '/answer?p=' + S.p + '&tok=' + encodeURIComponent(S.tok) + '&oid=' + oid).then(function (r) {
       if (gen !== S.gen) return null;
       if (r._status === 409) { S.tok = ''; saveSeat(); return connect(); }
@@ -357,7 +384,7 @@
       if (r._status === 429) return wait(5000).then(function () { return pollAnswer(gen, oid, t0); });
       if (!r.sdp) return wait(1000).then(function () { return pollAnswer(gen, oid, t0); });
       return S.pc.setRemoteDescription({ type: 'answer', sdp: r.sdp }).then(function () {
-        setTimeout(function () { if (gen === S.gen && !S.open) retry(gen); }, 15000);
+        setTimeout(function () { if (gen === S.gen && !S.open) { S.why = 'net'; retry(gen); } }, 15000);
       });
     });
   }
