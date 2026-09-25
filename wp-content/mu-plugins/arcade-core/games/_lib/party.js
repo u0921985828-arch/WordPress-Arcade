@@ -1377,7 +1377,7 @@ function strip(vals, unit, hl) {
 let LANE = null;
 function mgBowl() {
   const F = { x0: 92, x1: 708, y0: 150, y1: 372 }, HOME = 392, TL = 38;
-  const m = { name: 'Bolos Humanos', help: 'Apunta con el joystick, mantén A para coger impulso y suelta para rodar. Cada bolo 1 punto, el dorado 3 y tumbar a un rival 2.', done: false, rank: null };
+  const m = { name: 'Bolos Humanos', help: 'Apunta con el joystick, mantén A para coger impulso y suelta para rodar. Bolo 1 punto, el dorado 3, tumbar a un rival 2.', done: false, rank: null };
   const ps = [0, 1, 2, 3].map((p) => ({ p, x: XP[p], y: HOME, aim: -Math.PI / 2, pw: 0, ch: false, ball: null, pts: 0, stun: 0, back: 0, aiT: 0, want: 0, wantA: -Math.PI / 2, face: 1 }));
   const pins = [], marks = []; let T = 0, over = false, endT = 0, rack = 0, wait = 0;
   function newRack() {
@@ -1506,7 +1506,7 @@ function mgBowl() {
 /* 19. TORO MECÁNICO — aguanta encima inclinándote al lado contrario de cada sacudida. */
 function mgBull() {
   const CX = [100, 300, 500, 700], CY = 300, LIM = 0.82, WARM = 5;
-  const m = { name: 'Toro Mecánico', help: 'El toro avisa con una flecha antes de cada sacudida: empuja el joystick al lado contrario. Si te inclinas demasiado, caes.', done: false, rank: null };
+  const m = { name: 'Toro Mecánico', help: 'El toro avisa con una flecha antes de sacudir: empuja el joystick al lado contrario. Si te inclinas demasiado, caes.', done: false, rank: null };
   const ps = [0, 1, 2, 3].map((p) => ({ p, th: k.rnd(-0.05, 0.05), w: 0, out: -1, fallT: 0, bull: 0, react: 0, hold: 0, lapse: 0, kickDir: 0 }));
   let T = 0, next = 3, tel = null, over = false, endT = 0, bt = 0;
   const grav = () => lerp(2.0, 4.8, ease(T / 55));
@@ -1594,7 +1594,7 @@ function mgBull() {
 /* 20. HUEVO EN LA CUCHARA — corre deprisa pero sin que el huevo se te vaya de la cuchara. */
 function mgEgg() {
   const D = 1750, LY = [200, 262, 324, 386], TL = 55;
-  const m = { name: 'Huevo en la Cuchara', help: 'Mantén A para correr; cuanto más aceleras, más se va el huevo hacia atrás. Compensa con el joystick ← →. Si cae, pierdes tres segundos.', done: false, rank: null };
+  const m = { name: 'Huevo en la Cuchara', help: 'Mantén A para correr; al acelerar el huevo se va hacia atrás. Compénsalo con ← →. Si cae, pierdes 3 segundos.', done: false, rank: null };
   const ps = [0, 1, 2, 3].map((p) => ({ p, d: 0, v: 0, e: 0, ev: 0, drop: 0, fin: -1, run: false, aiT: 0, aim: 0, wob: 0, drops: 0 }));
   const bumps = []; for (let x = 260; x < D - 120; x += k.rnd(190, 300)) bumps.push(x);
   let T = 0, cam = 0, over = false, endT = 0, place = 0;
@@ -1676,7 +1676,7 @@ function mgEgg() {
 /* 21. FOTO DE GRUPO — colócate en tu silueta con la pose correcta antes del flash. */
 function mgPhoto() {
   const F = { x0: 80, x1: 720, y0: 246, y1: 408 }, SHOTS = 5;
-  const m = { name: 'Foto de Grupo', help: 'Corre hasta la silueta de tu color y ponte en la pose que marca: A brazos arriba, B agachado, nada de pie. Cuando salte el flash, quien esté en su sitio suma.', done: false, rank: null };
+  const m = { name: 'Foto de Grupo', help: 'Corre a la silueta de tu color y haz la pose: A brazos arriba, B agachado, nada de pie. Suma quien esté listo al flash.', done: false, rank: null };
   const poseOf = (p) => (cpu(p) ? null : k.pheld(p, 'a') ? 'up' : k.pheld(p, 'b') ? 'down' : 'stand');
   const ps = [0, 1, 2, 3].map((p) => ({ p, x: 200 + p * 130, y: 340, face: 1, mv: false, pts: 0, got: null, pose: 'stand', aiT: 0, ox: 0, oy: 0, react: 0, want: 'stand' }));
   let shot = 0, spots = [], st = 'set', sT = 0, CD = 4, flash = 0, swapT = -1, swapped = false, over = false, endT = 0;
@@ -1788,7 +1788,7 @@ function mgPhoto() {
 /* 22. RELEVO DE CUBOS — cooperativo: llenad el barril pasándoos cubos sin derramarlos. */
 function mgRelay() {
   const GY = 352, BD = [104, 252, 400, 548, 700], GOAL = 100, TL = 70, LITROS = 20;
-  const m = { name: 'Relevo de Cubos', help: 'Cooperativo: mueve tu tramo con ← →, coge el cubo con A y llévalo al siguiente. Si corres a tirones se derrama: mantén B para ir despacio y sujetarlo.', done: false, rank: null, teamHead: null };
+  const m = { name: 'Relevo de Cubos', help: 'Cooperativo: muévete por tu tramo con ← →, coge el cubo con A y pásalo al siguiente. Mantén B para no derramar agua.', done: false, rank: null, teamHead: null };
   const ps = [0, 1, 2, 3].map((p) => ({ p, x: BD[p] + 30, v: 0, pv: 0, face: 1, bucket: null, liters: 0, aiT: 0, steady: false }));
   const bks = []; let T = 0, barrel = 0, spawnT = 1, over = false, endT = 0, spilled = 0, done = 0;
   const bucketAt = (i) => bks.find((b) => b.carrier === i);
@@ -1903,7 +1903,7 @@ function mgRelay() {
 /* 23. GLOBO DE TODOS — cooperativo: todos manejan el mismo globo aerostático. */
 function mgHotair() {
   const BX = 250, TOP = 150, BOT = 320, TL = 58, SKY = 142, FLOOR = 378;
-  const m = { name: 'Globo de Todos', help: 'Cooperativo: el globo es de todos. A enciende tu quemador (sube) y B suelta lastre (baja). Se suman todos los mandos: si sopláis a la vez, os vais al techo. Esquivad los pájaros.', done: false, rank: null, teamHead: null };
+  const m = { name: 'Globo de Todos', help: 'Cooperativo: A enciende tu quemador (sube) y B suelta lastre (baja). Se suman los cuatro mandos. Esquivad los pájaros.', done: false, rank: null, teamHead: null };
   const ps = [0, 1, 2, 3].map((p) => ({ p, act: 0, ok: 0, bad: 0, fuel: 1 }));
   const birds = [], clouds = []; let y = 240, vy = 0, T = 0, hp = 5, inv = 0, nextB = 2.2, over = false, endT = 0, tick = 0, need = 0, dist = 0;
   for (let i = 0; i < 7; i++) clouds.push({ x: k.rnd(0, W), y: k.rnd(60, 340), s: k.rnd(0.6, 1.3) });
@@ -2009,7 +2009,7 @@ function mgHotair() {
 /* 24. TREN DE LA BRUJA — agáchate con B o salta con A cuando llega el palo de la bruja. */
 function mgWitch() {
   const PX = [250, 338, 426, 514], FY = 278, TL = 62, WARM = 6;
-  const m = { name: 'Tren de la Bruja', help: 'El vagón no para. Palo alto: agáchate manteniendo B. Palo bajo: salta con A. A veces cambia de altura en el último momento. Dos golpes y te caes del tren.', done: false, rank: null };
+  const m = { name: 'Tren de la Bruja', help: 'El vagón no para. Palo alto: agáchate con B. Palo bajo: salta con A. Algunos cambian de altura. Dos golpes y caes.', done: false, rank: null };
   const ps = [0, 1, 2, 3].map((p) => ({ p, h: 0, vy: 0, air: false, duck: 0, hits: 0, out: -1, stun: 0, cleared: 0, plan: null, fallX: 0, fallY: 0 }));
   const obs = [], deco = []; let T = 0, next = 3, sp = 230, over = false, endT = 0, scroll = 0;
   for (let i = 0; i < 9; i++) deco.push({ x: k.rnd(0, W), k: k.ri(0, 2), y: k.rnd(104, 158), s: k.rnd(0.7, 1.2) });
@@ -2118,7 +2118,7 @@ function mgWitch() {
 let HOLES = null;
 function mgMole() {
   const CX = [200, 305, 410, 515, 620], RY = [230, 302, 374], NC = 5, NR = 3, TL = 42;
-  const m = { name: 'Topo Burlón', help: 'Muévete de agujero con el joystick y mantén A para asomar: cada instante fuera suma. El martillo solo ve lo que tiene delante: asoma a su espalda y escóndete antes de que se gire. Las zanahorias valen 4.', done: false, rank: null };
+  const m = { name: 'Topo Burlón', help: 'Cambia de agujero con el joystick y mantén A para asomar: fuera sumas puntos. El martillo golpea lo que ve de frente. Zanahoria: 4.', done: false, rank: null };
   const hx = (i) => CX[i % NC], hy = (i) => RY[Math.floor(i / NC)];
   const ps = [0, 1, 2, 3].map((p) => ({ p, h: [0, 4, 10, 14][p], out: 0, want: false, stun: 0, pts: 0, mv: 0, aiT: 0, eat: 0, face: 1, hide: 0 }));
   const carrots = []; let T = 0, over = false, endT = 0, carT = 2.5;
