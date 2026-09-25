@@ -1,6 +1,6 @@
 /* Plataformas con arte propio (ART). CFG.mode: 'barrels' (vigas y escaleras) | 'ninja' (salto entre paredes) | 'hopper' (rebote en nubes) | 'lava' (la lava sube).
  * CFG.theme opcional; CFG.pal.p = color del héroe; CFG.bg = color de fondo exterior. */
-const M = CFG.mode === 'side' ? 'barrels' : CFG.mode, port = M !== 'barrels';
+const M = CFG.mode === 'side' ? 'barrels' : CFG.mode, TEJ = M === 'tejados', port = M !== 'barrels' && !TEJ;
 const TH = ART.THEMES[CFG.theme || { barrels: 'factory', ninja: 'night', hopper: 'sky', lava: 'dusk' }[M] || 'factory'], OUT = ART.OUT;
 const W = port ? 360 : 480, H = port ? 640 : 360, T = 20;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: CFG.bg || TH.sky[0] }), c = k.ctx;
@@ -72,10 +72,12 @@ function genVert() {
   else { platforms.push({ x: -10, y: H - 40, w: W + 20, kind: 'floor', sq: 0 }); p = mkP(W / 2 - 9, H - 70); genY = H - 40; }
   startY = hiY = p.y; genMore();
 }
-function build() { t = 0; rope = null; dashT = 0; dashCd = 0; swordT = 0; jumpBuf = 0; coyote = 0; cam = 0; dead = 0; sq = 0; steer = 0; diffT = 0; if (M === 'barrels') genBarrels(); else genVert(); }
+function build() { if (TEJ) return buildTej();
+  t = 0; rope = null; dashT = 0; dashCd = 0; swordT = 0; jumpBuf = 0; coyote = 0; cam = 0; dead = 0; sq = 0; steer = 0; diffT = 0; if (M === 'barrels') genBarrels(); else genVert(); }
 let rec = 0;
-function reset() { try { rec = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) { /* sin almacenamiento */ } level = 1; lives = 4; score = 0; got = 0; build(); }
-reset(); k.show(CFG.title, CFG.help);
+function reset() { if (TEJ) return resetTej();
+  try { rec = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) { /* sin almacenamiento */ } level = 1; lives = 4; score = 0; got = 0; build(); }
+if (!TEJ) reset(); k.show(CFG.title, CFG.help);
 
 /* ================= Muerte ================= */
 function die(col) {
@@ -95,6 +97,7 @@ function coinGet(co, oy) { co.got = true; got++; score += port ? 25 : 10; k.sfx(
 /* ================= Actualización ================= */
 k.run((dt) => {
   if (!k.gate(reset)) return;
+  if (TEJ) return updTej(dt);
   t += dt; sq += (0 - sq) * Math.min(1, dt * 10); intro -= dt;
   for (const f of fx) { f.t += dt; f.x += f.vx * dt; f.y += f.vy * dt; } fx = fx.filter((f) => f.t < f.max);
   if (dead) { dead -= dt; p.vy += 1500 * dt; p.y += p.vy * dt; if (dead <= 0) finish(); return; }
@@ -341,6 +344,7 @@ function hero(o, s) {
 
 /* ================= Dibujo: escenas ================= */
 function draw() {
+  if (TEJ) return drawTej();
   if (M === 'barrels') return drawBarrels();
   ART.background(c, TH, W, H, 0, Math.max(cam, -3000), t);
   if (M === 'hopper') { const a = Math.min(0.75, Math.max(0, -cam / 16000)); if (a > 0) { c.fillStyle = `rgba(22,16,64,${a})`; c.fillRect(0, 0, W, H); c.fillStyle = '#fff'; for (let i = 0; i < 40; i++) { c.globalAlpha = a * (0.5 + 0.5 * Math.sin(t * 2 + i)); c.fillRect((i * 97) % W, ((i * 173 - cam * 0.05) % H + H) % H, 2, 2); } c.globalAlpha = 1; } }

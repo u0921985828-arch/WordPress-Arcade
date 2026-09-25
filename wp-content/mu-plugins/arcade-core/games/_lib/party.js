@@ -1874,7 +1874,7 @@ function mgRelay() {
     c.fillStyle = '#2b3a67'; ART.rr(c, 50, GY - 48, 44, 14, 6); c.fill();
     ART.rr(c, 66, GY - 104, 8, 50, 3); ART.fillOut(c, '#8b5a3c', 2.4);
     c.beginPath(); c.moveTo(28, GY - 100); c.lineTo(70, GY - 126); c.lineTo(112, GY - 100); c.closePath(); ART.fillOut(c, '#b05a4a', 2.8);
-    fit('POZO', 70, GY - 70, 15, '#fff', 60);
+    fit('POZO', 70, GY - 140, 15, '#fff', 70);
     /* barril */
     const bx = BD[4] + 30;
     ART.rr(c, bx - 38, GY - 96, 76, 96, 14); ART.fillOut(c, '#b27a44', 3);
