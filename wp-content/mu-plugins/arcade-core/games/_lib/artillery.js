@@ -221,6 +221,7 @@ function explode(x, y, r, dmg, team) {
 function stepShot(s, dt) {
   const n = Math.max(1, Math.ceil(hyp(s.vx, s.vy) * dt / 3)), sd = dt / n, w = s.w;
   for (let i = 0; i < n; i++) {
+    if ((w.id === 'granada' && s.t >= 3) || s.t >= 10) return impact(s, null);
     if (w.id !== 'granada') s.vx += wind * WA * sd; s.vy += G * sd; const px = s.x, py = s.y; s.x += s.vx * sd; s.y += s.vy * sd; s.t += sd;
     if (s.x < -60 || s.x > W + 60 || s.y > H + 30) { s.dead = true; if (s.y > wl) splash(s.x); return; }
     if (s.y > wl && MD.water) { s.dead = true; splash(s.x); return; }
@@ -232,7 +233,6 @@ function stepShot(s, dt) {
       if (w.id === 'granada') { let nx = 0, ny = 0; for (let a = 0; a < 8; a++) { const ax = Math.cos(a * TAU / 8), ay = Math.sin(a * TAU / 8); if (solid(s.x + ax * 4, s.y + ay * 4)) { nx -= ax; ny -= ay; } } const L = hyp(nx, ny) || 1; nx /= L; ny /= L; const vn = s.vx * nx + s.vy * ny; s.vx = (s.vx - 2 * vn * nx) * 0.5; s.vy = (s.vy - 2 * vn * ny) * 0.5; s.x = px; s.y = py; if (Math.abs(vn) > 60) k.sfx('click'); if (hyp(s.vx, s.vy) < 25) { s.vx = 0; s.vy = 0; } continue; }
       return impact(s, null);
     }
-    if (w.id === 'granada' && s.t >= 3) return impact(s, null);
   }
   if (M !== 'snow' && (s.trail -= dt) <= 0) { s.trail = 0.03; amb.push({ x: s.x, y: s.y, t: 0.5, smoke: 1, r: 3 }); }
 }
