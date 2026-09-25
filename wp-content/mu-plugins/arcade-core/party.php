@@ -8,6 +8,8 @@
  *  arcade_party_<CODE>        sala: token del anfitrión, marcas de mandos conectados. Solo la escribe la tele.
  *  arcade_pslot_<CODE>_<p>    mando p (0..3): token, offer, oid. Solo lo escribe el móvil.
  *  arcade_pans_<CODE>_<p>     answer de la tele para el oid del mando. Solo lo escribe la tele.
+ *  arcade_prin_<CODE>_<p>     respaldo por el servidor (1.26): mensajes mando → tele. Solo lo escribe el móvil.
+ *  arcade_prout_<CODE>_<p>    respaldo por el servidor: mensajes tele → mando. Solo lo escribe la tele.
  * Así cada registro tiene un único escritor y no se pisan las escrituras concurrentes.
  */
 defined( 'ABSPATH' ) || exit;
@@ -23,7 +25,10 @@ final class Arcade_Party {
 		'create' => array( 6, 600 ),
 		'join'   => array( 60, 600 ),  // todos los móviles de una casa comparten IP (y cada reintento vuelve a unirse)
 		'req'    => array( 600, 60 ),
+		'relay'  => array( 2400, 60 ), // respaldo por el servidor: la tele y hasta 4 mandos, varias veces por segundo
 	);
+	const RELAY_KEEP = 80;   // mensajes que se guardan por sentido (los lectores piden desde su último número)
+	const RELAY_MSG  = 6144; // bytes por mensaje
 
 	public static function boot() {
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
@@ -281,6 +286,8 @@ final class Arcade_Party {
 				array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'get_answer' ), 'permission_callback' => $open ),
 			)
 		);
+		register_rest_route( $ns, $code . '/relay', array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'relay' ), 'permission_callback' => $open ) );
+		register_rest_route( $ns, $code . '/hrelay', array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'hrelay' ), 'permission_callback' => $open ) );
 	}
 
 	private static function ip() {
@@ -406,7 +413,11 @@ final class Arcade_Party {
 			delete_transient( 'arcade_pslot_' . $code . '_' . $p );
 			delete_transient( 'arcade_pans_' . $code . '_' . $p );
 		}
-		$room = array( 'k' => self::token(), 't' => time(), 'w' => time(), 'live' => array_fill( 0, self::PADS, 0 ), 'gone' => array_fill( 0, self::PADS, 0 ) );
+		for ( $p = 0; $p < self::PADS; $p++ ) {
+			delete_transient( 'arcade_prin_' . $code . '_' . $p );
+			delete_transient( 'arcade_prout_' . $code . '_' . $p );
+		}
+		$room = array( 'k' => self::token(), 't' => time(), 'w' => time(), 'live' => array_fill( 0, self::PADS, 0 ), 'gone' => array_fill( 0, self::PADS, 0 ), 'rtc' => '0' === (string) $req->get_param( 'rtc' ) ? 0 : 1 );
 		self::save_room( $code, $room );
 		return self::out( array( 'code' => $code, 'k' => $room['k'], 'ttl' => self::ttl(), 'max' => self::PADS ), 201 );
 	}
@@ -449,6 +460,11 @@ final class Arcade_Party {
 			}
 		}
 		$room['gone'] = $gone;
+		// La tele tiene mandos por el servidor: los siguientes que se unan van directos a ese modo (misma red).
+		if ( $req->get_param( 'rly' ) && $now - (int) ( $room['rly'] ?? 0 ) > 60 ) {
+			$room['rly'] = $now;
+			$dirty       = true;
+		}
 		if ( $dirty ) {
 			$room['w'] = $now;
 			self::save_room( $code, $room );
@@ -459,7 +475,7 @@ final class Arcade_Party {
 			if ( ! $s ) {
 				continue;
 			}
-			$row = array( 'p' => $p, 'sid' => substr( md5( $s['tok'] ), 0, 8 ), 'oid' => (int) $s['oid'], 'name' => $s['name'] );
+			$row = array( 'p' => $p, 'sid' => substr( md5( $s['tok'] ), 0, 8 ), 'oid' => (int) $s['oid'], 'name' => $s['name'], 'rl' => (string) ( $s['rl'] ?? '' ) );
 			$ans = get_transient( 'arcade_pans_' . $code . '_' . $p );
 			if ( $s['oid'] && ! empty( $s['offer'] ) && ( ! is_array( $ans ) || (int) $ans['oid'] !== (int) $s['oid'] ) ) {
 				$row['offer'] = $s['offer'];
@@ -508,6 +524,8 @@ final class Arcade_Party {
 		for ( $p = 0; $p < self::PADS; $p++ ) {
 			delete_transient( 'arcade_pslot_' . $code . '_' . $p );
 			delete_transient( 'arcade_pans_' . $code . '_' . $p );
+			delete_transient( 'arcade_prin_' . $code . '_' . $p );
+			delete_transient( 'arcade_prout_' . $code . '_' . $p );
 		}
 		return self::out( array( 'ok' => true ) );
 	}
@@ -551,7 +569,7 @@ final class Arcade_Party {
 				$s['name'] = $name;
 			}
 			self::save_slot( $code, $seat, $s );
-			return self::out( array( 'p' => $seat, 'tok' => $tok, 'color' => self::COLORS[ $seat ] ) );
+			return self::out( array( 'p' => $seat, 'tok' => $tok, 'color' => self::COLORS[ $seat ], 'rtc' => (int) ( $room['rtc'] ?? 1 ), 'rly' => self::rly( $room ) ) );
 		}
 		$e = self::limit( 'join' );
 		if ( $e ) {
@@ -582,7 +600,11 @@ final class Arcade_Party {
 		if ( ! $chk || $chk['tok'] !== $tok ) {
 			return self::err( 'arcade_party_busy', 'Sala ocupada, reintentando…', 503 );
 		}
-		return self::out( array( 'p' => $seat, 'tok' => $tok, 'color' => self::COLORS[ $seat ] ) );
+		return self::out( array( 'p' => $seat, 'tok' => $tok, 'color' => self::COLORS[ $seat ], 'rtc' => (int) ( $room['rtc'] ?? 1 ), 'rly' => self::rly( $room ) ) );
+	}
+
+	private static function rly( $room ) {
+		return ! empty( $room['rly'] ) && time() - (int) $room['rly'] < 10 * MINUTE_IN_SECONDS ? 1 : 0;
 	}
 
 	/** Mando p leído de nuevo, sin la caché de opciones de esta petición (con caché de objetos persistente no hace falta). */
@@ -647,6 +669,7 @@ final class Arcade_Party {
 		}
 		$s['oid']   = (int) $s['oid'] + 1;
 		$s['offer'] = $sdp;
+		$s['rl']    = ''; // vuelve a intentar la conexión directa: deja el respaldo
 		$s['seen']  = microtime( true );
 		self::save_slot( $code, $p, $s );
 		$chk = self::fresh_slot( $code, $p );
@@ -674,5 +697,103 @@ final class Arcade_Party {
 			self::save_slot( $code, $p, $s );
 		}
 		return self::out( array( 'sdp' => $ok ? $ans['sdp'] : null ) );
+	}
+
+	/* ------------------------------------------- Respaldo por el servidor (1.26) */
+	/*
+	 * Si la red no deja la conexión directa (wifi con aislamiento, sin TURN) o el navegador de la tele no
+	 * tiene WebRTC, los mensajes viajan por WordPress: el mando y la tele sondean varias veces por segundo.
+	 * Cada sentido es una lista con número de orden y un solo escritor; `rl` identifica la sesión de respaldo
+	 * del mando (una nueva vacía las listas).
+	 */
+
+	/** Mensajes JSON válidos y pequeños. */
+	private static function relay_msgs( $m ) {
+		$out = array();
+		foreach ( array_slice( is_array( $m ) ? $m : array(), 0, 40 ) as $x ) {
+			if ( is_array( $x ) && isset( $x['t'] ) && strlen( (string) wp_json_encode( $x ) ) <= self::RELAY_MSG ) {
+				$out[] = $x;
+			}
+		}
+		return $out;
+	}
+
+	private static function relay_push( $key, $rl, $msgs ) {
+		$q = self::fresh( $key );
+		if ( ! is_array( $q ) || ( $q['rl'] ?? '' ) !== $rl ) {
+			$q = array( 'rl' => $rl, 's' => 0, 'm' => array() );
+		}
+		foreach ( $msgs as $x ) {
+			$q['m'][] = array( ++$q['s'], $x );
+		}
+		$q['m'] = array_slice( $q['m'], -self::RELAY_KEEP );
+		set_transient( $key, $q, HOUR_IN_SECONDS );
+	}
+
+	private static function relay_since( $key, $rl, $a ) {
+		$q = self::fresh( $key );
+		if ( ! is_array( $q ) || ( $q['rl'] ?? '' ) !== $rl ) {
+			return array();
+		}
+		return array_values( array_filter( $q['m'], static function ( $x ) use ( $a ) { return $x[0] > $a; } ) );
+	}
+
+	/** POST /party/CODE/relay {p, tok, rl, a, m:[…]} → el mando envía y recoge lo que la tele le ha mandado. */
+	public static function relay( WP_REST_Request $req ) {
+		$e = self::limit( 'relay' );
+		if ( $e ) {
+			return self::out( $e );
+		}
+		$ps = self::pad_slot( $req );
+		if ( is_wp_error( $ps ) ) {
+			return self::out( $ps );
+		}
+		list( $code, $p, $s ) = $ps;
+		$rl = preg_replace( '/[^a-z0-9]/', '', (string) $req->get_param( 'rl' ) );
+		if ( strlen( $rl ) < 6 ) {
+			return self::err( 'arcade_party_rl', 'Sesión no válida.', 400 );
+		}
+		if ( ( $s['rl'] ?? '' ) !== $rl || time() - (int) $s['seen'] > 10 ) {
+			$s['rl']   = $rl;
+			$s['seen'] = microtime( true );
+			self::save_slot( $code, $p, $s );
+		}
+		$msgs = self::relay_msgs( $req->get_param( 'm' ) );
+		if ( $msgs ) {
+			self::relay_push( 'arcade_prin_' . $code . '_' . $p, $rl, $msgs );
+		}
+		return self::out( array( 'm' => self::relay_since( 'arcade_prout_' . $code . '_' . $p, $rl, (int) $req->get_param( 'a' ) ) ) );
+	}
+
+	/** POST /party/CODE/hrelay {k, rl:{p:…}, a:{p:n}, m:{p:[…]}} → la tele envía a sus mandos de respaldo y recoge. */
+	public static function hrelay( WP_REST_Request $req ) {
+		$e = self::limit( 'relay' );
+		if ( $e ) {
+			return self::out( $e );
+		}
+		$hr = self::host_room( $req );
+		if ( is_wp_error( $hr ) ) {
+			return self::out( $hr );
+		}
+		$code = $hr[0];
+		$rls  = (array) $req->get_param( 'rl' );
+		$as   = (array) $req->get_param( 'a' );
+		$ms   = (array) $req->get_param( 'm' );
+		$in   = array();
+		for ( $p = 0; $p < self::PADS; $p++ ) {
+			if ( ! isset( $rls[ $p ] ) ) {
+				continue;
+			}
+			$rl = preg_replace( '/[^a-z0-9]/', '', (string) $rls[ $p ] );
+			if ( '' === $rl ) {
+				continue;
+			}
+			$msgs = self::relay_msgs( $ms[ $p ] ?? array() );
+			if ( $msgs ) {
+				self::relay_push( 'arcade_prout_' . $code . '_' . $p, $rl, $msgs );
+			}
+			$in[ $p ] = array( 'rl' => $rl, 'm' => self::relay_since( 'arcade_prin_' . $code . '_' . $p, $rl, (int) ( $as[ $p ] ?? 0 ) ) );
+		}
+		return self::out( array( 'in' => (object) $in ) );
 	}
 }

@@ -249,7 +249,7 @@
     var t = Date.now(), gen = S.gen;
     S.rx = Math.max(S.rx, t - 4000); // oculto no hay latidos: 3 s de margen antes de dar el canal por muerto
     ping();
-    setTimeout(function () { if (gen === S.gen && S.open && S.rx < t) connect(); }, 3000);
+    setTimeout(function () { if (gen === S.gen && S.open && S.rx < t) connect(); }, S.relay ? 6000 : 3000);
   });
   window.addEventListener('pagehide', away);
   window.addEventListener('online', function () { if (code && !S.open) connect(); });
@@ -263,20 +263,21 @@
     tick = now;
     if (!S.open || document.hidden) return;
     if (stalled) S.rx = Math.max(S.rx, now - 4000);
-    if (now - S.rx > 7000) { S.open = false; releaseAll(); retry(S.gen); return; }
+    if (now - S.rx > (S.relay ? 12000 : 7000)) { S.open = false; releaseAll(); retry(S.gen); return; }
     ping();
   }, 1000);
 
   /* ================================================================ Conexión */
   function loadSeat() {
     var s = null; try { s = JSON.parse(store('arcade:pad:' + code) || 'null'); } catch (e) { s = null; }
-    S.tok = s && s.tok || ''; S.p = s && s.p >= 0 ? s.p : -1;
+    S.tok = s && s.tok || ''; S.p = s && s.p >= 0 ? s.p : -1; S.relay = !!(s && s.relay);
   }
-  function saveSeat() { store('arcade:pad:' + code, JSON.stringify({ tok: S.tok, p: S.p })); }
+  function saveSeat() { store('arcade:pad:' + code, JSON.stringify({ tok: S.tok, p: S.p, relay: S.relay ? 1 : 0 })); }
 
   function teardown() {
     S.open = false;
     if (S.pc) { try { S.pc.close(); } catch (e) { /* nada */ } }
+    if (S.dc && S.dc.relay) S.dc.close();
     S.pc = S.dc = null;
   }
 
@@ -285,7 +286,6 @@
   function connect() {
     var gen = ++S.gen;
     teardown();
-    if (!window.RTCPeerConnection) { overlay('<h1>Navegador no compatible</h1><p>Este navegador no permite conexión directa (WebRTC). Prueba con Chrome o Safari actualizados.</p>'); return; }
     S.title = 'Conectando…'; setMe();
     overlay('<span class="pd-spin"></span><h1>Conectando con la tele…</h1><p>Sala <b>' + esc(code) + '</b></p>');
     var body = { tok: S.tok, name: '' };
@@ -296,14 +296,20 @@
       if (r._status === 409) return fail('La sala está completa (4 mandos).');
       if (r._status === 429) { overlay('<h1>Demasiados intentos</h1><p>Espera un momento…</p>'); return wait(15000).then(function () { if (gen === S.gen) connect(); }); }
       if (r._status !== 200) throw new Error('join');
-      S.p = r.p; S.tok = r.tok; saveSeat(); setMe();
-      return negotiate(gen);
+      S.p = r.p; S.tok = r.tok;
+      // Respaldo por el servidor si la conexión directa ya falló, la tele no tiene WebRTC o este móvil tampoco.
+      // Sin TURN, si otro mando de la sala ya necesitó el servidor, esta red tampoco deja la conexión directa.
+      if (r.rtc === 0 || !window.RTCPeerConnection || (r.rly && !C.relay)) S.relay = true;
+      saveSeat(); setMe();
+      return S.relay ? relayStart(gen) : negotiate(gen);
     }).catch(function () { retry(gen); });
   }
 
   function retry(gen) {
     if (gen !== S.gen || S.retrying === gen) return; // onclose + failed llegan juntos: un solo reintento
     S.retrying = gen;
+    // Falló la conexión directa: a partir de ahora, por el servidor (siempre funciona si hay internet).
+    if (!S.relay && (S.why === 'net' || S.why === 'tv')) { S.relay = true; S.why = ''; saveSeat(); }
     teardown();
     S.retry++;
     var ms = Math.min(10000, 1000 * S.retry);
@@ -334,6 +340,15 @@
     // Fiable pero sin orden: un paquete perdido no retiene a los siguientes (sin bloqueo de cabeza de línea);
     // cada pulsación lleva número de orden y la tele descarta las atrasadas. «Soltar» nunca se pierde.
     var dc = S.dc = pc.createDataChannel('arcade', { ordered: false });
+    wire(gen, dc);
+    var dead = function () { if (gen === S.gen && S.pc === pc) { if (!S.open) S.why = 'net'; S.open = false; releaseAll(); retry(gen); } };
+    pc.onconnectionstatechange = function () { if (pc.connectionState === 'failed') dead(); };
+    pc.oniceconnectionstatechange = function () { if (pc.iceConnectionState === 'failed') dead(); };
+    return offer(gen, pc);
+  }
+
+  // Manejadores comunes del canal (directo o por el servidor).
+  function wire(gen, dc) {
     dc.onopen = function () {
       if (gen !== S.gen) return;
       S.open = true; S.retry = 0; S.rx = Date.now(); S.padSeq = -1; S.netFail = S.tvFail = 0;
@@ -355,9 +370,9 @@
       else if (d.t === 'priv') priv(d.d);
     };
     dc.onclose = function () { if (gen === S.gen) { S.open = false; releaseAll(); retry(gen); } };
-    var dead = function () { if (gen === S.gen && S.pc === pc) { if (!S.open) S.why = 'net'; S.open = false; releaseAll(); retry(gen); } };
-    pc.onconnectionstatechange = function () { if (pc.connectionState === 'failed') dead(); };
-    pc.oniceconnectionstatechange = function () { if (pc.iceConnectionState === 'failed') dead(); };
+  }
+
+  function offer(gen, pc) {
     var oid = 0;
     return pc.createOffer()
       .then(function (o) { return pc.setLocalDescription(o); })
@@ -384,9 +399,47 @@
       if (r._status === 429) return wait(5000).then(function () { return pollAnswer(gen, oid, t0); });
       if (!r.sdp) return wait(1000).then(function () { return pollAnswer(gen, oid, t0); });
       return S.pc.setRemoteDescription({ type: 'answer', sdp: r.sdp }).then(function () {
-        setTimeout(function () { if (gen === S.gen && !S.open) { S.why = 'net'; retry(gen); } }, 15000);
+        setTimeout(function () { if (gen === S.gen && !S.open) { S.why = 'net'; retry(gen); } }, 8000);
       });
     });
+  }
+
+  /* ======================================================= Respaldo por el servidor */
+  // Canal falso con la misma interfaz que el de WebRTC: una petición cada ~0,3 s lleva lo pendiente y trae
+  // lo que la tele ha mandado. Se «abre» con el primer mensaje de la tele.
+  function relayStart(gen) {
+    var dc = S.dc = { relay: true, readyState: 'open', q: [], a: 0, busy: false, t: 0, got: false,
+      rl: Math.random().toString(36).slice(2, 10) + Date.now().toString(36),
+      send: function (str) { if (dc.readyState !== 'open') return; try { dc.q.push(JSON.parse(str)); } catch (e) { return; } if (dc.q.length > 200) dc.q.splice(0, dc.q.length - 200); if (!dc.busy) { clearTimeout(dc.t); dc.t = setTimeout(pump, 0); } },
+      close: function () { dc.readyState = 'closed'; clearTimeout(dc.t); }
+    };
+    wire(gen, dc);
+    overlay('<span class="pd-spin"></span><h1>Conectando con la tele…</h1><p>Sala <b>' + esc(code) + '</b> · por el servidor</p>');
+    // La tele no contesta en 15 s: no está abierta (o no tiene internet).
+    setTimeout(function () { if (gen === S.gen && S.dc === dc && !dc.got) { S.why = 'tv'; retry(gen); } }, 15000);
+    function live() { return gen === S.gen && S.dc === dc && dc.readyState === 'open'; }
+    function again(ms) { if (live()) { clearTimeout(dc.t); dc.t = setTimeout(pump, ms); } }
+    function pump() {
+      if (!live() || dc.busy) return;
+      dc.busy = true;
+      var m = dc.q.splice(0, 40);
+      api('/' + code + '/relay', { method: 'POST', body: { p: S.p, tok: S.tok, rl: dc.rl, a: dc.a, m: m } }).then(function (r) {
+        dc.busy = false;
+        if (!live()) return;
+        if (r._status === 409) { S.tok = ''; saveSeat(); connect(); return; }
+        if (r._status === 404) { fail('La sala ha caducado. Mira el código nuevo en la tele.'); return; }
+        if (r._status !== 200) { dc.q = m.concat(dc.q); again(r._status === 429 ? 3000 : 1000); return; }
+        (r.m || []).forEach(function (x) {
+          if (!live() || x[0] <= dc.a) return;
+          dc.a = x[0];
+          if (!dc.got) { dc.got = true; dc.onopen(); }
+          dc.onmessage({ data: JSON.stringify(x[1]) });
+        });
+        again(dc.q.length ? 0 : document.hidden ? 2000 : 300);
+      }).catch(function () { dc.busy = false; dc.q = m.concat(dc.q); again(1000); });
+    }
+    pump();
+    return null;
   }
 
   /* ================================================================ Inicio */

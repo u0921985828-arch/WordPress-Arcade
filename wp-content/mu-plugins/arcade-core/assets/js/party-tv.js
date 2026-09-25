@@ -658,7 +658,7 @@
   // Los mandos envían un latido cada segundo; 3,5 s de silencio = desconectado.
   setInterval(function () {
     var now = Date.now();
-    Object.keys(S.peers).forEach(function (p) { var peer = S.peers[p]; if (peer.open && !peer.lost && now - peer.seen > 3500) lose(+p); });
+    Object.keys(S.peers).forEach(function (p) { var peer = S.peers[p]; if (peer.open && !peer.lost && now - peer.seen > (peer.relay ? 9000 : 3500)) lose(+p); });
   }, 500);
 
   function accept(row) {
@@ -670,37 +670,43 @@
     function gone() { if (S.peers[p] === peer) dropPeer(p, true); }
     renderPlayers();
     S.lastChange = Date.now();
-    pc.ondatachannel = function (ev) {
-      var dc = peer.dc = ev.channel;
-      dc.onopen = function () {
-        if (S.peers[p] !== peer) return;
-        peer.open = true; peer.seen = Date.now(); delete S.gone[p];
-        send(p, { t: 'you', p: p, color: COLORS[p] });
-        send(p, padMsg());
-        send(p, { t: 'buzz', ms: 40 });
-        renderPlayers();
-        post(playersMsg());
-        toast('J' + (p + 1) + (Date.now() - (S.recent[p] || 0) < 600000 ? ' ha vuelto' : ' se ha unido'));
-        status('');
-        schedulePoll();
-      };
-      dc.onmessage = function (m) {
-        var d; try { d = JSON.parse(m.data); } catch (e) { return; }
-        if (!d || S.peers[p] !== peer) return;
-        peer.seen = Date.now();
-        if (d.t === 'away') { lose(p); return; }
-        if (peer.lost) regain(p);
-        if (d.t === 'k') {
-          // Canal sin orden (sin bloqueo si se pierde un paquete): el número de orden por tecla descarta lo atrasado.
-          if (typeof d.s === 'number') { if (peer.seq[d.k] != null && d.s <= peer.seq[d.k]) return; peer.seq[d.k] = d.s; }
-          if (d.ts) { S.lat.push(Date.now() - d.ts); if (S.lat.length > 500) S.lat.shift(); }
-          padKey(p, d.k, !!d.d, d.ts);
-        } else if (d.t === 'p') send(p, { t: 'P', ts: d.ts });
-        else if (d.t === 'hi' && d.name) { peer.name = String(d.name).slice(0, 16); post(playersMsg()); }
-        else if (d.t === 'pick' && S.game && !S.menu && !S.ad) post({ type: 'arcade:ppick', p: p, v: d.v });
-      };
-      dc.onclose = gone;
+    pc.ondatachannel = function (ev) { wire(p, peer, peer.dc = ev.channel, gone); };
+    accept2(p, peer, pc, row, gone);
+  }
+
+  // Manejadores comunes del canal del mando p (directo o por el servidor).
+  function wire(p, peer, dc, gone) {
+    dc.onopen = function () {
+      if (S.peers[p] !== peer) return;
+      peer.open = true; peer.seen = Date.now(); delete S.gone[p];
+      send(p, { t: 'you', p: p, color: COLORS[p] });
+      send(p, padMsg());
+      send(p, { t: 'buzz', ms: 40 });
+      renderPlayers();
+      post(playersMsg());
+      toast('J' + (p + 1) + (Date.now() - (S.recent[p] || 0) < 600000 ? ' ha vuelto' : ' se ha unido'));
+      status('');
+      schedulePoll();
     };
+    dc.onmessage = function (m) {
+      var d; try { d = JSON.parse(m.data); } catch (e) { return; }
+      if (!d || S.peers[p] !== peer) return;
+      peer.seen = Date.now();
+      if (d.t === 'away') { lose(p); return; }
+      if (peer.lost) regain(p);
+      if (d.t === 'k') {
+        // Canal sin orden (sin bloqueo si se pierde un paquete): el número de orden por tecla descarta lo atrasado.
+        if (typeof d.s === 'number') { if (peer.seq[d.k] != null && d.s <= peer.seq[d.k]) return; peer.seq[d.k] = d.s; }
+        if (d.ts) { S.lat.push(Date.now() - d.ts); if (S.lat.length > 500) S.lat.shift(); }
+        padKey(p, d.k, !!d.d, d.ts);
+      } else if (d.t === 'p') send(p, { t: 'P', ts: d.ts });
+      else if (d.t === 'hi' && d.name) { peer.name = String(d.name).slice(0, 16); post(playersMsg()); }
+      else if (d.t === 'pick' && S.game && !S.menu && !S.ad) post({ type: 'arcade:ppick', p: p, v: d.v });
+    };
+    dc.onclose = gone;
+  }
+
+  function accept2(p, peer, pc, row, gone) {
     // connectionState no existe en Chromium < 72 (Smart TV antiguas): también iceConnectionState.
     pc.onconnectionstatechange = function () {
       if (pc.connectionState === 'failed' || pc.connectionState === 'closed') gone();
@@ -733,6 +739,55 @@
       .catch(function () { if (S.peers[p] === peer) dropPeer(p); });
   }
 
+  /* ============================================== Respaldo por el servidor (mandos sin conexión directa) */
+  function acceptRelay(row) {
+    var p = row.p;
+    if (S.peers[p]) dropPeer(p);
+    var dc = { relay: true, readyState: 'open', q: [],
+      send: function (str) { if (dc.readyState !== 'open') return; try { dc.q.push(JSON.parse(str)); } catch (e) { return; } if (dc.q.length > 200) dc.q.splice(0, dc.q.length - 200); relaySoon(0); },
+      close: function () { dc.readyState = 'closed'; }
+    };
+    var peer = S.peers[p] = { pc: { close: dc.close }, dc: dc, relay: true, rl: row.rl, a: 0, oid: row.oid, sid: row.sid, open: false, lost: false, held: {}, seq: {}, seen: 0, name: row.name || '' };
+    function gone() { if (S.peers[p] === peer) dropPeer(p, true); }
+    wire(p, peer, dc, gone);
+    S.lastChange = Date.now();
+    dc.onopen();
+    relaySoon(0);
+  }
+  function relayPeers() { return Object.keys(S.peers).filter(function (p) { return S.peers[p].relay; }); }
+  function relaySoon(ms) {
+    if (S.rbusy) { S.rmore = true; return; }
+    clearTimeout(S.rT); S.rT = setTimeout(relayPump, ms);
+  }
+  function relayPump() {
+    var ps = relayPeers();
+    if (!ps.length || !S.code || S.rbusy) return;
+    S.rbusy = true; S.rmore = false;
+    var a = {}, m = {}, rl = {}, sent = {};
+    ps.forEach(function (p) {
+      var pe = S.peers[p];
+      a[p] = pe.a; rl[p] = pe.rl;
+      if (pe.dc.q.length) { m[p] = sent[p] = pe.dc.q.splice(0, 40); }
+    });
+    function back() { Object.keys(sent).forEach(function (p) { var pe = S.peers[p]; if (pe && pe.relay && pe.rl === rl[p]) pe.dc.q = sent[p].concat(pe.dc.q); }); }
+    api('/' + S.code + '/hrelay', { method: 'POST', body: { k: S.k, a: a, m: m, rl: rl } }).then(function (r) {
+      S.rbusy = false;
+      if (r._status !== 200) { back(); relaySoon(r._status === 429 ? 3000 : 1000); return; }
+      var inn = r['in'] || {};
+      Object.keys(inn).forEach(function (p) {
+        var pe = S.peers[p], row = inn[p];
+        if (!pe || !pe.relay || !row || pe.rl !== row.rl) return;
+        (row.m || []).forEach(function (x) {
+          if (S.peers[p] !== pe || x[0] <= pe.a) return;
+          pe.a = x[0];
+          if (pe.dc.onmessage) pe.dc.onmessage({ data: JSON.stringify(x[1]) });
+        });
+      });
+      var more = S.rmore || relayPeers().some(function (p) { return S.peers[p].dc.q.length; });
+      relaySoon(more ? 0 : document.hidden ? 1000 : 120);
+    }).catch(function () { S.rbusy = false; back(); relaySoon(1000); });
+  }
+
   /* ============================================================== Sala */
   function status(t, bad) { ui.status.textContent = t || ''; ui.status.classList.toggle('bad', !!bad); }
 
@@ -745,7 +800,7 @@
 
   function create() {
     status('Creando sala…');
-    return api('', { method: 'POST' }).then(function (r) {
+    return api('', { method: 'POST', body: { rtc: window.RTCPeerConnection ? 1 : 0 } }).then(function (r) {
       if (r._status !== 201) {
         status(r._status === 429 ? 'Has creado demasiadas salas. Espera unos minutos.' : 'No se pudo crear la sala. Reintentando…', true);
         setTimeout(create, r._status === 429 ? 60000 : 5000);
@@ -768,7 +823,7 @@
     S.polling = true;
     var gone = Object.keys(S.gone).filter(function (p) { return !S.peers[p]; })
       .concat(Object.keys(S.peers).filter(function (p) { return S.peers[p].open && longLost(p); })).join(',');
-    api('/' + S.code + '?k=' + encodeURIComponent(S.k) + '&live=' + live() + (gone ? '&gone=' + gone : '')).then(function (r) {
+    api('/' + S.code + '?k=' + encodeURIComponent(S.k) + '&live=' + live() + (gone ? '&gone=' + gone : '') + (relayPeers().some(function (p) { return S.peers[p].open; }) ? '&rly=1' : '')).then(function (r) {
       S.polling = false;
       if (r._status === 404 || r._status === 403) { // sala caducada: otra nueva
         Object.keys(S.peers).forEach(function (p) { dropPeer(p); });
@@ -779,6 +834,7 @@
       if (r._status === 429) { schedulePoll(15000); return; }
       (r.pads || []).forEach(function (row) {
         var peer = S.peers[row.p];
+        if (row.rl) { if (!peer || peer.rl !== row.rl) acceptRelay(row); return; }
         if (row.offer && (!peer || peer.oid !== row.oid)) accept(row);
       });
       schedulePoll();
@@ -802,7 +858,6 @@
 
   /* ============================================================== Inicio */
   build();
-  if (!window.RTCPeerConnection) status('Este navegador no admite mandos por conexión directa (WebRTC). Prueba con Chrome o Edge.', true);
   loadCatalog();
   var saved = null; try { saved = JSON.parse(store('arcade:tv') || 'null'); } catch (e) { saved = null; }
   if (saved && saved.c && saved.k) { S.code = saved.c; S.k = saved.k; showRoom(); schedulePoll(100); } else create();
