@@ -357,8 +357,8 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       const cx = W / 2, cy = LAND ? 252 : 330, cw = LAND ? 170 : 190, chh = LAND ? 88 : 104;
       rr(cx - cw / 2, cy - chh / 2, cw, chh, 14, '#8b5a2b', 3);
       rr(cx - cw / 2, cy - chh / 2, cw, chh * 0.38, 12, '#a86b33', 2.5);
-      rr(cx - 18, cy - 4, 36, 30, 8, '#ffc94d', 2.5);
-      txt(String(S.pot), cx, cy + chh / 2 - 22, 30, '#ffe27a');
+      rr(cx - 15, cy - chh / 2 + chh * 0.38 - 13, 30, 26, 7, '#ffc94d', 2.5);   // candado sobre la tapa, sin tapar la cifra
+      txt(String(S.pot), cx, cy + chh * 0.22, 30, '#ffe27a');
       fit(`Ronda ${S.round} de ${S.rounds}${S.round >= S.rounds ? ' · cofre doble' : ''}`, cx, cy - chh / 2 - 26, 16, '#fff3c4', 'center', W - 40);
       if (S.phase === 'reveal') fit(S.res.kind === 'todos' ? `A ${S.res.out[0]} monedas cada uno` : S.res.kind === 'nadie' ? 'Nadie se lleva nada' : 'Los que roban se reparten el cofre', cx, cy + chh / 2 + 28, 17, '#fff', 'center', W - 40);
       this.drawCtl();

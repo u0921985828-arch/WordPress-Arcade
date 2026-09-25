@@ -582,6 +582,7 @@ function compass(open) {
  * y deposítalas: solo puntúa lo depositado. Chocar con quien va cargado le hace soltar la mitad.
  * A = destello del farol (ilumina toda la mina 1,2 s, con recarga). 90 s por partida y clasificación final. */
 var GP = [], GITEMS = [], GT = 0, gOver = 0, gMsg = '', gMsgT = 0, gCart = { x: 0, y: 0 }, gBoard = null, gWin = 0;
+var darkCv = null, darkCx = null;
 var GN = 13, GS = 0, GBX = 0, GBY = 0, GTIME = 90, GBOT = 44;
 var GVAL = [{ v: 1, col: '#8fe1ff', r: 7 }, { v: 3, col: '#ff7fd0', r: 8.5 }, { v: 5, col: '#ffd24d', r: 10 }];
 try { gWin = Math.min(8, +localStorage.getItem('cpu:' + CFG.id) || 0); } catch (e) { /* sin almacenamiento */ }
@@ -701,11 +702,11 @@ function gemBoard() {
     for (let y = 0; y < GN; y++) for (let x = 0; x < GN; x++) {
       const px = GBX + x * GS, py = GBY + y * GS;
       if (g[y][x] === 0) { const sh = 0.5 + rnd(x * 7.3 + y * 3.1) * 0.5;
-        b.fillStyle = shade('#3a3050', -0.35 + sh * 0.25); b.fillRect(px, py, GS, GS);
+        b.fillStyle = shade('#544878', -0.3 + sh * 0.3); b.fillRect(px, py, GS, GS);
         b.fillStyle = 'rgba(255,255,255,.04)'; b.fillRect(px + 2, py + 2, GS - 4, 2);
         for (let i = 0; i < 3; i++) { b.fillStyle = 'rgba(0,0,0,.16)'; b.fillRect(px + rnd(x + y * 3 + i) * (GS - 6) + 2, py + rnd(x * 2 + y + i * 5) * (GS - 6) + 2, 3, 3); } }
       else { const sh = rnd(x * 2.7 + y * 5.9);
-        b.fillStyle = shade('#241d3c', -0.1 + sh * 0.35); b.fillRect(px, py, GS, GS);
+        b.fillStyle = shade('#332a52', -0.1 + sh * 0.4); b.fillRect(px, py, GS, GS);
         b.strokeStyle = 'rgba(0,0,0,.45)'; b.lineWidth = 2; b.strokeRect(px + 1, py + 1, GS - 2, GS - 2);
         b.fillStyle = 'rgba(255,255,255,.07)'; b.fillRect(px + 3, py + 3, GS - 6, 3); }
     }
@@ -755,21 +756,24 @@ function drawGem() {
   GITEMS.forEach(drawGemItem);
   drawCart();
   GP.forEach(drawMinero);
-  // oscuridad: se recorta el farol de cada minero
+  // oscuridad: se dibuja en un lienzo aparte y se recortan los faroles antes de superponerla
   const full = GP.some((q) => q.flash > 0);
-  c.save(); c.beginPath(); c.rect(0, TOP, W, H - TOP - GBOT); c.clip();
-  c.globalCompositeOperation = 'source-over';
-  const dark = c.createLinearGradient(0, 0, 0, 1); // relleno plano
-  c.fillStyle = full ? 'rgba(6,4,14,.18)' : 'rgba(6,4,14,.86)'; c.fillRect(0, TOP, W, H - TOP - GBOT);
-  if (!full) { c.globalCompositeOperation = 'destination-out';
-    for (const pl of GP) { const r = GS * 2.6 + Math.sin(t * 3 + pl.p) * 3, x = gcx(pl.fx), y = gcy(pl.fy);
-      const gr = c.createRadialGradient(x, y, r * 0.25, x, y, r); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.65, 'rgba(0,0,0,.8)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
-      c.fillStyle = gr; c.beginPath(); c.arc(x, y, r, 0, R2); c.fill(); }
-    const cr = GS * 1.5, cx2 = gcx(gCart.x), cy2 = gcy(gCart.y);
-    const g2 = c.createRadialGradient(cx2, cy2, cr * 0.2, cx2, cy2, cr); g2.addColorStop(0, 'rgba(0,0,0,.85)'); g2.addColorStop(1, 'rgba(0,0,0,0)');
-    c.fillStyle = g2; c.beginPath(); c.arc(cx2, cy2, cr, 0, R2); c.fill(); }
-  c.restore(); c.globalCompositeOperation = 'source-over';
-  if (dark) { /* nada: variable auxiliar */ }
+  if (!darkCv) { darkCv = document.createElement('canvas'); darkCv.width = W; darkCv.height = H; darkCx = darkCv.getContext('2d'); }
+  const b = darkCx; b.setTransform(1, 0, 0, 1, 0, 0); b.globalCompositeOperation = 'source-over';
+  b.clearRect(0, 0, W, H);
+  b.fillStyle = full ? 'rgba(5,3,12,.2)' : 'rgba(5,3,12,.9)';
+  b.fillRect(0, TOP, W, H - TOP - GBOT);
+  if (!full) {
+    b.globalCompositeOperation = 'destination-out';
+    for (const pl of GP) { const r = GS * 2.7 + Math.sin(t * 3 + pl.p) * 3, x = gcx(pl.fx), y = gcy(pl.fy);
+      const gr = b.createRadialGradient(x, y, r * 0.18, x, y, r); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.55, 'rgba(0,0,0,.92)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      b.fillStyle = gr; b.beginPath(); b.arc(x, y, r, 0, R2); b.fill(); }
+    const cr = GS * 1.8, cx2 = gcx(gCart.x), cy2 = gcy(gCart.y);
+    const g2 = b.createRadialGradient(cx2, cy2, cr * 0.2, cx2, cy2, cr); g2.addColorStop(0, 'rgba(0,0,0,.9)'); g2.addColorStop(1, 'rgba(0,0,0,0)');
+    b.fillStyle = g2; b.beginPath(); b.arc(cx2, cy2, cr, 0, R2); b.fill();
+    b.globalCompositeOperation = 'source-over';
+  }
+  c.drawImage(darkCv, 0, 0, W, H);
   hudGem();
   if (gMsgT > 0) { c.globalAlpha = Math.min(1, gMsgT * 3); banner(gMsg, TOP + 18, '#ffd24d'); c.globalAlpha = 1; }
 }
