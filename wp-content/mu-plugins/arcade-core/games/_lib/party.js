@@ -1834,6 +1834,7 @@ function mgRelay() {
         b.sway += b.swayV * dt;
         if (Math.abs(b.sway) > 0.62 && b.level > 0) {
           const s = (Math.abs(b.sway) - 0.62) * 0.5 * dt; b.level = Math.max(0, b.level - s); spilled += s * LITROS;
+          q.liters = Math.max(0, q.liters - s * LITROS); /* lo que derramas te resta: el podio premia al que menos tiembla */
           if (Math.random() < 30 * s) k.burst(b.x + Math.sign(b.sway) * 12, GY - 34, '#8fd3ff', 2, 70);
         }
         if (q.p === 3 && q.x > BD[4] + 12) { q.bucket = null; pour(b); }
