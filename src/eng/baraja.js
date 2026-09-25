@@ -1366,7 +1366,12 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     }
   }
   function bubble(b) {
-    const [x0, y0] = PL[seatOf(b.p)], st = seatOf(b.p), x = st === 'l' ? x0 + 60 : st === 'r' ? x0 - 60 : x0 + (st === 't' ? 150 : 0), y = st === 'b' ? (viewer() === b.p ? handTop - (PORT ? 172 : 110) : y0 - 120) : st === 't' ? y0 + 70 : y0 - 10;
+    const [x0, y0] = PL[seatOf(b.p)], st = seatOf(b.p);
+    let x = st === 'l' ? x0 + 60 : st === 'r' ? x0 - 60 : x0 + (st === 't' ? 150 : 0), y = st === 'b' ? (viewer() === b.p ? handTop - (PORT ? 172 : 110) : y0 - 120) : st === 't' ? y0 + 70 : y0 - 10;
+    if (SI || ES || BU) {                 // modos nuevos: el globo sale de la chapa del jugador, no del centro ni sobre sus cartas
+      const [bxx, byy] = badgeXY(b.p);
+      if (st === 'b') x = bxx; else if (st !== 't') { x = bxx; y = byy - 36; }
+    }
     const size = b.big ? 26 : 17; c.font = `800 ${size}px ${FONT}`; const w = c.measureText(b.txt).width + 28, h = size + 18, xx = Math.max(w / 2 + 6, Math.min(W - w / 2 - 6, x)), s = Math.min(1, (b.big ? 2.4 : 1.7) - b.t < 0.15 ? 0.6 + ((b.big ? 2.4 : 1.7) - b.t) * 2.6 : 1);
     c.save(); c.translate(xx, y); c.scale(s, s); c.globalAlpha = Math.min(1, b.t * 3);
     ART.rr(c, -w / 2, -h / 2, w, h, h / 2); ART.fillOut(c, b.big ? '#ff5a5f' : '#fff', 2.5); c.beginPath(); c.moveTo(-8, h / 2 - 1); c.lineTo(0, h / 2 + 9); c.lineTo(8, h / 2 - 1); c.fillStyle = b.big ? '#ff5a5f' : '#fff'; c.fill();
