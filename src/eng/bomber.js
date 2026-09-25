@@ -2,26 +2,34 @@
  * (alcance, petardos, velocidad, patada) y reglas intercambiables por CFG.rules:
  *   fuse (s), range, bombs, speed (casillas/s), kick (patada desde el inicio), drop (prob. de mejora), round (s antes de la
  *   muerte súbita), wins (rondas para ganar), slide (los petardos resbalan al soltarlos, estilo hielo), crates (densidad).
- * Plaza de pueblo: adoquines, bolardos de piedra, cajas de mercado; los vecinos llevan gorro de fiesta del color del jugador. */
+ * Plaza de pueblo: adoquines, bolardos de piedra, cajas de mercado; los vecinos llevan gorro de fiesta del color del jugador.
+ * Modos (CFG.mode): 'plaza' (por defecto, el último en pie gana la ronda);
+ *   'hielo' (lago helado: A suelta el petardo deslizándose hacia donde miras hasta chocar, B lo planta quieto; un petardo que
+ *     choca con otro parado le pasa el impulso; al soltar el mando resbalas hasta el centro de la casilla);
+ *   'pintura' (las explosiones pintan el suelo del color del dueño; si te alcanzan, salpicas de su color tu casilla y las de
+ *     alrededor y reapareces en tu esquina; al acabar el reloj gana la ronda quien más suelo haya cubierto). */
+const MODE = CFG.mode || 'plaza', ICE = MODE === 'hielo', PAINT = MODE === 'pintura';
 const OUT = ART.OUT, TAU = 6.2832, T = 32, CO = 15, RO = 11, TOP = 46, W = CO * T, H = TOP + RO * T;
-const RU = Object.assign({ fuse: 2.4, range: 2, bombs: 1, speed: 3.3, kick: false, drop: 0.36, round: 60, wins: 2, slide: false, crates: 0.72 }, CFG.rules || {});
-const k = Kit({ w: W, h: H, title: CFG.title, bg: '#2a1f3a' }), c = k.ctx;
+const RU = Object.assign({ fuse: 2.4, range: 2, bombs: 1, speed: 3.3, kick: false, drop: 0.36, round: 60, wins: 2, slide: ICE, crates: 0.72 }, CFG.rules || {});
+const k = Kit({ w: W, h: H, title: CFG.title, bg: ICE ? '#1d2a4a' : PAINT ? '#2d2640' : '#2a1f3a' }), c = k.ctx;
 const lite = ART.lite, dark = ART.dark, alpha = ART.alpha;
 const FIRE_T = 0.55, MAXSPD = 5.6, HATS = ['cone', 'beret', 'crown', 'bow'];
 const lsGet = (key, d) => { try { const v = localStorage.getItem(key); return v == null ? d : +v; } catch (e) { return d; } };
 const lsSet = (key, v) => { try { localStorage.setItem(key, v); } catch (e) {} };
 const CPUK = 'cpu:' + CFG.id;
-let skill = 0.3, grid, items, fireT, fireD, bombs, pl, crumbs, round, rT, sudden, sudI, sudT, endT, msg, msgT, t = 0, SPIRAL, cdPend, fast;
+let skill = 0.3, grid, items, fireT, fireD, fireO, paint, pcount, bombs, pl, crumbs, round, rT, sudden, sudI, sudT, endT, msg, msgT, t = 0, SPIRAL, cdPend, fast;
+const SLIDE_V = ICE ? 7 : 8, INV0 = ICE || PAINT ? 5 : 3; // 1.27: en los modos nuevos nada te elimina en los 5 primeros segundos
 
 function mk(w, h, draw) { const r = Math.min(3, Math.max(2, Math.ceil((k.scale || 1) * Math.min(2, devicePixelRatio || 1)))), cv = document.createElement('canvas'); cv.width = w * r; cv.height = h * r; const q = cv.getContext('2d'); q.scale(r, r); q.lineJoin = 'round'; q.lineCap = 'round'; draw(q); return cv; }
 function label(s, x, y, size, col, align, base) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'center'; c.textBaseline = base || 'middle';
   c.lineJoin = 'round'; c.lineWidth = size / 4 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
 }
+const PAINTS = ['#ff6fb5', '#5b8cff', '#a8cf3f', '#ffc94d', '#6e62f5'];
 const rnd = (s) => { const x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 
 /* ---------------- Arte cacheado: suelo de adoquines, murete con flores, bolardos, cajas ---------------- */
-const FLOOR = mk(W, RO * T, (g) => {
+const FLOOR = ICE ? floorIce() : PAINT ? floorPaint() : mk(W, RO * T, (g) => {
   g.fillStyle = '#c9a77c'; g.fillRect(0, 0, W, RO * T);
   for (let y = 1; y < RO - 1; y++) for (let x = 1; x < CO - 1; x++) {
     const X = x * T, Y = y * T, alt = (x + y) % 2;
@@ -41,19 +49,94 @@ const FLOOR = mk(W, RO * T, (g) => {
   g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(T - 1.5, T - 1.5, W - 2 * T + 3, (RO - 2) * T + 3);
 });
 function mix3(v) { return v < 0.33 ? '#e3c69c' : v < 0.66 ? '#d4b186' : '#c8a176'; }
-const PILLAR = mk(T, T + 10, (g) => { // bolardo de piedra con farolillo
+const PILLAR = ICE ? pillarIce() : PAINT ? pillarPaint() : mk(T, T + 10, (g) => { // bolardo de piedra con farolillo
   ART.shadow(g, T / 2 + 2, T + 4, 14, 0.3);
   ART.rr(g, 3, 12, T - 6, T - 8, 7); const gr = g.createLinearGradient(3, 0, T - 3, 0); gr.addColorStop(0, '#d9cfe6'); gr.addColorStop(1, '#8e80a8'); g.fillStyle = gr; g.fill(); g.lineWidth = 2.4; g.strokeStyle = OUT; g.stroke();
   ART.rr(g, 5, 4, T - 10, 12, 5); const g2 = g.createLinearGradient(0, 4, 0, 16); g2.addColorStop(0, '#f2ecf8'); g2.addColorStop(1, '#b4a8c8'); g.fillStyle = g2; g.fill(); g.stroke();
   g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(8, 6, 8, 2); g.fillStyle = 'rgba(40,30,60,.25)'; g.fillRect(6, T - 2, T - 12, 3);
 });
-const CRATE = mk(T, T + 6, (g) => { // caja de mercado con fruta
+const CRATE = ICE ? crateIce() : PAINT ? cratePaint() : mk(T, T + 6, (g) => { // caja de mercado con fruta
   ART.shadow(g, T / 2 + 2, T + 2, 14, 0.28);
   ART.rr(g, 2, 6, T - 4, T - 6, 4); const gr = g.createLinearGradient(0, 6, 0, T); gr.addColorStop(0, '#e2a25d'); gr.addColorStop(1, '#a8652f'); g.fillStyle = gr; g.fill(); g.lineWidth = 2.4; g.strokeStyle = OUT; g.stroke();
   g.strokeStyle = 'rgba(90,45,20,.7)'; g.lineWidth = 1.5; for (const y of [14, 21]) { g.beginPath(); g.moveTo(4, y); g.lineTo(T - 4, y); g.stroke(); }
   g.fillStyle = 'rgba(255,255,255,.3)'; g.fillRect(5, 8, T - 10, 2);
   [['#ff5f5f', 9], ['#ffb13d', 16], ['#8be04a', 23]].forEach(([col, x], i) => { g.beginPath(); g.arc(x, 6 - (i % 2) * 1.5, 4.2, 0, TAU); g.fillStyle = col; g.fill(); g.lineWidth = 1.6; g.strokeStyle = OUT; g.stroke(); g.fillStyle = 'rgba(255,255,255,.6)'; g.beginPath(); g.arc(x - 1.3, 4.6 - (i % 2) * 1.5, 1.2, 0, TAU); g.fill(); });
 });
+/* Lago helado: placas de hielo con grietas y brillo, orilla de nieve con abetos, bloques de hielo y cajas nevadas */
+function floorIce() {
+  return mk(W, RO * T, (g) => {
+    g.fillStyle = '#9fd0ec'; g.fillRect(0, 0, W, RO * T);
+    for (let y = 1; y < RO - 1; y++) for (let x = 1; x < CO - 1; x++) {
+      const X = x * T, Y = y * T, v = rnd(x * 17 + y * 5), gr = g.createLinearGradient(X, Y, X + T, Y + T);
+      gr.addColorStop(0, v < 0.5 ? '#e4f5fd' : '#d9f0fb'); gr.addColorStop(1, v < 0.5 ? '#b9e0f3' : '#c3e5f5'); g.fillStyle = gr; g.fillRect(X, Y, T, T);
+      g.strokeStyle = 'rgba(80,140,190,.28)'; g.lineWidth = 1; g.strokeRect(X + 0.5, Y + 0.5, T - 1, T - 1);
+      if (v > 0.55) { g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 1.2; g.beginPath(); const sx = X + 4 + rnd(x + y * 9) * 20, sy = Y + 4 + rnd(x * 3 + y) * 20; g.moveTo(sx, sy); g.lineTo(sx + 6, sy + 3); g.lineTo(sx + 9, sy + 9); g.moveTo(sx + 6, sy + 3); g.lineTo(sx + 12, sy + 1); g.stroke(); }
+      g.fillStyle = 'rgba(255,255,255,.35)'; g.save(); g.beginPath(); g.rect(X, Y, T, T); g.clip(); g.beginPath(); g.moveTo(X + 2, Y + 14); g.lineTo(X + 14, Y + 2); g.lineTo(X + 19, Y + 2); g.lineTo(X + 2, Y + 19); g.closePath(); g.fill(); g.restore();
+    }
+    const gr = g.createLinearGradient(0, T, 0, T + 10); gr.addColorStop(0, 'rgba(30,60,110,.3)'); gr.addColorStop(1, 'rgba(30,60,110,0)'); g.fillStyle = gr; g.fillRect(T, T, W - 2 * T, 10);
+    for (let y = 0; y < RO; y++) for (let x = 0; x < CO; x++) if (x === 0 || y === 0 || x === CO - 1 || y === RO - 1) {
+      const X = x * T, Y = y * T, gr2 = g.createLinearGradient(0, Y, 0, Y + T); gr2.addColorStop(0, '#ffffff'); gr2.addColorStop(1, '#bcd3ea'); g.fillStyle = gr2; g.fillRect(X, Y, T, T);
+      g.fillStyle = '#ffffff'; for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(X + 6 + i * 10, Y + 6 + rnd(x * 7 + y * 3 + i) * 5, 7, 0, TAU); g.fill(); }
+      g.fillStyle = 'rgba(120,160,210,.35)'; g.fillRect(X, Y + T - 5, T, 5);
+      if ((x * 7 + y * 3) % 5 === 0) { // abeto nevado
+        g.beginPath(); g.moveTo(X + 16, Y + 1); g.lineTo(X + 27, Y + 24); g.lineTo(X + 5, Y + 24); g.closePath(); ART.fillOut(g, '#3f8f5a', 1.8);
+        g.fillStyle = '#fff'; g.beginPath(); g.moveTo(X + 16, Y + 1); g.lineTo(X + 21, Y + 11); g.lineTo(X + 11, Y + 11); g.closePath(); g.fill();
+        g.fillStyle = '#7a4b2a'; g.fillRect(X + 14, Y + 24, 4, 6); }
+    }
+    g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(T - 1.5, T - 1.5, W - 2 * T + 3, (RO - 2) * T + 3);
+  });
+}
+function pillarIce() {
+  return mk(T, T + 10, (g) => {
+    ART.shadow(g, T / 2 + 2, T + 4, 14, 0.25);
+    ART.rr(g, 3, 10, T - 6, T - 6, 5); const gr = g.createLinearGradient(3, 0, T - 3, 0); gr.addColorStop(0, '#bfe9ff'); gr.addColorStop(1, '#5aa6d6'); g.fillStyle = gr; g.fill(); g.lineWidth = 2.4; g.strokeStyle = OUT; g.stroke();
+    ART.rr(g, 3, 3, T - 6, 12, 5); g.fillStyle = '#eefaff'; g.fill(); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,.8)'; g.lineWidth = 2; g.beginPath(); g.moveTo(8, 18); g.lineTo(8, 30); g.moveTo(12, 20); g.lineTo(12, 25); g.stroke();
+    g.strokeStyle = 'rgba(40,90,140,.35)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(18, 16); g.lineTo(22, 22); g.lineTo(20, 28); g.stroke();
+  });
+}
+function crateIce() {
+  return mk(T, T + 6, (g) => {
+    ART.shadow(g, T / 2 + 2, T + 2, 14, 0.25);
+    ART.rr(g, 2, 6, T - 4, T - 6, 4); const gr = g.createLinearGradient(0, 6, 0, T); gr.addColorStop(0, '#c9925a'); gr.addColorStop(1, '#8c5a2e'); g.fillStyle = gr; g.fill(); g.lineWidth = 2.4; g.strokeStyle = OUT; g.stroke();
+    g.strokeStyle = 'rgba(70,35,15,.7)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(4, 8); g.lineTo(T - 4, T - 2); g.moveTo(T - 4, 8); g.lineTo(4, T - 2); g.stroke();
+    g.beginPath(); g.moveTo(1, 9); g.quadraticCurveTo(6, 1, 12, 5); g.quadraticCurveTo(17, 0, 22, 4); g.quadraticCurveTo(28, 1, 31, 9); g.quadraticCurveTo(26, 12, 20, 10); g.quadraticCurveTo(14, 13, 8, 10); g.quadraticCurveTo(4, 12, 1, 9); g.closePath();
+    g.fillStyle = '#ffffff'; g.fill(); g.lineWidth = 2; g.strokeStyle = OUT; g.stroke(); g.fillStyle = 'rgba(150,190,230,.5)'; g.fillRect(8, 8, 14, 2);
+  });
+}
+/* Taller de pintura: baldosas claras, paredes salpicadas, botes de pintura y cajas de cartón */
+function floorPaint() {
+  return mk(W, RO * T, (g) => {
+    g.fillStyle = '#d9d0c2'; g.fillRect(0, 0, W, RO * T);
+    for (let y = 1; y < RO - 1; y++) for (let x = 1; x < CO - 1; x++) { const X = x * T, Y = y * T, v = rnd(x * 11 + y * 23);
+      ART.rr(g, X + 1, Y + 1, T - 2, T - 2, 4); g.fillStyle = v < 0.5 ? '#f6f1e8' : '#efe8dc'; g.fill(); g.fillStyle = 'rgba(255,255,255,.6)'; g.fillRect(X + 4, Y + 3, T - 12, 2); }
+    const gr = g.createLinearGradient(0, T, 0, T + 10); gr.addColorStop(0, 'rgba(40,20,50,.25)'); gr.addColorStop(1, 'rgba(40,20,50,0)'); g.fillStyle = gr; g.fillRect(T, T, W - 2 * T, 10);
+    for (let y = 0; y < RO; y++) for (let x = 0; x < CO; x++) if (x === 0 || y === 0 || x === CO - 1 || y === RO - 1) {
+      const X = x * T, Y = y * T, gr2 = g.createLinearGradient(0, Y, 0, Y + T); gr2.addColorStop(0, '#8d86a8'); gr2.addColorStop(1, '#5f587c'); g.fillStyle = gr2; g.fillRect(X, Y, T, T);
+      g.strokeStyle = 'rgba(30,20,50,.35)'; g.lineWidth = 1; g.strokeRect(X + 0.5, Y + 0.5, T - 1, T - 1);
+      if (rnd(x * 5 + y * 13) < 0.45) { const col = PAINTS[(x + y * 3) % 5]; g.fillStyle = col; g.beginPath(); g.arc(X + 10 + rnd(x + y) * 12, Y + 12, 6, 0, TAU); g.fill(); g.fillRect(X + 12 + rnd(x + y) * 8, Y + 12, 3, 10 + rnd(y * x + 1) * 8); }
+    }
+    g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(T - 1.5, T - 1.5, W - 2 * T + 3, (RO - 2) * T + 3);
+  });
+}
+function pillarPaint() {
+  return mk(T, T + 10, (g) => { // bote de pintura grande
+    ART.shadow(g, T / 2 + 2, T + 4, 14, 0.28);
+    ART.rr(g, 4, 10, T - 8, T - 4, 4); const gr = g.createLinearGradient(4, 0, T - 4, 0); gr.addColorStop(0, '#eef0f8'); gr.addColorStop(0.5, '#c3c6d8'); gr.addColorStop(1, '#8a8ea8'); g.fillStyle = gr; g.fill(); g.lineWidth = 2.4; g.strokeStyle = OUT; g.stroke();
+    g.fillStyle = '#6e62f5'; g.fillRect(5, 17, T - 10, 9); g.strokeStyle = OUT; g.lineWidth = 1.4; g.strokeRect(5, 17, T - 10, 9); g.fillStyle = '#fff'; g.fillRect(9, 20, 8, 3);
+    g.beginPath(); g.ellipse(T / 2, 10, T / 2 - 4, 5, 0, 0, TAU); g.fillStyle = '#dfe2ee'; g.fill(); g.lineWidth = 2.2; g.stroke();
+    g.beginPath(); g.ellipse(T / 2, 10, T / 2 - 8, 3, 0, 0, TAU); g.fillStyle = '#ff6fb5'; g.fill();
+    g.fillStyle = '#ff6fb5'; g.beginPath(); g.moveTo(22, 11); g.lineTo(25, 11); g.lineTo(25, 20); g.arc(23.5, 20, 1.5, 0, Math.PI); g.closePath(); g.fill();
+  });
+}
+function cratePaint() {
+  return mk(T, T + 6, (g) => { // caja de cartón con cinta
+    ART.shadow(g, T / 2 + 2, T + 2, 14, 0.28);
+    ART.rr(g, 2, 6, T - 4, T - 6, 3); const gr = g.createLinearGradient(0, 6, 0, T); gr.addColorStop(0, '#e6c48c'); gr.addColorStop(1, '#b98e52'); g.fillStyle = gr; g.fill(); g.lineWidth = 2.4; g.strokeStyle = OUT; g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.55)'; g.fillRect(T / 2 - 3, 7, 6, T - 8); g.strokeStyle = 'rgba(120,80,30,.5)'; g.lineWidth = 1; g.beginPath(); g.moveTo(4, 14); g.lineTo(T - 4, 14); g.stroke();
+    g.fillStyle = 'rgba(90,60,20,.45)'; g.font = '700 7px sans-serif'; g.textAlign = 'center'; g.fillText('^^', 9, 26);
+  });
+}
 const ICON = {};
 function itemIcon(kind) {
   if (ICON[kind]) return ICON[kind];
@@ -72,12 +155,13 @@ function itemIcon(kind) {
 const inG = (x, y) => x >= 0 && y >= 0 && x < CO && y < RO;
 const hard = (x, y) => !inG(x, y) || grid[y][x] === 1;
 const bombAt = (x, y) => bombs.find((b) => !b.sl && b.x === x && b.y === y) || bombs.find((b) => b.sl && Math.round(b.fx - 0.5) === x && Math.round(b.fy - 0.5) === y);
+let FREE = 1;
 const SPAWN = [[1, 1], [CO - 2, RO - 2], [CO - 2, 1], [1, RO - 2]];
 function buildMap() {
-  grid = []; items = []; fireT = []; fireD = [];
-  for (let y = 0; y < RO; y++) { grid.push([]); items.push([]); fireT.push([]); fireD.push([]); for (let x = 0; x < CO; x++) {
+  grid = []; items = []; fireT = []; fireD = []; fireO = []; paint = []; pcount = [0, 0, 0, 0]; FREE = 0;
+  for (let y = 0; y < RO; y++) { grid.push([]); items.push([]); fireT.push([]); fireD.push([]); fireO.push([]); paint.push([]); for (let x = 0; x < CO; x++) {
     const edge = x === 0 || y === 0 || x === CO - 1 || y === RO - 1, pil = x % 2 === 0 && y % 2 === 0;
-    grid[y].push(edge || pil ? 1 : 0); items[y].push(0); fireT[y].push(0); fireD[y].push(0); } }
+    grid[y].push(edge || pil ? 1 : 0); items[y].push(0); fireT[y].push(0); fireD[y].push(0); fireO[y].push(-1); paint[y].push(-1); if (!edge && !pil) FREE++; } }
   const safe = new Set(); for (const [sx, sy] of SPAWN) for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [-2, 0], [0, 2], [0, -2]]) safe.add((sx + dx) + ',' + (sy + dy));
   for (let y = 1; y < RO - 1; y++) for (let x = 1; x < CO - 1; x++) if (!grid[y][x] && !safe.has(x + ',' + y) && Math.random() < RU.crates) grid[y][x] = 2;
   // espiral de la muerte súbita (de fuera hacia dentro)
@@ -92,7 +176,7 @@ function newPlayers() {
   pl = P.map((q, i) => ({ p: q.p, cpu: q.cpu, name: q.cpu ? 'CPU' : (k.party ? 'J' + (q.p + 1) : 'Tú'), col: k.pcol(q.p), wins: pl && pl[i] ? pl[i].wins : 0, hat: HATS[i] }));
 }
 function placePlayers() {
-  pl.forEach((q, i) => Object.assign(q, { x: SPAWN[i][0] + 0.5, y: SPAWN[i][1] + 0.5, dir: [0, 1], spd: RU.speed, max: RU.bombs, range: RU.range, kick: RU.kick, alive: true, dead: 0, inv: 3, mv: 0, ai: null, think: 0, anim: 0, bombT: 0 }));
+  pl.forEach((q, i) => Object.assign(q, { x: SPAWN[i][0] + 0.5, y: SPAWN[i][1] + 0.5, dir: [0, 1], spd: RU.speed, max: RU.bombs, range: RU.range, kick: RU.kick, alive: true, dead: 0, out: 0, gl: false, inv: INV0, mv: 0, ai: null, think: 0, anim: 0, bombT: 0 }));
 }
 const cellOf = (q) => [Math.floor(q.x), Math.floor(q.y)];
 function refreshCtl() { const P = k.players(4); pl.forEach((q) => { const hu = !P[q.p].cpu; q.cpu = !hu; q.name = hu ? (k.party ? 'J' + (q.p + 1) : 'Tú') : 'CPU'; q.col = k.pcol(q.p); }); }
@@ -136,12 +220,12 @@ function kickCheck(q, x, y, dx, dy) {
 const plAt = (x, y) => pl.some((q) => q.alive && Math.floor(q.x) === x && Math.floor(q.y) === y);
 
 /* ---------------- Petardos y explosiones ---------------- */
-function placeBomb(q) {
+function placeBomb(q, slide = RU.slide) {
   const [x, y] = cellOf(q);
   if (bombs.filter((b) => b.own === q).length >= q.max || bombAt(x, y) || grid[y][x]) return false;
   const b = { x, y, t: RU.fuse, range: q.range, own: q, pass: new Set(pl.filter((o) => o.alive && Math.floor(o.x) === x && Math.floor(o.y) === y)), sl: null, born: t };
   bombs.push(b); k.sfx('click'); q.bombT = 0.18;
-  if (RU.slide && !blocked(x + q.dir[0], y + q.dir[1], null)) { b.sl = q.dir.slice(); b.fx = x + 0.5; b.fy = y + 0.5; b.pass.clear(); }
+  if (slide && !blocked(x + q.dir[0], y + q.dir[1], null)) { b.sl = q.dir.slice(); b.fx = x + 0.5; b.fy = y + 0.5; b.pass.clear(); }
   return true;
 }
 function blast(b) {
@@ -151,24 +235,34 @@ function blast(b) {
   }
   return out;
 }
+function paintCell(x, y, oi) { if (hard(x, y) || grid[y][x] === 2 || paint[y][x] === oi) return; if (paint[y][x] >= 0) pcount[paint[y][x]]--; paint[y][x] = oi; pcount[oi]++; }
 function explode(b) {
-  bombs.splice(bombs.indexOf(b), 1); k.sfx('explode'); k.shake(5);
-  k.burst((b.x + 0.5) * T, TOP + (b.y + 0.5) * T, '#ffd166', 16, 200); k.burst((b.x + 0.5) * T, TOP + (b.y + 0.5) * T, '#ff5f7a', 10, 160);
+  bombs.splice(bombs.indexOf(b), 1); k.sfx('explode'); k.shake(5); const oi = pl.indexOf(b.own);
+  k.burst((b.x + 0.5) * T, TOP + (b.y + 0.5) * T, PAINT ? b.own.col : '#ffd166', 16, 200); k.burst((b.x + 0.5) * T, TOP + (b.y + 0.5) * T, PAINT ? '#fff' : '#ff5f7a', 10, 160);
   for (const [x, y, bit] of blast(b)) {
-    fireT[y][x] = FIRE_T; fireD[y][x] = bit === 0 ? 3 : (fireD[y][x] | bit);
+    fireT[y][x] = FIRE_T; fireD[y][x] = bit === 0 ? 3 : (fireD[y][x] | bit); fireO[y][x] = oi;
     if (grid[y][x] === 2) { grid[y][x] = 0; crumbs.push({ x, y, t: 0 }); k.burst((x + 0.5) * T, TOP + (y + 0.5) * T, '#c98a4b', 10, 150); if (Math.random() < RU.drop) items[y][x] = k.pick(['r', 'r', 'b', 'b', 's', 's', 'k']); fireT[y][x] = FIRE_T; }
     else if (items[y][x] && bit) { items[y][x] = 0; k.burst((x + 0.5) * T, TOP + (y + 0.5) * T, '#fff', 8, 120); }
     const o = bombAt(x, y); if (o && o !== b) o.t = Math.min(o.t, 0.06);
+    if (PAINT) paintCell(x, y, oi);
   }
 }
 function kill(q, why) {
   if (!q.alive) return; q.alive = false; q.dead = 1; k.sfx('hurt'); k.shake(7);
+  if (PAINT) { // pintura: nadie queda eliminado; el que te alcanza salpica tu casilla y las de alrededor, y reapareces en tu esquina
+    const [cx, cy] = cellOf(q), oi = fireO[cy][cx], by = pl[oi]; q.out = 1.6;
+    if (by && by !== q) { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) paintCell(cx + dx, cy + dy, oi); k.burst(q.x * T, TOP + q.y * T, by.col, 30, 240); }
+    k.float(by && by !== q ? '¡Pringado!' : '¡Uy!', q.x * T, TOP + q.y * T - 20, by ? by.col : q.col); return; }
   k.burst(q.x * T, TOP + q.y * T, q.col, 26, 220); k.burst(q.x * T, TOP + q.y * T, '#fff', 10, 140); k.float(why || '¡Fuera!', q.x * T, TOP + q.y * T - 20, q.col);
 }
 
 /* ---------------- IA: mapa de peligro + BFS ---------------- */
+function slideDest(x, y, d) { // hielo: casilla donde se parará un petardo que resbala desde (x,y) en la dirección d
+  for (let i = 0; i < CO; i++) { const nx = x + d[0], ny = y + d[1]; if (blocked(nx, ny, null) || plAt(nx, ny) || items[ny][nx]) break; x = nx; y = ny; } return [x, y];
+}
 function dangerMap(extra) {
-  const D = Array.from({ length: RO }, () => Array(CO).fill(Infinity)), B = bombs.map((b) => ({ x: b.sl ? Math.floor(b.fx) : b.x, y: b.sl ? Math.floor(b.fy) : b.y, t: b.t, range: b.range }));
+  const D = Array.from({ length: RO }, () => Array(CO).fill(Infinity)), B = bombs.map((b) => { if (ICE && b.sl) { const [x, y] = slideDest(Math.floor(b.fx), Math.floor(b.fy), b.sl); return { x, y, t: b.t, range: b.range }; }
+    return { x: b.sl ? Math.floor(b.fx) : b.x, y: b.sl ? Math.floor(b.fy) : b.y, t: b.t, range: b.range }; });
   if (extra) B.push(extra);
   let ch = true; const cov = B.map((b) => blast(b));
   while (ch) { ch = false; B.forEach((b, i) => { for (const [x, y] of cov[i]) B.forEach((o, j) => { if (j !== i && o.x === x && o.y === y && o.t > b.t) { o.t = b.t; ch = true; } }); }); }
@@ -193,8 +287,16 @@ function bfs(q, D, goal, extraBomb) {
   }
   return null;
 }
-function hitsFoe(q, x, y) { for (const [a, b] of blast({ x, y, range: q.range })) if (pl.some((o) => o !== q && o.alive && Math.floor(o.x) === a && Math.floor(o.y) === b)) return true; return false; }
+function hitsFoe(q, x, y) { for (const [a, b] of blast({ x, y, range: q.range })) if (pl.some((o) => o !== q && o.alive && (INV0 === 3 || o.inv <= 0) && Math.floor(o.x) === a && Math.floor(o.y) === b)) return true; return false; }
 function hitsCrate(q, x, y) { return blast({ x, y, range: q.range }).some(([a, b]) => grid[b][a] === 2); }
+function paintGain(q, x, y) { // pintura: cuánto suelo nuevo cubriría un petardo aquí
+  const me = pl.indexOf(q); let v = 0; for (const [a, b] of blast({ x, y, range: q.range })) v += grid[b][a] === 2 ? 1.2 : paint[b][a] === me ? 0 : paint[b][a] < 0 ? 1 : 1.4; return v;
+}
+function slideShot(q, cx, cy) { // hielo: ¿hay un rival en línea recta al que llegaría un petardo deslizado?
+  for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { if (blocked(cx + d[0], cy + d[1], null)) continue; const [ex, ey] = slideDest(cx, cy, d);
+    if (Math.abs(ex - cx) + Math.abs(ey - cy) >= 2 && hitsFoe(q, ex, ey)) return { d, x: ex, y: ey }; }
+  return null;
+}
 function aiThink(q) {
   const D = dangerMap(), [cx, cy] = cellOf(q), here = D[cy][cx];
   const early = rT < 5, aggr = Math.min(1, 0.25 + skill * 0.5 + rT / 135);
@@ -204,12 +306,17 @@ function aiThink(q) {
   }
   // ¿soltar petardo aquí?
   const mine = bombs.filter((b) => b.own === q).length;
+  if (!early && mine < q.max && !bombAt(cx, cy) && ICE && Math.random() < aggr * 0.5) { // hielo: lanza el petardo deslizando hacia un rival alineado
+    const sh = slideShot(q, cx, cy);
+    if (sh) { const eb = { x: sh.x, y: sh.y, t: RU.fuse - 0.3, range: q.range }, D2 = dangerMap(eb), esc = bfs(q, D2, (x, y) => D2[y][x] === Infinity);
+      if (esc && esc.length > 1) { q.dir = sh.d.slice(); placeBomb(q, true); q.ai = esc; q.think = 0.05; return; } }
+  }
   if (!early && mine < q.max && !bombAt(cx, cy)) {
-    const foe = hitsFoe(q, cx, cy), crate = hitsCrate(q, cx, cy);
+    const foe = hitsFoe(q, cx, cy), crate = PAINT ? paintGain(q, cx, cy) >= 3 - skill : hitsCrate(q, cx, cy);
     if ((foe && Math.random() < aggr) || (crate && Math.random() < 0.55 + skill * 0.4)) {
       const eb = { x: cx, y: cy, t: RU.fuse, range: q.range }, D2 = dangerMap(eb);
       const esc = bfs(q, D2, (x, y) => D2[y][x] === Infinity);
-      if (esc && esc.length > 1 && esc.length - 1 <= RU.fuse * q.spd * (0.55 + skill * 0.3)) { placeBomb(q); q.ai = esc; q.think = 0.05; return; }
+      if (esc && esc.length > 1 && esc.length - 1 <= RU.fuse * q.spd * (0.55 + skill * 0.3)) { placeBomb(q, ICE ? false : undefined); q.ai = esc; q.think = 0.05; return; }
     }
   }
   // objetivo: mejora cercana, rival o caja
@@ -217,7 +324,8 @@ function aiThink(q) {
   let path = bfs(q, D, (x, y, n) => n > 0 && items[y][x] && safeCell(x, y) && n < 8);
   const hunt = rT > 25 || !pl.some((o) => o !== q && o.alive && Math.abs(o.x - q.x) + Math.abs(o.y - q.y) > 14) || Math.random() < aggr * 0.5;
   if (!path && hunt) path = bfs(q, D, (x, y, n) => n > 0 && safeCell(x, y) && hitsFoe(q, x, y));
-  if (!path) path = bfs(q, D, (x, y, n) => safeCell(x, y) && hitsCrate(q, x, y) && !bombAt(x, y));
+  if (!path && PAINT) path = bfs(q, D, (x, y, n) => safeCell(x, y) && !bombAt(x, y) && paintGain(q, x, y) >= 4);
+  if (!path) path = bfs(q, D, (x, y, n) => safeCell(x, y) && (PAINT ? paintGain(q, x, y) >= 2 : hitsCrate(q, x, y)) && !bombAt(x, y));
   if (!path) { const foe = pl.filter((o) => o !== q && o.alive).sort((a, b) => Math.hypot(a.x - q.x, a.y - q.y) - Math.hypot(b.x - q.x, b.y - q.y))[0];
     if (foe) path = bfs(q, D, (x, y, n) => n > 0 && safeCell(x, y) && Math.abs(x + 0.5 - foe.x) + Math.abs(y + 0.5 - foe.y) < 2.2); }
   if (!path) path = bfs(q, D, (x, y, n) => n === 1 && safeCell(x, y));
@@ -240,7 +348,7 @@ k.run((dt) => {
   if (cdPend) { cdPend = false; k.count(3); }
   if (k.counting()) { t += dt; return; }
   const humans = pl.filter((q) => !q.cpu && q.alive).length;
-  fast = humans === 0 && pl.some((q) => !q.cpu) && !endT;
+  fast = !PAINT && humans === 0 && pl.some((q) => !q.cpu) && !endT;
   for (let s = 0; s < (fast ? 4 : 1); s++) step(dt);
 }, draw);
 
@@ -249,33 +357,39 @@ function step(dt) {
   if (endT) { endT -= dt; for (const q of pl) if (q.dead) q.dead = Math.max(0, q.dead - dt); if (endT <= 0) finishRound(); return; }
   for (let y = 0; y < RO; y++) for (let x = 0; x < CO; x++) if (fireT[y][x] > 0) { fireT[y][x] -= dt; if (fireT[y][x] <= 0) { fireT[y][x] = 0; fireD[y][x] = 0; } }
   for (const cr of crumbs) cr.t += dt; crumbs = crumbs.filter((cr) => cr.t < 0.5);
-  if (!sudden && rT > RU.round) { sudden = true; msg = '¡Muerte súbita!'; msgT = 2.2; k.sfx('lose'); k.flash('rgba(255,90,95,.3)'); }
+  if (!PAINT && !sudden && rT > RU.round) { sudden = true; msg = '¡Muerte súbita!'; msgT = 2.2; k.sfx('lose'); k.flash('rgba(255,90,95,.3)'); }
   if (sudden && sudI < SPIRAL.length) { sudT -= dt; if (sudT <= 0) { sudT = 0.25; const [x, y] = SPIRAL[sudI++]; grid[y][x] = 1; items[y][x] = 0; crumbs.push({ x, y, t: 0, drop: true });
     const b = bombAt(x, y); if (b) bombs.splice(bombs.indexOf(b), 1); k.sfx('hit'); k.shake(2);
     for (const q of pl) if (q.alive && Math.floor(q.x) === x && Math.floor(q.y) === y) kill(q, '¡Aplastado!'); } }
   // petardos
   for (const b of bombs.slice()) {
-    if (b.sl) { const sp = 8 * dt; b.fx += b.sl[0] * sp; b.fy += b.sl[1] * sp; const cx = Math.floor(b.fx), cy = Math.floor(b.fy), nx = cx + b.sl[0], ny = cy + b.sl[1];
+    if (b.sl) { const sp = SLIDE_V * dt; b.fx += b.sl[0] * sp; b.fy += b.sl[1] * sp; const cx = Math.floor(b.fx), cy = Math.floor(b.fy), nx = cx + b.sl[0], ny = cy + b.sl[1];
       const ahead = (b.sl[0] ? (b.fx - cx - 0.5) * b.sl[0] : (b.fy - cy - 0.5) * b.sl[1]) >= 0;
-      if (ahead && (blocked(nx, ny, null) || plAt(nx, ny) || items[ny][nx])) { b.x = cx; b.y = cy; b.sl = null; b.pass = new Set(pl.filter((o) => o.alive && Math.floor(o.x) === cx && Math.floor(o.y) === cy)); } }
+      if (ahead && (blocked(nx, ny, null) || plAt(nx, ny) || items[ny][nx])) {
+        const o = ICE && bombAt(nx, ny); // hielo: choque de petardos, el parado sale resbalando (carambola)
+        if (o && o !== b && !o.sl && !blocked(nx + b.sl[0], ny + b.sl[1], null) && !plAt(nx + b.sl[0], ny + b.sl[1]) && !items[ny + b.sl[1]][nx + b.sl[0]]) { o.sl = b.sl.slice(); o.fx = o.x + 0.5; o.fy = o.y + 0.5; o.pass.clear(); k.sfx('hit'); k.burst((nx + 0.5) * T, TOP + (ny + 0.5) * T, '#dff4ff', 8, 120); }
+        b.x = cx; b.y = cy; b.sl = null; b.fx = cx + 0.5; b.fy = cy + 0.5; b.pass = new Set(pl.filter((o) => o.alive && Math.floor(o.x) === cx && Math.floor(o.y) === cy)); } }
     b.t -= dt; if (b.t <= 0) explode(b);
   }
   for (const b of bombs) for (const q of b.pass) { const [x, y] = cellOf(q); if (x !== b.x || y !== b.y) b.pass.delete(q); }
   const D = pl.some((q) => q.cpu && q.alive) ? dangerMap() : null;
   // jugadores
   for (const q of pl) {
-    if (!q.alive) { q.dead = Math.max(0, q.dead - dt); continue; }
+    if (!q.alive) { q.dead = Math.max(0, q.dead - dt);
+      if (PAINT && q.out > 0 && (q.out -= dt) <= 0) { const i = pl.indexOf(q); Object.assign(q, { alive: true, x: SPAWN[i][0] + 0.5, y: SPAWN[i][1] + 0.5, inv: 2, ai: null, think: 0, dead: 0 }); k.sfx('pop'); k.burst(q.x * T, TOP + q.y * T, q.col, 14, 140); }
+      continue; }
     q.inv = Math.max(0, q.inv - dt); q.bombT = Math.max(0, q.bombT - dt);
     let dir = [0, 0], drop = false;
     if (q.cpu) { q.think -= dt; if (q.think <= 0 || !q.ai) aiThink(q); const [cx, cy] = cellOf(q); q.fleeing = D[cy][cx] !== Infinity; dir = aiDir(q, D); }
     else { const v = k.pdir(q.p); if (v.x || v.y) { // eje dominante; si se pulsan dos, prueba el que no está bloqueado
         const [cx, cy] = cellOf(q), hx = v.x ? [Math.sign(v.x), 0] : null, vy = v.y ? [0, Math.sign(v.y)] : null;
         if (hx && vy) dir = !blocked(cx + hx[0], cy, q) ? (q.dir[1] && !blocked(cx, cy + vy[1], q) ? vy : hx) : vy; else dir = hx || vy; }
-      drop = k.phit(q.p, 'a') || k.phit(q.p, 'b'); }
+      drop = k.phit(q.p, 'a') || k.phit(q.p, 'b'); if (ICE && drop) drop = k.phit(q.p, 'a') ? 'slide' : 'still'; }
+    if (ICE && !q.cpu) { if (dir[0] || dir[1]) q.gl = true; else if (q.gl && !glide(q, dt)) q.gl = false; } // hielo: resbalas hasta el centro de la casilla
     if (q.cpu && (!q.ai || q.ai.length < 2) && (dir[0] || dir[1])) { const [cx, cy] = cellOf(q), m = q.spd * dt; q.x += k.clamp(cx + 0.5 - q.x, -m, m); q.y += k.clamp(cy + 0.5 - q.y, -m, m); q.mv += dt; }
     else if (dir[0] || dir[1]) { q.dir = dir; tryMove(q, dir[0], dir[1], q.spd * dt); q.mv += dt; } else q.mv = 0;
     q.anim += dt;
-    if (drop && placeBomb(q)) {} else if (drop) k.sfx('click');
+    if (drop && placeBomb(q, drop === 'slide' ? true : drop === 'still' ? false : undefined)) {} else if (drop) k.sfx('click');
     const [cx, cy] = cellOf(q);
     if (items[cy][cx]) { const it = items[cy][cx]; items[cy][cx] = 0; k.sfx('coin'); k.burst(q.x * T, TOP + q.y * T, '#ffd166', 12, 140);
       if (it === 'r') { q.range = Math.min(8, q.range + 1); k.float('+Alcance', q.x * T, TOP + q.y * T - 18, '#ffb13d'); }
@@ -284,13 +398,22 @@ function step(dt) {
       if (it === 'k') { q.kick = true; k.float('¡Patada!', q.x * T, TOP + q.y * T - 18, '#c9b8ff'); } }
     if (fireT[cy][cx] > 0 && q.inv <= 0) kill(q);
   }
+  if (PAINT) { if (rT >= RU.round && !endT) { endT = 1.4; k.sfx('tick'); } return; }
   const alive = pl.filter((q) => q.alive);
   if ((alive.length <= 1 || (sudI >= SPIRAL.length && rT > RU.round + SPIRAL.length * 0.25 + 15)) && !endT) endT = 1.2;
 }
+function glide(q, dt) {
+  const [cx, cy] = cellOf(q), d = q.dir, off = d[0] ? (q.x - (cx + 0.5)) * d[0] : (q.y - (cy + 0.5)) * d[1];
+  const rem = off < -0.02 ? -off : off > 0.15 && !blocked(cx + d[0], cy + d[1], q) ? 1 - off : 0;
+  if (rem <= 0.01) return false; tryMove(q, d[0], d[1], Math.min(rem, q.spd * 0.8 * dt)); q.mv += dt; return true;
+}
+const pct = (i) => Math.round(100 * pcount[i] / FREE);
 function finishRound() {
-  const alive = pl.filter((q) => q.alive);
-  if (alive.length === 1) { const w = alive[0]; w.wins++; msg = `¡Ronda para ${w.name === 'Tú' ? 'ti' : w.name}!`; k.confetti(w.col, 60); }
-  else msg = '¡Nadie en pie! Ronda nula';
+  const alive = PAINT ? [] : pl.filter((q) => q.alive);
+  if (PAINT) { const best = Math.max(...pl.map((q, i) => pcount[i])), top = pl.filter((q, i) => pcount[i] === best);
+    if (top.length === 1 && best > 0) { const w = top[0]; w.wins++; msg = `¡Ronda para ${w.name === 'Tú' ? 'ti' : w.name}! ${pct(pl.indexOf(w))} %`; k.confetti(w.col, 60); } else msg = '¡Empate a pintura! Ronda nula'; }
+  else if (alive.length === 1) { const w = alive[0]; w.wins++; msg = `¡Ronda para ${w.name === 'Tú' ? 'ti' : w.name}!`; k.confetti(w.col, 60); }
+  else if (!PAINT) msg = '¡Nadie en pie! Ronda nula';
   const champ = pl.find((q) => q.wins >= RU.wins);
   if (champ) {
     const hu = !champ.cpu; if (!k.party && hu) lsSet(CPUK, lsGet(CPUK, 0) + 1); else if (!k.party) lsSet(CPUK, Math.max(0, lsGet(CPUK, 0) - 0.5));
@@ -305,8 +428,9 @@ function drawBomb(b) {
   const x = b.sl ? b.fx * T : (b.x + 0.5) * T, y = TOP + (b.sl ? b.fy * T : (b.y + 0.5) * T), f = b.t / RU.fuse, pulse = 1 + Math.sin(t * (10 + (1 - f) * 22)) * 0.06 * (1.4 - f);
   ART.shadow(c, x + 2, y + 11, 10, 0.3);
   c.save(); c.translate(x, y + 2); c.scale(pulse, pulse); if (b.sl) c.rotate(Math.sin(t * 30) * 0.15);
-  ART.rr(c, -8, -12, 16, 23, 5); const gr = c.createLinearGradient(-8, 0, 8, 0); gr.addColorStop(0, '#ff7a82'); gr.addColorStop(0.45, '#e63946'); gr.addColorStop(1, '#a3162a'); c.fillStyle = f < 0.3 && Math.floor(t * 12) % 2 ? '#fff0f0' : gr; c.fill(); c.lineWidth = 2.4; c.strokeStyle = OUT; c.stroke();
-  c.fillStyle = '#ffd166'; c.fillRect(-7, -8, 14, 3.5); c.fillRect(-7, 4, 14, 3.5); c.fillStyle = b.own.col; c.fillRect(-7, -2.5, 14, 4);
+  ART.rr(c, -8, -12, 16, 23, 5); const gr = c.createLinearGradient(-8, 0, 8, 0), bc = PAINT ? b.own.col : ICE ? '#3f8cff' : null;
+  if (bc) { gr.addColorStop(0, lite(bc, 0.35)); gr.addColorStop(0.45, bc); gr.addColorStop(1, dark(bc, 0.35)); } else { gr.addColorStop(0, '#ff7a82'); gr.addColorStop(0.45, '#e63946'); gr.addColorStop(1, '#a3162a'); } c.fillStyle = f < 0.3 && Math.floor(t * 12) % 2 ? '#fff0f0' : gr; c.fill(); c.lineWidth = 2.4; c.strokeStyle = OUT; c.stroke();
+  c.fillStyle = PAINT ? '#fff' : '#ffd166'; c.fillRect(-7, -8, 14, 3.5); c.fillRect(-7, 4, 14, 3.5); c.fillStyle = PAINT ? '#1a1530' : b.own.col; c.fillRect(-7, -2.5, 14, 4);
   c.fillStyle = 'rgba(255,255,255,.45)'; c.fillRect(-5, -10, 2.5, 18);
   c.beginPath(); c.moveTo(0, -12); c.quadraticCurveTo(4, -18, 2 + Math.sin(t * 8) * 1.5, -21); c.lineWidth = 2; c.strokeStyle = '#3a2a4a'; c.stroke();
   const sx = 2 + Math.sin(t * 8) * 1.5, sy = -22; c.fillStyle = '#fff4b8'; ART.glint(c, sx, sy, 4 + Math.sin(t * 40) * 1.5, '#ffd166'); ART.glint(c, sx, sy, 2.2, '#fff');
@@ -316,7 +440,8 @@ function drawFire(x, y) {
   const f = fireT[y][x] / FIRE_T, d = fireD[y][x], X = x * T, Y = TOP + y * T, s = 0.55 + 0.45 * Math.sin(Math.min(1, (1 - f) * 3) * Math.PI / 2 + 0.3);
   c.globalAlpha = Math.min(1, f * 2.5);
   const lay = (col, pad) => { c.fillStyle = col; if (d & 1 || d === 3) { ART.rr(c, X - 1, Y + pad, T + 2, T - pad * 2, (T - pad * 2) / 2); c.fill(); } if (d & 2 || d === 3) { ART.rr(c, X + pad, Y - 1, T - pad * 2, T + 2, (T - pad * 2) / 2); c.fill(); } };
-  lay('#ff5f7a', 3 + (1 - s) * 4); lay('#ffb13d', 8 + (1 - s) * 3); lay('#fff4b8', 12 + (1 - s) * 2);
+  const oc = PAINT && pl[fireO[y][x]] ? pl[fireO[y][x]].col : null, F = oc ? [dark(oc, 0.15), lite(oc, 0.3), '#ffffff'] : ICE ? ['#5b8cff', '#8fe3ff', '#ffffff'] : ['#ff5f7a', '#ffb13d', '#fff4b8'];
+  lay(F[0], 3 + (1 - s) * 4); lay(F[1], 8 + (1 - s) * 3); lay(F[2], 12 + (1 - s) * 2);
   if (d === 3) { c.fillStyle = '#fff'; c.beginPath(); c.arc(X + T / 2, Y + T / 2, 7 * s, 0, TAU); c.fill(); }
   const sp = rnd(x * 13 + y * 7 + Math.floor(t * 12)); c.fillStyle = ['#ffd166', '#5ce1e6', '#ff8fd0', '#fff'][Math.floor(sp * 4)]; c.fillRect(X + sp * 26, Y + rnd(sp * 99) * 26, 3, 3);
   c.globalAlpha = 1;
@@ -356,6 +481,10 @@ function bodyAt(q, x, y, live) {
 function draw() {
   c.fillStyle = '#2a1f3a'; c.fillRect(0, 0, W, H);
   c.drawImage(FLOOR, 0, TOP, W, RO * T);
+  if (PAINT) for (let y = 1; y < RO - 1; y++) for (let x = 1; x < CO - 1; x++) { const o = paint[y][x]; if (o < 0 || !pl[o]) continue; // manchas de pintura
+    const X = x * T, Y = TOP + y * T, col = pl[o].col, v = rnd(x * 7 + y * 31); c.fillStyle = col; c.globalAlpha = 0.82;
+    ART.rr(c, X + 1.5, Y + 1.5, T - 3, T - 3, 9); c.fill(); c.beginPath(); c.arc(X + 4 + v * 24, Y + (v > 0.5 ? 1 : T - 1), 3.5, 0, TAU); c.arc(X + (v > 0.3 ? T - 1 : 1), Y + 6 + v * 20, 3, 0, TAU); c.fill();
+    c.globalAlpha = 0.35; c.fillStyle = '#fff'; c.beginPath(); c.ellipse(X + 10, Y + 9, 5, 2.6, -0.5, 0, TAU); c.fill(); c.globalAlpha = 1; }
   for (let y = 1; y < RO - 1; y++) for (let x = 1; x < CO - 1; x++) if (items[y][x]) { const bb = Math.sin(t * 4 + x + y) * 2; ART.shadow(c, (x + 0.5) * T, TOP + y * T + 28, 9, 0.25); c.drawImage(itemIcon(items[y][x]), x * T + 2, TOP + y * T + 2 + bb, 28, 28); }
   for (let y = 0; y < RO; y++) for (let x = 0; x < CO; x++) if (fireT[y][x] > 0) drawFire(x, y);
   // objetos ordenados por fila (profundidad)
@@ -378,9 +507,10 @@ function draw() {
     label(q.name === 'Tú' ? 'TÚ' : q.name, x + 8, 17, k.party ? 18 : 13, q.alive ? q.col : '#8a82a6', 'left');
     for (let s = 0; s < RU.wins; s++) { c.fillStyle = s < q.wins ? '#ffd166' : 'rgba(255,255,255,.15)'; ART.glint(c, x + cw - 12 - s * 14, 17, 6, c.fillStyle); }
     c.drawImage(itemIcon('r'), x + 6, 26, 12, 12); label('' + q.range, x + 24, 32, k.party ? 14 : 11, '#fff'); c.drawImage(itemIcon('b'), x + 34, 26, 12, 12); label('' + q.max, x + 52, 32, k.party ? 14 : 11, '#fff');
-    if (q.kick) c.drawImage(itemIcon('k'), x + 62, 26, 12, 12); if (q.spd > RU.speed + 0.1) c.drawImage(itemIcon('s'), x + 76, 26, 12, 12); });
+    if (PAINT) { ART.rr(c, x + 60, 26, 28, 12, 4); c.fillStyle = q.col; c.fill(); label(pct(i) + '%', x + 74, 32, k.party ? 13 : 10, '#fff'); }
+    else { if (q.kick) c.drawImage(itemIcon('k'), x + 62, 26, 12, 12); if (q.spd > RU.speed + 0.1) c.drawImage(itemIcon('s'), x + 76, 26, 12, 12); } });
   const left = Math.max(0, RU.round - rT); label(sudden ? '¡YA!' : `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 232, 23, 18, sudden ? '#ff5f7a' : left < 10 ? '#ffd166' : '#fff');
-  if (msgT > 0 || endT) { const m = endT ? (pl.filter((q) => q.alive).length === 1 ? `¡${pl.find((q) => q.alive).name === 'Tú' ? 'Aguantas' : pl.find((q) => q.alive).name + ' aguanta'}!` : '¡Nadie en pie!') : msg;
+  if (msgT > 0 || endT) { const m = endT && PAINT ? '¡Tiempo!' : endT ? (pl.filter((q) => q.alive).length === 1 ? `¡${pl.find((q) => q.alive).name === 'Tú' ? 'Aguantas' : pl.find((q) => q.alive).name + ' aguanta'}!` : '¡Nadie en pie!') : msg;
     c.globalAlpha = endT ? 1 : Math.min(1, msgT * 2); c.font = '900 26px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const mw = c.measureText(m).width + 40;
     ART.rr(c, W / 2 - mw / 2, TOP + RO * T / 2 - 26, mw, 52, 14); c.fillStyle = 'rgba(26,21,48,.88)'; c.fill(); c.lineWidth = 3; c.strokeStyle = '#ffd166'; c.stroke(); label(m, W / 2, TOP + RO * T / 2, 26, '#fff'); c.globalAlpha = 1; }
   if (fast) label('Te han eliminado · la ronda termina a toda prisa', W / 2, H - 14, k.party ? 18 : 13, '#ffd166');

@@ -1,5 +1,11 @@
 /* brawl.js — Lucha en plataformas para 1–4 jugadores (la CPU rellena las plazas) con porcentaje de daño y expulsión.
- * CFG.mode: 'pillow' (Almohadazo Arena: almohadas, plumas y nada de violencia gráfica).
+ * CFG.mode: 'pillow' (Almohadazo Arena: almohadas, plumas y nada de violencia gráfica),
+ *   'toys'  (Gladiadores de Juguete: figuritas sobre una mesa; caen armas de juguete que cambian A —espada, martillo, arco de
+ *            ventosas, escudo de tapa (para golpes de frente), paraguas (B mantenido = planear) y yoyó—; ↓+A suelta el arma;
+ *            fases mesa, ventilador, suelo encerado y tren de juguete),
+ *   'scrap' (Robots de Chatarra: los golpes fuertes arrancan piezas —antena, brazo, coraza, casco—; con menos piezas corres y
+ *            saltas más pero sales más lejos; llave inglesa (repara), batería (puños eléctricos), bomba de tuercas;
+ *            fases nave, cinta transportadora, imán gigante y plataformas móviles).
  * Controles (solo joystick + A/B, válido para la tele): A golpe (mantener = golpe cargado), ↑+A molinete que sube,
  * B salto / doble salto, ↓+B esquiva (invulnerable un instante), mantener ↓ sobre un tablón = bajar.
  * Cuanto más % acumulas, más lejos sales volando; si sales de la pantalla pierdes una vida (3 vidas).
@@ -7,7 +13,7 @@
  * El escenario cambia cada 30 s: pradera, atardecer con viento, pista helada y noche con tablones que se mueven.
  * CPU: nivel 0..9 en localStorage 'cpu:<id>' (sube si gana un humano, baja si un humano queda último). */
 const W = 800, H = 450, OUT = ART.OUT, TAU = 6.2832, NP = 4, TH = ART.THEMES;
-const ID = CFG.id || 'brawl';
+const ID = CFG.id || 'brawl', MODE = ['toys', 'scrap'].includes(CFG.mode) ? CFG.mode : 'pillow', TOYS = MODE === 'toys', SCRAP = MODE === 'scrap';
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#1d1840' }), c = k.ctx;
 const lerp = (a, b, q) => a + (b - a) * q, ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x)), clamp = k.clamp;
 const FONT = (s, wt) => `${wt || 800} ${s}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
@@ -36,15 +42,20 @@ const PHASES = [
   { th: 'snow', name: 'Pista helada', fx: 'ice', pl: [[196, 222, 96], [508, 222, 96], [296, 146, 64], [440, 146, 64]] },
   { th: 'night', name: 'Tablones viajeros', fx: 'move', pl: [[160, 240, 96], [544, 240, 96], [352, 170, 96], [352, 170, 0]] },
 ];
+if (TOYS) [['Mesa de juegos', ''], ['Ventilador', 'wind'], ['Suelo encerado', 'ice'], ['Tren de juguete', 'move']].forEach(([n, fx], i) => { PHASES[i].name = n; PHASES[i].fx = fx; PHASES[i].th = 'meadow'; });
+if (SCRAP) [['Nave de montaje', ''], ['Cinta transportadora', 'belt'], ['Imán gigante', 'magnet'], ['Plataformas móviles', 'move']].forEach(([n, fx], i) => { PHASES[i].name = n; PHASES[i].fx = fx; PHASES[i].th = 'factory'; });
 const PH_LEN = 30, MATCH = 150;
-let order = [0, 1, 2, 3], phI = 0, phT = 0, morph = 1, prevTh = null, wind = 0, windT = 0, banner = null;
+let order = [0, 1, 2, 3], phI = 0, phT = 0, morph = 1, prevTh = null, wind = 0, windT = 0, banner = null, belt = 0, beltT = 0, mag = 0, magT = 0;
 const plats = [0, 1, 2, 3].map(() => ({ x: 0, y: 0, w: 0, fx: 0, fy: 0, fw: 0, tx: 0, ty: 0, tw: 0, dx: 0, dy: 0 }));
 const phase = () => PHASES[order[phI % order.length]];
+const SUBS = TOYS ? { wind: '¡El ventilador sopla!', ice: 'Recién encerado: resbala', move: 'El tren arrastra los bloques' }
+  : SCRAP ? { belt: 'La cinta te arrastra', magnet: 'Atrae a los robots ligeros', move: 'Las plataformas se mueven' }
+    : { wind: '¡Cuidado con el viento!', ice: 'El suelo resbala', move: 'Los tablones se mueven' };
 function setPhase(i, instant) {
   phI = i; const ph = phase(); prevTh = instant ? null : TH[PHASES[order[(i + order.length - 1) % order.length]].th];
   ph.pl.forEach((q, j) => { const P = plats[j]; P.fx = P.x; P.fy = P.y; P.fw = P.w; P.tx = q[0]; P.ty = q[1]; P.tw = q[2]; if (instant) { P.x = P.tx; P.y = P.ty; P.w = P.tw; } });
-  morph = instant ? 1 : 0; windT = 0; wind = 0;
-  if (!instant) { banner = { txt: ph.name, sub: ph.fx === 'wind' ? '¡Cuidado con el viento!' : ph.fx === 'ice' ? 'El suelo resbala' : ph.fx === 'move' ? 'Los tablones se mueven' : 'Todo en calma', t: 2.4 }; k.sfx('start'); }
+  morph = instant ? 1 : 0; windT = 0; wind = 0; beltT = 0; magT = 0; mag = 0;
+  if (!instant) { banner = { txt: ph.name, sub: SUBS[ph.fx] || 'Todo en calma', t: 2.4 }; k.sfx('start'); }
 }
 function updStage(dt, live) {
   if (live) { phT += dt; if (phT >= PH_LEN) { phT -= PH_LEN; setPhase(phI + 1); } }
@@ -56,6 +67,8 @@ function updStage(dt, live) {
     if (morph >= 1) { P.fx = P.x; P.fy = P.y; P.fw = P.w; }
     P.dx = P.x - ox; P.dy = P.y - oy;
   });
+  if (ph.fx === 'belt' && morph >= 1) { beltT += dt; const cyc = beltT % 10; belt = (Math.floor(beltT / 10) % 2 ? -1 : 1) * 95 * clamp(Math.min(cyc, 10 - cyc) / 0.8, 0, 1); } else belt *= 0.9;
+  if (ph.fx === 'magnet' && morph >= 1) { magT += dt; const cyc = magT % 8; mag = cyc < 2.5 ? 0 : clamp((cyc - 2.5) / 0.4, 0, 1) * clamp((8 - cyc) / 0.3, 0, 1); } else mag = 0;
   if (ph.fx === 'wind' && morph >= 1) { windT += dt; const cyc = windT % 8, dir = Math.floor(windT / 8) % 2 ? -1 : 1; wind = cyc < 1.5 ? 0 : dir * 170 * ease((cyc - 1.5) / 1.2) * (cyc > 7 ? (8 - cyc) : 1); } else wind *= 0.9;
   if (banner && (banner.t -= dt) <= 0) banner = null;
 }

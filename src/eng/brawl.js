@@ -1,5 +1,11 @@
 /* brawl.js — Lucha en plataformas para 1–4 jugadores (la CPU rellena las plazas) con porcentaje de daño y expulsión.
- * CFG.mode: 'pillow' (Almohadazo Arena: almohadas, plumas y nada de violencia gráfica).
+ * CFG.mode: 'pillow' (Almohadazo Arena: almohadas, plumas y nada de violencia gráfica),
+ *   'toys'  (Gladiadores de Juguete: figuritas sobre una mesa; caen armas de juguete que cambian A —espada, martillo, arco de
+ *            ventosas, escudo de tapa (para golpes de frente), paraguas (B mantenido = planear) y yoyó—; ↓+A suelta el arma;
+ *            fases mesa, ventilador, suelo encerado y tren de juguete),
+ *   'scrap' (Robots de Chatarra: los golpes fuertes arrancan piezas —antena, brazo, coraza, casco—; con menos piezas corres y
+ *            saltas más pero sales más lejos; llave inglesa (repara), batería (puños eléctricos), bomba de tuercas;
+ *            fases nave, cinta transportadora, imán gigante y plataformas móviles).
  * Controles (solo joystick + A/B, válido para la tele): A golpe (mantener = golpe cargado), ↑+A molinete que sube,
  * B salto / doble salto, ↓+B esquiva (invulnerable un instante), mantener ↓ sobre un tablón = bajar.
  * Cuanto más % acumulas, más lejos sales volando; si sales de la pantalla pierdes una vida (3 vidas).
@@ -7,7 +13,7 @@
  * El escenario cambia cada 30 s: pradera, atardecer con viento, pista helada y noche con tablones que se mueven.
  * CPU: nivel 0..9 en localStorage 'cpu:<id>' (sube si gana un humano, baja si un humano queda último). */
 const W = 800, H = 450, OUT = ART.OUT, TAU = 6.2832, NP = 4, TH = ART.THEMES;
-const ID = CFG.id || 'brawl';
+const ID = CFG.id || 'brawl', MODE = ['toys', 'scrap'].includes(CFG.mode) ? CFG.mode : 'pillow', TOYS = MODE === 'toys', SCRAP = MODE === 'scrap';
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#1d1840' }), c = k.ctx;
 const lerp = (a, b, q) => a + (b - a) * q, ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x)), clamp = k.clamp;
 const FONT = (s, wt) => `${wt || 800} ${s}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
@@ -36,15 +42,20 @@ const PHASES = [
   { th: 'snow', name: 'Pista helada', fx: 'ice', pl: [[196, 222, 96], [508, 222, 96], [296, 146, 64], [440, 146, 64]] },
   { th: 'night', name: 'Tablones viajeros', fx: 'move', pl: [[160, 240, 96], [544, 240, 96], [352, 170, 96], [352, 170, 0]] },
 ];
+if (TOYS) [['Mesa de juegos', ''], ['Ventilador', 'wind'], ['Suelo encerado', 'ice'], ['Tren de juguete', 'move']].forEach(([n, fx], i) => { PHASES[i].name = n; PHASES[i].fx = fx; PHASES[i].th = 'meadow'; });
+if (SCRAP) [['Nave de montaje', ''], ['Cinta transportadora', 'belt'], ['Imán gigante', 'magnet'], ['Plataformas móviles', 'move']].forEach(([n, fx], i) => { PHASES[i].name = n; PHASES[i].fx = fx; PHASES[i].th = 'factory'; });
 const PH_LEN = 30, MATCH = 150;
-let order = [0, 1, 2, 3], phI = 0, phT = 0, morph = 1, prevTh = null, wind = 0, windT = 0, banner = null;
+let order = [0, 1, 2, 3], phI = 0, phT = 0, morph = 1, prevTh = null, wind = 0, windT = 0, banner = null, belt = 0, beltT = 0, mag = 0, magT = 0;
 const plats = [0, 1, 2, 3].map(() => ({ x: 0, y: 0, w: 0, fx: 0, fy: 0, fw: 0, tx: 0, ty: 0, tw: 0, dx: 0, dy: 0 }));
 const phase = () => PHASES[order[phI % order.length]];
+const SUBS = TOYS ? { wind: '¡El ventilador sopla!', ice: 'Recién encerado: resbala', move: 'El tren arrastra los bloques' }
+  : SCRAP ? { belt: 'La cinta te arrastra', magnet: 'Atrae a los robots ligeros', move: 'Las plataformas se mueven' }
+    : { wind: '¡Cuidado con el viento!', ice: 'El suelo resbala', move: 'Los tablones se mueven' };
 function setPhase(i, instant) {
   phI = i; const ph = phase(); prevTh = instant ? null : TH[PHASES[order[(i + order.length - 1) % order.length]].th];
   ph.pl.forEach((q, j) => { const P = plats[j]; P.fx = P.x; P.fy = P.y; P.fw = P.w; P.tx = q[0]; P.ty = q[1]; P.tw = q[2]; if (instant) { P.x = P.tx; P.y = P.ty; P.w = P.tw; } });
-  morph = instant ? 1 : 0; windT = 0; wind = 0;
-  if (!instant) { banner = { txt: ph.name, sub: ph.fx === 'wind' ? '¡Cuidado con el viento!' : ph.fx === 'ice' ? 'El suelo resbala' : ph.fx === 'move' ? 'Los tablones se mueven' : 'Todo en calma', t: 2.4 }; k.sfx('start'); }
+  morph = instant ? 1 : 0; windT = 0; wind = 0; beltT = 0; magT = 0; mag = 0;
+  if (!instant) { banner = { txt: ph.name, sub: SUBS[ph.fx] || 'Todo en calma', t: 2.4 }; k.sfx('start'); }
 }
 function updStage(dt, live) {
   if (live) { phT += dt; if (phT >= PH_LEN) { phT -= PH_LEN; setPhase(phI + 1); } }
@@ -56,6 +67,8 @@ function updStage(dt, live) {
     if (morph >= 1) { P.fx = P.x; P.fy = P.y; P.fw = P.w; }
     P.dx = P.x - ox; P.dy = P.y - oy;
   });
+  if (ph.fx === 'belt' && morph >= 1) { beltT += dt; const cyc = beltT % 10; belt = (Math.floor(beltT / 10) % 2 ? -1 : 1) * 95 * clamp(Math.min(cyc, 10 - cyc) / 0.8, 0, 1); } else belt *= 0.9;
+  if (ph.fx === 'magnet' && morph >= 1) { magT += dt; const cyc = magT % 8; mag = cyc < 2.5 ? 0 : clamp((cyc - 2.5) / 0.4, 0, 1) * clamp((8 - cyc) / 0.3, 0, 1); } else mag = 0;
   if (ph.fx === 'wind' && morph >= 1) { windT += dt; const cyc = windT % 8, dir = Math.floor(windT / 8) % 2 ? -1 : 1; wind = cyc < 1.5 ? 0 : dir * 170 * ease((cyc - 1.5) / 1.2) * (cyc > 7 ? (8 - cyc) : 1); } else wind *= 0.9;
   if (banner && (banner.t -= dt) <= 0) banner = null;
 }
@@ -66,15 +79,30 @@ const span = (y) => { const r = Math.max(0, Math.floor((y - TOP) / T)); return [
 const feathers = [];
 function puff(x, y, n, cl, spd) { for (let i = 0; i < n && feathers.length < 260; i++) { const a = Math.random() * TAU, v = (spd || 160) * (0.3 + Math.random()); feathers.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 40, r: Math.random() * TAU, vr: k.rnd(-6, 6), life: 1 + Math.random() * 0.9, col: Math.random() < 0.35 ? cl || '#fff' : '#fff', s: 0.7 + Math.random() * 0.6 }); } }
 function updFeathers(dt) {
-  for (const f of feathers) { f.vx *= 1 - 2.2 * dt; f.vy = f.vy * (1 - 2.2 * dt) + 70 * dt; f.x += (f.vx + Math.sin(f.life * 5 + f.r) * 18 + wind * 0.3) * dt; f.y += f.vy * dt; f.r += f.vr * dt; f.life -= dt; }
+  const gv = SCRAP ? 900 : 70, dr = SCRAP ? 0.6 : 2.2;
+  for (const f of feathers) { f.vx *= 1 - dr * dt; f.vy = f.vy * (1 - dr * dt) + gv * dt; f.x += (f.vx + Math.sin(f.life * 5 + f.r) * 18 + wind * 0.3) * dt; f.y += f.vy * dt; f.r += f.vr * dt; f.life -= dt; }
   for (let i = feathers.length - 1; i >= 0; i--) if (feathers[i].life <= 0) feathers.splice(i, 1);
 }
 function drawFeathers() {
   for (const f of feathers) {
     c.save(); c.globalAlpha = Math.min(1, f.life / 0.4); c.translate(f.x, f.y); c.rotate(f.r); c.scale(f.s, f.s);
+    if (SCRAP) { // tuercas hexagonales
+      c.beginPath(); for (let i = 0; i < 6; i++) { const a = i * TAU / 6; c[i ? 'lineTo' : 'moveTo'](Math.cos(a) * 5.5, Math.sin(a) * 5.5); } c.closePath();
+      c.fillStyle = f.col === '#fff' ? '#b8c2cc' : f.col; c.fill(); c.lineWidth = 1.4; c.strokeStyle = OUT; c.stroke(); c.beginPath(); c.arc(0, 0, 2, 0, TAU); c.fillStyle = OUT; c.fill(); c.restore(); continue;
+    }
+    if (TOYS) { // confeti de plástico
+      c.fillStyle = f.col === '#fff' ? ['#ffd166', '#5ce1e6', '#ff9ad5', '#fff'][Math.floor(f.r * 7 + 20) % 4] : f.col; c.fillRect(-4, -2.5, 8, 5); c.lineWidth = 1; c.strokeStyle = 'rgba(26,21,48,.5)'; c.strokeRect(-4, -2.5, 8, 5); c.restore(); continue;
+    }
     c.beginPath(); c.moveTo(-7, 0); c.quadraticCurveTo(0, -4.5, 7, 0); c.quadraticCurveTo(0, 4.5, -7, 0); c.fillStyle = f.col; c.fill(); c.lineWidth = 1.2; c.strokeStyle = 'rgba(26,21,48,.55)'; c.stroke();
     c.beginPath(); c.moveTo(-8, 0); c.lineTo(6, 0); c.stroke(); c.restore();
   }
+}
+
+const debris = [];
+function updDebris(dt) {
+  for (const d of debris) { d.vy += 1300 * dt; d.x += d.vx * dt; d.y += d.vy * dt; d.r += d.vr * dt; d.life -= dt;
+    if (d.y > TOP && d.y - d.vy * dt <= TOP && d.x > MX0 && d.x < MX1 && d.vy > 0) { d.y = TOP; d.vy *= -0.4; d.vx *= 0.6; d.vr *= 0.5; } }
+  for (let i = debris.length - 1; i >= 0; i--) if (debris[i].life <= 0 || debris[i].y > H + 60) debris.splice(i, 1);
 }
 
 /* ---------------- Luchadores ---------------- */
@@ -83,11 +111,11 @@ const SPAWN = [[280, TOP], [520, TOP], [360, TOP], [440, TOP]];
 let F = [], items = [], shots = [], elim = 0, stop = 0, itemT = 8, endT = -1, clock = 0, overTxt = '';
 function mkFighter(p) {
   return { p, x: SPAWN[p][0], y: SPAWN[p][1], vx: 0, vy: 0, face: p % 2 ? -1 : 1, on: 'main', jumps: 1, upUsed: false, pct: 0, shown: 0, stocks: 3, out: -1, dead: 0, inv: 0, cloud: 0,
-    stun: 0, spin: 0, atk: null, chg: -1, aT: 0, dodge: 0, dodgeCd: 0, airDodge: false, drop: 0, downT: 0, item: null, last: -1, lastT: 0, kos: 0, sq: 0, wasA: false, run: 0,
-    ai: { tgt: null, tgtT: 0, think: 0, hold: 0, goal: 0, mx: 0, jump: false, down: false, atkCd: 0, threat: null, flee: 0, fleeDir: 1, react: 0, dodgeRoll: false } };
+    parts: ['ant', 'arm', 'core', 'helm'], elec: 0, glide: false, brk: 0, stun: 0, spin: 0, atk: null, chg: -1, aT: 0, dodge: 0, dodgeCd: 0, airDodge: false, drop: 0, downT: 0, item: null, last: -1, lastT: 0, kos: 0, sq: 0, wasA: false, run: 0,
+    ai: { glide: 0, tgt: null, tgtT: 0, think: 0, hold: 0, goal: 0, mx: 0, jump: false, down: false, atkCd: 0, threat: null, flee: 0, fleeDir: 1, react: 0, dodgeRoll: false } };
 }
 function reset() {
-  demo = false; F = [0, 1, 2, 3].map(mkFighter); items = []; shots = []; elim = 0; stop = 0; itemT = 8; endT = -1; clock = 0; overTxt = ''; feathers.length = 0;
+  demo = false; F = [0, 1, 2, 3].map(mkFighter); items = []; shots = []; elim = 0; stop = 0; itemT = TOYS ? 4 : 8; endT = -1; clock = 0; overTxt = ''; feathers.length = 0; debris.length = 0;
   order = [0].concat(k.shuffle([1, 2, 3])); phT = 0; setPhase(0, true); banner = null;
 }
 function demoReset() { F = [0, 1, 2, 3].map(mkFighter); items = []; shots = []; elim = 0; itemT = 4; clock = 0; }
@@ -96,7 +124,7 @@ function demoReset() { F = [0, 1, 2, 3].map(mkFighter); items = []; shots = []; 
 function input(f) {
   if (cpu(f.p)) return aiInput(f);
   const d = k.pdir(f.p);
-  return { x: d.x, y: d.y, aHit: k.phit(f.p, 'a'), aHeld: k.pheld(f.p, 'a'), bHit: k.phit(f.p, 'b'), upHit: k.phit(f.p, 'up') };
+  return { x: d.x, y: d.y, aHit: k.phit(f.p, 'a'), aHeld: k.pheld(f.p, 'a'), bHit: k.phit(f.p, 'b'), bHeld: k.pheld(f.p, 'b'), upHit: k.phit(f.p, 'up') };
 }
 
 /* Ataques: kind → forma y fuerza. r = radio del golpe, dmg %, kb = base + g·% (se multiplica por el objeto) */
@@ -105,11 +133,28 @@ const ATK = {
   smash: { dur: 0.42, a0: 0.08, a1: 0.2, r: 30, dmg: 11, base: 230, g: 4.0, ang: 0.7 },
   spin:  { dur: 0.4, a0: 0.05, a1: 0.3, r: 33, dmg: 8, base: 160, g: 2.6, ang: -1 },
   rise:  { dur: 0.45, a0: 0.0, a1: 0.3, r: 30, dmg: 6, base: 150, g: 2.2, ang: 1.35 },
+  // armas de juguete (modo 'toys')
+  slash: { dur: 0.34, a0: 0.06, a1: 0.2, r: 34, dmg: 9, base: 175, g: 2.9, ang: 0.55 },
+  hammer: { dur: 0.72, a0: 0.34, a1: 0.48, r: 36, dmg: 15, base: 280, g: 4.3, ang: 0.8 },
+  bash:  { dur: 0.4, a0: 0.05, a1: 0.28, r: 26, dmg: 7, base: 210, g: 2.4, ang: 0.45 },
+  poke:  { dur: 0.32, a0: 0.06, a1: 0.18, r: 26, dmg: 7, base: 170, g: 2.6, ang: 0.5 },
 };
+/* Armas de juguete: usos, qué hace A y alcance para la CPU. Objetos de chatarra: la llave y la batería se usan al cogerlas */
+const WPN = { sword: { uses: 14, act: 'slash', name: '¡Espada de madera!' }, hammer: { uses: 7, act: 'hammer', name: '¡Martillo chirriante!' },
+  bow: { uses: 8, act: 'shoot', name: '¡Arco de ventosas!' }, shield: { uses: 10, act: 'bash', name: '¡Escudo de tapa!' },
+  umbrella: { uses: 12, act: 'poke', name: '¡Paraguas!' }, yoyo: { uses: 10, act: 'yoyo', name: '¡Yoyó!' } };
+const THROW = new Set(TOYS ? [] : SCRAP ? ['bomb'] : ['ball', 'bomb']);
+const RANGE = TOYS ? { bow: 380, yoyo: 175 } : SCRAP ? { bomb: 300 } : { ball: 380, bomb: 300 };
+const INSTANT = new Set(SCRAP ? ['wrench', 'battery'] : []);
+const PNAME = { ant: 'la antena', arm: 'un brazo', core: 'la coraza', helm: 'el casco' };
+/* Chatarra: con menos piezas, más ligero (0 completo … 1 sin piezas) */
+const light = (f) => (SCRAP ? (4 - f.parts.length) / 4 : 0);
 function startAtk(f, kind, q) { f.atk = { kind, t: 0, q: q || 0, hit: [] }; k.sfx(kind === 'smash' ? 'shoot' : 'click'); }
 function hitCircle(f) {
   const A = ATK[f.atk.kind], big = f.item && f.item.type === 'giant' ? 1.4 : 1, r = A.r * big;
-  if (f.atk.kind === 'jab' || f.atk.kind === 'smash') return { x: f.x + f.face * (22 + r * 0.45), y: f.y - 26, r };
+  if (f.atk.kind === 'jab' || f.atk.kind === 'smash' || f.atk.kind === 'slash' || f.atk.kind === 'bash') return { x: f.x + f.face * (22 + r * 0.45), y: f.y - 26, r };
+  if (f.atk.kind === 'poke') return { x: f.x + f.face * (40 + r * 0.45), y: f.y - 30, r };
+  if (f.atk.kind === 'hammer') return { x: f.x + f.face * (28 + r * 0.45), y: f.y - 18, r };
   if (f.atk.kind === 'rise') return { x: f.x, y: f.y - 50, r };
   return { x: f.x, y: f.y - 24, r };
 }
@@ -118,6 +163,7 @@ const alive = (g) => g.stocks > 0 && g.dead <= 0;
 const vuln = (g) => alive(g) && g.inv <= 0 && g.dodge <= 0;
 function applyHit(g, from, dmg, base, gr, ang, dir, mul) {
   g.pct = Math.min(999, g.pct + dmg);
+  if (SCRAP) mul = (mul || 1) * (1 + 0.32 * light(g));
   const kb = (base + gr * g.pct) * (mul || 1), ax = Math.cos(ang) * dir, ay = -Math.sin(ang);
   g.vx = ax * kb; g.vy = Math.min(ay * kb, g.on ? -140 : ay * kb); g.on = null;
   g.stun = 0.12 + kb * 0.0012; g.spin = 0; g.atk = null; g.chg = -1; g.last = from; g.lastT = 6; g.jumps = 1; g.upUsed = false;
@@ -126,20 +172,45 @@ function applyHit(g, from, dmg, base, gr, ang, dir, mul) {
   k.burst(hx, hy, '#fff', 6, 140); k.shake(Math.min(12, 2 + kb / 110)); k.sfx(kb > 620 ? 'explode' : kb > 380 ? 'hurt' : 'hit');
   if (kb > 620) k.flash('rgba(255,255,255,.25)');
   k.float('+' + dmg + '%', hx, hy - 34, '#ffd166');
+  if (SCRAP && g.parts.length && (dmg >= 9 || kb > 330)) loosePart(g, dir);
 }
+function loosePart(g, dir) {
+  const pt = g.parts.pop(); debris.push({ part: pt, x: g.x, y: g.y - (pt === 'ant' ? 66 : pt === 'helm' ? 58 : 34), vx: dir * k.rnd(80, 220), vy: -k.rnd(260, 420), r: 0, vr: k.rnd(-9, 9), life: 2.4, col: col(g.p) });
+  k.float('¡Pierde ' + PNAME[pt] + '!', g.x, g.y - 96, '#fff'); k.burst(g.x, g.y - 40, '#ffd166', 8, 180);
+}
+function blocks(g, fx, kind) { // escudo de tapa: para lo que llega de frente (no lo que viene de arriba)
+  if (!TOYS || !g.item || g.item.type !== 'shield' || g.atk || g.chg >= 0 || g.stun > 0 || kind === 'rise') return false;
+  if (Math.sign(fx - g.x) !== g.face) return false;
+  g.vx = -g.face * 160; g.inv = Math.max(g.inv, 0.12); k.sfx('click'); k.burst(g.x + g.face * 18, g.y - 30, '#fff', 6, 120); k.float('¡Parado!', g.x, g.y - 90, '#fff');
+  if (--g.item.uses <= 0) breakItem(g); return true;
+}
+function breakItem(f) { puff(f.x, f.y - 30, 12, '#fff', 160); f.item = null; f.glide = false; k.float('¡Se rompió!', f.x, f.y - 70, '#fff'); k.sfx('pop'); }
 function resolveAtk(f) {
   const A = ATK[f.atk.kind], at = f.atk.t; if (at < A.a0 || at > A.a1) return;
   const h = hitCircle(f), giant = f.item && f.item.type === 'giant', mul = giant ? 1.35 : 1;
   for (const g of F) {
     if (g === f || !vuln(g) || f.atk.hit.includes(g.p) || !hurt(g, h.x, h.y, h.r)) continue;
     f.atk.hit.push(g.p);
+    if (blocks(g, f.x, f.atk.kind)) continue;
     let dmg = A.dmg, base = A.base, gr = A.g, ang = A.ang, dir = f.face;
     if (f.atk.kind === 'smash') { dmg = Math.round(A.dmg + 9 * f.atk.q); base = A.base * (0.85 + 0.45 * f.atk.q); gr = A.g * (0.85 + 0.5 * f.atk.q); }
     if (A.ang < 0) { dir = g.x >= f.x ? 1 : -1; ang = clamp(Math.atan2(f.y - g.y + 20, Math.abs(g.x - f.x) + 1), 0.35, 1.2); }
     if (giant) dmg = Math.round(dmg * 1.4);
+    if (f.elec > 0) { dmg = Math.round(dmg * 1.3); base *= 1.1; k.burst(g.x, g.y - 30, '#9fe8ff', 10, 220); }
     applyHit(g, f.p, dmg, base, gr, ang, dir, mul);
+    if (f.elec > 0) g.stun += 0.15;
     if (giant && f.item && --f.item.uses <= 0) { puff(f.x, f.y - 30, 14, '#fff', 200); f.item = null; k.float('¡Se rompió!', f.x, f.y - 70, '#fff'); }
   }
+}
+function weaponAct(f) { // A con un arma de juguete
+  const it = f.item, w = WPN[it.type];
+  if (w.act === 'shoot') { shots.push({ type: 'arrow', x: f.x + f.face * 24, y: f.y - 32, vx: f.face * 640, vy: -40, from: f.p, safe: 0.2, life: 1.3, bounces: 0, rot: 0, rest: false }); k.sfx('shoot'); f.atk = { kind: 'throw', t: 0, q: 0, hit: [] }; }
+  else if (w.act === 'yoyo') { if (shots.some((s) => s.type === 'yoyo' && s.from === f.p)) return; shots.push({ type: 'yoyo', x: f.x, y: f.y - 30, vx: f.face, vy: 0, from: f.p, safe: 0, life: 0.6, u: 0, hit: [], bounces: 0, rot: 0, rest: false }); k.sfx('shoot'); f.atk = { kind: 'throw', t: 0, q: 0, hit: [] }; }
+  else { startAtk(f, w.act); if (w.act === 'bash') { f.vx = f.face * 430; } }
+  if (--it.uses <= 0) f.brk = 0.3;
+}
+function dropItem(f) {
+  items.push({ type: f.item.type, x: f.x, y: f.y - 1, vy: 120, on: false, life: 7, sw: 0, uses: f.item.uses }); f.item = null; f.glide = false; k.sfx('pop');
 }
 function throwItem(f) {
   const it = f.item; f.item = null; const bomb = it.type === 'bomb';
@@ -156,11 +227,12 @@ function ko(f) {
   const ex = clamp(f.x, 16, W - 16), ey = clamp(f.y - 20, 20, H - 20);
   puff(ex, ey, 36, col(f.p), 360); k.burst(ex, ey, col(f.p), 18, 300); k.shake(12); k.sfx('explode'); k.flash('rgba(255,255,255,.3)');
   if (f.last >= 0 && f.lastT > 0 && f.last !== f.p) { F[f.last].kos++; k.float('¡KO!', clamp(ex, 60, W - 60), clamp(ey, 60, H - 90), col(f.last)); }
-  f.stocks--; f.item = null; f.atk = null; f.chg = -1; f.stun = 0; f.vx = f.vy = 0;
+  f.stocks--; f.item = null; f.elec = 0; f.glide = false; f.brk = 0; f.atk = null; f.chg = -1; f.stun = 0; f.vx = f.vy = 0;
   if (f.stocks <= 0) { f.out = elim++; f.dead = 1e9; k.float(nm(f.p) + ' eliminado', 400, 120, col(f.p)); }
   else f.dead = 1.3;
 }
 function respawn(f) {
+  if (SCRAP) f.parts = ['ant', 'arm', 'core', 'helm'];
   f.dead = 0; f.x = [340, 460, 280, 520][f.p]; f.y = 118; f.vx = f.vy = 0; f.pct = 0; f.shown = 0; f.inv = 2.6; f.cloud = 2.4; f.on = 'cloud'; f.jumps = 1; f.upUsed = false; f.last = -1;
   puff(f.x, f.y, 10, '#fff', 90);
 }
@@ -172,21 +244,24 @@ function updFighter(f, dt) {
   f.inv = Math.max(0, f.inv - dt); f.dodge = Math.max(0, f.dodge - dt); f.dodgeCd = Math.max(0, f.dodgeCd - dt); f.drop = Math.max(0, f.drop - dt); f.lastT -= dt; f.sq *= 0.85;
   f.shown += (f.pct - f.shown) * Math.min(1, dt * 10);
   if (f.item && f.item.type === 'giant' && (f.item.t -= dt) <= 0) { puff(f.x, f.y - 30, 12, '#fff', 160); f.item = null; }
+  if (f.brk > 0 && (f.brk -= dt) <= 0) { f.brk = 0; if (f.item) breakItem(f); }
+  if (f.elec > 0) { f.elec -= dt; if (Math.random() < dt * 12) k.burst(f.x + f.face * 16, f.y - 34, '#9fe8ff', 1, 80); }
+  const lt = light(f), spd = 1 + 0.22 * lt, jmp = 1 + 0.12 * lt;
   // nube de reaparición: quieto hasta que se mueva o pase el tiempo
   if (f.cloud > 0) { f.cloud -= dt; if (Math.abs(inp.x) > 0.3 || inp.bHit || inp.aHit || inp.upHit || f.cloud <= 0) { f.cloud = 0; f.on = null; f.inv = Math.min(f.inv, 1); } else { f.vx = f.vy = 0; f.wasA = inp.aHeld; return; } }
   const stunned = f.stun > 0; if (stunned) { f.stun -= dt; f.spin += dt * (8 + Math.hypot(f.vx, f.vy) / 60) * (f.vx >= 0 ? 1 : -1); } else f.spin = 0;
   // --- control
   if (!stunned) {
     const busy = f.atk && f.atk.kind !== 'throw';
-    const mv = f.chg >= 0 ? 0.25 : busy && f.on ? 0.2 : 1, want = inp.x * RUN * mv;
+    const mv = f.chg >= 0 ? 0.25 : busy && f.on ? (f.atk.kind === 'bash' ? 1 : 0.2) : 1, want = inp.x * RUN * mv * spd;
     if (f.on) { const acc = ice ? 520 : 2200; f.vx += clamp(want - f.vx, -acc * dt, acc * dt); }
     else { f.vx += clamp(want - f.vx, -1100 * dt, 1100 * dt); }
     if (Math.abs(inp.x) > 0.3 && !busy && f.chg < 0) f.face = inp.x > 0 ? 1 : -1;
     // salto y doble salto
     const jump = inp.bHit && inp.y < 0.5 || inp.upHit && !inp.aHit;
     if (jump && !busy) {
-      if (f.on) { f.vy = -JV; f.on = null; f.sq = -0.15; k.sfx('jump'); puff(f.x, f.y, 3, '#fff', 60); }
-      else if (f.jumps > 0) { f.jumps--; f.vy = -DJV; f.sq = -0.12; k.sfx('jump'); puff(f.x, f.y, 5, '#fff', 90); }
+      if (f.on) { f.vy = -JV * jmp; f.on = null; f.sq = -0.15; k.sfx('jump'); puff(f.x, f.y, 3, '#fff', 60); }
+      else if (f.jumps > 0) { f.jumps--; f.vy = -DJV * jmp; f.sq = -0.12; k.sfx('jump'); puff(f.x, f.y, 5, '#fff', 90); }
     }
     // esquiva ↓+B
     if (inp.bHit && inp.y > 0.5 && f.dodgeCd <= 0 && (f.on || !f.airDodge)) {
@@ -195,12 +270,16 @@ function updFighter(f, dt) {
     }
     // bajar de un tablón manteniendo ↓
     if (inp.y > 0.5 && !inp.bHit && typeof f.on === 'number') { f.downT += dt; if (f.downT > 0.14) { f.on = null; f.drop = 0.25; f.vy = 60; } } else f.downT = 0;
+    // paraguas: B mantenido en el aire = planear
+    f.glide = TOYS && !f.on && f.item && f.item.type === 'umbrella' && inp.bHeld && f.vy > 0 && inp.y <= 0.5;
     // caída rápida
     if (!f.on && inp.y > 0.5 && f.vy > 0) f.vy = Math.max(f.vy, 520);
     // ataques
     if (!f.atk && f.dodge <= 0) {
-      if (inp.aHit && f.item && f.item.type !== 'giant') throwItem(f);
-      else if (inp.aHit && inp.y < -0.5) { if (!f.upUsed) { f.upUsed = true; f.vy = -RISEV; f.on = null; startAtk(f, 'rise'); puff(f.x, f.y, 6, '#fff', 110); } }
+      if (inp.aHit && TOYS && f.item && inp.y > 0.5) dropItem(f);
+      else if (inp.aHit && f.item && THROW.has(f.item.type)) throwItem(f);
+      else if (inp.aHit && inp.y < -0.5) { if (!f.upUsed) { f.upUsed = true; f.vy = -RISEV * jmp; f.on = null; startAtk(f, 'rise'); puff(f.x, f.y, 6, '#fff', 110); } }
+      else if (inp.aHit && TOYS && f.item && WPN[f.item.type]) weaponAct(f);
       else if (inp.aHit && !f.on) startAtk(f, 'spin');
       else if (inp.aHit && f.on) f.chg = 0;
     }
@@ -217,6 +296,9 @@ function updFighter(f, dt) {
   if (stunned) f.vx *= Math.exp(-0.8 * dt);
   f.vx += wind * dt * (f.on ? 0.55 : 1);
   if (!f.on) { f.vy = Math.min(f.vy + GRAV * dt * (f.dodge > 0 ? 0.3 : 1), stunned ? 1400 : Math.max(MAXF, f.vy)); }
+  if (f.glide) { f.vy = Math.min(f.vy, 95); f.jumps = 0; }
+  if (mag > 0 && !f.on) f.vy -= mag * (330 + 520 * lt) * dt * (f.y < 60 ? 0.3 : 1); // imán: tira más de los ligeros
+  if (belt && f.on === 'main') f.x += belt * dt;
   // transportado por el tablón
   if (typeof f.on === 'number') { const P = plats[f.on]; f.x += P.dx; f.y = P.y; if (P.w < 8 || f.x < P.x - 4 || f.x > P.x + P.w + 4) f.on = null; }
   const oy = f.y; f.x += f.vx * dt; f.y += f.vy * dt;
@@ -233,9 +315,10 @@ function updFighter(f, dt) {
 }
 
 /* ---------------- Objetos ---------------- */
-const ITYPES = ['giant', 'ball', 'bomb'];
+const ITYPES = TOYS ? Object.keys(WPN) : SCRAP ? ['wrench', 'battery', 'bomb', 'wrench'] : ['giant', 'ball', 'bomb'];
+const INAME = { giant: '¡Almohadón!', ball: '¡Pelota!', bomb: SCRAP ? '¡Bomba de tuercas!' : '¡Bomba de plumas!', wrench: '¡Llave inglesa!', battery: '¡Batería!' };
 function updItems(dt, live) {
-  if ((itemT -= dt) <= 0 && items.length < 2) { itemT = k.rnd(9, 14) * (live ? 1 : 0.6);
+  if ((itemT -= dt) <= 0 && items.length < (TOYS ? 3 : 2)) { itemT = k.rnd(9, 14) * (live ? 1 : 0.6) * (TOYS ? 0.65 : 1);
     const sp = [[MX0 + 30, MX1 - 30]].concat(plats.filter((P) => P.w > 60).map((P) => [P.x + 16, P.x + P.w - 16])), s = k.pick(sp);
     items.push({ type: k.pick(ITYPES), x: k.rnd(s[0], s[1]), y: -30, vy: 70, on: false, life: 14, sw: Math.random() * 6 }); }
   for (const it of items) {
@@ -244,21 +327,35 @@ function updItems(dt, live) {
       if (oy <= TOP && it.y >= TOP && it.x > MX0 && it.x < MX1) { it.y = TOP; it.on = 'main'; }
       else for (let j = 0; j < 4; j++) { const P = plats[j]; if (P.w > 20 && oy <= P.y && it.y >= P.y && it.x > P.x && it.x < P.x + P.w) { it.y = P.y; it.on = j; } }
       if (it.y > H + 40) it.life = 0;
-    } else { if (typeof it.on === 'number') { const P = plats[it.on]; it.x += P.dx; it.y = P.y; if (it.x < P.x - 6 || it.x > P.x + P.w + 6 || P.w < 20) it.on = false; } it.life -= dt; }
-    for (const f of F) if (alive(f) && !f.item && f.cloud <= 0 && Math.abs(f.x - it.x) < 26 && Math.abs(f.y - 20 - (it.y - 14)) < 38 && it.life > 0) {
-      f.item = { type: it.type, uses: 6, t: 14 }; it.life = 0; k.sfx('coin'); puff(it.x, it.y - 14, 10, '#ffd166', 140);
-      k.float(it.type === 'giant' ? '¡Almohadón!' : it.type === 'ball' ? '¡Pelota!' : '¡Bomba de plumas!', it.x, it.y - 60, '#fff'); break; }
+    } else { if (typeof it.on === 'number') { const P = plats[it.on]; it.x += P.dx; it.y = P.y; if (it.x < P.x - 6 || it.x > P.x + P.w + 6 || P.w < 20) it.on = false; } else if (belt) it.x += belt * dt; if (it.on === 'main' && (it.x < MX0 || it.x > MX1)) it.on = false; it.life -= dt; }
+    for (const f of F) if (alive(f) && (!f.item || INSTANT.has(it.type)) && f.cloud <= 0 && Math.abs(f.x - it.x) < 26 && Math.abs(f.y - 20 - (it.y - 14)) < 38 && it.life > 0) {
+      it.life = 0; k.sfx('coin'); puff(it.x, it.y - 14, 10, '#ffd166', 140);
+      if (it.type === 'wrench') { const miss = ['ant', 'arm', 'core', 'helm'].filter((q) => !f.parts.includes(q)); if (miss.length) { f.parts.push(miss[0]); k.float('¡Repara ' + PNAME[miss[0]] + '!', it.x, it.y - 60, '#7cf7a0'); } else { f.pct = Math.max(0, f.pct - 15); k.float('−15 %', it.x, it.y - 60, '#7cf7a0'); } k.sfx('win'); break; }
+      if (it.type === 'battery') { f.elec = 12; k.float('¡Puños eléctricos!', it.x, it.y - 60, '#9fe8ff'); break; }
+      f.item = { type: it.type, uses: it.uses || (WPN[it.type] ? WPN[it.type].uses : 6), t: 14 };
+      k.float(WPN[it.type] ? WPN[it.type].name : INAME[it.type], it.x, it.y - 60, '#fff'); break; }
   }
   items = items.filter((it) => it.life > 0);
   for (const s of shots) {
     s.life -= dt; s.safe -= dt; s.rot += dt * (s.rest ? 0 : 10) * Math.sign(s.vx || 1);
-    if (!s.rest) { s.vy += (s.type === 'ball' ? 900 : 1100) * dt; s.vx += wind * 0.4 * dt; const oy = s.y; s.x += s.vx * dt; s.y += s.vy * dt;
+    if (s.type === 'yoyo') { // sale y vuelve a la mano, golpea una vez a cada rival en cada viaje
+      const o = F[s.from]; if (!alive(o)) { s.life = 0; continue; }
+      const u0 = s.u; s.u = Math.min(1, s.u + dt / 0.6); if (u0 < 0.5 && s.u >= 0.5) s.hit = [];
+      s.x = o.x + s.vx * Math.sin(Math.PI * s.u) * 170; s.y = o.y - 30; s.life = s.u >= 1 ? 0 : 1; s.rot += dt * 20;
+      for (const g of F) { if (g === o || !vuln(g) || s.hit.includes(g.p) || !hurt(g, s.x, s.y, 13)) continue; s.hit.push(g.p); if (blocks(g, s.x, 'yoyo')) continue;
+        applyHit(g, s.from, 7, 170, 2.4, 0.5, s.u < 0.5 ? s.vx : -s.vx, 1); }
+      continue;
+    }
+    if (!s.rest) { s.vy += (s.type === 'ball' ? 900 : s.type === 'arrow' ? 260 : 1100) * dt; s.vx += wind * 0.4 * dt; const oy = s.y; s.x += s.vx * dt; s.y += s.vy * dt;
       let floor = null; if (oy <= TOP && s.y >= TOP && s.x > MX0 && s.x < MX1) floor = TOP; else for (const P of plats) if (P.w > 20 && oy <= P.y && s.y >= P.y && s.x > P.x && s.x < P.x + P.w) floor = P.y;
-      if (floor != null) { s.y = floor; if (s.type === 'ball' && s.bounces < 3) { s.vy = -Math.abs(s.vy) * 0.62; s.vx *= 0.85; s.bounces++; k.sfx('pop'); } else if (s.type === 'bomb') { s.rest = true; s.vx = s.vy = 0; } else s.life = Math.min(s.life, 0.4); }
+      if (floor != null) { s.y = floor; if (s.type === 'arrow') { s.rest = true; s.vy = 0; s.life = Math.min(s.life, 0.5); } else if (s.type === 'ball' && s.bounces < 3) { s.vy = -Math.abs(s.vy) * 0.62; s.vx *= 0.85; s.bounces++; k.sfx('pop'); } else if (s.type === 'bomb') { s.rest = true; s.vx = s.vy = 0; } else s.life = Math.min(s.life, 0.4); }
     }
     for (const g of F) { if (!vuln(g) || (g.p === s.from && s.safe > 0) || s.life <= 0) continue;
       if (hurt(g, s.x, s.y - (s.type === 'ball' ? 0 : 0), s.type === 'ball' ? 16 : 13)) {
         if (s.type === 'bomb') { s.life = 0; s.boom = true; explode(s); break; }
+        if (s.rest) continue;
+        if (blocks(g, s.x, s.type)) { s.vx = -s.vx * 0.3; s.vy = -200; s.rest = s.type === 'arrow' ? false : s.rest; s.from = g.p; s.safe = 0.4; s.life = Math.min(s.life, 0.5); continue; }
+        if (s.type === 'arrow') { applyHit(g, s.from, 6, 150, 2.0, 0.45, Math.sign(s.vx) || 1, 1); s.life = 0; continue; }
         applyHit(g, s.from, 9, 210, 3.0, 0.55, Math.sign(s.vx) || 1, 1); s.vx = -s.vx * 0.4; s.vy = -260; s.from = g.p; s.safe = 0.3; s.life = Math.min(s.life, 0.8); }
     }
     if (s.type === 'bomb' && s.life <= 0 && !s.boom) { s.boom = true; explode(s); }
@@ -268,6 +365,13 @@ function updItems(dt, live) {
 
 /* ---------------- CPU ---------------- */
 function aiInput(f) {
+  const o = aiCore(f);
+  if (TOYS && o.aHit && o.y > 0.5) o.y = 0; // la CPU no suelta el arma sin querer
+  if (TOYS && f.item && f.item.type === 'umbrella' && !f.on && f.vy > 0) { const offX = f.x < MX0 - 2 || f.x > MX1 + 2; o.bHeld = offX || f.ai.glide > 0; }
+  if (TOYS && f.ai.glide > 0) f.ai.glide -= 1 / 60;
+  return o;
+}
+function aiCore(f) {
   const ai = f.ai, sk = SK() * (demo ? 0.8 : lerp(0.6, 1, ease(clock / 105))), o = { x: 0, y: 0, aHit: false, aHeld: false, bHit: false, upHit: false };
   ai.atkCd -= 1 / 60; ai.think -= 1 / 60; ai.tgtT -= 1 / 60;
   if (ai.hold > 0) { ai.hold -= 1 / 60; o.aHeld = true; }
@@ -303,11 +407,11 @@ function aiInput(f) {
   const g = ai.tgt; if (!g) { if (f.on === 'main') o.x = f.x < CX - 60 ? 1 : f.x > CX + 60 ? -1 : 0; return o; }
   // recoger objetos cercanos
   let goal = g.x, goalY = g.y;
-  if (!f.item) { const it = items.find((q) => q.on && Math.abs(q.x - f.x) < 240 && Math.abs(q.y - f.y) < 120); if (it && Math.random() < 0.9) { goal = it.x; goalY = it.y; } }
-  // lanzar lo que lleva
-  if (f.item && f.item.type !== 'giant') {
+  if (!f.item || SCRAP) { const it = items.find((q) => q.on && Math.abs(q.x - f.x) < 240 && Math.abs(q.y - f.y) < 120 && (!f.item || INSTANT.has(q.type)) && (q.type !== 'wrench' || f.parts.length < 4 || f.pct > 30)); if (it && Math.random() < 0.9) { goal = it.x; goalY = it.y; } }
+  // lanzar lo que lleva (o disparar el arco / el yoyó)
+  if (f.item && RANGE[f.item.type]) {
     const tdx = g.x - f.x, tdy = g.y - f.y;
-    if (Math.abs(tdy) < 60 && Math.abs(tdx) > 80 && Math.abs(tdx) < (f.item.type === 'bomb' ? 300 : 380) && ai.atkCd <= 0) { o.x = Math.sign(tdx) * 0.4; if (Math.sign(tdx) === f.face && Math.random() < 0.08 + sk * 0.2) { o.aHit = true; ai.atkCd = 0.6; } return o; }
+    if (Math.abs(tdy) < 60 && Math.abs(tdx) > 80 && Math.abs(tdx) < RANGE[f.item.type] && ai.atkCd <= 0) { o.x = Math.sign(tdx) * 0.4; if (Math.sign(tdx) === f.face && Math.random() < 0.08 + sk * 0.2) { o.aHit = true; ai.atkCd = 0.6; } return o; }
     if (Math.abs(tdx) < 80) goal = clamp(f.x - Math.sign(tdx || 1) * 120, MX0 + 30, MX1 - 30);
   }
   const dx = goal - f.x, dy = goalY - f.y, adx = Math.abs(dx);
@@ -324,7 +428,7 @@ function aiInput(f) {
     if (dy > 50 && typeof f.on === 'number' && adx < 200) o.y = 1;
   }
   // atacar
-  const tdx = g.x - f.x, tdy = g.y - f.y, big = f.item && f.item.type === 'giant' ? 14 : 0;
+  const tdx = g.x - f.x, tdy = g.y - f.y, big = f.item ? { giant: 14, sword: 10, hammer: 12, umbrella: 16, shield: 4 }[f.item.type] || 0 : 0;
   if (ai.atkCd <= 0 && !f.atk && alive(g) && g.inv <= 0) {
     const agg = (0.35 + sk * 0.55) * (clock < 3 && !demo ? 0.5 : 1);
     if (Math.abs(tdx) < 26 && tdy < -30 && tdy > -110) { if (Math.random() < agg) { o.aHit = true; o.y = -1; } ai.atkCd = lerp(0.8, 0.3, sk); }

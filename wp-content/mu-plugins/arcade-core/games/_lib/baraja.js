@@ -1,5 +1,5 @@
 /* Baraja española (40 cartas: oros, copas, espadas, bastos; sota, caballo y rey) dibujada por código.
- * CFG.mode: 'brisca' | 'mus' | 'chinchon'. Motor de bazas y combinaciones, IA por reglas que mejora con tus victorias
+ * CFG.mode: 'brisca' | 'mus' | 'chinchon' | 'tute' (tute cabrón individual a 3–4) | 'cinquillo'. Motor de bazas y combinaciones, IA por reglas que mejora con tus victorias
  * (localStorage cpu:<id>), mano privada en el móvil en el modo tele (k.priv / k.onPick) y mano en pantalla sin tele.
  * BJ = reglas puras (sin DOM): create / need / act / ai. En Node se exporta para el simulador bot contra bot. */
 const BJ = (() => {
@@ -365,27 +365,172 @@ const BJ = (() => {
     cand.sort((x, y) => x.sc - y.sc); return cand[0].a;
   }
 
+  /* =========================== TUTE CABRÓN =========================== */
+  /* Individual a 3 o 4 (a 3 se quita el Dos de oros: 13 cartas cada uno). Se reparte todo; la última carta, que
+     recibe quien da, marca el triunfo. Orden y puntos como en la brisca (As 11, Tres 10, Rey 4, Caballo 3, Sota 2).
+     Obligatorio asistir y montar (superar la carta que gana si se puede); sin el palo, fallar con triunfo y montar
+     sobre el triunfo que gana si se puede (si no se puede montar, carta libre). Quien gana una baza puede cantar antes
+     de salir: Rey y Caballo del mismo palo 20, del triunfo 40 (una vez por palo, un cante por baza); con los cuatro
+     Reyes o los cuatro Caballos canta tute y gana la mano. La última baza suma 10 (diez de últimas). Gana la mano
+     quien más suma (empate: más puntos de cartas); quien menos suma es el cabrón. Partida a N manos ganadas. */
+  function tDeal(S) {
+    let d = newDeck(); if (S.n === 3) d = d.filter((c) => c.id !== 1);
+    S.deck = []; S.hands = Array.from({ length: S.n }, () => []); S.trick = []; S.pts = Array(S.n).fill(0); S.cant = Array(S.n).fill(0); S.won = Array.from({ length: S.n }, () => []);
+    S.sung = [false, false, false, false]; S.can = -1; S.last = null; S.handWin = -1; S.tute = false; S.tally = [];
+    d.forEach((c, i) => S.hands[(S.dealer + 1 + i) % S.n].push(c));
+    S.muestra = d[d.length - 1]; S.ts = S.muestra.s;
+    S.turn = (S.dealer + 1) % S.n; S.phase = 'play'; S.hand++;
+    ev(S, { t: 'deal' }); ev(S, { t: 'info', txt: `Triunfo: ${SUIT[S.ts]}` });
+  }
+  function tLegal(S, p) {
+    const h = S.hands[p]; if (!S.trick.length) return h.slice();
+    const lead = S.trick[0].c.s, w = trickWin(S).c, same = h.filter((c) => c.s === lead);
+    if (same.length) { if (w.s === lead) { const hi = same.filter((c) => STR[c.r] > STR[w.r]); if (hi.length) return hi; } return same; }
+    const tr = h.filter((c) => c.s === S.ts);
+    if (tr.length) { if (w.s === S.ts) { const hi = tr.filter((c) => STR[c.r] > STR[w.r]); return hi.length ? hi : h.slice(); } return tr; }
+    return h.slice();
+  }
+  const pairIn = (h, s) => h.some((c) => c.s === s && c.r === 12) && h.some((c) => c.s === s && c.r === 11);
+  const tuteIn = (h) => h.filter((c) => c.r === 12).length === 4 || h.filter((c) => c.r === 11).length === 4;
+  function cantesOf(S, p) {
+    if (S.can !== p || S.trick.length) return [];
+    const h = S.hands[p], out = []; if (tuteIn(h)) out.push('tute');
+    for (let s = 0; s < 4; s++) if (!S.sung[s] && pairIn(h, s)) out.push('cante:' + s);
+    return out;
+  }
+  function tNeed(S) {
+    if (S.phase === 'play') {
+      if (S.trick.length === S.n) return { p: -1, kind: 'collect', legal: ['collect'] };
+      const p = S.turn; return { p, kind: 'play', legal: tLegal(S, p).map((c) => 'c:' + c.id).concat(cantesOf(S, p)) };
+    }
+    if (S.phase === 'hand') return { p: -1, kind: 'next', legal: ['next'] };
+    return null;
+  }
+  const tTot = (S, p) => S.pts[p] + S.cant[p];
+  function tEnd(S, win) {
+    const ord = S.hands.map((_, p) => p);
+    if (win == null) { const best = Math.max(...ord.map((p) => tTot(S, p))), top = ord.filter((p) => tTot(S, p) === best); if (top.length === 1) win = top[0]; else { const bp = Math.max(...top.map((p) => S.pts[p])), t2 = top.filter((p) => S.pts[p] === bp); win = t2.length === 1 ? t2[0] : -1; } }
+    const lo = Math.min(...ord.map((p) => tTot(S, p))), cab = S.tute ? [] : ord.filter((p) => tTot(S, p) === lo && p !== win);
+    S.handWin = win; S.cabron = cab.length === 1 ? cab[0] : -1; S.phase = 'hand';
+    if (win >= 0) S.games[win]++;
+    if (win >= 0 && S.games[win] >= S.target) { S.over = true; S.winner = win; }
+    ev(S, { t: 'hand', win });
+  }
+  function tAct(S, p, a) {
+    if (a === 'next') { if (S.over) { S.phase = 'end'; ev(S, { t: 'end' }); } else { S.dealer = (S.dealer + 1) % S.n; tDeal(S); } return true; }
+    if (a === 'collect') {
+      const w = trickWin(S), sum = S.trick.reduce((q, x) => q + pts(x.c), 0);
+      S.won[w.p].push(...S.trick.map((x) => x.c)); S.pts[w.p] += sum; S.last = { p: w.p, pts: sum, cards: S.trick.map((x) => x.c) }; S.trick = [];
+      const lastT = S.hands.every((h) => !h.length); if (lastT) S.pts[w.p] += 10;
+      ev(S, { t: 'trick', p: w.p, pts: sum + (lastT ? 10 : 0), ult: lastT });
+      S.turn = w.p; S.can = w.p;
+      if (lastT) tEnd(S);
+      return true;
+    }
+    if (a === 'tute') { if (!cantesOf(S, p).includes('tute')) return false; S.tute = true; S.can = -1; ev(S, { t: 'cante', p, tute: true, v: 0 }); tEnd(S, p); return true; }
+    if (typeof a === 'string' && a.startsWith('cante:')) {
+      const su = +a.slice(6); if (!cantesOf(S, p).includes(a)) return false;
+      const v = su === S.ts ? 40 : 20; S.cant[p] += v; S.sung[su] = true; S.can = -1; ev(S, { t: 'cante', p, s: su, v }); return true;
+    }
+    const c = cid(a); if (!c || !tLegal(S, p).includes(c) || !rm(S.hands[p], c)) return false;
+    S.trick.push({ p, c }); S.can = -1; S.turn = (p + 1) % S.n; ev(S, { t: 'play', p, c });
+    return true;
+  }
+  function tAI(S, p) {
+    const nd = tNeed(S), h = S.hands[p], lvl = S.lvl, ts = S.ts, legal = nd.legal;
+    if (legal.includes('tute')) return 'tute';
+    const cs = legal.filter((a) => a.startsWith('cante:')); if (cs.length) return cs.find((a) => +a.slice(6) === ts) || cs[0];
+    const L = legal.filter((a) => a.startsWith('c:')).map(cid); if (L.length === 1) return 'c:' + L[0].id;
+    if (R() < NOISE[lvl] * 0.5) return 'c:' + L[Math.floor(R() * L.length)].id;
+    const keep = (c) => ((c.r === 11 || c.r === 12) && !S.sung[c.s] && pairIn(h, c.s) ? 8 : 0);
+    const cost = (c) => pts(c) * 2 + (c.s === ts ? 7 + STR[c.r] * 1.2 : 0) + STR[c.r] * 0.25 + keep(c);
+    const cheapest = (arr) => arr.slice().sort((a, b) => cost(a) - cost(b))[0];
+    if (!S.trick.length) {
+      if (lvl >= 2 && h.length <= 3) { const hiT = L.filter((c) => c.s === ts && STR[c.r] >= 8); if (hiT.length) return 'c:' + hiT[0].id; }
+      if (lvl >= 1) { const ace = L.find((c) => c.s !== ts && c.r === 1 && h.length > S.n); if (ace && R() < 0.5) return 'c:' + ace.id; }
+      const pool = L.filter((c) => c.s !== ts && !pts(c)); return 'c:' + cheapest(pool.length ? pool : L).id;
+    }
+    const best = trickWin(S), sum = S.trick.reduce((q, x) => q + pts(x.c), 0), last = S.trick.length === S.n - 1;
+    const wins = L.filter((c) => beats(S, c, best.c));
+    if (wins.length) {
+      if (last) { const nt = wins.filter((c) => c.s !== ts); return 'c:' + (nt.length ? nt.sort((a, b) => pts(b) - pts(a))[0] : cheapest(wins)).id; }
+      const strong = wins.filter((c) => c.s !== ts && STR[c.r] >= 8); if (strong.length && sum + pts(strong[0]) >= 10) return 'c:' + strong[0].id;
+      if (sum >= 10 - lvl * 2 || wins.length === L.length) return 'c:' + cheapest(wins).id;
+    }
+    const lose = L.filter((c) => !wins.includes(c)); return 'c:' + cheapest(lose.length ? lose : L).id;
+  }
+
+  /* =========================== CINQUILLO =========================== */
+  /* 40 cartas repartidas entre 3 o 4. Abre quien tenga el Cinco de oros. Se juega un Cinco para abrir su palo o una
+     carta contigua a una fila ya abierta (hacia abajo hasta el As, hacia arriba 6, 7, Sota, Caballo y Rey). Si puedes
+     jugar, es obligatorio; si no, pasas. Gana la ronda quien se queda sin cartas; los demás suman un punto por cada
+     carta que les queda. Tras las rondas pactadas gana quien menos puntos tiene. */
+  function qDeal(S) {
+    const d = newDeck(); S.deck = []; S.hands = Array.from({ length: S.n }, () => []); S.rows = [null, null, null, null]; S.table = []; S.tally = []; S.roundWin = -1; S.passes = 0;
+    d.forEach((c, i) => S.hands[(S.dealer + 1 + i) % S.n].push(c));
+    S.turn = S.hands.findIndex((h) => h.some((c) => c.id === 4)); S.phase = 'play'; S.hand++; ev(S, { t: 'deal' });
+  }
+  const qOK = (S, c) => { const r = S.rows[c.s]; if (!r) return c.i === 4 && (c.s === 0 || !!S.rows[0]); return c.i === r.lo - 1 || c.i === r.hi + 1; };
+  function qNeed(S) {
+    if (S.phase === 'play') { const p = S.turn, L = S.hands[p].filter((c) => qOK(S, c)).map((c) => 'c:' + c.id); return { p, kind: 'play', legal: L.length ? L : ['pass'] }; }
+    if (S.phase === 'hand') return { p: -1, kind: 'next', legal: ['next'] };
+    return null;
+  }
+  function qAct(S, p, a) {
+    if (a === 'next') { if (S.over) { S.phase = 'end'; ev(S, { t: 'end' }); } else { S.dealer = (S.dealer + 1) % S.n; qDeal(S); } return true; }
+    if (a === 'pass') { if (S.hands[p].some((c) => qOK(S, c))) return false; S.passes++; ev(S, { t: 'say', p, txt: 'Paso' }); S.turn = (p + 1) % S.n; return true; }
+    const c = cid(a); if (!c || !S.hands[p].includes(c) || !qOK(S, c)) return false;
+    rm(S.hands[p], c); const r = S.rows[c.s]; if (!r) S.rows[c.s] = { lo: 4, hi: 4 }; else if (c.i < r.lo) r.lo = c.i; else r.hi = c.i;
+    S.table.push(c); ev(S, { t: 'play', p, c });
+    if (!S.hands[p].length) {
+      S.roundWin = p; S.rounds++; S.tally = S.hands.map((h, q) => ({ p: q, v: h.length })); S.tally.forEach((q) => (S.score[q.p] += q.v)); S.phase = 'hand';
+      if (S.rounds >= S.target) { S.over = true; const lo = Math.min(...S.score), top = S.score.map((v, q) => q).filter((q) => S.score[q] === lo); S.winner = top.includes(p) ? p : top[0]; }
+      ev(S, { t: 'hand', win: p }); return true;
+    }
+    S.turn = (p + 1) % S.n; return true;
+  }
+  /* IA: juega primero lo que le desbloquea sus propias cartas y retiene las que taponan a los demás. */
+  function qAI(S, p) {
+    const nd = qNeed(S); if (nd.legal[0] === 'pass') return 'pass';
+    const h = S.hands[p], lvl = S.lvl, L = nd.legal.map(cid); if (L.length === 1) return 'c:' + L[0].id;
+    const played = new Set(S.table.map((c) => c.id)), mine = new Set(h.map((c) => c.id));
+    const beyond = (c, dir) => { let m = 0, o = 0; for (let i = c.i + dir; i >= 0 && i <= 9; i += dir) { const id = c.s * 10 + i; if (mine.has(id)) m += 1 + (9 - Math.abs(i - c.i)) * 0.05; else if (!played.has(id)) o++; } return [m, o]; };
+    let best = L[0], bv = -1e9;
+    for (const c of L) {
+      let m = 0, o = 0;
+      if (c.i === 4) { const [a1, b1] = beyond(c, 1), [a2, b2] = beyond(c, -1); m = a1 + a2; o = b1 + b2; } else [m, o] = beyond(c, c.i > 4 ? 1 : -1);
+      const sc = m * 3 - o * (0.3 + lvl * 0.25) + (R() - 0.5) * NOISE[lvl] * 14;
+      if (sc > bv) { bv = sc; best = c; }
+    }
+    return 'c:' + best.id;
+  }
+
   /* =========================== Común =========================== */
   function create(mode, o) {
     o = o || {};
     const S = { mode, ev: [], hand: 0, lvl: Math.max(0, Math.min(4, o.lvl | 0)), over: false, winner: null, phase: 'deal' };
     if (mode === 'brisca') { S.n = o.n === 4 ? 4 : 2; S.target = o.target || 2; S.cambio = o.cambio !== false; S.games = [0, 0]; S.dealer = Math.floor(R() * S.n); bDeal(S); }
     else if (mode === 'mus') { S.n = 4; S.target = o.target || 40; S.senas = o.senas !== false; S.maxMus = o.maxMus || 4; S.score = [0, 0]; S.dealer = Math.floor(R() * 4); mDeal(S); }
+    else if (mode === 'tute') { S.n = o.n === 3 ? 3 : 4; S.target = o.target || 3; S.games = Array(S.n).fill(0); S.dealer = Math.floor(R() * S.n); tDeal(S); }
+    else if (mode === 'cinquillo') { S.n = o.n === 3 ? 3 : 4; S.target = o.target || 3; S.rounds = 0; S.score = Array(S.n).fill(0); S.dealer = Math.floor(R() * S.n); qDeal(S); }
     else { S.n = Math.max(2, Math.min(4, o.n || 2)); S.target = o.target || 100; S.score = Array(S.n).fill(0); S.out = Array(S.n).fill(false); S.dealer = Math.floor(R() * S.n); cDeal(S); }
     return S;
   }
-  const need = (S) => (S.phase === 'end' ? null : S.mode === 'brisca' ? bNeed(S) : S.mode === 'mus' ? mNeed(S) : cNeed(S));
-  function act(S, p, a) { const nd = need(S); if (!nd || nd.p !== p) return false; if (typeof a === 'string' && !nd.legal.includes(a)) return false; return S.mode === 'brisca' ? bAct(S, p, a) : S.mode === 'mus' ? mAct(S, p, a) : cAct(S, p, a); }
-  const ai = (S, p) => (S.mode === 'brisca' ? bAI(S, p) : S.mode === 'mus' ? mAI(S, p) : cAI(S, p));
+  const FN = { brisca: [bNeed, bAct, bAI], mus: [mNeed, mAct, mAI], chinchon: [cNeed, cAct, cAI], tute: [tNeed, tAct, tAI], cinquillo: [qNeed, qAct, qAI] };
+  const need = (S) => (S.phase === 'end' ? null : FN[S.mode][0](S));
+  function act(S, p, a) { const nd = need(S); if (!nd || nd.p !== p) return false; if (typeof a === 'string' && !nd.legal.includes(a)) return false; return FN[S.mode][1](S, p, a); }
+  const ai = (S, p) => FN[S.mode][2](S, p);
   /* Todas las cartas de la partida (para comprobar que no se pierde ni se duplica ninguna). */
   function allCards(S) {
     const a = S.hands.flat().concat(S.deck);
     if (S.mode === 'brisca') a.push(...S.trick.map((x) => x.c), ...S.won[0], ...S.won[1]);
     if (S.mode === 'mus') a.push(...S.disc, ...S.newDisc);
     if (S.mode === 'chinchon') a.push(...S.pile);
+    if (S.mode === 'tute') a.push(...S.trick.map((x) => x.c), ...S.won.flat());
+    if (S.mode === 'cinquillo') a.push(...S.table);
     return a;
   }
-  return { X, CARDS, RANKS, SUIT, RN, name, create, need, act, ai, allCards, pts, STR, trickWin, bTeam, bSena, swapCard, mv, jPts, paresOf, mSena, PARN, LN, SAY, best, isChin, closeWith, cv, eligOf };
+  return { X, CARDS, RANKS, SUIT, RN, name, create, need, act, ai, allCards, pts, STR, trickWin, bTeam, bSena, swapCard, mv, jPts, paresOf, mSena, PARN, LN, SAY, best, isChin, closeWith, cv, eligOf, tLegal, cantesOf, tTot, pairIn, qOK };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = BJ;
 
@@ -543,10 +688,13 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     brisca: [{ k: 'n', l: 'Jugadores', v: [2, 4], t: (v) => (v === 2 ? '2 · mano a mano' : '4 · por parejas') }, { k: 'target', l: 'Partida', v: [2, 1, 3], t: (v) => `a ${v} juego${v > 1 ? 's' : ''}` }, { k: 'cambio', l: 'Cambiar el 7 / el 2', v: [true, false], t: (v) => (v ? 'Sí' : 'No') }],
     mus: [{ k: 'target', l: 'Partida', v: [40, 20], t: (v) => (v === 40 ? 'a 40 piedras' : 'corta · a 20') }, { k: 'senas', l: 'Señas del compañero', v: [true, false], t: (v) => (v ? 'Sí' : 'No') }],
     chinchon: [{ k: 'n', l: 'Jugadores', v: [2, 3, 4], t: (v) => `${v} jugadores` }, { k: 'target', l: 'Eliminación', v: [100, 50], t: (v) => (v === 100 ? 'a 100 puntos' : 'corta · a 50') }],
+    tute: [{ k: 'n', l: 'Jugadores', v: [4, 3], t: (v) => `${v} jugadores` }, { k: 'target', l: 'Partida', v: [3, 1, 5], t: (v) => `a ${v} mano${v > 1 ? 's' : ''} ganada${v > 1 ? 's' : ''}` }],
+    cinquillo: [{ k: 'n', l: 'Jugadores', v: [4, 3], t: (v) => `${v} jugadores` }, { k: 'target', l: 'Rondas', v: [3, 5, 1], t: (v) => `${v} ronda${v > 1 ? 's' : ''}` }],
   }[MODE];
+  const TQ = MODE === 'tute' || MODE === 'cinquillo';
   let SET = {}; OPTS.forEach((o) => (SET[o.k] = o.v[0]));
   try { const sv = JSON.parse(localStorage.getItem('baraja:' + CFG.id) || '{}'); OPTS.forEach((o) => { if (o.v.some((v) => v === sv[o.k])) SET[o.k] = sv[o.k]; }); } catch (e) { /* sin almacenamiento */ }
-  let S = null, ui = 'setup', row = 0, t = 0, thinkT = 0, waitT = 0, sel = [new Set(), new Set(), new Set(), new Set()], foc = 0, kbd = false, bubbles = [], banner = null, lastNd = '', privT = 0, privSig = {}, hover = null, finished = false;
+  let showPair = null; let S = null, ui = 'setup', row = 0, t = 0, thinkT = 0, waitT = 0, sel = [new Set(), new Set(), new Set(), new Set()], foc = 0, kbd = false, bubbles = [], banner = null, lastNd = '', privT = 0, privSig = {}, hover = null, finished = false;
   const AN = new Map(); let HITS = [], BTN = [];
   const nP = () => (S ? S.n : MODE === 'mus' ? 4 : SET.n || 2);
   const humans = () => (k.party ? k.party.map((q) => q.p) : [0]);
@@ -557,7 +705,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
   const tname = (t2) => (!k.party ? (t2 === 0 ? 'Nosotros' : 'Ellos') : `${label(t2)} y ${label(t2 + 2)}`);
   function viewer() { if (!S) return -1; if (!k.party) return 0; if (privMode()) return -1; const nd = BJ.need(S); return nd && nd.p >= 0 && isHum(nd.p) ? nd.p : -1; }
   const minN = () => Math.max(2, Math.min(4, humans().length));
-  function fixSet() { if (MODE === 'brisca' && humans().length > 2) SET.n = 4; if (MODE === 'chinchon' && SET.n < minN()) SET.n = minN(); }
+  function fixSet() { if (MODE === 'brisca' && humans().length > 2) SET.n = 4; if ((MODE === 'chinchon' || TQ) && SET.n < minN()) SET.n = minN(); }
 
   /* Asientos: J1 abajo y el resto en sentido contrario a las agujas del reloj (derecha, arriba, izquierda). */
   const CX = W / 2, CY = H * (PORT ? 0.46 : 0.45);
@@ -581,8 +729,9 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       if (e.t === 'deal' || e.t === 'redeal') { dealAnim(e.t === 'redeal'); k.sfx('pop'); sel.forEach((q) => q.clear()); if (e.t === 'deal') bubbles = []; }
       else if (e.t === 'play' || e.t === 'discard') { k.sfx('click'); if (e.t === 'discard' && e.cs) e.cs.forEach((cd) => { const a = AN.get(cd.id); if (a) a.lift = 0; }); }
       else if (e.t === 'draw') k.sfx('pop');
-      else if (e.t === 'trick') { const [x, y] = seatXY(e.p); k.sfx(e.pts >= 10 ? 'coin' : 'pop'); if (e.pts) { k.float('+' + e.pts, CX + (x - CX) * 0.35, CY + (y - CY) * 0.35, '#ffe27a'); if (e.pts >= 10) k.burst(CX, CY, '#ffe27a', 14, 150); } }
+      else if (e.t === 'trick') { const [x, y] = seatXY(e.p); if (e.ult) banner = { txt: `Diez de últimas: ${label(e.p)}`, t: 1.6 }; k.sfx(e.pts >= 10 ? 'coin' : 'pop'); if (e.pts) { k.float('+' + e.pts, CX + (x - CX) * 0.35, CY + (y - CY) * 0.35, '#ffe27a'); if (e.pts >= 10) k.burst(CX, CY, '#ffe27a', 14, 150); } }
       else if (e.t === 'say') say(e.p, e.txt, e.big);
+      else if (e.t === 'cante') { const [x, y] = seatXY(e.p); if (e.tute) { say(e.p, '¡Tute!', true); k.confetti(); k.sfx('fanfare'); } else { say(e.p, e.v === 40 ? '¡Las cuarenta!' : `Veinte en ${BJ.SUIT[e.s]}`, e.v === 40); if (e.v === 40) k.sfx('win'); else k.sfx('coin'); k.float('+' + e.v, CX + (x - CX) * 0.5, CY + (y - CY) * 0.5, '#ffd166'); showPair = { p: e.p, s: e.s, t: 2.2 }; } }
       else if (e.t === 'swap') { say(e.p, `Cambia el ${e.c.r}`); k.sfx('coin'); }
       else if (e.t === 'lance') { banner = { txt: BJ.LN[e.L], t: 1.4 }; k.sfx('tick'); }
       else if (e.t === 'info') banner = { txt: e.txt, t: 1.8 };
@@ -594,13 +743,17 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     }
   }
   function say(p, txt, big) { bubbles = bubbles.filter((b) => b.p !== p); bubbles.push({ p, txt, t: big ? 2.4 : 1.7, big }); if (big) { k.shake(8); k.flash('rgba(255,90,90,.35)'); k.sfx('explode'); } else k.sfx('click'); }
-  function dealAnim(re) { let i = 0; const [dx, dy] = MODE === 'chinchon' ? STOCK : DECK; for (const h of S.hands) for (const cd of h) { let a = AN.get(cd.id); if (!a || !re) { a = { x: dx, y: dy, r: 0, w: TW, up: false, f: 0, lift: 0 }; AN.set(cd.id, a); } if (!re) a.delay = 0.1 + (i++) * (MODE === 'brisca' ? 0.09 : 0.06); } }
+  function dealAnim(re) { let i = 0; const [dx, dy] = MODE === 'chinchon' ? STOCK : TQ ? [CX, CY] : DECK; for (const h of S.hands) for (const cd of h) { let a = AN.get(cd.id); if (!a || !re) { a = { x: dx, y: dy, r: 0, w: TW, up: false, f: 0, lift: 0 }; AN.set(cd.id, a); } if (!re) a.delay = 0.1 + (i++) * (MODE === 'brisca' ? 0.09 : TQ ? 0.03 : 0.06); } }
   function finish() {
     if (finished) return; finished = true; for (const p of humans()) k.priv(p, null);
-    const humWin = MODE === 'chinchon' || (MODE === 'brisca' && S.n === 2) ? humans().includes(S.winner) : humans().some((p) => p % 2 === S.winner);
+    const humWin = MODE === 'chinchon' || TQ || (MODE === 'brisca' && S.n === 2) ? humans().includes(S.winner) : humans().some((p) => p % 2 === S.winner);
     let lv = lvlGet(); try { const v0 = +localStorage.getItem(LVKEY) || 0; localStorage.setItem(LVKEY, String(humWin ? Math.min(3.5, v0 + 0.5) : Math.max(0, v0 - 0.5))); } /* 1.23: medio nivel por victoria, tope 3 */ catch (e) { /* nada */ }
     if (humWin) k.best(CFG.id, lv + 1);
-    if (MODE === 'chinchon') {
+    if (MODE === 'tute') {
+      k.podium(S.games.map((v, p) => ({ p, name: label(p), score: v + (p === S.winner ? 0.001 : 0) })), { head: winHead(label(S.winner)), fmt: (v) => { const f = Math.floor(v); return `${f} mano${f === 1 ? '' : 's'}`; }, noTie: true });
+    } else if (MODE === 'cinquillo') {
+      k.podium(S.score.map((v, p) => ({ p, name: label(p), score: v - (p === S.winner ? 0.001 : 0) })), { asc: true, head: winHead(label(S.winner)), fmt: (v) => { const f = Math.ceil(v); return `${f} punto${f === 1 ? '' : 's'}`; }, noTie: true });
+    } else if (MODE === 'chinchon') {
       const rows = S.score.map((v, p) => ({ p, name: label(p), score: p === S.winner ? Math.min(v, -1000 + v) : v }));
       k.podium(rows, { asc: true, head: S.chinchon ? (!k.party && S.winner === 0 ? '¡Chinchón! Has ganado' : `¡Chinchón de ${label(S.winner)}!`) : winHead(label(S.winner)), fmt: (v) => (v < -500 ? `${v + 1000} pts · gana` : `${v} pts${v > S.target ? ' · eliminado' : ''}`) });
     } else if (teamed()) {
@@ -632,6 +785,15 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       else { const L = BJ.LN[nd.L]; const lab = { paso: 'Paso', envido: 'Envido 2', env5: 'Envido 5', ordago: 'Órdago', quiero: 'Quiero', noquiero: 'No quiero', sube: 'Dos más' }, col = { ordago: '#ff5a5f', quiero: '#7cf7a0', noquiero: '#ff9a8a', paso: '#cfd6e6' };
         nd.legal.forEach((a) => out.btns.push({ v: a, l: lab[a], col: col[a] || '#ffd166' })); out.text = nd.stake === 0 ? `${L}: ¿envidas?` : nd.stake === 'O' ? `${L}: ¡te echan órdago!` : `${L}: te envidan ${nd.stake}`; }
     }
+    if (MODE === 'tute') {
+      nd.legal.forEach((a) => a.startsWith('c:') && out.cards.set(+a.slice(2), a));
+      nd.legal.forEach((a) => { if (a === 'tute') out.btns.push({ v: a, l: '¡Tute!', col: '#ff9ad5' }); else if (a.startsWith('cante:')) { const su = +a.slice(6); out.btns.push({ v: a, l: su === S.ts ? 'Las cuarenta' : `20 en ${BJ.SUIT[su]}`, col: '#ffd166' }); } });
+      out.text = out.btns.length ? 'Puedes cantar antes de salir' : S.trick.length ? 'Tu turno: asiste y monta si puedes' : 'Tu turno: sales tú';
+    }
+    if (MODE === 'cinquillo') {
+      if (nd.legal[0] === 'pass') { out.btns.push({ v: 'pass', l: 'Paso', col: '#ff9a8a' }); out.text = 'No puedes jugar: pasas'; }
+      else { nd.legal.forEach((a) => out.cards.set(+a.slice(2), a)); out.text = S.table.length ? 'Juega un Cinco o una carta contigua' : 'Abre con el Cinco de oros'; }
+    }
     if (MODE === 'chinchon') {
       if (nd.kind === 'draw') { out.btns.push({ v: 'stock', l: 'Robar del mazo', col: '#ffd166' }); if (nd.legal.includes('pile')) out.btns.push({ v: 'pile', l: 'Coger descarte', col: '#7cf7a0' }); out.text = 'Roba una carta'; }
       else { nd.legal.forEach((a) => a.startsWith('c:') && out.cards.set(+a.slice(2), a)); if (nd.legal.includes('close')) out.btns.push({ v: 'close', l: 'Cerrar', col: '#7cf7a0' }); out.text = nd.legal.includes('close') ? 'Descarta una carta o cierra' : 'Descarta una carta'; }
@@ -643,6 +805,8 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     const h = S.hands[p].slice();
     if (MODE === 'brisca') return h.sort((a, b) => (a.s === S.ts) - (b.s === S.ts) || a.s - b.s || BJ.STR[a.r] - BJ.STR[b.r]);
     if (MODE === 'mus') return h.sort((a, b) => BJ.mv(b.r) - BJ.mv(a.r) || a.s - b.s);
+    if (MODE === 'tute') return h.sort((a, b) => (a.s === S.ts) - (b.s === S.ts) || a.s - b.s || BJ.STR[a.r] - BJ.STR[b.r]);
+    if (MODE === 'cinquillo') return h.sort((a, b) => a.s - b.s || a.i - b.i);
     const b = BJ.best(h); return b.melds.flat().concat(b.loose.sort((x, y) => x.s - y.s || x.i - y.i));
   }
   function meldGroups(p) { if (MODE !== 'chinchon') return null; const b = BJ.best(S.hands[p]), m = new Map(); b.melds.forEach((g, i) => g.forEach((cd) => m.set(cd.id, i))); return m; }
@@ -650,7 +814,8 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
   /* ------------------------------------------------ Mensajes privados al móvil (modo tele) */
   function status(p) {
     const o = options(p); let txt = o.text;
-    if (MODE === 'brisca') txt += ` · Triunfo: ${BJ.SUIT[S.ts]}`;
+    if (MODE === 'brisca' || MODE === 'tute') txt += ` · Triunfo: ${BJ.SUIT[S.ts]}`;
+    if (MODE === 'tute') txt += ` · Llevas ${BJ.tTot(S, p)}`;
     if (S.senas !== false && teamed() && S.phase !== 'reveal') { const mate = (p + 2) % 4; const sn = MODE === 'mus' ? (S.phase === 'lance' ? BJ.mSena(S.hands[mate]) : null) : BJ.bSena(S, mate); if (sn) txt += ` · Seña de ${label(mate)}: ${sn}`; }
     return { o, txt };
   }
@@ -677,7 +842,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     events(); if (!S) return;
     const nd = BJ.need(S);
     const sig = nd ? nd.p + nd.kind + (nd.legal || []).length + S.phase : 'end'; if (sig !== lastNd) { lastNd = sig; foc = 0; thinkT = 0; }
-    bubbles.forEach((b) => (b.t -= dt)); bubbles = bubbles.filter((b) => b.t > 0); if (banner && (banner.t -= dt) <= 0) banner = null;
+    bubbles.forEach((b) => (b.t -= dt)); bubbles = bubbles.filter((b) => b.t > 0); if (showPair && (showPair.t -= dt) <= 0) showPair = null; if (banner && (banner.t -= dt) <= 0) banner = null;
     if (!nd) return;
     if (nd.p === -1) {
       waitT += dt;
@@ -743,7 +908,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
   }
   /* Posiciones objetivo de las 40 cartas; la animación las persigue. */
   function layout() {
-    const T = new Map(), v = viewer(), rev = S.phase === 'reveal' || S.phase === 'end', o = v >= 0 ? options(v) : null, gm = v >= 0 ? meldGroups(v) : null;
+    const T = new Map(), v = viewer(), rev = S.phase === 'reveal' || S.phase === 'end' || (MODE === 'cinquillo' && S.phase === 'hand'), o = v >= 0 ? options(v) : null, gm = v >= 0 ? meldGroups(v) : null;
     HITS = []; BTN = [];
     const put = (cd, x, y, w, r, up, z, extra) => T.set(cd.id, Object.assign({ x, y, w, r: r || 0, up, z }, extra || {}));
     const hr = (id) => ((id * 7919) % 100) / 100 - 0.5;
@@ -761,6 +926,11 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       S.pile.forEach((cd, i) => put(cd, PILE[0] + hr(cd.id) * 6, PILE[1] + hr(cd.id + 1) * 6, TW + 4, hr(cd.id) * 0.22, !(rev && cd === S.closeCard && i === S.pile.length - 1), 1 + i));
       if (!rev && S.phase === 'draw' && v >= 0 && o && o.btns.length) { HITS.push({ x: STOCK[0] - 40, y: STOCK[1] - 60, w: 80, h: 120, v: 'stock', tbl: 1 }); if (S.pile.length) HITS.push({ x: PILE[0] - 40, y: PILE[1] - 60, w: 80, h: 120, v: 'pile', tbl: 1 }); }
     }
+    if (MODE === 'tute') {
+      for (let p = 0; p < S.n; p++) { const [x, y] = tWonXY(p); S.won[p].forEach((cd, i) => put(cd, x, y - i * 0.3, SW, 0.3 * (p % 2 ? -1 : 1), false, 1 + i)); }
+      S.trick.forEach((q, i) => { const [dx, dy] = DIR[seatOf(q.p)]; put(q.c, CX + dx * (PORT ? 70 : 92) + hr(q.c.id) * 10, CY + dy * (PORT ? 74 : 62) + hr(q.c.id + 3) * 8, TW + 6, hr(q.c.id) * 0.25, true, 100 + i); });
+    }
+    if (MODE === 'cinquillo') S.table.forEach((cd) => { const [x, y] = slotXY(cd.s, cd.i); put(cd, x, y, QG.w, 0, true, 10 + cd.s * 12 + cd.i); });
     // Manos
     for (let p = 0; p < S.n; p++) {
       const h = S.hands[p]; if (!h.length) continue; const st = seatOf(p);
@@ -784,7 +954,14 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     }
     return T;
   }
+  /* Cinquillo: cuatro filas (una por palo) con el Cinco en el centro; en horizontal, 2 × 2. */
+  const QG = PORT ? { w: 46, sp: 36, step: 78 } : { w: 40, sp: 30, step: 76 };
+  function slotXY(su, i) {
+    if (PORT) return [CX + (i - 4.5) * QG.sp, CY + 40 + (su - 1.5) * QG.step];
+    return [CX + (su % 2 ? 170 : -170) + (i - 4.5) * QG.sp, CY - 8 + (su < 2 ? -0.5 : 0.5) * QG.step];
+  }
   function revealOrder(p) { if (MODE !== 'chinchon') return sorted(p); const tl = S.tally.find((q) => q.p === p); if (!tl) return sorted(p); const ms = p === S.closer && S.closedMelds ? [] : tl.melds; return ms.flat().concat(tl.laid || [], tl.loose); }
+  function tWonXY(p) { const st = seatOf(p), [x, y] = PL[st]; return st === 'b' ? [PORT ? W - 44 : W - 70, handY] : st === 't' ? [x + (PORT ? 150 : 170), y] : [x + (st === 'l' ? 1 : -1) * (PORT ? 72 : 96), y + (PORT ? 96 : 70)]; }
   function wonXY(tm) { const p = tm, st = seatOf(p); const [x, y] = PL[st]; return st === 'b' ? [PORT ? W - 44 : W - 70, handY] : st === 't' ? [x + (PORT ? 150 : 170), y] : [x, y + 80]; }
 
   function draw() {
@@ -812,6 +989,8 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       if (tg.hand && tg.meld >= 0 && !(a.f > 0)) { c.fillStyle = ['#7cf7a0', '#ffd166', '#5ce1e6', '#ff9ad5'][tg.meld % 4]; ART.rr(c, a.x - a.w / 2 + 6, a.y + a.lift + CH / 2 + 3, a.w - 12, 5, 2.5); c.fill(); }
     }
     drawSeats(); drawHUD(v);
+    if (showPair) { const [x0, y0] = seatXY(showPair.p), x = CX + (x0 - CX) * 0.55, y = CY + (y0 - CY) * 0.55 - (seatOf(showPair.p) === 'b' ? 30 : 0), al = Math.min(1, showPair.t * 3); c.globalAlpha = al;
+      card(showPair.s * 10 + 9, x - 22, y, TW, -0.12, true); card(showPair.s * 10 + 8, x + 22, y, TW, 0.12, true); c.globalAlpha = 1; }
     for (const b of bubbles) bubble(b);
     if (banner) { const al = Math.min(1, banner.t * 3); c.globalAlpha = al; const w = Math.max(220, banner.txt.length * 13 + 60); pill(CX - w / 2, CY - 26, w, 52, '#fff3c4', banner.txt, 24); c.globalAlpha = 1; }
     if (S.phase === 'reveal' || S.phase === 'hand') drawResult();
@@ -819,6 +998,11 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
   function drawTable() {
     if (MODE === 'brisca') { if (!S.deck.length) { c.globalAlpha = 0.4; label2('Mazo vacío', DECK[0], DECK[1], 15, '#fff'); c.globalAlpha = 1; } else label2(String(S.deck.length), DECK[0], DECK[1] - 72, 16, '#fff3c4');
       const tx = DECK[0] + (PORT ? 112 : 34), ty = DECK[1] + (PORT ? -10 : 60); label2('Triunfo', tx, ty, 14, '#fff3c4'); sym(c, S.ts, tx, ty + 22, 9); }
+    if (MODE === 'tute') { ART.rr(c, 10, 34, 150, 40, 12); ART.fillOut(c, 'rgba(12,18,32,.85)', 2); label2('Triunfo', 20, 54, 14, '#fff3c4', 'left'); sym(c, S.ts, 94, 54, 11); label2(BJ.SUIT[S.ts], 110, 54, 13, '#fff', 'left');
+      const sung = [0, 1, 2, 3].filter((q) => S.sung[q]); if (sung.length) label2('Cantado: ' + sung.map((q) => (q === S.ts ? '40' : '20') + ' ' + BJ.SUIT[q]).join(', '), 14, 86, 11.5, '#cfe8d8', 'left'); }
+    if (MODE === 'cinquillo') for (let su = 0; su < 4; su++) { if (S.rows[su]) continue; const [x, y] = slotXY(su, 4), w = QG.w + 2, h = w * 1.55;
+      c.setLineDash([5, 5]); ART.rr(c, x - w / 2, y - h / 2, w, h, 6); c.fillStyle = 'rgba(0,0,0,.18)'; c.fill(); c.lineWidth = 2; c.strokeStyle = 'rgba(255,243,196,.45)'; c.stroke(); c.setLineDash([]);
+      c.globalAlpha = 0.5; sym(c, su, x, y - 4, su >= 2 ? 13 : 9); label2('5', x, y + h / 2 - 11, 12, '#fff3c4'); c.globalAlpha = 1; }
     if (MODE === 'chinchon') { label2('Mazo', STOCK[0], STOCK[1] + 72, 14, '#fff3c4'); label2('Descarte', PILE[0], PILE[1] + 72, 14, '#fff3c4'); }
     if (MODE === 'mus') {
       const L = S.phase === 'lance' || S.phase === 'reveal' ? S.L : -1, names = ['Grande', 'Chica', 'Pares', S.punto ? 'Punto' : 'Juego'], bw = PORT ? 108 : 118, x0 = CX - (bw * 4 + 18) / 2, y0 = CY + (PORT ? 14 : -44);
@@ -852,6 +1036,8 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
   }
   function sub(p) {
     if (MODE === 'chinchon') return `${S.score[p]} pts`;
+    if (MODE === 'tute') return `${S.games[p]} mano${S.games[p] === 1 ? '' : 's'} · ${BJ.tTot(S, p)} pts`;
+    if (MODE === 'cinquillo') return `${S.hands[p].length} cartas · ${S.score[p]} pts`;
     if (MODE === 'mus') return `Pareja ${p % 2 ? 'B' : 'A'}`;
     if (S.n === 4) return `Pareja ${p % 2 ? 'B' : 'A'}`;
     return `${S.games[p]} juego${S.games[p] === 1 ? '' : 's'}`;
@@ -865,6 +1051,8 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
         if (MODE === 'mus') { c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(x + 42, yy + 9, w - 90, 3); c.fillStyle = k.pcol(tm); c.fillRect(x + 42, yy + 9, (w - 90) * Math.min(1, sc[tm] / S.target), 3); } });
       label2(MODE === 'mus' ? `a ${S.target}` : `a ${S.target} juego${S.target > 1 ? 's' : ''}`, x + w / 2, y + 74, 11, '#cfe8d8');
     } else if (MODE === 'chinchon') { label2(`Eliminación a ${S.target}`, x + 4, y + 10, 13, '#fff3c4', 'left'); }
+    else if (MODE === 'tute') label2(`A ${S.target} mano${S.target > 1 ? 's' : ''} ganada${S.target > 1 ? 's' : ''}`, x + 4, y + 10, 13, '#fff3c4', 'left');
+    else if (MODE === 'cinquillo') label2(`Ronda ${Math.min(S.rounds + (S.phase === 'hand' ? 0 : 1), S.target)} de ${S.target}`, x + 4, y + 10, 13, '#fff3c4', 'left');
     else label2(`A ${S.target} juego${S.target > 1 ? 's' : ''}`, x + 4, y + 10, 13, '#fff3c4', 'left');
     // Aviso y botones del jugador que mira la pantalla
     const nd = BJ.need(S); let txt = '', btns = [];
@@ -893,15 +1081,18 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     const lines = [];
     if (MODE === 'brisca') { const nt = 2; for (let tm = 0; tm < nt; tm++) lines.push({ col: teamed() ? k.pcol(tm) : k.pcol(tm), txt: `${teamed() ? tname(tm) : label(tm)}: ${S.pts[tm]} puntos`, v: S.handWin === tm ? '+1 juego' : '' }); if (S.handWin < 0) lines.push({ col: '#fff', txt: 'Empate a 60: nadie suma', v: '' }); }
     if (MODE === 'mus') S.tally.forEach((q) => lines.push({ col: q.team >= 0 ? k.pcol(q.team) : '#fff', txt: `${q.txt}${q.team >= 0 ? ' · ' + tname(q.team) : ''}`, v: q.v === 'Partida' ? '¡Partida!' : q.v ? `+${q.v}${q.pre ? ' (ya)' : ''}` : '' }));
+    if (MODE === 'tute') for (let p = 0; p < S.n; p++) lines.push({ col: k.pcol(p), txt: `${label(p)}: ${S.pts[p]}${S.cant[p] ? ` + ${S.cant[p]} de cantes` : ''}`, v: p === S.handWin ? '+1 mano' : p === S.cabron ? 'Cabrón' : String(BJ.tTot(S, p)) });
+    if (MODE === 'tute' && S.handWin < 0) lines.push({ col: '#fff', txt: 'Empate: nadie se lleva la mano', v: '' });
+    if (MODE === 'cinquillo') S.tally.forEach((q) => lines.push({ col: k.pcol(q.p), txt: q.p === S.roundWin ? `${label(q.p)}: sin cartas` : `${label(q.p)}: ${q.v} carta${q.v === 1 ? '' : 's'}`, v: `+${q.v} → ${S.score[q.p]}` }));
     if (MODE === 'chinchon') S.tally.forEach((q) => lines.push({ col: q.p >= 0 ? k.pcol(q.p) : '#fff', txt: q.p >= 0 ? `${label(q.p)}: ${q.txt || 'suma sueltas'}` : q.txt, v: q.p >= 0 ? `${q.v > 0 ? '+' : ''}${q.v} → ${S.score[q.p]}` : '' }));
     const w = PORT ? 460 : 470, lh = 26, h = 52 + lines.length * lh, x = CX - w / 2, y = (PORT ? CY - 40 : CY - 20) - h / 2;
     ART.rr(c, x, y + 5, w, h, 16); c.fillStyle = OUT; c.fill(); ART.rr(c, x, y, w, h, 16); ART.fillOut(c, 'rgba(18,22,40,.95)', 3);
-    label2(MODE === 'brisca' ? `Fin de la mano ${S.hand}` : MODE === 'mus' ? 'Recuento' : 'Cierre de la mano', CX, y + 24, 19, '#ffd166');
+    label2(MODE === 'tute' ? (S.tute ? `¡Tute de ${label(S.handWin)}!` : `Fin de la mano ${S.hand}`) : MODE === 'cinquillo' ? `Fin de la ronda ${S.rounds}` : MODE === 'brisca' ? `Fin de la mano ${S.hand}` : MODE === 'mus' ? 'Recuento' : 'Cierre de la mano', CX, y + 24, 19, '#ffd166');
     lines.forEach((l, i) => { const yy = y + 52 + i * lh; circ(c, x + 20, yy, 6, l.col, 1.5); label2(l.txt, x + 34, yy, 14.5, '#fff', 'left'); label2(l.v, x + w - 16, yy, 14.5, '#ffd166', 'right'); });
   }
   /* Portada / menú: abanico de cartas sobre el tapete */
   function drawShowcase() {
-    const ids = MODE === 'brisca' ? [0, 29, 12, 38, 27] : MODE === 'mus' ? [9, 19, 29, 2] : [23, 24, 25, 26, 27, 28, 29], n = ids.length, cy = ui === 'setup' && k.st === 'play' ? (PORT ? 190 : 72) : CY + 10, w = ui === 'setup' && k.st === 'play' ? (PORT ? 70 : 52) : PORT ? 150 : 172;
+    const ids = MODE === 'tute' ? [0, 29, 19, 18, 39] : MODE === 'cinquillo' ? [3, 4, 14, 24, 34, 35] : MODE === 'brisca' ? [0, 29, 12, 38, 27] : MODE === 'mus' ? [9, 19, 29, 2] : [23, 24, 25, 26, 27, 28, 29], n = ids.length, cy = ui === 'setup' && k.st === 'play' ? (PORT ? 190 : 72) : CY + 10, w = ui === 'setup' && k.st === 'play' ? (PORT ? 70 : 52) : PORT ? 150 : 172;
     ids.forEach((id, i) => { const a = (i - (n - 1) / 2) * 0.2 + Math.sin(t * 1.3 + i) * 0.02; const x = CX + Math.sin(a) * w * 2.4, y = cy + (1 - Math.cos(a)) * w * 2.4 + (ui === 'setup' && k.st === 'play' ? 0 : -10); card(id, x, y, w, a, true); });
     if (MODE === 'brisca' && k.st === 'ready') card(33, PORT ? CX : CX - 380, PORT ? CY + 330 : CY + 30, 110, Math.PI / 2 - 0.1, true);
     if (k.st !== 'play' || ui !== 'setup') return;

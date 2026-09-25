@@ -1,5 +1,5 @@
-/* Naves. CFG.mode: 'invaders' | 'vertical' | 'centipede' | 'bullethell'. Arte propio vectorial. */
-const M = CFG.mode, land = M === 'invaders';
+/* Naves. CFG.mode: 'invaders' | 'vertical' | 'centipede' | 'bullethell' | 'coop' (invasores a dúo con escudo compartido). Arte propio vectorial. */
+const M = CFG.mode, land = M === 'invaders' || M === 'coop';
 const W = land ? 480 : 360, H = land ? 400 : 640;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#070814' }), c = k.ctx, OUT = '#0d0b1c';
 let p, shots, foes, eb, score, lives, wave, cool, inv, dirX, t, pt, calm, mush, bunkers, ufo, pups, power, shield, stars, banner, bannerT;
@@ -14,12 +14,12 @@ function gspr(id) {
   if (id === 'r' || id === 'R') { g.beginPath(); g.arc(0, 0, w / 2, 0, 6.283); g.fill(); } else g.fillRect(-w / 2, -h / 2, w, h);
   return (GSP[id] = { cv, w: cw, h: ch, o: -cw / 2, q: -ch / 2 });
 }
-function ship(x, y, s, tilt) {
+function ship(x, y, s, tilt, wing) {
   c.save(); c.translate(x, y); c.scale(s, s); c.rotate(tilt * 0.25);
   const fl = 6 + Math.random() * 6; glow('#ff9a3c', 12); c.fillStyle = '#ffb347'; c.beginPath(); c.moveTo(-5, 12); c.lineTo(0, 12 + fl); c.lineTo(5, 12); c.fill(); c.shadowBlur = 0;
   c.beginPath(); c.moveTo(0, -18); c.lineTo(7, -4); c.lineTo(16, 8); c.lineTo(16, 13); c.lineTo(5, 10); c.lineTo(-5, 10); c.lineTo(-16, 13); c.lineTo(-16, 8); c.lineTo(-7, -4); c.closePath();
   c.fillStyle = '#dfe6f5'; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
-  c.fillStyle = '#6e62f5'; c.beginPath(); c.moveTo(-16, 8); c.lineTo(-7, 2); c.lineTo(-7, 10); c.lineTo(-16, 13); c.fill(); c.beginPath(); c.moveTo(16, 8); c.lineTo(7, 2); c.lineTo(7, 10); c.lineTo(16, 13); c.fill();
+  c.fillStyle = wing || '#6e62f5'; c.beginPath(); c.moveTo(-16, 8); c.lineTo(-7, 2); c.lineTo(-7, 10); c.lineTo(-16, 13); c.fill(); c.beginPath(); c.moveTo(16, 8); c.lineTo(7, 2); c.lineTo(7, 10); c.lineTo(16, 13); c.fill();
   c.fillStyle = '#5ce1e6'; c.beginPath(); c.ellipse(0, -4, 3.5, 7, 0, 0, 6.283); c.fill(); c.fillStyle = 'rgba(255,255,255,.7)'; c.fillRect(-1.5, -9, 1.5, 4);
   c.restore();
 }
@@ -101,12 +101,12 @@ function spawnWave() {
 }
 function makeBunkers() { bunkers = []; for (let b = 0; b < 4; b++) { const bx = 70 + b * 110, by = H - 100; for (let y = 0; y < 5; y++) for (let x = 0; x < 8; x++) { if ((y === 4 && x > 2 && x < 5) || (y === 0 && (x === 0 || x === 7))) continue; bunkers.push({ x: bx + x * 5, y: by + y * 5 }); } } }
 function reset() { p = { x: W / 2, y: H - 50, tilt: 0 }; shots = []; foes = []; eb = []; pups = []; score = 0; lives = 4; wave = 0; cool = 0; inv = 3; t = 0; pt = 0; calm = 0; power = 1; shield = 0; ufo = null; bunkers = []; stars = Array.from({ length: 70 }, () => ({ x: k.rnd(0, W), y: k.rnd(0, H), z: k.rnd(0.2, 1) })); spawnWave(); }
-reset(); k.show(CFG.title, CFG.help);
+if (M !== 'coop') { reset(); k.show(CFG.title, CFG.help); }
 function hitPlayer() { if (inv > 0) return; if (shield > 0) { shield = 0; inv = 1; k.sfx('hit'); k.burst(p.x, p.y, '#5ce1e6', 16); return; } lives--; inv = 2; eb = []; power = Math.max(1, power - 1); k.burst(p.x, p.y, '#ffb347', 30, 220); k.sfx('explode'); k.shake(8); k.flash('rgba(255,80,90,.35)'); if (lives <= 0) k.lose(CFG.id, Math.floor(score), 'Nave destruida', `Oleada ${wave}`); }
 function killFoe(f) { f.dead = true; score += f.pts; k.burst(f.x, f.y, f.boss ? '#f0647e' : EC[(f.kind || 0) % 4], f.boss ? 70 : 14, f.boss ? 260 : 160); k.sfx(f.boss ? 'explode' : 'hit'); if (f.boss) { k.shake(12); k.float(`+${f.pts}`, f.x, f.y, '#e9b949'); pups.push({ x: f.x, y: f.y, t: 'P' }); }
   if (M === 'centipede' && f.seg) mush.push({ x: Math.round((f.x - 10) / 20) * 20 + 10, y: f.y, hp: 3 });
   if (M === 'vertical' && !f.boss && Math.random() < 0.08) pups.push({ x: f.x, y: f.y, t: Math.random() < 0.6 ? 'P' : 'S' }); }
-k.run((dt) => {
+if (M !== 'coop') k.run((dt) => {
   t += dt; for (const s of stars) { s.y += (20 + s.z * 90) * dt; if (s.y > H) { s.y = 0; s.x = k.rnd(0, W); } }
   bannerT -= dt;
   if (!k.gate(reset)) return;
@@ -189,3 +189,141 @@ k.run((dt) => {
   if (M === 'vertical' && power > 1) for (let i = 1; i < power; i++) { c.beginPath(); c.moveTo(18 + (i - 1) * 16, 36); c.lineTo(25 + (i - 1) * 16, 47); c.lineTo(11 + (i - 1) * 16, 47); c.closePath(); ART.fillOut(c, '#5ce1e6', 2); }
   if (bannerT > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, bannerT); label(banner, W / 2, H * 0.42, 28, '#fff', 'center'); c.globalAlpha = 1; }
 });
+/* ================================================================ modo 'coop': invasores a dúo
+   Dos naves en la franja baja (8 direcciones), escudo de energía compartido (un impacto gasta 25),
+   enlace entre naves cercanas que absorbe balas, rescate de la nave caída (acércate 1,2 s) o reaparición
+   a los 6 s con la reserva común. La partida acaba si caen las dos a la vez o la flota llega a los búnkeres. */
+if (M === 'coop') {
+  const BY = H - 128, TOP = H - 74, BOT = H - 22, LINK = 125;
+  let ships, shE, shT, reserve, fox, foy, divT, cpl, kills;
+  const coopBunkers = () => { bunkers = []; for (let b = 0; b < 4; b++) { const bx = 58 + b * 112, by = BY; for (let y = 0; y < 5; y++) for (let x = 0; x < 9; x++) { if ((y === 4 && x > 2 && x < 6) || (y === 0 && (x === 0 || x === 8))) continue; bunkers.push({ x: bx + x * 5, y: by + y * 5 }); } } };
+  const mkShips = () => { cpl = k.players(2); ships = cpl.map((q, i) => ({ p: q.p, x: W / 2 + (i ? 60 : -60), y: BOT - 14, tilt: 0, cool: 0, inv: 0, down: false, rt: 0, help: 0, cpu: q.cpu, col: q.color, name: q.name, tx: W / 2, tt: 0 })); };
+  const syncShips = () => { cpl = k.players(2); ships.forEach((s, i) => { s.cpu = cpl[i].cpu; s.col = cpl[i].color; s.name = cpl[i].name; }); };
+  const coopWave = () => {
+    wave++; foes = []; calm = wave === 1 ? 5 : 2.2; fox = 0; foy = 0; dirX = 1; divT = wave === 1 ? 7 : 3.5;
+    const rows = Math.min(5, 3 + Math.floor((wave + 1) / 3)), cols = 8;
+    for (let r = 0; r < rows; r++) for (let i = 0; i < cols; i++) foes.push({ gx: 58 + i * 48, gy: 52 + r * 30, x: 0, y: 0, r: 12, hp: r === 0 && wave > 2 ? 2 : 1, pts: [30, 20, 20, 10, 10][r], kind: r < 1 ? 1 : r < 3 ? 0 : 2, fr: 0, dive: 0 });
+    if (wave === 1 || wave % 3 === 1) coopBunkers();
+    for (const s of ships) if (s.down) { s.down = false; s.inv = 2; s.x = k.clamp(s.x, 20, W - 20); s.y = BOT - 14; }
+    if (wave > 1) { reserve = Math.min(5, reserve + 1); shE = Math.min(100, shE + 35); }
+    msg(`Oleada ${wave}`);
+  };
+  function coopReset() { t = 0; pt = 0; score = 0; wave = 0; shots = []; eb = []; pups = []; shE = 100; shT = 0; reserve = 3; kills = [0, 0]; stars = Array.from({ length: 70 }, () => ({ x: k.rnd(0, W), y: k.rnd(0, H), z: k.rnd(0.2, 1) })); mkShips(); coopWave(); }
+  k.onParty = () => { if (k.st !== 'play') coopReset(); else syncShips(); };
+  coopReset(); k.show(CFG.title, CFG.help);
+  window.__coop = (kill) => (kill && ships.forEach((s) => { s.inv = 0; shE = 0; hitShip(s); }), { ships: ships.map((s) => ({ x: s.x, y: s.y, down: s.down, cpu: s.cpu, name: s.name })), shE, reserve, wave, score, foes: foes.length, eb: eb.length, kills }); /* pruebas */
+  const alive = () => ships.filter((s) => !s.down);
+  function gameOver(why) { const nm = ships.map((s, i) => `${s.name} ${kills[i]}`).join(' · '); k.lose(CFG.id, Math.floor(score), why, `Oleada ${wave} · derribos: ${nm}`); }
+  function hitShip(s) {
+    if (s.down || s.inv > 0) return;
+    shT = 2.2;
+    if (shE >= 25) { shE -= 25; s.inv = 0.8; k.sfx('hit'); k.burst(s.x, s.y, '#5ce1e6', 18, 160); k.flash('rgba(92,225,230,.18)'); return; }
+    s.down = true; s.rt = 6; s.help = 0; k.burst(s.x, s.y, '#ffb347', 34, 220); k.sfx('explode'); k.shake(8); k.flash('rgba(255,80,90,.3)');
+    if (!alive().length) gameOver('Escuadrón abatido');
+  }
+  function segDist(px, py, ax, ay, bx, by) { const vx = bx - ax, vy = by - ay, q = k.clamp(((px - ax) * vx + (py - ay) * vy) / (vx * vx + vy * vy || 1), 0, 1); return Math.hypot(px - ax - vx * q, py - ay - vy * q); }
+  /* aliado CPU: se coloca bajo la columna más baja (separado del compañero), esquiva balas y rescata */
+  function allyInput(s, o, dt) {
+    let tx = s.x, ty = BOT - 14, fire = false;
+    if (o.down) { tx = o.x; ty = o.y; }
+    else {
+      s.tt -= dt;
+      if (s.tt <= 0) { s.tt = k.rnd(0.35, 0.8); const cand = foes.filter((f) => Math.abs(f.x - o.x) > 50); const f = cand.length ? cand.reduce((a, b) => (Math.abs(b.x - s.x) + (H - b.y) * 0.6 < Math.abs(a.x - s.x) + (H - a.y) * 0.6 ? b : a)) : foes[0]; s.tx = f ? f.x : W / 2; }
+      tx = s.tx; if (Math.abs(s.x - o.x) < 40) tx += s.x < o.x ? -50 : 50;
+      fire = foes.some((f) => Math.abs(f.x - s.x) < 16);
+    }
+    for (const e of eb) if (e.y < s.y && e.y > s.y - 110 && Math.abs(e.x - s.x) < 20) { tx = s.x + (e.x > s.x ? -60 : 60); ty = BOT - 4; }
+    for (const f of foes) if (f.dive && Math.hypot(f.x - s.x, f.y - s.y) < 70) tx = s.x + (f.x > s.x ? -70 : 70);
+    const dx = tx - s.x, dy = ty - s.y; return { x: Math.abs(dx) > 6 ? Math.sign(dx) : 0, y: Math.abs(dy) > 6 ? Math.sign(dy) : 0, fire };
+  }
+  k.run((dt) => {
+    t += dt; for (const s of stars) { s.y += (20 + s.z * 90) * dt; if (s.y > H) { s.y = 0; s.x = k.rnd(0, W); } }
+    bannerT -= dt;
+    if (!k.gate(coopReset)) return;
+    pt += dt; calm -= dt; const D = ease(Math.min(1, (wave - 1) / 12)), sp = 230;
+    /* naves */
+    ships.forEach((s, i) => {
+      const o = ships[1 - i]; s.inv -= dt; s.cool -= dt;
+      if (s.down) {
+        s.rt -= dt; const near = !o.down && Math.hypot(o.x - s.x, o.y - s.y) < 38; s.help = near ? s.help + dt : Math.max(0, s.help - dt * 0.5);
+        if (s.help >= 1.2) { s.down = false; s.inv = 2; k.sfx('coin'); k.float('¡Rescatado!', s.x, s.y - 26, '#5ce1e6'); }
+        else if (s.rt <= 0 && reserve > 0) { reserve--; s.down = false; s.inv = 2; s.x = W / 2; s.y = BOT - 14; k.sfx('start'); }
+        return;
+      }
+      let ix = 0, iy = 0, fire = false; const ox = s.x;
+      if (s.cpu) { const a = allyInput(s, o, dt); ix = a.x; iy = a.y; fire = a.fire; }
+      else { const d = k.pdir(s.p); ix = d.x; iy = d.y; fire = k.pheld(s.p, 'a');
+        if (s.p === 0 && k.ptr.down) { s.x += (k.ptr.x - s.x) * Math.min(1, dt * 12); s.y += (k.ptr.y - 60 - s.y) * Math.min(1, dt * 12); fire = true; } }
+      const m = ix && iy ? 0.7071 : 1; s.x += ix * sp * m * dt; s.y += iy * sp * m * dt;
+      s.x = k.clamp(s.x, 16, W - 16); s.y = k.clamp(s.y, TOP, BOT); s.tilt += (((s.x - ox) / Math.max(dt, 0.001)) / 300 - s.tilt) * Math.min(1, dt * 10);
+      if (fire && s.cool <= 0 && shots.filter((q) => q.o === i).length < 3) { s.cool = 0.32; shots.push({ x: s.x, y: s.y - 16, vx: 0, o: i }); k.sfx('shoot'); }
+    });
+    shT -= dt; if (shT <= 0) shE = Math.min(100, shE + dt * 7);
+    for (const s of shots) s.y -= 540 * dt;
+    /* flota */
+    const form = foes.filter((f) => !f.dive), n = foes.length, spd = lerp(14, 30, D) + (40 - Math.min(40, n)) * 1.6;
+    fox += dirX * spd * dt;
+    let lo = 1e9, hi = -1e9, low = 0; for (const f of form) { lo = Math.min(lo, f.gx + fox); hi = Math.max(hi, f.gx + fox); low = Math.max(low, f.gy + foy); }
+    if (form.length && (lo < 16 || hi > W - 16)) { dirX *= -1; fox += dirX * 3; foy += 8; if (low + 8 > BY - 10) return gameOver('La flota llegó a la base'); }
+    const fr = Math.floor(t * (1 + (40 - Math.min(40, n)) / 12)) % 2;
+    for (const f of foes) { f.fr = fr;
+      if (!f.dive) { f.x = f.gx + fox; f.y = f.gy + foy; continue; }
+      f.dt += dt;
+      if (f.dive === 1) { const tg = ships[f.tg]; const ax = (tg && !tg.down ? tg.x : W / 2) - f.x; f.vx += Math.sign(ax) * 140 * dt; f.vx = k.clamp(f.vx, -120, 120); f.x += (f.vx + Math.sin(f.dt * 4) * 60) * dt; f.y += lerp(110, 170, D) * dt;
+        if (f.shots > 0 && f.y > 90 && f.y < BY - 30 && Math.random() < dt * 1.4) { f.shots--; eb.push({ x: f.x, y: f.y + 10, vx: 0, vy: lerp(150, 200, D), zig: 1 }); }
+        if (f.y > H + 20) { f.dive = 2; f.y = -20; } }
+      else { const hx = f.gx + fox, hy = f.gy + foy; f.x += (hx - f.x) * Math.min(1, dt * 3); f.y += (hy - f.y) * Math.min(1, dt * 3); if (Math.hypot(hx - f.x, hy - f.y) < 3) f.dive = 0; }
+    }
+    if (calm <= 0) {
+      divT -= dt;
+      if (divT <= 0 && form.length > 2) { divT = lerp(5, 2, D) * k.rnd(0.8, 1.3); const f = k.pick(form); f.dive = 1; f.dt = 0; f.vx = 0; f.shots = wave > 2 ? 1 : 0; f.tg = k.pick(alive().map((s) => ships.indexOf(s))) || 0; k.sfx('pop'); }
+      if (form.length && Math.random() < dt * lerp(0.55, 2.0, D)) { const cols = {}; for (const f of form) { const key = Math.round(f.x / 10); if (!cols[key] || cols[key].y < f.y) cols[key] = f; } const f = k.pick(Object.values(cols)); eb.push({ x: f.x, y: f.y + 10, vx: 0, vy: lerp(125, 200, D), zig: 1 }); }
+    }
+    /* impactos */
+    for (const s of shots) {
+      for (const b of bunkers) if (!b.dead && !s.dead && s.x > b.x - 1 && s.x < b.x + 6 && s.y < b.y + 6 && s.y + 540 * dt > b.y) { b.dead = true; s.dead = true; }
+      for (const f of foes) if (!f.dead && !s.dead && Math.hypot(s.x - f.x, s.y - f.y) < f.r + 4) { s.dead = true; f.flash = 0.06; if (--f.hp <= 0) { f.dead = true; const pts = f.pts * (f.dive ? 2 : 1); score += pts; kills[s.o]++; k.burst(f.x, f.y, EC[f.kind % 4], 14, 160); k.sfx('hit'); if (f.dive) k.float(`+${pts}`, f.x, f.y, '#e9b949'); if (Math.random() < 0.06) pups.push({ x: f.x, y: f.y, t: 'S' }); } }
+    }
+    const [a0, a1] = ships, linked = !a0.down && !a1.down && Math.hypot(a0.x - a1.x, a0.y - a1.y) < LINK;
+    for (const e of eb) { e.x += e.vx * dt; e.y += e.vy * dt;
+      for (const b of bunkers) if (!b.dead && !e.dead && e.x > b.x - 2 && e.x < b.x + 7 && e.y > b.y && e.y - e.vy * dt < b.y + 6) { b.dead = true; e.dead = true; k.burst(e.x, e.y, '#4cc38a', 3, 60); }
+      if (!e.dead && linked && shE >= 4 && segDist(e.x, e.y, a0.x, a0.y - 6, a1.x, a1.y - 6) < 7) { e.dead = true; shE -= 4; shT = 1; k.burst(e.x, e.y, '#5ce1e6', 6, 90); k.sfx('click'); }
+      if (!e.dead) for (const s of ships) if (!s.down && Math.hypot(e.x - s.x, e.y - s.y) < 10) { e.dead = true; hitShip(s); } }
+    for (const f of foes) { f.flash = (f.flash || 0) - dt; if (f.dead) continue; for (const s of ships) if (!s.down && Math.hypot(f.x - s.x, f.y - s.y) < f.r + 10) { f.dead = true; k.burst(f.x, f.y, EC[f.kind % 4], 14, 160); hitShip(s); }
+      for (const b of bunkers) if (!b.dead && !f.dive && Math.abs(f.x - b.x) < 14 && Math.abs(f.y - b.y) < 10) b.dead = true; }
+    for (const u of pups) { u.y += 80 * dt; for (const s of ships) if (!u.dead && !s.down && Math.hypot(u.x - s.x, u.y - s.y) < 26) { u.dead = true; shE = Math.min(100, shE + 40); k.sfx('coin'); k.float('¡Escudo +40!', s.x, s.y - 30, '#5ce1e6'); } }
+    shots = shots.filter((s) => !s.dead && s.y > -10); eb = eb.filter((e) => !e.dead && e.y < H + 20); foes = foes.filter((f) => !f.dead); pups = pups.filter((u) => !u.dead && u.y < H + 20); bunkers = bunkers.filter((b) => !b.dead);
+    if (k.st === 'play' && !foes.length) { score += 200 * wave; k.float(`+${200 * wave}`, W / 2, H * 0.45, '#e9b949'); k.sfx('win'); k.confetti(); coopWave(); }
+  }, () => {
+    background();
+    if (bunkers) { c.fillStyle = OUT; for (const b of bunkers) c.fillRect(b.x - 1, b.y - 1, 7, 7); c.fillStyle = '#4cc38a'; for (const b of bunkers) c.fillRect(b.x, b.y, 5, 5); c.fillStyle = '#8ef0bd'; for (const b of bunkers) c.fillRect(b.x, b.y, 5, 1.5); }
+    for (const f of foes) alien(f.x, f.y, f.kind, f.fr, f.flash > 0);
+    for (const f of foes) if (f.hp > 1) { c.strokeStyle = '#e9b949'; c.lineWidth = 2; c.beginPath(); c.arc(f.x, f.y, 15, 3.6, 5.8); c.stroke(); }
+    const [a0, a1] = ships;
+    if (!a0.down && !a1.down) { const d = Math.hypot(a0.x - a1.x, a0.y - a1.y); if (d < LINK && shE >= 4) { const al = 0.35 + 0.25 * Math.sin(t * 10);
+      c.lineCap = 'round'; c.strokeStyle = `rgba(92,225,230,${al * 0.5})`; c.lineWidth = 8; c.beginPath(); c.moveTo(a0.x, a0.y - 6); c.lineTo(a1.x, a1.y - 6); c.stroke();
+      c.strokeStyle = `rgba(220,255,255,${al + 0.3})`; c.lineWidth = 2; c.beginPath(); c.moveTo(a0.x, a0.y - 6); for (let i = 1; i < 8; i++) { const q = i / 8; c.lineTo(lerp(a0.x, a1.x, q), lerp(a0.y, a1.y, q) - 6 + Math.sin(t * 30 + i * 2) * 3); } c.lineTo(a1.x, a1.y - 6); c.stroke(); } }
+    for (const u of pups) { const b = 1 + Math.sin(t * 6) * 0.08; c.save(); c.translate(u.x, u.y); c.scale(b, b); c.globalAlpha = 0.3; c.fillStyle = '#5ce1e6'; c.beginPath(); c.arc(0, 0, 17, 0, 6.283); c.fill(); c.globalAlpha = 1;
+      ART.rr(c, -11, -11, 22, 22, 7); ART.fillOut(c, '#5ce1e6', 2.5); c.fillStyle = OUT; c.beginPath(); c.moveTo(0, -7); c.lineTo(6, -4); c.lineTo(5, 3); c.lineTo(0, 7); c.lineTo(-5, 3); c.lineTo(-6, -4); c.closePath(); c.fill(); c.restore(); }
+    const sh = gspr('s'); for (const s of shots) c.drawImage(sh.cv, s.x + sh.o, s.y - 1 + sh.q, sh.w, sh.h);
+    const ez = gspr('z'); for (const e of eb) c.drawImage(ez.cv, e.x + (Math.floor(e.y / 6) % 2 ? 2 : -2) + ez.o, e.y + ez.q, ez.w, ez.h);
+    ships.forEach((s, i) => {
+      if (s.down) { c.globalAlpha = 0.45; ship(s.x, s.y, 0.9, 0, '#555a70'); c.globalAlpha = 1;
+        c.strokeStyle = 'rgba(12,10,24,.7)'; c.lineWidth = 5; c.beginPath(); c.arc(s.x, s.y, 24, 0, 6.283); c.stroke();
+        c.strokeStyle = s.help > 0 ? '#5ce1e6' : s.col; c.lineWidth = 3; c.beginPath(); c.arc(s.x, s.y, 24, -1.571, -1.571 + 6.283 * (s.help > 0 ? s.help / 1.2 : Math.max(0, 1 - s.rt / 6))); c.stroke();
+        label(s.help > 0 ? 'Rescatando' : reserve > 0 ? String(Math.ceil(s.rt)) : '¡Rescátame!', s.x, s.y - 44, 12, '#fff', 'center'); return; }
+      if (k.st === 'play' && s.inv > 0 && Math.floor(s.inv * 10) % 2) return;
+      ship(s.x, s.y, 1, k.clamp(s.tilt, -1.5, 1.5), s.col);
+      if (s.inv > 0 && k.st === 'play') { c.strokeStyle = 'rgba(92,225,230,.55)'; c.lineWidth = 2; c.beginPath(); c.arc(s.x, s.y, 22, 0, 6.283); c.stroke(); }
+      c.fillStyle = s.col; c.beginPath(); c.moveTo(s.x - 5, s.y + 22); c.lineTo(s.x + 5, s.y + 22); c.lineTo(s.x, s.y + 17); c.closePath(); ART.fillOut(c, s.col, 1.5);
+      if (k.party || i === 1) label(s.cpu ? 'CPU' : s.name, s.x, s.y + 22, 10, s.col, 'center');
+    });
+    label(String(Math.floor(score)), 12, 8, 22, '#fff'); label(`Oleada ${wave}`, 12, 34, 12, '#a097ff');
+    const bw = 150, bx = W / 2 - bw / 2; ART.rr(c, bx - 2, 10, bw + 4, 12, 6); ART.fillOut(c, 'rgba(12,10,24,.75)', 2);
+    c.fillStyle = shE >= 25 ? '#5ce1e6' : '#f0647e'; ART.rr(c, bx, 12, bw * shE / 100, 8, 4); c.fill(); c.fillStyle = 'rgba(255,255,255,.4)'; c.fillRect(bx + 3, 13, Math.max(0, bw * shE / 100 - 6), 1.5);
+    c.fillStyle = 'rgba(12,10,24,.6)'; for (let i = 1; i < 4; i++) c.fillRect(bx + bw * i / 4 - 1, 12, 2, 8);
+    label('Escudo', W / 2, 25, 11, '#bff6ff', 'center');
+    for (let i = 0; i < reserve; i++) ship(W - 18 - i * 20, 22, 0.5, 0);
+    if (bannerT > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, bannerT); label(banner, W / 2, H * 0.4, 28, '#fff', 'center'); c.globalAlpha = 1; }
+  });
+}

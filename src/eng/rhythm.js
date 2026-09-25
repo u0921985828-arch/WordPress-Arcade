@@ -1,7 +1,7 @@
 /* Rhythm Tap: toca los carriles cuando las notas llegan a la línea. Música generada con WebAudio.
  * Valoración PERFECTO / GENIAL / BIEN / FALLO, multiplicador por combo, precisión y barra de energía. */
 const OUT = ART.OUT, R2 = 6.2832;
-if (CFG.mode === 'drums') drumsGame(); else {
+if (CFG.mode === 'drums') drumsGame(); else if (CFG.mode === 'dance') danceGame(); else {
 const k = Kit({ w: 360, h: 640, title: CFG.title, bg: '#0d0a1f' }), c = k.ctx;
 const LANES = 4, LW = 90, HITY = 530, SPEED = 420, COLS = ['#ff5f7a', '#f2d15c', '#5ce1e6', '#7cf7a0'], SCALE = [0, 3, 5, 7, 10, 12];
 const JUD = [[0.05, 'PERFECTO', 100, 1, '#fff27a'], [0.09, 'GENIAL', 70, 0.8, '#7cf7a0'], [0.16, 'BIEN', 40, 0.5, '#5ce1e6']];
@@ -298,5 +298,186 @@ function drumsGame() {
   window.__dr = { get P() { return P; }, get notes() { return notes; }, get t() { return t; } };
   reset();
   k.show(CFG.title || 'Tambores de Fiesta', 'Golpea el tambor A o B cuando la nota llegue a su parche. Las barras amarillas piden los dos a la vez y en los redobles cuenta cada golpe. Teclado: A = Espacio/Z/←, B = X/→. En pantalla táctil: mitad izquierda A, derecha B.<br>Toca para jugar');
+  k.run(update, draw);
+}
+/* ================= Flechas de Baile (CFG.mode 'dance'): 2–4 pistas de cuatro flechas =================
+ * Todos bailan la misma coreografía: las flechas suben hasta los huecos de arriba; pulsa esa dirección al coincidir.
+ * Dobles (dos direcciones a la vez, se hacen con la diagonal del joystick) y largas (mantener hasta el final).
+ * PERFECTO / GENIAL / BIEN / FALLO; combo ×1..×4. Canción ≈100 s: 100 → 140 ppm. Pulsar sin flecha no penaliza.
+ * Táctil (J1 en solitario): la pantalla se divide en cuatro columnas ← ↓ ↑ → (varios dedos, mantener para las largas).
+ * La CPU ocupa las pistas libres y afina más con 'cpu:<id>'. */
+function danceGame() {
+  const W = 640, H = 360, TOPY = 76, SPEED = 200, SONG = 100, ID = CFG.id || 'flechas-de-baile', OUT = ART.OUT, R2 = 6.2832;
+  const k = Kit({ w: W, h: H, title: CFG.title, bg: '#1a0f33' }), c = k.ctx;
+  const DIRS = ['left', 'down', 'up', 'right'], DCOL = ['#ff6fb5', '#5b8cff', '#a8cf3f', '#ffc94d'], ROT = [-Math.PI / 2, Math.PI, 0, Math.PI / 2];
+  const JW = [0.05, 0.1, 0.15], JN = ['¡PERFECTO!', '¡GENIAL!', 'BIEN'], JC = ['#fff27a', '#7cf7a0', '#8fd3ff'], JP = [100, 70, 40], CNAME = ['roja', 'azul', 'amarilla', 'verde'];
+  let P = [], notes = [], beats = [], t = 0, bpm = 100, nextBeat = 0, beatN = 0, over = false, overT = 0, LV = 0, rng = Math.random, busy = [0, 0, 0, 0], lastD = -1, touchUI = false;
+  const lsGet = (key) => { try { return +localStorage.getItem(key) || 0; } catch (e) { return 0; } };
+  const lsSet = (key, v) => { try { localStorage.setItem(key, v); } catch (e) { /* sin almacenamiento */ } };
+  const mulberry = (a) => () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let q = Math.imul(a ^ (a >>> 15), 1 | a); q = (q + Math.imul(q ^ (q >>> 7), 61 | q)) ^ q; return ((q ^ (q >>> 14)) >>> 0) / 4294967296; };
+  const gauss = () => { let u = 0; while (!u) u = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(R2 * Math.random()); };
+  const nLanes = () => (k.party ? Math.max(2, ...k.party.map((q) => q.p + 1)) : 2);
+  /* ---------- música: bombo y charles sintetizados por pulso ---------- */
+  let ac = null, kicked = 0;
+  function audio() { if (k.muted()) return; if (!ac) try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { /* sin audio */ } if (ac && ac.state === 'suspended') ac.resume(); }
+  function tone(f0, f1, d, when, vol, type) { if (!ac || k.muted()) return; const w0 = Math.max(ac.currentTime, when), o = ac.createOscillator(), g = ac.createGain(); o.type = type || 'sine'; o.frequency.setValueAtTime(f0, w0); o.frequency.exponentialRampToValueAtTime(f1, w0 + d * 0.8); g.gain.setValueAtTime(vol, w0); g.gain.exponentialRampToValueAtTime(0.001, w0 + d); o.connect(g).connect(ac.destination); o.start(w0); o.stop(w0 + d + 0.02); }
+  const BASS = [55, 55, 65.4, 73.4, 49, 49, 58.3, 65.4];
+  function music() { if (!ac || over || k.st !== 'play' || k.counting() || k.paused) return; for (let i = 0; i < beats.length; i++) { const b = beats[i]; if (b.at > kicked && b.at <= t + 0.12) { kicked = b.at; const w = ac.currentTime + Math.max(0, b.at - t); tone(130, 42, 0.2, w, 0.45); tone(BASS[(b.n >> 1) % 8] * 2, BASS[(b.n >> 1) % 8] * 2, 0.22, w + 0.01, 0.12, 'triangle'); tone(900, 700, 0.05, w + 60 / bpm / 2, 0.06, 'square'); } } }
+  /* ---------- coreografía compartida ---------- */
+  const tempo = (x) => 100 + 40 * Math.min(1, x / SONG);
+  function pickDir(avoid) { for (let n = 0; n < 12; n++) { const d = (rng() * 4) | 0; if (busy[d] > nextBeat - 0.01 || avoid.indexOf(d) >= 0) continue; if (d === lastD && rng() < 0.6) continue; return d; } return -1; }
+  function add(d, at, end) { const n = { d, time: at, end: end || 0, st: {}, hs: {}, id: notes.length }; notes.push(n); lastD = d; if (end) busy[d] = end + 0.15; return n; }
+  function compose(upTo) {
+    while (nextBeat < upTo && nextBeat < SONG) {
+      const at = nextBeat, e = Math.min(1, at / SONG), beat = 60 / tempo(at), bar = beatN % 16; beats.push({ at, n: beatN }); beatN++;
+      if (at >= 3 && !(bar >= 14 && Math.floor(beatN / 16) % 4 === 3)) {   // respiro al final de cada cuarta frase
+        if (rng() < 0.55 + 0.35 * e) {
+          if (at > 20 && rng() < 0.06 + 0.1 * e) { const a = pickDir([]), b = a >= 0 ? pickDir([a]) : -1; if (a >= 0) add(a, at).dbl = b >= 0; if (b >= 0) add(b, at).dbl = true; }
+          else if (at > 12 && rng() < 0.1 + 0.05 * e) { const d = pickDir([]); if (d >= 0) add(d, at, at + beat * (1 + ((rng() * 2) | 0))); }
+          else { const d = pickDir([]); if (d >= 0) add(d, at); }
+        }
+        if (at > 28 && bar % 4 !== 3 && rng() < (0.1 + 0.3 * e) * Math.min(1, (at - 28) / 30)) { const d = pickDir([]); if (d >= 0) add(d, at + beat / 2); }
+      }
+      nextBeat += beat;
+    }
+  }
+  /* ---------- jugadores ---------- */
+  function mk(pl) { return { p: pl.p, cpu: pl.cpu, name: pl.name, col: pl.color, score: 0, combo: 0, maxC: 0, cnt: [0, 0, 0, 0], judge: '', jc: '#fff', jt: 0, fl: [0, 0, 0, 0], plan: [], hold: [0, 0, 0, 0], rings: [] }; }
+  const nm = (q) => (q.cpu ? 'CPU ' + CNAME[q.p % 4] : String(q.name).slice(0, 10));
+  function setup() { const n = nLanes(), pl = k.players(n); if (P.length !== n) P = pl.map(mk); else P.forEach((q, i) => { q.cpu = pl[i].cpu; q.name = pl[i].name; q.col = pl[i].color; q.plan = []; }); }
+  k.onParty = () => { if (k.st !== 'play') { P = []; setup(); } else setup(); };
+  function reset() {
+    LV = Math.min(10, lsGet('cpu:' + ID)); P = []; setup(); notes = []; beats = []; t = -0.2; nextBeat = 1.4; beatN = 0; over = false; overT = 0; busy = [0, 0, 0, 0]; lastD = -1; kicked = 0;
+    rng = mulberry((Math.random() * 1e9) | 0); compose(8); k.count(3);
+  }
+  const mult = (q) => Math.min(4, 1 + Math.floor(q.combo / 10));
+  const laneX = (q) => { const LW = W / P.length; return q.p * LW; };
+  const colX = (q, d) => { const LW = W / P.length, cw = Math.min(58, (LW - 20) / 4); return laneX(q) + LW / 2 + (d - 1.5) * cw; };
+  function say(q, s, col) { q.judge = s; q.jc = col; q.jt = 0.6; }
+  function breakCombo(q, s) { if (q.combo >= 10 && !q.cpu) k.sfx('hurt'); q.combo = 0; say(q, s || 'FALLO', '#ff5f7a'); }
+  function press(q, di) {
+    q.fl[di] = 1; let best = null, bd = 9;
+    for (const n of notes) { if (n.d !== di || n.st[q.p]) continue; const o = Math.abs(n.time - t); if (o < bd) { bd = o; best = n; } }
+    if (!best || bd > JW[2]) return;
+    const j = bd < JW[0] ? 0 : bd < JW[1] ? 1 : 2; best.st[q.p] = 'hit'; q.cnt[j]++; q.combo++; q.maxC = Math.max(q.maxC, q.combo); q.score += JP[j] * mult(q);
+    say(q, JN[j], JC[j]); q.rings.push({ d: di, t: 0, big: j === 0 }); k.burst(colX(q, di), TOPY, j === 0 ? '#fff27a' : DCOL[di], j === 0 ? 8 : 5, 120);
+    if (best.end) best.hs[q.p] = 'on';
+    if (q.combo % 10 === 0 && q.combo <= 30) k.float(`x${mult(q)}`, laneX(q) + W / P.length / 2, 150, '#fff27a');
+  }
+  function cpuPlan(q, n) {
+    const pMiss = Math.max(0.04, 0.18 - LV * 0.012), sig = Math.max(0.025, 0.075 - LV * 0.005);
+    if (Math.random() < pMiss) return;
+    const at = n.time + gauss() * sig; q.plan.push({ at, d: n.d, rel: n.end ? (Math.random() < Math.max(0.03, 0.15 - LV * 0.01) ? n.time + (n.end - n.time) * 0.5 : n.end + 0.05) : at + 0.08 });
+    q.plan.sort((a, b) => a.at - b.at);
+  }
+  /* ---------- táctil en solitario: cuatro columnas de pantalla ---------- */
+  const touches = new Map(), tHit = new Set();
+  const zone = (e) => { const r = k.cv.getBoundingClientRect(), x = (e.clientX - r.left) / k.scale; return clampI(Math.floor(x / (W / 4)), 0, 3); };
+  const clampI = (v, a, b) => Math.max(a, Math.min(b, v));
+  addEventListener('pointerdown', (e) => { audio(); if (k.st !== 'play' || k.paused || k.party) return; if (e.pointerType !== 'mouse') touchUI = true; const z = zone(e); touches.set(e.pointerId, z); tHit.add(z); });
+  addEventListener('pointermove', (e) => { if (!touches.has(e.pointerId)) return; const z = zone(e), was = touches.get(e.pointerId); if (z !== was) { touches.set(e.pointerId, z); tHit.add(z); } });
+  const tUp = (e) => touches.delete(e.pointerId); addEventListener('pointerup', tUp); addEventListener('pointercancel', tUp);
+  const tHeld = (d) => { for (const z of touches.values()) if (z === d) return true; return false; };
+  /* ---------- bucle ---------- */
+  function update(dt) {
+    for (const q of P) { q.jt -= dt; for (let d = 0; d < 4; d++) q.fl[d] = Math.max(0, q.fl[d] - dt * 5); q.rings.forEach((r) => (r.t += dt)); q.rings = q.rings.filter((r) => r.t < 0.3); }
+    if (!k.gate(reset)) { tHit.clear(); return; }
+    if (k.counting()) { tHit.clear(); return; }
+    audio();
+    if (over) { overT += dt; if (overT > 1.4) finish(); return; }
+    t += dt; bpm = tempo(t); compose(t + (H - TOPY) / SPEED + 0.4);
+    for (const n of notes) if (!n.pl) { n.pl = 1; for (const q of P) if (q.cpu) cpuPlan(q, n); }
+    while (beats.length && beats[0].at < t - 0.5) beats.shift();
+    for (const q of P) {
+      let held;
+      if (q.cpu) {
+        while (q.plan.length && q.plan[0].at <= t) { const pl = q.plan.shift(); press(q, pl.d); q.hold[pl.d] = pl.rel; }
+        held = (d) => q.hold[d] > t;
+      } else {
+        const solo = q.p === 0 && !k.party;
+        for (let d = 0; d < 4; d++) if (k.phit(q.p, DIRS[d]) || (solo && tHit.has(d))) press(q, d);
+        held = (d) => k.pheld(q.p, DIRS[d]) || (solo && tHeld(d));
+      }
+      for (let d = 0; d < 4; d++) if (held(d)) q.fl[d] = Math.max(q.fl[d], 0.5);
+      // largas: mantener hasta el final
+      for (const n of notes) if (n.end && n.hs[q.p] === 'on') {
+        if (t >= n.end) { n.hs[q.p] = 'ok'; q.score += 50 * mult(q); say(q, '¡AGUANTA!', '#fff27a'); q.rings.push({ d: n.d, t: 0, big: true }); }
+        else if (!held(n.d) && t < n.end - 0.1) { n.hs[q.p] = 'drop'; breakCombo(q, 'SOLTADA'); }
+      }
+    }
+    tHit.clear();
+    for (const n of notes) if (t - n.time > JW[2]) for (const q of P) if (!n.st[q.p]) { n.st[q.p] = 'miss'; q.cnt[3]++; breakCombo(q); }
+    notes = notes.filter((n) => t - Math.max(n.time, n.end) < 0.6);
+    if (t >= SONG + 1.6) { over = true; overT = 0; k.sfx('win'); k.confetti(); }
+  }
+  function finish() {
+    over = false; const rows = P.map((q) => ({ p: q.p, score: q.score, name: nm(q) })), hu = P.filter((q) => !q.cpu), top = Math.max(...rows.map((r) => r.score));
+    if (hu.length === 1) { const win = hu[0].score === top && rows.filter((r) => r.score === top).length === 1; lsSet('cpu:' + ID, Math.max(0, Math.min(10, LV + (win ? 0.5 : -0.5)))); }
+    k.podium(rows, { fmt: (v) => v + ' pts' });
+  }
+  /* ---------- arte ---------- */
+  function off(w, h, draw) { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const g = cv.getContext('2d'); g.scale(2, 2); g.lineJoin = 'round'; draw(g); return cv; }
+  function arrowPath(g, r) { g.beginPath(); g.moveTo(0, -r); g.lineTo(r, 0); g.lineTo(r * 0.42, 0); g.lineTo(r * 0.42, r * 0.9); g.lineTo(-r * 0.42, r * 0.9); g.lineTo(-r * 0.42, 0); g.lineTo(-r, 0); g.closePath(); }
+  const SZ = 48, AR = 17;
+  const SPR = DIRS.map((_, d) => [0, 1].map((kind) => off(SZ, SZ, (g) => {
+    g.translate(SZ / 2, SZ / 2); g.rotate(ROT[d]); g.translate(0, -2);
+    if (kind === 0) { arrowPath(g, AR); const gr = g.createLinearGradient(-AR, -AR, AR, AR); gr.addColorStop(0, ART.lite(DCOL[d], 0.35)); gr.addColorStop(1, ART.dark(DCOL[d], 0.2)); g.fillStyle = gr; g.fill(); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke();
+      g.save(); arrowPath(g, AR * 0.55); g.fillStyle = 'rgba(255,255,255,.35)'; g.fill(); g.restore(); }
+    else { arrowPath(g, AR); g.fillStyle = 'rgba(20,12,44,.75)'; g.fill(); g.lineWidth = 3; g.strokeStyle = 'rgba(210,200,255,.55)'; g.stroke(); }
+  })));
+  let BG = null, bgN = 0;
+  function buildBG() {
+    bgN = P.length; const n = P.length, LW = W / n;
+    BG = off(W, H, (g) => {
+      const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#2a1260'); gr.addColorStop(1, '#0c0624'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+      // pista de baile en perspectiva (baldosas de colores)
+      for (let r = 0; r < 7; r++) for (let i = -2; i < 14; i++) { const y0 = 220 + r * r * 3.2 + r * 8, y1 = 220 + (r + 1) * (r + 1) * 3.2 + (r + 1) * 8, sc0 = 0.5 + r * 0.1, sc1 = 0.5 + (r + 1) * 0.1, x = (i - 6) * 56;
+        g.fillStyle = ['#ff6fb5', '#5b8cff', '#a8cf3f', '#ffc94d', '#6e62f5'][(i + r * 2 + 25) % 5]; g.globalAlpha = 0.14 + ((i + r) % 2) * 0.08;
+        g.beginPath(); g.moveTo(W / 2 + x * sc0, y0); g.lineTo(W / 2 + (x + 56) * sc0, y0); g.lineTo(W / 2 + (x + 56) * sc1, y1); g.lineTo(W / 2 + x * sc1, y1); g.closePath(); g.fill(); }
+      g.globalAlpha = 1;
+      for (const [x, col] of [[80, 'rgba(255,111,181,.12)'], [320, 'rgba(255,201,77,.1)'], [560, 'rgba(91,140,255,.12)']]) { g.fillStyle = col; g.beginPath(); g.moveTo(x - 5, 0); g.lineTo(x + 5, 0); g.lineTo(x + 100, H); g.lineTo(x - 100, H); g.fill(); }
+      for (let i = 0; i < 50; i++) { const r = Math.sin(i * 91.7) * 43758.5, f = r - Math.floor(r); g.fillStyle = `rgba(255,255,255,${0.15 + f * 0.4})`; g.fillRect((i * 131) % W, (f * 997) % 180, 1.6, 1.6); }
+      for (let p = 0; p < n; p++) { const x0 = p * LW; ART.rr(g, x0 + 6, 44, LW - 12, H - 50, 14); g.fillStyle = 'rgba(12,8,32,.7)'; g.fill(); g.lineWidth = 2.5; g.strokeStyle = OUT; g.stroke(); }
+    });
+  }
+  function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'middle'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
+  function spr(d, kind, x, y, s) { const z = SZ * (s || 1); c.drawImage(SPR[d][kind], x - z / 2, y - z / 2, z, z); }
+  function draw() {
+    music();
+    if (!BG || bgN !== P.length) buildBG();
+    c.drawImage(BG, 0, 0, W, H);
+    const bp = ((t > 0 ? t : 0) * bpm / 60) % 1, pulse = t > 0 && k.st === 'play' && !over ? Math.pow(1 - bp, 3) : 0;
+    const tv = k.st === 'ready' ? (notes.length ? notes[0].time - 0.9 : 0) : t, Y = (tm) => TOPY + (tm - tv) * SPEED;
+    const LW = W / P.length;
+    for (const q of P) {
+      const x0 = laneX(q), xm = x0 + LW / 2, sc = Math.min(1, (Math.min(58, (LW - 20) / 4)) / 44);
+      c.save(); ART.rr(c, x0 + 6, 44, LW - 12, H - 50, 14); c.clip();
+      c.globalAlpha = 0.1 * pulse; c.fillStyle = q.col; c.fillRect(x0, 44, LW, H); c.globalAlpha = 1;
+      c.fillStyle = 'rgba(255,255,255,.07)'; for (const b of beats) { const y = Y(b.at); if (y > TOPY && y < H) c.fillRect(x0 + 12, y - 1, LW - 24, 2); }
+      for (let d = 0; d < 4; d++) { spr(d, 1, colX(q, d), TOPY, sc * (1 + q.fl[d] * 0.12)); if (q.fl[d] > 0) { c.globalAlpha = q.fl[d] * 0.7; spr(d, 0, colX(q, d), TOPY, sc * (1 + q.fl[d] * 0.12)); c.globalAlpha = 1; } }
+      // largas: cola detrás de la cabeza
+      for (const n of notes) { if (!n.end) continue; const hs = n.hs[q.p], y1 = Y(n.end), y0 = hs === 'on' ? TOPY : Y(n.time); if (y0 > H + 30 || y1 < TOPY - 20 || hs === 'ok') continue; const x = colX(q, n.d), w = 16 * sc;
+        c.globalAlpha = hs === 'drop' || n.st[q.p] === 'miss' ? 0.3 : 0.85; ART.rr(c, x - w / 2, Math.max(TOPY, y0), w, Math.max(0, y1 - Math.max(TOPY, y0)), w / 2); ART.fillOut(c, ART.alpha(DCOL[n.d], 0.8), 2); c.globalAlpha = 1; }
+      // enlaces de dobles
+      for (let i = 0; i < notes.length; i++) { const n = notes[i]; if (!n.dbl || n.st[q.p] === 'hit') continue; const m = notes[i + 1]; if (m && m.dbl && m.time === n.time && m.st[q.p] !== 'hit') { const y = Y(n.time); if (y < H + 20) { c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 4; c.beginPath(); c.moveTo(colX(q, n.d), y); c.lineTo(colX(q, m.d), y); c.stroke(); } } }
+      for (const n of notes) { const st = n.st[q.p]; if (st === 'hit' && !(n.end && n.hs[q.p] === 'on')) continue; const y = st === 'hit' ? TOPY : Y(n.time); if (y > H + 30 || y < TOPY - 40) continue;
+        c.globalAlpha = st === 'miss' ? 0.3 : 1; spr(n.d, 0, colX(q, n.d), y, sc); c.globalAlpha = 1; }
+      for (const r of q.rings) { const p = r.t / 0.3; c.globalAlpha = 1 - p; c.lineWidth = r.big ? 4 : 3; c.strokeStyle = r.big ? '#fff27a' : DCOL[r.d]; c.beginPath(); c.arc(colX(q, r.d), TOPY, (16 + p * (r.big ? 26 : 16)) * sc, 0, R2); c.stroke(); c.globalAlpha = 1; }
+      c.restore();
+      if (q.combo >= 5) { c.globalAlpha = 0.75; label(String(q.combo), xm, 196, 30, mult(q) >= 4 ? '#fff27a' : '#fff', 'center'); label('COMBO', xm, 220, 12, '#b8b0ff', 'center'); c.globalAlpha = 1; }
+      if (q.jt > 0) { const p = 1 - q.jt / 0.6, s = p < 0.15 ? 0.6 + p / 0.15 * 0.5 : 1.1 - Math.min(0.1, (p - 0.15) * 0.4); c.save(); c.translate(xm, 138 - p * 8); c.scale(s, s); c.globalAlpha = Math.min(1, q.jt / 0.2); label(q.judge, 0, 0, LW < 200 ? 16 : 20, q.jc, 'center'); c.restore(); c.globalAlpha = 1; }
+      // placa del jugador (arriba)
+      ART.rr(c, x0 + 6, 4, LW - 12, 34, 10); ART.fillOut(c, 'rgba(26,21,48,.92)', 2.5); c.fillStyle = q.col; ART.rr(c, x0 + 10, 8, 5, 26, 2.5); c.fill();
+      label(nm(q).slice(0, LW < 200 ? 7 : 10), x0 + 20, 21, 14, q.col); label(String(q.score), x0 + LW - (LW < 200 ? 16 : 52), 21, 16, '#fff', 'right');
+      if (LW >= 200) label(`x${mult(q)}`, x0 + LW - 14, 21, 14, mult(q) > 1 ? '#fff27a' : '#8a86b5', 'right');
+    }
+    // progreso de la canción
+    const pr = Math.max(0, Math.min(1, t / SONG)); c.fillStyle = 'rgba(0,0,0,.4)'; c.fillRect(0, 40, W, 3); c.fillStyle = '#b98cff'; c.fillRect(0, 40, W * pr, 3);
+    // botones táctiles de J1 en solitario
+    if (touchUI && !k.party && k.st === 'play') for (let d = 0; d < 4; d++) { const x = W / 8 + d * W / 4, on = tHeld(d); c.globalAlpha = on ? 0.9 : 0.45; ART.rr(c, x - W / 8 + 6, H - 44, W / 4 - 12, 38, 12); ART.fillOut(c, on ? ART.alpha(DCOL[d], 0.6) : 'rgba(26,21,48,.7)', 2); spr(d, 0, x, H - 25, 0.7); c.globalAlpha = 1; }
+  }
+  window.__da = { get P() { return P; }, get notes() { return notes; }, get t() { return t; } };
+  reset();
+  k.show(CFG.title || 'Flechas de Baile', 'Pulsa ← ↓ ↑ → cuando cada flecha que sube llegue a su hueco. Las dobles piden dos direcciones a la vez (usa la diagonal) y las largas hay que mantenerlas. PERFECTO, GENIAL o BIEN; el combo multiplica hasta ×4. En el móvil, la pantalla se divide en cuatro columnas: toca la de cada flecha.<br>Toca para jugar');
   k.run(update, draw);
 }

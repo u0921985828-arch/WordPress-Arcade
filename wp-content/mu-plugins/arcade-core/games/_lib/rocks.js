@@ -4,7 +4,7 @@
  * Táctil: joystick flotante en la mitad izquierda (la nave gira hacia él y acelera), mitad derecha dispara, botón de salto.
  * Teclado: ← → girar, ↑ propulsar, A disparar, B o ↓ hiperespacio. */
 const OUT = ART.OUT, R2 = 6.2832, ID = CFG.id || 'rock-belt';
-const PORT = innerHeight > innerWidth, W = PORT ? 360 : 640, H = PORT ? 640 : 480;
+const MP = CFG.mode === 'arena', PORT = !MP && innerHeight > innerWidth, W = PORT ? 360 : 640, H = PORT ? 640 : 480;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#07080f' }), c = k.ctx;
 const RS = PORT ? { 3: 36, 2: 21, 1: 12 } : { 3: 44, 2: 25, 1: 14 }, PTS = { 3: 20, 2: 50, 1: 100 };
 const PCOL = { triple: '#ffb13d', rapid: '#5ce1e6', shield: '#7cf7a0', life: '#ff4d6d' };
@@ -203,11 +203,11 @@ function update(dt) {
 }
 
 /* ---------- dibujo ---------- */
-function drawShip(x, y, a, s, thr, tilt) {
+function drawShip(x, y, a, s, thr, tilt, wing) {
   c.save(); c.translate(x, y); c.rotate(a); c.scale(s, s);
   if (thr > 0.05) { const fl = (10 + Math.random() * 8) * thr; c.fillStyle = '#ff7a3d'; c.beginPath(); c.moveTo(-11, -5); c.lineTo(-13 - fl, 0); c.lineTo(-11, 5); c.fill(); c.fillStyle = '#ffe39a'; c.beginPath(); c.moveTo(-11, -2.5); c.lineTo(-11 - fl * 0.55, 0); c.lineTo(-11, 2.5); c.fill(); }
   // alas (la que va por fuera del giro se ve más)
-  for (const sd of [-1, 1]) { const w = 1 + tilt * sd * 0.25; c.beginPath(); c.moveTo(-2, sd * 6); c.lineTo(-12, sd * 15 * w); c.lineTo(-14, sd * 12 * w); c.lineTo(-10, sd * 4); c.closePath(); ART.fillOut(c, '#6e62f5', 2); }
+  for (const sd of [-1, 1]) { const w = 1 + tilt * sd * 0.25; c.beginPath(); c.moveTo(-2, sd * 6); c.lineTo(-12, sd * 15 * w); c.lineTo(-14, sd * 12 * w); c.lineTo(-10, sd * 4); c.closePath(); ART.fillOut(c, wing || '#6e62f5', 2); }
   c.beginPath(); c.moveTo(18, 0); c.quadraticCurveTo(8, -10, -10, -8); c.quadraticCurveTo(-14, 0, -10, 8); c.quadraticCurveTo(8, 10, 18, 0); ART.fillOut(c, '#e8ecf7', 2.4);
   c.fillStyle = '#b9c0d8'; c.beginPath(); c.moveTo(-10, 8); c.quadraticCurveTo(-14, 0, -10, -8); c.lineTo(-6, -7); c.quadraticCurveTo(-9, 0, -6, 7); c.fill();
   c.fillStyle = '#ff5f7a'; c.fillRect(8, -1.5, 6, 3);
@@ -286,7 +286,152 @@ function draw() {
   }
 }
 
+if (!MP) {
 bgCv = renderBg(); reset();
 k.show(CFG.title || 'Rock Belt', 'Destruye las rocas: se parten al disparar. Cuidado con los OVNIs. Móvil: joystick a la izquierda, dispara tocando a la derecha, botón morado = hiperespacio. Teclado: ← → girar, ↑ propulsar, A disparar, B salto.<br>Toca para empezar');
 k.run((dt) => { if (!k.gate(reset)) { t += dt; for (const r of rocks) { r.x += r.vx * dt * 0.5; r.y += r.vy * dt * 0.5; r.ang += r.rot * dt; wrap(r); } return; } update(dt); }, draw);
 addEventListener('resize', () => { clearTimeout(window.__ot); window.__ot = setTimeout(() => { if ((innerHeight > innerWidth) !== PORT && k.st !== 'play') location.reload(); }, 400); });
+}
+/* ================================================================ modo 'arena': Arena de Asteroides (1–4 naves)
+   Naves con inercia alrededor de un agujero negro central que atrae naves, rocas y balas (tocar el núcleo destruye).
+   Mando: la cruceta apunta y acelera hacia esa dirección, A dispara, B turbo. Cada nave tiene 3 corazones;
+   rondas de 60 s como máximo (el agujero crece con el tiempo), 3/2/1/0 puntos por puesto, 3 rondas y podio. */
+if (MP) {
+  const BX = W / 2, BY = H / 2, ROUNDS = 3, RLEN = 60, SAFE = 5, WINGS = 3;
+  let P = [], round = 0, rt = 0, phase = 'play', btw = 0, cdPend = false, elim = [], banner2 = null, bannerT2 = 0, hole = 18, arocks = [], ashots = [];
+  let LV = 0; try { LV = Math.min(8, +localStorage.getItem('cpu:' + ID) || 0); } catch (e) { /* sin almacenamiento */ }
+  const skill = () => Math.min(0.8, 0.22 + LV * 0.07);
+  const CORN = [[70, 70], [W - 70, H - 70], [W - 70, 70], [70, H - 70]];
+  function mkPlayers() { P = k.players(Math.max(2, Math.min(4, k.party ? Math.max(...k.party.map((q) => q.p)) + 1 : 4))).map((q) => ({ ...q, pts: 0, kills: 0 })); }
+  function syncPlayers() { const pl = k.players(P.length); P.forEach((s, i) => { s.cpu = pl[i].cpu; s.name = pl[i].name; s.color = pl[i].color; if (i >= pl.length) s.out = true; }); }
+  function newRound() {
+    round++; rt = 0; phase = 'play'; elim = []; hole = 18; ashots = []; arocks = []; cdPend = true; wave = 1;
+    P.forEach((s, i) => { const [x, y] = CORN[i]; Object.assign(s, { x, y, vx: 0, vy: 0, a: Math.atan2(BY - y, BX - x) + Math.PI / 2, hp: WINGS, dead: false, inv: SAFE, cool: 0, bcd: 0, thr: 0, tilt: 0, fl: 0, aiT: 0, aim: 0, tgt: null, place: 0 }); });
+    for (let i = 0; i < 4; i++) { const a = i * 1.5708 + 0.785, d = 150; const r = mkRock(BX + Math.cos(a) * d, BY + Math.sin(a) * d, 2, -Math.sin(a) * 40, Math.cos(a) * 40); arocks.push(r); }
+    banner2 = `Ronda ${round}`; bannerT2 = 1.6;
+  }
+  function reset() { t = 0; round = 0; mkPlayers(); newRound(); }
+  k.onParty = () => { if (k.st !== 'play') reset(); else syncPlayers(); };
+  bgCv = renderBg(); reset();
+  k.show(CFG.title, CFG.help);
+  window.__arena = { get: () => ({ round, rt, phase, hole, rocks: arocks.length, P: P.map((s) => ({ x: s.x, y: s.y, hp: s.hp, dead: s.dead, cpu: s.cpu, pts: s.pts, kills: s.kills, name: s.name })) }), end: () => { rt = RLEN; } }; /* pruebas */
+  const alive = () => P.filter((s) => !s.dead);
+  function pull(o, m, dt) { const dx = BX - o.x, dy = BY - o.y, d2 = Math.max(dx * dx + dy * dy, 900), d = Math.sqrt(d2), g = Math.min(420, (m * hole * 500) / Math.max(30, d)); o.vx += dx / d * g * dt; o.vy += dy / d * g * dt; return d; }
+  function hurt(s, by, n) {
+    if (s.dead || s.inv > 0) return; s.hp -= n || 1; s.inv = 1.2; s.fl = 0.25; k.sfx('hurt'); k.burst(s.x, s.y, s.color, 12, 160);
+    if (s.hp <= 0) kill(s, by);
+  }
+  function kill(s, by) {
+    if (s.dead) return; s.dead = true; s.hp = 0; elim.push(s); if (by && by !== s) by.kills++;
+    k.sfx('explode'); k.shake(7); k.burst(s.x, s.y, '#ffb347', 30, 240); k.burst(s.x, s.y, s.color, 16, 200);
+    s.debris = [0, 1, 2, 3, 4].map((i) => ({ x: s.x, y: s.y, vx: s.vx * 0.4 + Math.cos(i * 1.26) * 90, vy: s.vy * 0.4 + Math.sin(i * 1.26) * 90, a: i, va: k.rnd(-6, 6) }));
+    if (by && by !== s) k.float(`${by.name} derriba a ${s.name}`, W / 2, 60, by.color);
+  }
+  function endRound() {
+    const al = alive().sort((a, b) => b.hp - a.hp), order = al.concat(elim.slice().reverse()); /* primero = mejor */
+    order.forEach((s, i) => { s.pts += Math.max(0, 3 - i); s.place = i + 1; });
+    const w = order[0]; if (w) { banner2 = `${w.name} gana la ronda`; bannerT2 = 2.2; k.sfx(w.cpu ? 'lose' : 'win'); if (!w.cpu) k.confetti(); }
+    phase = 'between'; btw = 2.6;
+  }
+  function finish() {
+    const best = Math.max(...P.map((s) => s.pts)), win = P.filter((s) => s.pts === best);
+    if (win.length === 1) { LV = win[0].cpu ? Math.max(0, LV - 1) : Math.min(8, LV + 1); try { localStorage.setItem('cpu:' + ID, LV); } catch (e) { /* sin almacenamiento */ } }
+    k.podium(P.map((s) => ({ p: s.p, score: s.pts * 100 + s.kills })), { fmt: (v) => `${Math.floor(v / 100)} pts · ${v % 100} derribos`, head: !k.party && win.length === 1 && !win[0].cpu ? '¡Has ganado!' : undefined });
+  }
+  /* entrada humana: la dirección marca hacia dónde apunta la nave; acelera cuando ya mira hacia allí */
+  function humanCtl(s) {
+    const d = k.pdir(s.p); let ta = null, thrust = 0, fire = k.pheld(s.p, 'a'), boost = k.phit(s.p, 'b');
+    if (d.x || d.y) { ta = Math.atan2(d.y, d.x); thrust = 1; }
+    if (s.p === 0 && !k.party) for (const q of touches.values()) {
+      if (q.zone === 'fire') fire = true; else if (q.zone === 'hyper') { if (q.fresh) boost = true; }
+      else { const dx = q.x - q.sx, dy = q.y - q.sy, m = Math.hypot(dx, dy); if (m > 10) { ta = Math.atan2(dy, dx); thrust = Math.min(1, (m - 10) / 40); } }
+      q.fresh = false;
+    }
+    return { ta, thrust, fire, boost };
+  }
+  function cpuCtl(s, dt) {
+    const sk = skill(); let ta = s.a, thrust = 0, fire = false, boost = false;
+    const dh = Math.hypot(BX - s.x, BY - s.y), inward = ((BX - s.x) * s.vx + (BY - s.y) * s.vy) / Math.max(1, dh);
+    if ((s.aiT -= dt) <= 0) { s.aiT = k.rnd(0.6, 1.2); const others = alive().filter((o) => o !== s); s.tgt = others.length ? others.reduce((a, b) => (Math.hypot(b.x - s.x, b.y - s.y) < Math.hypot(a.x - s.x, a.y - s.y) ? b : a)) : null; s.aim = k.rnd(-1, 1) * (0.5 - sk * 0.5); }
+    if (dh < hole * 2.2 + 90 && inward > -20) { ta = Math.atan2(s.y - BY, s.x - BX) + 0.6; thrust = 1; if (dh < hole * 2 + 50 && s.bcd <= 0 && Math.random() < sk) boost = true; }
+    else if (s.tgt && !s.tgt.dead) {
+      const o = s.tgt, dx = o.x - s.x, dy = o.y - s.y, d = Math.hypot(dx, dy), lt = d / 420;
+      ta = Math.atan2(dy + (o.vy - s.vy) * lt * sk, dx + (o.vx - s.vx) * lt * sk) + s.aim;
+      const err = Math.abs(Math.atan2(Math.sin(ta - s.a), Math.cos(ta - s.a)));
+      fire = rt > SAFE + 0.5 && err < 0.25 && d < 320 && Math.random() < 0.4 + sk * 0.6;
+      thrust = d > 200 ? 0.8 : d < 110 ? 0 : 0.3;
+    } else { ta = Math.atan2(s.y - BY, s.x - BX) + 1.5708; thrust = 0.4; }
+    for (const r of arocks) if (Math.hypot(r.x - s.x, r.y - s.y) < r.r + 40) { ta = Math.atan2(s.y - r.y, s.x - r.x); thrust = 1; }
+    return { ta, thrust, fire, boost };
+  }
+  function step(dt) {
+    rt += dt; t += dt; hole = Math.min(46, 18 + Math.max(0, rt - SAFE) * 0.45);
+    const G = Math.min(1, rt / SAFE); /* la atracción entra poco a poco en los primeros 5 s */
+    for (const s of P) {
+      if (s.dead) { if (s.debris) for (const d of s.debris) { d.x += d.vx * dt; d.y += d.vy * dt; d.a += d.va * dt; } continue; }
+      s.inv -= dt; s.cool -= dt; s.bcd -= dt; s.fl -= dt;
+      const ctl = s.cpu ? cpuCtl(s, dt) : humanCtl(s); let turn = 0;
+      if (ctl.ta !== null) { const d = Math.atan2(Math.sin(ctl.ta - s.a), Math.cos(ctl.ta - s.a)); s.a += k.clamp(d, -6.5 * dt, 6.5 * dt); turn = Math.sign(d); if (Math.abs(d) > 1.2) ctl.thrust *= 0.25; }
+      if (ctl.thrust) { s.vx += Math.cos(s.a) * 300 * ctl.thrust * dt; s.vy += Math.sin(s.a) * 300 * ctl.thrust * dt; if (Math.random() < 0.5) k.burst(s.x - Math.cos(s.a) * 16, s.y - Math.sin(s.a) * 16, '#ffb347', 1, 60); }
+      if (ctl.boost && s.bcd <= 0) { s.bcd = 2; s.vx += Math.cos(s.a) * 260; s.vy += Math.sin(s.a) * 260; k.sfx('jump'); k.burst(s.x, s.y, s.color, 10, 140); }
+      if (ctl.fire && s.cool <= 0 && ashots.filter((q) => q.o === s).length < 4) { s.cool = 0.24; ashots.push({ x: s.x + Math.cos(s.a) * 16, y: s.y + Math.sin(s.a) * 16, vx: Math.cos(s.a) * 460 + s.vx * 0.5, vy: Math.sin(s.a) * 460 + s.vy * 0.5, t: 1.1, o: s }); k.sfx('shoot'); s.vx -= Math.cos(s.a) * 5; s.vy -= Math.sin(s.a) * 5; }
+      s.thr += ((ctl.thrust ? 1 : 0) - s.thr) * Math.min(1, dt * 12); s.tilt += (turn - s.tilt) * Math.min(1, dt * 10);
+      const dh = pull(s, G, dt);
+      const v = Math.hypot(s.vx, s.vy), vm = s.bcd > 1.6 ? 520 : 360; if (v > vm) { s.vx *= vm / v; s.vy *= vm / v; }
+      s.vx *= 1 - 0.4 * dt; s.vy *= 1 - 0.4 * dt; s.x += s.vx * dt; s.y += s.vy * dt; wrap(s);
+      if (dh < hole * 0.55 + 10) { if (s.inv > 0) { const a = Math.atan2(s.y - BY, s.x - BX); s.vx = Math.cos(a) * 200; s.vy = Math.sin(a) * 200; } else { k.flash('rgba(110,98,245,.3)'); kill(s, null); k.float(`${s.name} cae al agujero`, W / 2, 60, '#a097ff'); } }
+    }
+    /* choques entre naves */
+    const al = alive();
+    for (let i = 0; i < al.length; i++) for (let j = i + 1; j < al.length; j++) { const a = al[i], b = al[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy); if (d < 26 && d > 0) { const nx = dx / d, ny = dy / d, rv = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny; if (rv < 0) { a.vx += rv * nx; a.vy += rv * ny; b.vx -= rv * nx; b.vy -= rv * ny; k.sfx('click'); } a.x -= nx * (26 - d) / 2; a.y -= ny * (26 - d) / 2; b.x += nx * (26 - d) / 2; b.y += ny * (26 - d) / 2; } }
+    /* rocas: orbitan, caen al agujero y reaparecen por el borde */
+    for (const r of arocks) { pull(r, G * 0.5, dt); r.x += r.vx * dt; r.y += r.vy * dt; r.ang += r.rot * dt; wrap(r); r.hit = Math.max(0, r.hit - dt);
+      if (Math.hypot(r.x - BX, r.y - BY) < hole * 0.6 + r.r * 0.4) { r.dead = true; k.burst(r.x, r.y, '#a097ff', 10, 100); }
+      for (const s of al) if (!s.dead && Math.hypot(s.x - r.x, s.y - r.y) < r.r * 0.9 + 9) { const a = Math.atan2(s.y - r.y, s.x - r.x); s.vx = Math.cos(a) * 180; s.vy = Math.sin(a) * 180; hurt(s, null); } }
+    for (const q of ashots) { if (q.t <= 0) continue; pull(q, G * 0.35, dt); q.x += q.vx * dt; q.y += q.vy * dt; q.t -= dt; wrap(q);
+      if (Math.hypot(q.x - BX, q.y - BY) < hole * 0.6) { q.t = 0; continue; }
+      for (const r of arocks) if (!r.dead && Math.hypot(q.x - r.x, q.y - r.y) < r.r) { q.t = 0; r.dead = true; k.burst(r.x, r.y, '#b3a8cf', 12, 120); k.sfx('hit'); if (r.size > 1) { const a = Math.atan2(r.vy, r.vx), sp = Math.hypot(r.vx, r.vy) * 1.1 + 15; for (const d of [-0.7, 0.7]) arocks.push(mkRock(r.x, r.y, r.size - 1, Math.cos(a + d) * sp, Math.sin(a + d) * sp)); } break; }
+      if (q.t > 0) for (const s of al) if (s !== q.o && !s.dead && Math.hypot(q.x - s.x, q.y - s.y) < 13) { q.t = 0; if (s.inv <= 0) { s.vx += q.vx * 0.12; s.vy += q.vy * 0.12; } hurt(s, q.o); break; } }
+    arocks = arocks.filter((r) => !r.dead); ashots = ashots.filter((q) => q.t > 0);
+    if (arocks.length < 3 && Math.random() < dt * 0.5) { const e = k.ri(0, 3), x = e === 0 ? 0 : e === 1 ? W : k.rnd(0, W), y = e === 2 ? 0 : e === 3 ? H : k.rnd(0, H), a = Math.atan2(BY - y, BX - x) + k.rnd(0.5, 0.9); arocks.push(mkRock(x, y, k.pick([1, 2, 2]), Math.cos(a) * 60, Math.sin(a) * 60)); }
+    const hum = al.filter((s) => !s.cpu).length;
+    if (al.length <= 1 || rt >= RLEN) endRound();
+    return !hum && P.some((s) => !s.cpu);
+  }
+  function drawHole() {
+    const r = hole; c.save(); c.translate(BX, BY);
+    const gl = c.createRadialGradient(0, 0, r * 0.4, 0, 0, r * 3.2); gl.addColorStop(0, 'rgba(110,98,245,.55)'); gl.addColorStop(0.4, 'rgba(255,111,181,.18)'); gl.addColorStop(1, 'rgba(110,98,245,0)'); c.fillStyle = gl; c.beginPath(); c.arc(0, 0, r * 3.2, 0, R2); c.fill();
+    for (let i = 0; i < 3; i++) { c.save(); c.rotate(t * (0.9 + i * 0.5) + i * 2); c.strokeStyle = ['#a097ff', '#ff6fb5', '#ffc94d'][i]; c.globalAlpha = 0.55; c.lineWidth = 3 - i * 0.6; c.beginPath(); c.ellipse(0, 0, r * (1.5 + i * 0.35), r * (0.9 + i * 0.2), 0, 0, 4.2); c.stroke(); c.restore(); }
+    c.globalAlpha = 1; c.beginPath(); c.arc(0, 0, r * 0.62, 0, R2); ART.fillOut(c, '#05040c', 3); c.strokeStyle = 'rgba(255,201,77,.8)'; c.lineWidth = 1.5; c.beginPath(); c.arc(0, 0, r * 0.62 + 3, 0, R2); c.stroke();
+    c.restore();
+  }
+  function draw2() {
+    c.drawImage(bgCv, 0, 0, W, H);
+    for (let i = 0; i < 24; i++) { c.globalAlpha = 0.3 + 0.7 * Math.abs(Math.sin(t * 1.3 + i * 2.1)); c.fillStyle = '#fff'; c.fillRect(rnd(i + 77) * W, rnd(i + 177) * H, 1.6, 1.6); } c.globalAlpha = 1;
+    drawHole();
+    for (const r of arocks) each(r, r.r + 5, (x, y) => { c.save(); c.translate(x, y); c.rotate(r.ang); const S = r.r * 2 + 10; c.drawImage(r.cv, -S / 2, -S / 2, S, S); c.restore(); });
+    c.lineCap = 'round'; for (const q of ashots) { const tx = q.vx * 0.02, ty = q.vy * 0.02; c.strokeStyle = q.o.color; c.globalAlpha = 0.5; c.lineWidth = 7; c.beginPath(); c.moveTo(q.x - tx, q.y - ty); c.lineTo(q.x, q.y); c.stroke(); c.globalAlpha = 1; c.strokeStyle = '#fff'; c.lineWidth = 3; c.beginPath(); c.moveTo(q.x - tx * 0.5, q.y - ty * 0.5); c.lineTo(q.x, q.y); c.stroke(); }
+    for (const s of P) {
+      if (s.dead) { if (s.debris && phase === 'play') for (const d of s.debris) { c.save(); c.translate(d.x, d.y); c.rotate(d.a); ART.rr(c, -6, -2.5, 12, 5, 2); ART.fillOut(c, d.a % 2 < 1 ? '#e8ecf7' : s.color, 1.5); c.restore(); } continue; }
+      if (s.inv > 0 && s.fl <= 0 && rt > SAFE && Math.floor(s.inv * 10) % 2) continue;
+      each(s, 20, (x, y) => drawShip(x, y, s.a, 1, s.thr, s.tilt, s.color));
+      if (rt < SAFE) { c.globalAlpha = 0.35 + Math.sin(t * 6) * 0.1; c.strokeStyle = s.color; c.lineWidth = 2.5; c.beginPath(); c.arc(s.x, s.y, 22, 0, R2); c.stroke(); c.globalAlpha = 1; }
+      for (let i = 0; i < WINGS; i++) ART.heart(c, s.x - 12 + i * 12, s.y - 28, 0.42, i < s.hp);
+      if (s.bcd > 0) { c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 2; c.beginPath(); c.arc(s.x, s.y, 17, -1.57, -1.57 + R2 * (1 - s.bcd / 2)); c.stroke(); }
+    }
+    if (touchOn && !k.party && k.st === 'play') drawControls();
+    /* marcador: chapas por jugador */
+    P.forEach((s, i) => { const x = 10 + i * 118, y = H - 30; ART.rr(c, x, y, 110, 22, 8); ART.fillOut(c, s.dead ? 'rgba(26,21,48,.6)' : 'rgba(26,21,48,.85)', 2); c.fillStyle = s.color; ART.rr(c, x + 5, y + 5, 12, 12, 4); c.fill(); label(`${s.name.slice(0, 7)} ${s.pts}`, x + 22, y + 4, 12, s.dead ? 'rgba(255,255,255,.5)' : '#fff'); });
+    label(`Ronda ${Math.max(1, round)}/${ROUNDS}`, 12, 8, 14, '#fff');
+    if (phase === 'play') label(String(Math.max(0, Math.ceil(RLEN - rt))), W - 12, 8, 18, rt > RLEN - 10 ? '#ff6fb5' : '#fff', 'right');
+    if (bannerT2 > 0 && banner2) { c.globalAlpha = Math.min(1, bannerT2 * 2); c.font = '800 24px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const mw = c.measureText(banner2).width + 40; ART.rr(c, W / 2 - mw / 2, H * 0.24 - 24, mw, 48, 14); c.fillStyle = 'rgba(26,21,48,.85)'; c.fill(); label(banner2, W / 2, H * 0.24 - 13, 24, '#fff', 'center'); c.globalAlpha = 1; }
+  }
+  k.run((dt) => {
+    bannerT2 -= dt;
+    if (!k.gate(reset)) { t += dt; for (const r of arocks) { r.x += r.vx * dt * 0.5; r.y += r.vy * dt * 0.5; r.ang += r.rot * dt; wrap(r); } return; }
+    if (phase === 'between') { t += dt; btw -= dt; for (const s of P) if (s.dead && s.debris) for (const d of s.debris) { d.x += d.vx * dt; d.y += d.vy * dt; } if (btw <= 0) { if (round >= ROUNDS) finish(); else newRound(); } return; }
+    if (cdPend) { cdPend = false; k.count(3); }
+    if (k.counting()) { t += dt; return; }
+    if (step(dt) && phase === 'play') { step(dt); if (phase === 'play') step(dt); } /* sin humanos vivos: avance rápido */
+  }, draw2);
+}

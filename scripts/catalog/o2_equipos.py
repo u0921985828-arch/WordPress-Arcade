@@ -1,0 +1,76 @@
+"""Oleada 2 — agente «equipos»: nuevos modos de teamball (canasta, sala, futbolín) y de bomber (hielo, pintura)."""
+
+GAMES = [
+    dict(
+        title='Canasta de Patio', genre='sports-casual', tags=['baloncesto', 'canasta', 'equipos', 'versus', 'vector'],
+        orient='auto', aspect='fill', inputs='TKG', engine='teamball', players='1–4 jugadores',
+        cfg=dict(hud='bl', mode='canasta', pts=21, help='Dos contra dos a una sola canasta; gana quien llegue antes a 21. Con balón, A pasa y B mantenido prepara el tiro: suéltalo cuando la barra esté en la franja verde. Desde fuera de la línea curva vale 3, desde dentro 2. Sin balón, B roba (o tapona si el rival ya ha tirado) y A pide el pase o cambia de jugador. Tras un robo o un rebote defensivo hay que sacar el balón fuera del triple antes de tirar. Si te defienden de cerca, no aguantes el balón más de 5 segundos sin pasar ni tirar: pierdes la posesión.'),
+        pad=dict(d='8', a='Pase', b='Tiro'), mp=(1, 4),
+        desc=[
+            'Canasta de Patio es el partido de la hora del recreo: una sola canasta atornillada a la pared, asfalto con grietas, una zona pintada de color teja y cuatro jugadores que se conocen todos los trucos. Se juega dos contra dos a media pista y el primer equipo que suma 21 puntos se queda con la pista hasta la próxima campana.',
+            'El balón bota pegado a la mano de quien lo lleva. A lo pasa al compañero y B, mantenido, arma el tiro: la barra se llena y hay que soltar el botón justo en la franja verde, porque un lanzamiento corto o pasado de fuerza rebota en el aro. Debajo del aro la bandeja casi siempre entra; desde lejos cuesta más, pero detrás de la línea curva cada canasta vale tres. Un defensor encima te estropea el tiro, así que merece la pena mover el balón hasta encontrar un hueco. Como en la calle, tras un robo o un rebote defensivo hay que sacar primero el balón fuera del triple.',
+            'Sin balón, B lanza un manotazo para robar o, si el rival acaba de tirar y estás cerca, un tapón. En el móvil se juega con el joystick virtual y dos botones; en el ordenador, con flechas, Espacio y X; en la tele, hasta cuatro personas con su móvil como mando. La CPU completa los equipos, defiende al hombre, corta hacia el aro y afina su puntería a medida que le vas ganando.',
+        ],
+        tips=['Suelta el tiro en la franja verde: medio segundo de más o de menos convierte un triple en un rebote.',
+              'Si te marcan de cerca, pasa y corta hacia el aro; tu compañero te la devuelve para una bandeja fácil.',
+              'Tras un rebote en defensa sal primero del triple: el tiro no se puede hacer hasta entonces.'],
+    ),
+    dict(
+        title='Fútbol Sala Neón', genre='sports-casual', tags=['futbol-sala', 'neon', 'equipos', 'versus', 'vector'],
+        orient='auto', aspect='fill', inputs='TKG', engine='teamball', players='1–4 jugadores',
+        cfg=dict(hud='bl', mode='sala', time=300, help='Dos jugadores de campo por equipo más un portero de la CPU. Mueve con el joystick o las flechas. Con balón, A pasa y B mantenido carga el tiro; sin balón, A pide el pase o cambia al compañero más cercano y B hace una entrada. Las paredes devuelven el balón: úsalas para pasar y tirar. Cinco minutos; si hay empate, gol de oro.'),
+        pad=dict(d='8', a='Pase', b='Tiro'), mp=(1, 4),
+        desc=[
+            'Fútbol Sala Neón se juega en una pista cerrada que brilla en la oscuridad: líneas de color cian, vallas de luz rosa y unas porterías pequeñas que obligan a afinar cada disparo. No hay banda ni fuera: el balón rebota en las paredes con muy poca pérdida y sigue vivo, así que una pared bien usada vale tanto como un compañero desmarcado.',
+            'Cada equipo tiene dos jugadores de campo y un portero que siempre lleva la CPU; se queda en su área, sale a por los balones sueltos cercanos y, cuando atrapa uno, lo saca rápido hacia el compañero más adelantado. Con el balón, A pasa y B mantenido carga el tiro, que busca un palo. Sin el balón, A pide el pase o te cambia al jugador más cercano y B se lanza a por la pelota. El partido dura cinco minutos de reloj y, si termina igualado, el primer gol de la prórroga decide.',
+            'En el móvil se juega con joystick y dos botones; con teclado, flechas, Espacio y X; y en la tele, hasta cuatro amigos, rosas contra azules, cada uno con su móvil. Los huecos los cubre la CPU, que triangula, cierra líneas de pase y mejora con cada derrota. Engancha por el ritmo: el balón nunca se detiene y los rebotes de neón dejan jugadas imposibles.',
+        ],
+        tips=['Tira contra la pared cuando el portero tape el palo: el rebote llega con muy poco ángulo.',
+              'Con porterías tan pequeñas es mejor acercarse y tirar cruzado que cargar un cañonazo desde lejos.',
+              'Si tu compañero está marcado, un pase a la pared lateral lo encuentra por detrás de su defensor.'],
+    ),
+    dict(
+        title='Futbolín de Bar', genre='sports-casual', tags=['futbolin', 'mesa', 'versus', 'vector'],
+        orient='auto', aspect='fill', inputs='TKG', engine='teamball', players='1–4 jugadores',
+        cfg=dict(hud='bl', mode='futbolin', pts=5, help='Mueve las barras con el joystick o las flechas y golpea con A cuando la bola pase delante de un muñeco; B golpea con efecto y la bola se curva. Jugando solo llevas las cuatro barras a la vez; si sois dos en el mismo equipo, J1 y J2 llevan portero y defensa y J3 y J4 medios y delanteros. Gana quien meta 5 goles. Si la bola se queda parada, se saca de nuevo por el lateral.'),
+        pad=dict(d='8', a='Tiro', b='Efecto'), mp=(1, 4),
+        desc=[
+            'Futbolín de Bar trae al móvil la mesa de madera del fondo del bar, con sus muñecos atornillados, sus barras que chirrían y una bola blanca que no se queda quieta ni un momento. Cada equipo tiene cuatro barras, como en las mesas de siempre: el portero, la defensa de dos, la media de cinco y la delantera de tres, colocadas alternando con las del rival.',
+            'Al deslizar la barra todos sus muñecos se mueven a la vez, y el golpe sale solo si la bola está justo delante de uno de ellos. A pega un tiro seco y recto; B gira la muñeca y la bola sale con efecto, curvándose hacia el lado contrario de tu movimiento para sortear al portero. Mover la barra justo en el momento del golpe también cambia el ángulo. Si la bola se muere entre dos barras, vuelve a entrar por el agujero del lateral, como en cualquier mesa de verdad. El primer equipo que marca cinco goles gana la partida.',
+            'Solo, llevas las cuatro barras de tu equipo con el joystick y dos botones, o con flechas, Espacio y X. En la tele pueden jugar hasta cuatro: si dos comparten equipo, uno lleva portero y defensa y el otro medios y delanteros, igual que en la mesa del bar. La CPU coloca sus muñecos adivinando el recorrido de la bola y reacciona más rápido cada vez que la derrotas.',
+        ],
+        tips=['Espera a que la bola se pare delante de un muñeco de la delantera: un tiro desde parado es mucho más preciso.',
+              'Mueve la barra justo al golpear para abrir el ángulo; el portero rival reacciona tarde a los tiros cruzados.',
+              'El efecto con B es perfecto para rodear al portero cuando está bien colocado frente a la bola.'],
+    ),
+    dict(
+        title='Petardo Glaciar', genre='party', tags=['petardos', 'hielo', 'laberinto', 'versus', 'vector'],
+        orient='auto', aspect='4:3', inputs='TKG', engine='bomber', players='1–4 jugadores',
+        cfg=dict(hud='bl', mode='hielo', help='Muévete con el joystick o las flechas. A suelta el petardo deslizándose sobre el hielo hacia donde miras hasta chocar con algo; B lo deja quieto a tus pies. Si un petardo que resbala choca con otro parado, le pasa el impulso. Al soltar el mando resbalas hasta el centro de la casilla. Gana la ronda quien quede en pie; el primero en ganar 2 rondas se lleva el lago.',
+                 rules=dict(fuse=2.6, range=2, bombs=1, speed=3.3, round=70, wins=2)),
+        pad=dict(d='8', a='Deslizar', b='Plantar'), mp=(1, 4),
+        desc=[
+            'Petardo Glaciar lleva la verbena a un lago helado: cuatro vecinos abrigados arrancan en las esquinas de una pista de hielo rodeada de nieve y abetos, con bloques de hielo como columnas y cajas nevadas por todas partes. Aquí los petardos no se quedan donde los sueltas: resbalan por el hielo en línea recta y no se paran hasta chocar con una caja, un bloque, una mejora o un rival.',
+            'Tienes dos formas de soltar la traca. A la lanza deslizándose hacia donde miras, perfecta para mandarla por un pasillo largo hasta los pies de alguien que se cree a salvo. B la planta quieta, como siempre, para abrir camino entre las cajas. Si un petardo lanzado choca contra otro que está parado, este sale disparado en la misma dirección, así que las carambolas están a la orden del día. Tú también resbalas un poco: al soltar el mando sigues hasta el centro de la casilla, lo justo para tener que pensar antes de frenar junto al fuego.',
+            'En el móvil se juega con el joystick y dos botones; con teclado, flechas, Espacio y X; en la tele, hasta cuatro amigos con su móvil. Las plazas vacías las ocupa la CPU, que esquiva leyendo por dónde van a resbalar los petardos, aprovecha los pasillos para dispararte y se vuelve más lista cada vez que la vences. Las cajas sueltan las mejoras de siempre, bota incluida.',
+        ],
+        tips=['Antes de deslizar un petardo mira si hay una caja en medio: se parará allí y no donde querías.',
+              'Coloca un petardo quieto en un pasillo y empújalo con otro deslizado: la carambola sorprende a cualquiera.',
+              'Suelta el mando un poco antes de llegar: resbalas hasta el centro de la casilla.'],
+    ),
+    dict(
+        title='Bombas de Pintura', genre='party', tags=['pintura', 'petardos', 'territorio', 'versus', 'vector'],
+        orient='auto', aspect='4:3', inputs='TKG', engine='bomber', players='1–4 jugadores',
+        cfg=dict(hud='bl', mode='pintura', help='Muévete con el joystick o las flechas y suelta una bomba de pintura con A. Al estallar pinta de tu color las casillas de la cruz, también las que ya eran de otro. Si una explosión rival te alcanza, salpica su color a tu alrededor y reapareces en tu esquina. No hay eliminados: al acabar el minuto gana la ronda quien haya pintado más suelo. El primero en ganar 2 rondas gana.',
+                 rules=dict(fuse=2.2, range=2, bombs=2, speed=3.4, round=60, wins=2, drop=0.4)),
+        pad=dict(d='8', a='Bomba'), mp=(2, 4),
+        desc=[
+            'Bombas de Pintura cambia la pólvora por botes de color: cuatro artistas sueltos en un taller de baldosas blancas, rodeados de cajas de cartón y botes gigantes, con sesenta segundos para dejar el suelo de su color. Aquí nadie queda eliminado; lo que cuenta al final no es quién sigue en pie, sino quién ha cubierto más superficie.',
+            'Cada bomba estalla en cruz y pinta todas las casillas que alcanza, incluidas las que ya había pintado otro jugador, así que el marcador cambia sin parar y nunca hay nada seguro. Romper cajas abre terreno nuevo y suelta mejoras de alcance, más bombas, velocidad o la bota para empujarlas. Si te pilla la explosión de un rival, salpica su color en tu casilla y en las ocho de alrededor y vuelves a tu esquina, así que también compensa ir a por los demás. El porcentaje de cada jugador aparece arriba en todo momento.',
+            'Se juega con el joystick y un botón en el móvil, con flechas y Espacio en el teclado y, en la tele, con dos, tres o cuatro amigos, cada uno con su móvil. Si falta alguien, la CPU pinta por su cuenta buscando las zonas que aún no son suyas y mejora con cada victoria tuya. Las rondas son cortas, las remontadas en los últimos segundos son habituales y la revancha siempre apetece.',
+        ],
+        tips=['Pinta primero las zonas vacías y deja para el final las del rival: repintar vale lo mismo pero cuesta más llegar.',
+              'Dos bombas en cadena cubren un pasillo entero; con la mejora de alcance, media sala.',
+              'En los últimos segundos ve a por el líder: cada vez que lo alcanzas, pintas nueve casillas.'],
+    ),
+]

@@ -1,4 +1,4 @@
-/* tablero.js — juegos de recorrido con dados y fichas. CFG.mode: 'parchis' | 'expres' | 'oca'
+/* tablero.js — juegos de recorrido con dados y fichas. CFG.mode: 'parchis' | 'expres' | 'oca' | 'serpientes'
  * Reglas (TAB, puras y comprobables en Node con module.exports):
  *  Parchís (reglas españolas): 68 casillas, 12 seguros (salidas incluidas), pasillo de 7 + meta con entrada exacta.
  *   Sale con 5 (obligatorio si puede; si en la salida hay 2 fichas y alguna es rival, come la última en llegar).
@@ -10,7 +10,10 @@
  *   dados que sumen 5; los dobles repiten y obligan a abrir barrera; tres dobles: la última ficha movida vuelve a casa.
  *  Oca: 63 casillas en espiral; de oca a oca y tiro; puentes 6↔12 y dados 26↔53 (y tiro); posada 19 (1 turno);
  *   pozo 31 (hasta que otro caiga); laberinto 42 → 30; cárcel 56 (2 turnos); calavera 58 → 1; entrada exacta en
- *   la 63 rebotando (si el rebote cae en oca, retrocede a la oca anterior y tira). */
+ *   la 63 rebotando (si el rebote cae en oca, retrocede a la oca anterior y tira).
+ *  Serpientes y escaleras: 10×10 en zigzag (1 = salida, 100 = meta); el pie de una escalera sube a su final y la
+ *   cabeza de una serpiente baja a su cola; a la 100 se entra justo (lo que sobra rebota hacia atrás y el rebote
+ *   también cuenta escaleras y serpientes); un 6 repite tirada, como mucho dos veces seguidas. */
 const TAB = (() => {
   const SAFE = new Set(); for (let a = 0; a < 4; a++) for (const o of [4, 11, 16]) SAFE.add((17 * a + o) % 68);
   const END = 71, LAST = 63;
@@ -116,13 +119,27 @@ const TAB = (() => {
     if (to !== t) { S.pos[p] = to; ev.to = to; if (to === 63) S.winner = p; }
     S.again = again && S.winner < 0; return ev;
   }
+  /* ---- Serpientes y escaleras ---- */
+  const LADD = { 2: 38, 4: 14, 9: 31, 21: 42, 28: 84, 36: 44, 51: 67, 71: 91, 80: 100 };
+  const SNAK = { 16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 78 };
+  function newS(n) { return { n, pos: Array(n).fill(1), skip: Array(n).fill(0), pozo: -1, cur: 0, winner: -1, again: false, turns: 0, sixes: 0 }; }
+  function snkRoll(S, d) {
+    const p = S.cur, from = S.pos[p]; let t = from + d, bounce = false; const path = [];
+    for (let s = from + 1; s <= Math.min(t, 100); s++) path.push(s);
+    if (t > 100) { bounce = true; t = 200 - t; for (let s = 99; s >= t; s--) path.push(s); }
+    S.turns++; const ev = { p, d, from, path, land: t, bounce }; let to = t;
+    if (LADD[t]) { to = LADD[t]; ev.fx = 'escalera'; } else if (SNAK[t]) { to = SNAK[t]; ev.fx = 'serpiente'; }
+    S.pos[p] = to; if (to !== t) ev.to = to; if (to === 100) S.winner = p;
+    S.sixes = d === 6 ? S.sixes + 1 : 0; S.again = d === 6 && S.sixes < 3 && S.winner < 0; if (!S.again) S.sixes = 0;
+    return ev;
+  }
   function ocaEnd(S) { if (S.again && S.winner < 0) { S.again = false; return false; } S.cur = (S.cur + 1) % S.n; return true; }
-  return { SAFE, END, LAST, VAR, OCAS, newP, tIdx, key, occ, bar, legal, roll, apply, settle, endTurn, pscore, threat, aiPick, newO, ocaStart, ocaRoll, ocaEnd };
+  return { SAFE, END, LAST, VAR, OCAS, newP, tIdx, key, occ, bar, legal, roll, apply, settle, endTurn, pscore, threat, aiPick, newO, ocaStart, ocaRoll, ocaEnd, LADD, SNAK, newS, snkRoll };
 })();
 if (typeof module === 'object' && module.exports) module.exports = TAB;
 else (function () {
   /* ================= Interfaz ================= */
-  const MODE = CFG.mode || 'parchis', OCA = MODE === 'oca', TWO = MODE === 'expres', PORT = innerHeight > innerWidth;
+  const MODE = CFG.mode || 'parchis', SNK = MODE === 'serpientes', OCA = MODE === 'oca' || SNK, TWO = MODE === 'expres', PORT = innerHeight > innerWidth;
   const W = PORT ? 600 : 960, H = PORT ? 920 : 600;
   const k = Kit({ w: W, h: H, title: CFG.title, bg: '#1d1533' }), c = k.ctx, OUT = ART.OUT, TAU = Math.PI * 2;
   const BS = PORT ? 584 : 572, BX = PORT ? 8 : 14, BY = PORT ? 8 : 14, CX = BX + BS / 2, CY = BY + BS / 2;
@@ -155,10 +172,11 @@ else (function () {
   }
 
   /* ---------- Geometría de la oca (espiral 8×8: 0 = salida, 63 = jardín) ---------- */
-  const G = BS / 8, SP = (() => { const out = []; let x0 = 0, y0 = 0, x1 = 7, y1 = 7;
+  const G = BS / (SNK ? 10 : 8), SP = (() => { const out = []; let x0 = 0, y0 = 0, x1 = 7, y1 = 7;
     while (out.length < 64) { for (let x = x0; x <= x1; x++) out.push([x, y1]); y1--; for (let y = y1; y >= y0; y--) out.push([x1, y]); x1--; for (let x = x1; x >= x0; x--) out.push([x, y0]); y0++; for (let y = y0; y <= y1; y++) out.push([x0, y]); x0++; }
     return out.slice(0, 64); })();
-  const ocaXY = (s) => [BX + SP[s][0] * G + G / 2, BY + SP[s][1] * G + G / 2];
+  const snkXY = (s) => { s = Math.max(1, Math.min(100, s)); const row = Math.floor((s - 1) / 10), col = row % 2 ? 9 - ((s - 1) % 10) : (s - 1) % 10; return [BX + col * G + G / 2, BY + (9 - row) * G + G / 2]; };
+  const ocaXY = (s) => (SNK ? snkXY(s) : [BX + SP[s][0] * G + G / 2, BY + SP[s][1] * G + G / 2]);
   function ocaSlot(s, p, cnt, idx) { const [x, y] = ocaXY(s); if (cnt <= 1) return [x, y + G * 0.08]; const o = [[-1, -1], [1, -1], [-1, 1], [1, 1]][idx]; return [x + o[0] * G * 0.2, y + o[1] * G * 0.17 + G * 0.1]; }
   function ocaPos(p) { const s = S.pos[p], same = []; for (let q = 0; q < S.n; q++) if (S.pos[q] === s) same.push(q); return ocaSlot(s, p, same.length, same.indexOf(p)); }
   const OCA_T = {}; TAB.OCAS.forEach((o) => (OCA_T[o] = 'oca')); Object.assign(OCA_T, { 6: 'puente', 12: 'puente', 19: 'posada', 26: 'dados', 53: 'dados', 31: 'pozo', 42: 'laberinto', 56: 'carcel', 58: 'muerte', 63: 'jardin', 0: 'salida' });
@@ -198,7 +216,7 @@ else (function () {
     const res = Math.min(3, Math.max(1, k.scale * Math.min(2, devicePixelRatio || 1))), kk = res + '|' + (S && S.seats ? S.seats.join() + pl.map((q) => q.color).join() : '') + MODE;
     if (boardCv && boardKey === kk) return boardCv;
     boardKey = kk; boardCv = document.createElement('canvas'); boardCv.width = Math.ceil(W * res); boardCv.height = Math.ceil(H * res);
-    const g0 = boardCv.getContext('2d'); g0.scale(res, res); (OCA ? ocaBoard : parBoard)(g0); return boardCv;
+    const g0 = boardCv.getContext('2d'); g0.scale(res, res); (SNK ? snkBoard : OCA ? ocaBoard : parBoard)(g0); return boardCv;
   }
   const colSeat = (a) => { if (!S) return NEUTRAL; const p = S.seats ? S.seats.indexOf(a) : -1; return p >= 0 ? k.pcol(p) : NEUTRAL; };
   function poly(g, P, fill, lw, stroke) { g.beginPath(); g.moveTo(P[0][0], P[0][1]); for (let q = 1; q < P.length; q++) g.lineTo(P[q][0], P[q][1]); g.closePath(); g.fillStyle = fill; g.fill(); if (lw) { g.lineWidth = lw; g.strokeStyle = stroke || OUT; g.stroke(); } }
@@ -245,6 +263,56 @@ else (function () {
       else { g.font = FONT(900, Math.round(G * 0.2)); g.textAlign = 'center'; g.textBaseline = 'top'; g.fillStyle = '#2f5b25'; g.fillText('SALIDA', x, y0 + 4); }
     }
   }
+  /* ---------- Serpientes y escaleras: tablero (cacheado), escaleras y serpientes animadas ---------- */
+  const SN_COL = ['#6fcf5a', '#ff8a3d', '#b98cff', '#ff6fb5', '#5b8cff', '#ffc94d', '#4fd1c5', '#e0525f', '#a8cf3f', '#f08bd0'];
+  const SN_LIST = Object.keys(TAB.SNAK).map(Number).sort((a, b) => b - a).map((h, i) => ({ h, t: TAB.SNAK[h], col: SN_COL[i % SN_COL.length], ph: i * 1.7 }));
+  function snkBoard(g) {
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    ART.rr(g, BX - 6, BY - 2, BS + 12, BS + 12, 22); g.fillStyle = OUT; g.fill();
+    ART.rr(g, BX - 6, BY - 6, BS + 12, BS + 12, 22); const wd = g.createLinearGradient(BX, BY, BX + BS, BY + BS); wd.addColorStop(0, '#5fb0e8'); wd.addColorStop(1, '#3a74c2'); g.fillStyle = wd; g.fill(); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke();
+    const PAL = [['#fff4d6', '#ffe6a8'], ['#e3f6d4', '#c9ecb0'], ['#e6e8ff', '#d0d4ff'], ['#ffe2ec', '#ffcadb'], ['#dff5f7', '#c3eaee']];
+    for (let s = 1; s <= 100; s++) {
+      const [x, y] = snkXY(s), x0 = x - G / 2 + 1.5, y0 = y - G / 2 + 1.5, sz = G - 3, row = Math.floor((s - 1) / 10), pal = PAL[(row + ((s - 1) % 10)) % PAL.length];
+      ART.rr(g, x0, y0, sz, sz, 7); const tg = g.createLinearGradient(x0, y0, x0, y0 + sz); tg.addColorStop(0, pal[0]); tg.addColorStop(1, pal[1]); g.fillStyle = s === 100 ? '#ffd166' : s === 1 ? '#c4f0b8' : tg; g.fill(); g.lineWidth = 1.6; g.strokeStyle = ART.alpha(OUT, 0.55); g.stroke();
+      g.font = FONT(900, Math.round(G * 0.24)); g.textAlign = 'left'; g.textBaseline = 'top'; g.lineWidth = 3; g.strokeStyle = '#fff'; g.strokeText(String(s), x0 + 4, y0 + 3); g.fillStyle = '#3a2b4f'; g.fillText(String(s), x0 + 4, y0 + 3);
+    }
+    { const [x, y] = snkXY(100); g.beginPath(); g.moveTo(x - G * 0.26, y + G * 0.2); g.lineTo(x - G * 0.3, y - G * 0.12); g.lineTo(x - G * 0.13, y + G * 0.02); g.lineTo(x, y - G * 0.2); g.lineTo(x + G * 0.13, y + G * 0.02); g.lineTo(x + G * 0.3, y - G * 0.12); g.lineTo(x + G * 0.26, y + G * 0.2); g.closePath(); ART.fillOut(g, '#ffb020', 2); }
+    { const [x, y] = snkXY(1); g.font = FONT(900, Math.round(G * 0.19)); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#2f5b25'; g.fillText('SALIDA', x, y + G * 0.26); }
+    for (const f in TAB.LADD) ladder(g, +f, TAB.LADD[f]);
+  }
+  function ladder(g, f, t) {
+    const [x0, y0] = snkXY(f), [x1, y1] = snkXY(t), dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L, px = -uy * G * 0.19, py = ux * G * 0.19;
+    const a0 = [x0 - ux * G * 0.15, y0 - uy * G * 0.15], a1 = [x1 + ux * G * 0.1, y1 + uy * G * 0.1];
+    g.save(); g.globalAlpha = 0.25; g.strokeStyle = '#000'; g.lineWidth = G * 0.12; for (const sgn of [-1, 1]) { g.beginPath(); g.moveTo(a0[0] + px * sgn + 4, a0[1] + py * sgn + 5); g.lineTo(a1[0] + px * sgn + 4, a1[1] + py * sgn + 5); g.stroke(); } g.restore();
+    const n = Math.max(2, Math.round(L / (G * 0.34)));
+    for (let q = 1; q < n; q++) { const u = q / n, cx = a0[0] + (a1[0] - a0[0]) * u, cy = a0[1] + (a1[1] - a0[1]) * u;
+      g.beginPath(); g.moveTo(cx - px, cy - py); g.lineTo(cx + px, cy + py); g.lineWidth = G * 0.09 + 3; g.strokeStyle = OUT; g.stroke(); g.lineWidth = G * 0.09; g.strokeStyle = '#e8b97a'; g.stroke(); }
+    for (const sgn of [-1, 1]) { g.beginPath(); g.moveTo(a0[0] + px * sgn, a0[1] + py * sgn); g.lineTo(a1[0] + px * sgn, a1[1] + py * sgn); g.lineWidth = G * 0.11 + 4; g.strokeStyle = OUT; g.stroke(); g.lineWidth = G * 0.11; g.strokeStyle = '#b8743a'; g.stroke(); g.lineWidth = G * 0.03; g.strokeStyle = 'rgba(255,230,190,.55)'; g.beginPath(); g.moveTo(a0[0] + px * sgn - uy * 1.5, a0[1] + py * sgn + ux * 1.5); g.lineTo(a1[0] + px * sgn - uy * 1.5, a1[1] + py * sgn + ux * 1.5); g.stroke(); }
+  }
+  /* Curva de una serpiente de la cabeza (u=0) a la cola (u=1), con ondulación animada. */
+  function snakePts(sn, time) {
+    const [x0, y0] = snkXY(sn.h), [x1, y1] = snkXY(sn.t), dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy), nx = -dy / L, ny = dx / L, N = 30, out = [], waves = Math.max(1.5, L / (G * 1.6));
+    for (let q = 0; q <= N; q++) { const u = q / N, env = Math.sin(Math.PI * Math.min(1, u * 1.15)) * (1 - u * 0.3), o = Math.sin(u * Math.PI * waves + sn.ph + time * 2.2) * G * 0.3 * env;
+      out.push([x0 + dx * u + nx * o, y0 + dy * u + ny * o]); }
+    return out;
+  }
+  function drawSnake(sn) {
+    const P = snakePts(sn, T), n = P.length - 1, wid = (u) => G * (0.26 - 0.2 * u) + 1;
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    c.save(); c.globalAlpha = 0.22; c.strokeStyle = '#000'; c.beginPath(); P.forEach(([x, y], i) => (i ? c.lineTo(x + 4, y + 6) : c.moveTo(x + 4, y + 6))); c.lineWidth = G * 0.2; c.stroke(); c.restore();
+    for (let pass = 0; pass < 3; pass++) for (let i = n - 1; i >= 0; i--) { const u = i / n, w = wid(u);
+      c.beginPath(); c.moveTo(P[i][0], P[i][1]); c.lineTo(P[i + 1][0], P[i + 1][1]);
+      if (pass === 0) { c.lineWidth = w + 4; c.strokeStyle = OUT; } else if (pass === 1) { c.lineWidth = w; c.strokeStyle = i % 4 < 2 ? sn.col : ART.dark(sn.col, 0.22); } else { c.lineWidth = w * 0.28; c.strokeStyle = ART.alpha('#ffffff', 0.35); }
+      c.stroke(); }
+    const [hx, hy] = P[0], an = Math.atan2(P[0][1] - P[2][1], P[0][0] - P[2][0]), hs = G * 0.2;
+    c.save(); c.translate(hx, hy); c.rotate(an);
+    if (Math.sin(T * 5 + sn.ph) > 0.4) { c.beginPath(); c.moveTo(hs * 0.9, 0); c.lineTo(hs * 1.7, 0); c.lineTo(hs * 1.95, -hs * 0.25); c.moveTo(hs * 1.7, 0); c.lineTo(hs * 1.95, hs * 0.25); c.lineWidth = 2.2; c.strokeStyle = '#e0304a'; c.stroke(); }
+    c.beginPath(); c.ellipse(hs * 0.2, 0, hs * 1.15, hs * 0.95, 0, 0, TAU); ART.fillOut(c, ART.lite(sn.col, 0.08), 2.5);
+    for (const sg of [-1, 1]) { c.beginPath(); c.arc(hs * 0.3, sg * hs * 0.45, hs * 0.32, 0, TAU); ART.fillOut(c, '#fff', 1.6); c.beginPath(); c.arc(hs * 0.4, sg * hs * 0.45, hs * 0.15, 0, TAU); c.fillStyle = OUT; c.fill(); }
+    c.fillStyle = ART.alpha(OUT, 0.6); for (const sg of [-1, 1]) { c.beginPath(); c.arc(hs * 1.05, sg * hs * 0.18, hs * 0.07, 0, TAU); c.fill(); }
+    c.restore();
+  }
+  const ladderPts = (f, t) => { const [x0, y0] = snkXY(f), [x1, y1] = snkXY(t), N = Math.max(4, Math.round(Math.hypot(x1 - x0, y1 - y0) / (G * 0.34))), out = []; for (let q = 0; q <= N; q++) out.push([x0 + (x1 - x0) * q / N, y0 + (y1 - y0) * q / N]); return out; };
   function goose(g, x, y, s) {
     g.save(); g.translate(x, y); g.scale(s / 40, s / 40);
     g.beginPath(); g.ellipse(-2, 8, 15, 10, 0.1, 0, TAU); ART.fillOut(g, '#ffffff', 2.4);
@@ -276,7 +344,7 @@ else (function () {
   function tickAnim(dt) {
     const a = queue[0]; if (!a) return;
     const n1 = a.pts.length - 1, before = Math.floor(a.t / a.step); a.t += dt; const after = Math.floor(a.t / a.step);
-    if (after > before && after <= n1) k.sfx(a.sfx || 'pop');
+    if (after > before && after <= n1 && a.sfx !== 'none') k.sfx(a.sfx || 'pop');
     if (a.t >= a.step * n1) { queue.shift(); if (a.done) a.done(); }
   }
   const busy = () => queue.length > 0;
@@ -289,11 +357,12 @@ else (function () {
   function humansMax() { return k.party ? Math.max(...k.party.map((q) => q.p + 1)) : 1; }
   function demo() { // posición de muestra en la portada (miniatura)
     n = 4; pl = k.players(4);
-    if (OCA) { S = TAB.newO(4); S.pos = [23, 9, 42, 57]; S.demo = true; }
+    if (SNK) { S = TAB.newS(4); S.pos = [23, 45, 68, 91]; S.demo = true; }
+    else if (OCA) { S = TAB.newO(4); S.pos = [23, 9, 42, 57]; S.demo = true; }
     else { S = TAB.newP(MODE, [0, 1, 2, 3]); const put = [[-1, 12, 40, 66], [3, -1, 20, -1], [0, 30, -1, 71], [-1, 5, 50, -1]]; S.pcs.forEach((a, p) => a.forEach((pc, i) => { pc.r = put[p][i] === undefined ? -1 : put[p][i]; })); S.demo = true; }
   }
   function start() {
-    n = nSel; pl = k.players(n); S = OCA ? TAB.newO(n) : TAB.newP(MODE, seatsOf(n)); S.cur = k.ri(0, n - 1); boardKey = '';
+    n = nSel; pl = k.players(n); S = SNK ? TAB.newS(n) : OCA ? TAB.newO(n) : TAB.newP(MODE, seatsOf(n)); S.cur = k.ri(0, n - 1); boardKey = '';
     phase = 'turn'; k.sfx('start'); say(`Empieza ${nm(S.cur)}`, k.pcol(S.cur)); beginTurn();
   }
   function say(t, col) { k.float(t, BX + BS / 2, BY + BS * 0.5, col || '#fff'); }
@@ -314,6 +383,20 @@ else (function () {
   }
   function afterRoll() {
     const vs = dice.vals; k.sfx('coin'); dice.pop = 0.3;
+    if (SNK) {
+      const ev = TAB.snkRoll(S, vs[0]), p = ev.p, st = S.pos[p]; S.pos[p] = ev.from; hideP = { p }; phase = 'moving';
+      msg = `${nm(p)} saca ${vs[0]}`; sub = ev.bounce ? 'Rebota: a la 100 se entra justo' : '';
+      hop({ p }, [ocaXY(ev.from), ...ev.path.map(ocaXY)], 0.15 * fast(), G * 0.35, () => {
+        S.pos[p] = ev.land;
+        if (!ev.fx) { S.pos[p] = st; return endO(); }
+        const [x, y] = ocaXY(ev.land), up = ev.fx === 'escalera', sn = up ? null : SN_LIST.find((q) => q.h === ev.land);
+        msg = up ? `¡Escalera! Sube a la ${ev.to}` : `¡Serpiente! Baja a la ${ev.to}`;
+        k.float(up ? '¡Arriba!' : '¡Ssss!', x, y - G * 0.5, up ? '#7cf7a0' : '#ff8a8a'); k.burst(x, y, up ? '#ffd166' : sn.col, 16, 140); k.sfx(up ? 'jump' : 'hurt'); if (!up) k.shake(5);
+        const pts = up ? ladderPts(ev.land, ev.to) : snakePts(sn, T);
+        wait(0.35 * fast(), () => { phase = 'moving'; hop({ p }, pts, (up ? 0.9 : 1.3) * fast() / (pts.length - 1), 0, () => { S.pos[p] = st; const [tx, ty] = ocaXY(st); k.burst(tx, ty, k.pcol(p), 10, 90); k.sfx(up ? 'coin' : 'hit'); endO(); }, 'none'); });
+      });
+      return;
+    }
     if (OCA) {
       const ev = TAB.ocaRoll(S, vs[0]), p = ev.p, st = S.pos[p]; S.pos[p] = ev.from; hideP = p;
       msg = `${nm(p)} saca ${vs[0]}`; sub = '';
@@ -370,7 +453,7 @@ else (function () {
     phase = 'over'; const w = S.winner, rows = pl.map((q) => ({ p: q.p, score: OCA ? S.pos[q.p] : TAB.pscore(S, q.p) }));
     const humWin = !isCpu(w); if (pl.some((q) => !q.cpu)) { lvl = humWin ? Math.min(2.5, lvl + 0.5) : Math.max(0, lvl - 1); try { localStorage.setItem(LK, lvl); } catch (e) { /* nada */ } }
     rows.sort((a, b) => (a.p === w ? -1 : b.p === w ? 1 : b.score - a.score)); rows.forEach((r, i) => (r.score = rows.length - i));
-    const det = (p) => (OCA ? `casilla ${S.pos[p]}` : `${S.pcs[p].filter((q) => q.r === TAB.END).length}/${S.o.np} en meta`);
+    const det = (p) => (SNK && S.pos[p] >= 100 ? 'meta' : OCA ? `casilla ${S.pos[p]}` : `${S.pcs[p].filter((q) => q.r === TAB.END).length}/${S.o.np} en meta`);
     const map = {}; rows.forEach((r) => (map[r.score] = r.p));
     k.podium(rows, { fmt: (s) => det(map[s]), noTie: true, head: `¡Gana ${nm(w)}!` });
   }
@@ -388,7 +471,7 @@ else (function () {
       for (let p = 0; p < 4; p++) { if (k.phit(p, 'left')) { nSel = Math.max(lo, nSel - 1); k.sfx('click'); } if (k.phit(p, 'right')) { nSel = Math.min(4, nSel + 1); k.sfx('click'); } }
       if (!k.party && k.ptr.hit) { const b = setupBtns().find((q) => Math.abs(k.ptr.x - q.x) < q.w / 2 && Math.abs(k.ptr.y - q.y) < q.h / 2); if (b) { if (b.v === 'go') start(); else if (b.v >= lo) { nSel = b.v; k.sfx('click'); } } return; }
       for (let p = 0; p < 4; p++) if (k.phit(p, 'a')) { start(); return; }
-      if (!S || S.n !== nSel || S.turns || S.demo) { n = nSel; pl = k.players(n); if (OCA) S = TAB.newO(n); else S = TAB.newP(MODE, seatsOf(n)); boardKey = ''; }
+      if (!S || S.n !== nSel || S.turns || S.demo) { n = nSel; pl = k.players(n); if (SNK) S = TAB.newS(n); else if (OCA) S = TAB.newO(n); else S = TAB.newP(MODE, seatsOf(n)); boardKey = ''; }
       return;
     }
     if (phase === 'over') return;
@@ -427,6 +510,7 @@ else (function () {
   function setupBtns() { const out = [], y = CY - 10; [2, 3, 4].forEach((v, q) => out.push({ v, x: CX + (q - 1) * 120, y, w: 100, h: 100 })); out.push({ v: 'go', x: CX, y: y + 120, w: 240, h: 64 }); return out; }
   function drawPieces() {
     if (!S) return;
+    if (SNK) SN_LIST.forEach(drawSnake);
     if (OCA) { const order = pl.map((q) => q.p).filter((p) => p < S.n).sort((a, b) => ocaPos(a)[1] - ocaPos(b)[1]);
       for (const p of order) { if (hideP && hideP.p === p && busy()) continue; const [x, y] = ocaPos(p), cur = phase !== 'setup' && phase !== 'over' && S.cur === p; pawn(x, y, G * 0.5, k.pcol(p), cur ? Math.abs(Math.sin(T * 4)) * 4 : 0, cur && phase === 'roll' ? '#fff' : null); }
     } else {
@@ -456,7 +540,8 @@ else (function () {
       c.textAlign = 'left'; c.textBaseline = 'middle'; c.font = FONT(900, PORT ? 20 : 22); c.fillStyle = '#fff'; c.fillText(nm(p), x + 50, y + rh * 0.34);
       c.font = FONT(700, PORT ? 16 : 17); c.fillStyle = ART.lite(col, 0.4);
       let st = '';
-      if (OCA) st = S.pos[p] ? `Casilla ${S.pos[p]}` + (S.pozo === p ? ' · pozo' : S.skip[p] ? ` · espera ${S.skip[p]}` : '') : 'En la salida';
+      if (SNK) st = S.pos[p] >= 100 ? '¡Meta!' : S.pos[p] > 1 ? `Casilla ${S.pos[p]}` : 'En la salida';
+      else if (OCA) st = S.pos[p] ? `Casilla ${S.pos[p]}` + (S.pozo === p ? ' · pozo' : S.skip[p] ? ` · espera ${S.skip[p]}` : '') : 'En la salida';
       else { const a = S.pcs[p], m = a.filter((q) => q.r === TAB.END).length, h = a.filter((q) => q.r < 0).length; st = `Meta ${m}/${a.length} · casa ${h}`; }
       c.fillText(st, x + 50, y + rh * 0.72);
       if (cur) { c.fillStyle = col; c.beginPath(); const ax = x + rw - 14, ay = y + rh / 2; c.moveTo(ax + 6, ay - 9); c.lineTo(ax - 6, ay); c.lineTo(ax + 6, ay + 9); c.closePath(); c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke(); }
