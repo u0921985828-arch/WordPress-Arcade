@@ -1629,7 +1629,7 @@ function mgEgg() {
     const lead = Math.max(...ps.map((q) => q.d));
     /* la cámara sigue al humano (si lo hay) para que nunca se salga; los demás se marcan en los bordes */
     const me = ps.find((q) => !cpu(q.p));
-    const tgt = me ? clamp(me.d - 210, lead - 620, lead - 150) : lead - 300;
+    const tgt = me ? me.d - 230 : lead - 300;
     cam = clamp(lerp(cam, tgt, 1 - Math.exp(-4 * dt)), 0, D - 520);
     const done = ps.every((q) => q.fin >= 0);
     if (!over && (done || T > TL)) { over = true; endT = 1.6; m.rank = rankBy(ps, (q) => (q.fin >= 0 ? 1e6 - q.fin : q.d)); }
@@ -1657,7 +1657,7 @@ function mgEgg() {
       fit('META', fx, LY[0] - 74, 22, '#ffd166', 120); }
     for (const q of ps) {
       const x = 100 + q.d - cam, y = LY[q.p];
-      if (x < 24 || x > W - 24) { const bx = x < 24 ? 22 : W - 22; arrowGlyph(bx, y - 18, 13, x < 24 ? 'left' : 'right', col(q.p)); continue; }
+      if (x < 30 || x > W - 58) { const bx = x < 30 ? 24 : W - 24; arrowGlyph(bx, y - 18, 13, x < 30 ? 'left' : 'right', col(q.p)); continue; }
       guy(q.p, x, y, 1.35, { face: 1, state: q.drop > 0 ? 'idle' : q.v > 40 ? 'run' : 'idle', squash: q.wob > 0 ? 0.12 : 0 });
       drawSpoon(x, y, q.e, col(q.p), q.drop);
       tagDraw(q.p, x, y - 76);
