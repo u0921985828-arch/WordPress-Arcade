@@ -30,7 +30,7 @@ let hpMul = 1; /* coop: la vida de los enemigos escala con el nº de jugadores *
 /* radio, vida, velocidad, puntos */
 const FOE = { bat: [10, 2, 92, 15], eye: [12, 3, 50, 25], skel: [11, 3, 62, 20], ghost: [12, 2, 46, 25], slime: [16, 3, 56, 20], mini: [9, 1, 95, 10], zombie: [11, 2, 42, 15], brute: [17, 6, 36, 50], thug: [13, 3, 74, 20], tank: [15, 3, 58, 60] };
 const RANGED = { eye: 1, ghost: 1, tank: 1 };
-const FCOL = { bat: '#8a6fd1', eye: '#ff5f7a', skel: '#f4efe6', ghost: '#b98cff', slime: '#8be04a', mini: '#b6f36a', zombie: '#8fc26a', brute: M === 'zombie' ? '#6fa04f' : '#d9a27a', thug: '#e05a5a', tank: '#e0564a' };
+const FCOL = { bat: '#8a6fd1', eye: '#ff5f7a', skel: '#f4efe6', ghost: '#b98cff', slime: '#8be04a', mini: '#b6f36a', zombie: '#8fc26a', brute: ZQ ? '#6fa04f' : '#d9a27a', thug: '#e05a5a', tank: '#e0564a' };
 const UP = {
   rate: ['Cadencia', '+25 % de ataques por segundo', () => { upg.rate += 0.25; }],
   dmg: ['Fuerza', '+50 % de daño', () => { upg.dmg += 0.5; }],
@@ -885,7 +885,7 @@ function drawFoe(f) {
   } else if (f.type === 'ghost') { c.globalAlpha = 0.88; ART.enemy(c, 'ghost', -12, -14, 24, 24, { t: ph, face: f.face, col }); c.globalAlpha = 1; }
   else if (f.type === 'slime' || f.type === 'mini') { const hop = Math.max(0, Math.sin(t * 5 + f.ph)) * 5; c.translate(0, -hop); ART.enemy(c, 'slime', -b, -b * 0.8, b * 2, b * 1.7, { t: ph, face: f.face, col }); }
   else if (f.type === 'zombie') humanoid(b, fl ? '#fff' : '#8fc26a', '#6b5a8c', '#3b3552', { mv: f.mv, ph: f.ph, face: f.face, zombie: true, eye: '#ff3b3b' });
-  else if (f.type === 'brute') M === 'zombie' ? humanoid(b, fl ? '#fff' : '#6fa04f', '#8c4a4a', '#3b3552', { mv: f.mv, ph: f.ph, face: f.face, zombie: true, eye: '#ffd23d' }) : humanoid(b, fl ? '#fff' : '#d9a27a', '#3b3552', '#2a2540', { mv: f.mv, ph: f.ph, face: f.face, punch: f.dash > 0 });
+  else if (f.type === 'brute') ZQ ? humanoid(b, fl ? '#fff' : '#6fa04f', '#8c4a4a', '#3b3552', { mv: f.mv, ph: f.ph, face: f.face, zombie: true, eye: '#ffd23d' }) : humanoid(b, fl ? '#fff' : '#d9a27a', '#3b3552', '#2a2540', { mv: f.mv, ph: f.ph, face: f.face, punch: f.dash > 0 });
   else if (f.type === 'thug') humanoid(b, fl ? '#fff' : '#f0c8a0', '#e05a5a', '#2a2540', { mv: f.mv, ph: f.ph, face: f.face, band: '#1a1530', hair: '#3a2a4a', punch: Math.sin(ph * 3) > 0.9 });
   c.restore();
   if (f.boss) crown(f.x, f.y - f.r * 1.55);
@@ -901,7 +901,7 @@ function drawHero() {
   if (M === 'brawl' && swing > 0) { const a = p.swingA, d = 14 + (0.18 - swing) * 90; c.beginPath(); c.arc(p.x + Math.cos(a) * d, p.y - 6 + Math.sin(a) * d, 6, 0, R2); ART.fillOut(c, '#ffd9b5', 2); }
   if (!melee) {
     c.save(); c.translate(p.x + p.face * 2, p.y - 6); c.rotate(p.aim); const rc = p.recoil * 30;
-    if (M === 'zombie') { ART.rr(c, 2 - rc, -3, 16, 6, 2); ART.fillOut(c, '#4a4a58', 2); ART.rr(c, 4 - rc, 1, 5, 6, 1.5); ART.fillOut(c, '#3a3a46', 1.5); }
+    if (ZQ) { ART.rr(c, 2 - rc, -3, 16, 6, 2); ART.fillOut(c, '#4a4a58', 2); ART.rr(c, 4 - rc, 1, 5, 6, 1.5); ART.fillOut(c, '#3a3a46', 1.5); }
     else { ART.rr(c, 2 - rc, -2, 17, 4, 2); ART.fillOut(c, '#8a5a3b', 1.8); c.beginPath(); c.arc(20 - rc, 0, 4, 0, R2); ART.fillOut(c, TH.shot, 1.8); c.globalAlpha = 0.35 + Math.sin(t * 8) * 0.15; c.fillStyle = TH.shot; c.beginPath(); c.arc(20 - rc, 0, 8, 0, R2); c.fill(); c.globalAlpha = 1; }
     c.restore();
   }

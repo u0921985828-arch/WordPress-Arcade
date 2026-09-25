@@ -2097,7 +2097,7 @@ function mgWitch() {
       c.beginPath(); c.moveTo(46, -5); c.quadraticCurveTo(78, -17, 86, 0); c.quadraticCurveTo(78, 17, 46, 5); c.closePath(); ART.fillOut(c, '#c9a05a', 2.4);
       c.strokeStyle = 'rgba(26,21,48,.5)'; c.lineWidth = 1.4; for (let i = -3; i <= 3; i++) { c.beginPath(); c.moveTo(50, i * 2.2); c.lineTo(82, i * 4.2); c.stroke(); }
       c.restore();
-      if (T < 22) fit(o.kind === 'high' ? 'B agáchate' : 'A salta', o.x, y + (o.kind === 'high' ? -26 : 34), 16, o.kind === 'high' ? '#e0b6ff' : '#cbef7a', 160);
+      if (T < 22 && o.x > 560) fit(o.kind === 'high' ? 'B agáchate' : 'A salta', o.x, y + (o.kind === 'high' ? -26 : 34), 16, o.kind === 'high' ? '#e0b6ff' : '#cbef7a', 160);
     }
     for (const q of ps) {
       const x = PX[q.p];

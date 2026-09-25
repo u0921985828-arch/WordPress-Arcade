@@ -692,7 +692,7 @@ const AB = (() => {
     if (k.human(top.p) && top.score > 0) SAVE('cpu:' + CFG.id, Math.min(8, lvl() + 1));
     const solo = !k.party && rows.length === 1;
     k.podium(rows, {
-      head: solo ? (me.ok >= letters.length ? '¡Rosco completo!' : undefined) : undefined,
+      head: solo ? (me.ok >= letters.length ? '¡Rosco completo!' : 'Rosco terminado') : undefined,
       go: `${solo ? `Aciertos: ${me.ok}/${letters.length} · Récord ${k.best(CFG.id, 0)}<br>` : ''}Toca para otro rosco`,
     });
   }
@@ -749,7 +749,7 @@ const AB = (() => {
     outlined(cd.l, cx, cy - (LAND ? 16 : 20), LAND ? 76 : 88, '#ffd36b', 'center', 8);
     txt(k.party || seats.length > 1 ? 'Turno de ' + seats[turn].name : 'Tu turno', cx, cy + (LAND ? 34 : 40), LAND ? 16 : 18, k.pcol(seats[turn].p), 'center', 900);
     const ok = stt.filter((v) => v === 1).length, ko = stt.filter((v) => v === 2).length;
-    txt(`${ok} aciertos · ${ko} fallos`, cx, cy + (LAND ? 58 : 68), LAND ? 14 : 16, 'rgba(255,255,255,.7)', 'center', 800);
+    txt(`${ok} ${ok === 1 ? 'acierto' : 'aciertos'} · ${ko} ${ko === 1 ? 'fallo' : 'fallos'}`, cx, cy + (LAND ? 58 : 68), LAND ? 14 : 16, 'rgba(255,255,255,.7)', 'center', 800);
     c.restore();
   }
   function draw() {

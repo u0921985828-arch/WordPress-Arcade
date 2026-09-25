@@ -39,6 +39,12 @@ function label(s, x, y, size, col, align, base) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'center'; c.textBaseline = base || 'middle';
   c.lineJoin = 'round'; c.lineWidth = size / 4 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
 }
+const flo = (t, x, y, col) => k.float(t, k.clamp(x, 62, W - 62), y, col); // los avisos de los modos nuevos no se salen del lienzo
+function fitSize(s, maxW, size) { // baja el cuerpo de letra hasta que el texto cabe (medida real)
+  let z = size;
+  while (z > 10) { c.font = `900 ${z}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; if (c.measureText(s).width <= maxW) break; z -= 1; }
+  return z;
+}
 function fitName(s, maxW, size) { // recorta el rótulo si no cabe en la tarjeta (medida real)
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
   if (c.measureText(s).width <= maxW) return s;
@@ -277,7 +283,7 @@ function explode(b) {
     fireT[y][x] = FIRE_T; fireD[y][x] = bit === 0 ? 3 : (fireD[y][x] | bit); fireO[y][x] = oi;
     if (grid[y][x] === 3) { const bi = BASE.findIndex(([a, b2]) => a === x && b2 === y);
       if (bi >= 0 && bhp[bi] > 0) { bhp[bi]--; k.sfx('hurt'); k.shake(6); k.burst((x + 0.5) * T, TOP + (y + 0.5) * T, '#ffb13d', 18, 190);
-        if (bhp[bi] <= 0) { grid[y][x] = 0; baseDown(bi); } else k.float('¡Carro tocado!', (x + 0.5) * T, TOP + y * T - 8, '#ffd166'); } }
+        if (bhp[bi] <= 0) { grid[y][x] = 0; baseDown(bi); } else flo('¡Carro tocado!', (x + 0.5) * T, TOP + y * T - 8, '#ffd166'); } }
     else if (grid[y][x] === 2) { grid[y][x] = 0; crumbs.push({ x, y, t: 0 }); k.burst((x + 0.5) * T, TOP + (y + 0.5) * T, '#c98a4b', 10, 150); if (Math.random() < RU.drop) items[y][x] = k.pick(UNICA ? ['s'] : ['r', 'r', 'b', 'b', 's', 's', 'k']); fireT[y][x] = FIRE_T; }
     else if (items[y][x] && bit) { items[y][x] = 0; k.burst((x + 0.5) * T, TOP + (y + 0.5) * T, '#fff', 8, 120); }
     const o = bombAt(x, y); if (o && o !== b) o.t = Math.min(o.t, 0.06);
@@ -295,10 +301,10 @@ function kill(q, why) {
     const [cx, cy] = cellOf(q), oi = fireO[cy][cx], by = pl[oi]; q.out = 1.6;
     if (by && by !== q) { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) paintCell(cx + dx, cy + dy, oi); k.burst(q.x * T, TOP + q.y * T, by.col, 30, 240); }
     k.float(by && by !== q ? '¡Pringado!' : '¡Uy!', q.x * T, TOP + q.y * T - 20, by ? by.col : q.col); return; }
-  k.burst(q.x * T, TOP + q.y * T, q.col, 26, 220); k.burst(q.x * T, TOP + q.y * T, '#fff', 10, 140); k.float(why || '¡Fuera!', q.x * T, TOP + q.y * T - 20, q.col);
+  k.burst(q.x * T, TOP + q.y * T, q.col, 26, 220); k.burst(q.x * T, TOP + q.y * T, '#fff', 10, 140); if (PAIR || GHOST || UNICA) flo(why || '¡Fuera!', q.x * T, TOP + q.y * T - 20, q.col); else k.float(why || '¡Fuera!', q.x * T, TOP + q.y * T - 20, q.col);
   const [cx, cy] = cellOf(q), oi = fireO[cy][cx], by = pl[oi];
-  if (PAIR) { const m = mate(q); if (m && m.alive) { m.range = Math.min(8, m.range + 1); m.max = Math.min(6, m.max + 1); k.float('¡Relevo!', m.x * T, TOP + m.y * T - 24, m.col); k.sfx('coin'); } }
-  if (GHOST) { q.ghost = true; q.gcd = 3; q.dead = 0; q.x = k.clamp(q.x, 1.3, CO - 1.3); q.y = k.clamp(q.y, 1.3, RO - 1.3); k.float('¡Fantasma!', q.x * T, TOP + q.y * T - 34, '#a097ff');
+  if (PAIR) { const m = mate(q); if (m && m.alive) { m.range = Math.min(8, m.range + 1); m.max = Math.min(6, m.max + 1); flo('¡Relevo!', m.x * T, TOP + m.y * T - 24, m.col); k.sfx('coin'); } }
+  if (GHOST) { q.ghost = true; q.gcd = 3; q.dead = 0; q.x = k.clamp(q.x, 1.3, CO - 1.3); q.y = k.clamp(q.y, 1.3, RO - 1.3); flo('¡Fantasma!', q.x * T, TOP + q.y * T - 34, '#a097ff');
     if (by && by !== q && by.ghost) revive(by, cx, cy); }
 }
 function revive(o, x, y) { // fantasma: vuelve a la vida en la casilla del rival al que acaba de pillar
@@ -306,7 +312,7 @@ function revive(o, x, y) { // fantasma: vuelve a la vida en la casilla del rival
   for (let b = 1; b < RO - 1; b++) for (let a = 1; a < CO - 1; a++) if (!grid[b][a] && !fireT[b][a] && !bombAt(a, b) && !plAt(a, b)) { const d = Math.abs(a - x) + Math.abs(b - y); if (d < bd) { bd = d; best = [a, b]; } }
   if (!best) return;
   Object.assign(o, { alive: true, ghost: false, dead: 0, x: best[0] + 0.5, y: best[1] + 0.5, inv: 2.5, ai: null, think: 0, mv: 0 });
-  k.sfx('win'); k.confetti(o.col, 20); k.burst(o.x * T, TOP + o.y * T, o.col, 22, 200); k.float('¡Vuelves!', o.x * T, TOP + o.y * T - 26, o.col);
+  k.sfx('win'); k.confetti(o.col, 20); k.burst(o.x * T, TOP + o.y * T, o.col, 22, 200); flo('¡Vuelves!', o.x * T, TOP + o.y * T - 26, o.col);
 }
 
 /* ---------------- IA: mapa de peligro + BFS ---------------- */
@@ -509,9 +515,9 @@ function spawnHot() {
   if (!best) return;
   hotN++; const fu = Math.max(3.4, RU.fuse - (hotN - 1) * 0.6);
   hot = { x: best[0], y: best[1], t: fu, fu, range: RU.range + Math.min(2, Math.floor((hotN - 1) / 2)), own: null, pass: new Set(), sl: null, born: t, hot: true, car: null, last: null, cool: 0 };
-  bombs.push(hot); k.sfx('start'); k.float('¡Petardo!', (hot.x + 0.5) * T, TOP + hot.y * T, '#ffd166');
+  bombs.push(hot); k.sfx('start'); flo('¡Petardo!', (hot.x + 0.5) * T, TOP + hot.y * T, '#ffd166');
 }
-function grabHot(q) { hot.car = q; hot.own = q; hot.sl = null; hot.pass = new Set(); hot.fx = q.x; hot.fy = q.y; k.sfx('coin'); k.shake(2); k.float('¡Lo tienes!', q.x * T, TOP + q.y * T - 30, q.col); }
+function grabHot(q) { hot.car = q; hot.own = q; hot.sl = null; hot.pass = new Set(); hot.fx = q.x; hot.fy = q.y; k.sfx('coin'); k.shake(2); flo('¡Lo tienes!', q.x * T, TOP + q.y * T - 30, q.col); }
 function throwHot(q) {
   if (!hot || hot.car !== q) { k.sfx('click'); return; }
   const [cx, cy] = cellOf(q);
@@ -696,8 +702,9 @@ function draw() {
   const left = Math.max(0, RU.round - rT); label(sudden ? '¡YA!' : `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 232, 23, 18, sudden ? '#ff5f7a' : left < 10 ? '#ffd166' : '#fff');
   if (msgT > 0 || endT) { const al = pl.filter((q) => q.alive);
     const m = endT && PAINT ? '¡Tiempo!' : endT && PAIR ? (al.length ? `¡Equipo ${team(al[0]) ? 'B' : 'A'}!` : '¡Nadie en pie!') : endT ? (al.length === 1 ? `¡${al[0].name === 'Tú' ? 'Aguantas' : al[0].name + ' aguanta'}!` : '¡Nadie en pie!') : msg;
-    c.globalAlpha = endT ? 1 : Math.min(1, msgT * 2); c.font = '900 26px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const mw = c.measureText(m).width + 40;
-    ART.rr(c, W / 2 - mw / 2, TOP + RO * T / 2 - 26, mw, 52, 14); c.fillStyle = 'rgba(26,21,48,.88)'; c.fill(); c.lineWidth = 3; c.strokeStyle = '#ffd166'; c.stroke(); label(m, W / 2, TOP + RO * T / 2, 26, '#fff'); c.globalAlpha = 1; }
-  if (fast) label('Te han eliminado · la ronda termina a toda prisa', W / 2, H - 14, k.party ? 18 : 13, '#ffd166');
+    c.globalAlpha = endT ? 1 : Math.min(1, msgT * 2);
+    const mz = fitSize(m, W - 64, 26), mw = Math.min(W - 16, c.measureText(m).width + 40), mh = mz + 26;
+    ART.rr(c, W / 2 - mw / 2, TOP + RO * T / 2 - mh / 2, mw, mh, 14); c.fillStyle = 'rgba(26,21,48,.88)'; c.fill(); c.lineWidth = 3; c.strokeStyle = '#ffd166'; c.stroke(); label(m, W / 2, TOP + RO * T / 2, mz, '#fff'); c.globalAlpha = 1; }
+  if (fast) { const ft = 'Te han eliminado · la ronda termina a toda prisa'; label(ft, W / 2, H - 14, fitSize(ft, W - 20, k.party ? 18 : 13), '#ffd166'); }
   if (k.st === 'play' && rT < 3 && !k.counting()) label('Ronda ' + round, W / 2, TOP + 22, 20, '#fff');
 }
