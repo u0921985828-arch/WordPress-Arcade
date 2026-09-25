@@ -717,6 +717,8 @@ function gemBoard() {
 function drawGemItem(it) {
   const q = GVAL[it.t], x = gcx(it.x), y = gcy(it.y) + Math.sin(t * 2.4 + it.ph) * 2;
   c.save(); c.translate(x, y);
+  const gl = c.createRadialGradient(0, 0, 1, 0, 0, q.r * 2.6); gl.addColorStop(0, ART.alpha(q.col, 0.5)); gl.addColorStop(1, ART.alpha(q.col, 0));
+  c.fillStyle = gl; c.beginPath(); c.arc(0, 0, q.r * 2.6, 0, R2); c.fill();
   c.beginPath(); c.moveTo(0, -q.r); c.lineTo(q.r * 0.8, -q.r * 0.2); c.lineTo(q.r * 0.5, q.r * 0.8); c.lineTo(-q.r * 0.5, q.r * 0.8); c.lineTo(-q.r * 0.8, -q.r * 0.2); c.closePath();
   ART.fillOut(c, q.col, 2);
   c.beginPath(); c.moveTo(0, -q.r); c.lineTo(q.r * 0.3, 0); c.lineTo(-q.r * 0.3, 0); c.closePath(); c.fillStyle = 'rgba(255,255,255,.5)'; c.fill();
@@ -763,11 +765,11 @@ function drawGem() {
   if (!darkCv) { darkCv = document.createElement('canvas'); darkCv.width = W; darkCv.height = H; darkCx = darkCv.getContext('2d'); }
   const b = darkCx; b.setTransform(1, 0, 0, 1, 0, 0); b.globalCompositeOperation = 'source-over';
   b.clearRect(0, 0, W, H);
-  b.fillStyle = full ? 'rgba(5,3,12,.2)' : 'rgba(5,3,12,.9)';
+  b.fillStyle = full ? 'rgba(5,3,12,.18)' : 'rgba(5,3,12,.8)';
   b.fillRect(0, TOP, W, H - TOP - GBOT);
   if (!full) {
     b.globalCompositeOperation = 'destination-out';
-    for (const pl of GP) { const r = GS * 2.7 + Math.sin(t * 3 + pl.p) * 3, x = gcx(pl.fx), y = gcy(pl.fy);
+    for (const pl of GP) { const r = GS * 3 + Math.sin(t * 3 + pl.p) * 3, x = gcx(pl.fx), y = gcy(pl.fy);
       const gr = b.createRadialGradient(x, y, r * 0.18, x, y, r); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.55, 'rgba(0,0,0,.92)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
       b.fillStyle = gr; b.beginPath(); b.arc(x, y, r, 0, R2); b.fill(); }
     const cr = GS * 1.8, cx2 = gcx(gCart.x), cy2 = gcy(gCart.y);

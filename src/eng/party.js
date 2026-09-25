@@ -1787,7 +1787,7 @@ function mgPhoto() {
 
 /* 22. RELEVO DE CUBOS — cooperativo: llenad el barril pasándoos cubos sin derramarlos. */
 function mgRelay() {
-  const GY = 352, BD = [104, 252, 400, 548, 700], GOAL = 100, TL = 70, LITROS = 20;
+  const GY = 352, BD = [104, 252, 400, 548, 700], GOAL = 100, TL = 70, LITROS = 25;
   const m = { name: 'Relevo de Cubos', help: 'Cooperativo: muévete por tu tramo con ← →, coge el cubo con A y pásalo al siguiente. Mantén B para no derramar agua.', done: false, rank: null, teamHead: null };
   const ps = [0, 1, 2, 3].map((p) => ({ p, x: BD[p] + 30, v: 0, pv: 0, face: 1, bucket: null, liters: 0, aiT: 0, steady: false }));
   const bks = []; let T = 0, barrel = 0, spawnT = 1, over = false, endT = 0, spilled = 0, done = 0;
@@ -1803,13 +1803,13 @@ function mgRelay() {
   m.update = (dt) => {
     T += dt;
     spawnT -= dt;
-    if (spawnT <= 0 && bks.filter((b) => b.carrier < 1).length < 1 && bks.length < 2 && !over) { spawn(); spawnT = 3.4; }
+    if (spawnT <= 0 && bks.filter((b) => b.carrier < 1).length < 1 && bks.length < 3 && !over) { spawn(); spawnT = 2.6; }
     for (const q of ps) {
       const lo = BD[q.p], hi = BD[q.p + 1], b = q.bucket;
       let d = 0; q.steady = false;
       if (cpu(q.p)) {
         q.aiT -= dt;
-        if (b) { d = 1; q.steady = Math.abs(b.sway) > lerp(0.36, 0.24, SK()) || Math.abs(b.swayV) > 1.4; if (q.x > hi - 26) d = 0; }
+        if (b) { d = 1; q.steady = Math.abs(b.sway) > lerp(0.36, 0.24, SK()) || Math.abs(b.swayV) > 1.4; if (q.p === 3 ? q.x > BD[4] + 20 : q.x > hi - 26) d = 0; }
         else { const free = bks.find((x) => x.carrier === -1 && q.p === 0) || (q.p > 0 && bucketAt(q.p - 1));
           const tx = q.p === 0 ? (free ? free.x : lo + 30) : lo + 14;
           d = Math.abs(tx - q.x) > 8 ? Math.sign(tx - q.x) : 0;
@@ -1829,11 +1829,11 @@ function mgRelay() {
       if (b) {
         const acc = (q.v - q.pv) / Math.max(dt, 0.001);
         b.x = q.x + 20 * q.face; b.y = GY;
-        b.swayV += (-9 * b.sway - acc * 0.0165) * dt;
-        b.swayV *= Math.exp(-(q.steady ? 6.5 : 1.7) * dt);
+        b.swayV += (-9 * b.sway - acc * 0.006) * dt;
+        b.swayV *= Math.exp(-(q.steady ? 6.5 : 2.8) * dt);
         b.sway += b.swayV * dt;
-        if (Math.abs(b.sway) > 0.5 && b.level > 0) {
-          const s = (Math.abs(b.sway) - 0.5) * 1.15 * dt; b.level = Math.max(0, b.level - s); spilled += s * LITROS;
+        if (Math.abs(b.sway) > 0.62 && b.level > 0) {
+          const s = (Math.abs(b.sway) - 0.62) * 0.5 * dt; b.level = Math.max(0, b.level - s); spilled += s * LITROS;
           if (Math.random() < 30 * s) k.burst(b.x + Math.sign(b.sway) * 12, GY - 34, '#8fd3ff', 2, 70);
         }
         if (q.p === 3 && q.x > BD[4] + 12) { q.bucket = null; pour(b); }
