@@ -494,16 +494,17 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
         fit(nameOf(p), cx + 28, cy + 16, 13.5, '#fff', 'left', bw - 90);
         fit(`${S.rows[p].length}/${S.tries}`, cx + bw - 10, cy + 16, 13, S.rows[p].length >= S.tries - 2 ? '#ff9a8a' : '#cfe8d8', 'right', 54);
         const listY = cy + 32, rowH = Math.min(26, (bh - 40 - (S.done[p] || !hum(p) ? 0 : 30)) / Math.max(1, S.tries));
-        const pegR = Math.min(9, rowH * 0.36), stepX = Math.min(30, (bw - 80) / 4);
+        const pegR = Math.min(11, rowH * 0.36), stepX = Math.min(34, (bw - 80) / 4);
+        const rowW = 4 * stepX + 32, rx = cx + Math.max(18, (bw - rowW) / 2);   // fila centrada de verdad en el panel
         S.rows[p].forEach((r, i) => {
           const y = listY + i * rowH + rowH / 2;
-          r.g.forEach((v, j) => circ(cx + 18 + j * stepX, y, pegR, PAL[v], 1.8));
-          const px = cx + 18 + 4 * stepX + 10;
+          r.g.forEach((v, j) => circ(rx + j * stepX, y, pegR, PAL[v], 1.8));
+          const px = rx + 4 * stepX + 10;
           for (let q2 = 0; q2 < 4; q2++) { const on = q2 < r.ok ? '#1a1530' : q2 < r.ok + r.col ? '#fff' : null; const xx = px + (q2 % 2) * 11, yy = y - 5 + (q2 >> 1) * 11; c.beginPath(); c.arc(xx, yy, 4.2, 0, TAU); c.fillStyle = on || 'rgba(255,255,255,.13)'; c.fill(); if (on) { c.lineWidth = 1.2; c.strokeStyle = 'rgba(255,255,255,.5)'; c.stroke(); } }
         });
         if (S.phase === 'play' && !S.done[p]) {
           const y = listY + S.rows[p].length * rowH + rowH / 2 + 2;
-          S.guess[p].forEach((v, j) => { const x = cx + 18 + j * stepX; if (S.slot[p] === j && hum(p)) { circ(x, y, pegR + 4, '#ffd166', 0); } circ(x, y, pegR, PAL[v], 1.8); if (!k.party && p === 0) hits.push({ x: x - pegR - 4, y: y - pegR - 4, w: pegR * 2 + 8, h: pegR * 2 + 8, v: j }); });
+          S.guess[p].forEach((v, j) => { const x = rx + j * stepX; if (S.slot[p] === j && hum(p)) { circ(x, y, pegR + 4, '#ffd166', 0); } circ(x, y, pegR, PAL[v], 1.8); if (!k.party && p === 0) hits.push({ x: x - pegR - 4, y: y - pegR - 4, w: pegR * 2 + 8, h: pegR * 2 + 8, v: j }); });
         } else if (S.done[p]) fit(S.rows[p].length && S.rows[p][S.rows[p].length - 1].ok === 4 ? '¡Clave rota!' : 'Sin intentos', cx + bw / 2, cy + bh - 16, 14, S.rows[p].length && S.rows[p][S.rows[p].length - 1].ok === 4 ? '#7cf7a0' : '#ff9a8a', 'center', bw - 20);
       }
       if (S.phase === 'reveal') {
