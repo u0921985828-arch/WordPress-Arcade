@@ -238,11 +238,11 @@ function paddleX() {
     const LIVES = CFG.lives || 3, MAXS = 560;
     /* lado i: 0 abajo, 1 arriba, 2 izquierda, 3 derecha; n = normal hacia dentro de la mesa */
     const SD = [{ n: [0, -1], hz: true }, { n: [0, 1], hz: true }, { n: [1, 0], hz: false }, { n: [-1, 0], hz: false }];
-    let PL4 = [], puck, tm = 0, serveT = 0, goalT = 0, goalSide = -1, order = 0, cdPend = false, spd = 150, over = false, lastHit = -1;
+    let PL4 = [], puck, tm = 0, calm = 0, serveT = 0, goalT = 0, goalSide = -1, order = 0, cdPend = false, spd = 150, over = false, lastHit = -1;
     const pos = (s) => [[s.c, B - INS], [s.c, INS], [INS, s.c], [B - INS, s.c]][s.i];
     function reset() {
       PL4 = [0, 1, 2, 3].map((i) => ({ i, p: i, c: B / 2, pc: B / 2, lives: LIVES, out: false, outAt: 0, err: 0, flash: 0 }));
-      puck = { x: B / 2, y: B / 2, vx: 0, vy: 0, r: PR, bz: 0 }; tm = 0; serveT = 1.6; order = 0; goalT = 0; over = false; lastHit = -1; spd = 150; cdPend = !!k.party; trail = [];
+      puck = { x: B / 2, y: B / 2, vx: 0, vy: 0, r: PR, bz: 0 }; tm = 0; calm = 0; serveT = 1.6; order = 0; goalT = 0; over = false; lastHit = -1; spd = 150; cdPend = !!k.party; trail = [];
     }
     let trail = [];
     k.onParty = () => { if (k.st !== 'play') reset(); };
@@ -256,7 +256,7 @@ function paddleX() {
       puck.x = B / 2; puck.y = B / 2; puck.vx = Math.cos(a) * v; puck.vy = Math.sin(a) * v; k.sfx('pop');
     }
     function goal(s) {
-      s.lives--; s.flash = 1; goalT = 1.2; goalSide = s.i; trail = [];
+      s.lives--; s.flash = 1; calm = 0; goalT = 1.2; goalSide = s.i; trail = [];
       k.burst(OX + puck.x, OY + puck.y, k.pcol(s.p), 24, 220); k.sfx(k.human(s.p) && !k.party ? 'hurt' : 'coin'); k.shake(k.human(s.p) ? 7 : 4);
       if (k.human(s.p) && !k.party) k.flash('rgba(255,70,90,.25)');
       if (s.lives <= 0) { s.out = true; s.outAt = ++order; k.sfx('explode'); k.float(pname(s.p) + ' eliminado', OX + B / 2, OY + B / 2 - 30, k.pcol(s.p)); }
@@ -314,12 +314,12 @@ function paddleX() {
       if (!k.gate(reset)) return;
       if (cdPend) { cdPend = false; k.count(3); }
       if (k.counting() || over) return;
-      tm += dt; const L = lvl(), noHum = !PL4.some((s) => !s.out && k.human(s.p));
+      tm += dt; if (serveT <= 0) calm += dt; const L = lvl(), noHum = !PL4.some((s) => !s.out && k.human(s.p));
       for (const s of PL4) { if (s.out) continue; s.pc = s.c;
         if (k.human(s.p)) { const d = k.pdir(s.p), hz = SD[s.i].hz; const m = hz ? d.x : d.y || (s.i === 2 ? d.x : -d.x); s.c += m * 380 * dt;
           if (!k.party && s.p === 0 && k.ptr.down) { const tx = k.ptr.x - OX; s.c += (tx - s.c) * Math.min(1, dt * 22); } }
         else { const pr = predict(s.i), sp = 150 + 240 * L; let tgt = B / 2;
-          if (pr && pr.t < 0.5 + L * 1.2) tgt = pr.a + s.err; else s.err = k.rnd(-1, 1) * (1 - L) * 48;
+          if (pr && pr.t < 0.5 + L * 1.2) tgt = pr.a + s.err; else s.err = k.rnd(-1, 1) * ((1 - L) * 48 + Math.min(70, Math.max(0, calm - (noHum ? 6 : 20)) * 4)); // sin goles un buen rato: la CPU se cansa y falla más
           s.c += clamp(tgt - s.c, -sp * dt, sp * dt); }
         s.c = clamp(s.c, CUT + PL / 2 - 8, B - CUT - PL / 2 + 8); }
       if (serveT > 0) { serveT -= dt; if (serveT <= 0) launch(); return; }

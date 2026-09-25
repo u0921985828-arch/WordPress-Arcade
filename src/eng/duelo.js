@@ -867,5 +867,5 @@ k.run((dt) => {
   drawBits();
   if (!demo) hud();
   if (!k.counting()) drawBanner();
-  if (phase === 'down' && countN > 0 && endT < 0) label(String(countN), 400, 120, 60, '#ffd166');
+  if (phase === 'down' && countN > 0 && endT < 0) label(String(countN), 400, 215, 64, '#ffd166');
 });
