@@ -986,13 +986,13 @@ Object.assign(MODES, {
       return { x: mv.x, y: mv.y, bh: jump };
     },
   },
-  /* Imanes Opuestos: polos iguales se repelen y distintos se atraen (fuerza ∝ 1/d²). A cambia de polo, B ancla. La placa encoge desde los 20 s. */
+  /* Imanes Opuestos: polos iguales se repelen y distintos se atraen (fuerza ∝ 1/d²). A cambia de polo, B ancla. La placa encoge desde los 14 s. */
   imanes: {
     hint: ['A: cambia de polo', 'Iguales se repelen', 'B: anclarse'],
     init() { S.R = 205; P.forEach((pl) => { pl.pol = pl.i % 3 ? 1 : -1; pl.flip = 0; }); },
     act(pl, inp) { pl.brace = !!inp.b; if (inp.ah && pl.cd <= 0) { pl.pol = -pl.pol; pl.cd = 0.3; pl.flip = 0.25; k.sfx('click'); } return pl.brace ? 0.1 : 1; },
     step(dt) {
-      S.R = rt < 20 ? 205 : Math.max(125, 205 - (rt - 20) * 2);
+      S.R = rt < 14 ? 205 : Math.max(60, 205 - (rt - 14) * 3.5); /* 1.28.1: encoge antes y hasta 60 px, para que la ronda no acabe sin nadie fuera */
       const al = standing(), ramp = lerp(0.25, 1, rt / 6);
       for (const pl of P) pl.flip = Math.max(0, pl.flip - dt);
       for (let i = 0; i < al.length; i++) for (let j = i + 1; j < al.length; j++) { const a = al[i], b = al[j], dx = b.x - a.x, dy = b.y - a.y, d = hyp(dx, dy); if (d > 230 || d < 1) continue;

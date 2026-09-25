@@ -47,7 +47,8 @@ function mkBodies() {
 }
 function refreshCtl() { for (const b of B) b.ctl = b.slot >= 0 && k.human(b.slot) ? b.slot : -1; }
 k.onParty = () => { if (k.st !== 'play') { reset(); return; } refreshCtl(); };
-const nameOf = (b) => (b.ctl < 0 ? 'CPU' : k.party ? 'J' + (b.ctl + 1) : 'TÚ');
+/* 1.28.1: con más de una CPU se numeran (CPU 1, CPU 2…) para no ver varios rótulos iguales. */
+const nameOf = (b) => (b.ctl >= 0 ? (k.party ? 'J' + (b.ctl + 1) : 'TÚ') : B.filter((o) => o.ctl < 0).length > 1 ? 'CPU ' + (B.filter((o) => o.ctl < 0).indexOf(b) + 1) : 'CPU');
 const humanTeam = () => { const h = B.filter((b) => b.ctl >= 0).map((b) => b.team); return h.length && h.every((x) => x === h[0]) ? h[0] : -1; };
 const atk = (tm) => (tm === 0 ? 1 : -1); // sentido de ataque en x
 /* Ventaja amable: un equipo solo de CPU que gana de 2 o más a un equipo con humanos afloja un poco (partidos igualados) */
@@ -987,11 +988,16 @@ function drawCourt() {
   if (ball.own && needClear && ball.own.team === poss) { const [x, y] = V(CHECK[0], HY); c.globalAlpha = 0.5 + 0.4 * Math.sin(t * 8); c.strokeStyle = '#ffd166'; c.lineWidth = 3; c.beginPath(); c.arc(x, y, 16, 0, TAU); c.stroke(); c.globalAlpha = 1; }
 }
 function hud() {
-  const g = c.createLinearGradient(0, 0, 0, 46); g.addColorStop(0, 'rgba(26,21,48,.95)'); g.addColorStop(1, 'rgba(26,21,48,.75)'); c.fillStyle = g; ART.rr(c, W / 2 - 150, 4, 300, k.party ? 50 : 40, 12); c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
-  for (const tm of [0, 1]) { const x = W / 2 + (tm ? 1 : -1) * 104; ART.rr(c, x - 40, 10, 80, 28, 9); c.fillStyle = TEAM[tm].col; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke(); label(TEAM[tm].name.toUpperCase(), x, 24, k.party ? 18 : 14, '#fff'); }
-  label(`${score[0]} – ${score[1]}`, W / 2, 20, 22, '#fff');
+  /* 1.28.1: el panel se ajusta al ancho real; en vertical el subtítulo baja a su propia línea y no pisa los escudos. */
+  const PW = Math.min(300, W - 12), PX = W / 2 - PW / 2, BW = Math.max(56, Math.min(84, (PW - 108) / 2));
+  const PH = 48, BY = 7, BH = 22; /* una sola disposición: los escudos arriba y el subtítulo debajo, siempre dentro de la franja de 56 px */
+  const g = c.createLinearGradient(0, 0, 0, PH + 6); g.addColorStop(0, 'rgba(26,21,48,.95)'); g.addColorStop(1, 'rgba(26,21,48,.75)'); c.fillStyle = g; ART.rr(c, PX, 4, PW, PH, 12); c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
+  for (const tm of [0, 1]) { const x = W / 2 + (tm ? 1 : -1) * (PW / 2 - BW / 2 - 5); ART.rr(c, x - BW / 2, BY, BW, BH, 9); c.fillStyle = TEAM[tm].col; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
+    const nm = TEAM[tm].name.toUpperCase(); let fs = 15; c.font = `800 ${fs}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; const tw = c.measureText(nm).width; if (tw > BW - 12) fs = Math.max(9, fs * (BW - 12) / tw);
+    label(nm, x, BY + BH / 2, fs, '#fff'); }
+  label(`${score[0]} – ${score[1]}`, W / 2, BY + BH / 2, 20, '#fff');
   let sub; if (MODE === 'voley') sub = `a ${PTS} · saca ${TEAM[serveTeam].name.toLowerCase()}`; else if (MODE === 'canasta') sub = needClear && ball.own && ball.own.team === poss ? '¡sácala del triple!' : `a ${PTS_B} · atacan ${TEAM[poss].name.toLowerCase()}`; else if (MODE === 'futbolin') sub = `a ${PTS_F} goles`; else if (golden) sub = MODE === 'prisionero' ? 'bola de oro' : 'gol de oro'; else sub = `${MODE === 'prisionero' ? 'ronda ' + roundNo + ' · ' : ''}${Math.floor(Math.max(0, clock) / 60)}:${String(Math.floor(Math.max(0, clock) % 60)).padStart(2, '0')}`;
-  label(sub, W / 2, k.party ? 41 : 37, k.party ? 17 : 12, golden || (MODE === 'canasta' && needClear && ball.own) ? '#ffd166' : '#d8d0f0');
+  label(sub, W / 2, 40, 13, golden || (MODE === 'canasta' && needClear && ball.own) ? '#ffd166' : '#d8d0f0');
   if (msgT > 0 || phase === 'serve') { const m = phase === 'serve' && msgT <= 0 ? (ball.srv.ctl >= 0 ? `Saca ${nameOf(ball.srv)}: pulsa A` : '') : msg; if (m) {
     c.globalAlpha = Math.min(1, (msgT || 1) * 2); c.font = '900 26px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const mw = c.measureText(m).width + 40, my = SIDE ? 80 : H / 2 + (VERT ? -40 : 0);
     ART.rr(c, W / 2 - mw / 2, my - 24, mw, 48, 14); c.fillStyle = 'rgba(26,21,48,.88)'; c.fill(); c.lineWidth = 3; c.strokeStyle = '#ffd166'; c.stroke(); label(m, W / 2, my, 24, '#fff'); c.globalAlpha = 1; } }

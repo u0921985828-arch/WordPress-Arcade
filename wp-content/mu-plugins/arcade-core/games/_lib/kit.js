@@ -14,8 +14,8 @@
     st.textContent = `:root{--bg:${bg};--ac:${acc}}
 html,body{margin:0;height:100%;background:${bg};overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;font-family:ui-rounded,"Trebuchet MS",system-ui,sans-serif;color:#f5f1e6}
 canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-action:none}
-#ov{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:16px;pointer-events:none;background:color-mix(in srgb,var(--bg) 70%,rgba(4,4,10,.6));backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
-#ov .card{display:flex;flex-direction:column;align-items:center;gap:10px;padding:24px 22px 22px;min-width:min(300px,84vw);max-width:420px;border-radius:20px;background:linear-gradient(180deg,color-mix(in srgb,var(--bg) 82%,#fff 12%),color-mix(in srgb,var(--bg) 92%,#000));border:3px solid #1a1530;box-shadow:inset 0 2px 0 rgba(255,255,255,.14),0 7px 0 #1a1530,0 18px 40px rgba(0,0,0,.45);animation:pop .28s cubic-bezier(.2,1.2,.4,1)}
+#ov{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:16px;pointer-events:none;background:color-mix(in srgb,var(--bg) 55%,rgba(4,4,10,.78));backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+#ov .card{display:flex;flex-direction:column;align-items:center;gap:10px;padding:24px 22px 22px;min-width:min(300px,84vw);max-width:420px;border-radius:20px;background:linear-gradient(180deg,color-mix(in srgb,var(--bg) 45%,#241d44),color-mix(in srgb,var(--bg) 30%,#14102a));border:3px solid #1a1530;box-shadow:inset 0 2px 0 rgba(255,255,255,.14),0 7px 0 #1a1530,0 18px 40px rgba(0,0,0,.45);animation:pop .28s cubic-bezier(.2,1.2,.4,1)}
 #ov h1{margin:0;font:900 clamp(26px,7vmin,40px)/1.05 ui-rounded,"Trebuchet MS",system-ui,sans-serif;letter-spacing:-.01em;color:#fff;text-shadow:0 3px 0 #1a1530,0 0 18px color-mix(in srgb,var(--ac) 45%,transparent)}
 #ov p{margin:0;font:600 clamp(13px,3.4vmin,16px)/1.45 ui-rounded,"Trebuchet MS",system-ui,sans-serif;color:color-mix(in srgb,#fff 78%,var(--ac));max-width:36ch}#ov.hide{display:none}
 #ov .go{margin-top:8px;padding:13px 30px;border-radius:14px;background:var(--ac);color:#fff;font:800 clamp(15px,4vmin,18px)/1 ui-rounded,"Trebuchet MS",system-ui,sans-serif;border:3px solid #1a1530;box-shadow:inset 0 2px 0 rgba(255,255,255,.3),0 5px 0 #1a1530;text-shadow:0 2px 0 rgba(26,21,48,.5);animation:bob 1.6s ease-in-out infinite}
@@ -79,14 +79,16 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
     k.mpMax = (window.CFG && Array.isArray(CFG.mp) && CFG.mp[1]) || 1;
     k.privOK = false; k.onPick = null;
     k.human = (p) => (k.party ? k.party.some((x) => x.p === p) : p === 0);
-    k.players = (n) => { const out = []; for (let p = 0; p < (n || k.mpMax); p++) { const q = k.party && k.party.find((x) => x.p === p), hu = k.human(p); out.push({ p, color: k.pcol(p), name: hu ? (q && q.name) || (k.party ? 'J' + (p + 1) : 'Tú') : 'CPU', cpu: !hu }); } return out; };
+    k.players = (n) => { const out = []; for (let p = 0; p < (n || k.mpMax); p++) { const q = k.party && k.party.find((x) => x.p === p), hu = k.human(p); out.push({ p, color: k.pcol(p), name: hu ? (q && q.name) || (k.party ? 'J' + (p + 1) : 'Tú') : 'CPU', cpu: !hu }); } /* con varias CPU se numeran para distinguirlas en el podio */ if (out.filter((s) => s.cpu).length > 1) { let i = 0; for (const s of out) if (s.cpu) s.name = 'CPU ' + ++i; } return out; };
     k.pheld = (p, key) => (k.party ? k.pad(p).held.has(key) : p === 0 && k.held.has(key));
     k.phit = (p, key) => (k.party ? k.pad(p).hit.has(key) : p === 0 && k.hit.has(key));
     k.pdir = (p) => ({ x: (k.pheld(p, 'right') ? 1 : 0) - (k.pheld(p, 'left') ? 1 : 0), y: (k.pheld(p, 'down') ? 1 : 0) - (k.pheld(p, 'up') ? 1 : 0) });
     k.priv = (p, data) => { if (k.privOK) tell('arcade:priv', { p, data: data || null }); };
     k.podium = (rows, o) => {
       o = o || {}; if (!rows || !rows.length) rows = [{ p: 0, score: 0 }]; const r = rows.slice().sort((a, b) => (o.asc ? a.score - b.score : b.score - a.score)), top = r[0], pl = k.players(Math.max(k.mpMax, r.length));
-      const nm = (x) => x.name || (pl[x.p] && pl[x.p].name) || 'J' + (x.p + 1);
+      const raw = (x) => x.name || (pl[x.p] && pl[x.p].name) || 'J' + (x.p + 1);
+      /* 1.28.1: si dos filas traen el mismo rótulo (varias CPU), se numeran por plaza. */
+      const nm = (x) => { const n = raw(x); return r.filter((y) => raw(y) === n).length > 1 ? n + ' ' + (x.p + 1) : n; };
       const tie = r.length > 1 && r[1].score === top.score && !o.noTie;
       const body = r.map((x, i) => `<span style="display:inline-block;min-width:1.4em;color:${k.pcol(x.p)}">${i + 1}.</span><b style="color:${k.pcol(x.p)}">${nm(x)}</b> · ${o.fmt ? o.fmt(x.score) : x.score}`).join('<br>');
       k.win(o.head || (tie ? '¡Empate!' : `¡Gana ${nm(top)}!`), tie ? '#ffd166' : k.pcol(top.p), `${body}<br>${o.go || 'Toca para la revancha'}`, top.score);

@@ -297,9 +297,16 @@ function slideShot(q, cx, cy) { // hielo: ¿hay un rival en línea recta al que 
     if (Math.abs(ex - cx) + Math.abs(ey - cy) >= 2 && hitsFoe(q, ex, ey)) return { d, x: ex, y: ey }; }
   return null;
 }
+/* 1.28.1 (pintura): la CPU afloja si ya domina el suelo, para que la ronda no se decida en el primer minuto. */
+function pEase(q) {
+  if (!PAINT) return 1;
+  const me = pl.indexOf(q), best = Math.max(...pl.map((o, i) => (o === q ? -1 : pcount[i])));
+  const lead = (pcount[me] - Math.max(0, best)) / Math.max(1, FREE);
+  return lead <= 0.06 ? 1 : k.clamp(1 - (lead - 0.06) * 3.2, 0.45, 1);
+}
 function aiThink(q) {
   const D = dangerMap(), [cx, cy] = cellOf(q), here = D[cy][cx];
-  const early = rT < 5, aggr = Math.min(1, 0.25 + skill * 0.5 + rT / 135);
+  const early = rT < 5, aggr = Math.min(1, 0.25 + skill * 0.5 + rT / 135) * pEase(q);
   if (here !== Infinity) { // huir
     const path = bfs(q, D, (x, y) => D[y][x] === Infinity);
     q.ai = path && path.length > 1 ? path : null; q.think = 0.05; return;
@@ -313,7 +320,7 @@ function aiThink(q) {
   }
   if (!early && mine < q.max && !bombAt(cx, cy)) {
     const foe = hitsFoe(q, cx, cy), crate = PAINT ? paintGain(q, cx, cy) >= 2 : hitsCrate(q, cx, cy); // mismo umbral que el objetivo de abajo (si no, va y viene sin tirar)
-    if ((foe && Math.random() < aggr) || (crate && Math.random() < 0.55 + skill * 0.4)) {
+    if ((foe && Math.random() < aggr) || (crate && Math.random() < (PAINT ? 0.34 + skill * 0.3 : 0.55 + skill * 0.4) * pEase(q))) {
       const eb = { x: cx, y: cy, t: RU.fuse, range: q.range }, D2 = dangerMap(eb);
       const esc = bfs(q, D2, (x, y) => D2[y][x] === Infinity);
       if (esc && esc.length > 1 && esc.length - 1 <= RU.fuse * q.spd * (0.55 + skill * 0.3)) { placeBomb(q, ICE ? false : undefined); q.ai = esc; q.think = 0.05; return; }
@@ -330,7 +337,7 @@ function aiThink(q) {
     if (foe) path = bfs(q, D, (x, y, n) => n > 0 && safeCell(x, y) && Math.abs(x + 0.5 - foe.x) + Math.abs(y + 0.5 - foe.y) < 2.2); }
   if (!path) path = bfs(q, D, (x, y, n) => n === 1 && safeCell(x, y));
   q.ai = path && path.length > 1 ? path.slice(0, 3) : null;
-  q.think = k.rnd(0.08, 0.1) + (1 - skill) * k.rnd(0.1, 0.35);
+  q.think = k.rnd(0.08, 0.1) + (1 - skill) * k.rnd(0.1, 0.35) + (PAINT ? k.rnd(0.12, 0.3) / pEase(q) : 0);
 }
 function aiDir(q, D) {
   if (!q.ai || q.ai.length < 2) { const [cx, cy] = cellOf(q), ox = cx + 0.5 - q.x, oy = cy + 0.5 - q.y; // sin ruta: vuelve al centro de su casilla

@@ -405,10 +405,14 @@ function drawHUD() {
   const vs = views(), rk = ranking();
   for (const v of vs) { const r = v.r || camTarget(), me = SL ? r : r; if (!me) continue;
     const x = v.x + 8, y = 8, compact = v.w < 260;
-    if (SL) { rr(c, x, y, compact ? v.w - 16 : 150, compact ? 50 : 56, 10); c.fillStyle = 'rgba(20,16,36,.66)'; c.fill(); c.lineWidth = 2; c.strokeStyle = vs.length > 1 ? me.col : OUT; c.stroke();
-      const t = me.fin ? me.time : raceT + me.pen; label(fmtT(t), x + 8, y + 5, compact ? 18 : 22, me.fin ? '#7cf7a0' : '#fff');
-      label(`${ORD(rk.indexOf(me) + 1)}  ·  ${Math.min(me.g, T.gates.length)}/${T.gates.length}`, x + 8, y + (compact ? 28 : 32), compact ? 12 : 14, '#c9c3e6');
-      if (me.pen) label(`+${me.pen} s`, x + (compact ? v.w - 24 : 142), y + 5, compact ? 13 : 15, '#ff8a8a', 'right'); }
+    /* 1.28.1: con 3–4 columnas el panel pasa a una sola línea para tapar lo menos posible de la pista. */
+    const slim = SL && vs.length >= 3, pw = slim ? v.w - 16 : compact ? v.w - 16 : 150, ph = slim ? 24 : compact ? 50 : 56;
+    if (SL) { rr(c, x, y, pw, ph, 10); c.fillStyle = 'rgba(20,16,36,.66)'; c.fill(); c.lineWidth = 2; c.strokeStyle = vs.length > 1 ? me.col : OUT; c.stroke();
+      const t = me.fin ? me.time : raceT + me.pen; label(fmtT(t), x + 7, y + (slim ? 4 : 5), slim ? 15 : compact ? 18 : 22, me.fin ? '#7cf7a0' : '#fff');
+      const prog = `${ORD(rk.indexOf(me) + 1)}  ·  ${Math.min(me.g, T.gates.length)}/${T.gates.length}`;
+      if (slim) label(prog, x + pw - 7, y + 6, 11, '#c9c3e6', 'right');
+      else label(prog, x + 8, y + (compact ? 28 : 32), compact ? 12 : 14, '#c9c3e6');
+      if (me.pen) label(`+${me.pen} s`, x + pw - 7, y + (slim ? ph + 2 : 5), slim ? 12 : compact ? 13 : 15, '#ff8a8a', 'right'); }
     else { const hs = humans(); if (hs.length <= 1) { const q = hs[0] || rk[0], pos = rk.indexOf(q) + 1; rr(c, x, y, 112, 56, 12); c.fillStyle = 'rgba(20,16,36,.66)'; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
         label(ORD(pos), x + 8, y + 3, 30, pos === 1 ? '#ffd166' : '#fff'); label('/4', x + 10 + c.measureText(ORD(pos)).width, y + 14, 16, '#c9c3e6'); label(q.fin ? '¡Meta!' : `${Math.round(clamp(q.y / T.LEN, 0, 1) * 100)} %`, x + 8, y + 36, 14, '#c9c3e6'); }
       else { let xx = x; for (const q of hs) { const pos = rk.indexOf(q) + 1; rr(c, xx, y, 76, 30, 9); c.fillStyle = 'rgba(20,16,36,.7)'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = q.col; c.stroke(); label(`J${q.p + 1} ${ORD(pos)}`, xx + 7, y + 6, 16, q.col); xx += 82; } } }

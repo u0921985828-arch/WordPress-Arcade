@@ -38,7 +38,7 @@ GAMES = [
     ),
     dict(
         title='Imanes Opuestos', genre='party', tags=['imanes', 'fisica', 'empujar', 'eliminacion', 'versus', 'vector'], **_P,
-        cfg=dict(mode='imanes', hud='bl', help='Cada jugador es un imán con polo N o S. Polos iguales se repelen y distintos se atraen, con más fuerza cuanto más cerca. A cambia tu polo y B te ancla al suelo (pesas el triple pero apenas te mueves). Echa a los demás de la placa, que encoge a partir de los 20 segundos. Tres rondas.'),
+        cfg=dict(mode='imanes', hud='bl', help='Cada jugador es un imán con polo N o S. Polos iguales se repelen y distintos se atraen, con más fuerza cuanto más cerca. A cambia tu polo y B te ancla al suelo (pesas el triple pero apenas te mueves). Echa a los demás de la placa, que encoge a partir de los 14 segundos. Tres rondas.'),
         pad=dict(d='8', a='Polo', b='Anclar'), mp=(2, 4), players='2–4 jugadores (o tú contra 3 CPU)',
         desc=[
             'En Imanes Opuestos cada jugador es un muñeco con un imán de herradura en la cabeza, rojo si es polo norte y azul si es polo sur. Todos comparten una placa metálica redonda suspendida sobre un foso oscuro, rodeada por una franja amarilla y negra de advertencia. Ganas si eres el último que queda encima, y para echar a los demás no hace falta tocarlos: basta con la física del magnetismo.',
