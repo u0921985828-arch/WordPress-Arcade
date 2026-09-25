@@ -281,6 +281,8 @@ function newRound() {
 }
 function reset() { mkPlayers(); round = 0; newRound(); }
 function dash(pl, pow, dur, kb) { pl.vx += pl.fx * pow; pl.vy += pl.fy * pow; pl.dash = dur; pl.kb = kb || 0; k.sfx('jump'); k.burst(W2(pl.x - pl.fx * pl.r), H2(pl.y - pl.fy * pl.r), '#e8e2ff', 6, 90); }
+/* Primeros 5 s: nadie cae (se le devuelve al último punto seguro). Solo lo usan los modos de la oleada 2. */
+function safe(pl, ok) { if (ok) { pl.sx = pl.x; pl.sy = pl.y; return false; } if (rt >= 5 || pl.sx == null) return false; pl.x = pl.sx; pl.y = pl.sy; pl.vx *= -0.4; pl.vy *= -0.4; return true; }
 function fallOut(pl, txt) { if (pl.fall) return; pl.fall = 0.001; k.sfx('hurt'); k.float(txt || (M === 'hielo' ? '¡Al agua!' : '¡Fuera!'), W2(pl.x), H2(pl.y) - 26, pl.col); }
 function eliminate(pl) { if (!pl.alive) return; pl.alive = false; pl.fall = 0; elimOrder.push(pl.i); }
 function human(pl) {
@@ -835,14 +837,15 @@ Object.assign(MODES, {
     val: (pl) => pl.val + (pl.val === 1 ? ' mosca' : ' moscas'),
     over(pl) { netAt(pl); },
     top() { for (const f of flies()) if (f.rsp <= 0) flyAt(f); },
-    ai(pl, ai, s) {
+    ai(pl, ai, s, dt) {
       if (ai.go || !ai.f || ai.f.rsp > 0 || (ai.f.gold && ai.f !== S.gold)) { let best = -1; ai.f = null;
         for (const f of flies()) if (f.rsp <= 0) { const v = (f.gold ? 3 + s * 4 : 1) / (hyp(f.x - pl.x, f.y - pl.y) + 40); if (v > best) { best = v; ai.f = f; } }
         const [o, d] = near(pl); ai.rv = o && d < 60 && Math.random() < s * 0.2 ? o : null; ai.dash = ai.f && hyp(ai.f.x - pl.x, ai.f.y - pl.y) > 150 && Math.random() < s * 0.5; }
       const f = ai.f; if (!f) return { x: 0, y: 0 };
       const ld = lerp(0.05, 0.3, s), mv = seek(pl, f.x + f.vx * ld - pl.fx * (pl.r + 14), f.y + f.vy * ld - pl.fy * (pl.r + 14), 0.1), [hx, hy] = this.hoop(pl);
       const can = hyp(f.x - hx, f.y - hy) < lerp(14, 23, s), rv = ai.rv && ai.rv.alive && hyp(ai.rv.x - hx, ai.rv.y - hy) < ai.rv.r + 10;
-      return { x: mv.x, y: mv.y, ah: can || rv, bh: ai.dash };
+      ai.hw = can ? (ai.hw || 0) + dt : 0;
+      return { x: mv.x, y: mv.y, ah: (can && ai.hw > lerp(0.3, 0.06, s)) || rv, bh: ai.dash };
     },
   },
   /* Escondite de Cajas: por turnos, uno busca (lupa) y los demás son cajas idénticas a las que mueve la CPU.
@@ -950,7 +953,7 @@ Object.assign(MODES, {
     step(dt) {
       const ct = lerp(0.95, 0.6, rt / 60);
       for (const pl of standing()) { if (pl.z > 0) continue; const i = hexAt(pl.x, pl.y), h = i >= 0 ? S.hx[i] : null;
-        if (!h || h.st < 0) { fallOut(pl, '¡Al vacío!'); continue; } if (h.st === 0 && rt > 3) h.st = 0.001; }
+        if (!h || h.st < 0) { if (!safe(pl, false)) fallOut(pl, '¡Al vacío!'); continue; } safe(pl, true); if (h.st === 0 && rt > 4.2) h.st = 0.001; }
       if (rt > S.next) { S.next = rt + lerp(2.4, 0.9, (rt - 25) / 40); const ok = S.hx.filter((h) => h.st === 0); if (ok.length) k.pick(ok).st = 0.001; }
       for (const h of S.hx) { if (h.st > 0) { h.st += dt / ct; if (h.st >= 1) { h.st = -1; h.fa = 0.001; k.burst(W2(h.x), H2(h.y), HEXCOL[h.ring], 8, 110); } } else if (h.fa > 0 && h.fa < 1) h.fa += dt * 1.5; }
     },
@@ -991,7 +994,7 @@ Object.assign(MODES, {
       for (const pl of P) pl.flip = Math.max(0, pl.flip - dt);
       for (let i = 0; i < al.length; i++) for (let j = i + 1; j < al.length; j++) { const a = al[i], b = al[j], dx = b.x - a.x, dy = b.y - a.y, d = hyp(dx, dy); if (d > 230 || d < 1) continue;
         const f = Math.min(1500, 2.6e6 / (d * d)) * ramp * dt * a.pol * b.pol, nx = dx / d, ny = dy / d; a.vx -= nx * f / mass(a); a.vy -= ny * f / mass(a); b.vx += nx * f / mass(b); b.vy += ny * f / mass(b); }
-      for (const pl of al) if (hyp(pl.x - CX, pl.y - CY) > S.R + pl.r * 0.15) fallOut(pl);
+      for (const pl of al) { const out = hyp(pl.x - CX, pl.y - CY) > S.R + pl.r * 0.15; if (!safe(pl, !out) && out) fallOut(pl); }
     },
     key: (pl) => -hyp(pl.x - CX, pl.y - CY),
     val: (pl) => (!pl.alive || pl.fall ? 'Fuera' : (pl.pol > 0 ? 'Polo N' : 'Polo S') + (pl.brace ? ' · ancla' : '')),
@@ -1034,8 +1037,8 @@ Object.assign(MODES, {
         const nx = dx / d, ny = dy / d;
         if (o.blk && facing(o, pl, 1.1)) { pl.stun = 0.6; pl.vx -= nx * 220; pl.vy -= ny * 220; o.vx += nx * 50; o.vy += ny * 50; k.sfx('click'); k.float('¡Bloqueo!', W2(o.x), H2(o.y) - 34, '#fff'); k.burst(W2(o.x - nx * o.r), H2(o.y - ny * o.r), '#fff', 8, 120); continue; }
         o.vx += nx * 330; o.vy += ny * 330; o.stun = 0.25; k.sfx('hit'); for (let j = 0; j < 7; j++) S.fx.push({ x: o.x + k.rnd(-10, 10), y: o.y - 10 + k.rnd(-8, 8), vx: k.rnd(-70, 70) + nx * 60, vy: k.rnd(-90, -20), a: k.rnd(0, 6), t: 0 });
-        if (o.inv > 0 || rt < 3) continue;
-        o.fe--; o.inv = 1.1; k.shake(4); k.float(o.fe > 0 ? '−1 pluma' : '¡Sin plumas!', W2(o.x), H2(o.y) - 36, o.col);
+        if (o.inv > 0 || rt < 5) continue;
+        o.fe--; o.inv = 1.6; k.shake(4); k.float(o.fe > 0 ? '−1 pluma' : '¡Sin plumas!', W2(o.x), H2(o.y) - 36, o.col);
         if (o.fe <= 0) fallOut(o, '¡Fuera!');
       }
     },
@@ -1049,12 +1052,13 @@ Object.assign(MODES, {
     icons(pl, x, y, w, h) { for (let j = 0; j < 3; j++) { const X = x + 22 + j * 20, Y = y + h - 46; c.save(); c.translate(X, Y); c.rotate(-0.7); c.beginPath(); c.ellipse(0, 0, 9, 4, 0, 0, TAU); ART.fillOut(c, j < pl.fe ? '#fff' : '#3a3458', 1.5); c.beginPath(); c.moveTo(-10, 0); c.lineTo(8, 0); c.lineWidth = 1; c.strokeStyle = OUT; c.stroke(); c.restore(); } },
     ai(pl, ai, s, dt) {
       const [o, d] = near(pl); if (!o) return seek(pl, CX, CY);
-      if (ai.go) { ai.blk = o.sw > 0 && d < 75 && facing(o, pl, 0.9) && Math.random() < s * 0.8 ? 0.45 : ai.blk; ai.hit = Math.random() < 0.35 + s * 0.55; ai.side = k.rnd(-0.5, 0.5) * (1 - s); }
+      if (ai.go) { ai.blk = o.sw > 0 && d < 75 && facing(o, pl, 0.9) && Math.random() < s * 0.8 ? 0.45 : ai.blk; ai.hit = Math.random() < 0.2 + s * 0.5; ai.side = k.rnd(-0.5, 0.5) * (1 - s); }
       if (ai.blk > 0) { ai.blk -= dt; const mv = seek(pl, o.x, o.y, 0); return { x: mv.x * 0.3, y: mv.y * 0.3, b: true }; }
       const want = pl.r + o.r + 14, dx = pl.x - o.x, dy = pl.y - o.y, L = hyp(dx, dy) || 1; let mv = d > want ? seek(pl, o.x + dx / L * want, o.y + dy / L * want, 0.15) : seek(pl, o.x, o.y, 0);
       if (pl.inv > 0.4 && d < 90) mv = { x: dx / L, y: dy / L };
       mv.x += -mv.y * ai.side; mv.y += mv.x * ai.side;
-      return { x: mv.x, y: mv.y, ah: ai.hit && d < pl.r + o.r + 22 && facing(pl, o, 0.7) };
+      const near2 = d < pl.r + o.r + 22 && facing(pl, o, 0.7); ai.hw = near2 ? (ai.hw || 0) + dt : 0;
+      return { x: mv.x, y: mv.y, ah: ai.hit && near2 && ai.hw > lerp(0.45, 0.12, s) };
     },
   },
   /* Pelea de Pingüinos: A = barrigazo (resbalón largo que embiste fuerte), B = frenar con las patas. El témpano pierde trozos; el pez mejora el siguiente barrigazo. */
@@ -1073,7 +1077,7 @@ Object.assign(MODES, {
         if (!cand.length || rt > 40) cand = cand.concat(idle(1));
         if (cand.length) { S.pc[k.pick(cand)].st = 0.001; k.sfx('click'); } }
       for (let i = 0; i < S.pc.length; i++) { const p = S.pc[i]; if (p.st > 0) { p.st += dt / 1.8; if (p.st >= 1) { p.st = -1; k.sfx('hit'); k.burst(W2(FLOE[i].cx), H2(FLOE[i].cy), '#dff3ff', 14, 140); } } else if (p.st < 0 && p.dr < 1) p.dr += dt / 3; }
-      for (const pl of standing()) { const i = pieceAt(pl.x, pl.y); if (i < 0 || S.pc[i].st < 0) fallOut(pl, '¡Al agua!'); }
+      for (const pl of standing()) { const i = pieceAt(pl.x, pl.y); const out = i < 0 || S.pc[i].st < 0; if (!safe(pl, !out) && out) fallOut(pl, '¡Al agua!'); }
       if (S.fish) { S.fish.t += dt; const pi = pieceAt(S.fish.x, S.fish.y); if (pi < 0 || S.pc[pi].st !== 0) { S.fish = null; S.ft = 3; }
         else for (const pl of standing()) if (hyp(pl.x - S.fish.x, pl.y - S.fish.y) < pl.r + 12) { pl.fish = 1; k.sfx('coin'); k.float('¡Pez! Barrigazo doble', W2(pl.x), H2(pl.y) - 34, '#9fd8f2'); S.fish = null; S.ft = k.rnd(6, 9); break; } }
       else { S.ft -= dt; if (S.ft <= 0) { const ok = S.pc.map((p, i) => i).filter((i) => S.pc[i].st === 0); if (ok.length) { const f = FLOE[k.pick(ok)]; const u = k.rnd(-0.3, 0.3); S.fish = { x: f.j ? CX + (f.cx - CX) * (1 + u * 0.3) : CX + k.rnd(-30, 30), y: f.j ? CY + (f.cy - CY) * (1 + u * 0.3) : CY + k.rnd(-30, 30), t: 0 }; } S.ft = 4; } }

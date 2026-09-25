@@ -234,7 +234,7 @@ function paddleX() {
 
   /* ------------------------------------------------------------------ Disco a Cuatro Bandas */
   function four() {
-    const B = 340, OX = LAND ? 150 : 10, OY = LAND ? 12 : 150, GW = 150, G0 = (B - GW) / 2, G1 = G0 + GW, CUT = 44, PL = 68, PT = 13, INS = 22, PR = 11;
+    const B = 340, OX = LAND ? 150 : 10, OY = LAND ? 12 : 188, GW = 150, G0 = (B - GW) / 2, G1 = G0 + GW, CUT = 44, PL = 68, PT = 13, INS = 22, PR = 11;
     const LIVES = CFG.lives || 3, MAXS = 560;
     /* lado i: 0 abajo, 1 arriba, 2 izquierda, 3 derecha; n = normal hacia dentro de la mesa */
     const SD = [{ n: [0, -1], hz: true }, { n: [0, 1], hz: true }, { n: [1, 0], hz: false }, { n: [-1, 0], hz: false }];
@@ -364,8 +364,8 @@ function paddleX() {
       /* nombres junto a cada portería (dentro de la mesa) */
       for (const s of PL4) { if (s.out) continue; const [x, y] = [[B / 2, B - 44], [B / 2, 44], [44, B / 2], [B - 44, B / 2]][s.i]; c.globalAlpha = 0.8; label(pname(s.p), OX + x, OY + y, k.party ? 15 : 12, k.pcol(s.p)); c.globalAlpha = 1; }
       /* panel: jugadores y vidas */
-      const rows = PL4.map((s, j) => (LAND ? [10, 64 + j * 44] : [14 + (j % 2) * 172, 58 + Math.floor(j / 2) * 40]));
-      if (!LAND) label('Última portería en pie', W / 2, 22, 13, '#cfd8ff'); else { label('Última', 75, 22, 13, '#cfd8ff'); label('portería en pie', 75, 38, 13, '#cfd8ff'); }
+      const rows = PL4.map((s, j) => (LAND ? [10, 64 + j * 44] : [14 + (j % 2) * 172, 82 + Math.floor(j / 2) * 44]));
+      if (!LAND) label('Última portería en pie', W / 2, 44, 14, '#cfd8ff'); else { label('Última', 75, 22, 13, '#cfd8ff'); label('portería en pie', 75, 38, 13, '#cfd8ff'); }
       PL4.forEach((s, j) => { const [x, y] = rows[j], col = k.pcol(s.p), side = ['abajo', 'arriba', 'izq.', 'dcha.'][s.i];
         ART.rr(c, x, y - 15, LAND ? 130 : 160, 32, 9); c.fillStyle = s.out ? 'rgba(26,21,48,.45)' : 'rgba(26,21,48,.8)'; c.fill(); c.lineWidth = 2; c.strokeStyle = s.out ? '#3a3560' : col; c.stroke();
         label(pname(s.p), x + 8, y - 4, 13, s.out ? '#6f6a94' : col, 'left'); c.font = '700 10px ui-rounded,system-ui,sans-serif'; c.fillStyle = '#9f98c8'; c.textAlign = 'left'; c.fillText(side, x + 8, y + 9);
@@ -377,7 +377,7 @@ function paddleX() {
 
   /* ------------------------------------------------------------------ Frontón Vasco */
   function fronton() {
-    const WALLY = 38, LX = 30, RX = 318, FALTA = 214, PASA = 540, BACK = 632, CHAPA = 9, GR = 560, EW = 0.86, REACH = 30, TO = CFG.to || 15;
+    const WALLY = 38, LX = 30, RX = 318, FALTA = 214, PASA = 540, BACK = 632, CHAPA = 9, GR = 230, EW = 0.86, REACH = 30, TO = CFG.to || 15;
     const TOP = LAND ? 0 : 40, SCL = (640 - TOP) / 640, OXT = 180 * (1 - SCL);
     const tp = (x, y) => (LAND ? [640 - y, x] : [OXT + x * SCL, TOP + y * SCL]);
     const keyset = (d) => (LAND ? { x: d.y, y: -d.x } : d);
@@ -538,7 +538,7 @@ function paddleX() {
       if (msgT > 0 && k.st === 'play') { c.save(); c.globalAlpha = Math.min(1, msgT / 0.3); label(msg, W / 2, H / 2 - 30, 34, msgC); c.restore(); }
     }
     function drawBall() {
-      const r = 7, hx = LAND ? ball.z * 0.6 : 0, hy = LAND ? 0 : ball.z * 0.6;
+      const r = 7 + Math.min(3, ball.z / 40), hx = LAND ? ball.z * 0.45 : 0, hy = LAND ? 0 : ball.z * 0.45;
       c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(ball.x, ball.y + 2, r * 0.9, r * 0.5, 0, 0, R2); c.fill();
       const x = ball.x - hx, y = ball.y - hy; c.beginPath(); c.arc(x, y, r, 0, R2); const gr = c.createRadialGradient(x - 2, y - 2, 1, x, y, r); gr.addColorStop(0, '#fffaf0'); gr.addColorStop(1, '#d9ccb0'); c.fillStyle = gr; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
       c.strokeStyle = '#a0522d'; c.lineWidth = 1.2; c.beginPath(); c.arc(x - r * 0.8, y, r * 0.75, -0.9, 0.9); c.stroke();

@@ -417,7 +417,7 @@ function finishRound() {
   const champ = pl.find((q) => q.wins >= RU.wins);
   if (champ) {
     const hu = !champ.cpu; if (!k.party && hu) lsSet(CPUK, lsGet(CPUK, 0) + 1); else if (!k.party) lsSet(CPUK, Math.max(0, lsGet(CPUK, 0) - 0.5));
-    k.podium(pl.map((q) => ({ p: q.p, score: q.wins, name: q.name })), { fmt: (s) => s + (s === 1 ? ' ronda' : ' rondas'), head: champ.name === 'Tú' ? '¡Ganas la plaza!' : `¡Gana ${champ.name}!` });
+    k.podium(pl.map((q) => ({ p: q.p, score: q.wins, name: q.name })), { fmt: (s) => s + (s === 1 ? ' ronda' : ' rondas'), head: champ.name === 'Tú' ? (ICE ? '¡Ganas en el hielo!' : PAINT ? '¡Ganas la guerra de pintura!' : '¡Ganas la plaza!') : `¡Gana ${champ.name}!` });
     return;
   }
   msgT = 2; newRound();

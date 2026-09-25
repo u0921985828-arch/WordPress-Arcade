@@ -262,15 +262,15 @@ function planTeam(t) {
   if (phase !== 'play' || ball.last === t) return;
   const C = predict(t); if (!C.length) return;
   const e = lvl(), spd = PS * (0.66 + 0.3 * e);
-  let best = null;
-  for (const pl of m) { let pick = null, worst = null;
-    const net = Math.abs(pl.y) < 5;
+  const opts = m.map((pl) => { let pick = null, worst = null; const net = Math.abs(pl.y) < 5;
     for (let i = 0; i < C.length; i += 2) { const cd = C[i]; if (!cd.bn && !net) continue; const need = Math.max(0, hyp(cd.x - pl.x, cd.y - pl.y) - REACH * 0.6), slack = cd.t - need / (pl.ctl >= 0 ? PS : spd) - pl.react;
       if (slack >= 0) { pick = cd; break; } if (!worst || slack > worst.slack) worst = { cd, slack }; }
-    if (!pick && !worst) continue;
-    const score = pick ? pick.t : 100 - worst.slack;
-    if (!best || score < best.score) best = { pl, cd: pick || worst.cd, score };
-  }
+    return { pl, cd: pick || (worst && worst.cd), ok: !!pick, score: pick ? pick.t : worst ? 100 - worst.slack : 1e9 }; });
+  /* en dobles cada uno cubre su mitad (derecha i=0, izquierda i=1); solo invade la del compañero si este no llega */
+  const mine = (o) => !DBL || !o.cd || o.cd.x * (o.pl.i === 0 ? 1 : -1) * sg(t) >= -0.6;
+  let best = null;
+  for (const o of opts) { if (!o.cd) continue; const other = opts.find((q) => q !== o), oOk = other && other.ok && mine(other);
+    const v = o.score + (mine(o) ? 0 : oOk ? 50 : 3); if (!best || v < best.v) best = Object.assign({ v }, o); }
   if (!best) return;
   if (best.pl.ctl >= 0) { // el humano va a por ella: el compañero CPU cubre su mitad
     return; }
