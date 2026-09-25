@@ -302,8 +302,8 @@ if (MP) {
   let LV = 0; try { LV = Math.min(8, +localStorage.getItem('cpu:' + ID) || 0); } catch (e) { /* sin almacenamiento */ }
   const skill = () => Math.min(0.8, 0.22 + LV * 0.07);
   const CORN = [[70, 70], [W - 70, H - 70], [W - 70, 70], [70, H - 70]];
-  function mkPlayers() { P = k.players(Math.max(2, Math.min(4, k.party ? Math.max(...k.party.map((q) => q.p)) + 1 : 4))).map((q) => ({ ...q, pts: 0, kills: 0 })); }
-  function syncPlayers() { const pl = k.players(P.length); P.forEach((s, i) => { s.cpu = pl[i].cpu; s.name = pl[i].name; s.color = pl[i].color; if (i >= pl.length) s.out = true; }); }
+  function mkPlayers() { P = k.players(Math.max(2, Math.min(4, k.party ? Math.max(...k.party.map((q) => q.p)) + 1 : 4))).map((q, i) => ({ ...q, name: q.cpu ? 'CPU ' + (i + 1) : q.name, pts: 0, kills: 0 })); }
+  function syncPlayers() { const pl = k.players(P.length); P.forEach((s, i) => { s.cpu = pl[i].cpu; s.name = pl[i].cpu ? 'CPU ' + (i + 1) : pl[i].name; s.color = pl[i].color; if (i >= pl.length) s.out = true; }); }
   function newRound() {
     round++; rt = 0; phase = 'play'; elim = []; hole = 18; ashots = []; arocks = []; cdPend = true; wave = 1;
     P.forEach((s, i) => { const [x, y] = CORN[i]; Object.assign(s, { x, y, vx: 0, vy: 0, a: Math.atan2(BY - y, BX - x) + Math.PI / 2, hp: WINGS, dead: false, inv: SAFE, cool: 0, bcd: 0, thr: 0, tilt: 0, fl: 0, aiT: 0, aim: 0, tgt: null, place: 0 }); });

@@ -20,7 +20,7 @@ const MD = {
   pastores: { rounds: 2, len: 55, fr: 5.5, acc: 1100, max: 205, r: 13, walls: 1, sp: 0 },
   moscas: { rounds: 3, len: 40, fr: 4.5, acc: 950, max: 175, r: 15, walls: 1, sp: 150 },
   cajas: { rounds: 4, len: 45, fr: 6, acc: 700, max: 58, r: 17, walls: 1, sp: 150 },
-  menguante: { rounds: 3, len: 90, elim: 1, fr: 4, acc: 820, max: 165, r: 13, walls: 0, sp: 120 },
+  menguante: { rounds: 3, len: 90, elim: 1, fr: 4, acc: 760, max: 135, r: 13, walls: 0, sp: 120 },
   imanes: { rounds: 3, len: 60, elim: 1, fr: 3, acc: 700, max: 170, r: 17, walls: 0, sp: 120 },
   almohadas: { rounds: 3, len: 75, elim: 1, fr: 3.5, acc: 820, max: 170, r: 17, walls: 1, sp: 130, we: 0.9 },
   pinguinos: { rounds: 3, len: 75, elim: 1, fr: 1.3, acc: 520, max: 190, r: 16, walls: 0, sp: 115, e: 0.9 },
@@ -951,9 +951,9 @@ Object.assign(MODES, {
       return 1;
     },
     step(dt) {
-      const ct = lerp(0.95, 0.6, rt / 60);
+      const ct = lerp(1.35, 0.7, rt / 70);
       for (const pl of standing()) { if (pl.z > 0) continue; const i = hexAt(pl.x, pl.y), h = i >= 0 ? S.hx[i] : null;
-        if (!h || h.st < 0) { if (!safe(pl, false)) fallOut(pl, '¡Al vacío!'); continue; } safe(pl, true); if (h.st === 0 && rt > 4.2) h.st = 0.001; }
+        if (!h || h.st < 0) { if (!safe(pl, false)) fallOut(pl, '¡Al vacío!'); continue; } safe(pl, true); if (h.st === 0 && rt > 5) h.st = 0.001; }
       if (rt > S.next) { S.next = rt + lerp(2.4, 0.9, (rt - 25) / 40); const ok = S.hx.filter((h) => h.st === 0); if (ok.length) k.pick(ok).st = 0.001; }
       for (const h of S.hx) { if (h.st > 0) { h.st += dt / ct; if (h.st >= 1) { h.st = -1; h.fa = 0.001; k.burst(W2(h.x), H2(h.y), HEXCOL[h.ring], 8, 110); } } else if (h.fa > 0 && h.fa < 1) h.fa += dt * 1.5; }
     },
@@ -968,17 +968,20 @@ Object.assign(MODES, {
       }
     },
     ai(pl, ai, s) {
-      const th = ai.th != null ? S.hx[ai.th] : null;
-      if (ai.go || !th || th.st !== 0 || hyp(th.x - pl.x, th.y - pl.y) < 9) {
+      const th = ai.th != null ? S.hx[ai.th] : null, hi = hexAt(pl.x, pl.y), cur = hi >= 0 ? S.hx[hi] : null;
+      /* quieta en su casilla mientras aguante; cuando se agrieta, salta a la mejor vecina */
+      ai.nx = ai.ny = 0;
+      if (cur && cur.st >= 0 && cur.st < lerp(0.45, 0.7, s) && pl.z <= 0 && (!th || th === cur || th.st !== 0) && !ai.push) { ai.th = hi; const mv = seek(pl, cur.x, cur.y, 0.3); return { x: mv.x * 0.5, y: mv.y * 0.5 }; }
+      if (ai.go || !th || th.st !== 0 || th === cur) {
         let best = -1e9, bi = null;
         for (let i = 0; i < S.hx.length; i++) { const h = S.hx[i]; if (h.st !== 0) continue; const d = hyp(h.x - pl.x, h.y - pl.y); if (d < 20 || d > 110) continue;
-          const m = hexAt((h.x + pl.x) / 2, (h.y + pl.y) / 2); if (m < 0 || S.hx[m].st < 0) continue;
+          const m = hexAt((h.x + pl.x) / 2, (h.y + pl.y) / 2); if (m < 0 || S.hx[m].st < 0 || S.hx[m].st > 0.7) continue;
           let nb = 0; for (const [dq, dr] of NB) { const j = HIDX.get((h.q + dq) + ',' + (h.r + dr)); if (j != null && S.hx[j].st === 0) nb++; }
-          const sc = nb * 3 - hyp(h.x - CX, h.y - CY) * 0.03 - d * 0.02 + Math.random() * (1 - s) * 6; if (sc > best) { best = sc; bi = i; } }
-        ai.th = bi; const [o, d] = near(pl); ai.push = o && d < 75 && Math.random() < 0.2 + s * 0.5 ? o : null; ai.jmp = Math.random() < 0.3 + s * 0.6;
+          const sc = nb * 3 - hyp(h.x - CX, h.y - CY) * 0.03 - (d > 60 ? 8 : 0) + Math.random() * (1 - s) * 6; if (sc > best) { best = sc; bi = i; } }
+        ai.th = bi; const [o, d] = near(pl); ai.push = o && d < 75 && rt > 8 && Math.random() < 0.1 + s * 0.35 ? o : null; ai.jmp = Math.random() < 0.6 + s * 0.4;
       }
-      const tg = ai.th != null ? S.hx[ai.th] : null; let mv = tg ? seek(pl, tg.x, tg.y, 0.2) : seek(pl, CX, CY);
-      const ah = hexAt(pl.x + pl.vx * 0.2, pl.y + pl.vy * 0.2), jump = ai.jmp && (ah < 0 || S.hx[ah].st < 0) && hyp(pl.vx, pl.vy) > 60;
+      const tg = ai.th != null ? S.hx[ai.th] : null; let mv = tg ? seek(pl, tg.x, tg.y, 0.2) : { x: 0, y: 0 };
+      const ah = hexAt(pl.x + pl.vx * 0.2, pl.y + pl.vy * 0.2), jump = ai.jmp && ah >= 0 && ah !== hi && (S.hx[ah].st < 0 || S.hx[ah].st > 0.75) && hyp(pl.vx, pl.vy) > 35;
       if (ai.push && ai.push.alive && !ai.push.fall) { const o = ai.push; mv = seek(pl, o.x, o.y, 0); return { x: mv.x, y: mv.y, ah: facing(pl, o, 0.4) && hyp(o.x - pl.x, o.y - pl.y) < 55, bh: jump }; }
       return { x: mv.x, y: mv.y, bh: jump };
     },

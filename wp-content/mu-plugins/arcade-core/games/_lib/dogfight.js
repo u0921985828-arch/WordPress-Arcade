@@ -71,7 +71,7 @@ function AI(pl, dt) {
   if (tgt) { const dx = wdx(pl.x, tgt.x), dy = tgt.y - pl.y, d = hyp(dx, dy), tt = d / 480, lx = dx + Math.cos(tgt.a) * tgt.v * tt * s, ly = dy + (Math.sin(tgt.a) * tgt.v + tgt.sink) * tt * s;
     ai.want = Math.atan2(ly, lx) + ai.noise;
     const off = Math.abs(adiff(Math.atan2(ly, lx) - pl.a));
-    o.fire = rt > 5 && d < 320 && off < 0.1 + (1 - s) * 0.12 && pl.heat < 0.85;
+    o.fire = rt > 5 && d < 300 && off < 0.1 + (1 - s) * 0.12 && pl.heat < 0.7 && Math.sin(T * 2.2 + pl.i * 1.7) > 0.35 - s * 0.6; /* ráfagas con pausas */
     /* un rival pegado a la cola: rizo */
     for (const e of P) if (e !== pl && e.alive && !e.down) { const ex = wdx(e.x, pl.x), ey = pl.y - e.y, ed = hyp(ex, ey); if (ed < 130 && Math.abs(adiff(Math.atan2(ey, ex) - e.a)) < 0.3 && pl.loopCd <= 0 && Math.random() < dt * s * 3) o.loop = true; } }
   else ai.want = dir > 0 ? 0 : Math.PI;
@@ -84,7 +84,7 @@ function AI(pl, dt) {
   o.want = want; return o;
 }
 function shoot(pl) {
-  const ca = Math.cos(pl.a), sa = Math.sin(pl.a), sp = pl.v + 430, j = k.rnd(-0.025, 0.025);
+  const ca = Math.cos(pl.a), sa = Math.sin(pl.a), sp = pl.v + 430, j = k.rnd(-0.045, 0.045);
   bullets.push({ x: pl.x + ca * 18, y: pl.y + sa * 18, vx: Math.cos(pl.a + j) * sp, vy: Math.sin(pl.a + j) * sp + pl.sink, t: 0.72, own: pl.i, col: pl.col });
   pl.cd = 0.1; pl.heat += 0.075; if (pl.heat >= 1) { pl.hot = true; k.sfx('hurt'); }
   k.sfx('shoot');
@@ -157,7 +157,7 @@ k.run((dt) => {
   rt += dt;
   for (const pl of P) if (pl.alive) fly(pl, pl.down ? {} : pl.cpu ? AI(pl, dt) : human(pl), dt);
   for (const b of bullets) { b.x += b.vx * dt; b.y += b.vy * dt; b.t -= dt; b.x = (b.x + W) % W; if (b.y > gh(b.x)) { b.t = 0; k.burst(b.x, b.y, '#a0703f', 3, 60); }
-    for (const pl of P) if (pl.i !== b.own && pl.alive && !pl.down && b.t > 0 && hyp(wdx(b.x, pl.x), b.y - pl.y) < 12) { b.t = 0; if (pl.loopT > 0 && Math.random() < 0.7) continue; damage(pl, b.own, 1); } }
+    for (const pl of P) if (pl.i !== b.own && pl.alive && !pl.down && b.t > 0 && hyp(wdx(b.x, pl.x), b.y - pl.y) < 12) { b.t = 0; if (pl.loopT > 0 && Math.random() < 0.7) continue; damage(pl, b.own, 0.5); } }
   bullets = bullets.filter((b) => b.t > 0 && b.y > -20);
   /* choque entre aviones */
   for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) { const a = P[i], b = P[j]; if (!a.alive || !b.alive || a.down || b.down) continue; if (hyp(wdx(a.x, b.x), a.y - b.y) < 18 && rt > 5) { damage(a, j, 3); damage(b, i, 3); a.a += 0.8; b.a -= 0.8; k.shake(6); } }
@@ -190,7 +190,7 @@ function drawHUD() {
     const w = 92, dead = !pl.alive || pl.down; ART.rr(c, x, 8, w, 30, 9); ART.fillOut(c, 'rgba(26,21,48,.72)', 2);
     c.globalAlpha = dead ? 0.45 : 1; c.fillStyle = pl.col; ART.rr(c, x + 6, 13, 8, 8, 2); c.fill();
     c.font = '800 11px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillStyle = '#fff'; c.fillText(pl.name.slice(0, 9), x + 18, 17.5);
-    for (let i = 0; i < 6; i++) { c.fillStyle = i < Math.max(0, pl.hp) ? pl.col : 'rgba(255,255,255,.15)'; ART.rr(c, x + 7 + i * 8, 26, 6, 6, 2); c.fill(); }
+    for (let i = 0; i < 6; i++) { c.fillStyle = i < Math.ceil(Math.max(0, pl.hp)) ? pl.col : 'rgba(255,255,255,.15)'; ART.rr(c, x + 7 + i * 8, 26, 6, 6, 2); c.fill(); }
     label(pl.pts + '', x + w - 12, 28, 11, '#ffd166');
     if (!pl.cpu && pl.alive) { c.fillStyle = pl.hot ? '#ff5f7a' : 'rgba(255,255,255,.7)'; c.fillRect(x + 58, 25, 16 * Math.min(1, pl.heat), 3); }
     c.globalAlpha = 1; x += w + 6;

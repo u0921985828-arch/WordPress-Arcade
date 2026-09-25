@@ -323,7 +323,7 @@ if (M === 'coop') {
     c.fillStyle = shE >= 25 ? '#5ce1e6' : '#f0647e'; ART.rr(c, bx, 12, bw * shE / 100, 8, 4); c.fill(); c.fillStyle = 'rgba(255,255,255,.4)'; c.fillRect(bx + 3, 13, Math.max(0, bw * shE / 100 - 6), 1.5);
     c.fillStyle = 'rgba(12,10,24,.6)'; for (let i = 1; i < 4; i++) c.fillRect(bx + bw * i / 4 - 1, 12, 2, 8);
     label('Escudo', W / 2, 25, 11, '#bff6ff', 'center');
-    for (let i = 0; i < reserve; i++) ship(W - 18 - i * 20, 22, 0.5, 0);
+    for (let i = 0; i < reserve; i++) ship(20 + i * 20, 62, 0.5, 0);
     if (bannerT > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, bannerT); label(banner, W / 2, H * 0.4, 28, '#fff', 'center'); c.globalAlpha = 1; }
   });
 }

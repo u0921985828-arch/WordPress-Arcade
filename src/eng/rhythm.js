@@ -450,7 +450,7 @@ function danceGame() {
     const tv = k.st === 'ready' ? (notes.length ? notes[0].time - 0.9 : 0) : t, Y = (tm) => TOPY + (tm - tv) * SPEED;
     const LW = W / P.length;
     for (const q of P) {
-      const x0 = laneX(q), xm = x0 + LW / 2, sc = Math.min(1, (Math.min(58, (LW - 20) / 4)) / 44);
+      const x0 = laneX(q), xm = x0 + LW / 2, sc = Math.min(1.25, (Math.min(58, (LW - 20) / 4)) / 44);
       c.save(); ART.rr(c, x0 + 6, 44, LW - 12, H - 50, 14); c.clip();
       c.globalAlpha = 0.1 * pulse; c.fillStyle = q.col; c.fillRect(x0, 44, LW, H); c.globalAlpha = 1;
       c.fillStyle = 'rgba(255,255,255,.07)'; for (const b of beats) { const y = Y(b.at); if (y > TOPY && y < H) c.fillRect(x0 + 12, y - 1, LW - 24, 2); }

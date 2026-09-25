@@ -312,7 +312,7 @@ function aiThink(q) {
       if (esc && esc.length > 1) { q.dir = sh.d.slice(); placeBomb(q, true); q.ai = esc; q.think = 0.05; return; } }
   }
   if (!early && mine < q.max && !bombAt(cx, cy)) {
-    const foe = hitsFoe(q, cx, cy), crate = PAINT ? paintGain(q, cx, cy) >= 3 - skill : hitsCrate(q, cx, cy);
+    const foe = hitsFoe(q, cx, cy), crate = PAINT ? paintGain(q, cx, cy) >= 2 : hitsCrate(q, cx, cy); // mismo umbral que el objetivo de abajo (si no, va y viene sin tirar)
     if ((foe && Math.random() < aggr) || (crate && Math.random() < 0.55 + skill * 0.4)) {
       const eb = { x: cx, y: cy, t: RU.fuse, range: q.range }, D2 = dangerMap(eb);
       const esc = bfs(q, D2, (x, y) => D2[y][x] === Infinity);
@@ -324,8 +324,8 @@ function aiThink(q) {
   let path = bfs(q, D, (x, y, n) => n > 0 && items[y][x] && safeCell(x, y) && n < 8);
   const hunt = rT > 25 || !pl.some((o) => o !== q && o.alive && Math.abs(o.x - q.x) + Math.abs(o.y - q.y) > 14) || Math.random() < aggr * 0.5;
   if (!path && hunt) path = bfs(q, D, (x, y, n) => n > 0 && safeCell(x, y) && hitsFoe(q, x, y));
-  if (!path && PAINT) path = bfs(q, D, (x, y, n) => safeCell(x, y) && !bombAt(x, y) && paintGain(q, x, y) >= 4);
-  if (!path) path = bfs(q, D, (x, y, n) => safeCell(x, y) && (PAINT ? paintGain(q, x, y) >= 2 : hitsCrate(q, x, y)) && !bombAt(x, y));
+  if (!path && PAINT) path = bfs(q, D, (x, y, n) => n > 0 && safeCell(x, y) && !bombAt(x, y) && paintGain(q, x, y) >= 4);
+  if (!path) path = bfs(q, D, (x, y, n) => (n > 0 || !PAINT) && safeCell(x, y) && (PAINT ? paintGain(q, x, y) >= 2 : hitsCrate(q, x, y)) && !bombAt(x, y)); // pintura: nunca se queda quieto en una casilla sin salida
   if (!path) { const foe = pl.filter((o) => o !== q && o.alive).sort((a, b) => Math.hypot(a.x - q.x, a.y - q.y) - Math.hypot(b.x - q.x, b.y - q.y))[0];
     if (foe) path = bfs(q, D, (x, y, n) => n > 0 && safeCell(x, y) && Math.abs(x + 0.5 - foe.x) + Math.abs(y + 0.5 - foe.y) < 2.2); }
   if (!path) path = bfs(q, D, (x, y, n) => n === 1 && safeCell(x, y));

@@ -210,7 +210,7 @@ function weaponAct(f) { // A con un arma de juguete
   if (--it.uses <= 0) f.brk = 0.3;
 }
 function dropItem(f) {
-  items.push({ type: f.item.type, x: f.x, y: f.y - 1, vy: 120, on: false, life: 7, sw: 0, uses: f.item.uses }); f.item = null; f.glide = false; k.sfx('pop');
+  items.push({ type: f.item.type, x: f.x, y: f.y - 1, vy: 120, on: false, life: 7, sw: 0, uses: f.item.uses, from: f.p, nog: 1.2 }); f.item = null; f.glide = false; k.sfx('pop');
 }
 function throwItem(f) {
   const it = f.item; f.item = null; const bomb = it.type === 'bomb';
@@ -322,13 +322,13 @@ function updItems(dt, live) {
     const sp = [[MX0 + 30, MX1 - 30]].concat(plats.filter((P) => P.w > 60).map((P) => [P.x + 16, P.x + P.w - 16])), s = k.pick(sp);
     items.push({ type: k.pick(ITYPES), x: k.rnd(s[0], s[1]), y: -30, vy: 70, on: false, life: 14, sw: Math.random() * 6 }); }
   for (const it of items) {
-    it.sw += dt;
+    it.sw += dt; if (it.nog > 0) it.nog -= dt;
     if (!it.on) { const oy = it.y; it.y += it.vy * dt; it.x += Math.sin(it.sw * 1.6) * 18 * dt + wind * 0.15 * dt;
       if (oy <= TOP && it.y >= TOP && it.x > MX0 && it.x < MX1) { it.y = TOP; it.on = 'main'; }
       else for (let j = 0; j < 4; j++) { const P = plats[j]; if (P.w > 20 && oy <= P.y && it.y >= P.y && it.x > P.x && it.x < P.x + P.w) { it.y = P.y; it.on = j; } }
       if (it.y > H + 40) it.life = 0;
     } else { if (typeof it.on === 'number') { const P = plats[it.on]; it.x += P.dx; it.y = P.y; if (it.x < P.x - 6 || it.x > P.x + P.w + 6 || P.w < 20) it.on = false; } else if (belt) it.x += belt * dt; if (it.on === 'main' && (it.x < MX0 || it.x > MX1)) it.on = false; it.life -= dt; }
-    for (const f of F) if (alive(f) && (!f.item || INSTANT.has(it.type)) && f.cloud <= 0 && Math.abs(f.x - it.x) < 26 && Math.abs(f.y - 20 - (it.y - 14)) < 38 && it.life > 0) {
+    for (const f of F) if (alive(f) && !(it.nog > 0 && it.from === f.p) && (!f.item || INSTANT.has(it.type)) && f.cloud <= 0 && Math.abs(f.x - it.x) < 26 && Math.abs(f.y - 20 - (it.y - 14)) < 38 && it.life > 0) {
       it.life = 0; k.sfx('coin'); puff(it.x, it.y - 14, 10, '#ffd166', 140);
       if (it.type === 'wrench') { const miss = ['ant', 'arm', 'core', 'helm'].filter((q) => !f.parts.includes(q)); if (miss.length) { f.parts.push(miss[0]); k.float('¡Repara ' + PNAME[miss[0]] + '!', it.x, it.y - 60, '#7cf7a0'); } else { f.pct = Math.max(0, f.pct - 15); k.float('−15 %', it.x, it.y - 60, '#7cf7a0'); } k.sfx('win'); break; }
       if (it.type === 'battery') { f.elec = 12; k.float('¡Puños eléctricos!', it.x, it.y - 60, '#9fe8ff'); break; }
@@ -369,6 +369,7 @@ function aiInput(f) {
   if (TOYS && o.aHit && o.y > 0.5) o.y = 0; // la CPU no suelta el arma sin querer
   if (TOYS && f.item && f.item.type === 'umbrella' && !f.on && f.vy > 0) { const offX = f.x < MX0 - 2 || f.x > MX1 + 2; o.bHeld = offX || f.ai.glide > 0; }
   if (TOYS && f.ai.glide > 0) f.ai.glide -= 1 / 60;
+  if (MODE !== 'pillow' && !demo && clock < 5) { o.aHit = false; o.aHeld = false; } // nada te golpea en los 5 primeros segundos
   return o;
 }
 function aiCore(f) {
@@ -565,7 +566,7 @@ function drawMetal() { // islote de chapa (fábrica) y cinta transportadora
 }
 function drawMagnet() {
   if (phase().fx !== 'magnet') return; const warn = mag <= 0 && magT % 8 > 1.2;
-  c.save(); c.translate(400, 58); c.strokeStyle = OUT; c.lineWidth = 3; c.beginPath(); c.moveTo(0, -60); c.lineTo(0, -18); c.stroke();
+  c.save(); c.translate(400, 74); c.strokeStyle = OUT; c.lineWidth = 3; c.beginPath(); c.moveTo(0, -60); c.lineTo(0, -18); c.stroke(); // cadena
   c.beginPath(); c.arc(0, 8, 36, Math.PI, 0); c.lineTo(36, 34); c.lineTo(18, 34); c.lineTo(18, 8); c.arc(0, 8, 18, 0, Math.PI, true); c.lineTo(-18, 34); c.lineTo(-36, 34); c.closePath(); ART.fillOut(c, '#ff5a5f', 3);
   ART.rr(c, -36, 22, 18, 14, 3); ART.fillOut(c, '#dfe7f4', 2.4); ART.rr(c, 18, 22, 18, 14, 3); ART.fillOut(c, '#dfe7f4', 2.4);
   c.beginPath(); c.arc(0, -14, 5, 0, TAU); ART.fillOut(c, warn && Math.floor(t * 8) % 2 ? '#ffd166' : mag > 0 ? '#7cf7a0' : '#3a3258', 2);
@@ -627,7 +628,7 @@ function giftAlt(x, y, type, sw, falling) { // cajas de juguetes / de repuestos
 /* Robot de chatarra: piernas de pistón, cuerpo del color del jugador, cabeza con visor; las piezas perdidas dejan cables */
 function robot(f, pa, chg) {
   const cl = col(f.p), has = (q) => f.parts.includes(q), air = !f.on && f.cloud <= 0, run = f.on && Math.abs(f.vx) > 30 && f.stun <= 0, ph = t * 14 + f.p;
-  c.save(); c.translate(f.x, f.y); c.scale(f.face * (1 + f.sq), 1 - f.sq); c.lineJoin = 'round'; c.lineCap = 'round';
+  c.save(); c.translate(f.x, f.y); c.scale(f.face * (1 + f.sq) * 0.84, (1 - f.sq) * 0.84); c.lineJoin = 'round'; c.lineCap = 'round';
   // piernas
   for (const i of [1, 0]) { const dx = i ? -7 : 7, sw = run ? Math.sin(ph + i * Math.PI) * 6 : air ? (i ? -4 : 4) : 0, lift = run ? Math.max(0, Math.cos(ph + i * Math.PI)) * 5 : air ? 6 : 0;
     ART.rr(c, dx - 3.5 + sw * 0.5, -20, 7, 16 - lift * 0.6, 3); ART.fillOut(c, i ? '#5d6b77' : '#7b8791', 2); ART.rr(c, dx - 6 + sw, -6 - lift, 13, 6, 2.5); ART.fillOut(c, i ? '#2a3138' : '#3a4650', 2); }
@@ -690,7 +691,7 @@ function drawFighter(f) {
     else pa = lerp(-1.8, 0.4, ease(q));
   } else if (f.chg >= 0) { pa = -2.4 + sh * 0.05; back = true; }
   else if (f.stun > 0) pa = 2.4;
-  if (SCRAP) { robot(f, pa, chg); if (f.item && f.item.type === 'bomb') nutBomb(f.x + f.face * 16, f.y - 70, 0, false, 0.9); }
+  if (SCRAP) { robot(f, pa, chg); if (f.item && f.item.type === 'bomb') nutBomb(f.x + f.face * 16, f.y - 62, 0, false, 0.85); }
   else if (TOYS) {
     const wt = f.item ? f.item.type : 'fist', wa = wt === 'bow' || wt === 'shield' ? (f.atk && f.atk.kind === 'bash' ? 0 : 0.1) : wt === 'hammer' && f.atk && f.atk.kind === 'hammer' ? lerp(-2.4, 0.9, ease(clamp((f.atk.t - 0.2) / 0.28, 0, 1))) : pa;
     const drawW = () => { if (wt === 'yoyo' && shots.some((q) => q.type === 'yoyo' && q.from === f.p)) return; c.save(); c.translate(hx + sh + (wt === 'shield' ? f.face * 6 : 0), hy); c.scale(f.face, 1); weapon(wt, wa, 0.95, cl, f.glide); c.restore(); };
@@ -717,7 +718,7 @@ function drawFighter(f) {
   }
   c.restore();
   // etiqueta
-  if (!demo) { const s = tag(f.p); c.font = FONT(15); const w = c.measureText(s).width + 12, y = f.y - (SCRAP ? 104 : TOYS ? 92 : 84);
+  if (!demo) { const s = tag(f.p); c.font = FONT(15); const w = c.measureText(s).width + 12, y = f.y - (SCRAP ? 94 : TOYS ? (f.glide ? 118 : 92) : 84);
     ART.rr(c, f.x - w / 2, y - 10, w, 20, 7); ART.fillOut(c, cl, 2); c.fillStyle = OUT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(s, f.x, y + 1); }
 }
 function offscreen(f) {

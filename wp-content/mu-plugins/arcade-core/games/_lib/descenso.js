@@ -141,7 +141,7 @@ function startRun() {
   const h = racers.find((q) => !q.cpu) || racers[0]; cam = { x: T.cx(0), y: h.y + 120 };
   msg = `${SL ? 'Manga' : 'Bajada'} ${run + 1} de ${RUNS} · ${T.name}`; msgT = 3; cdPend = true;
 }
-function reset() { SEED = (Math.random() * 1e9) | 0; run = 0; racers = Array.from({ length: 4 }, (_, p) => mkRacer(p)); startRun(); }
+function reset() { demoOn = false; SEED = (Math.random() * 1e9) | 0; run = 0; racers = Array.from({ length: 4 }, (_, p) => mkRacer(p)); startRun(); }
 k.onParty = () => {
   if (k.st !== 'play') { reset(); return; }
   for (const r of racers) { const hu = k.human(r.p), q = k.party && k.party.find((x) => x.p === r.p); r.cpu = !hu; r.col = k.pcol(r.p); r.name = hu ? (q && q.name) || (k.party ? 'J' + (r.p + 1) : 'Tú') : 'CPU ' + CN[r.p]; }
@@ -271,14 +271,7 @@ function gates(r) {
   if (g && r.y >= g.y) { const ok = r.x > g.cx - g.gap / 2 && r.x < g.cx + g.gap / 2; r.g++;
     if (ok) { if (!r.cpu) k.sfx('coin'); } else { r.pen += 5; if (!r.cpu) { k.sfx('hurt'); fl(r, '¡Puerta fallada! +5 s', '#ff8a8a'); k.shake(3); } } }
 }
-function update(dt) {
-  if (!k.gate(reset)) return;
-  if (cdPend) { cdPend = false; k.count(3); updCam(0, true); }
-  if (msgT > 0) msgT -= dt;
-  for (let i = flo.length - 1; i >= 0; i--) { flo[i].t -= dt; if (flo[i].t <= 0) flo.splice(i, 1); }
-  for (const g of T.gates) for (let s = 0; s < 2; s++) g.wob[s] = Math.max(0, g.wob[s] - dt * 1.5);
-  if (phase === 'stand') { phT -= dt; updParts(dt); if (phT <= 0 || (phT < 3.2 && (k.hit.has('a') || k.ptr.hit || (k.party && k.party.some((q) => k.phit(q.p, 'a')))))) nextRun(); return; }
-  if (k.counting()) { updCam(dt); return; }
+function sim(dt) {
   raceT += dt;
   for (const r of racers) {
     step(r, dt);
@@ -288,6 +281,25 @@ function update(dt) {
   }
   if (!SL) collide();
   updCam(dt);
+}
+/* Demostración detrás de la pantalla de inicio: bajan cuatro corredores de la CPU (también da la miniatura). */
+let demoOn = false;
+function attract(dt) {
+  if (!demoOn || finOrder.length >= 2 || raceT > 60) { reset(); demoOn = true; for (const r of racers) r.cpu = true; msgT = 0; cdPend = false; for (let i = 0; i < 100; i++) { sim(1 / 30); updParts(1 / 30); } updCam(0, true); }
+  sim(Math.min(dt, 0.05)); updParts(dt);
+  for (const g of T.gates) for (let q = 0; q < 2; q++) g.wob[q] = Math.max(0, g.wob[q] - dt * 1.5);
+}
+function update(dt) {
+  if (k.st === 'ready' && !k.party) attract(dt);
+  else if (demoOn && k.st === 'play') reset();
+  if (!k.gate(reset)) return;
+  if (cdPend) { cdPend = false; k.count(3); updCam(0, true); }
+  if (msgT > 0) msgT -= dt;
+  for (let i = flo.length - 1; i >= 0; i--) { flo[i].t -= dt; if (flo[i].t <= 0) flo.splice(i, 1); }
+  for (const g of T.gates) for (let s = 0; s < 2; s++) g.wob[s] = Math.max(0, g.wob[s] - dt * 1.5);
+  if (phase === 'stand') { phT -= dt; updParts(dt); if (phT <= 0 || (phT < 3.2 && (k.hit.has('a') || k.ptr.hit || (k.party && k.party.some((q) => k.phit(q.p, 'a')))))) nextRun(); return; }
+  if (k.counting()) { updCam(dt); return; }
+  sim(dt);
   /* trineo con varios humanos: quien se queda fuera de cámara reaparece junto al primero */
   if (!SL && humans().length >= 2 && raceT > 3) { const v = views()[0], cm = camFor(v), lead = camTarget();
     for (const r of humans()) { if (r === lead || r.fin || r.hold > 0) continue; const out = r.y < cm.y - cm.VH / 2 - 10 || Math.abs(r.x - cm.x) > cm.VW / 2 + 10;

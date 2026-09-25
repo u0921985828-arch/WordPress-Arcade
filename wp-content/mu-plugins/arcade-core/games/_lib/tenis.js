@@ -235,6 +235,7 @@ function cpuShot(pl) {
   if (ball.z > 1.85 && Math.abs(pl.y) < 7 && Math.random() < e) { v = PADEL ? 20 : 19; spin = 0.3; word = '¡Remate!'; ty = -s * L * 0.6; }
   else if (oy < 5 && Math.random() < (PADEL ? 0.55 : 0.35)) { lob = PADEL ? 6.4 : 7; ty = -s * (L - 1.8); spin = -0.1; word = 'Globo'; }
   const er = (1 - e) * 1.5; tx += k.rnd(-1, 1) * er; ty += -s * k.rnd(-0.5, 0.9) * er * 0.8;
+  if (!lob && Math.random() < 0.03 + 0.07 * (1 - e) + Math.min(0.12, rally * 0.008)) { if (Math.random() < 0.5) tx = Math.sign(tx || 1) * HW * k.rnd(1.05, 1.25); else ty = -s * L * k.rnd(1.04, 1.15); } // error no forzado: puntos que terminan
   if (PADEL) v *= 0.72;
   v *= 1 + Math.min(0.2, rally * 0.015);
   launch(pl, tx, ty, v, spin, lob || Math.random() > 0.1 * (1 - e) + 0.02, lob);

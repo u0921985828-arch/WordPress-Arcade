@@ -139,9 +139,11 @@ function duelGame() {
   function newBall(s) {
     const d = Math.min(1, s.shotN++ / 14), u = k.rnd(170 - 120 * d, 230 - 30 * d), y = k.rnd(318 - 20 * d, 350);
     s.ball = { u, y, vu: 0, vy: 0, fly: false, scored: false, prevY: 0, rot: 0, sp: 0, touched: false, bounces: 0, pop: 0, su: u, sy: y };
-    const need = solve(s, -1.0); s.kAng = -1.0; s.kPow = need ? clamp(need * 0.88, 0.3, 1) : 0.7;
+    const a0 = bestAng(s), need = solve(s, a0); s.kAng = a0; s.kPow = need ? clamp(need * 0.88, 0.3, 1) : 0.7;   // el mando parte de un tiro corto: hay que ajustarlo
     s.cpuT = 1.2 + Math.random() * 0.6 - LV * 0.05; s.cpuP = null;
   }
+  /* ángulo de mínima fuerza (45° + mitad de la elevación), algo más tendido para que entre bajando */
+  function bestAng(s) { const b = s.ball, dx = s.hoop.u - b.u, hh = b.y - s.hoop.y; return -clamp(Math.PI / 4 + Math.atan2(hh, dx) / 2 + 0.05, 0.6, 1.4); }
   /* fuerza (0..1) para encestar con el ángulo a desde la posición del balón */
   function solve(s, a) { const b = s.ball, dx = s.hoop.u - b.u, hh = b.y - s.hoop.y, den = 2 * Math.cos(a) ** 2 * (dx * Math.tan(-a) - hh); if (den <= 0) return null; return Math.sqrt(G * dx * dx / den) / VMAX; }
   function throwBall(s, a, p) { const b = s.ball; b.vu = Math.cos(a) * p * VMAX; b.vy = Math.sin(a) * p * VMAX; b.sp = b.vu / 60; b.fly = true; s.att++; if (!seats[s.i].cpu) k.sfx('jump'); }
@@ -162,7 +164,7 @@ function duelGame() {
     const i = s.i, p = seats[i].p, local = !k.party && p === 0 && !seats[i].cpu;
     if (seats[i].cpu) {
       s.cpuT -= dt; if (s.cpuT > 0) return;
-      if (!s.cpuP) { const a = -(0.95 + Math.random() * 0.25), need = solve(s, a) || 0.8, sig = Math.max(0.012, 0.045 - LV * 0.003); s.cpuP = { a: a + gauss() * sig * 0.4, p: clamp(need * (1 + gauss() * sig), 0.2, 1), t: 0 }; }
+      if (!s.cpuP) { const a = bestAng(s) - Math.random() * 0.12, need = solve(s, a) || 0.8, sig = Math.max(0.01, 0.04 - LV * 0.003); s.cpuP = { a: a + gauss() * sig * 0.4, p: clamp(need * (1 + gauss() * sig), 0.2, 1), t: 0 }; }
       s.cpuP.t += dt; s.kAng += (s.cpuP.a - s.kAng) * Math.min(1, dt * 5); s.kPow += (s.cpuP.p - s.kPow) * Math.min(1, dt * 5);
       if (s.cpuP.t > 0.55) { throwBall(s, s.cpuP.a, s.cpuP.p); s.cpuP = null; }
       return;
@@ -191,7 +193,7 @@ function duelGame() {
       if (!b.scored && b.prevY < s.hoop.y && b.y >= s.hoop.y && Math.abs(b.u - s.hoop.u) < RIM - 4 && b.vy > 0) scored(s);
       for (const n of s.net) { const [nx0, ny0] = netRest(s, n), px = nx0 + n.dx, py = ny0 + n.dy, d = Math.hypot(px - b.u, py - b.y); if (d < BR + 1 && d > 0) { const f = BR + 1 - d; n.dx += (px - b.u) / d * f * 0.7; n.dy += (py - b.y) / d * f * 0.7; n.vx += b.vu * 0.02; n.vy += b.vy * 0.03; } }
       if (b.y > FLOOR - BR && b.vy > 0) { b.y = FLOOR - BR; b.vy *= -0.55; b.vu *= 0.8; b.sp *= 0.8; b.bounces++; if (Math.abs(b.vy) > 60) k.sfx('pop'); } }
-    if (b.bounces >= 2 || b.u < -10 || b.u > 440) { if (!b.scored) { if (s.streak >= 2) { s.msg = 'Fallo'; s.msgC = '#ff9a9a'; s.msgT = 0.7; } s.streak = 0; } newBall(s); }
+    if (b.bounces >= 1 || (b.scored && b.y > s.hoop.y + 80) || b.u < -10 || b.u > 440) { if (!b.scored) { if (s.streak >= 2) { s.msg = 'Fallo'; s.msgC = '#ff9a9a'; s.msgT = 0.7; } s.streak = 0; } newBall(s); }
   }
   function finish() {
     const rows = S.map((s) => ({ p: seats[s.i].p, score: s.score, name: nm(s.i) })), hum = seats.filter((q) => !q.cpu);

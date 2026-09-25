@@ -79,7 +79,7 @@ function startHeat() {
   cams = bikes.map((b) => ({ x: b.x + 200, y: b.y - 40 }));
 }
 let cams = [];
-function reset() { SEED = (Math.random() * 1e9) | 0; heat = 0; bikes = [0, 1].map(mkBike); startHeat(); }
+function reset() { demoOn = false; SEED = (Math.random() * 1e9) | 0; heat = 0; bikes = [0, 1].map(mkBike); startHeat(); }
 k.onParty = () => {
   if (k.st !== 'play') { reset(); return; }
   for (const b of bikes) { const hu = k.human(b.p), q = k.party && k.party.find((x) => x.p === b.p); b.cpu = !hu; b.col = k.pcol(b.p); b.name = hu ? (q && q.name) || (k.party ? 'J' + (b.p + 1) : 'Tú') : 'CPU'; }
@@ -190,7 +190,23 @@ function dust(b, n) { const o = rot(b.th, WH[0]); for (let i = 0; i < n; i++) ad
 function addPart(x, y, col, spd, life, r) { if (parts.length > 260) return; const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.4, v = Math.random() * spd; parts.push({ x, y, vx: Math.cos(a) * v - 30, vy: Math.sin(a) * v, life, max: life, col, r: r * (0.6 + Math.random() * 0.6) }); }
 
 /* ---------- Bucle ---------- */
+function sim(dt) {
+  raceT += dt;
+  for (const b of bikes) {
+    stepBike(b, dt);
+    if (!b.fin && b.x >= T.LEN) { b.fin = raceT; b.time = raceT; finOrder.push(b); if (!b.cpu) { k.sfx(finOrder.length === 1 ? 'win' : 'coin'); if (finOrder.length === 1) k.confetti(b.col, 50); } }
+  }
+  updCams(dt);
+}
+/* Demostración detrás de la pantalla de inicio: dos pilotos de la CPU (también da la miniatura). */
+let demoOn = false;
+function attract(dt) {
+  if (!demoOn || finOrder.length || raceT > 60) { reset(); demoOn = true; for (const b of bikes) b.cpu = true; msgT = 0; cdPend = false; for (let i = 0; i < 80; i++) { sim(1 / 30); updParts(1 / 30); } updCams(0, true); }
+  sim(Math.min(dt, 0.05)); updParts(dt);
+}
 function update(dt) {
+  if (k.st === 'ready' && !k.party) attract(dt);
+  else if (demoOn && k.st === 'play') reset();
   if (!k.gate(reset)) return;
   if (cdPend) { cdPend = false; k.count(3); }
   if (msgT > 0) msgT -= dt;
@@ -198,12 +214,7 @@ function update(dt) {
   updParts(dt);
   if (phase === 'stand') { phT -= dt; if (phT <= 0 || (phT < 3.2 && (k.hit.has('a') || k.ptr.hit || (k.party && k.party.some((q) => k.phit(q.p, 'a')))))) nextHeat(); updCams(dt); return; }
   if (k.counting()) { updCams(dt, true); return; }
-  raceT += dt;
-  for (const b of bikes) {
-    stepBike(b, dt);
-    if (!b.fin && b.x >= T.LEN) { b.fin = raceT; b.time = raceT; finOrder.push(b); if (!b.cpu) { k.sfx(finOrder.length === 1 ? 'win' : 'coin'); if (finOrder.length === 1) k.confetti(b.col, 50); } }
-  }
-  updCams(dt);
+  sim(dt);
   const hs = humans(), first = finOrder[0];
   if (finOrder.length >= 2 || (hs.length && hs.every((b) => b.fin) && raceT - Math.max(...hs.map((b) => b.fin)) > 1.5) || (first && raceT - first.fin > 10) || raceT > 180) endHeat();
 }
