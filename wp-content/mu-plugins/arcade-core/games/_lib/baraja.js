@@ -1371,6 +1371,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     if (SI || ES || BU) {                 // modos nuevos: el globo no tapa las cartas ni el rótulo de ayuda
       const [bxx, byy] = badgeXY(b.p);
       if (st === 'l' || st === 'r') { x = bxx; y = byy - 36; }
+      else if (st === 't') { x = Math.min(bxx, PORT ? 120 : 150); y = byy + 40; }   // bajo la chapa y a la izquierda del rótulo central
       else if (st === 'b' && viewer() === b.p) { if (BU) y = handTop - (PORT ? 230 : 152); else x = bxx; }
     }
     const size = b.big ? 26 : 17; c.font = `800 ${size}px ${FONT}`; const w = c.measureText(b.txt).width + 28, h = size + 18, xx = Math.max(w / 2 + 6, Math.min(W - w / 2 - 6, x)), s = Math.min(1, (b.big ? 2.4 : 1.7) - b.t < 0.15 ? 0.6 + ((b.big ? 2.4 : 1.7) - b.t) * 2.6 : 1);

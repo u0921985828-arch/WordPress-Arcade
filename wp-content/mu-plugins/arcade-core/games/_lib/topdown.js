@@ -593,7 +593,7 @@ function coopDraw() {
   /* marcador por héroe: vida, habilidad y color */
   const n = HE.length, pw = Math.min(140, (W - 110) / n - 6);
   HE.forEach((h, i) => { const x = 8 + i * (pw + 6); ART.rr(c, x, 4, pw, 30, 9); c.fillStyle = h.down ? 'rgba(80,20,40,.8)' : 'rgba(26,21,48,.85)'; c.fill(); c.lineWidth = 2; c.strokeStyle = h.col; c.stroke();
-    label(h.cpu ? 'CPU' : h.name, x + 7, 7, 12, h.col); const hs = Math.min(10, (pw - 50) / Math.max(1, h.max));
+    { const nm = h.cpu ? 'CPU' : h.name; label(nm, x + 7, 7, fitLab(nm, 40, 12), h.col); } const hs = Math.min(10, (pw - 50) / Math.max(1, h.max));
     for (let j = 0; j < h.max; j++) ART.heart(c, x + 50 + j * hs, 13, 0.55, j < h.hp);
     const sk = Math.max(0, h.sk) / (CLS[h.cls].skcd * (h.skMul || 1)); ART.rr(c, x + 7, 24, pw - 14, 5, 2.5); c.fillStyle = 'rgba(255,255,255,.15)'; c.fill(); ART.rr(c, x + 7, 24, (pw - 14) * (1 - sk), 5, 2.5); c.fillStyle = sk <= 0 ? '#ffc928' : '#8a7fd8'; c.fill(); });
   coinIcon(W - 18, 19); label(`${score}`, W - 32, 10, 18, '#fff', 'right');
@@ -918,6 +918,11 @@ function icon(o, x, y) {
   else if (o === 'pierce') { c.beginPath(); c.arc(4, 0, 10, 0, R2); ART.fillOut(c, '#ff5f7a', 2); c.strokeStyle = OUT; c.lineWidth = 5; c.beginPath(); c.moveTo(-18, 0); c.lineTo(18, 0); c.stroke(); c.strokeStyle = '#e8eef8'; c.lineWidth = 2.5; c.stroke(); c.beginPath(); c.moveTo(22, 0); c.lineTo(14, -6); c.lineTo(14, 6); c.closePath(); ART.fillOut(c, '#e8eef8', 2); }
   else if (o === 'reach') { c.strokeStyle = OUT; c.lineWidth = 9; c.beginPath(); c.arc(-8, 6, 20, -1.2, 0.6); c.stroke(); c.strokeStyle = '#e8eef8'; c.lineWidth = 5; c.stroke(); }
   c.restore();
+}
+function fitLab(s, maxW, size) { // cuerpo de letra que cabe de verdad (measureText), para nombres largos
+  let z = size;
+  while (z > 8) { c.font = `800 ${z}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; if (c.measureText(s).width <= maxW) break; z -= 1; }
+  return z;
 }
 function label(s, x, y, size, col, align) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top';
