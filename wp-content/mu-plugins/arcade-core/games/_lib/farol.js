@@ -255,12 +255,12 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       // Selector de cantidad y cara
       const bw = LAND ? 54 : 46, y = by;
       const qx = W / 2 - (LAND ? 190 : 150);
-      fit('Cantidad', qx, y - 22, 13, '#cfe8d8', 'center', 110);
+      fit('Cantidad', qx, y - 28, 13, '#cfe8d8', 'center', 110);
       pill(qx - bw - 26, y - 20, 34, 40, '#463ac4', '−', 24, '#fff'); hits.push({ x: qx - bw - 26, y: y - 20, w: 34, h: 40, v: 'q-' });
       txt(String(S.sel.q), qx, y, 34, '#ffd166');
       pill(qx + 26, y - 20, 34, 40, '#463ac4', '+', 24, '#fff'); hits.push({ x: qx + 26, y: y - 20, w: 34, h: 40, v: 'q+' });
       const fx = W / 2 + (LAND ? 30 : 10), fw = Math.min(30, (W / 2 - 40) / 6 - 4);
-      fit('Valor', fx + (fw + 4) * 2.5 + fw / 2, y - 22, 13, '#cfe8d8', 'center', 110);
+      fit('Valor', fx + (fw + 4) * 2.5 + fw / 2, y - 28, 13, '#cfe8d8', 'center', 110);
       for (let f = 1; f <= 6; f++) {
         const x = fx + (f - 1) * (fw + 4);
         if (S.sel.f === f) { rr(x - 3, y - fw / 2 - 3, fw + 6, fw + 6, 8, '#ffd166', 2); }
