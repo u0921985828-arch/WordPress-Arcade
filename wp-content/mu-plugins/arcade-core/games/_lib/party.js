@@ -1892,10 +1892,10 @@ function mgRelay() {
       if (q.steady) fit('despacio', q.x, GY + 16, 14, '#a8cf3f', 90);
     }
     /* barra de equipo */
-    panel(200, 56, 400, 30, 12, 'rgba(26,21,48,.85)', 3);
+    panel(200, 56, 400, 54, 12, 'rgba(26,21,48,.85)', 3); // la chapa recoge tambien la linea del tiempo
     ART.rr(c, 206, 62, 388 * clamp(barrel / GOAL, 0, 1), 18, 9); ART.fillOut(c, '#5b8cff', 2);
     fit(`Barril ${Math.round(barrel)} / ${GOAL} L`, 400, 71, 18, '#fff', 380);
-    fit(`${Math.max(0, Math.ceil(TL - T))} s · derramados ${Math.round(spilled)} L`, 400, 104, 18, '#e8e3ff', 420);
+    fit(`${Math.max(0, Math.ceil(TL - T))} s · derramados ${Math.round(spilled)} L`, 400, 98, 16, '#e8e3ff', 380);
     strip(ps.map((q) => Math.round(q.liters) + ' L'));
   };
   return m;

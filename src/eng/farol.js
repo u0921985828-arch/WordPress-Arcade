@@ -226,7 +226,9 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
         } else txt(`${this.total()} dados en juego`, W / 2, cy, 26, '#fff');
       }
       this.drawCtl();
-      if (msgT > 0) { const w2 = Math.min(W - 24, tw(msg, 17) + 34); c.globalAlpha = Math.min(1, msgT * 2); const my = LAND ? H - 24 : 150; ART.rr(c, W / 2 - w2 / 2, my - 17, w2, 34, 17); c.fillStyle = 'rgba(8,14,26,.92)'; c.fill(); fit(msg, W / 2, my, 17, '#fff3c4', 'center', w2 - 16); c.globalAlpha = 1; }   // abajo: durante el recuento no hay botones y no tapa a los jugadores
+      // el aviso va abajo, pero nunca si ya están los botones de apostar/dudar (lo que dice se ve igual en el recuento)
+      const ctlOn = !k.party && S.phase === 'bid' && S.cur === 0;
+      if (msgT > 0 && !(LAND && ctlOn)) { const w2 = Math.min(W - 24, tw(msg, 17) + 34); c.globalAlpha = Math.min(1, msgT * 2); const my = LAND ? H - 24 : 150; ART.rr(c, W / 2 - w2 / 2, my - 17, w2, 34, 17); c.fillStyle = 'rgba(8,14,26,.92)'; c.fill(); fit(msg, W / 2, my, 17, '#fff3c4', 'center', w2 - 16); c.globalAlpha = 1; }
     },
     drawReveal(cy) {
       const r = S.res, n = S.n;

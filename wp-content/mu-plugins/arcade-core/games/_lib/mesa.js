@@ -341,7 +341,7 @@ else (function () {
 
   const PANH = PORT ? (MODE === 'damas' ? 78 : 132) : 0, PANW = PORT ? 0 : 250;
   /* en horizontal no hay banda de letterbox: se deja sitio arriba para la pausa y el sonido del reproductor */
-  const TOPR = PORT ? 0 : 46;
+  const TOPR = PORT ? 0 : 64; // franja libre arriba: ahi cae el boton de pausa del reproductor en apaisado
   const BD = PORT ? { x: 10, y: 10, w: W - 20, h: H - PANH - 26 } : { x: 10, y: TOPR, w: W - PANW - 30, h: H - TOPR - 10 };
   const PAN = PORT ? { x: 10, y: H - PANH - 8, w: W - 20, h: PANH } : { x: W - PANW - 10, y: 10, w: PANW, h: H - 20 };
 

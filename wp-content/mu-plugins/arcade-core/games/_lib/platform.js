@@ -603,10 +603,14 @@ function drawTej() {
 function hudTej() {
   c.fillStyle = '#0c0a20'; c.fillRect(0, 0, W, TTOP);
   c.fillStyle = 'rgba(255,255,255,.08)'; c.fillRect(0, TTOP - 2, W, 2);
-  const n = Math.max(1, NJ.length), cw = (W - 86) / n;
+  const n = Math.max(1, NJ.length);
+  // hueco central libre: ahi cae el boton de pausa del reproductor cuando el juego ocupa toda la pantalla
+  const gapL = W / 2 - 66, gapR = W / 2 + 66, availL = gapL - 8, availR = W - 86 - gapR;
+  const nl = Math.min(n, Math.max(1, Math.round(n * availL / (availL + availR)))), nr = n - nl;
+  const wl = availL / nl, wr = nr ? availR / nr : 0;
   label(`Ronda ${round_}`, W - 10, 9, 14, '#fff', 'right');
   NJ.forEach((nj, i) => {
-    const x = 8 + i * cw, inner = cw - 10;
+    const lf = i < nl, x = lf ? 8 + i * wl : gapR + (i - nl) * wr, inner = (lf ? wl : wr) - 10;
     c.globalAlpha = nj.out ? 0.42 : 1;
     c.fillStyle = nj.col; ART.rr(c, x, 6, 8, 8, 3); c.fill(); c.lineWidth = 1.8; c.strokeStyle = OUT; c.stroke();
     const [nm, ns] = tFit(String(nj.name), inner - 13, 12, 8);

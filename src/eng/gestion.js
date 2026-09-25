@@ -376,7 +376,13 @@ function draw() {
   if (FARM) label('mercado ' + Math.round(precio * (has('pre') ? 1.25 : 1)) + ' €', PORT ? 150 : 200, 46, 13, '#d8d4f5', 'left');
   else label('mesas listas: ' + mesas.filter((m) => !m.cli && !m.dirty).length, PORT ? 150 : 200, 46, 13, '#d8d4f5', 'left');
   if (up.length) label(up.map((u) => UPG.find((q) => q.id === u).n).join(' · '), PORT ? 150 : 200, 70, 11, '#8a86b5', 'left');
-  if (hintT > 0) { c.globalAlpha = Math.min(1, hintT); label(hint, W / 2, TOP + 22, 16, '#ff9ecb'); c.globalAlpha = 1; }
+  if (hintT > 0) {  // el aviso lleva su propia chapa oscura: si no, se pierde sobre la valla o el suelo claro
+    c.globalAlpha = Math.min(1, hintT * 3);
+    c.font = '800 16px ui-rounded,"Trebuchet MS",system-ui,sans-serif';
+    const hw = c.measureText(hint).width + 30;
+    rr(c, W / 2 - hw / 2, TOP + 10, hw, 32, 16); fillOut(c, '#140f2e', 2);
+    label(hint, W / 2, TOP + 26, 16, '#ffd0e6'); c.globalAlpha = 1;
+  }
   if (bt > 0) { c.globalAlpha = Math.min(1, bt); label(banner, W / 2, H / 2 - 40, 44, '#fff'); c.globalAlpha = 1; }
 }
 

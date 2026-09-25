@@ -784,9 +784,9 @@ function drawGem() {
 function hudGem() {
   c.fillStyle = '#0c0a20'; c.fillRect(0, 0, W, TOP); c.fillRect(0, H - GBOT, W, GBOT);
   c.fillStyle = 'rgba(255,255,255,.08)'; c.fillRect(0, TOP - 2, W, 2); c.fillRect(0, H - GBOT, W, 2);
-  // reloj centrado con medida real
+  // reloj a la izquierda: el centro de la franja lo tapa el boton de pausa del reproductor
   const ts = Math.max(0, Math.ceil(GT)), tx = `${Math.floor(ts / 60)}:${String(ts % 60).padStart(2, '0')}`;
-  label(tx, W / 2, 9, 22, GT < 15 ? '#ff7b7b' : '#fff', 'center');
+  label(tx, 12, 9, 22, GT < 15 ? '#ff7b7b' : '#fff', 'left');
   const n = Math.max(1, GP.length), cw = W / n;
   GP.forEach((pl, i) => {
     const x = i * cw + 8, inner = cw - 16, y = H - GBOT + 7;

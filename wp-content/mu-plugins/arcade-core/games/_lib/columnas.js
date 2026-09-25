@@ -211,8 +211,8 @@ function draw() {
   label('Nivel ' + level, W - 14, 10, 16, '#ffc94d', 'right');
   label(cleared + ' gemas', W - 14, 32, 12, 'rgba(255,255,255,.65)', 'right');
   // siguiente columna
-  label('Siguiente', W / 2, 58, 11, 'rgba(255,255,255,.6)', 'center');
-  if (next) for (let i = 0; i < 3; i++) drawGem(W / 2 - 34 + i * 34, 74, next[i], 0.62);
+  label('Siguiente', W / 2, 50, 11, 'rgba(255,255,255,.6)', 'center');
+  if (next) for (let i = 0; i < 3; i++) drawGem(W / 2 - 34 + i * 34, 77, next[i], 0.62);
   if (msgT > 0) { c.globalAlpha = Math.min(1, msgT * 2); label(msg, W / 2, Y0 + ROWS * CS + 14, 20, '#a8cf3f', 'center'); c.globalAlpha = 1; }
 }
 spr.push(...GEM.map((_, i) => gemSprite(i)));

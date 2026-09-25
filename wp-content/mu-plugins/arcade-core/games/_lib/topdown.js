@@ -260,7 +260,7 @@ function vsDraw() {
     c.beginPath(); r.pts.forEach((pt, j) => (j ? c.lineTo(pt[0], pt[1]) : c.moveTo(pt[0], pt[1]))); c.stroke(); c.restore();
     if (r.hit >= 0) { const o = VS[r.hit]; c.strokeStyle = q.col; c.lineWidth = 2.5; c.beginPath(); c.arc(o.x, o.y, 20 + Math.sin(t * 10) * 2, 0, R2); c.stroke(); }
   });
-  for (const q of [...VS].sort((a, b) => a.y - b.y)) { if (!q.alive || (q.inv > 0 && !vsFreeze && Math.floor(q.inv * 14) % 2)) continue; shadow(q.x, q.y + 10, 10); tankSprite(q.x, q.y, q.body, q.aim, q.col, q.recoil, q.mv); label(q.name, q.x, q.y - 34, 14, q.cpu ? '#e8e4f4' : q.col, 'center'); }
+  for (const q of [...VS].sort((a, b) => a.y - b.y)) { if (!q.alive || (q.inv > 0 && !vsFreeze && Math.floor(q.inv * 14) % 2)) continue; shadow(q.x, q.y + 10, 10); tankSprite(q.x, q.y, q.body, q.aim, q.col, q.recoil, q.mv); label(q.name, q.x, Math.max(Y0 + 8, q.y - 34), 14, q.cpu ? '#e8e4f4' : q.col, 'center'); }
   for (const s of shots) {
     if (BOUNCE) { /* bola de energía del color del dueño con estela; parpadea en blanco cuando ya puede alcanzar a su dueño */
       c.lineCap = 'round'; for (let j = 2; j < s.tr.length; j += 2) { c.globalAlpha = (j / s.tr.length) * 0.5; c.strokeStyle = s.col; c.lineWidth = 2 + (j / s.tr.length) * 5; c.beginPath(); c.moveTo(s.tr[j - 2], s.tr[j - 1]); c.lineTo(s.tr[j], s.tr[j + 1]); c.stroke(); }
@@ -337,7 +337,7 @@ function coopParty() {
   if (k.st !== 'play') { reset(); return; }
   const pl = k.players(4);
   for (const h of HE) { h.cpu = pl[h.pl].cpu; h.name = pl[h.pl].name; h.ai = null; if (lobby) lobby.ready[HE.indexOf(h)] = h.cpu; }
-  for (const q of pl) if (!q.cpu && !HE.some((h) => h.pl === q.p)) { const h = mkHero(q, CK[q.p]); h.x = X0 + 40; h.y = H / 2; h.inv = 2; HE.push(h); if (lobby) lobby.ready.push(false); k.float('¡' + h.name + ' se une!', h.x + 30, h.y - 30, h.col); }
+  for (const q of pl) if (!q.cpu && !HE.some((h) => h.pl === q.p)) { const h = mkHero(q, CK[q.p]); h.x = X0 + 40; h.y = H / 2; h.inv = 2; HE.push(h); if (lobby) lobby.ready.push(false); k.float('¡' + h.name + ' se une!', h.x + 30, Math.max(Y0 + 44, h.y - 30), h.col); }
   HE.sort((a, b) => a.pl - b.pl); if (lobby) lobby.ready = HE.map((h) => h.cpu);
   hpMul = 1 + 0.35 * (HE.length - 1);
 }
@@ -371,7 +371,7 @@ function heroHurt(h, n, sx, sy) {
   if (h.inv > 0 || h.down || h.roll > 0) return;
   h.hp -= n; h.inv = 1.5; k.shake(5); k.sfx('hurt'); k.burst(h.x, h.y, h.col, 10, 150);
   if (sx !== undefined) { const a = Math.atan2(h.y - sy, h.x - sx); h.kx = Math.cos(a) * 280; h.ky = Math.sin(a) * 280; }
-  if (h.hp <= 0) { h.hp = 0; h.down = true; h.rev = 0; k.flash('rgba(255,60,80,.25)'); k.float(`¡${h.name} ha caído!`, h.x, h.y - 30, h.col); }
+  if (h.hp <= 0) { h.hp = 0; h.down = true; h.rev = 0; k.flash('rgba(255,60,80,.25)'); k.float(`¡${h.name} ha caído!`, h.x, Math.max(Y0 + 44, h.y - 30), h.col); }
 }
 function skill(h) {
   const C = CLS[h.cls]; h.sk = C.skcd * (h.skMul || 1); k.sfx('explode'); k.shake(3);
@@ -379,7 +379,7 @@ function skill(h) {
   else if (h.cls === 'archer') for (let i = 0; i < 12; i++) { const a = (i / 12) * R2; shots.push({ x: h.x, y: h.y - 4, vx: Math.cos(a) * 460, vy: Math.sin(a) * 460, life: 0.9, b: 0, pierce: 1, hits: [], dmg: 1.2 * upg.dmg, col: C.shot, arrow: 1 }); }
   else if (h.cls === 'mage') { fxs.push({ k: 'ring', x: h.x, y: h.y, r: 130, t: 0.45, col: '#7df0ff' }); for (const f of foes) if (Math.hypot(f.x - h.x, f.y - h.y) < 130 + f.r) { f.frz = f.boss ? 1.2 : 2.6; dmgFoe(f, 1, Math.atan2(f.y - h.y, f.x - h.x)); } }
   else { fxs.push({ k: 'ring', x: h.x, y: h.y, r: 120, t: 0.5, col: '#ffd23d' }); for (const o of HE) if (Math.hypot(o.x - h.x, o.y - h.y) < 120) { if (o.down) revive(o, 2); else { o.hp = Math.min(o.max, o.hp + 2); k.float('+2', o.x, o.y - 26, '#7cf7a0'); } } }
-  k.float(C.sk, h.x, h.y - 40, '#ffc928');
+  k.float(C.sk, h.x, Math.max(Y0 + 44, h.y - 40), '#ffc928');
 }
 function revive(h, hp) { h.down = false; h.hp = Math.min(h.max, hp); h.inv = 1.5; h.rev = 0; k.sfx('win'); k.burst(h.x, h.y, '#7cf7a0', 18, 160); k.float('¡Arriba!', h.x, h.y - 30, '#7cf7a0'); }
 /* CPU aliada: esquiva, levanta a los caídos, pelea según su clase (cuerpo a cuerpo se acerca; a distancia mantiene 150–210 px) y no se aleja del líder humano */
@@ -538,7 +538,7 @@ function coopHero(h) {
   if (h.inv > 0 && h.roll <= 0 && Math.floor(h.inv * 14) % 2) return;
   c.strokeStyle = h.col; c.lineWidth = 3; c.globalAlpha = 0.85; c.beginPath(); c.ellipse(h.x, h.y + 11, 14, 5.5, 0, 0, R2); c.stroke(); c.globalAlpha = 1;
   heroSprite(h, h.x, h.y, 0.72);
-  label(h.name, h.x, h.y - 40, 13, h.cpu ? '#e8e4f4' : h.col, 'center');
+  label(h.name, h.x, Math.max(Y0 + 8, h.y - 40), 13, h.cpu ? '#e8e4f4' : h.col, 'center');
 }
 function drawPlate(q) {
   const on = q.on, r = 19;

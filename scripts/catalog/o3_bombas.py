@@ -66,7 +66,7 @@ GAMES = [
     ),
     dict(
         title='Castillo de Dos', genre='arcade', tags=['cooperativo', 'mazmorra', 'llaves', 'equipos', 'vector'],
-        orient='auto', aspect='fill', inputs='TKG', engine='topdown', players='1–4 jugadores',
+        orient='landscape', aspect='16:9', inputs='TKG', engine='topdown', players='1–4 jugadores',
         cfg=dict(hud='bl', mode='castillo',
                  help='Cooperativo para uno a cuatro. Elige clase con ← → y confirma con A. Te mueves con el joystick o las flechas y atacas solo al enemigo más cercano; A lanza la habilidad de tu clase y B es una voltereta. Si un compañero cae, quédate a su lado para levantarlo. Al limpiar la sala aparecen dos losas de presión: una está encerrada tras una reja y la otra fuera, y hay que pisarlas a la vez para que la reja suba y se abra la puerta de salida. Jugando solo, la CPU se coloca en la losa que quede libre.'),
         pad=dict(d='8', a='Habilidad', b='Rodar'), mp=(1, 4),
@@ -81,7 +81,7 @@ GAMES = [
     ),
     dict(
         title='Asedio Zombi Coop', genre='arcade', tags=['cooperativo', 'zombis', 'oleadas', 'supervivencia', 'vector'],
-        orient='auto', aspect='fill', inputs='TKG', engine='topdown', players='1–4 jugadores',
+        orient='landscape', aspect='16:9', inputs='TKG', engine='topdown', players='1–4 jugadores',
         cfg=dict(hud='bl', mode='horda',
                  help='Cooperativo para uno a cuatro. Elige clase con ← → y confirma con A. Muévete con el joystick o las flechas; el ataque sale solo contra el zombi más cercano, A lanza la habilidad de tu clase y B es una voltereta. Los zombis entran por los bordes del corral sin parar hasta completar la oleada. Si un compañero cae, quédate a su lado unos segundos para levantarlo; si caéis todos a la vez, se acabó. Entre oleada y oleada elegís una mejora para todo el equipo, y cada cinco oleadas aparece un bruto.'),
         pad=dict(d='8', a='Habilidad', b='Rodar'), mp=(1, 4),

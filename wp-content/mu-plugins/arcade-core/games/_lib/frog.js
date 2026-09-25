@@ -395,9 +395,12 @@ function fitTxt(s, max, size, min) {
 }
 function hudInf() {
   c.fillStyle = '#0c0a20'; c.fillRect(0, 0, W, TOP); c.fillStyle = 'rgba(255,255,255,.08)'; c.fillRect(0, TOP - 2, W, 2);
-  const n = Math.max(1, IP.length), cw = W / n;
+  // hueco central libre: ahi cae el boton de pausa del reproductor cuando el juego ocupa toda la pantalla
+  const n = Math.max(1, IP.length), gapL = W / 2 - 58, gapR = W / 2 + 58;
+  const nl = Math.min(n, Math.max(1, Math.round(n / 2))), nr = n - nl;
+  const wl = gapL / nl, wr = nr ? (W - gapR) / nr : 0;
   IP.forEach((pl, i) => {
-    const x = i * cw + 8, inner = cw - 16;
+    const lf = i < nl, x = (lf ? i * wl : gapR + (i - nl) * wr) + 8, inner = (lf ? wl : wr) - 16;
     c.globalAlpha = pl.out ? 0.4 : 1;
     c.fillStyle = pl.col; ART.rr(c, x, 7, 10, 10, 3); c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
     const [nm, ns] = fitTxt(String(pl.name), inner - 15, 12, 8);

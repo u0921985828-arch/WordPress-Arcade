@@ -91,7 +91,7 @@ GAMES = [
         tags=['laberinto', 'gemas', 'versus', 'vector'],
         orient='portrait', aspect='4:3', inputs='TKG',
         engine='maze',
-        cfg=dict(mode='gemas', bg='#0a0912', help='Una mina a oscuras para 1–4: solo ves lo que alumbra tu farol, y el farol de los demás te delata a ti. Muévete con las flechas, el joystick o deslizando el dedo y recoge gemas: las azules valen 1, las rosas 3 y la dorada 5. Si chocas con un rival, el que más gemas lleve encima suelta la mitad por el suelo, así que conviene ir dejándolas en la vagoneta del centro de la mina, donde ya nadie te las puede quitar. Con A das un destello que ilumina toda la galería durante un momento, pero tarda ocho segundos en recargarse. Noventa segundos; gana quien más gemas haya guardado en la vagoneta.'),
+        cfg=dict(mode='gemas', bg='#0a0912', help='Una mina a oscuras para 1–4: solo ves lo que alumbra tu farol, y el farol de los demás te delata. Muévete con las flechas, el joystick o el dedo y recoge gemas: azules 1, rosas 3, dorada 5. Si chocas con un rival, el que más lleve encima suelta la mitad, así que conviene ir dejándolas en la vagoneta del centro. Con A das un destello que ilumina la galería (ocho segundos de recarga). Noventa segundos: gana quien más gemas guarde.'),
         pad=dict(d='8', a='Farol', t=1),
         mp=(1, 4),
         desc=[

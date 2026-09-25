@@ -594,15 +594,19 @@ function pianoGame() {
   function draw() {
     c.drawImage(BG, 0, 0, 360, 640);
     for (let i = 0; i < LN; i++) if (flash[i] > 0) {
-      c.globalAlpha = flash[i] * 0.45; c.fillStyle = COLS[i]; c.fillRect(i * LW + 2, 60, LW - 4, HITY - 60);
+      c.globalAlpha = flash[i] * 0.45; c.fillStyle = COLS[i]; c.fillRect(i * LW + 2, 72, LW - 4, HITY - 72);
       c.globalAlpha = flash[i] * 0.85; ART.rr(c, i * LW + 2, HITY + 6, LW - 4, 168, 8); c.fillStyle = COLS[i]; c.fill(); c.globalAlpha = 1;
     }
     c.fillStyle = 'rgba(255,255,255,.28)'; c.fillRect(0, HITY - 2, 360, 4);
-    if (inter <= 0 && !done) for (const n of notes) {
-      if (n.hit) continue;
-      const y = HITY - (n.time - t) * SPEED; if (y < 46) continue;
-      if (n.miss) { c.globalAlpha = Math.max(0, 1 - (t - n.time) * 2); c.drawImage(GREY, n.lane * LW, y - 20, LW, 40); c.globalAlpha = 1; }
-      else c.drawImage(NOTE[n.lane], n.lane * LW, y - 20, LW, 40);
+    if (inter <= 0 && !done) {   // recortado bajo la cabecera: las notas salen de debajo del marcador, nunca encima
+      c.save(); c.beginPath(); c.rect(0, 72, 360, HITY + 200 - 72); c.clip();
+      for (const n of notes) {
+        if (n.hit) continue;
+        const y = HITY - (n.time - t) * SPEED; if (y < 46) continue;
+        if (n.miss) { c.globalAlpha = Math.max(0, 1 - (t - n.time) * 2); c.drawImage(GREY, n.lane * LW, y - 20, LW, 40); c.globalAlpha = 1; }
+        else c.drawImage(NOTE[n.lane], n.lane * LW, y - 20, LW, 40);
+      }
+      c.restore();
     }
     for (const r of rings) { const p = r.t / 0.4; c.globalAlpha = 1 - p; c.lineWidth = r.big ? 5 : 3; c.strokeStyle = r.big ? '#fff27a' : COLS[r.lane]; c.beginPath(); c.arc(r.lane * LW + LW / 2, HITY, 14 + p * (r.big ? 34 : 22), 0, TAU); c.stroke(); c.globalAlpha = 1; }
     for (let i = 0; i < LN; i++) label(NOM[i], i * LW + LW / 2, HITY + 150, 12, flash[i] ? '#1a1530' : '#6a6490', 'center', 'middle');

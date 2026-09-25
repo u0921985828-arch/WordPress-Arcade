@@ -59,8 +59,8 @@ function arcoiris() {
     g.fillStyle = 'rgba(255,255,255,.05)';
     for (let i = 0; i < 40; i++) { g.beginPath(); g.arc(R2(i) * W, R2(i + 31) * H, 3 + R2(i + 7) * 12, 0, TAU); g.fill(); }
     // marco del tubo
-    ART.rr(g, 6, TOP - 22, W - 12, LINE - TOP + 30, 16); g.lineWidth = 5; g.strokeStyle = 'rgba(160,151,255,.35)'; g.stroke();
-    ART.rr(g, 10, TOP - 18, W - 20, 12, 6); g.fillStyle = 'rgba(255,255,255,.12)'; g.fill();
+    ART.rr(g, 6, TOP - 12, W - 12, LINE - TOP + 20, 16); g.lineWidth = 5; g.strokeStyle = 'rgba(160,151,255,.35)'; g.stroke();
+    ART.rr(g, 10, TOP - 9, W - 20, 9, 5); g.fillStyle = 'rgba(255,255,255,.12)'; g.fill();
   });
 
   function colorsNow() { return Math.min(COL.length, 3 + Math.floor(drops / 4)); }
@@ -199,11 +199,13 @@ function arcoiris() {
       }
       c.lineTo(x, y); c.stroke(); c.setLineDash([]);
     }
+    c.save(); c.beginPath(); c.rect(0, TOP - 6, W, H - TOP + 6); c.clip();  // las filas nuevas salen de debajo del techo, nunca sobre el marcador
     for (let r = 0; r < G.length; r++) for (let i = 0; i < G[r].length; i++) {
       const cell = G[r][i]; if (!cell) continue;
       const y = cellY(r) - slide; if (y < TOP - R) continue;
       drawBubble(cellX(r, i), y, cell.c, cell.pop < 1 ? 0.6 + 0.5 * Math.sin(cell.pop * 2.1) : 1);
     }
+    c.restore();
     for (const f of fallers) drawBubble(f.x, f.y, f.c, 1);
     if (shot) drawBubble(shot.x, shot.y, shot.c, 1);
     // lanzador
