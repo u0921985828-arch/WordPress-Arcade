@@ -5,9 +5,11 @@
 const OUT = ART.OUT, R2 = 6.2832, ID = CFG.id || 'serpent-grid';
 /* disposición: vertical 360×640 (tablero 14×23) u horizontal 640×360 (26×13); franja superior para el marcador */
 /* CFG.mode 'mp' (Serpientes Hambrientas): siempre horizontal, tablero 28×14 de 22 px, hasta 4 serpientes (ver snakeMP al final) */
-const MP = CFG.mode === 'mp', PORT = !MP && innerHeight > innerWidth, CS = MP ? 22 : 24;
-const COLS = MP ? 28 : PORT ? 14 : 26, ROWS = MP ? 14 : PORT ? 23 : 13, W = PORT ? 360 : 640, H = PORT ? 640 : 360;
-const X0 = (W - COLS * CS) / 2, Y0 = PORT ? 62 : 40, NEED = 8;
+/* CFG.mode 'comilona' (Comilona a Cuatro): mismo tablero horizontal, dos comedores contra dos fantasmas (ver comilona al final) */
+const MP = CFG.mode === 'mp', CM = CFG.mode === 'comilona', GR = MP || CM;
+const PORT = !GR && innerHeight > innerWidth, CS = CM ? 21 : GR ? 22 : 24;
+const COLS = GR ? 28 : PORT ? 14 : 26, ROWS = GR ? 14 : PORT ? 23 : 13, W = PORT ? 360 : 640, H = PORT ? 640 : 360;
+const X0 = (W - COLS * CS) / 2, Y0 = PORT ? 62 : CM ? 38 : 40, NEED = 8;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#16241b' }), c = k.ctx;
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const THM = [
@@ -284,7 +286,7 @@ function draw() {
   }
 }
 
-if (MP) snakeMP(); else {
+if (CM) comilona(); else if (MP) snakeMP(); else {
 reset();
 k.show(CFG.title || 'Serpent Grid', 'Come manzanas para crecer. Las doradas valen más y los arándanos te frenan. Cada 8 manzanas, nivel nuevo con rocas. Desliza, toca a un lado de la cabeza o usa las flechas.<br>Toca para empezar');
 k.run((dt) => { if (!k.gate(reset)) { t += dt; for (const f of foods) f.pop = Math.min(1, f.pop + dt * 4); return; } update(dt); }, draw);
@@ -487,5 +489,253 @@ function snakeMP() {
   window.__sn = { get S() { return S; }, get clock() { return clock; }, get foods() { return foods; } };
   reset();
   k.show(CFG.title || 'Serpientes Hambrientas', 'Hasta 4 serpientes y 90 segundos. Manzana +1, dorada +3. Si una rival choca contra tu cuerpo, +2 para ti. Chocar no elimina: vuelves más corta tras un parpadeo. Flechas, joystick o desliza.<br>Toca para jugar');
+  k.run(update, draw);
+}
+
+/* ================= Comilona a Cuatro (CFG.mode 'comilona'): 2 comedores contra 2 fantasmas, ronda de 90 s =========
+ * Tablero horizontal 28×14 con rocas colocadas por freeOk() (sin callejones ni zonas aisladas), sembrado de bolitas
+ * y cuatro bolas de poder. Los comedores (J1 y J2) suman 1 por bolita; los fantasmas (J3 y J4) suman 15 por captura.
+ * Con una bola de poder, durante 7 s los fantasmas huyen y valen 20. Nadie captura durante los 5 primeros segundos.
+ * CPU: BFS a la bolita o al comedor más cercano, con despiste que baja según 'cpu:<id>'. */
+function comilona() {
+  const ROUND = 90, POWER = 7, NP = 4;
+  const OPP = { up: 'down', down: 'up', left: 'right', right: 'left' };
+  const lsGet = (key) => { try { return +localStorage.getItem(key) || 0; } catch (e) { return 0; } };
+  const lsSet = (key, v) => { try { localStorage.setItem(key, v); } catch (e) { /* sin almacenamiento */ } };
+  let E = [], pel, left, clock, over, overT, cpuLv, scared, warned, banner, bannerT2;
+  const HOME = [[2, ROWS - 2], [COLS - 3, 1], [COLS - 3, ROWS - 2], [2, 1]];
+  const inB = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS;
+  const wall = (x, y) => !inB(x, y) || rockAt(x, y);
+  const idx = (x, y) => y * COLS + x;
+
+  level = 1; t = 0; th = THM[4]; snake = [{ x: 1, y: 1 }]; foods = []; rocks = [];
+
+  /* ---------- laberinto: bloques simétricos validados con freeOk() ---------- */
+  function buildMaze() {
+    rocks = [];
+    const put = (x, y) => { if (x < 1 || y < 1 || x >= COLS - 1 || y >= ROWS - 1 || rockAt(x, y)) return false; rocks.push({ x, y, pop: 1 }); return true; };
+    for (let n = 0; n < 60 && rocks.length < COLS * ROWS * 0.2; n++) {
+      const x = k.ri(2, Math.floor(COLS / 2) - 2), y = k.ri(2, ROWS - 3);
+      const w = k.ri(1, 2), h = k.ri(1, 2), added = [];
+      for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) {
+        if (put(x + i, y + j)) added.push(rocks[rocks.length - 1]);
+        if (put(COLS - 1 - x - i, y + j)) added.push(rocks[rocks.length - 1]);   // simetría izquierda/derecha
+      }
+      if (!freeOk() || HOME.some(([hx, hy]) => rockAt(hx, hy))) for (const r of added) rocks.splice(rocks.indexOf(r), 1);
+    }
+    rockCv = renderRock(); floorCv = renderFloor();
+  }
+  function seed() {
+    pel = new Int8Array(COLS * ROWS); left = 0;
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (!wall(x, y)) { pel[idx(x, y)] = 1; left++; }
+    for (const [hx, hy] of HOME) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const x = hx + dx, y = hy + dy; if (inB(x, y) && pel[idx(x, y)]) { pel[idx(x, y)] = 0; left--; }
+    }
+    const spots = [[3, 2], [COLS - 4, 2], [3, ROWS - 3], [COLS - 4, ROWS - 3]];
+    for (const [sx, sy] of spots) {
+      let best = null, bd = 1e9;
+      for (let y = 1; y < ROWS - 1; y++) for (let x = 1; x < COLS - 1; x++) if (pel[idx(x, y)] === 1) { const d = (x - sx) ** 2 + (y - sy) ** 2; if (d < bd) { bd = d; best = [x, y]; } }
+      if (best) pel[idx(best[0], best[1])] = 2;
+    }
+  }
+  function mk(pl, i) {
+    return { p: pl.p, cpu: pl.cpu, name: pl.name, col: pl.color, eat: i < 2, x: HOME[i][0], y: HOME[i][1], px: HOME[i][0], py: HOME[i][1],
+      dir: i < 2 ? 'right' : 'left', acc: 0, score: 0, down: 0, inv: 0, cool: 0, mouth: 0, home: HOME[i], anchor: null, eaten: 0 };
+  }
+  function setup() {
+    const pl = k.players(4);
+    if (E.length !== 4) E = pl.map(mk); else E.forEach((e, i) => { e.cpu = pl[i].cpu; e.name = pl[i].name; e.col = pl[i].color; });
+  }
+  k.onParty = () => setup();
+  function reset() {
+    cpuLv = Math.min(8, lsGet('cpu:' + ID)); E = []; setup(); buildMaze(); seed();
+    clock = 0; over = false; overT = 0; scared = 0; warned = 0; banner = ''; bannerT2 = 0; t = 0;
+    E.forEach((e, i) => { e.score = 0; e.acc = 0; e.down = 0; e.inv = 0; e.cool = 0; e.eaten = 0; place(e, HOME[i][0], HOME[i][1]); });
+    k.count(3);
+  }
+  function place(e, x, y) { e.x = x; e.y = y; e.px = x; e.py = y; e.acc = 0; e.dir = e.eat ? 'right' : 'left'; }
+  const speed = (e) => {
+    const g = Math.min(1, clock / 70);
+    if (e.eat) return 1 / (6.0 + 1.4 * g);
+    return 1 / ((scared > 0 ? 4.4 : 4.8 + 1.5 * g) * (e.cpu ? 0.82 + cpuLv * 0.02 : 1));   // 1.29: fantasma CPU flojo de base
+  };
+  /* ---------- BFS: primer paso hacia el objetivo más cercano ---------- */
+  function bfsDir(e, isTarget, avoid) {
+    const par = new Int32Array(COLS * ROWS).fill(-2), q = [idx(e.x, e.y)]; par[q[0]] = -1;
+    for (let i = 0; i < q.length; i++) {
+      const cur = q[i], x = cur % COLS, y = (cur / COLS) | 0;
+      if (i && isTarget(x, y)) {
+        let c2 = cur; while (par[c2] !== q[0] && par[c2] >= 0) c2 = par[c2];
+        const dx = c2 % COLS - e.x, dy = ((c2 / COLS) | 0) - e.y;
+        return dx > 0 ? 'right' : dx < 0 ? 'left' : dy > 0 ? 'down' : 'up';
+      }
+      for (const d of Object.values(DIRS)) {
+        const nx = x + d[0], ny = y + d[1], j = idx(nx, ny);
+        if (!wall(nx, ny) && par[j] === -2 && !(avoid && avoid(nx, ny))) { par[j] = cur; q.push(j); }
+      }
+    }
+    return null;
+  }
+  function cpuDir(e) {
+    const err = Math.max(0.04, 0.24 - cpuLv * 0.02);
+    const foes = E.filter((q) => q.eat !== e.eat && q.down <= 0);
+    let want = null;
+    if (e.eat) {
+      const near = (x, y) => foes.some((g) => scared <= 0 && Math.abs(g.x - x) + Math.abs(g.y - y) <= 2);
+      if (scared > 1.5 && foes.length) want = bfsDir(e, (x, y) => foes.some((g) => g.x === x && g.y === y));
+      if (!want) want = bfsDir(e, (x, y) => pel[idx(x, y)] > 0, near);
+      if (!want) want = bfsDir(e, (x, y) => pel[idx(x, y)] > 0);
+    } else if (foes.length) {
+      if (scared > 0) {   // huir: vecino que más se aleja del comedor más cercano
+        let bd = -1, bdir = null;
+        for (const [n, d] of Object.entries(DIRS)) {
+          const nx = e.x + d[0], ny = e.y + d[1]; if (wall(nx, ny)) continue;
+          const dist = Math.min(...foes.map((f) => Math.abs(f.x - nx) + Math.abs(f.y - ny)));
+          if (dist > bd) { bd = dist; bdir = n; }
+        }
+        want = bdir;
+      } else want = bfsDir(e, (x, y) => foes.some((f) => f.x === x && f.y === y && f.inv <= 0));
+    }
+    if (!want || Math.random() < err) {
+      const alt = Object.keys(DIRS).filter((n) => !wall(e.x + DIRS[n][0], e.y + DIRS[n][1]) && n !== OPP[e.dir]);
+      want = alt.length ? k.pick(alt) : want;
+    }
+    return want;
+  }
+  function humanDir(e) {
+    for (const n of ['up', 'down', 'left', 'right']) if (k.pheld(e.p, n) && !wall(e.x + DIRS[n][0], e.y + DIRS[n][1])) return n;
+    if (k.party || e.p !== 0) return null;
+    const p = k.ptr;   // solo, J1: deslizar sobre el tablero
+    if (p.hit) e.anchor = [p.x, p.y];
+    if (p.down && e.anchor) {
+      const dx = p.x - e.anchor[0], dy = p.y - e.anchor[1];
+      if (Math.max(Math.abs(dx), Math.abs(dy)) * k.scale > 22) { e.anchor = [p.x, p.y]; e.want = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'); }
+    }
+    if (p.up) e.anchor = null;
+    return e.want && !wall(e.x + DIRS[e.want][0], e.y + DIRS[e.want][1]) ? e.want : null;
+  }
+  function stepOne(e) {
+    const nd = e.cpu ? cpuDir(e) : humanDir(e);
+    if (nd) e.dir = nd;
+    const d = DIRS[e.dir], nx = e.x + d[0], ny = e.y + d[1];
+    e.px = e.x; e.py = e.y;
+    if (wall(nx, ny)) return;
+    e.x = nx; e.y = ny; e.mouth += 1;
+    if (e.eat) {
+      const i = idx(nx, ny), v = pel[i];
+      if (v) {
+        pel[i] = 0; left--;
+        if (v === 2) { scared = POWER; e.score += 3; k.sfx('win'); k.flash('rgba(160,151,255,.2)'); banner = '¡Bola de poder!'; bannerT2 = 1.6; k.burst(cx(nx), cy(ny), '#a097ff', 16, 160); }
+        else { e.score += 1; k.sfx('pop'); }
+      }
+    }
+  }
+  function catches() {
+    if (clock < 5) return;
+    for (const g of E) for (const f of E) {
+      if (g.eat || !f.eat || g.down > 0 || f.down > 0 || g.cool > 0) continue;
+      const same = g.x === f.x && g.y === f.y, swap = g.x === f.px && g.y === f.py && g.px === f.x && g.py === f.y;
+      if (!same && !swap) continue;
+      if (scared > 0) {
+        g.down = 3; g.score = Math.max(0, g.score - 2); f.score += 20; f.eaten++;
+        k.burst(cx(g.x), cy(g.y), g.col, 16, 170); k.float('+20', cx(f.x), cy(f.y) - 18, '#a8cf3f'); k.sfx('coin');
+      } else if (f.inv <= 0) {
+        f.down = 1.6; f.inv = 0; g.score += 10; g.cool = 3; f.score = Math.max(0, f.score - 2);   // 1.29: capturas menos castigadas
+        k.burst(cx(f.x), cy(f.y), '#fff', 16, 180); k.shake(5); k.sfx('hurt'); k.float('+15', cx(g.x), cy(g.y) - 18, g.col);
+      }
+    }
+  }
+  const teams = () => [E.filter((e) => e.eat).reduce((a, e) => a + e.score, 0), E.filter((e) => !e.eat).reduce((a, e) => a + e.score, 0)];
+  function update(dt) {
+    t += dt;
+    if (!k.gate(reset)) return;
+    if (k.counting()) return;
+    bannerT2 = Math.max(0, bannerT2 - dt);
+    if (over) { overT += dt; if (overT > 1.3) finish(); return; }
+    clock += dt; scared = Math.max(0, scared - dt);
+    const rest = ROUND - clock;
+    if (rest <= 10 && Math.ceil(rest) !== warned) { warned = Math.ceil(rest); k.sfx('click'); }
+    if (rest <= 0 || left <= 0) {
+      if (left <= 0) for (const e of E) if (e.eat) { e.score += 25; }
+      over = true; overT = 0; k.sfx('win'); k.confetti(); return;
+    }
+    for (const e of E) {
+      if (e.down > 0) { e.down -= dt; if (e.down <= 0) { place(e, e.home[0], e.home[1]); e.inv = e.eat ? 2.6 : 0; } continue; }
+      e.inv = Math.max(0, e.inv - dt); e.cool = Math.max(0, (e.cool || 0) - dt);
+      if (clock < 2.5 && !e.eat) continue;                  // los fantasmas salen tras dos segundos y medio
+      e.acc += dt; const st = speed(e);
+      let n = 0; while (e.acc >= st && n++ < 3) { e.acc -= st; stepOne(e); }
+    }
+    catches();
+  }
+  function finish() {
+    const [ce, cf] = teams(), rows = E.map((e) => ({ p: e.p, score: e.score }));
+    const hu = E.filter((e) => !e.cpu), win = ce === cf ? 'Empate' : ce > cf ? 'Ganan los comedores' : 'Ganan los fantasmas';
+    const meEat = hu.length === 1 && hu[0].eat, mine = hu.length === 1 ? (meEat ? ce > cf : cf > ce) : false;
+    if (mine) lsSet('cpu:' + ID, Math.min(8, cpuLv + 0.5));
+    k.podium(rows, { fmt: (v) => v + (v === 1 ? ' punto' : ' puntos'), head: `${win} · ${ce}–${cf}` });
+  }
+  /* ---------- dibujo ---------- */
+  function eater(x, y, col, dir, m, inv) {
+    if (inv && Math.floor(inv * 10) % 2) return;
+    const a = 0.12 + Math.abs(Math.sin(m * 3.2)) * 0.5, rot = dir === 'left' ? Math.PI : dir === 'up' ? -1.5708 : dir === 'down' ? 1.5708 : 0;
+    c.save(); c.translate(x, y); c.rotate(rot);
+    c.beginPath(); c.arc(0, 0, CS * 0.44, a, R2 - a); c.lineTo(0, 0); c.closePath(); ART.fillOut(c, col, 2.4);
+    c.fillStyle = 'rgba(255,255,255,.28)'; c.beginPath(); c.arc(-2, -3, CS * 0.22, 0, R2); c.fill();
+    c.rotate(-rot);
+    c.beginPath(); c.arc(dir === 'left' ? -2 : 2, -CS * 0.2, 2.6, 0, R2); ART.fillOut(c, '#fff', 1.4);
+    c.fillStyle = OUT; c.beginPath(); c.arc(dir === 'left' ? -2.6 : 2.6, -CS * 0.2, 1.4, 0, R2); c.fill();
+    c.restore();
+  }
+  function ghost(x, y, col, scaredNow, down) {
+    if (down > 0) return;
+    const r = CS * 0.42, bob = Math.sin(t * 5 + x) * 1.2, cc = scaredNow ? (scared < 2 && Math.floor(scared * 8) % 2 ? '#fff' : '#5b8cff') : col;
+    c.save(); c.translate(x, y + bob);
+    c.beginPath(); c.arc(0, -1, r, Math.PI, 0);
+    c.lineTo(r, r * 0.7);
+    for (let i = 0; i < 3; i++) { c.quadraticCurveTo(r - (i * 2 + 1) * r / 3, r * 1.15, r - (i * 2 + 2) * r / 3, r * 0.7); }
+    c.closePath(); ART.fillOut(c, cc, 2.4);
+    c.fillStyle = 'rgba(255,255,255,.22)'; c.beginPath(); c.ellipse(-r * 0.3, -r * 0.45, r * 0.3, r * 0.2, -0.5, 0, R2); c.fill();
+    for (const s of [-1, 1]) {
+      c.beginPath(); c.arc(s * r * 0.4, -r * 0.2, r * 0.3, 0, R2); ART.fillOut(c, '#fff', 1.5);
+      c.fillStyle = OUT; c.beginPath(); c.arc(s * r * 0.4 + (scaredNow ? 0 : 1.4), -r * 0.2, r * 0.15, 0, R2); c.fill();
+    }
+    if (scaredNow) { c.strokeStyle = OUT; c.lineWidth = 2; c.lineCap = 'round'; c.beginPath(); c.moveTo(-r * 0.4, r * 0.3); c.lineTo(-r * 0.1, r * 0.14); c.lineTo(r * 0.2, r * 0.3); c.stroke(); }
+    c.restore();
+  }
+  function draw() {
+    c.drawImage(floorCv, 0, 0, W, H);
+    for (const r of rocks) { const sz = CS + 8; c.drawImage(rockCv, cx(r.x) - sz / 2, cy(r.y) - sz / 2 + 1, sz, sz); }
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+      const v = pel[idx(x, y)]; if (!v) continue;
+      if (v === 1) { c.beginPath(); c.arc(cx(x), cy(y), 2.8, 0, R2); ART.fillOut(c, '#ffe8a3', 1.2); }
+      else { const s = 1 + Math.sin(t * 6 + x) * 0.12; c.beginPath(); c.arc(cx(x), cy(y), 6.5 * s, 0, R2); ART.fillOut(c, '#a097ff', 2); sparkle(cx(x), cy(y), 0.5); }
+    }
+    for (const e of E) {
+      const f = k.clamp(e.acc / speed(e), 0, 1), x = cx(e.px + (e.x - e.px) * f), y = cy(e.py + (e.y - e.py) * f);
+      if (e.eat) eater(x, y, e.col, e.dir, e.mouth + f, e.inv); else ghost(x, y, e.col, scared > 0, e.down);
+    }
+    // marcador: comedores a la izquierda, fantasmas a la derecha (centro libre para pausa/sonido)
+    const xs = [8, 132, 380, 504];
+    E.forEach((e, i) => {
+      const x = xs[i], y = 3;
+      ART.rr(c, x, y, 118, 30, 10); ART.fillOut(c, e.down > 0 ? 'rgba(90,70,120,.6)' : 'rgba(26,21,48,.72)', 2);
+      if (e.eat) eater(x + 17, y + 15, e.col, 'right', 1.1, 0); else ghost(x + 17, y + 14, e.col, scared > 0, 0);
+      label(e.name.slice(0, 6), x + 31, y + 8, 11, e.col);
+      label(String(e.score), x + 112, y + 5, 16, '#fff', 'right');
+    });
+    const [ce, cf] = teams(), rest = Math.max(0, ROUND - clock), bw = COLS * CS;
+    c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(X0, 35, bw, 4);
+    c.fillStyle = rest < 10 ? '#ff5a5f' : '#ffd166'; c.fillRect(X0, 35, bw * rest / ROUND, 4);
+    const by = Y0 + ROWS * CS + 3;                     // una sola línea al pie: cabe siempre en los 360 px de alto
+    label(`${ce} – ${cf}`, W / 2, by, 16, '#fff', 'center');
+    label(`${left} bolitas`, W - 14, by + 3, 11, 'rgba(255,255,255,.6)', 'right');
+    if (scared > 0) { c.globalAlpha = 0.85; label(`¡Huid! ${Math.ceil(scared)}`, W / 2 - 66, by + 2, 14, '#a097ff', 'right'); c.globalAlpha = 1; }
+    if (bannerT2 > 0) { c.globalAlpha = Math.min(1, bannerT2 * 2); label(banner, W / 2, Y0 + ROWS * CS / 2 - 14, 24, '#ffd166', 'center'); c.globalAlpha = 1; }
+    if (k.st === 'play' && !k.counting() && rest < 10 && rest > 0) { c.globalAlpha = 0.5; label(String(Math.ceil(rest)), W / 2, Y0 + ROWS * CS / 2 - 50, 64, '#fff', 'center'); c.globalAlpha = 1; }
+  }
+  window.__cm = { get E() { return E; }, get left() { return left; }, get clock() { return clock; }, get scared() { return scared; } };
+  reset();
+  k.show(CFG.title || 'Comilona a Cuatro', 'Dos comedores se llevan las bolitas y dos fantasmas los persiguen. Bolita +1, bola de poder: siete segundos para comerse a los fantasmas (+20). Cada captura vale 15 al fantasma. Noventa segundos.<br>Toca para jugar');
   k.run(update, draw);
 }

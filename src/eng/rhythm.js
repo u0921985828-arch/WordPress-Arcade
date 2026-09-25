@@ -1,7 +1,7 @@
 /* Rhythm Tap: toca los carriles cuando las notas llegan a la línea. Música generada con WebAudio.
  * Valoración PERFECTO / GENIAL / BIEN / FALLO, multiplicador por combo, precisión y barra de energía. */
 const OUT = ART.OUT, R2 = 6.2832;
-if (CFG.mode === 'drums') drumsGame(); else if (CFG.mode === 'dance') danceGame(); else {
+if (CFG.mode === 'drums') drumsGame(); else if (CFG.mode === 'dance') danceGame(); else if (CFG.mode === 'piano') pianoGame(); else {
 const k = Kit({ w: 360, h: 640, title: CFG.title, bg: '#0d0a1f' }), c = k.ctx;
 const LANES = 4, LW = 90, HITY = 530, SPEED = 420, COLS = ['#ff5f7a', '#f2d15c', '#5ce1e6', '#7cf7a0'], SCALE = [0, 3, 5, 7, 10, 12];
 const JUD = [[0.05, 'PERFECTO', 100, 1, '#fff27a'], [0.09, 'GENIAL', 70, 0.8, '#7cf7a0'], [0.16, 'BIEN', 40, 0.5, '#5ce1e6']];
@@ -479,5 +479,152 @@ function danceGame() {
   window.__da = { get P() { return P; }, get notes() { return notes; }, get t() { return t; } };
   reset();
   k.show(CFG.title || 'Flechas de Baile', 'Pulsa ← ↓ ↑ → cuando cada flecha que sube llegue a su hueco. Las dobles piden dos direcciones a la vez (usa la diagonal) y las largas hay que mantenerlas. PERFECTO, GENIAL o BIEN; el combo multiplica hasta ×4. En el móvil, la pantalla se divide en cuatro columnas: toca la de cada flecha.<br>Toca para jugar');
+  k.run(update, draw);
+}
+
+/* ================= Piano de Colores (CFG.mode 'piano') =====================================================
+ * Ocho teclas de colores (do re mi fa sol la si do) y melodías tradicionales o clásicas de dominio público.
+ * Las notas caen sobre su tecla: toca (o pulsa A S D F G H J K) justo cuando llegan. PERFECTO / GENIAL / BIEN / FALLO,
+ * multiplicador por combo hasta ×4, precisión y barra de energía. Multitoque: se pueden pulsar varias teclas a la vez.
+ * Cinco melodías encadenadas, cada una un poco más rápida; al terminar la última se gana la partida. */
+function pianoGame() {
+  const k = Kit({ w: 360, h: 640, title: CFG.title, bg: '#120c2a' }), c = k.ctx;
+  const LN = 8, LW = 360 / LN, HITY = 452, SPEED = 300, TAU = R2;
+  const COLS = ['#ff5f7a', '#ff9e4d', '#ffd84d', '#a8cf3f', '#5ce1e6', '#5b8cff', '#a097ff', '#ff6fb5'];
+  const NOM = ['do', 're', 'mi', 'fa', 'sol', 'la', 'si', 'do'];
+  const FRQ = [261.63, 293.66, 329.63, 349.23, 392.0, 440.0, 493.88, 523.25];
+  const BLACK = [0, 1, 3, 4, 5]; /* huecos con tecla negra detrás: do-re, re-mi, fa-sol, sol-la, la-si */
+  const JU = [[0.055, 'PERFECTO', 100, 1, '#fff27a'], [0.1, 'GENIAL', 70, 0.8, '#7cf7a0'], [0.19, 'BIEN', 40, 0.5, '#5ce1e6']];
+  /* melodías de dominio público, en una octava (0 = do). [grado, duración en tiempos]; -1 = silencio. */
+  const SONGS = [
+    { n: 'Martinillo', a: 'tradicional', bpm: 104, m: [[0,1],[1,1],[2,1],[0,1],[0,1],[1,1],[2,1],[0,1],[2,1],[3,1],[4,2],[2,1],[3,1],[4,2],[4,.5],[5,.5],[4,.5],[3,.5],[2,1],[0,1],[4,.5],[5,.5],[4,.5],[3,.5],[2,1],[0,1],[0,1],[4,1],[0,2],[-1,1]] },
+    { n: 'Estrellita', a: 'tradicional', bpm: 108, m: [[0,1],[0,1],[4,1],[4,1],[5,1],[5,1],[4,2],[3,1],[3,1],[2,1],[2,1],[1,1],[1,1],[0,2],[4,1],[4,1],[3,1],[3,1],[2,1],[2,1],[1,2],[4,1],[4,1],[3,1],[3,1],[2,1],[2,1],[1,2],[0,1],[0,1],[4,1],[4,1],[5,1],[5,1],[4,2],[3,1],[3,1],[2,1],[2,1],[1,1],[1,1],[0,2],[-1,1]] },
+    { n: 'Los pollitos', a: 'tradicional', bpm: 112, m: [[4,1],[4,1],[4,1],[4,1],[5,1],[4,1],[2,2],[4,1],[4,1],[4,1],[4,1],[5,1],[4,1],[2,2],[2,1],[2,1],[3,1],[4,1],[5,1],[4,1],[3,1],[2,2],[4,1],[4,1],[3,1],[2,1],[1,1],[0,2],[-1,1]] },
+    { n: 'Himno de la alegría', a: 'Beethoven', bpm: 116, m: [[2,1],[2,1],[3,1],[4,1],[4,1],[3,1],[2,1],[1,1],[0,1],[0,1],[1,1],[2,1],[2,1.5],[1,.5],[1,2],[2,1],[2,1],[3,1],[4,1],[4,1],[3,1],[2,1],[1,1],[0,1],[0,1],[1,1],[2,1],[1,1.5],[0,.5],[0,2],[-1,1]] },
+    { n: 'Canon', a: 'Pachelbel', bpm: 120, m: [[0,1],[7,1],[6,1],[5,1],[4,1],[3,1],[4,1],[5,1],[0,1],[7,1],[6,1],[5,1],[4,1],[3,1],[4,1],[2,1],[3,.5],[4,.5],[5,.5],[4,.5],[3,.5],[2,.5],[1,.5],[2,.5],[3,.5],[2,.5],[1,.5],[0,.5],[1,.5],[2,.5],[3,.5],[4,.5],[0,2],[-1,1]] },
+  ];
+  let ac, notes, t, si, score, combo, maxCombo, hp, flash, judge, judgeT, judgeC, rings, accSum, accN, songEnd, inter, done, hits;
+  function audio() { if (k.muted()) return; if (!ac) try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} if (ac && ac.state === 'suspended') ac.resume(); }
+  function tone(f, dur, type, vol) {
+    if (!ac || k.muted()) return; const t0 = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || 'triangle'; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol || 0.16, t0 + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g).connect(ac.destination); o.start(t0); o.stop(t0 + dur + 0.03);
+  }
+  function loadSong(i) {
+    const s = SONGS[i], bpm = s.bpm * (1 + 0.05 * i), beat = 60 / bpm;
+    notes = []; let at = 3.4; /* 3,4 s de cortesía antes de la primera nota */
+    for (const [d, dur] of s.m) { if (d >= 0) notes.push({ lane: d, time: at, dur: dur * beat }); at += dur * beat; }
+    songEnd = at + 0.9; t = 0; hits = 0;
+  }
+  function reset() { si = 0; score = 0; combo = 0; maxCombo = 0; hp = 100; flash = new Array(LN).fill(0); judge = ''; judgeT = 0; judgeC = '#fff'; rings = []; accSum = 0; accN = 0; inter = 0; done = 0; loadSong(0); }
+  reset();
+  const acc = () => (accN ? Math.round(accSum / accN * 100) : 100);
+  const mult = () => Math.min(4, 1 + Math.floor(combo / 8));
+  const setJudge = (s, col) => { judge = s; judgeC = col; judgeT = 0.55; };
+  /* entrada propia: multitoque y varias teclas a la vez */
+  const KEYMAP = { KeyA: 0, KeyS: 1, KeyD: 2, KeyF: 3, KeyG: 4, KeyH: 5, KeyJ: 6, KeyK: 7, Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4, Digit6: 5, Digit7: 6, Digit8: 7 };
+  const pressed = [];
+  addEventListener('keydown', (e) => { if (e.repeat) return; const l = KEYMAP[e.code]; if (l !== undefined && k.st === 'play' && !k.paused) pressed.push(l); });
+  addEventListener('message', (e) => { const d = e.data; if (d && d.type === 'arcade:key' && d.event === 'keydown') { const l = KEYMAP[d.code]; if (l !== undefined && k.st === 'play' && !k.paused) pressed.push(l); } });
+  addEventListener('pointerdown', (e) => {
+    audio(); if (k.st !== 'play' || k.paused) return;
+    const r = k.cv.getBoundingClientRect(), x = (e.clientX - r.left) / k.scale, y = (e.clientY - r.top) / k.scale;
+    if (y > 150 && x >= 0 && x < 360) pressed.push(Math.min(LN - 1, Math.max(0, Math.floor(x / LW))));
+  });
+  function off(w, h, draw) { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const g = cv.getContext('2d'); g.scale(2, 2); g.lineJoin = 'round'; draw(g); return cv; }
+  function label(s, x, y, size, col, align, base) {
+    c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = base || 'top';
+    c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
+  }
+  const BG = off(360, 640, (g) => {
+    let gr = g.createLinearGradient(0, 0, 0, 640); gr.addColorStop(0, '#2b1a5e'); gr.addColorStop(0.5, '#170f36'); gr.addColorStop(1, '#0a0720'); g.fillStyle = gr; g.fillRect(0, 0, 360, 640);
+    for (let i = 0; i < 60; i++) { const r = Math.sin(i * 77.3) * 43758.5, f = r - Math.floor(r); g.fillStyle = `rgba(255,255,255,${0.12 + f * 0.35})`; g.fillRect((i * 113) % 360, (f * 881) % 440, 1.6, 1.6); }
+    for (let i = 0; i < LN; i++) {
+      const x = i * LW; gr = g.createLinearGradient(0, 60, 0, HITY); gr.addColorStop(0, 'rgba(18,12,42,0)'); gr.addColorStop(0.3, 'rgba(18,12,42,.7)'); gr.addColorStop(1, 'rgba(14,10,34,.92)');
+      g.fillStyle = gr; g.fillRect(x + 1.5, 60, LW - 3, HITY - 60);
+      g.fillStyle = COLS[i]; g.globalAlpha = 0.3; g.fillRect(x + 1.5, 60, 1.5, HITY - 60); g.globalAlpha = 1;
+    }
+    g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(0, HITY - 18, 360, 36);
+    /* teclado: blancas y, detrás, las negras (solo decorativas) */
+    for (let i = 0; i < LN; i++) { const x = i * LW; ART.rr(g, x + 2, HITY + 6, LW - 4, 168, 8); ART.fillOut(g, '#f4f1ea', 2.6); ART.rr(g, x + 2, HITY + 6, LW - 4, 16, 8); g.fillStyle = ART.alpha(COLS[i], 0.85); g.fill(); }
+    for (const b of BLACK) { const x = (b + 1) * LW; ART.rr(g, x - 11, HITY + 6, 22, 86, 5); ART.fillOut(g, '#241d44', 2.4); }
+  });
+  const NOTE = COLS.map((col) => off(LW, 40, (g) => {
+    ART.rr(g, 5, 7, LW - 10, 24, 11); const lg = g.createLinearGradient(0, 7, 0, 31); lg.addColorStop(0, '#fff'); lg.addColorStop(0.2, col); lg.addColorStop(1, ART.dark(col, 0.2));
+    g.fillStyle = lg; g.fill(); g.lineWidth = 2.6; g.strokeStyle = OUT; g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.7)'; ART.rr(g, 10, 11, LW - 26, 4, 2); g.fill();
+  }));
+  const GREY = off(LW, 40, (g) => { ART.rr(g, 5, 7, LW - 10, 24, 11); ART.fillOut(g, '#4e4869', 2.4); });
+  function hitLane(lane) {
+    flash[lane] = 1; audio();
+    let n = null, bd = 9;
+    for (const q of notes) if (q.lane === lane && !q.hit && !q.miss && Math.abs(q.time - t) < bd) { bd = Math.abs(q.time - t); n = q; }
+    if (n && bd < 0.19) {
+      n.hit = true; hits++;
+      const j = JU.find((q) => bd < q[0]) || JU[2];
+      combo++; maxCombo = Math.max(maxCombo, combo);
+      score += j[2] * mult(); accSum += j[3]; accN++; hp = Math.min(100, hp + (j[3] === 1 ? 3 : 2));
+      setJudge(j[1], j[4]); tone(FRQ[lane], 0.55, 'triangle', 0.18); tone(FRQ[lane] * 2, 0.3, 'sine', 0.05);
+      rings.push({ lane, t: 0, big: j[3] === 1 });
+      k.burst(lane * LW + LW / 2, HITY, j[3] === 1 ? '#fff27a' : COLS[lane], j[3] === 1 ? 14 : 8, 160);
+      if (combo && combo % 25 === 0) { k.float(`¡${combo} seguidas!`, 180, 260, '#fff27a'); k.sfx('coin'); }
+    } else {
+      tone(FRQ[lane] * 0.5, 0.18, 'sawtooth', 0.05);
+      if (t > 3) { hp -= 2; if (combo >= 8) k.sfx('hurt'); combo = 0; setJudge('FALLO', '#ff5f7a'); }
+    }
+  }
+  function update(dt) {
+    judgeT -= dt; for (let i = 0; i < LN; i++) flash[i] = Math.max(0, flash[i] - dt * 4);
+    rings.forEach((r) => (r.t += dt)); rings = rings.filter((r) => r.t < 0.4);
+    if (!k.gate(reset)) { pressed.length = 0; return; }
+    if (done) { pressed.length = 0; return; }
+    if (inter > 0) { inter -= dt; pressed.length = 0; if (inter <= 0) loadSong(si); return; }
+    t += dt;
+    for (const lane of pressed.splice(0)) hitLane(lane);
+    for (const n of notes) if (!n.hit && !n.miss && t - n.time > 0.19) { n.miss = true; hp -= 6; combo = 0; accN++; setJudge('FALLO', '#ff5f7a'); }
+    if (hp <= 0) { hp = 0; done = 1; return k.lose(CFG.id, score, 'Se te fue la melodía', `${SONGS[si].n} · Precisión ${acc()} % · Combo máx. ${maxCombo}`); }
+    if (t > songEnd) {
+      const bonus = 200 + Math.round(hits * 8);
+      score += bonus; k.float('+' + bonus, 180, 300, '#fff27a'); k.sfx('win'); k.confetti(COLS[si % LN], 60);
+      si++;
+      if (si >= SONGS.length) { done = 1; k.st = 'over'; k.confetti(); return k.end(CFG.id, score, '¡Concierto completo!', `${SONGS.length} melodías · Precisión ${acc()} % · Combo máx. ${maxCombo}`); }
+      inter = 2.4;
+    }
+  }
+  function draw() {
+    c.drawImage(BG, 0, 0, 360, 640);
+    for (let i = 0; i < LN; i++) if (flash[i] > 0) {
+      c.globalAlpha = flash[i] * 0.45; c.fillStyle = COLS[i]; c.fillRect(i * LW + 2, 60, LW - 4, HITY - 60);
+      c.globalAlpha = flash[i] * 0.85; ART.rr(c, i * LW + 2, HITY + 6, LW - 4, 168, 8); c.fillStyle = COLS[i]; c.fill(); c.globalAlpha = 1;
+    }
+    c.fillStyle = 'rgba(255,255,255,.28)'; c.fillRect(0, HITY - 2, 360, 4);
+    if (inter <= 0 && !done) for (const n of notes) {
+      if (n.hit) continue;
+      const y = HITY - (n.time - t) * SPEED; if (y < 46) continue;
+      if (n.miss) { c.globalAlpha = Math.max(0, 1 - (t - n.time) * 2); c.drawImage(GREY, n.lane * LW, y - 20, LW, 40); c.globalAlpha = 1; }
+      else c.drawImage(NOTE[n.lane], n.lane * LW, y - 20, LW, 40);
+    }
+    for (const r of rings) { const p = r.t / 0.4; c.globalAlpha = 1 - p; c.lineWidth = r.big ? 5 : 3; c.strokeStyle = r.big ? '#fff27a' : COLS[r.lane]; c.beginPath(); c.arc(r.lane * LW + LW / 2, HITY, 14 + p * (r.big ? 34 : 22), 0, TAU); c.stroke(); c.globalAlpha = 1; }
+    for (let i = 0; i < LN; i++) label(NOM[i], i * LW + LW / 2, HITY + 150, 12, flash[i] ? '#1a1530' : '#6a6490', 'center', 'middle');
+    if (combo >= 4) { c.globalAlpha = 0.8; label(String(combo), 180, 210, 50, mult() >= 4 ? '#fff27a' : '#fff', 'center', 'middle'); label('seguidas', 180, 248, 13, '#b8b0ff', 'center', 'middle'); c.globalAlpha = 1; }
+    if (judgeT > 0) { const p = 1 - judgeT / 0.55, s = p < 0.15 ? 0.6 + p / 0.15 * 0.55 : 1.15 - Math.min(0.15, (p - 0.15) * 0.5); c.save(); c.translate(180, 320 - p * 10); c.scale(s, s); c.globalAlpha = Math.min(1, judgeT / 0.2); label(judge, 0, 0, 30, judgeC, 'center', 'middle'); c.restore(); c.globalAlpha = 1; }
+    const s = SONGS[si] || SONGS[SONGS.length - 1];
+    label(score, 10, 8, 24, '#fff'); label(`x${mult()}`, 12, 36, 14, mult() > 1 ? '#fff27a' : '#8a86b5');
+    label(`${acc()} %`, 350, 8, 18, '#5ce1e6', 'right'); label(`${si + (inter > 0 ? 1 : 0) > SONGS.length - 1 ? SONGS.length : si + 1}/${SONGS.length}`, 350, 30, 12, '#b8b0ff', 'right');
+    label(s.n + ' · ' + s.a, 10, 56, 12, '#d8d4f5');
+    const bw = 110, bx = 350 - bw; ART.rr(c, bx, 48, bw, 11, 5.5); ART.fillOut(c, '#1b1438', 2.4);
+    const hw = Math.max(0, hp) / 100 * (bw - 4); if (hw > 1) { ART.rr(c, bx + 2, 50, hw, 7, 3.5); c.fillStyle = hp > 60 ? '#7cf7a0' : hp > 30 ? '#f2d15c' : '#ff5f7a'; c.fill(); }
+    if (inter > 0) { c.fillStyle = 'rgba(10,7,26,.72)'; c.fillRect(0, 230, 360, 130); label('¡Melodía completa!', 180, 262, 22, '#fff27a', 'center'); label('Ahora: ' + (SONGS[si] ? SONGS[si].n : ''), 180, 300, 17, '#fff', 'center'); label(SONGS[si] ? SONGS[si].a : '', 180, 326, 13, '#b8b0ff', 'center'); }
+    else if (t < 3.2 && k.st === 'play' && !done) { const n = Math.ceil(3.4 - t); label(n > 0 ? String(n) : '¡Ya!', 180, 300, 40, '#fff', 'center', 'middle'); }
+    else if (k.st !== 'play') { /* antes de empezar: notas de muestra para que se vea de qué va */
+      const DEMO = [[0, 150], [2, 230], [4, 200], [5, 300], [7, 260], [3, 380]];
+      c.globalAlpha = 0.85; for (const [ln, y] of DEMO) c.drawImage(NOTE[ln], ln * LW, y - 20, LW, 40); c.globalAlpha = 1;
+      label('Toca la melodía', 180, 430, 20, '#d8d4f5', 'center', 'middle');
+    }
+    if (!k.party) { const pr = Math.max(0, Math.min(1, t / songEnd)); c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(0, 72, 360, 3); c.fillStyle = COLS[si % LN]; c.fillRect(0, 72, 360 * pr, 3); }
+  }
+  window.__pi = { get notes() { return notes; }, get t() { return t; }, get score() { return score; }, get si() { return si; }, get hp() { return hp; },
+    get flash() { return flash; }, get combo() { return combo; }, get acc() { return accN ? Math.round((accSum / accN) * 100) : 100; } };
+  k.show(CFG.title || 'Piano de Colores', 'Ocho teclas de colores y melodías de siempre. Toca la tecla justo cuando su nota llega abajo; puedes usar varios dedos a la vez. Con teclado, A S D F G H J K (o del 1 al 8). Cinco melodías encadenadas, cada una un poco más rápida.<br>Toca para empezar');
   k.run(update, draw);
 }

@@ -3,10 +3,12 @@
  *           Pantalla dividida en columnas (una por jugador humano); el resto de corredores se ve como fantasma.
  *  'trineo' Trineo Nevado: copa de 3 bajadas por un sendero sinuoso con abetos, rampas, placas de hielo y turbos.
  *           Cámara compartida con el humano que va primero; los trineos chocan entre sí; salir de cámara te recoloca.
+ *  'tabla'  Descenso Loco a Cuatro (oleada 3): misma física de sendero que el trineo pero en tabla de snow, con una
+ *           pista que se estrecha bajada tras bajada y empujones (B) que apartan al rival y te frenan a ti un poco.
  * Física de ladera: la gravedad empuja según el ángulo con la línea de máxima pendiente (cruzarse frena), rozamiento
  * del aire (agacharse lo reduce), cuña para frenar. Siempre bajan 4: humanos según la tele y CPU en el resto; la CPU
  * mejora con las victorias guardadas en localStorage (cup:<id>). Vista cenital con árboles y banderas «de pie». */
-const M = CFG.mode || 'slalom', SL = M === 'slalom', OUT = ART.OUT, TAU = Math.PI * 2;
+const M = CFG.mode || 'slalom', SL = M === 'slalom', TB = M === 'tabla', OUT = ART.OUT, TAU = Math.PI * 2;
 const PORT = innerHeight > innerWidth, W = PORT ? 405 : 720, H = PORT ? 720 : 405;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#e8f2fb' }), c = k.ctx;
 const { lite, dark, alpha, rr, fillOut, glint, shadow } = ART, SNOW = ART.THEMES.snow;
@@ -25,7 +27,7 @@ const skill = () => clamp(0.3 + CUP * 0.06, 0.3, 0.6);
 /* ---------- Pistas ---------- */
 const CW = 360, NETL = 16, NETR = CW - 16; /* slalom: pista recta de 360 de ancho con redes a los lados */
 const RUNS = SL ? 2 : 3, PTS = [10, 6, 3, 1];
-const NAMES = SL ? ['Pista Azul', 'Pista Roja'] : ['Bosque de abetos', 'Paso helado', 'Barranco del eco'];
+const NAMES = SL ? ['Pista Azul', 'Pista Roja'] : TB ? ['Canal ancho', 'Garganta de pinos', 'Embudo final'] : ['Bosque de abetos', 'Paso helado', 'Barranco del eco'];
 let T = null, SEED = 1;
 function buildSlalom(run) {
   const rng = RNG(SEED + run * 7919), gates = [], n = 20 + run * 3; let y = 430;
@@ -44,7 +46,9 @@ function buildTrail(run) {
   const rng = RNG(SEED + run * 104729), LEN = 6200 + run * 700, p1 = rng() * TAU, p2 = rng() * TAU, p3 = rng() * TAU, ST = 20, n = Math.ceil((LEN + 1400) / ST) + 40;
   const CX = [], HW = [];
   for (let i = 0; i < n; i++) { const y = i * ST - 400, u = clamp(y / LEN, 0, 1), A = lerp(70, 210, u) * sstep(y / 700);
-    CX.push(A * (0.62 * Math.sin(y * 0.0019 + p1) + 0.38 * Math.sin(y * 0.0043 + p2))); HW.push(235 - 62 * Math.max(0, Math.sin(y * 0.0012 + p3)) * clamp(y / 1800, 0, 1)); }
+    /* en 'tabla' el canal se va cerrando a lo largo de la bajada y de una bajada a la siguiente */
+    const base = TB ? lerp(250, lerp(150, 104, run / Math.max(1, RUNS - 1)), u) : 235;
+    CX.push(A * (0.62 * Math.sin(y * 0.0019 + p1) + 0.38 * Math.sin(y * 0.0043 + p2))); HW.push(base - (TB ? 30 : 62) * Math.max(0, Math.sin(y * 0.0012 + p3)) * clamp(y / 1800, 0, 1)); }
   const at = (A, y) => { const f = (y + 400) / ST, i = clamp(Math.floor(f), 0, n - 2), q = clamp(f - i, 0, 1); return A[i] + (A[i + 1] - A[i]) * q; };
   const cx = (y) => at(CX, y), hw = (y) => at(HW, y), trees = [], obj = [];
   /* bosque a los lados (varias filas) */
@@ -106,6 +110,26 @@ function drawRacer(r, tt, ghost) {
     rr(c, -7 + lean, tuck ? -18 : -25, 14, 12, 5); const g = c.createLinearGradient(-7, -25, 7, -13); g.addColorStop(0, lite(col, 0.25)); g.addColorStop(1, dark(col, 0.2)); c.fillStyle = g; c.fill(); c.lineWidth = 1.8; c.strokeStyle = OUT; c.stroke();
     c.beginPath(); c.arc(lean * 1.2, tuck ? -21 : -29, 5.6, 0, TAU); c.fillStyle = col; c.fill(); c.lineWidth = 1.8; c.strokeStyle = OUT; c.stroke();
     rr(c, lean * 1.2 - 4.5, (tuck ? -21 : -29) - 1, 9, 3.2, 1.5); c.fillStyle = '#ffd166'; c.fill(); c.lineWidth = 1.2; c.stroke(); glint(c, lean * 1.2 - 2, (tuck ? -21 : -29) - 3.5, 1.6);
+  } else if (TB) {
+    /* tabla de snow: la plancha va bajo los pies, girada según el rumbo, y el rider se inclina al empujar */
+    const lean = clamp(r.steer, -1, 1) * 3.4, tuck = r.tuck && !r.crash, pu = r.push > 0 ? Math.min(1, r.push / 0.25) : 0;
+    c.save(); c.rotate(-a * 0.9); c.scale(1, 0.62);
+    rr(c, -7, -20, 14, 40, 7); const bg = c.createLinearGradient(-7, -20, 7, 20); bg.addColorStop(0, lite(col, 0.3)); bg.addColorStop(1, dark(col, 0.25)); c.fillStyle = bg; c.fill(); c.lineWidth = 2.4; c.strokeStyle = OUT; c.stroke();
+    c.fillStyle = alpha('#ffffff', 0.75); c.fillRect(-2, -14, 4, 28);
+    for (const o of [-7, 7]) { rr(c, -5, o - 2.5, 10, 5, 2); c.fillStyle = OUT; c.fill(); }
+    c.restore();
+    /* piernas flexionadas y torso */
+    c.lineWidth = 4.4; c.strokeStyle = OUT; c.lineCap = 'round';
+    for (const sd of [-1, 1]) { c.beginPath(); c.moveTo(sd * 3 + lean * 0.4, tuck ? -7 : -10); c.lineTo(sd * 6, 3); c.stroke(); }
+    rr(c, -7 + lean, tuck ? -17 : -23, 14, tuck ? 12 : 15, 6); const g = c.createLinearGradient(-7, -23, 7, -8); g.addColorStop(0, lite(col, 0.25)); g.addColorStop(1, dark(col, 0.2)); c.fillStyle = g; c.fill(); c.lineWidth = 1.8; c.strokeStyle = OUT; c.stroke();
+    /* brazos: abiertos para el equilibrio, uno estirado al empujar */
+    c.lineWidth = 3.4; c.strokeStyle = OUT; c.lineCap = 'round';
+    for (const sd of [-1, 1]) { const ex = sd * (10 + pu * 12), ey = (tuck ? -12 : -16) + sd * lean * 0.6 - pu * 4;
+      c.beginPath(); c.moveTo(sd * 5 + lean, tuck ? -14 : -19); c.lineTo(ex, ey); c.stroke(); c.lineWidth = 2; c.strokeStyle = lite(col, 0.35); c.stroke(); c.lineWidth = 3.4; c.strokeStyle = OUT; }
+    const hy = tuck ? -20 : -27; c.beginPath(); c.arc(lean * 1.2, hy, 5.8, 0, TAU); c.fillStyle = '#ffd9b8'; c.fill(); c.lineWidth = 1.8; c.strokeStyle = OUT; c.stroke();
+    c.beginPath(); c.arc(lean * 1.2, hy - 1, 6.2, Math.PI, 0); c.fillStyle = col; c.fill(); c.lineWidth = 1.8; c.stroke();
+    rr(c, lean * 1.2 - 4.6, hy - 1.6, 9.2, 3.4, 1.6); c.fillStyle = '#2c2a44'; c.fill(); c.lineWidth = 1.2; c.stroke(); glint(c, lean * 1.2 - 2, hy - 3.6, 1.6);
+    if (r.shoved > 0) for (let i = 0; i < 2; i++) glint(c, Math.cos(tt * 12 + i * 3) * 16, hy - 8 + Math.sin(tt * 12 + i * 3) * 4, 3, '#ff8a8a');
   } else {
     /* trineo de madera orientado según el rumbo */
     c.save(); c.rotate(-a); c.scale(1, 0.8);
@@ -130,14 +154,14 @@ function mkRacer(p) {
   const hu = k.human(p), q = k.party && k.party.find((x) => x.p === p);
   return { p, col: k.pcol(p), cpu: !hu, name: hu ? (q && q.name) || (k.party ? 'J' + (p + 1) : 'Tú') : 'CPU ' + CN[p], x: 0, y: 0, a: 0, dir: 0, v: 0, z: 0, air: 0, airMax: 0, bx: 0,
     steer: 0, tuck: false, crash: 0, inv: 0, boost: 0, hold: 0, spinDir: 1, g: 0, pen: 0, fin: 0, pts: 0, gain: 0, times: [], trail: [], trT: 0, surf: '', offT: 0,
-    tx: 0, reT: 0, err: 0, blind: 0, spd: 0.97 + (3 - p) * 0.01, place: 0 };
+    tx: 0, reT: 0, err: 0, blind: 0, spd: 0.97 + (3 - p) * 0.01, place: 0, pcd: 0, push: 0, shoves: 0, shoved: 0 };
 }
 function startRun() {
   T = SL ? buildSlalom(run) : buildTrail(run);
   parts = []; finOrder = []; raceT = 0; phase = 'run'; phT = 0;
   const order = SL ? racers.slice() : racers.slice().sort((a, b) => (run === 0 ? (a.cpu - b.cpu) || a.p - b.p : a.pts - b.pts));
   order.forEach((r, i) => { const x = SL ? CW / 2 + (i - 1.5) * 10 : T.cx(0) + (i - 1.5) * 52;
-    Object.assign(r, { x, y: SL ? -i * 2 : -(i % 2) * 18, a: 0, dir: 0, v: 0, z: 0, air: 0, bx: 0, crash: 0, inv: 0, boost: 0, hold: 0, g: 0, pen: 0, fin: 0, gain: 0, trail: [], trT: 0, offT: 0, tx: x, reT: 0 }); });
+    Object.assign(r, { x, y: SL ? -i * 2 : -(i % 2) * 18, a: 0, dir: 0, v: 0, z: 0, air: 0, bx: 0, crash: 0, inv: 0, boost: 0, hold: 0, g: 0, pen: 0, fin: 0, gain: 0, trail: [], trT: 0, offT: 0, tx: x, reT: 0, pcd: 0, push: 0, shoved: 0 }); });
   const h = racers.find((q) => !q.cpu) || racers[0]; cam = { x: T.cx(0), y: h.y + 120 };
   msg = `${SL ? 'Manga' : 'Bajada'} ${run + 1} de ${RUNS} · ${T.name}`; msgT = 3; cdPend = true;
 }
@@ -172,11 +196,12 @@ function updCam(dt, snap) {
 
 /* ---------- Entrada ---------- */
 function humanIn(r) {
-  const d = k.pdir(r.p); let s = d.x, tuck = k.pheld(r.p, 'a') || d.y > 0, brake = k.pheld(r.p, 'b') || d.y < 0;
+  const d = k.pdir(r.p); let s = d.x, tuck = k.pheld(r.p, 'a') || d.y > 0, brake = TB ? d.y < 0 : k.pheld(r.p, 'b') || d.y < 0;
+  const push = TB && k.phit(r.p, 'b');
   if (!k.party && r.p === 0 && k.ptr.down) { /* táctil sin mando: el esquiador va hacia donde está el dedo */
     const v = views()[0], cm = camFor(v), wx = cm.x + (k.ptr.x - v.x - v.w / 2) / v.s, want = clamp(Math.atan2(wx - r.x, 150), -1.2, 1.2);
     s = Math.abs(want - r.a) > 0.06 ? Math.sign(want - r.a) : 0; if (Math.abs(want) < 0.25 && Math.abs(r.a) < 0.3) tuck = true; }
-  return { s, tuck, brake };
+  return { s, tuck, brake, push };
 }
 function cpuIn(r, dt) {
   const sk = skill(); let tx, look;
@@ -202,7 +227,9 @@ function cpuIn(r, dt) {
   const s = Math.abs(dA) > 0.05 ? clamp(dA * 4, -1, 1) : 0;
   const tuck = Math.abs(want) < 0.3 && Math.abs(r.a) < 0.35 && Math.random() < 0.6 + sk * 0.4;
   const brake = SL && r.v > 200 && Math.abs(dA) > 0.7;
-  return { s, tuck, brake };
+  let push = false;
+  if (TB && r.pcd <= 0 && raceT > 5) { const o = nearRival(r); push = !!o && Math.random() < 0.02 + sk * 0.05; }
+  return { s, tuck, brake, push };
 }
 
 /* ---------- Física ---------- */
@@ -239,6 +266,8 @@ function step(r, dt) {
   if (r.boost > 0) { r.boost -= dt; r.v = Math.min(r.v + 260 * dt, 430 * vf); }
   if (sf === 'ramp' && r.surf !== 'ramp' && r.v > 70) { r.air = r.airMax = clamp(r.v / 300 * 0.95, 0.45, 1.05); if (!r.cpu) k.sfx('jump'); }
   r.surf = sf;
+  if (TB) { r.pcd = Math.max(0, r.pcd - dt); r.push = Math.max(0, r.push - dt); r.shoved = Math.max(0, r.shoved - dt);
+    if (inp.push && r.pcd <= 0 && !air) shove(r); }
   const grip = air ? 0.5 : sf === 'ice' ? 1.3 : 10; r.dir += (r.a - r.dir) * Math.min(1, grip * dt);
   r.x += (r.v * Math.sin(r.dir) + r.bx) * dt; r.y += r.v * Math.cos(r.dir) * dt; r.bx *= Math.exp(-4 * dt);
   if (r.air > 0) { r.air -= dt; r.z = Math.sin(Math.PI * clamp(1 - r.air / r.airMax, 0, 1)) * clamp(r.airMax, 0.5, 1);
@@ -250,6 +279,24 @@ function step(r, dt) {
   /* límites */
   if (SL) { if (r.x < NETL + 6 || r.x > NETR - 6) { r.x = clamp(r.x, NETL + 6, NETR - 6); r.v *= 0.7; r.a *= -0.4; r.dir = r.a; if (!r.cpu) { k.sfx('hit'); k.shake(3); } } }
   else if (r.z < 0.3 && r.inv <= 0) for (const t of treesNear(r.y, 30)) { if (Math.hypot(r.x - t.x, r.y - t.y) < t.r + 7) { crash(r, t); break; } }
+}
+/* 'tabla': empujón lateral. Aparta al rival que tienes al lado y te frena un poco a ti (acción y reacción). */
+function nearRival(r) {
+  let best = null, bd = 1e9;
+  for (const o of racers) { if (o === r || o.fin || o.hold > 0 || o.crash > 0) continue;
+    const dx = o.x - r.x, dy = o.y - r.y; if (Math.abs(dx) > 62 || dy < -46 || dy > 34) continue;
+    const d = Math.hypot(dx, dy); if (d < bd) { bd = d; best = o; } }
+  return best;
+}
+function shove(r) {
+  r.pcd = 0.85; r.push = 0.25; const o = nearRival(r);
+  if (!o) { if (!r.cpu) k.sfx('click'); return; }
+  const sd = o.x >= r.x ? 1 : -1;
+  o.bx += sd * 260; o.v *= 0.9; o.a = clamp(o.a + sd * 0.35, -1.45, 1.45); o.shoved = 0.5;
+  r.bx -= sd * 70; r.v *= 0.97; r.shoves++;
+  for (let i = 0; i < 7; i++) addPart((r.x + o.x) / 2, (r.y + o.y) / 2, i % 2 ? '#ffffff' : '#ffd166', 130, 0.4, 2.6);
+  k.sfx('hit'); if (!r.cpu || !o.cpu) k.shake(3);
+  if (!r.cpu) fl(r, '¡Empujón!', '#ffd166'); else if (!o.cpu) fl(o, '¡Te empujan!', '#ff8a8a');
 }
 function crash(r, t) {
   r.crash = 1.0; r.spinDir = r.x < t.x ? -1 : 1; r.v = Math.min(r.v, 60); r.dir = r.a = clamp(r.a + r.spinDir * 0.8, -1.2, 1.2); r.air = 0; r.z = 0; r.boost = 0;

@@ -7,29 +7,50 @@
  *   'hielo' (lago helado: A suelta el petardo deslizándose hacia donde miras hasta chocar, B lo planta quieto; un petardo que
  *     choca con otro parado le pasa el impulso; al soltar el mando resbalas hasta el centro de la casilla);
  *   'pintura' (las explosiones pintan el suelo del color del dueño; si te alcanzan, salpicas de su color tu casilla y las de
- *     alrededor y reapareces en tu esquina; al acabar el reloj gana la ronda quien más suelo haya cubierto). */
+ *     alrededor y reapareces en tu esquina; al acabar el reloj gana la ronda quien más suelo haya cubierto);
+ *   'parejas' (2 contra 2, cada equipo en un lado; sin fuego amigo: el petardo de tu compañero no te elimina, y cuando cae te
+ *     deja su material (+1 alcance y +1 petardo); cada equipo defiende su carro de pólvora, que aguanta 3 explosiones: la ronda
+ *     es del equipo que conserve su carro o a alguien en pie);
+ *   'fantasma' (al caer vuelves como fantasma: flotas por encima de todo, sueltas un petardo espectral cada 5 s y si con él
+ *     eliminas a alguien vivo resucitas en su casilla);
+ *   'unica' (solo hay un petardo en la plaza: se coge pisándolo, se lleva en la mano mientras la mecha corre y se lanza con A,
+ *     resbalando hasta chocar; quien lo tenga cuando estalle se va, y aparece otro con la mecha más corta). */
 const MODE = CFG.mode || 'plaza', ICE = MODE === 'hielo', PAINT = MODE === 'pintura';
+const PAIR = MODE === 'parejas', GHOST = MODE === 'fantasma', UNICA = MODE === 'unica';
 const OUT = ART.OUT, TAU = 6.2832, T = 32, CO = 15, RO = 11, TOP = 46, W = CO * T, H = TOP + RO * T;
 const RU = Object.assign({ fuse: 2.4, range: 2, bombs: 1, speed: 3.3, kick: false, drop: 0.36, round: 60, wins: 2, slide: ICE, crates: 0.72 }, CFG.rules || {});
-const k = Kit({ w: W, h: H, title: CFG.title, bg: ICE ? '#1d2a4a' : PAINT ? '#2d2640' : '#2a1f3a' }), c = k.ctx;
+const k = Kit({ w: W, h: H, title: CFG.title, bg: ICE ? '#1d2a4a' : PAINT ? '#2d2640' : GHOST ? '#171233' : '#2a1f3a' }), c = k.ctx;
 const lite = ART.lite, dark = ART.dark, alpha = ART.alpha;
 const FIRE_T = 0.55, MAXSPD = 5.6, HATS = ['cone', 'beret', 'crown', 'bow'];
 const lsGet = (key, d) => { try { const v = localStorage.getItem(key); return v == null ? d : +v; } catch (e) { return d; } };
 const lsSet = (key, v) => { try { localStorage.setItem(key, v); } catch (e) {} };
 const CPUK = 'cpu:' + CFG.id;
 let skill = 0.3, grid, items, fireT, fireD, fireO, paint, pcount, bombs, pl, crumbs, round, rT, sudden, sudI, sudT, endT, msg, msgT, t = 0, SPIRAL, cdPend, fast;
-const SLIDE_V = ICE ? 7 : 8, INV0 = ICE || PAINT ? 5 : 3; // 1.27: en los modos nuevos nada te elimina en los 5 primeros segundos
+let hot = null, hotT = 0, hotN = 0; // 'unica': el petardo que se pasa de mano en mano
+let bhp = [3, 3], baseLost = -1; // 'parejas': carros de pólvora
+const SLIDE_V = ICE ? 7 : 8, INV0 = MODE === 'plaza' ? 3 : 5; // en los modos nuevos nada te elimina en los 5 primeros segundos
+const GCD = 5; // recarga del petardo espectral
+const team = (q) => (pl.indexOf(q) < 2 ? 0 : 1);
+const mate = (q) => pl[pl.indexOf(q) ^ 1];
+const friendly = (q, oi) => PAIR && oi >= 0 && !!pl[oi] && pl[oi] !== q && team(pl[oi]) === team(q);
 
 function mk(w, h, draw) { const r = Math.min(3, Math.max(2, Math.ceil((k.scale || 1) * Math.min(2, devicePixelRatio || 1)))), cv = document.createElement('canvas'); cv.width = w * r; cv.height = h * r; const q = cv.getContext('2d'); q.scale(r, r); q.lineJoin = 'round'; q.lineCap = 'round'; draw(q); return cv; }
 function label(s, x, y, size, col, align, base) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'center'; c.textBaseline = base || 'middle';
   c.lineJoin = 'round'; c.lineWidth = size / 4 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
 }
+function fitName(s, maxW, size) { // recorta el rótulo si no cabe en la tarjeta (medida real)
+  c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
+  if (c.measureText(s).width <= maxW) return s;
+  let o = s; while (o.length > 2 && c.measureText(o + '…').width > maxW) o = o.slice(0, -1);
+  return o + '…';
+}
 const PAINTS = ['#ff6fb5', '#5b8cff', '#a8cf3f', '#ffc94d', '#6e62f5'];
 const rnd = (s) => { const x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 
 /* ---------------- Arte cacheado: suelo de adoquines, murete con flores, bolardos, cajas ---------------- */
-const FLOOR = ICE ? floorIce() : PAINT ? floorPaint() : mk(W, RO * T, (g) => {
+const FLOOR = ICE ? floorIce() : PAINT ? floorPaint() : GHOST ? floorNight() : floorPlaza();
+function floorPlaza() { return mk(W, RO * T, (g) => {
   g.fillStyle = '#c9a77c'; g.fillRect(0, 0, W, RO * T);
   for (let y = 1; y < RO - 1; y++) for (let x = 1; x < CO - 1; x++) {
     const X = x * T, Y = y * T, alt = (x + y) % 2;
@@ -47,21 +68,32 @@ const FLOOR = ICE ? floorIce() : PAINT ? floorPaint() : mk(W, RO * T, (g) => {
       const fc = ['#ff5f7a', '#ffd166', '#fff'][(x * 3 + y) % 3]; g.fillStyle = fc; for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(X + 10 + i * 6, Y + 6 - (i % 2) * 2, 2.4, 0, TAU); g.fill(); } }
   }
   g.strokeStyle = OUT; g.lineWidth = 3; g.strokeRect(T - 1.5, T - 1.5, W - 2 * T + 3, (RO - 2) * T + 3);
-});
+}); }
+function tintCv(src, w, h, col, a, extra) { return mk(w, h, (g) => { g.drawImage(src, 0, 0, w, h); g.globalCompositeOperation = 'source-atop'; g.globalAlpha = a; g.fillStyle = col; g.fillRect(0, 0, w, h); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; if (extra) extra(g); }); }
+/* Plaza de noche: la misma plaza teñida de azul con luna y farolillos colgados */
+function floorNight() { return tintCv(floorPlaza(), W, RO * T, '#2e2570', 0.62, (g) => {
+  g.globalAlpha = 0.14; g.fillStyle = '#fff3cf'; g.beginPath(); g.arc(W - 78, 52, 96, 0, TAU); g.fill(); g.globalAlpha = 1;
+  for (let x = 2; x < CO - 1; x += 3) { const X = x * T + 16;
+    g.strokeStyle = 'rgba(255,220,150,.4)'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(X, 0); g.lineTo(X, 10); g.stroke();
+    g.globalAlpha = 0.25; g.fillStyle = '#ffd166'; g.beginPath(); g.arc(X, 16, 13, 0, TAU); g.fill(); g.globalAlpha = 1;
+    g.beginPath(); g.arc(X, 16, 5.5, 0, TAU); ART.fillOut(g, '#ffd166', 1.8); }
+}); }
 function mix3(v) { return v < 0.33 ? '#e3c69c' : v < 0.66 ? '#d4b186' : '#c8a176'; }
-const PILLAR = ICE ? pillarIce() : PAINT ? pillarPaint() : mk(T, T + 10, (g) => { // bolardo de piedra con farolillo
+const PILLAR = ICE ? pillarIce() : PAINT ? pillarPaint() : GHOST ? tintCv(pillarPlaza(), T, T + 10, '#3b2f84', 0.5) : pillarPlaza();
+function pillarPlaza() { return mk(T, T + 10, (g) => { // bolardo de piedra con farolillo
   ART.shadow(g, T / 2 + 2, T + 4, 14, 0.3);
   ART.rr(g, 3, 12, T - 6, T - 8, 7); const gr = g.createLinearGradient(3, 0, T - 3, 0); gr.addColorStop(0, '#d9cfe6'); gr.addColorStop(1, '#8e80a8'); g.fillStyle = gr; g.fill(); g.lineWidth = 2.4; g.strokeStyle = OUT; g.stroke();
   ART.rr(g, 5, 4, T - 10, 12, 5); const g2 = g.createLinearGradient(0, 4, 0, 16); g2.addColorStop(0, '#f2ecf8'); g2.addColorStop(1, '#b4a8c8'); g.fillStyle = g2; g.fill(); g.stroke();
   g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(8, 6, 8, 2); g.fillStyle = 'rgba(40,30,60,.25)'; g.fillRect(6, T - 2, T - 12, 3);
-});
-const CRATE = ICE ? crateIce() : PAINT ? cratePaint() : mk(T, T + 6, (g) => { // caja de mercado con fruta
+}); }
+const CRATE = ICE ? crateIce() : PAINT ? cratePaint() : GHOST ? tintCv(cratePlaza(), T, T + 6, '#3b2f84', 0.45) : cratePlaza();
+function cratePlaza() { return mk(T, T + 6, (g) => { // caja de mercado con fruta
   ART.shadow(g, T / 2 + 2, T + 2, 14, 0.28);
   ART.rr(g, 2, 6, T - 4, T - 6, 4); const gr = g.createLinearGradient(0, 6, 0, T); gr.addColorStop(0, '#e2a25d'); gr.addColorStop(1, '#a8652f'); g.fillStyle = gr; g.fill(); g.lineWidth = 2.4; g.strokeStyle = OUT; g.stroke();
   g.strokeStyle = 'rgba(90,45,20,.7)'; g.lineWidth = 1.5; for (const y of [14, 21]) { g.beginPath(); g.moveTo(4, y); g.lineTo(T - 4, y); g.stroke(); }
   g.fillStyle = 'rgba(255,255,255,.3)'; g.fillRect(5, 8, T - 10, 2);
   [['#ff5f5f', 9], ['#ffb13d', 16], ['#8be04a', 23]].forEach(([col, x], i) => { g.beginPath(); g.arc(x, 6 - (i % 2) * 1.5, 4.2, 0, TAU); g.fillStyle = col; g.fill(); g.lineWidth = 1.6; g.strokeStyle = OUT; g.stroke(); g.fillStyle = 'rgba(255,255,255,.6)'; g.beginPath(); g.arc(x - 1.3, 4.6 - (i % 2) * 1.5, 1.2, 0, TAU); g.fill(); });
-});
+}); }
 /* Lago helado: placas de hielo con grietas y brillo, orilla de nieve con abetos, bloques de hielo y cajas nevadas */
 function floorIce() {
   return mk(W, RO * T, (g) => {
@@ -156,7 +188,8 @@ const inG = (x, y) => x >= 0 && y >= 0 && x < CO && y < RO;
 const hard = (x, y) => !inG(x, y) || grid[y][x] === 1;
 const bombAt = (x, y) => bombs.find((b) => !b.sl && b.x === x && b.y === y) || bombs.find((b) => b.sl && Math.round(b.fx - 0.5) === x && Math.round(b.fy - 0.5) === y);
 let FREE = 1;
-const SPAWN = [[1, 1], [CO - 2, RO - 2], [CO - 2, 1], [1, RO - 2]];
+const SPAWN = PAIR ? [[1, 1], [1, RO - 2], [CO - 2, 1], [CO - 2, RO - 2]] : [[1, 1], [CO - 2, RO - 2], [CO - 2, 1], [1, RO - 2]];
+const BASE = [[1, (RO - 1) / 2], [CO - 2, (RO - 1) / 2]]; // carro de cada equipo (izquierda / derecha)
 function buildMap() {
   grid = []; items = []; fireT = []; fireD = []; fireO = []; paint = []; pcount = [0, 0, 0, 0]; FREE = 0;
   for (let y = 0; y < RO; y++) { grid.push([]); items.push([]); fireT.push([]); fireD.push([]); fireO.push([]); paint.push([]); for (let x = 0; x < CO; x++) {
@@ -164,10 +197,11 @@ function buildMap() {
     grid[y].push(edge || pil ? 1 : 0); items[y].push(0); fireT[y].push(0); fireD[y].push(0); fireO[y].push(-1); paint[y].push(-1); if (!edge && !pil) FREE++; } }
   const safe = new Set(); for (const [sx, sy] of SPAWN) for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [-2, 0], [0, 2], [0, -2]]) safe.add((sx + dx) + ',' + (sy + dy));
   for (let y = 1; y < RO - 1; y++) for (let x = 1; x < CO - 1; x++) if (!grid[y][x] && !safe.has(x + ',' + y) && Math.random() < RU.crates) grid[y][x] = 2;
+  if (PAIR) { bhp = [3, 3]; baseLost = -1; for (const [bx, by] of BASE) { grid[by][bx] = 3; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (grid[by + dy][bx + dx] === 2 && Math.random() < 0.5) grid[by + dy][bx + dx] = 0; } }
   // espiral de la muerte súbita (de fuera hacia dentro)
   SPIRAL = []; let x0 = 1, y0 = 1, x1 = CO - 2, y1 = RO - 2;
   while (x0 <= x1 && y0 <= y1) { for (let x = x0; x <= x1; x++) SPIRAL.push([x, y0]); for (let y = y0 + 1; y <= y1; y++) SPIRAL.push([x1, y]); if (y1 > y0) for (let x = x1 - 1; x >= x0; x--) SPIRAL.push([x, y1]); if (x1 > x0) for (let y = y1 - 1; y > y0; y--) SPIRAL.push([x0, y]); x0++; y0++; x1--; y1--; }
-  { const f = SPIRAL.filter(([x, y]) => grid[y][x] !== 1); SPIRAL = f.slice(0, f.length - 5); } // deja libre el corazón de la plaza
+  { const f = SPIRAL.filter(([x, y]) => grid[y][x] !== 1 && grid[y][x] !== 3); SPIRAL = f.slice(0, f.length - 5); } // deja libre el corazón de la plaza
 }
 
 /* ---------------- Jugadores ---------------- */
@@ -176,7 +210,7 @@ function newPlayers() {
   pl = P.map((q, i) => ({ p: q.p, cpu: q.cpu, name: q.cpu ? 'CPU' : (k.party ? 'J' + (q.p + 1) : 'Tú'), col: k.pcol(q.p), wins: pl && pl[i] ? pl[i].wins : 0, hat: HATS[i] }));
 }
 function placePlayers() {
-  pl.forEach((q, i) => Object.assign(q, { x: SPAWN[i][0] + 0.5, y: SPAWN[i][1] + 0.5, dir: [0, 1], spd: RU.speed, max: RU.bombs, range: RU.range, kick: RU.kick, alive: true, dead: 0, out: 0, gl: false, inv: INV0, mv: 0, ai: null, think: 0, anim: 0, bombT: 0 }));
+  pl.forEach((q, i) => Object.assign(q, { x: SPAWN[i][0] + 0.5, y: SPAWN[i][1] + 0.5, dir: [0, 1], spd: RU.speed, max: RU.bombs, range: RU.range, kick: RU.kick, alive: true, dead: 0, out: 0, gl: false, inv: INV0, mv: 0, ai: null, think: 0, anim: 0, bombT: 0, ghost: false, gcd: 0 }));
 }
 const cellOf = (q) => [Math.floor(q.x), Math.floor(q.y)];
 function refreshCtl() { const P = k.players(4); pl.forEach((q) => { const hu = !P[q.p].cpu; q.cpu = !hu; q.name = hu ? (k.party ? 'J' + (q.p + 1) : 'Tú') : 'CPU'; q.col = k.pcol(q.p); }); }
@@ -187,14 +221,14 @@ function reset() {
   pl = null; newPlayers(); round = 0; newRound();
 }
 function newRound() {
-  round++; buildMap(); bombs = []; crumbs = []; rT = 0; sudden = false; sudI = 0; sudT = 0; endT = 0; msg = ''; msgT = 0; fast = false;
+  round++; buildMap(); bombs = []; crumbs = []; hot = null; hotN = 0; hotT = UNICA ? 1.8 : 0; rT = 0; sudden = false; sudI = 0; sudT = 0; endT = 0; msg = ''; msgT = 0; fast = false;
   placePlayers(); cdPend = true;
 }
 
 /* ---------------- Movimiento en rejilla con ayuda en esquinas ---------------- */
 function blocked(x, y, q) {
-  if (hard(x, y) || grid[y][x] === 2) return true;
-  const b = bombAt(x, y); return !!(b && !(q && b.pass.has(q)));
+  if (hard(x, y) || grid[y][x] >= 2) return true;
+  const b = bombAt(x, y); return !!(b && !b.car && !(q && b.pass.has(q)));
 }
 function tryMove(q, dx, dy, d) {
   const [cx, cy] = cellOf(q), H1 = dx !== 0, off = H1 ? q.y - (cy + 0.5) : q.x - (cx + 0.5), so = Math.sign(off);
@@ -231,21 +265,29 @@ function placeBomb(q, slide = RU.slide) {
 function blast(b) {
   const out = [[b.x, b.y, 0]];
   for (const [dx, dy, bit] of [[1, 0, 1], [-1, 0, 1], [0, 1, 2], [0, -1, 2]]) for (let i = 1; i <= b.range; i++) {
-    const x = b.x + dx * i, y = b.y + dy * i; if (hard(x, y)) break; out.push([x, y, bit, i === b.range]); if (grid[y][x] === 2) break;
+    const x = b.x + dx * i, y = b.y + dy * i; if (hard(x, y)) break; out.push([x, y, bit, i === b.range]); if (grid[y][x] >= 2) break;
   }
   return out;
 }
 function paintCell(x, y, oi) { if (hard(x, y) || grid[y][x] === 2 || paint[y][x] === oi) return; if (paint[y][x] >= 0) pcount[paint[y][x]]--; paint[y][x] = oi; pcount[oi]++; }
 function explode(b) {
-  bombs.splice(bombs.indexOf(b), 1); k.sfx('explode'); k.shake(5); const oi = pl.indexOf(b.own);
+  bombs.splice(bombs.indexOf(b), 1); if (b === hot) { hot = null; hotT = 1.5; } k.sfx('explode'); k.shake(5); const oi = pl.indexOf(b.own);
   k.burst((b.x + 0.5) * T, TOP + (b.y + 0.5) * T, PAINT ? b.own.col : '#ffd166', 16, 200); k.burst((b.x + 0.5) * T, TOP + (b.y + 0.5) * T, PAINT ? '#fff' : '#ff5f7a', 10, 160);
   for (const [x, y, bit] of blast(b)) {
     fireT[y][x] = FIRE_T; fireD[y][x] = bit === 0 ? 3 : (fireD[y][x] | bit); fireO[y][x] = oi;
-    if (grid[y][x] === 2) { grid[y][x] = 0; crumbs.push({ x, y, t: 0 }); k.burst((x + 0.5) * T, TOP + (y + 0.5) * T, '#c98a4b', 10, 150); if (Math.random() < RU.drop) items[y][x] = k.pick(['r', 'r', 'b', 'b', 's', 's', 'k']); fireT[y][x] = FIRE_T; }
+    if (grid[y][x] === 3) { const bi = BASE.findIndex(([a, b2]) => a === x && b2 === y);
+      if (bi >= 0 && bhp[bi] > 0) { bhp[bi]--; k.sfx('hurt'); k.shake(6); k.burst((x + 0.5) * T, TOP + (y + 0.5) * T, '#ffb13d', 18, 190);
+        if (bhp[bi] <= 0) { grid[y][x] = 0; baseDown(bi); } else k.float('¡Carro tocado!', (x + 0.5) * T, TOP + y * T - 8, '#ffd166'); } }
+    else if (grid[y][x] === 2) { grid[y][x] = 0; crumbs.push({ x, y, t: 0 }); k.burst((x + 0.5) * T, TOP + (y + 0.5) * T, '#c98a4b', 10, 150); if (Math.random() < RU.drop) items[y][x] = k.pick(UNICA ? ['s'] : ['r', 'r', 'b', 'b', 's', 's', 'k']); fireT[y][x] = FIRE_T; }
     else if (items[y][x] && bit) { items[y][x] = 0; k.burst((x + 0.5) * T, TOP + (y + 0.5) * T, '#fff', 8, 120); }
     const o = bombAt(x, y); if (o && o !== b) o.t = Math.min(o.t, 0.06);
     if (PAINT) paintCell(x, y, oi);
   }
+}
+function baseDown(bi) {
+  if (baseLost >= 0) return; baseLost = bi; k.sfx('explode'); k.shake(9); k.flash('rgba(255,180,90,.35)');
+  const [x, y] = BASE[bi]; k.burst((x + 0.5) * T, TOP + (y + 0.5) * T, '#ffd166', 40, 300);
+  msg = `¡Carro del equipo ${bi ? 'B' : 'A'} por los aires!`; msgT = 2.4; if (!endT) endT = 1.6;
 }
 function kill(q, why) {
   if (!q.alive) return; q.alive = false; q.dead = 1; k.sfx('hurt'); k.shake(7);
@@ -254,14 +296,25 @@ function kill(q, why) {
     if (by && by !== q) { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) paintCell(cx + dx, cy + dy, oi); k.burst(q.x * T, TOP + q.y * T, by.col, 30, 240); }
     k.float(by && by !== q ? '¡Pringado!' : '¡Uy!', q.x * T, TOP + q.y * T - 20, by ? by.col : q.col); return; }
   k.burst(q.x * T, TOP + q.y * T, q.col, 26, 220); k.burst(q.x * T, TOP + q.y * T, '#fff', 10, 140); k.float(why || '¡Fuera!', q.x * T, TOP + q.y * T - 20, q.col);
+  const [cx, cy] = cellOf(q), oi = fireO[cy][cx], by = pl[oi];
+  if (PAIR) { const m = mate(q); if (m && m.alive) { m.range = Math.min(8, m.range + 1); m.max = Math.min(6, m.max + 1); k.float('¡Relevo!', m.x * T, TOP + m.y * T - 24, m.col); k.sfx('coin'); } }
+  if (GHOST) { q.ghost = true; q.gcd = 3; q.dead = 0; q.x = k.clamp(q.x, 1.3, CO - 1.3); q.y = k.clamp(q.y, 1.3, RO - 1.3); k.float('¡Fantasma!', q.x * T, TOP + q.y * T - 34, '#a097ff');
+    if (by && by !== q && by.ghost) revive(by, cx, cy); }
+}
+function revive(o, x, y) { // fantasma: vuelve a la vida en la casilla del rival al que acaba de pillar
+  let best = null, bd = 99;
+  for (let b = 1; b < RO - 1; b++) for (let a = 1; a < CO - 1; a++) if (!grid[b][a] && !fireT[b][a] && !bombAt(a, b) && !plAt(a, b)) { const d = Math.abs(a - x) + Math.abs(b - y); if (d < bd) { bd = d; best = [a, b]; } }
+  if (!best) return;
+  Object.assign(o, { alive: true, ghost: false, dead: 0, x: best[0] + 0.5, y: best[1] + 0.5, inv: 2.5, ai: null, think: 0, mv: 0 });
+  k.sfx('win'); k.confetti(o.col, 20); k.burst(o.x * T, TOP + o.y * T, o.col, 22, 200); k.float('¡Vuelves!', o.x * T, TOP + o.y * T - 26, o.col);
 }
 
 /* ---------------- IA: mapa de peligro + BFS ---------------- */
 function slideDest(x, y, d) { // hielo: casilla donde se parará un petardo que resbala desde (x,y) en la dirección d
   for (let i = 0; i < CO; i++) { const nx = x + d[0], ny = y + d[1]; if (blocked(nx, ny, null) || plAt(nx, ny) || items[ny][nx]) break; x = nx; y = ny; } return [x, y];
 }
-function dangerMap(extra) {
-  const D = Array.from({ length: RO }, () => Array(CO).fill(Infinity)), B = bombs.map((b) => { if (ICE && b.sl) { const [x, y] = slideDest(Math.floor(b.fx), Math.floor(b.fy), b.sl); return { x, y, t: b.t, range: b.range }; }
+function dangerMap(extra, skip) {
+  const D = Array.from({ length: RO }, () => Array(CO).fill(Infinity)), B = bombs.filter((b) => b !== skip).map((b) => { if (ICE && b.sl) { const [x, y] = slideDest(Math.floor(b.fx), Math.floor(b.fy), b.sl); return { x, y, t: b.t, range: b.range }; }
     return { x: b.sl ? Math.floor(b.fx) : b.x, y: b.sl ? Math.floor(b.fy) : b.y, t: b.t, range: b.range }; });
   if (extra) B.push(extra);
   let ch = true; const cov = B.map((b) => blast(b));
@@ -278,8 +331,9 @@ function bfs(q, D, goal, extraBomb) {
     if (goal(x, y, n)) { let key = x + ',' + y, prev = seen.get(key), path = [[x, y]]; while (prev) { path.unshift(prev); prev = seen.get(prev[0] + ',' + prev[1]); } return path; }
     if (n > 26) continue;
     for (const [dx, dy] of k.shuffle([[1, 0], [-1, 0], [0, 1], [0, -1]])) {
-      const nx = x + dx, ny = y + dy, key = nx + ',' + ny; if (seen.has(key) || hard(nx, ny) || grid[ny][nx] === 2) continue;
-      if (bombAt(nx, ny) || (extraBomb && extraBomb.x === nx && extraBomb.y === ny)) continue;
+      const nx = x + dx, ny = y + dy, key = nx + ',' + ny; if (seen.has(key) || hard(nx, ny) || grid[ny][nx] >= 2) continue;
+      const grabbable = UNICA && hot && !hot.car && !hot.sl && hot.x === nx && hot.y === ny;
+      if ((bombAt(nx, ny) && !grabbable) || (extraBomb && extraBomb.x === nx && extraBomb.y === ny)) continue;
       const inT = Math.max(0, n + 0.45) / sp, outT = (n + 1.6) / sp, d = D[ny][nx]; // entra en la casilla antes de llegar a su centro
       if (d !== Infinity) { if (d < 0) { if (-d > inT - 0.08) continue; } else if (!(d > outT + 0.35 || d + FIRE_T < inT - 0.08)) continue; }
       seen.set(key, [x, y]); Q.push([nx, ny, n + 1]);
@@ -287,8 +341,10 @@ function bfs(q, D, goal, extraBomb) {
   }
   return null;
 }
-function hitsFoe(q, x, y) { for (const [a, b] of blast({ x, y, range: q.range })) if (pl.some((o) => o !== q && o.alive && (INV0 === 3 || o.inv <= 0) && Math.floor(o.x) === a && Math.floor(o.y) === b)) return true; return false; }
+function hitsFoe(q, x, y) { for (const [a, b] of blast({ x, y, range: q.range })) if (pl.some((o) => o !== q && o.alive && !(PAIR && team(o) === team(q)) && (INV0 === 3 || o.inv <= 0) && Math.floor(o.x) === a && Math.floor(o.y) === b)) return true; return false; }
+const nearestFoe = (q) => pl.filter((o) => o !== q && o.alive && !(PAIR && team(o) === team(q))).sort((a, b) => Math.hypot(a.x - q.x, a.y - q.y) - Math.hypot(b.x - q.x, b.y - q.y))[0];
 function hitsCrate(q, x, y) { return blast({ x, y, range: q.range }).some(([a, b]) => grid[b][a] === 2); }
+function hitsBase(q, x, y) { if (!PAIR) return false; const bi = 1 - team(q), [bx, by] = BASE[bi]; return bhp[bi] > 0 && blast({ x, y, range: q.range }).some(([a, b]) => a === bx && b === by); }
 function paintGain(q, x, y) { // pintura: cuánto suelo nuevo cubriría un petardo aquí
   const me = pl.indexOf(q); let v = 0; for (const [a, b] of blast({ x, y, range: q.range })) v += grid[b][a] === 2 ? 1.2 : paint[b][a] === me ? 0 : paint[b][a] < 0 ? 1 : 1.4; return v;
 }
@@ -319,7 +375,7 @@ function aiThink(q) {
       if (esc && esc.length > 1) { q.dir = sh.d.slice(); placeBomb(q, true); q.ai = esc; q.think = 0.05; return; } }
   }
   if (!early && mine < q.max && !bombAt(cx, cy)) {
-    const foe = hitsFoe(q, cx, cy), crate = PAINT ? paintGain(q, cx, cy) >= 2 : hitsCrate(q, cx, cy); // mismo umbral que el objetivo de abajo (si no, va y viene sin tirar)
+    const foe = hitsFoe(q, cx, cy) || hitsBase(q, cx, cy), crate = PAINT ? paintGain(q, cx, cy) >= 2 : hitsCrate(q, cx, cy); // mismo umbral que el objetivo de abajo (si no, va y viene sin tirar)
     if ((foe && Math.random() < aggr) || (crate && Math.random() < (PAINT ? 0.34 + skill * 0.3 : 0.55 + skill * 0.4) * pEase(q))) {
       const eb = { x: cx, y: cy, t: RU.fuse, range: q.range }, D2 = dangerMap(eb);
       const esc = bfs(q, D2, (x, y) => D2[y][x] === Infinity);
@@ -331,6 +387,7 @@ function aiThink(q) {
   let path = bfs(q, D, (x, y, n) => n > 0 && items[y][x] && safeCell(x, y) && n < 8);
   const hunt = rT > 25 || !pl.some((o) => o !== q && o.alive && Math.abs(o.x - q.x) + Math.abs(o.y - q.y) > 14) || Math.random() < aggr * 0.5;
   if (!path && hunt) path = bfs(q, D, (x, y, n) => n > 0 && safeCell(x, y) && hitsFoe(q, x, y));
+  if (!path && PAIR && rT > 12) path = bfs(q, D, (x, y, n) => n > 0 && safeCell(x, y) && !bombAt(x, y) && hitsBase(q, x, y));
   if (!path && PAINT) path = bfs(q, D, (x, y, n) => n > 0 && safeCell(x, y) && !bombAt(x, y) && paintGain(q, x, y) >= 4);
   if (!path) path = bfs(q, D, (x, y, n) => (n > 0 || !PAINT) && safeCell(x, y) && (PAINT ? paintGain(q, x, y) >= 2 : hitsCrate(q, x, y)) && !bombAt(x, y)); // pintura: nunca se queda quieto en una casilla sin salida
   if (!path) { const foe = pl.filter((o) => o !== q && o.alive).sort((a, b) => Math.hypot(a.x - q.x, a.y - q.y) - Math.hypot(b.x - q.x, b.y - q.y))[0];
@@ -355,7 +412,7 @@ k.run((dt) => {
   if (cdPend) { cdPend = false; k.count(3); }
   if (k.counting()) { t += dt; return; }
   const humans = pl.filter((q) => !q.cpu && q.alive).length;
-  fast = !PAINT && humans === 0 && pl.some((q) => !q.cpu) && !endT;
+  fast = !PAINT && !GHOST && humans === 0 && pl.some((q) => !q.cpu) && !endT;
   for (let s = 0; s < (fast ? 4 : 1); s++) step(dt);
 }, draw);
 
@@ -366,7 +423,7 @@ function step(dt) {
   for (const cr of crumbs) cr.t += dt; crumbs = crumbs.filter((cr) => cr.t < 0.5);
   if (!PAINT && !sudden && rT > RU.round) { sudden = true; msg = '¡Muerte súbita!'; msgT = 2.2; k.sfx('lose'); k.flash('rgba(255,90,95,.3)'); }
   if (sudden && sudI < SPIRAL.length) { sudT -= dt; if (sudT <= 0) { sudT = 0.25; const [x, y] = SPIRAL[sudI++]; grid[y][x] = 1; items[y][x] = 0; crumbs.push({ x, y, t: 0, drop: true });
-    const b = bombAt(x, y); if (b) bombs.splice(bombs.indexOf(b), 1); k.sfx('hit'); k.shake(2);
+    const b = bombAt(x, y); if (b) { bombs.splice(bombs.indexOf(b), 1); if (b === hot) { hot = null; hotT = 1.5; } } k.sfx('hit'); k.shake(2);
     for (const q of pl) if (q.alive && Math.floor(q.x) === x && Math.floor(q.y) === y) kill(q, '¡Aplastado!'); } }
   // petardos
   for (const b of bombs.slice()) {
@@ -379,15 +436,19 @@ function step(dt) {
     b.t -= dt; if (b.t <= 0) explode(b);
   }
   for (const b of bombs) for (const q of b.pass) { const [x, y] = cellOf(q); if (x !== b.x || y !== b.y) b.pass.delete(q); }
+  if (UNICA) stepHot(dt);
   const D = pl.some((q) => q.cpu && q.alive) ? dangerMap() : null;
   // jugadores
   for (const q of pl) {
     if (!q.alive) { q.dead = Math.max(0, q.dead - dt);
+      if (GHOST && q.ghost) updGhost(q, dt);
       if (PAINT && q.out > 0 && (q.out -= dt) <= 0) { const i = pl.indexOf(q); Object.assign(q, { alive: true, x: SPAWN[i][0] + 0.5, y: SPAWN[i][1] + 0.5, inv: 2, ai: null, think: 0, dead: 0 }); k.sfx('pop'); k.burst(q.x * T, TOP + q.y * T, q.col, 14, 140); }
       continue; }
     q.inv = Math.max(0, q.inv - dt); q.bombT = Math.max(0, q.bombT - dt);
     let dir = [0, 0], drop = false;
-    if (q.cpu) { q.think -= dt; if (q.think <= 0 || !q.ai) aiThink(q); const [cx, cy] = cellOf(q); q.fleeing = D[cy][cx] !== Infinity; dir = aiDir(q, D); }
+    if (q.cpu) { const carry = UNICA && hot && hot.car === q, DD = carry ? dangerMap(null, hot) : D;
+      q.think -= dt; if (q.think <= 0 || !q.ai) (UNICA ? aiHot : aiThink)(q);
+      const [cx, cy] = cellOf(q); q.fleeing = DD[cy][cx] !== Infinity; dir = aiDir(q, DD); }
     else { const v = k.pdir(q.p); if (v.x || v.y) { // eje dominante; si se pulsan dos, prueba el que no está bloqueado
         const [cx, cy] = cellOf(q), hx = v.x ? [Math.sign(v.x), 0] : null, vy = v.y ? [0, Math.sign(v.y)] : null;
         if (hx && vy) dir = !blocked(cx + hx[0], cy, q) ? (q.dir[1] && !blocked(cx, cy + vy[1], q) ? vy : hx) : vy; else dir = hx || vy; }
@@ -396,18 +457,102 @@ function step(dt) {
     if (q.cpu && (!q.ai || q.ai.length < 2) && (dir[0] || dir[1])) { const [cx, cy] = cellOf(q), m = q.spd * dt; q.x += k.clamp(cx + 0.5 - q.x, -m, m); q.y += k.clamp(cy + 0.5 - q.y, -m, m); q.mv += dt; }
     else if (dir[0] || dir[1]) { q.dir = dir; tryMove(q, dir[0], dir[1], q.spd * dt); q.mv += dt; } else q.mv = 0;
     q.anim += dt;
-    if (drop && placeBomb(q, drop === 'slide' ? true : drop === 'still' ? false : undefined)) {} else if (drop) k.sfx('click');
+    if (UNICA) { if (drop) throwHot(q); }
+    else if (drop && placeBomb(q, drop === 'slide' ? true : drop === 'still' ? false : undefined)) {} else if (drop) k.sfx('click');
     const [cx, cy] = cellOf(q);
     if (items[cy][cx]) { const it = items[cy][cx]; items[cy][cx] = 0; k.sfx('coin'); k.burst(q.x * T, TOP + q.y * T, '#ffd166', 12, 140);
       if (it === 'r') { q.range = Math.min(8, q.range + 1); k.float('+Alcance', q.x * T, TOP + q.y * T - 18, '#ffb13d'); }
       if (it === 'b') { q.max = Math.min(6, q.max + 1); k.float('+Petardo', q.x * T, TOP + q.y * T - 18, '#ff8fa3'); }
       if (it === 's') { q.spd = Math.min(MAXSPD, q.spd + 0.55); k.float('+Velocidad', q.x * T, TOP + q.y * T - 18, '#8fdcff'); }
       if (it === 'k') { q.kick = true; k.float('¡Patada!', q.x * T, TOP + q.y * T - 18, '#c9b8ff'); } }
-    if (fireT[cy][cx] > 0 && q.inv <= 0) kill(q);
+    if (fireT[cy][cx] > 0 && q.inv <= 0 && !friendly(q, fireO[cy][cx])) kill(q);
   }
   if (PAINT) { if (rT >= RU.round && !endT) { endT = 1.4; k.sfx('tick'); } return; }
   const alive = pl.filter((q) => q.alive);
-  if ((alive.length <= 1 || (sudI >= SPIRAL.length && rT > RU.round + SPIRAL.length * 0.25 + 15)) && !endT) endT = 1.2;
+  const over = PAIR ? baseLost >= 0 || !alive.some((q) => team(q) === 0) || !alive.some((q) => team(q) === 1) : alive.length <= 1;
+  if ((over || (sudI >= SPIRAL.length && rT > RU.round + SPIRAL.length * 0.25 + 15)) && !endT) endT = 1.2;
+}
+
+/* ---------------- 'fantasma': espíritus que siguen jugando ---------------- */
+function updGhost(q, dt) {
+  q.gcd = Math.max(0, q.gcd - dt); q.anim += dt; q.inv = 0;
+  let dir = [0, 0], drop = false;
+  if (q.cpu) { const foe = nearestFoe(q);
+    if (foe) { const dx = foe.x - q.x, dy = foe.y - q.y, l = Math.max(0.3, Math.hypot(dx, dy)); dir = [dx / l, dy / l];
+      drop = q.gcd <= 0 && l < 2.6 && Math.random() < 0.05 + skill * 0.1; } }
+  else { const v = k.pdir(q.p); dir = [v.x, v.y]; drop = k.phit(q.p, 'a') || k.phit(q.p, 'b'); }
+  const sp = 3.4 * dt; q.x = k.clamp(q.x + dir[0] * sp, 1.3, CO - 1.3); q.y = k.clamp(q.y + dir[1] * sp, 1.3, RO - 1.3);
+  if (dir[0] || dir[1]) { q.dir = [Math.sign(dir[0]), Math.sign(dir[1])]; q.mv += dt; } else q.mv = 0;
+  if (drop && q.gcd <= 0) { const x = Math.floor(q.x), y = Math.floor(q.y);
+    if (!grid[y][x] && !bombAt(x, y)) { bombs.push({ x, y, t: 2.6, range: q.range, own: q, pass: new Set(), sl: null, born: t, gh: true }); q.gcd = GCD; k.sfx('shoot'); k.burst((x + 0.5) * T, TOP + (y + 0.5) * T, q.col, 12, 130); }
+    else k.sfx('click'); }
+}
+function drawGhost(q) {
+  const x = q.x * T, y = TOP + q.y * T + Math.sin(q.anim * 3) * 3;
+  c.save(); c.globalAlpha = 0.82;
+  c.beginPath(); c.arc(x, y - 6, 11, Math.PI, 0); c.lineTo(x + 11, y + 8);
+  for (let i = 0; i < 3; i++) { const x0 = x + 11 - i * 7.33; c.quadraticCurveTo(x0 - 3.6, y + 8 + (i % 2 ? 7 : -5), x0 - 7.33, y + 8); }
+  c.lineTo(x - 11, y - 6); c.closePath();
+  const gr = c.createLinearGradient(x, y - 17, x, y + 8); gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, lite(q.col, 0.4)); c.fillStyle = gr; c.fill(); c.lineWidth = 2.2; c.strokeStyle = OUT; c.stroke();
+  c.fillStyle = OUT; for (const s of [-1, 1]) { c.beginPath(); c.arc(x + s * 4 + q.dir[0] * 2, y - 8, 2.2, 0, TAU); c.fill(); }
+  c.restore();
+  label(q.name === 'Tú' ? 'TÚ' : q.name, x, y - 27, k.party ? 16 : 11, q.col);
+  const w = 24, f = 1 - q.gcd / GCD;
+  ART.rr(c, x - w / 2, y + 13, w, 5, 2.5); c.fillStyle = 'rgba(26,21,48,.75)'; c.fill();
+  if (f > 0) { ART.rr(c, x - w / 2 + 1, y + 14, (w - 2) * f, 3, 1.5); c.fillStyle = f >= 1 ? '#a8cf3f' : '#a097ff'; c.fill(); }
+}
+
+/* ---------------- 'unica': un solo petardo que se pasa de mano en mano ---------------- */
+function spawnHot() {
+  let best = null, bd = 1e9; const mx = (CO - 1) / 2, my = (RO - 1) / 2;
+  for (let y = 1; y < RO - 1; y++) for (let x = 1; x < CO - 1; x++) if (!grid[y][x] && !fireT[y][x] && !plAt(x, y)) { const d = Math.hypot(x - mx, y - my); if (d < bd) { bd = d; best = [x, y]; } }
+  if (!best) return;
+  hotN++; const fu = Math.max(3.4, RU.fuse - (hotN - 1) * 0.6);
+  hot = { x: best[0], y: best[1], t: fu, fu, range: RU.range + Math.min(2, Math.floor((hotN - 1) / 2)), own: null, pass: new Set(), sl: null, born: t, hot: true, car: null, last: null, cool: 0 };
+  bombs.push(hot); k.sfx('start'); k.float('¡Petardo!', (hot.x + 0.5) * T, TOP + hot.y * T, '#ffd166');
+}
+function grabHot(q) { hot.car = q; hot.own = q; hot.sl = null; hot.pass = new Set(); hot.fx = q.x; hot.fy = q.y; k.sfx('coin'); k.shake(2); k.float('¡Lo tienes!', q.x * T, TOP + q.y * T - 30, q.col); }
+function throwHot(q) {
+  if (!hot || hot.car !== q) { k.sfx('click'); return; }
+  const [cx, cy] = cellOf(q);
+  hot.car = null; hot.last = q; hot.cool = 0.45; hot.sl = q.dir.slice(); hot.fx = cx + 0.5; hot.fy = cy + 0.5; hot.x = cx; hot.y = cy;
+  k.sfx('shoot'); k.burst(q.x * T, TOP + q.y * T, '#ffd166', 10, 150);
+}
+function stepHot(dt) {
+  if (!hot) { if (hotT > 0 && (hotT -= dt) <= 0 && !endT) spawnHot(); return; }
+  hot.cool = Math.max(0, hot.cool - dt);
+  const ok = (q) => q.alive && !(q === hot.last && hot.cool > 0);
+  if (hot.car && !hot.car.alive) { hot.last = hot.car; hot.car = null; hot.cool = 0.3; }
+  if (hot.car) { const [cx, cy] = cellOf(hot.car); hot.x = cx; hot.y = cy; hot.fx = hot.car.x; hot.fy = hot.car.y; return; }
+  if (hot.sl) { const cand = pl.filter((q) => ok(q) && Math.abs(q.x - hot.fx) + Math.abs(q.y - hot.fy) < 1.25); if (cand.length) grabHot(cand[0]); return; }
+  const cand = pl.filter((q) => ok(q) && Math.floor(q.x) === hot.x && Math.floor(q.y) === hot.y);
+  if (cand.length) grabHot(cand[0]);
+}
+function aimHot(q, foe) { // dirección en la que el petardo lanzado llegaría al rival
+  const [cx, cy] = cellOf(q);
+  for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { let x = cx, y = cy;
+    for (let i = 0; i < CO; i++) { const nx = x + d[0], ny = y + d[1]; if (blocked(nx, ny, q)) break; x = nx; y = ny;
+      if (Math.floor(foe.x) === x && Math.floor(foe.y) === y) return d.slice(); } }
+  return null;
+}
+function aiHot(q) {
+  const carry = hot && hot.car === q, D = dangerMap(null, carry ? hot : null), foe = nearestFoe(q);
+  q.think = 0.1 + (1 - skill) * k.rnd(0.12, 0.3);
+  if (carry) {
+    if (foe) { const d = aimHot(q, foe);
+      if (d && (hot.t < hot.fu * 0.85 || Math.random() < 0.35 + skill)) { q.dir = d; throwHot(q); q.ai = null; return; }
+      if (hot.t < 1.7) { const dx = foe.x - q.x, dy = foe.y - q.y; q.dir = Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx) || 1, 0] : [0, Math.sign(dy) || 1]; throwHot(q); q.ai = null; return; }
+      const path = bfs(q, D, (x, y, n) => n > 0 && (x === Math.floor(foe.x) || y === Math.floor(foe.y)) && Math.abs(x + 0.5 - foe.x) + Math.abs(y + 0.5 - foe.y) < 9)
+        || bfs(q, D, (x, y, n) => n > 0 && Math.abs(x + 0.5 - foe.x) + Math.abs(y + 0.5 - foe.y) < 3.5);
+      q.ai = path && path.length > 1 ? path.slice(0, 3) : null; return; }
+    q.ai = null; return;
+  }
+  if (hot && !hot.car && !hot.sl && hot.t > 2.4 && Math.random() < 0.3 + skill * 0.5) { const path = bfs(q, D, (x, y) => x === hot.x && y === hot.y); if (path && path.length > 1) { q.ai = path.slice(0, 4); return; } }
+  const far = (x, y) => !hot || Math.abs(x - hot.x) + Math.abs(y - hot.y) > 4;
+  const path = bfs(q, D, (x, y, n) => n > 1 && D[y][x] === Infinity && far(x, y) && items[y][x])
+    || bfs(q, D, (x, y, n) => n > 2 && D[y][x] === Infinity && far(x, y))
+    || bfs(q, D, (x, y, n) => n === 1 && D[y][x] === Infinity);
+  q.ai = path && path.length > 1 ? path.slice(0, 4) : null;
 }
 function glide(q, dt) {
   const [cx, cy] = cellOf(q), d = q.dir, off = d[0] ? (q.x - (cx + 0.5)) * d[0] : (q.y - (cy + 0.5)) * d[1];
@@ -415,16 +560,24 @@ function glide(q, dt) {
   if (rem <= 0.01) return false; tryMove(q, d[0], d[1], Math.min(rem, q.spd * 0.8 * dt)); q.mv += dt; return true;
 }
 const pct = (i) => Math.round(100 * pcount[i] / FREE);
+function winTeam(i) {
+  pl.forEach((q, j) => { if ((j < 2 ? 0 : 1) === i) q.wins++; });
+  const mine = pl.some((q) => !q.cpu && (pl.indexOf(q) < 2 ? 0 : 1) === i);
+  msg = k.party || !pl.some((q) => !q.cpu) ? `¡Ronda para el equipo ${i ? 'B' : 'A'}!` : mine ? '¡Ronda para tu equipo!' : '¡Ronda para el equipo rival!';
+  k.confetti(pl[i * 2].col, 60);
+}
 function finishRound() {
   const alive = PAINT ? [] : pl.filter((q) => q.alive);
-  if (PAINT) { const best = Math.max(...pl.map((q, i) => pcount[i])), top = pl.filter((q, i) => pcount[i] === best);
+  if (PAIR) { const a = alive.some((q) => team(q) === 0), b = alive.some((q) => team(q) === 1);
+    if (baseLost >= 0) winTeam(1 - baseLost); else if (a && !b) winTeam(0); else if (b && !a) winTeam(1); else msg = '¡Nadie en pie! Ronda nula'; }
+  else if (PAINT) { const best = Math.max(...pl.map((q, i) => pcount[i])), top = pl.filter((q, i) => pcount[i] === best);
     if (top.length === 1 && best > 0) { const w = top[0]; w.wins++; msg = `¡Ronda para ${w.name === 'Tú' ? 'ti' : w.name}! ${pct(pl.indexOf(w))} %`; k.confetti(w.col, 60); } else msg = '¡Empate a pintura! Ronda nula'; }
-  else if (alive.length === 1) { const w = alive[0]; w.wins++; msg = `¡Ronda para ${w.name === 'Tú' ? 'ti' : w.name}!`; k.confetti(w.col, 60); }
-  else if (!PAINT) msg = '¡Nadie en pie! Ronda nula';
+  else if (alive.length === 1 && !PAIR) { const w = alive[0]; w.wins++; msg = `¡Ronda para ${w.name === 'Tú' ? 'ti' : w.name}!`; k.confetti(w.col, 60); }
+  else if (!PAINT && !PAIR) msg = '¡Nadie en pie! Ronda nula';
   const champ = pl.find((q) => q.wins >= RU.wins);
   if (champ) {
-    const hu = !champ.cpu; if (!k.party && hu) lsSet(CPUK, lsGet(CPUK, 0) + 1); else if (!k.party) lsSet(CPUK, Math.max(0, lsGet(CPUK, 0) - 0.5));
-    k.podium(pl.map((q) => ({ p: q.p, score: q.wins, name: q.name })), { fmt: (s) => s + (s === 1 ? ' ronda' : ' rondas'), head: champ.name === 'Tú' ? (ICE ? '¡Ganas en el hielo!' : PAINT ? '¡Ganas la guerra de pintura!' : '¡Ganas la plaza!') : `¡Gana ${champ.name}!` });
+    const hu = PAIR ? pl.some((o) => !o.cpu && team(o) === team(champ)) : !champ.cpu; if (!k.party && hu) lsSet(CPUK, lsGet(CPUK, 0) + 1); else if (!k.party) lsSet(CPUK, Math.max(0, lsGet(CPUK, 0) - 0.5));
+    k.podium(pl.map((q) => ({ p: q.p, score: q.wins, name: q.name })), { fmt: (s) => s + (s === 1 ? ' ronda' : ' rondas'), head: PAIR ? (hu ? '¡Gana tu equipo!' : '¡Gana el equipo rival!') : champ.name === 'Tú' ? (ICE ? '¡Ganas en el hielo!' : PAINT ? '¡Ganas la guerra de pintura!' : GHOST ? '¡Sobrevives a los fantasmas!' : UNICA ? '¡El petardo nunca te pilla!' : '¡Ganas la plaza!') : `¡Gana ${champ.name}!` });
     return;
   }
   msgT = 2; newRound();
@@ -432,16 +585,20 @@ function finishRound() {
 
 /* ---------------- Dibujo ---------------- */
 function drawBomb(b) {
-  const x = b.sl ? b.fx * T : (b.x + 0.5) * T, y = TOP + (b.sl ? b.fy * T : (b.y + 0.5) * T), f = b.t / RU.fuse, pulse = 1 + Math.sin(t * (10 + (1 - f) * 22)) * 0.06 * (1.4 - f);
-  ART.shadow(c, x + 2, y + 11, 10, 0.3);
+  const x = (b.car || b.sl) ? b.fx * T : (b.x + 0.5) * T, y = TOP + ((b.car || b.sl) ? b.fy * T : (b.y + 0.5) * T) - (b.car ? 36 : 0), f = b.t / (b.fu || RU.fuse), pulse = 1 + Math.sin(t * (10 + (1 - f) * 22)) * 0.06 * (1.4 - f);
+  if (!b.car) ART.shadow(c, x + 2, y + 11, 10, 0.3);
+  if (b.gh) { c.globalAlpha = 0.72; c.save(); c.globalAlpha = 0.25; c.fillStyle = b.own.col; c.beginPath(); c.arc(x, y + 2, 20, 0, TAU); c.fill(); c.restore(); }
+  if (b.hot) { const R = 20; c.lineWidth = 4; c.strokeStyle = 'rgba(26,21,48,.55)'; c.beginPath(); c.arc(x, y + 2, R, 0, TAU); c.stroke();
+    c.strokeStyle = f < 0.3 ? '#ff5f7a' : f < 0.6 ? '#ffc94d' : '#a8cf3f'; c.beginPath(); c.arc(x, y + 2, R, -Math.PI / 2, -Math.PI / 2 + TAU * Math.max(0, f)); c.stroke(); }
   c.save(); c.translate(x, y + 2); c.scale(pulse, pulse); if (b.sl) c.rotate(Math.sin(t * 30) * 0.15);
   ART.rr(c, -8, -12, 16, 23, 5); const gr = c.createLinearGradient(-8, 0, 8, 0), bc = PAINT ? b.own.col : ICE ? '#3f8cff' : null;
   if (bc) { gr.addColorStop(0, lite(bc, 0.35)); gr.addColorStop(0.45, bc); gr.addColorStop(1, dark(bc, 0.35)); } else { gr.addColorStop(0, '#ff7a82'); gr.addColorStop(0.45, '#e63946'); gr.addColorStop(1, '#a3162a'); } c.fillStyle = f < 0.3 && Math.floor(t * 12) % 2 ? '#fff0f0' : gr; c.fill(); c.lineWidth = 2.4; c.strokeStyle = OUT; c.stroke();
-  c.fillStyle = PAINT ? '#fff' : '#ffd166'; c.fillRect(-7, -8, 14, 3.5); c.fillRect(-7, 4, 14, 3.5); c.fillStyle = PAINT ? '#1a1530' : b.own.col; c.fillRect(-7, -2.5, 14, 4);
+  c.fillStyle = PAINT ? '#fff' : '#ffd166'; c.fillRect(-7, -8, 14, 3.5); c.fillRect(-7, 4, 14, 3.5); c.fillStyle = PAINT ? '#1a1530' : b.own ? b.own.col : '#ffd166'; c.fillRect(-7, -2.5, 14, 4);
   c.fillStyle = 'rgba(255,255,255,.45)'; c.fillRect(-5, -10, 2.5, 18);
   c.beginPath(); c.moveTo(0, -12); c.quadraticCurveTo(4, -18, 2 + Math.sin(t * 8) * 1.5, -21); c.lineWidth = 2; c.strokeStyle = '#3a2a4a'; c.stroke();
   const sx = 2 + Math.sin(t * 8) * 1.5, sy = -22; c.fillStyle = '#fff4b8'; ART.glint(c, sx, sy, 4 + Math.sin(t * 40) * 1.5, '#ffd166'); ART.glint(c, sx, sy, 2.2, '#fff');
-  c.restore();
+  c.restore(); c.globalAlpha = 1;
+  if (b.hot) label(Math.ceil(b.t) + '', x, y + 30, 15, f < 0.3 ? '#ff8fa3' : '#fff');
 }
 function drawFire(x, y) {
   const f = fireT[y][x] / FIRE_T, d = fireD[y][x], X = x * T, Y = TOP + y * T, s = 0.55 + 0.45 * Math.sin(Math.min(1, (1 - f) * 3) * Math.PI / 2 + 0.3);
@@ -454,6 +611,7 @@ function drawFire(x, y) {
   c.globalAlpha = 1;
 }
 function drawPlayer(q) {
+  if (GHOST && q.ghost) return drawGhost(q);
   const x = q.x * T, y = TOP + q.y * T, bob = q.mv ? Math.abs(Math.sin(q.anim * 14)) * 2.5 : Math.sin(q.anim * 3) * 0.8, sq = q.bombT > 0 ? 0.15 : 0;
   if (!q.alive) { if (q.dead <= 0) return; c.save(); c.globalAlpha = q.dead; c.translate(x, y - (1 - q.dead) * 26); c.rotate((1 - q.dead) * 6); c.scale(q.dead, q.dead); bodyAt(q, 0, 0, 0); c.restore(); return; }
   if (q.inv > 0 && Math.floor(q.inv * 12) % 2) c.globalAlpha = 0.5;
@@ -485,6 +643,22 @@ function bodyAt(q, x, y, live) {
   if (q.hat === 'bow') { c.beginPath(); c.moveTo(0, 0); c.lineTo(-10, -6); c.lineTo(-10, 5); c.closePath(); c.moveTo(0, 0); c.lineTo(10, -6); c.lineTo(10, 5); c.closePath(); c.fillStyle = hc; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke(); c.beginPath(); c.arc(0, 0, 3, 0, TAU); c.fill(); c.stroke(); }
   c.restore();
 }
+let BARREL = null;
+const barrel = () => BARREL || (BARREL = mk(T, T + 12, (g) => { // carro de pólvora: barril con mecha sobre ruedas
+  ART.shadow(g, T / 2 + 1, T + 8, 14, 0.3);
+  g.fillStyle = '#4a3a2a'; for (const x of [8, T - 8]) { g.beginPath(); g.arc(x, T + 5, 4.5, 0, TAU); ART.fillOut(g, '#3a2a4a', 1.8); }
+  ART.rr(g, 5, 12, T - 10, T - 8, 6); const gr = g.createLinearGradient(5, 0, T - 5, 0); gr.addColorStop(0, '#b9773f'); gr.addColorStop(0.5, '#96592c'); gr.addColorStop(1, '#6e3f1e'); g.fillStyle = gr; g.fill(); g.lineWidth = 2.4; g.strokeStyle = OUT; g.stroke();
+  g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 2; for (const y of [17, 27]) { g.beginPath(); g.moveTo(6, y); g.lineTo(T - 6, y); g.stroke(); }
+  g.beginPath(); g.moveTo(T / 2, 12); g.quadraticCurveTo(T / 2 + 6, 4, T / 2 + 2, 1); g.lineWidth = 2; g.strokeStyle = '#3a2a4a'; g.stroke();
+}));
+function drawBase(x, y) {
+  const bi = BASE.findIndex(([a, b]) => a === x && b === y), X = x * T, Y = TOP + y * T;
+  c.drawImage(barrel(), X, Y - 12, T, T + 12);
+  const col = pl[bi * 2] ? pl[bi * 2].col : '#fff';
+  c.fillStyle = col; ART.rr(c, X + 4, Y + 2, T - 8, 7, 3); c.fill(); c.lineWidth = 1.8; c.strokeStyle = OUT; c.stroke();
+  label(bi ? 'B' : 'A', X + T / 2, Y + 5.5, 9, '#fff');
+  for (let i = 0; i < 3; i++) { const cx = X + T / 2 + (i - 1) * 9; c.beginPath(); c.arc(cx, Y - 16, 3.4, 0, TAU); c.fillStyle = i < bhp[bi] ? '#a8cf3f' : 'rgba(255,255,255,.18)'; c.fill(); c.lineWidth = 1.6; c.strokeStyle = OUT; c.stroke(); }
+}
 function draw() {
   c.fillStyle = '#2a1f3a'; c.fillRect(0, 0, W, H);
   c.drawImage(FLOOR, 0, TOP, W, RO * T);
@@ -497,27 +671,31 @@ function draw() {
   // objetos ordenados por fila (profundidad)
   const L = [];
   for (let y = 1; y < RO - 1; y++) for (let x = 1; x < CO - 1; x++) if (grid[y][x]) L.push([y + 0.9, 0, x, y]);
-  for (const b of bombs) L.push([(b.sl ? b.fy : b.y + 0.5), 1, b]);
+  for (const b of bombs) L.push([b.car ? b.fy + 0.25 : b.sl ? b.fy : b.y + 0.5, 1, b]);
   for (const q of pl) L.push([q.y + 0.2, 2, q]);
   L.sort((a, b) => a[0] - b[0]);
   for (const e of L) {
     if (e[1] === 0) { const [, , x, y] = e, cr = crumbs.find((q) => q.drop && q.x === x && q.y === y), dy = cr ? -(1 - cr.t / 0.5) * 40 : 0;
-      if (grid[y][x] === 2) c.drawImage(CRATE, x * T, TOP + y * T - 6, T, T + 6); else if (x % 2 === 0 && y % 2 === 0) c.drawImage(PILLAR, x * T, TOP + y * T - 10, T, T + 10);
+      if (grid[y][x] === 3) drawBase(x, y); else if (grid[y][x] === 2) c.drawImage(CRATE, x * T, TOP + y * T - 6, T, T + 6); else if (x % 2 === 0 && y % 2 === 0) c.drawImage(PILLAR, x * T, TOP + y * T - 10, T, T + 10);
       else { c.save(); c.translate(0, dy); c.drawImage(PILLAR, x * T, TOP + y * T - 10, T, T + 10); c.fillStyle = 'rgba(255,90,95,.35)'; ART.rr(c, x * T + 4, TOP + y * T + 2, T - 8, T - 6, 6); c.fill(); c.restore(); } }
     else if (e[1] === 1) drawBomb(e[2]); else drawPlayer(e[2]);
   }
   for (const cr of crumbs) if (!cr.drop) { c.globalAlpha = 1 - cr.t / 0.5; for (let i = 0; i < 4; i++) { const a = i * 1.7, r = cr.t * 50; c.fillStyle = '#c98a4b'; c.fillRect((cr.x + 0.5) * T + Math.cos(a) * r - 3, TOP + (cr.y + 0.5) * T + Math.sin(a) * r - 3 + cr.t * cr.t * 60, 6, 6); } c.globalAlpha = 1; }
   // marcador
   const gr = c.createLinearGradient(0, 0, 0, TOP); gr.addColorStop(0, '#3b2d5c'); gr.addColorStop(1, '#2a1f45'); c.fillStyle = gr; c.fillRect(0, 0, W, TOP);
+  if (PAIR) for (let i = 0; i < 2; i++) { const bx = 6 + i * (2 * 96 + 72); ART.rr(c, bx, 1.5, 2 * 92 + 4, 3.5, 1.8); c.fillStyle = pl[i * 2].col; c.fill(); }
   const cw = 92; pl.forEach((q, i) => { const x = 6 + i * (cw + 4) + (i >= 2 ? 72 : 0);
     ART.rr(c, x, 6, cw, 34, 10); c.fillStyle = q.alive ? 'rgba(26,21,48,.9)' : 'rgba(26,21,48,.45)'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = q.col; c.stroke();
-    label(q.name === 'Tú' ? 'TÚ' : q.name, x + 8, 17, k.party ? 18 : 13, q.alive ? q.col : '#8a82a6', 'left');
+    label(fitName((PAIR ? (i < 2 ? 'A·' : 'B·') : '') + (q.name === 'Tú' ? 'TÚ' : q.name), cw - 34, k.party ? 18 : 13), x + 8, 17, k.party ? 18 : 13, q.alive ? q.col : '#8a82a6', 'left');
     for (let s = 0; s < RU.wins; s++) { c.fillStyle = s < q.wins ? '#ffd166' : 'rgba(255,255,255,.15)'; ART.glint(c, x + cw - 12 - s * 14, 17, 6, c.fillStyle); }
+    if (GHOST && q.ghost) { label('FANTASMA', x + 6, 32, k.party ? 13 : 11, '#a097ff', 'left'); return; }
+    if (UNICA) { label(hot && hot.car === q ? '¡LO LLEVAS!' : q.alive ? 'A SALVO' : 'FUERA', x + 6, 32, k.party ? 13 : 11, hot && hot.car === q ? '#ffd166' : q.alive ? '#a8cf3f' : '#8a82a6', 'left'); return; }
     c.drawImage(itemIcon('r'), x + 6, 26, 12, 12); label('' + q.range, x + 24, 32, k.party ? 14 : 11, '#fff'); c.drawImage(itemIcon('b'), x + 34, 26, 12, 12); label('' + q.max, x + 52, 32, k.party ? 14 : 11, '#fff');
     if (PAINT) { ART.rr(c, x + 60, 26, 28, 12, 4); c.fillStyle = q.col; c.fill(); label(pct(i) + '%', x + 74, 32, k.party ? 13 : 10, '#fff'); }
     else { if (q.kick) c.drawImage(itemIcon('k'), x + 62, 26, 12, 12); if (q.spd > RU.speed + 0.1) c.drawImage(itemIcon('s'), x + 76, 26, 12, 12); } });
   const left = Math.max(0, RU.round - rT); label(sudden ? '¡YA!' : `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 232, 23, 18, sudden ? '#ff5f7a' : left < 10 ? '#ffd166' : '#fff');
-  if (msgT > 0 || endT) { const m = endT && PAINT ? '¡Tiempo!' : endT ? (pl.filter((q) => q.alive).length === 1 ? `¡${pl.find((q) => q.alive).name === 'Tú' ? 'Aguantas' : pl.find((q) => q.alive).name + ' aguanta'}!` : '¡Nadie en pie!') : msg;
+  if (msgT > 0 || endT) { const al = pl.filter((q) => q.alive);
+    const m = endT && PAINT ? '¡Tiempo!' : endT && PAIR ? (al.length ? `¡Equipo ${team(al[0]) ? 'B' : 'A'}!` : '¡Nadie en pie!') : endT ? (al.length === 1 ? `¡${al[0].name === 'Tú' ? 'Aguantas' : al[0].name + ' aguanta'}!` : '¡Nadie en pie!') : msg;
     c.globalAlpha = endT ? 1 : Math.min(1, msgT * 2); c.font = '900 26px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const mw = c.measureText(m).width + 40;
     ART.rr(c, W / 2 - mw / 2, TOP + RO * T / 2 - 26, mw, 52, 14); c.fillStyle = 'rgba(26,21,48,.88)'; c.fill(); c.lineWidth = 3; c.strokeStyle = '#ffd166'; c.stroke(); label(m, W / 2, TOP + RO * T / 2, 26, '#fff'); c.globalAlpha = 1; }
   if (fast) label('Te han eliminado · la ronda termina a toda prisa', W / 2, H - 14, k.party ? 18 : 13, '#ffd166');

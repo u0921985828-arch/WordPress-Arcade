@@ -1,0 +1,100 @@
+"""Oleada 3 — agente «party3»: ocho minijuegos nuevos del motor party.js (un CFG.mode por juego, 3 rondas con 3-2-1 puntos)."""
+
+GAMES = [
+    dict(
+        title='Bolos Humanos', genre='party', tags=['bolos', 'choques', 'punteria', 'minijuegos', 'vector'],
+        orient='landscape', aspect='16:9', inputs='TKG', engine='party',
+        cfg=dict(mode='bowl', hud='br', help='Apunta la flecha con el joystick, mantén A para coger impulso y suéltalo para salir rodando hecho una bola. Cada bolo que tumbas vale 1 punto, el dorado 3 y atropellar a un rival que esté apuntando, 2. Cuando caen los diez bolos se planta un juego nuevo. Ronda de 38 segundos.'),
+        pad=dict(d='8', a='Rodar', t=1), mp=(1, 4), players='1–4 jugadores',
+        desc=[
+            'En Bolos Humanos nadie lanza la bola: la bola eres tú. Los cuatro jugadores se colocan al pie de una pista de madera encerada, se hacen un ovillo y salen rodando hacia el juego de bolos del fondo. Antes de salir hay que decidir dos cosas con una sola mano: hacia dónde apunta la flecha de tu color y cuánto impulso coges manteniendo el botón. Poco impulso y te quedas a medio camino; demasiado y rebotas en las bandas como una canica.',
+            'La pista es una sola y está compartida, así que las trayectorias se cruzan todo el rato. Chocar contra la bola de otro le roba velocidad y te da un punto, y si pillas a alguien parado en la línea de tiro lo mandas por los aires y te llevas dos: por eso conviene mirar de reojo hacia dónde apuntan los demás antes de salir. Los bolos caen con su punto de física, uno de ellos es dorado y vale el triple, y cuando no queda ninguno en pie se coloca un juego nuevo para todos.',
+            'Con teclado se apunta con las flechas y se carga con la barra espaciadora; en el móvil valen el joystick virtual y el botón, y en la tele cada jugador usa el mando de su teléfono. Las plazas libres las ocupa la CPU, que apunta al grupo de bolos más cercano y de vez en cuando se acuerda de que tumbar a un humano también suma. Si le vas ganando partidas, afina la puntería y calcula mejor el impulso. Tres rondas, puntos por puesto y podio final.',
+        ],
+        tips=['El impulso a tope rebota mucho: para los bolos del fondo suele bastar con tres cuartos de barra.', 'Si un rival está cargando su tiro, apúntale: son dos puntos y además pierde el turno.', 'Después de un pleno los bolos vuelven al centro; colócate ya apuntando hacia allí.'],
+    ),
+    dict(
+        title='Toro Mecánico', genre='party', tags=['equilibrio', 'reflejos', 'eliminacion', 'minijuegos', 'vector'],
+        orient='landscape', aspect='16:9', inputs='TKG', engine='party',
+        cfg=dict(mode='bull', hud='br', help='Cada jugador monta su toro. Antes de cada sacudida aparece una flecha amarilla: empuja el joystick hacia el lado contrario para compensar. La barra de debajo del nombre indica cuánto estás inclinado; si se va del todo a un lado, caes. Los cinco primeros segundos son de calentamiento y no eliminan. El último que aguanta gana la ronda.'),
+        pad=dict(d='h', t=1), mp=(1, 4), players='1–4 jugadores',
+        desc=[
+            'Toro Mecánico es una prueba de equilibrio puro. Cuatro toros de feria, uno por jugador, dan tumbos al atardecer sobre la tierra de la plaza mientras sus jinetes intentan no besar el suelo. No hay que pulsar botones: solo inclinarse a izquierda o derecha en el momento justo. La gracia está en que el muñeco se comporta como un péndulo invertido: cuanto más inclinado estás, más rápido te caes, así que corregir tarde no sirve de nada y corregir de más te manda al otro lado.',
+            'Cada sacudida se anuncia con una flecha amarilla que parpadea al lado por el que va a tirar el toro. Ese aviso dura más de medio segundo al principio y se acorta según avanza la ronda, igual que aumentan la fuerza de las coces y la frecuencia con la que llegan. Bajo cada jinete hay una barra con una marca central que enseña su inclinación actual: cuando el relleno se pone rojo queda muy poco margen. Los cinco primeros segundos son de calentamiento, nadie cae y sirven para coger el punto al movimiento.',
+            'Se juega con las flechas del teclado, con el mando virtual del móvil o con el joystick del teléfono en el modo tele; solo se usa el eje horizontal. La CPU ocupa las plazas libres y reacciona con un retardo humano, se despista de vez en cuando y afina sus reflejos a medida que le ganas partidas. Si te caes, el resto de la ronda se ve en avance rápido. Tres rondas, puntos por puesto según el orden en que cae cada uno y podio al final.',
+        ],
+        tips=['No esperes a estar inclinado para corregir: empuja al lado contrario en cuanto aparece la flecha.', 'Después de compensar una coz, suelta el joystick un instante o te irás al otro lado.', 'Mira tu barra, no al toro: la marca central te dice antes que los ojos si vas bien.'],
+    ),
+    dict(
+        title='Huevo en la Cuchara', genre='party', tags=['carrera', 'equilibrio', 'relevos', 'minijuegos', 'vector'],
+        orient='landscape', aspect='16:9', inputs='TKG', engine='party',
+        cfg=dict(mode='egg', hud='br', help='Mantén A para correr y suéltalo para frenar. Cuanto más aceleras, más se va el huevo hacia el borde de la cuchara: compénsalo inclinando con ← →. Las piedrecitas del camino dan un bote. Si el huevo cae, pierdes tres segundos recogiéndolo. Gana quien cruce antes la meta.'),
+        pad=dict(d='h', a='Correr', t=1), mp=(1, 4), players='1–4 jugadores',
+        desc=[
+            'La carrera del huevo y la cuchara de las fiestas del pueblo, con cuatro calles de hierba y una meta a cuadros al fondo. La idea es sencilla y la ejecución no tanto: correr lo más rápido posible con un huevo suelto sobre una cuchara. Cada vez que aceleras, la inercia empuja el huevo hacia el borde de atrás, y si dejas que llegue al final se cae al suelo y pierdes tres segundos agachado recogiéndolo mientras los demás se te escapan.',
+            'La cuchara se inclina con el eje horizontal del joystick, y esa es toda la defensa que tienes. Inclinar hacia el lado contrario devuelve el huevo al centro, pero pasarse lo manda disparado al otro borde, porque el huevo conserva su propia velocidad. El resultado es un tira y afloja constante entre las ganas de correr y la necesidad de calmar el huevo: los buenos corredores aceleran a ráfagas cortas y aprovechan las frenadas para centrarlo. Por el camino hay piedrecitas que dan un bote y descolocan el huevo justo cuando ibas lanzado.',
+            'En el móvil se corre tocando la pantalla y se inclina con el joystick virtual; con teclado, espacio para correr y flechas para inclinar; en la tele, el mando de cada teléfono. Las barras de arriba muestran el avance de los cuatro corredores y la franja de abajo, el puesto o el porcentaje recorrido. La CPU corre con prudencia, suelta el acelerador cuando el huevo se le va y se vuelve más atrevida cuanto más le ganas. Tres rondas con puntos por orden de llegada.',
+        ],
+        tips=['Acelera a ráfagas de un segundo: da casi la misma velocidad media y el huevo se mueve mucho menos.', 'Cuando el huevo vaya hacia un borde, inclina y vuelve a soltar enseguida; si mantienes, lo mandas al otro lado.', 'Antes de una piedra conviene ir despacio: el bote se suma a lo que ya estaba moviéndose.'],
+    ),
+    dict(
+        title='Foto de Grupo', genre='party', tags=['punteria', 'colocacion', 'poses', 'minijuegos', 'vector'],
+        orient='landscape', aspect='16:9', inputs='TKG', engine='party',
+        cfg=dict(mode='photo', hud='br', help='Corre con el joystick hasta la silueta de tu color y ponte en la pose que marca el muñequito: mantén A para brazos arriba, mantén B para agacharte y no pulses nada para salir de pie. Al saltar el flash, sitio y pose correctos suman 2 puntos, uno de los dos suma 1. Son cinco fotos y desde la tercera las siluetas pueden intercambiarse a mitad de cuenta atrás.'),
+        pad=dict(d='8', a='Brazos', b='Agacharse', t=1), mp=(1, 4), players='1–4 jugadores',
+        desc=[
+            'Foto de Grupo es una carrera corta contra el disparador de una cámara. Sobre el césped hay cuatro siluetas pintadas con línea discontinua, una del color de cada jugador, y encima de cada una un muñequito indica la pose que hay que adoptar: de pie, con los brazos en alto o agachado. El fotógrafo cuenta atrás desde lo alto de su trípode y, cuando llega a cero, el flash congela la escena tal y como esté.',
+            'Colocarse en el sitio da un punto y acertar la pose, otro; hacer las dos cosas vale dos puntos y un aplauso. Cada foto reparte las siluetas por sitios distintos del jardín, y la cuenta atrás se acorta foto a foto: la primera da margen de sobra y la última apenas deja tiempo para llegar. A partir de la tercera foto aparece el giro de la casa: a mitad de la cuenta suena un aviso y dos siluetas intercambian dueño, así que el que ya estaba cómodo en su marca tiene que salir corriendo hacia otra.',
+            'Agacharse también frena, de modo que ponerse en pose demasiado pronto puede dejarte a medio camino. Se juega con las flechas y dos teclas, con el mando virtual del móvil o con el joystick y los botones del teléfono en la tele. La CPU cubre las plazas libres, apunta a su marca con un pequeño error de colocación y a veces se equivoca de pose o tarda en reaccionar al cambio; con las partidas que le ganas se vuelve más precisa. Cinco fotos por ronda, tres rondas y podio.',
+        ],
+        tips=['Lee la pose mientras corres: llegar tarde pero bien colocado sigue dando un punto.', 'Si vas a agacharte, hazlo en el último medio segundo, porque agachado se corre mucho más despacio.', 'Desde la tercera foto no te confíes: espera el aviso de cambio antes de plantarte del todo.'],
+    ),
+    dict(
+        title='Relevo de Cubos', genre='party', tags=['cooperativo', 'relevos', 'equilibrio', 'minijuegos', 'vector'],
+        orient='landscape', aspect='16:9', inputs='TKG', engine='party',
+        cfg=dict(mode='relay', hud='br', help='Cooperativo: entre los cuatro hay que llenar el barril con 100 litros en 70 segundos. Cada jugador se mueve por su tramo con ← →. Coge el cubo con A cuando lo tengas cerca y llévalo hasta el siguiente compañero, que lo recoge también con A; el último lo vuelca en el barril. Los acelerones hacen que el agua se balancee y se derrame: mantén B para ir despacio y sujetar el cubo. El marcador de cada jugador cuenta los litros que han pasado por sus manos.'),
+        pad=dict(d='h', a='Coger', b='Despacio', t=1), mp=(1, 4), players='1–4 jugadores',
+        desc=[
+            'Relevo de Cubos es el único juego de esta tanda en el que nadie gana solo: los cuatro forman una cadena entre el pozo de la izquierda y el barril de la derecha, y el objetivo común es llenarlo antes de que se acabe el tiempo. El primero saca el cubo del pozo, corre por su tramo y se lo entrega al segundo; este al tercero, y el cuarto lo vuelca en el barril. Cada cubo lleno vale veinte litros, así que hacen falta cinco entregas limpias para completar los cien.',
+            'La trampa está en el agua. El cubo se balancea según acelera y frena quien lo lleva, como un péndulo, y en cuanto la inclinación pasa de cierto punto empieza a derramarse por el borde a chorros. Correr a tirones vacía medio cubo en dos zancadas; arrancar suave y mantener la velocidad casi no gasta nada. El botón de ir despacio reduce la marcha y amortigua el vaivén, y es la forma de salvar un cubo que ya se estaba desbordando antes de llegar al relevo.',
+            'La entrega se hace cuando los dos compañeros están juntos en la línea que separa sus tramos: basta con que uno de los dos pulse el botón. El marcador general muestra los litros del barril y los derramados, y el de cada jugador cuenta los litros que han pasado por sus manos, que es lo que ordena el podio al final de la ronda. La CPU ocupa las plazas libres, va a buscar el cubo a su línea y frena cuando nota que el agua se mueve demasiado. Tres rondas cooperativas.',
+        ],
+        tips=['Arranca y para suave: la mayor parte del agua se pierde en el primer acelerón y en el frenazo del relevo.', 'Llega al relevo ya despacio y con el botón de sujetar pulsado; el compañero puede recogerlo él mismo.', 'Si el cubo casi está vacío, vale más entregarlo rápido y volver a por otro que arrastrarlo con cuidado.'],
+    ),
+    dict(
+        title='Globo de Todos', genre='party', tags=['cooperativo', 'vuelo', 'coordinacion', 'minijuegos', 'vector'],
+        orient='landscape', aspect='16:9', inputs='TKG', engine='party',
+        cfg=dict(mode='hotair', hud='br', help='Cooperativo: los cuatro manejáis el mismo globo aerostático. Mantén A para encender tu quemador (sube) y B para soltar lastre (baja); se suman todos los mandos, así que si todos sopláis a la vez os estrelláis contra las nubes. Hay que aguantar 58 segundos esquivando a los pájaros con las cinco vidas del globo. El aviso de arriba dice si conviene subir, bajar o mantener; cada jugador suma un punto por cada acierto.'),
+        pad=dict(d='', a='Quemador', b='Lastre', t=1), mp=(1, 4), players='1–4 jugadores',
+        desc=[
+            'Un globo aerostático con cuatro tripulantes y cuatro quemadores es un desastre esperando a ocurrir, y de eso trata Globo de Todos. La cesta es una sola y la altura también: lo que hace cada jugador se suma a lo que hacen los demás. Un quemador encendido basta para ganar altura con calma; dos suben deprisa; cuatro a la vez mandan el globo directo al techo de nubes, que hace tanto daño como el suelo de rocas. El lastre de arena empuja hacia abajo y sirve para frenar una subida pasada de vueltas.',
+            'Enfrente vienen bandadas de pájaros a distintas alturas, primero sueltos y luego en grupos de tres, cada vez más rápidos. El globo aguanta cinco picotazos, marcados con corazones sobre el marcador; si se acaban, la ronda termina antes de tiempo. La clave no es reaccionar rápido sino repartirse: si ves que otro ya ha encendido su quemador, quédate quieto; si nadie hace nada y el aviso pide subir, enciende tú. Todo pasa en menos de un minuto y da para muchos gritos cruzados.',
+            'Aunque el resultado es de equipo, el podio sale de la coordinación individual: cada pocas décimas se comprueba qué hacía falta de verdad y quien estaba haciendo lo correcto suma un acierto, mientras que empujar en sentido contrario resta. Así se ve quién llevaba el globo y quién estaba estorbando. Con teclado se usan espacio y la tecla de acción secundaria, en el móvil los dos botones del mando virtual y en la tele los botones A y B de cada teléfono. La CPU rellena las plazas y también se equivoca.',
+        ],
+        tips=['Cuando el aviso diga mantener, lo mejor es no tocar nada: el globo ya viene equilibrado.', 'Mirad el color de los gajos del globo: se aclara el de quien tiene el quemador encendido.', 'Para esquivar un pájaro, un solo quemador suele bastar; dos os llevan directos a las nubes.'],
+    ),
+    dict(
+        title='Tren de la Bruja', genre='party', tags=['reflejos', 'obstaculos', 'eliminacion', 'minijuegos', 'vector'],
+        orient='landscape', aspect='16:9', inputs='TKG', engine='party',
+        cfg=dict(mode='witch', hud='br', help='Vais de pie en un vagón que no para. Cuando llega el palo de la bruja a la altura de la cabeza, mantén B para agacharte; cuando llega bajo, pulsa A para saltarlo. El rótulo de cada palo te dice cuál es, pero algunos cambian de altura en el último momento. Dos golpes y te caes del tren. Los seis primeros segundos son de calentamiento.'),
+        pad=dict(d='', a='Saltar', b='Agacharse', t=1), mp=(1, 4), players='1–4 jugadores',
+        desc=[
+            'El tren de la bruja de las ferias, pero con los pasajeros de pie sobre el vagón. La vagoneta avanza sin frenos por un túnel lleno de telarañas, calabazas y fantasmas mientras, desde la oscuridad de la derecha, van saliendo los palos de escoba que la bruja pasa a ras del vagón. Unos vienen a la altura de la cabeza y hay que agacharse; otros a la altura de las rodillas y hay que saltarlos. No hay más que dos botones, pero el tren cada vez corre más.',
+            'Cada palo lleva escrito lo que hay que hacer, así que la información siempre está a la vista; el problema es el tiempo para leerla. Pasado el primer tramo aparecen los palos tramposos, que cambian de altura cuando ya están encima y castigan a quien se compromete demasiado pronto. Cada jugador aguanta dos golpes, marcados con dos corazones sobre su cabeza: al segundo se cae del vagón y sigue viendo la ronda desde las vías. El último que queda de pie gana, y si todos aguantan hasta el final decide quién ha esquivado más palos.',
+            'El calentamiento de los primeros seis segundos no elimina, solo sirve para coger el ritmo. Con teclado se salta con espacio y se agacha con la tecla de acción secundaria; en el móvil hay dos botones grandes y en la tele cada jugador usa los de su teléfono. La CPU rellena las plazas libres, reacciona con un retardo propio, pica de vez en cuando con los palos tramposos y mejora sus tiempos a medida que le ganas partidas. Si quedas fuera, el resto de la ronda pasa en avance rápido.',
+        ],
+        tips=['Agacharse no tiene penalización: ante la duda, quédate agachado y levántate después.', 'Con los palos tramposos conviene esperar al último momento; saltar pronto es lo que más golpes cuesta.', 'Cuando el tren va lanzado, el salto se acorta: pulsa justo cuando el palo entra en el vagón.'],
+    ),
+    dict(
+        title='Topo Burlón', genre='arcade', tags=['topos', 'sigilo', 'reflejos', 'minijuegos', 'vector'],
+        orient='landscape', aspect='16:9', inputs='TKG', engine='party',
+        cfg=dict(mode='mole', hud='br', help='Aquí el topo eres tú. Cambia de agujero con el joystick (solo puedes moverte escondido) y mantén A para asomar: cada instante fuera suma puntos. El martillo alumbra con un cono de luz lo que tiene delante: si te ve asomado, se coloca sobre tu agujero, avisa un momento y golpea (−3 puntos y te deja aturdido). Las zanahorias valen 4 si aguantas medio segundo sobre ellas. Ronda de 42 segundos.'),
+        pad=dict(d='8', a='Asomar', t=1), mp=(1, 4), players='1–4 jugadores',
+        desc=[
+            'Topo Burlón le da la vuelta al clásico de los topos y el martillo: ahora los topos son los jugadores y el martillo es el enemigo común. El prado tiene quince agujeros en tres filas y cada topo se mueve entre ellos por debajo de la tierra, sin que nadie lo vea, mientras el mazo gigante patrulla por encima con dos ojos enormes y un cono de luz que enseña exactamente hacia dónde está mirando.',
+            'Estar asomado es lo que da puntos, y cuanto más tiempo fuera, mejor. El riesgo es evidente: si asomas dentro del cono de luz, el martillo abandona su ronda, se planta sobre tu agujero, marca el objetivo con un círculo rojo y descarga. El golpe resta tres puntos y te deja viendo estrellas un par de segundos, tiempo suficiente para que los demás te adelanten. Por eso el juego consiste en leer el barrido de la mirada y trabajar siempre a su espalda: salir cuando se gira, contar hasta dos y volver a esconderte antes de que la luz te alcance.',
+            'Como aliciente aparecen zanahorias en agujeros al azar: hay que asomar sobre ellas y aguantar medio segundo para llevárselas, y valen cuatro puntos, así que muchas veces están justo donde no conviene estar. Si el martillo lleva mucho rato sin ver a nadie, golpea un agujero al azar para que nadie se acomode. Se juega con el joystick y un botón, en teclado, móvil o en la tele con cuatro mandos. La CPU rellena las plazas libres y también aprende a asomar en el momento justo.',
+        ],
+        tips=['Muévete mientras estás escondido: bajo tierra el martillo no puede verte ni golpearte.', 'Cuando el cono se acerque, suelta el botón antes de que llegue; volver a asomar es rápido.', 'Las zanahorias caducan: si la que ha salido está iluminada, déjala pasar y sigue sumando fuera de la luz.'],
+    ),
+]

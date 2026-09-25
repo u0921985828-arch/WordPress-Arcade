@@ -59,7 +59,12 @@ function tile(x, y, s, ch, stt, sy, big) {
 
 /* ---------- Datos ---------- */
 let SOL = null, VALID = null, CATS = null, LOADERR = false;
-const needW = MODE === 'daily', needC = MODE !== 'daily';
+const needW = MODE === 'daily', needC = MODE === 'hang' || MODE === 'sopa';
+let ROSCO = null, ANAG = null;
+if (MODE === 'abc') fetch('../_data/rosco-es.json').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((d) => { ROSCO = d; })
+  .catch(() => { LOADERR = true; ROSCO = { letras: 'ABC', r: { A: [{ d: 1, q: 'Insecto que fabrica miel.', a: ['abeja', 'abanico', 'almendra', 'ancla'] }], B: [{ d: 1, q: 'Embarcación pequeña de remos.', a: ['barca', 'bufanda', 'botella', 'bandeja'] }], C: [{ d: 1, q: 'Habitación donde se preparan las comidas.', a: ['cocina', 'cuadro', 'cortina', 'cuchara'] }] } }; });
+if (MODE === 'ana') fetch('../_data/anagramas-es.json').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((d) => { ANAG = d; })
+  .catch(() => { LOADERR = true; ANAG = { racks: [{ l: 'CAMINOS', w: ['CAMINOS', 'CAMINO', 'CASINO', 'MOSCA', 'MINAS', 'MANOS', 'MANO', 'SANO', 'CASO', 'COSA', 'SACO', 'CIMA'] }] }; });
 if (needW) fetch('../_data/palabras5-es.txt').then((r) => { if (!r.ok) throw new Error(r.status); return r.text(); }).then((t) => {
   let sec = ''; const sol = [], adm = [];
   for (const ln of t.split('\n')) { const s = ln.trim(); if (!s) continue; if (s[0] === '#') { if (/soluciones/.test(s)) sec = 's'; else if (/admitidas/.test(s)) sec = 'a'; continue; } if (sec === 's') sol.push(s); else if (sec === 'a') adm.push(s); }
@@ -627,8 +632,348 @@ const SP = (() => {
   return { st: () => ({ words, G, lvl, doneT }), reset, update, draw, onKey: () => false, intro: 'Encuentra las ocho palabras escondidas en la rejilla: arrastra el dedo desde la primera letra hasta la última. Pueden ir en horizontal, vertical, diagonal o al revés según el nivel.' };
 })();
 
+/* ===================================================================================== */
+/* ============================= ABECEDARIO VELOZ (rosco) ============================== */
+/* ===================================================================================== */
+const AB = (() => {
+  const TOT = 150, TURN = 15;
+  const L = LAND
+    ? { bar: [16, 8, 768, 34], ring: [190, 240, 150, 16], def: [372, 50, 412, 116], opt: (i) => [372 + (i % 2) * 210, 176 + (i >> 1) * 74, 202, 64], pass: [372, 326, 412, 46], chip: (i) => [372 + i * 104, 382, 98, 54] }
+    : { bar: [12, 10, 426, 34], ring: [225, 272, 143, 18], def: [12, 448, 426, 112], opt: (i) => [12 + (i % 2) * 219, 570 + (i >> 1) * 72, 207, 64], pass: [12, 718, 426, 44], chip: (i) => [12 + i * 108, 50, 102, 44] };
+  const lvl = () => Math.min(8, +ST('cpu:' + CFG.id, 0) || 0);
+  let letters, cards, stt, idx, seats, turn, phase, time, turnT, sel, msg, msgT, cpuT, flash;
+  function reset() {
+    if (!ROSCO) { letters = null; return; }
+    letters = [...ROSCO.letras];
+    cards = letters.map((ch) => {
+      const arr = ROSCO.r[ch] || [{ d: 1, q: '¿?', a: [ch, ch, ch, ch] }], e = k.pick(arr), ord = k.shuffle([0, 1, 2, 3]);
+      return { l: ch, q: e.q, d: e.d || 2, opts: ord.map((j) => e.a[j]), right: ord.indexOf(0) };
+    });
+    stt = letters.map(() => 0);
+    seats = k.players(k.party ? Math.max(2, k.party.length) : 1).map((pl) => ({ p: pl.p, name: pl.name, cpu: pl.cpu, score: 0, ok: 0, fail: 0 }));
+    idx = 0; turn = 0; phase = 'play'; time = TOT; turnT = 0; sel = -1; msg = ''; msgT = 0; flash = 0;
+    cpuT = k.rnd(2.6, 5.2);
+  }
+  function say(m) { msg = m; msgT = 1.5; }
+  function pending() { return stt.some((v) => v === 0); }
+  function nextIdx() {
+    for (let n = 1; n <= letters.length; n++) { const i = (idx + n) % letters.length; if (stt[i] === 0) { idx = i; return true; } }
+    return false;
+  }
+  function passTurn() { turn = (turn + 1) % seats.length; turnT = 0; sel = -1; cpuT = k.rnd(2.6, 5.4); }
+  function answer(i) {
+    const cd = cards[idx], s = seats[turn], [cx, cy, r] = L.ring, a = (idx / letters.length) * 6.2832 - 1.5708;
+    const lx = cx + Math.cos(a) * r, ly = cy + Math.sin(a) * r;
+    if (i === cd.right) {
+      stt[idx] = 1; s.ok++; s.score += 100; k.sfx('coin'); k.burst(lx, ly, '#4caf62', 12, 130); k.float('+100', lx, ly - 18, '#7cf7a0');
+      say('¡Correcto! ' + cd.opts[cd.right]);
+      if (!nextIdx()) return finish();
+      turnT = 0; sel = -1; cpuT = k.rnd(2.6, 5.4);
+    } else {
+      stt[idx] = 2; s.fail++; k.sfx('hurt'); k.shake(3); flash = 0.4;
+      say('Era: ' + cd.opts[cd.right]);
+      if (!nextIdx()) return finish();
+      passTurn();
+    }
+  }
+  function pasa() { k.sfx('click'); say('¡Pasapalabra!'); if (!nextIdx()) return finish(); passTurn(); }
+  function cpuPlay() {
+    const cd = cards[idx], base = [0, 0.66, 0.52, 0.4][cd.d] + lvl() * 0.02;
+    if (Math.random() < 0.12) return pasa();
+    answer(Math.random() < Math.min(0.86, base) ? cd.right : k.pick([0, 1, 2, 3].filter((i) => i !== cd.right)));
+  }
+  function finish() {
+    if (phase === 'end') return;
+    phase = 'end';
+    const rows = seats.map((s) => ({ p: s.p, score: s.score + (s === seats[0] ? 0 : 0) }));
+    const me = seats[0];
+    if (!k.party) { const sc = me.score + Math.round(time) * 5; k.best(CFG.id, sc); rows[0].score = sc; }
+    const top = rows.slice().sort((a, b) => b.score - a.score)[0];
+    if (k.human(top.p) && top.score > 0) SAVE('cpu:' + CFG.id, Math.min(8, lvl() + 1));
+    const solo = !k.party && rows.length === 1;
+    k.podium(rows, {
+      head: solo ? (me.ok >= letters.length ? '¡Rosco completo!' : undefined) : undefined,
+      go: `${solo ? `Aciertos: ${me.ok}/${letters.length} · Récord ${k.best(CFG.id, 0)}<br>` : ''}Toca para otro rosco`,
+    });
+  }
+  function update(dt) {
+    if (!ROSCO) return;
+    if (!letters) reset();
+    if (phase !== 'play') return;
+    if (msgT > 0) msgT -= dt;
+    if (flash > 0) flash -= dt;
+    time -= dt; turnT += dt;
+    if (time <= 0) { time = 0; return finish(); }
+    if (!pending()) return finish();
+    const s = seats[turn], q = cards[idx];
+    if (s.cpu) { if (turnT >= cpuT) cpuPlay(); return; }
+    const dx = (k.phit(s.p, 'right') ? 1 : 0) - (k.phit(s.p, 'left') ? 1 : 0), dy = (k.phit(s.p, 'down') ? 1 : 0) - (k.phit(s.p, 'up') ? 1 : 0);
+    if (dx || dy) {
+      let i = sel < 0 ? 0 : sel, cx = i % 2, cy = i >> 1;
+      if (sel < 0) { cx = dx > 0 ? 1 : 0; cy = dy > 0 ? 1 : 0; } else { if (dx) cx = dx > 0 ? 1 : 0; if (dy) cy = dy > 0 ? 1 : 0; }
+      sel = cy * 2 + cx; k.sfx('click');
+    }
+    if (k.phit(s.p, 'a')) { if (sel >= 0) answer(sel); else { sel = 0; k.sfx('click'); } return; }
+    if (k.phit(s.p, 'b')) return pasa();
+    if (s.p === 0 && !k.party && k.ptr.hit) {
+      for (let i = 0; i < 4; i++) if (inR(L.opt(i), k.ptr.x, k.ptr.y)) return answer(i);
+      if (inR(L.pass, k.ptr.x, k.ptr.y)) return pasa();
+    }
+    if (turnT >= TURN) { say('Se acabó el tiempo de la letra'); pasa(); }
+  }
+  function onKey(e) {
+    if (!letters || phase !== 'play' || k.st !== 'play' || k.paused) return false;
+    const s = seats[turn]; if (s.cpu || !k.human(s.p)) return false;
+    const c2 = e.key.toUpperCase();
+    if ('ABCD'.includes(c2) && c2.length === 1) { answer('ABCD'.indexOf(c2)); return true; }
+    if ('1234'.includes(c2)) { answer(+c2 - 1); return true; }
+    if (e.key === 'Enter') { pasa(); return true; }
+    return false;
+  }
+  /* ---------- Dibujo ---------- */
+  function ring(t) {
+    const [cx, cy, r, lr] = L.ring, n = letters.length, s = seats[turn];
+    c.save();
+    c.beginPath(); c.arc(cx, cy, r, 0, 6.2832); c.lineWidth = 2; c.strokeStyle = 'rgba(255,255,255,.12)'; c.stroke();
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * 6.2832 - 1.5708, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r, act = i === idx;
+      const col = stt[i] === 1 ? '#4caf62' : stt[i] === 2 ? '#d9534f' : act ? k.pcol(s.p) : '#3a3478';
+      if (act) { c.save(); c.globalAlpha = 0.35 + 0.25 * Math.sin(t * 6); c.beginPath(); c.arc(x, y, lr + 8, 0, 6.2832); c.fillStyle = col; c.fill(); c.restore(); }
+      c.beginPath(); c.arc(x, y + 3, lr, 0, 6.2832); c.fillStyle = 'rgba(6,4,20,.4)'; c.fill();
+      c.beginPath(); c.arc(x, y, lr, 0, 6.2832);
+      const g = c.createLinearGradient(0, y - lr, 0, y + lr); g.addColorStop(0, ART.lite(col, 0.2)); g.addColorStop(1, ART.dark(col, 0.12)); c.fillStyle = g; c.fill();
+      c.lineWidth = act ? 3.5 : 2.5; c.strokeStyle = act ? '#fff' : OUT; c.stroke();
+      txt(letters[i], x, y + 1, lr * 1.05, '#fff', 'center', 900);
+    }
+    const cd = cards[idx];
+    outlined(cd.l, cx, cy - (LAND ? 16 : 20), LAND ? 76 : 88, '#ffd36b', 'center', 8);
+    txt(k.party || seats.length > 1 ? 'Turno de ' + seats[turn].name : 'Tu turno', cx, cy + (LAND ? 34 : 40), LAND ? 16 : 18, k.pcol(seats[turn].p), 'center', 900);
+    const ok = stt.filter((v) => v === 1).length, ko = stt.filter((v) => v === 2).length;
+    txt(`${ok} aciertos · ${ko} fallos`, cx, cy + (LAND ? 58 : 68), LAND ? 14 : 16, 'rgba(255,255,255,.7)', 'center', 800);
+    c.restore();
+  }
+  function draw() {
+    c.drawImage(backdrop('#2b2458', '#120e2c', 30), 0, 0);
+    if (!letters) { outlined('Cargando el rosco…', W / 2, H / 2, 26, '#fff', 'center', 6); return; }
+    const [bx, by, bw, bh] = L.bar, s = seats[turn], cd = cards[idx];
+    panel(bx, by, bw, bh, 12, '#3a3478', { drop: 3 });
+    const fr = Math.max(0, time / TOT);
+    c.save(); ART.rr(c, bx + 4, by + 4, Math.max(6, (bw - 8) * fr), bh - 8, 8); c.fillStyle = fr > 0.4 ? '#6fd66f' : fr > 0.18 ? '#ffc94a' : '#ff6b6b'; c.fill(); c.restore();
+    const mm = Math.floor(time / 60), ss = Math.floor(time % 60);
+    outlined(`${mm}:${String(ss).padStart(2, '0')}`, bx + bw / 2, by + bh / 2, 20, '#fff', 'center', 5);
+    /* fichas de jugador */
+    if (seats.length > 1) seats.forEach((q, i) => {
+      const [x, y, w, h] = L.chip(i), col = k.pcol(q.p);
+      panel(x, y, w, h, 10, i === turn ? ART.dark(col, 0.25) : '#241d4e', { drop: 2, lw: i === turn ? 3.5 : 2.5, stroke: i === turn ? '#fff' : OUT });
+      txt(q.name, x + w / 2, y + 15, 14, col, 'center', 900);
+      outlined(String(q.score), x + w / 2, y + h - 17, 20, '#fff', 'center', 4);
+    });
+    ring(performance.now() / 1000);
+    /* definición */
+    const [dx, dy, dw, dh] = L.def;
+    panel(dx, dy, dw, dh, 16, '#fbf8ff');
+    txt('Con la ' + cd.l, dx + 14, dy + 18, 15, '#6a6394', 'left', 900);
+    const words = cd.q.split(' '); let line = '', lines = [];
+    const fs = LAND ? 19 : 20; c.font = FONT(fs, 800);
+    for (const w of words) { const t2 = line ? line + ' ' + w : w; if (c.measureText(t2).width > dw - 28 && line) { lines.push(line); line = w; } else line = t2; }
+    if (line) lines.push(line);
+    lines.slice(0, 4).forEach((ln, i) => txt(ln, dx + dw / 2, dy + 44 + i * (fs + 4), fs, OUT, 'center', 800));
+    /* opciones */
+    for (let i = 0; i < 4; i++) {
+      const [x, y, w, h] = L.opt(i), act = sel === i && !s.cpu;
+      panel(x, y, w, h, 14, act ? '#463ac4' : '#2d2a5c', { lw: act ? 4 : 3, stroke: act ? '#fff' : OUT });
+      c.beginPath(); c.arc(x + 26, y + h / 2, 15, 0, 6.2832); c.fillStyle = ['#ff6b6b', '#4fb3ff', '#ffc94a', '#6fd66f'][i]; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
+      txt('ABCD'[i], x + 26, y + h / 2 + 1, 16, '#fff', 'center', 900);
+      txt(cd.opts[i], x + 52, y + h / 2 + 1, fitSize(cd.opts[i], w - 66, 22, 12, 800), '#fff', 'left', 800);
+    }
+    const [px2, py2, pw2, ph2] = L.pass;
+    panel(px2, py2, pw2, ph2, 14, '#8a5a2f', { lw: 3 });
+    txt('Pasapalabra' + (s.cpu ? '' : k.party ? '  (B)' : '  (Intro)'), px2 + pw2 / 2, py2 + ph2 / 2 + 1, 19, '#fff', 'center', 900);
+    if (msgT > 0 && msg) { c.save(); c.globalAlpha = Math.min(1, msgT * 3); const mw = Math.min(W - 40, c.measureText(msg).width + 260); panel(W / 2 - mw / 2, LAND ? 404 : 770, mw, 32, 16, '#f4f0ff', { drop: 2 }); txt(msg, W / 2, (LAND ? 404 : 770) + 17, fitSize(msg, mw - 20, 17, 11, 900), OUT, 'center', 900); c.restore(); }
+    if (flash > 0) { c.save(); c.globalAlpha = flash * 0.4; c.fillStyle = '#d9534f'; c.fillRect(0, 0, W, H); c.restore(); }
+  }
+  k.onParty = () => {
+    if (MODE !== 'abc') return;
+    if (k.st !== 'play' || !seats) return reset();
+    const want = k.players(k.party ? Math.max(2, k.party.length) : 1);
+    seats = want.map((pl, i) => { const old = seats[i] || { score: 0, ok: 0, fail: 0 }; return { p: pl.p, name: pl.name, cpu: pl.cpu, score: old.score, ok: old.ok, fail: old.fail }; });
+    if (turn >= seats.length) turn = 0;
+  };
+  return { st: () => ({ letters, stt, idx, seats, turn, time, phase }), reset, update, draw, onKey, intro: 'Un rosco de 25 letras: una definición por letra y cuatro respuestas que empiezan igual. Tienes 150 segundos para dar la vuelta entera. Si no la sabes, pasapalabra y vuelves luego.' };
+})();
+
+/* ===================================================================================== */
+/* =================================== ANAGRAMAS ======================================= */
+/* ===================================================================================== */
+const AN = (() => {
+  const RONDAS = 2, RT = 100, TURN = 22, PTS = { 3: 100, 4: 200, 5: 400, 6: 700, 7: 1200 };
+  const L = LAND
+    ? { bar: [16, 8, 768, 34], wy: 72, ws: 52, ry: 158, rs: 58, btn: (i) => [88 + i * 130, 244, 120, 52], cx: 278, list: [556, 50, 228, 288], chip: (i) => [16 + i * 134, 328, 128, 56], msg: 410 }
+    : { bar: [12, 10, 426, 34], wy: 82, ws: 50, ry: 166, rs: 52, btn: (i) => [15 + i * 140, 250, 132, 54], cx: 225, list: [12, 320, 426, 244], chip: (i) => [12 + i * 108, 578, 102, 58], msg: 668 };
+  const lvl = () => Math.min(8, +ST('cpu:' + CFG.id, 0) || 0);
+  let rack, letras, usada, cur2, found, seats, turn, ronda, time, turnT, phase, sel, msg, msgT, cpuT, cpuWord, shakeT;
+  function newRound(n) {
+    const pool = ANAG.racks.slice();
+    rack = pool[(Math.floor(Math.random() * pool.length) + n) % pool.length];
+    letras = [...rack.l]; usada = letras.map(() => false); cur2 = []; found = new Set();
+    time = RT; turnT = 0; sel = 0; cpuT = k.rnd(3.5, 8); cpuWord = null;
+  }
+  function reset() {
+    if (!ANAG) { rack = null; return; }
+    seats = k.players(k.party ? Math.max(2, k.party.length) : 1).map((pl) => ({ p: pl.p, name: pl.name, cpu: pl.cpu, score: 0, ok: 0 }));
+    turn = 0; ronda = 0; phase = 'play'; msg = ''; msgT = 0; shakeT = 0;
+    newRound(0);
+  }
+  function say(m) { msg = m; msgT = 1.6; }
+  function clearW() { cur2 = []; usada = letras.map(() => false); }
+  function addL(i) { if (usada[i] || cur2.length >= 7) return; usada[i] = true; cur2.push(i); k.sfx('click'); }
+  function delL() { const i = cur2.pop(); if (i == null) return; usada[i] = false; k.sfx('pop'); }
+  function mezcla() { const ord = k.shuffle([...letras.keys()]); const nl = ord.map((i) => letras[i]); const nu = ord.map((i) => usada[i]); cur2 = cur2.map((i) => ord.indexOf(i)); letras = nl; usada = nu; k.sfx('click'); }
+  function word() { return cur2.map((i) => letras[i]).join(''); }
+  function passTurn() { if (seats.length > 1) turn = (turn + 1) % seats.length; turnT = 0; cpuT = k.rnd(3.5, 8.5); cpuWord = null; clearW(); sel = 0; }
+  function submit() {
+    const w = word(), s = seats[turn];
+    if (w.length < 3) { say('Al menos tres letras'); k.sfx('hurt'); shakeT = 0.3; return; }
+    if (found.has(w)) { say('Esa ya estaba'); k.sfx('hurt'); shakeT = 0.3; clearW(); return; }
+    if (!rack.w.includes(w)) { say('No vale: ' + w); k.sfx('hurt'); k.shake(3); shakeT = 0.3; clearW(); return; }
+    const p = PTS[w.length] || 100;
+    found.add(w); s.score += p; s.ok++;
+    k.sfx(w.length >= 6 ? 'win' : 'coin'); k.float('+' + p, L.cx, L.wy + 10, '#7cf7a0');
+    say(w.length === 7 ? '¡Palabra completa! +' + p : '¡Bien! ' + w + ' +' + p);
+    if (w.length === 7) k.confetti();
+    clearW();
+    if (found.size >= rack.w.length) return endRound();
+    passTurn();
+  }
+  function cpuPlay() {
+    const rem = rack.w.filter((w) => !found.has(w));
+    if (!rem.length) return endRound();
+    if (Math.random() < Math.max(0.08, 0.3 - lvl() * 0.025)) { say(seats[turn].name + ' no encuentra ninguna'); k.sfx('hurt'); return passTurn(); }
+    const max = 3 + Math.min(4, Math.round(lvl() / 2) + (Math.random() < 0.4 ? 1 : 0));
+    const pool = rem.filter((w) => w.length <= max);
+    const w = k.pick(pool.length ? pool : [rem.reduce((a, b) => (b.length < a.length ? b : a))]);
+    clearW();
+    for (const ch of w) { const i = letras.findIndex((l, n) => l === ch && !usada[n]); if (i >= 0) { usada[i] = true; cur2.push(i); } }
+    submit();
+  }
+  function endRound() {
+    if (ronda + 1 >= RONDAS) return finish();
+    ronda++; k.sfx('start'); say('Tanda ' + (ronda + 1) + ' de ' + RONDAS);
+    newRound(ronda); passTurn(); turn = 0;
+  }
+  function finish() {
+    if (phase === 'end') return;
+    phase = 'end';
+    const rows = seats.map((s) => ({ p: s.p, score: s.score }));
+    const top = rows.slice().sort((a, b) => b.score - a.score)[0];
+    if (k.human(top.p) && top.score > 0) SAVE('cpu:' + CFG.id, Math.min(8, lvl() + 1));
+    const me = seats[0]; if (!k.party) k.best(CFG.id, me.score);
+    const solo = !k.party && rows.length === 1;
+    k.podium(rows, { go: `${solo ? `Palabras: ${me.ok} · Récord ${k.best(CFG.id, 0)}<br>` : ''}Toca para otra partida` });
+  }
+  function rackRect(i) { const n = letras.length, tot = n * L.rs + (n - 1) * 6; return [L.cx - tot / 2 + i * (L.rs + 6), L.ry, L.rs, L.rs]; }
+  function wordRect(i) { const n = 7, tot = n * L.ws + (n - 1) * 5; return [L.cx - tot / 2 + i * (L.ws + 5), L.wy, L.ws, L.ws]; }
+  function update(dt) {
+    if (!ANAG) return;
+    if (!rack) reset();
+    if (phase !== 'play') return;
+    if (msgT > 0) msgT -= dt;
+    if (shakeT > 0) shakeT -= dt;
+    time -= dt; turnT += dt;
+    if (time <= 0) { time = 0; return endRound(); }
+    const s = seats[turn];
+    if (s.cpu) { if (turnT >= cpuT) cpuPlay(); return; }
+    const dx = (k.phit(s.p, 'right') ? 1 : 0) - (k.phit(s.p, 'left') ? 1 : 0), dy = (k.phit(s.p, 'down') ? 1 : 0) - (k.phit(s.p, 'up') ? 1 : 0);
+    if (dx) { sel = (sel + dx + 10) % 10; k.sfx('click'); }
+    if (dy) { sel = sel < 7 ? 7 + Math.min(2, Math.floor(sel / 3)) : Math.min(6, (sel - 7) * 3); k.sfx('click'); }
+    if (k.phit(s.p, 'a')) { if (sel < 7) addL(sel); else if (sel === 7) submit(); else if (sel === 8) delL(); else mezcla(); }
+    if (k.phit(s.p, 'b')) delL();
+    if (s.p === 0 && !k.party && k.ptr.hit) {
+      for (let i = 0; i < letras.length; i++) if (inR(rackRect(i), k.ptr.x, k.ptr.y)) { addL(i); break; }
+      for (let i = 0; i < 3; i++) if (inR(L.btn(i), k.ptr.x, k.ptr.y)) { i === 0 ? submit() : i === 1 ? delL() : mezcla(); break; }
+      for (let i = 0; i < cur2.length; i++) if (inR(wordRect(i), k.ptr.x, k.ptr.y)) { delL(); break; }
+    }
+    if (turnT >= TURN) { say(seats.length > 1 ? 'Se acabó tu turno' : 'Sigue probando'); k.sfx('hurt'); passTurn(); }
+  }
+  function onKey(e) {
+    if (!rack || phase !== 'play' || k.st !== 'play' || k.paused) return false;
+    const s = seats[turn]; if (s.cpu || !k.human(s.p)) return false;
+    if (e.key === 'Enter') { submit(); return true; }
+    if (e.key === 'Backspace') { delL(); return true; }
+    if (e.key === ' ') { mezcla(); return true; }
+    const ch = norm(e.key); if (ch.length !== 1 || !ALPHA.includes(ch)) return false;
+    const i = letras.findIndex((l, n) => l === ch && !usada[n]);
+    if (i >= 0) addL(i); else { k.sfx('hurt'); shakeT = 0.25; }
+    return true;
+  }
+  function draw() {
+    c.drawImage(backdrop('#231f4e', '#100e28', 26), 0, 0);
+    if (!rack) { outlined('Cargando letras…', W / 2, H / 2, 26, '#fff', 'center', 6); return; }
+    const [bx, by, bw, bh] = L.bar, s = seats[turn];
+    panel(bx, by, bw, bh, 12, '#3a3478', { drop: 3 });
+    const fr = Math.max(0, time / RT);
+    c.save(); ART.rr(c, bx + 4, by + 4, Math.max(6, (bw - 8) * fr), bh - 8, 8); c.fillStyle = fr > 0.4 ? '#6fd66f' : fr > 0.18 ? '#ffc94a' : '#ff6b6b'; c.fill(); c.restore();
+    outlined(`Tanda ${ronda + 1}/${RONDAS} · ${Math.ceil(time)} s · ${found.size}/${rack.w.length}`, bx + bw / 2, by + bh / 2, LAND ? 19 : 17, '#fff', 'center', 5);
+    /* palabra en construcción */
+    const sh = shakeT > 0 ? Math.sin(shakeT * 60) * 6 : 0;
+    for (let i = 0; i < 7; i++) {
+      const [x, y, w] = wordRect(i);
+      if (i < cur2.length) tile(x + sh, y, w, letras[cur2[i]], 3);
+      else tile(x, y, w, '', -1);
+    }
+    /* letras disponibles */
+    letras.forEach((ch, i) => {
+      const [x, y, w] = rackRect(i), act = sel === i && !s.cpu;
+      if (usada[i]) { tile(x, y, w, ch, -1); return; }
+      c.save(); if (act) { c.shadowColor = k.pcol(s.p); c.shadowBlur = 14; }
+      tile(x, y, w, ch, 3);
+      c.restore();
+      if (act) { c.lineWidth = 3.5; c.strokeStyle = k.pcol(s.p); ART.rr(c, x - 3, y - 3, w + 6, w + 6, w * 0.2); c.stroke(); }
+    });
+    /* botones */
+    ['Enviar', 'Borrar', 'Mezclar'].forEach((t2, i) => {
+      const [x, y, w, h] = L.btn(i), act = sel === 7 + i && !s.cpu;
+      panel(x, y, w, h, 14, ['#3fa55a', '#8a3f3f', '#463ac4'][i], { lw: act ? 4 : 3, stroke: act ? '#fff' : OUT });
+      txt(t2, x + w / 2, y + h / 2 + 1, LAND ? 20 : 20, '#fff', 'center', 900);
+    });
+    /* palabras encontradas */
+    const [lx, ly, lw, lh] = L.list;
+    panel(lx, ly, lw, lh, 14, '#1d1942', { lw: 2.5 });
+    txt(`Encontradas ${found.size}/${rack.w.length}`, lx + lw / 2, ly + 16, 15, '#a097ff', 'center', 900);
+    const cols = LAND ? 2 : 4, cw = (lw - 16) / cols, rows = Math.floor((lh - 30) / 22);
+    [...found].slice(-cols * rows).forEach((w, i) => {
+      const cx2 = lx + 8 + (i % cols) * cw, cy2 = ly + 32 + Math.floor(i / cols) * 22;
+      panel(cx2, cy2, cw - 6, 19, 6, w.length >= 6 ? '#8a6a2f' : '#2d2a5c', { drop: 1, lw: 2, nogl: true });
+      txt(w, cx2 + (cw - 6) / 2, cy2 + 10, fitSize(w, cw - 14, 14, 9, 900), '#fff', 'center', 900);
+    });
+    /* jugadores */
+    if (seats.length > 1) seats.forEach((q, i) => {
+      const [x, y, w, h] = L.chip(i), col = k.pcol(q.p);
+      panel(x, y, w, h, 10, i === turn ? ART.dark(col, 0.25) : '#241d4e', { drop: 2, lw: i === turn ? 3.5 : 2.5, stroke: i === turn ? '#fff' : OUT });
+      txt(q.name, x + w / 2, y + 16, 14, col, 'center', 900);
+      outlined(String(q.score), x + w / 2, y + h - 18, 20, '#fff', 'center', 4);
+    });
+    const who = seats.length > 1 ? (s.cpu ? s.name + ' está pensando…' : 'Turno de ' + s.name) : 'Forma todas las palabras que puedas';
+    txt(who, W / 2, L.msg - 26, LAND ? 15 : 16, 'rgba(255,255,255,.75)', 'center', 800);
+    if (msgT > 0 && msg) {
+      c.save(); c.globalAlpha = Math.min(1, msgT * 3);
+      c.font = FONT(18, 900); const mw = Math.min(W - 40, c.measureText(msg).width + 44);
+      panel(W / 2 - mw / 2, L.msg, mw, 34, 16, '#f4f0ff', { drop: 2 });
+      txt(msg, W / 2, L.msg + 18, fitSize(msg, mw - 20, 18, 11, 900), OUT, 'center', 900);
+      c.restore();
+    }
+  }
+  k.onParty = () => {
+    if (MODE !== 'ana') return;
+    if (k.st !== 'play' || !seats) return reset();
+    const want = k.players(k.party ? Math.max(2, k.party.length) : 1);
+    seats = want.map((pl, i) => { const old = seats[i] || { score: 0, ok: 0 }; return { p: pl.p, name: pl.name, cpu: pl.cpu, score: old.score, ok: old.ok }; });
+    if (turn >= seats.length) { turn = 0; passTurn(); }
+  };
+  return { st: () => ({ rack, letras, cur2, found, seats, turn, time, ronda, phase }), reset, update, draw, onKey, intro: 'Siete letras y muchas palabras escondidas. Forma todas las que puedas de tres letras o más; la que usa las siete vale muchísimo. Dos tandas de cien segundos.' };
+})();
 /* ---------- Arranque ---------- */
-const M = MODE === 'hang' ? HG : MODE === 'sopa' ? SP : D; window.__m = M;
+const M = MODE === 'hang' ? HG : MODE === 'sopa' ? SP : MODE === 'abc' ? AB : MODE === 'ana' ? AN : D; window.__m = M;
 /* Teclado físico: las letras (incluida P, que el kit usa para pausar) se capturan antes que el kit mientras se juega. */
 addEventListener('keydown', (e) => { if (M.onKey(e)) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
 M.reset();

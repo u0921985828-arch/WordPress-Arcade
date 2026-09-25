@@ -1,0 +1,97 @@
+"""Oleada 3 — agente «fisica»: motor nuevo fisica.js (cuerpos con físicas, muñecos articulados y empujones,
+con cinco modos) y un modo nuevo 'tabla' en descenso.js (Descenso Loco a Cuatro)."""
+
+PAD = lambda d, a, b: dict(d=d, a=a, b=b, t=1)
+
+GAMES = [
+    dict(
+        title='Pulso de Titanes', genre='arcade', tags=['pulso', 'ritmo', 'versus', 'fuerza', 'vector'],
+        orient='auto', aspect='fill', inputs='TKG', engine='fisica',
+        cfg=dict(mode='pulso', hud='bl', help='Pulso a ritmo. A tu lado late el corazón del RIVAL: pulsa A justo cuando se hincha y tu tirón vale doble; a destiempo pierdes fuerza. Mantén B para aguantar (recibes menos empuje, pero se te agota el brazo). Tumba su mano antes de que él tumbe la tuya. Al mejor de tres rondas.'),
+        pad=PAD('', 'Tirar', 'Aguantar'), mp=(1, 2), players='1–2 jugadores',
+        desc=[
+            'Pulso de Titanes es un duelo de brazos sobre una mesa de madera bajo un foco, pero con un detalle que lo cambia todo: no gana quien más pulsa, sino quien mejor escucha. A cada lado de la mesa late un corazón, y el que tienes junto a ti no es el tuyo, es el del rival. Cada vez que ese corazón se hincha tienes una ventana muy corta para apretar, y solo entonces tu tirón mueve de verdad la mano.',
+            'Apretar a destiempo es peor que no apretar: pierdes fuerza en el brazo y das aire al contrario. Por eso conviene contener las ganas, coger el compás y soltar tres o cuatro tirones seguidos cuando lo tengas cogido. La defensa tiene su propio botón: aguantar recorta casi a la mitad el empuje que recibes, aunque te vacía el brazo poco a poco, así que sirve para frenar una racha ajena, no para vivir escondido.',
+            'El compás no es fijo. Cuando alguien va perdiendo, su corazón se acelera, y eso obliga al que domina a leer un ritmo cada vez más rápido: las remontadas son frecuentes y ninguna ventaja está asegurada hasta que la mano toca la mesa. Los primeros segundos de cada ronda están protegidos, así que nadie puede llevarse el pulso de un arranque afortunado.',
+            'Se disputa al mejor de tres rondas. Contra la máquina empezarás con un rival despistado, que falla el compás y suelta tirones a destiempo, pero cada ronda que le ganas afina su oído y responde mejor. En el modo tele se juega a dos con el móvil de cada uno como mando.',
+        ],
+        tips=['No mires tu propio lado: el corazón que tienes que seguir es el que late a tu altura, y marca el ritmo del rival.',
+              'Aguanta con B solo mientras el otro encadena tirones buenos; si lo dejas puesto llegarás sin brazo al final.',
+              'Cuando vayas perdiendo, tu corazón se acelera: aprovéchalo, porque también te da más ocasiones de tirar.'],
+    ),
+    dict(
+        title='Justa de Caballeros', genre='arcade', tags=['justa', 'caballeros', 'versus', 'medieval', 'vector'],
+        orient='landscape', aspect='16:9', inputs='TKG', engine='fisica',
+        cfg=dict(mode='justa', hud='bl', help='Pulsa A al compás de los cascos para acelerar el galope. Arriba apunta la lanza al peto y abajo al escudo; mantén B para subir tu escudo. En los últimos metros ya no puedes cambiar. Si tu lanza va donde no está su escudo, tocas: peto 3 puntos (puede derribar) y escudo 1; si coincidís, lanza rota. Cinco lanzas.'),
+        pad=PAD('8', 'Galope', 'Escudo'), mp=(1, 2), players='1–2 jugadores',
+        desc=[
+            'Justa de Caballeros recrea el momento más tenso de un torneo medieval: dos jinetes lanzados el uno contra el otro por la liza, con las gradas llenas y la valla pintada de rojo y blanco entre ambos. Toda la partida se reduce a una decisión repetida cinco veces, pero es una decisión endiablada, porque hay que tomarla a ciegas y a la vez que el rival.',
+            'El galope no es automático. Los cascos del caballo marcan un compás y pulsar en el momento exacto de la zancada acelera de verdad; pulsar a lo loco apenas sirve. Ir más rápido no solo te hace llegar antes: una lanzada al peto a mucha velocidad puede sacar al otro de la silla y mandarlo rodando por la arena, con el punto extra y la ovación que eso supone.',
+            'Mientras cargas eliges dos cosas: dónde apuntas la lanza, arriba al peto o abajo al escudo, y dónde llevas tu propio escudo. Cuando quedan pocos metros, las dos decisiones se bloquean y ya no hay marcha atrás. Si tu punta va donde el escudo del rival no está, tocas; si coincidís, las lanzas se rompen contra la madera y la lanza queda en blanco. El peto vale tres puntos y el escudo, uno.',
+            'Se corren cinco lanzas y gana quien más sume. La máquina no adivina: se fija en dónde sueles poner tú el escudo y, cuando repites demasiado, empieza a apuntar al hueco. Cada torneo que le ganas la vuelve más observadora. En la tele juegan dos personas, cada una con su móvil.',
+        ],
+        tips=['Cambia de idea de vez en cuando: si siempre cubres arriba, la CPU acabará apuntando abajo.',
+              'El galope a compás es lo que abre la puerta al derribo; sin velocidad, un tocado al peto solo suma tres.',
+              'Elige pronto: en los últimos metros la lanza y el escudo se quedan como los dejaste.'],
+    ),
+    dict(
+        title='Almohadas en Órbita', genre='party', tags=['gravedad-cero', 'almohadas', 'empujones', 'espacio', 'vector'],
+        orient='auto', aspect='fill', inputs='TKG', engine='fisica',
+        cfg=dict(mode='orbita', hud='bl', help='Guerra de almohadas sin gravedad. El joystick te orienta y empuja un poco. A da el almohadazo: si aciertas mandas al otro volando y tú retrocedes; al aire, solo sales despedido. Mantén B para agarrarte a la pared. Tres escotillas giran abiertas al vacío: quien sale por una queda eliminado. Tres rondas.'),
+        pad=PAD('8', 'Almohada', 'Agarrar'), mp=(2, 4), players='2–4 jugadores',
+        desc=[
+            'Almohadas en Órbita es una pelea de almohadas en el módulo circular de una estación espacial, y en gravedad cero la broma se complica: aquí nadie camina. Los propulsores del traje apenas empujan, así que casi todo tu movimiento viene de los golpes que das y de los rebotes contra la pared. Es un juego de inercia pura, donde cada acción tiene su reacción.',
+            'El almohadazo es la clave. Si atinas, el rival sale disparado en la dirección en que apuntabas, pero tú retrocedes; si golpeas al vacío, solo consigues impulsarte tú. Eso convierte la almohada en arma y en motor a la vez: se puede usar para colocarse, para frenar a alguien que viene lanzado o para empujarlo justo hacia donde no debería ir. Agarrarse a la pared te deja clavado, útil para no acabar dando vueltas sin control.',
+            'El peligro está en el borde. Tres escotillas abiertas giran lentamente por la pared del módulo y cualquiera que cruce una se pierde en el vacío. Como giran, el sitio seguro de hace un momento deja de serlo, y conviene mirar no solo dónde estás tú sino hacia dónde estás derivando. Durante los primeros segundos de cada ronda las escotillas no eliminan a nadie, para que dé tiempo a colocarse.',
+            'Cada ronda dura hasta que queda uno o se acaba el tiempo, y se juegan tres. Las plazas libres las ocupan astronautas de la máquina, flojos al principio y más certeros conforme les vas ganando. En la tele caben cuatro jugadores con el móvil como mando.',
+        ],
+        tips=['Golpear al aire también te mueve: úsalo como propulsor de emergencia cuando vayas hacia una escotilla.',
+              'Agárrate a la pared antes de rebotar; frenar a tiempo vale más que dar otro almohadazo.',
+              'Empuja a los demás justo cuando una escotilla les queda de espaldas: es el momento en que menos pueden corregir.'],
+    ),
+    dict(
+        title='Gravedad Compartida', genre='party', tags=['cooperativo', 'gravedad', 'votacion', 'puzle', 'vector'],
+        orient='auto', aspect='fill', inputs='TKG', engine='fisica',
+        cfg=dict(mode='gravedad', hud='bl', help='Cooperativo: llevad el núcleo dorado hasta la puerta verde. La gravedad apunta hacia donde señala la mayoría: mantén el joystick en una dirección y, si coincidís, el mundo gira. A da un impulso con los pies apoyados y B te agarra. Los pinchos devuelven el núcleo al centro. 95 segundos; puntúan las puertas cruzadas.'),
+        pad=PAD('8', 'Impulso', 'Agarrar'), mp=(2, 4), players='2–4 jugadores (cooperativo)',
+        desc=[
+            'Gravedad Compartida es el juego cooperativo de la tanda: nadie gana a nadie, o lo sacáis entre todos o no lo saca nadie. En una cámara cerrada flota un núcleo dorado y en una de las paredes hay una puerta verde. Llevarlo hasta allí sería sencillo si pudierais empujarlo, pero el núcleo pesa demasiado: lo único que lo mueve es la gravedad.',
+            'Y la gravedad la decidís entre todos. Cada jugador señala con el joystick hacia dónde quiere que caiga el mundo, y cuando la mayoría coincide durante un instante, la cámara entera gira y el suelo pasa a ser otra pared. Aquí está toda la gracia y toda la tensión: si tres tiran hacia un lado y uno hacia otro, no pasa nada; si nadie se pone de acuerdo, el núcleo se queda quieto mientras el reloj corre. Hablarlo en voz alta es parte del juego.',
+            'Las cámaras tienen bloques a media altura que hay que rodear y, siempre en la pared opuesta a la puerta, una hilera de pinchos que devuelve el núcleo al centro si lo dejáis caer ahí. Vosotros también rebotáis y podéis empujar el núcleo con el cuerpo, saltar con un impulso o agarraros para no salir despedidos cuando el mundo gira de golpe.',
+            'Cada puerta cruzada genera una cámara nueva, un poco más enredada, y suma un punto. La partida dura noventa y cinco segundos y la puntuación es cuántas puertas habéis logrado. Se puede jugar en solitario, con los compañeros de la máquina votando contigo, pero el juego está pensado para cuatro móviles alrededor de la tele.',
+        ],
+        tips=['Decid en voz alta la dirección antes de moverla: sin mayoría clara la gravedad no cambia y se pierde tiempo.',
+              'Mirad dónde está la puerta antes de votar: a veces conviene una dirección intermedia y luego otra, en dos pasos.',
+              'Agarraos justo antes de un giro: si os pilla en el aire acabaréis todos amontonados en una esquina.'],
+    ),
+    dict(
+        title='El Suelo es Lava', genre='party', tags=['lava', 'saltos', 'empujones', 'supervivencia', 'vector'],
+        orient='auto', aspect='fill', inputs='TKG', engine='fisica',
+        cfg=dict(mode='lava', hud='bl', help='Solo se salva quien esté subido a un mueble. Joystick ← → para correr, A para saltar y B para empujar al que tengas al lado (a él lo lanza y a ti te retira un poco). La lava tarda seis segundos en subir y los muebles que cubre dejan de sostener. Quien la toca queda eliminado. Tres rondas con puntos por puesto.'),
+        pad=PAD('8', 'Saltar', 'Empujón'), mp=(2, 4), players='2–4 jugadores',
+        desc=[
+            'El Suelo es Lava lleva el juego de siempre a un salón de dibujos animados donde la amenaza es real: el suelo se llena de lava naranja y sube sin parar. Los muebles son las únicas islas seguras, y están repartidos a distintas alturas, desde el sofá y la mesa baja hasta las estanterías y las lámparas del techo. Subir es solo cuestión de tiempo, porque lo que hoy te sostiene dentro de veinte segundos estará bajo la lava.',
+            'Correr y saltar es la mitad del juego; la otra mitad es el empujón. Un toque a quien tienes al lado lo manda volando, y en un salón lleno de huecos eso suele acabar en chapuzón. Pero el empujón también te retira a ti un poco, así que darlo al borde de una estantería es una forma estupenda de eliminaros los dos. Lo mejor es esperar a que alguien esté saltando justo por encima del vacío.',
+            'La lava no empieza a subir hasta el sexto segundo, de modo que hay tiempo para colocarse y decidir hacia dónde tirar. Según sube, cada mueble anegado deja de contar como plataforma, y el salón se convierte poco a poco en un embudo: los últimos supervivientes acaban peleando por la misma estantería alta con muy poco sitio.',
+            'Se juegan tres rondas y puntúa el puesto en cada una, así que sobrevivir cuenta más que empujar, aunque quien empuja bien sobrevive mejor. Los rivales de la máquina completan las plazas libres, eligen mueble con cierta torpeza al principio y afinan cuando les vas ganando. En la tele caben cuatro con el móvil como mando.',
+        ],
+        tips=['Sube pronto: quedarte abajo dando empujones es divertido hasta que la lava te corta la retirada.',
+              'El mejor momento para empujar es cuando el rival acaba de saltar y no tiene suelo bajo los pies.',
+              'Mira qué mueble te queda por encima antes de saltar: cuando la lava cubre el tuyo, ya no sostiene a nadie.'],
+    ),
+    dict(
+        title='Descenso Loco a Cuatro', genre='racing', tags=['snowboard', 'nieve', 'empujones', 'descenso', 'vector'],
+        orient='auto', aspect='fill', inputs='TKG', engine='descenso',
+        cfg=dict(mode='tabla', help='Bajada en tabla por un canal que se estrecha. Joystick ← → para girar, A para agacharte y coger velocidad, B para empujar al rival de al lado (tarda casi un segundo en recargarse). Esquiva los abetos, pisa las flechas de turbo y salta en las rampas: aterrizar enderezado da impulso. Salirte a la nieve virgen frena mucho. Tres bajadas.'),
+        pad=PAD('h', 'Agacharse', 'Empujón'), mp=(1, 4), players='1–4 jugadores',
+        desc=[
+            'Descenso Loco a Cuatro es una bajada de snowboard sin reglamento por un canal abierto entre abetos. Cuatro tablas salen a la vez, la cámara sigue a quien va primero y el camino, que al principio es ancho y cómodo, se va cerrando conforme baja hasta convertirse en un pasillo por el que no caben cuatro personas sin tocarse. Ahí empieza lo bueno.',
+            'Además de girar y agacharte para ganar velocidad, tienes un botón de empujón. Un manotazo al vecino lo desvía de golpe, y con la pista estrechándose eso suele acabar en la nieve virgen de los lados, que frena muchísimo, o directamente contra un abeto. El empujón tiene su precio: te frena un poco a ti y tarda casi un segundo en volver a estar disponible, así que hay que elegir el momento.',
+            'El terreno está lleno de cosas que aprovechar. Las flechas pintadas dan un turbo, las rampas te mandan por el aire y, si aterrizas enderezado, sales con impulso; caer cruzado, en cambio, te deja casi parado. Las placas de hielo hacen que la tabla siga recta aunque gires, un problema serio cuando el canal se cierra y hay que corregir rápido.',
+            'La copa son tres bajadas por sendas distintas y puntúan los cuatro puestos, de modo que un mal descenso no te deja fuera. Las tablas libres las bajan riders de la máquina, que esquivan, aprovechan los turbos y también empujan; mejoran cada vez que les ganas la copa. En la tele caben cuatro jugadores con el móvil como mando.',
+        ],
+        tips=['Guarda el empujón para el tramo estrecho: en la parte ancha el rival apenas pierde tiempo.',
+              'Endereza la tabla antes de la rampa; un aterrizaje limpio vale más que cualquier empujón.',
+              'Si te sacan del canal, no fuerces el giro: sal de la nieve virgen en diagonal y recupera velocidad cuesta abajo.'],
+    ),
+]

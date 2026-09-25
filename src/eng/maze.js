@@ -2,7 +2,7 @@
  * muncher: laberinto simétrico sin callejones, casa de fantasmas con salida escalonada, dispersión/persecución, fruta.
  * digger: tierra por estratos, gemas, rocas que caen y aplastan bichos; los bichos cruzan la tierra como fantasmas.
  * iso/dungeon: laberinto isométrico por casillas con 3 llaves y salida; dungeon con monstruos, espada y corazones. */
-const M = CFG.mode, ISO = M === 'iso' || M === 'dungeon', OUT = ART.OUT, R2 = 6.2832;
+const M = CFG.mode, GEM = M === 'gemas', ISO = M === 'iso' || M === 'dungeon', OUT = ART.OUT, R2 = 6.2832;
 const W = 480, H = 520, TOP = 40;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: CFG.bg || '#0d0f24' }), c = k.ctx;
 const D = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }, OPP = { up: 'down', down: 'up', left: 'right', right: 'left' }, DIRS = ['up', 'left', 'down', 'right'];
@@ -62,10 +62,11 @@ const tapped = () => k.tap && !dragged;
 /* ---------- Construcción de niveles ---------- */
 function build() {
   items = []; foes = []; drops = []; rocks = []; fright = 0; chain = 0; freeze = 0; dying = 0; clearT = 0; lvT = 0; boardCv = flashCv = floorCv = null; dirty = true; fruit = null; eaten = 0;
+  if (GEM) return buildGem();
   if (M === 'muncher') buildMuncher(); else if (M === 'digger') buildDigger(); else buildIso();
   left = items.length;
 }
-function reset() { score = 0; lives = 4; level = 1; swordT = 0; invT = 0; best = k.best(CFG.id, 0); build(); }
+function reset() { if (GEM) return resetGem(); score = 0; lives = 4; level = 1; swordT = 0; invT = 0; best = k.best(CFG.id, 0); build(); }
 
 /* ================= COME-COCOS ================= */
 const GCOL = ['#ff4d5e', '#ff9ad5', '#4fd8e8', '#ffa94d'];
@@ -282,10 +283,11 @@ function updIso(dt) {
 }
 
 /* ================= Bucle ================= */
-reset(); k.show(CFG.title, CFG.help);
+if (!GEM) reset(); k.show(CFG.title, CFG.help);
 k.run((dt) => {
   t += dt; if (k.ptr.hit) dragged = false;
   if (!k.gate(reset)) return;
+  if (GEM) return updGem(dt);
   if (msgT > 0) msgT -= dt;
   if (freeze > 0) { freeze -= dt; return; }
   if (dying > 0) { if ((dying -= dt) <= 0) afterDeath(); return; }
@@ -303,6 +305,7 @@ function afterDeath() {
 
 /* ================= Dibujo ================= */
 function draw() {
+  if (GEM) return drawGem();
   if (M === 'muncher') drawMuncher(); else if (M === 'digger') drawDigger(); else drawIso();
   if (msgT > 0) { c.globalAlpha = Math.min(1, msgT * 2); banner(msg, (TOP + H) / 2 - 70, '#ffc928'); c.globalAlpha = 1; }
 }
@@ -573,3 +576,223 @@ function compass(open) {
   if (open) { c.beginPath(); c.moveTo(cx - 8, cy + 8); c.lineTo(cx - 8, cy - 4); c.arc(cx, cy - 4, 8, Math.PI, 0); c.lineTo(cx + 8, cy + 8); c.closePath(); ART.fillOut(c, '#1d6b4a', 1.8); c.fillStyle = '#7cf7a0'; c.fillRect(cx - 4, cy - 3, 8, 11); }
   else c.drawImage(keySprite(), cx - 11, cy - 6, 22, 12);
 }
+
+/* ================= MINA DE GEMAS (CFG.mode='gemas'): 1–4 mineros en una cueva a oscuras =================
+ * Cada minero lleva un farol (círculo de luz). Recoge gemas (1, 3 o 5), llévalas a la vagoneta del centro
+ * y deposítalas: solo puntúa lo depositado. Chocar con quien va cargado le hace soltar la mitad.
+ * A = destello del farol (ilumina toda la mina 1,2 s, con recarga). 90 s por partida y clasificación final. */
+var GP = [], GITEMS = [], GT = 0, gOver = 0, gMsg = '', gMsgT = 0, gCart = { x: 0, y: 0 }, gBoard = null, gWin = 0;
+var GN = 13, GS = 0, GBX = 0, GBY = 0, GTIME = 90, GBOT = 44;
+var GVAL = [{ v: 1, col: '#8fe1ff', r: 7 }, { v: 3, col: '#ff7fd0', r: 8.5 }, { v: 5, col: '#ffd24d', r: 10 }];
+try { gWin = Math.min(8, +localStorage.getItem('cpu:' + CFG.id) || 0); } catch (e) { /* sin almacenamiento */ }
+const gSkill = () => Math.min(0.8, 0.3 + gWin * 0.06);
+const gcx = (fx) => GBX + (fx + 0.5) * GS, gcy = (fy) => GBY + (fy + 0.5) * GS;
+function gSeats() { return k.party ? Math.max(1, Math.max.apply(null, k.party.map((q) => q.p)) + 1) : Math.min(2, k.mpMax || 1); }
+function gFree(x, y) { return inside(x, y) && g[y][x] === 0; }
+function buildGem() {
+  GN = 13; g = carve(GN, 16); N = GN;
+  GS = Math.floor(Math.min(W - 14, H - TOP - GBOT - 10) / GN);
+  GBX = Math.round((W - GN * GS) / 2); GBY = Math.round(TOP + (H - TOP - GBOT - GN * GS) / 2);
+  const cm = (GN - 1) / 2; // hueco central para la vagoneta
+  for (let y = cm - 1; y <= cm + 1; y++) for (let x = cm - 1; x <= cm + 1; x++) g[y][x] = 0;
+  gCart = { x: cm, y: cm };
+  gBoard = null;
+  const cor = [[1, 1], [GN - 2, GN - 2], [GN - 2, 1], [1, GN - 2]];
+  const seats = k.players(gSeats());
+  GP = seats.map((q, i) => { const [sx, sy] = cor[i % 4], e = ent(sx, sy, 4.2);
+    return Object.assign(e, { p: q.p, col: q.color, name: q.name, cpu: q.cpu, carry: 0, bank: 0, stun: 0, flash: 0, cd: 0, think: 0.3 + i * 0.1, hit: 0 }); });
+  GITEMS = []; spawnGems(22);
+}
+function spawnGems(n) {
+  const spots = [];
+  for (let y = 1; y < GN - 1; y++) for (let x = 1; x < GN - 1; x++) {
+    if (!gFree(x, y) || (Math.abs(x - gCart.x) <= 1 && Math.abs(y - gCart.y) <= 1)) continue;
+    if (GITEMS.some((q) => q.x === x && q.y === y) || GP.some((q) => q.sx === x && q.sy === y)) continue;
+    spots.push([x, y]);
+  }
+  k.shuffle(spots);
+  for (let i = 0; i < n && i < spots.length; i++) {
+    const r = Math.random(), t2 = r < 0.6 ? 0 : r < 0.88 ? 1 : 2;
+    GITEMS.push({ x: spots[i][0], y: spots[i][1], t: t2, ph: Math.random() * 6 });
+  }
+}
+function resetGem() { GT = GTIME; gOver = 0; gMsgT = 0; t = 0; score = 0; build(); }
+function gDrop(pl, amount, killer) {
+  let leftv = amount, guard = 0;
+  while (leftv > 0 && guard++ < 12) {
+    const t2 = leftv >= 5 ? 2 : leftv >= 3 ? 1 : 0, v = GVAL[t2].v;
+    const spots = DIRS.map((d) => [pl.x + D[d][0], pl.y + D[d][1]]).filter(([x, y]) => gFree(x, y));
+    const [sx, sy] = spots.length ? k.pick(spots) : [pl.x, pl.y];
+    GITEMS.push({ x: sx, y: sy, t: t2, ph: Math.random() * 6 }); leftv -= v;
+  }
+  k.burst(gcx(pl.fx), gcy(pl.fy), '#ffd24d', 12, 130);
+  if (killer && !killer.cpu) { gMsg = `${killer.name} asalta a ${pl.name}`; gMsgT = 1.4; }
+}
+function gPickCpu(pl) {
+  const pass = (x, y) => gFree(x, y);
+  if (pl.carry >= (3 + Math.round(gSkill() * 4)) || (GT < 12 && pl.carry > 0)) {
+    const dm = distMap(gCart.x, gCart.y, pass); return gStep(pl, dm);
+  }
+  let bestIt = null, bestD = 1e9;
+  const dm = distMap(pl.x, pl.y, pass);
+  for (const it of GITEMS) { const d = dm[it.x + ',' + it.y]; if (d === undefined) continue;
+    const sc = d - GVAL[it.t].v * gSkill() * 1.6; if (sc < bestD) { bestD = sc; bestIt = it; } }
+  if (!bestIt) { const dmc = distMap(gCart.x, gCart.y, pass); return gStep(pl, dmc); }
+  return gStep(pl, distMap(bestIt.x, bestIt.y, pass));
+}
+function gStep(pl, dm) {
+  const here = dm[pl.x + ',' + pl.y]; if (here === undefined) return k.pick(DIRS.filter((d) => gFree(pl.x + D[d][0], pl.y + D[d][1]))) || null;
+  const opts = DIRS.filter((d) => { const nx = pl.x + D[d][0], ny = pl.y + D[d][1]; return gFree(nx, ny) && dm[nx + ',' + ny] === here - 1; });
+  if (!opts.length) return k.pick(DIRS.filter((d) => gFree(pl.x + D[d][0], pl.y + D[d][1]))) || null;
+  return opts[0];
+}
+function gInput(pl) {
+  if (pl.stun > 0) return null;
+  if (pl.cpu) return gPickCpu(pl);
+  let d = DIRS.find((q) => k.pheld(pl.p, q));
+  if (!k.party && pl.p === 0 && !d) d = heldDir();
+  if (!d) return null;
+  return gFree(pl.x + D[d][0], pl.y + D[d][1]) ? d : null;
+}
+function updGem(dt) {
+  if (gOver > 0) { gOver -= dt; if (gOver <= 0) {
+      const top = GP.slice().sort((a, b) => b.bank - a.bank)[0];
+      if (top && !top.cpu) { gWin++; try { localStorage.setItem('cpu:' + CFG.id, gWin); } catch (e) { /* sin almacenamiento */ } }
+      k.podium(GP.map((q) => ({ p: q.p, score: q.bank })), { fmt: (v) => v + ' pt' }); } return; }
+  t += 0;
+  GT -= dt; if (gMsgT > 0) gMsgT -= dt;
+  for (const pl of GP) {
+    if (pl.stun > 0) { pl.stun -= dt; pl.dir = null; pl.fx = pl.px + (pl.x - pl.px) * pl.t; pl.fy = pl.py + (pl.y - pl.py) * pl.t; }
+    if (pl.flash > 0) pl.flash -= dt;
+    if (pl.cd > 0) pl.cd -= dt;
+    if (pl.hit > 0) pl.hit -= dt;
+    const wantA = pl.cpu ? (pl.cd <= 0 && Math.random() < 0.004) : k.phit(pl.p, 'a');
+    if (wantA && pl.cd <= 0) { pl.flash = 1.2; pl.cd = 8; k.sfx('coin'); }
+    stepEnt(pl, dt, gInput);
+    // recoger gemas
+    for (let i = GITEMS.length - 1; i >= 0; i--) { const it = GITEMS[i];
+      if (Math.abs(it.x - pl.fx) < 0.55 && Math.abs(it.y - pl.fy) < 0.55) {
+        pl.carry += GVAL[it.t].v; GITEMS.splice(i, 1); if (!pl.cpu) k.sfx('coin');
+        k.float('+' + GVAL[it.t].v, gcx(pl.fx), gcy(pl.fy) - 12, GVAL[it.t].col); } }
+    // depositar en la vagoneta
+    if (pl.carry > 0 && Math.abs(gCart.x - pl.fx) < 0.7 && Math.abs(gCart.y - pl.fy) < 0.7) {
+      pl.bank += pl.carry; k.float('+' + pl.carry, gcx(gCart.x), gcy(gCart.y) - 20, pl.col);
+      k.burst(gcx(gCart.x), gcy(gCart.y), pl.col, 10, 110); pl.carry = 0; if (!pl.cpu) k.sfx('win');
+    }
+  }
+  // choques: quien va cargado suelta la mitad
+  for (let i = 0; i < GP.length; i++) for (let j = i + 1; j < GP.length; j++) {
+    const a = GP[i], b = GP[j];
+    if (a.stun > 0 || b.stun > 0) continue;
+    if (Math.hypot(a.fx - b.fx, a.fy - b.fy) > 0.6) continue;
+    const rich = a.carry >= b.carry ? a : b, poor = rich === a ? b : a;
+    if (rich.carry <= 0) continue;
+    const loss = Math.max(1, Math.floor(rich.carry / 2));
+    rich.carry -= loss; rich.stun = 0.9; poor.hit = 0.3; gDrop(rich, loss, poor);
+    k.sfx('hit'); k.shake(4);
+  }
+  if (GITEMS.length < 8) spawnGems(10);
+  if (GT <= 0) { GT = 0; gOver = 1.2; k.sfx('win'); if (GP.some((q) => !q.cpu && q.bank >= 30)) k.confetti(); }
+}
+/* ---------- Dibujo de la mina ---------- */
+function gemBoard() {
+  if (gBoard) return gBoard;
+  return (gBoard = mkCv(W, H, (b) => {
+    for (let y = 0; y < GN; y++) for (let x = 0; x < GN; x++) {
+      const px = GBX + x * GS, py = GBY + y * GS;
+      if (g[y][x] === 0) { const sh = 0.5 + rnd(x * 7.3 + y * 3.1) * 0.5;
+        b.fillStyle = shade('#3a3050', -0.35 + sh * 0.25); b.fillRect(px, py, GS, GS);
+        b.fillStyle = 'rgba(255,255,255,.04)'; b.fillRect(px + 2, py + 2, GS - 4, 2);
+        for (let i = 0; i < 3; i++) { b.fillStyle = 'rgba(0,0,0,.16)'; b.fillRect(px + rnd(x + y * 3 + i) * (GS - 6) + 2, py + rnd(x * 2 + y + i * 5) * (GS - 6) + 2, 3, 3); } }
+      else { const sh = rnd(x * 2.7 + y * 5.9);
+        b.fillStyle = shade('#241d3c', -0.1 + sh * 0.35); b.fillRect(px, py, GS, GS);
+        b.strokeStyle = 'rgba(0,0,0,.45)'; b.lineWidth = 2; b.strokeRect(px + 1, py + 1, GS - 2, GS - 2);
+        b.fillStyle = 'rgba(255,255,255,.07)'; b.fillRect(px + 3, py + 3, GS - 6, 3); }
+    }
+  }));
+}
+function drawGemItem(it) {
+  const q = GVAL[it.t], x = gcx(it.x), y = gcy(it.y) + Math.sin(t * 2.4 + it.ph) * 2;
+  c.save(); c.translate(x, y);
+  c.beginPath(); c.moveTo(0, -q.r); c.lineTo(q.r * 0.8, -q.r * 0.2); c.lineTo(q.r * 0.5, q.r * 0.8); c.lineTo(-q.r * 0.5, q.r * 0.8); c.lineTo(-q.r * 0.8, -q.r * 0.2); c.closePath();
+  ART.fillOut(c, q.col, 2);
+  c.beginPath(); c.moveTo(0, -q.r); c.lineTo(q.r * 0.3, 0); c.lineTo(-q.r * 0.3, 0); c.closePath(); c.fillStyle = 'rgba(255,255,255,.5)'; c.fill();
+  c.restore();
+}
+function drawMinero(pl) {
+  const x = gcx(pl.fx), y = gcy(pl.fy), sq = pl.stun > 0 ? 1 : 0;
+  c.save(); c.translate(x, y);
+  if (sq) c.rotate(Math.sin(t * 28) * 0.18);
+  c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(0, 11, 10, 4, 0, 0, R2); c.fill();
+  c.beginPath(); ART.rr(c, -8, -4, 16, 15, 5); ART.fillOut(c, pl.col, 2.2);           // cuerpo
+  c.beginPath(); c.arc(0, -9, 7.5, 0, R2); ART.fillOut(c, '#f7d9b5', 2.2);            // cara
+  c.beginPath(); c.arc(-2.6, -9.5, 1.5, 0, R2); c.arc(2.6, -9.5, 1.5, 0, R2); c.fillStyle = OUT; c.fill();
+  c.beginPath(); ART.rr(c, -9, -19, 18, 8, 4); ART.fillOut(c, ART.dark(pl.col, 0.25), 2.2); // casco
+  c.beginPath(); c.arc(0, -19, 3.4, 0, R2); ART.fillOut(c, '#ffe89a', 1.8);           // linterna
+  if (pl.carry > 0) { c.font = '800 11px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    const w2 = c.measureText(pl.carry).width + 12; c.beginPath(); ART.rr(c, -w2 / 2, -34, w2, 14, 6); ART.fillOut(c, '#1a1530', 2);
+    c.fillStyle = '#ffd24d'; c.fillText(pl.carry, 0, -26.5); }
+  c.restore();
+}
+function drawCart() {
+  const x = gcx(gCart.x), y = gcy(gCart.y);
+  c.save(); c.translate(x, y);
+  c.fillStyle = 'rgba(0,0,0,.4)'; c.beginPath(); c.ellipse(0, 13, 20, 6, 0, 0, R2); c.fill();
+  c.beginPath(); ART.rr(c, -18, -12, 36, 22, 4); ART.fillOut(c, '#6b4a2e', 2.4);
+  c.beginPath(); ART.rr(c, -14, -14, 28, 7, 3); ART.fillOut(c, '#ffd24d', 2);
+  [-10, 10].forEach((dx) => { c.beginPath(); c.arc(dx, 11, 5, 0, R2); ART.fillOut(c, '#2b2340', 2); });
+  c.restore();
+}
+function gFit(s, max, size, min) {
+  let sz = size;
+  for (; sz > (min || 8); sz--) { c.font = `800 ${sz}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; if (c.measureText(s).width <= max) return [s, sz]; }
+  let out = s; while (out.length > 1) { out = out.slice(0, -1); if (c.measureText(out + '…').width <= max) return [out + '…', sz]; }
+  return [out, sz];
+}
+function drawGem() {
+  c.fillStyle = '#07060f'; c.fillRect(0, 0, W, H);
+  c.drawImage(gemBoard(), 0, 0, W, H);
+  GITEMS.forEach(drawGemItem);
+  drawCart();
+  GP.forEach(drawMinero);
+  // oscuridad: se recorta el farol de cada minero
+  const full = GP.some((q) => q.flash > 0);
+  c.save(); c.beginPath(); c.rect(0, TOP, W, H - TOP - GBOT); c.clip();
+  c.globalCompositeOperation = 'source-over';
+  const dark = c.createLinearGradient(0, 0, 0, 1); // relleno plano
+  c.fillStyle = full ? 'rgba(6,4,14,.18)' : 'rgba(6,4,14,.86)'; c.fillRect(0, TOP, W, H - TOP - GBOT);
+  if (!full) { c.globalCompositeOperation = 'destination-out';
+    for (const pl of GP) { const r = GS * 2.6 + Math.sin(t * 3 + pl.p) * 3, x = gcx(pl.fx), y = gcy(pl.fy);
+      const gr = c.createRadialGradient(x, y, r * 0.25, x, y, r); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.65, 'rgba(0,0,0,.8)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = gr; c.beginPath(); c.arc(x, y, r, 0, R2); c.fill(); }
+    const cr = GS * 1.5, cx2 = gcx(gCart.x), cy2 = gcy(gCart.y);
+    const g2 = c.createRadialGradient(cx2, cy2, cr * 0.2, cx2, cy2, cr); g2.addColorStop(0, 'rgba(0,0,0,.85)'); g2.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = g2; c.beginPath(); c.arc(cx2, cy2, cr, 0, R2); c.fill(); }
+  c.restore(); c.globalCompositeOperation = 'source-over';
+  if (dark) { /* nada: variable auxiliar */ }
+  hudGem();
+  if (gMsgT > 0) { c.globalAlpha = Math.min(1, gMsgT * 3); banner(gMsg, TOP + 18, '#ffd24d'); c.globalAlpha = 1; }
+}
+function hudGem() {
+  c.fillStyle = '#0c0a20'; c.fillRect(0, 0, W, TOP); c.fillRect(0, H - GBOT, W, GBOT);
+  c.fillStyle = 'rgba(255,255,255,.08)'; c.fillRect(0, TOP - 2, W, 2); c.fillRect(0, H - GBOT, W, 2);
+  // reloj centrado con medida real
+  const ts = Math.max(0, Math.ceil(GT)), tx = `${Math.floor(ts / 60)}:${String(ts % 60).padStart(2, '0')}`;
+  label(tx, W / 2, 9, 22, GT < 15 ? '#ff7b7b' : '#fff', 'center');
+  const n = Math.max(1, GP.length), cw = W / n;
+  GP.forEach((pl, i) => {
+    const x = i * cw + 8, inner = cw - 16, y = H - GBOT + 7;
+    c.fillStyle = pl.col; ART.rr(c, x, y + 1, 9, 9, 3); c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
+    const [nm, ns] = gFit(String(pl.name), inner - 14, 12, 8);
+    label(nm, x + 14, y, ns, '#fff');
+    const [sc, ss] = gFit(`${pl.bank} pt`, inner * 0.6, 15, 10);
+    label(sc, x, y + 16, ss, pl.col);
+    if (pl.carry > 0) { const [cy3, cs] = gFit(`+${pl.carry}`, inner * 0.35, 13, 9); label(cy3, x + inner - c.measureText(cy3).width, y + 17, cs, '#ffd24d'); }
+    if (pl.cd > 0) { c.fillStyle = 'rgba(255,255,255,.18)'; c.fillRect(x, y + 33, inner, 3);
+      c.fillStyle = '#8fe1ff'; c.fillRect(x, y + 33, inner * (1 - pl.cd / 8), 3); }
+    else { c.fillStyle = '#ffe89a'; c.fillRect(x, y + 33, inner, 3); }
+  });
+}
+if (GEM) k.onParty = () => { if (k.st === 'play' && GP.length === gSeats()) { const seats = k.players(gSeats());
+    seats.forEach((q, i) => { if (GP[i]) { GP[i].cpu = q.cpu; GP[i].name = q.name; GP[i].col = q.color; } }); } else resetGem(); };
+if (GEM) resetGem(); // el estado de la mina se crea tras declarar sus variables

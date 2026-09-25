@@ -1,6 +1,11 @@
-/* Acción cenital con arte propio (ART). CFG.mode: 'dungeon' | 'crypt' | 'arena' | 'zombie' | 'brawl' | 'tank' | 'bounce' | 'coop'
+/* Acción cenital con arte propio (ART). CFG.mode: 'dungeon' | 'crypt' | 'arena' | 'zombie' | 'brawl' | 'tank' | 'bounce' | 'coop' | 'castillo' | 'horda'
  * 'bounce': arena 1–4 por rondas, balas que rebotan 3 veces (tu propia bala te alcanza tras el primer rebote), una vida por ronda.
  * 'coop': mazmorra cooperativa 1–4 con clases, botín compartido y revivir al compañero caído quedándote a su lado.
+ * 'castillo': el mismo motor cooperativo, pero la puerta de cada sala pide dos placas de presión pisadas a la vez; una está
+ *   dentro de una alcoba con reja que solo se levanta mientras alguien pisa la otra, así que hay que repartirse (con un solo
+ *   humano, el compañero CPU se coloca en la placa libre).
+ * 'horda': asedio en un solo patio; los zombis entran por los bordes en oleadas cada vez mayores y entre oleada y oleada el
+ *   equipo elige una mejora, sin puerta ni salas.
  * Salas con obstáculos en perspectiva 3/4, enemigos con IA propia, aviso antes de cada aparición,
  * botín (monedas y corazones), jefe cada 5 salas y una mejora a elegir entre tres al superar cada sala. */
 const M = CFG.mode, land = CFG.land !== false, OUT = ART.OUT, R2 = 6.2832;
@@ -13,10 +18,14 @@ const TH = {
   brawl:   { f1: '#a06e46', f2: '#976740', grout: '#6e4a2e', edge: '#3e2a1e', top: '#c9a27a', face: '#7e5236', wall: 'panel', block: 'crate', light: 'lantern', foes: ['thug', 'thug', 'brute'], boss: 'brute', plank: true, label: 'Oleada', vig: 0.4 },
   bounce:  { f1: '#39436e', f2: '#343e67', grout: '#262d52', edge: '#161a31', top: '#aab4de', face: '#5a6494', wall: 'panel', block: 'steel', light: 'lamp', foes: ['tank'], boss: 'tank', label: 'Ronda', vig: 0.45 },
   coop:    { f1: '#52506a', f2: '#4b4963', grout: '#36344b', edge: '#211f33', top: '#9690b4', face: '#5d5780', wall: 'brick', block: 'brick', light: 'torch', foes: ['bat', 'skel', 'eye', 'slime', 'ghost'], boss: 'eye', door: true, label: 'Sala', shot: '#7df0ff', vig: 0.5 },
+  castillo:{ f1: '#5a5470', f2: '#524c68', grout: '#3a3550', edge: '#1e1b2e', top: '#a79fc4', face: '#63597f', wall: 'brick', block: 'brick', light: 'torch', foes: ['skel', 'bat', 'ghost', 'eye'], boss: 'skel', door: true, label: 'Sala', shot: '#7df0ff', vig: 0.55 },
+  horda:   { f1: '#74654f', f2: '#6d5f4a', edge: '#332b22', top: '#c98a4b', face: '#8a5a33', wall: 'fence', block: 'crate', light: 'lamp', foes: ['zombie', 'zombie', 'zombie', 'brute'], boss: 'brute', dirt: true, label: 'Oleada', shot: '#ffd23d', vig: 0.5 },
   tank:    { f1: '#93b05e', f2: '#8ba757', edge: '#4f6330', top: '#d6cc9f', face: '#a89d70', wall: 'sand', block: 'sand', foes: ['tank'], boss: 'tank', grass: true, label: 'Batalla', vig: 0.3 },
 }[M];
 const k = Kit({ w: W, h: H, title: CFG.title, bg: TH.edge }), c = k.ctx;
-const melee = M === 'crypt' || M === 'brawl', tankM = M === 'tank', BOUNCE = M === 'bounce', COOP = M === 'coop';
+const CASTLE = M === 'castillo', HORDE = M === 'horda';
+const melee = M === 'crypt' || M === 'brawl', tankM = M === 'tank', BOUNCE = M === 'bounce', COOP = M === 'coop' || CASTLE || HORDE;
+const ZQ = M === 'zombie' || HORDE; /* oleadas que entran por los bordes */
 let hpMul = 1; /* coop: la vida de los enemigos escala con el nº de jugadores */
 /* radio, vida, velocidad, puntos */
 const FOE = { bat: [10, 2, 92, 15], eye: [12, 3, 50, 25], skel: [11, 3, 62, 20], ghost: [12, 2, 46, 25], slime: [16, 3, 56, 20], mini: [9, 1, 95, 10], zombie: [11, 2, 42, 15], brute: [17, 6, 36, 50], thug: [13, 3, 74, 20], tank: [15, 3, 58, 60] };
@@ -35,7 +44,7 @@ const UP = {
 let p, foes, shots, eshots, walls, pend, drops, room, score, t, cool, upg, msgT, msg, swing, quota, spawnT, cleared, clearT, door, choice, floorCv, vigCv, bossF, kills;
 
 /* ---------- Utilidades ---------- */
-const wallAt = (x, y, r) => walls.find((w) => x + r > w.x && x - r < w.x + w.w && y + r > w.y && y - r < w.y + w.h);
+const wallAt = (x, y, r) => walls.find((w) => !w.open && x + r > w.x && x - r < w.x + w.w && y + r > w.y && y - r < w.y + w.h);
 const rectHit = (x, y, r, ghost) => x - r < X0 || y - r < Y0 || x + r > X1 || y + r > Y1 || (!ghost && !!wallAt(x, y, r));
 function move(o, dx, dy, ghost) { if (!rectHit(o.x + dx, o.y, o.r, ghost)) o.x += dx; if (!rectHit(o.x, o.y + dy, o.r, ghost)) o.y += dy; }
 const angDiff = (a, b) => Math.abs(((a - b + 3 * Math.PI) % R2) - Math.PI);
@@ -50,7 +59,7 @@ function place(minD, edge) {
 /* Curva de dificultad: 0 en la sala 1 → 1 hacia la sala 9 (suavizada). Velocidad, cadencia y balas enemigas escalan con ella. */
 const ramp = () => { const d = Math.min(1, (room - 1) / 12); return d * d * (3 - 2 * d); };
 const spK = () => 0.56 + 0.29 * ramp(), cdK = () => (1.6 - 0.6 * ramp()) / 0.75, bK = () => 0.64 + 0.16 * ramp(); // 1.23: más fácil (vel. ×0,8/×0,85, cadencia −25 %, balas −20 %)
-function pickType() { const f = TH.foes; if (M === 'zombie' && Math.random() < room * 0.02) return 'brute'; return k.pick(f); }
+function pickType() { const f = TH.foes; if (ZQ && Math.random() < room * 0.02) return 'brute'; return k.pick(f); }
 function addFoe(type, x, y, boss) {
   const b = FOE[type], sc = 1 + (room - 1) * 0.12;
   const f = { type, x, y, r: b[0] * (boss ? 2.1 : 1), hp: Math.round(b[1] * sc * (boss ? 8 : 1) * hpMul), sp: b[2] * (boss ? 0.7 : 1) * spK(), pts: b[3] * (boss ? 10 : 1), cd: k.rnd(0.9, 2) * cdK(), cd2: 1.5, a: 0, body: 0, kx: 0, ky: 0, fl: 0, ph: Math.random() * 6, boss, dash: 0, warn: 0, face: 1 };
@@ -61,16 +70,16 @@ function buildRoom() {
   room++; walls = []; foes = []; shots = []; eshots = []; pend = []; drops = []; cleared = false; door = false; bossF = null; floorCv = null; clearT = 0;
   const isBoss = room % 5 === 0, nb = isBoss ? 2 : M === 'brawl' ? k.ri(0, 2) : M === 'arena' ? k.ri(1, 3) : k.ri(3, 6);
   for (let i = 0, tries = 0; i < nb && tries < 120; tries++) {
-    const round = TH.block === 'rock', w = round ? k.pick([40, 50]) : k.pick(tankM || M === 'zombie' ? [30, 60, 90] : [40, 40, 80, 120]), h = round ? w : k.pick([30, 40, 60]);
+    const round = TH.block === 'rock', w = round ? k.pick([40, 50]) : k.pick(tankM || ZQ ? [30, 60, 90] : [40, 40, 80, 120]), h = round ? w : k.pick([30, 40, 60]);
     const x = Math.round(k.rnd(X0 + 50, X1 - 50 - w) / 10) * 10, y = Math.round(k.rnd(Y0 + 40, Y1 - 30 - h) / 10) * 10;
     if (walls.some((q) => x < q.x + q.w + 44 && x + w + 44 > q.x && y < q.y + q.h + 44 && y + h + 44 > q.y)) continue;
     if (x < p.x + 70 && x + w > p.x - 70 && y < p.y + 70 && y + h > p.y - 70) continue;
     if (TH.door && x + w > X1 - 80 && y < H / 2 + 56 && y + h > H / 2 - 56) continue;
-    walls.push({ x, y, w, h, hp: (TH.block === 'crate' && M === 'zombie') || (tankM && Math.random() < 0.5) ? 4 : 0, fl: 0, seed: Math.random() }); i++;
+    walls.push({ x, y, w, h, hp: (TH.block === 'crate' && ZQ) || (tankM && Math.random() < 0.5) ? 4 : 0, fl: 0, seed: Math.random() }); i++;
   }
   quota = 0;
-  if (isBoss) { queue(TH.boss, true); if (M === 'zombie') quota = 6; }
-  else if (M === 'zombie') { quota = 5 + room * 3; spawnT = 2.5; }
+  if (isBoss) { queue(TH.boss, true); if (ZQ) quota = 6; }
+  else if (ZQ) { quota = 5 + room * 3; spawnT = 2.5; }
   else { const n = tankM ? Math.min(4, 1 + Math.ceil((room - 1) / 2)) : M === 'arena' ? Math.min(8, 2 + Math.round((room - 1) * 0.8)) : Math.min(11, 3 + Math.round((room - 1) * 1.1)); for (let i = 0; i < n; i++) queue(pickType()); }
   msg = `${TH.label} ${room}${isBoss ? ' · Jefe' : ''}`; msgT = 1.8;
 }
@@ -291,6 +300,31 @@ const CLS = {
 };
 const CK = ['knight', 'archer', 'mage', 'cleric'];
 let HE = [], lobby = null, fxs = [];
+/* 'castillo': placas de presión. plates[0] está dentro de la alcoba, plates[1] fuera y su peso levanta la reja. */
+let plates = [], gate = null, unlocked = false, ALC = null;
+const inAlcove = (x, y, m) => !!ALC && x > ALC.x - m && x < ALC.x + ALC.w + m && y > ALC.y - m && y < ALC.y + ALC.h + m;
+function castleSetup() {
+  plates = []; gate = null; unlocked = false; ALC = null;
+  if (room % 5 === 0) return; // sala de jefe: sin placas
+  const IW = 62, IH = 54, TW = 12, ax = X0 + 46, ay = Math.random() < 0.5 ? Y0 + 26 : Y1 - 26 - IH;
+  ALC = { x: ax, y: ay, w: IW, h: IH };
+  walls = walls.filter((w) => !(w.x < ax + IW + 30 && w.x + w.w > ax - 30 && w.y < ay + IH + 30 && w.y + w.h > ay - 30));
+  const push = (x, y, w, h, extra) => { const o = { x, y, w, h, hp: 0, fl: 0, seed: Math.random() }; if (extra) Object.assign(o, extra); walls.push(o); return o; };
+  push(ax - TW, ay - TW, IW + TW * 2, TW); push(ax - TW, ay + IH, IW + TW * 2, TW); push(ax - TW, ay, TW, IH);
+  gate = push(ax + IW, ay, TW, IH, { gate: 1, open: false });
+  plates.push({ x: ax + IW / 2, y: ay + IH / 2, on: false, inn: 1 });
+  let px = X1 - 90, py = H / 2;
+  for (let i = 0; i < 40; i++) { const [a, b] = place(90); if (!inAlcove(a, b, 60) && a > ax + IW + 70) { px = a; py = b; break; } }
+  plates.push({ x: px, y: py, on: false, inn: 0 });
+  for (const q of pend) if (inAlcove(q.x, q.y, 24)) { for (let i = 0; i < 30; i++) { const [a, b] = place(60); if (!inAlcove(a, b, 24)) { q.x = a; q.y = b; break; } } }
+}
+function plateFor(h) { // placa a la que se dirige una CPU: la libre, empezando por la de fuera
+  if (!plates.length || unlocked) return null;
+  const mine = plates.find((q) => Math.hypot(h.x - q.x, h.y - q.y) < 24); if (mine) return mine;
+  const free = plates.filter((q) => !HE.some((o) => o !== h && !o.down && Math.hypot(o.x - q.x, o.y - q.y) < 30));
+  const out = free.find((q) => !q.inn); if (out) return out;
+  return free.find((q) => q.inn && (gate ? gate.open : true)) || null;
+}
 function mkHero(q, cls) { return { pl: q.p, col: q.color, name: q.cpu ? 'CPU' : q.name, cpu: q.cpu, cls, x: X0 + 40, y: H / 2, r: 11, hp: CLS[cls].hp, max: CLS[cls].hp, inv: 0, kx: 0, ky: 0, mv: false, face: 1, a: 0, aim: 0, cool: 0, sk: 2, roll: 0, rollCd: 0, down: false, rev: 0, swing: 0, swingA: 0, ai: null, ph: Math.random() * 6 }; }
 function coopReset() {
   VS = null; room = 0; score = 0; t = 0; kills = 0; choice = null; fxs = []; hpMul = 1; upg = { rate: 1, dmg: 1, speed: 1, multi: 1, pierce: 0, reach: 1 };
@@ -309,10 +343,13 @@ function coopParty() {
 }
 function formation() { const n = HE.length; HE.forEach((h, i) => { h.x = X0 + 36 + (i % 2) * 18; h.y = H / 2 + (i - (n - 1) / 2) * 30; h.kx = h.ky = 0; }); }
 function coopRoom() {
-  TH.boss = (room + 1) % 10 === 0 ? 'skel' : 'eye'; p = { x: X0 + 40, y: H / 2, r: 11 };
+  TH.boss = HORDE ? 'brute' : CASTLE ? ((room + 1) % 10 === 0 ? 'eye' : 'skel') : (room + 1) % 10 === 0 ? 'skel' : 'eye';
+  p = { x: X0 + 40, y: H / 2, r: 11 };
   buildRoom(); const n = HE.length;
-  if (room % 5 === 0) { for (let i = 1; i < n; i++) queue(k.pick(['bat', 'skel'])); }
+  if (room % 5 === 0) { for (let i = 1; i < n; i++) queue(k.pick(TH.foes)); }
   else { const extra = Math.round(pend.length * 0.6 * (n - 1)); for (let i = 0; i < extra; i++) queue(pickType()); }
+  if (quota > 0) quota = Math.round(quota * (1 + 0.45 * (n - 1)));
+  if (CASTLE) castleSetup();
   formation();
 }
 function coopStart() { hpMul = 1 + 0.35 * (HE.length - 1); HE.forEach((h) => { const C = CLS[h.cls]; h.hp = h.max = C.hp; h.sk = 2; }); lobby = null; coopRoom(); k.count(3); }
@@ -353,6 +390,8 @@ function heroCpu(h, dt) {
   const [nf, nd] = nearFoe(h.x, h.y), lead = HE.find((o) => !o.cpu && !o.down) || HE.find((o) => !o.down && o !== h);
   let mx = 0, my = 0, sk = false, roll = false;
   for (const s of eshots) { const rx = h.x - s.x, ry = h.y - s.y, sp = Math.hypot(s.vx, s.vy) || 1, tt = (rx * s.vx + ry * s.vy) / (sp * sp); if (tt < 0 || tt > 0.5) continue; const ex = s.x + s.vx * tt - h.x, ey = s.y + s.vy * tt - h.y; if (Math.hypot(ex, ey) < 22) { const nx = -s.vy / sp, ny = s.vx / sp, sd = ex * nx + ey * ny > 0 ? -1 : 1; return [nx * sd, ny * sd, false, h.rollCd <= 0 && Math.random() < 0.04]; } }
+  if (CASTLE && cleared && !unlocked && plates.length) { const tg = plateFor(h);
+    if (tg) { const dx = tg.x - h.x, dy = tg.y - h.y, d = Math.hypot(dx, dy); return d > 9 ? [dx / d, dy / d, false, false] : [0, 0, false, false]; } }
   const dn = HE.filter((o) => o.down).sort((a, b) => Math.hypot(a.x - h.x, a.y - h.y) - Math.hypot(b.x - h.x, b.y - h.y))[0];
   if (dn && (nd > 60 || !nf) && Math.hypot(dn.x - h.x, dn.y - h.y) < 400) { const dx = dn.x - h.x, dy = dn.y - h.y, d = Math.hypot(dx, dy); if (d > 16) { mx = dx / d; my = dy / d; } if (h.cls === 'cleric' && h.sk <= 0 && d < 110) sk = true; return [mx, my, sk, false]; }
   if (nf) {
@@ -389,6 +428,7 @@ function coopUpdate(dt) {
   for (const w of walls) w.fl -= dt;
   for (const q of pend) { q.t -= dt; if (q.t <= 0) { q.done = 1; addFoe(q.type, q.x, q.y, q.boss); k.burst(q.x, q.y, '#b98cff', 10, 120); } }
   pend = pend.filter((q) => !q.done);
+  if (quota > 0) { spawnT -= dt; if (spawnT <= 0 && foes.length + pend.length < (8 + room * 2) * HE.length) { spawnT = Math.max(0.5, 2.1 - room * 0.12) / Math.max(1, HE.length * 0.6); quota--; queue(pickType(), false, true); } }
   /* héroes */
   for (const h of HE) {
     h.inv -= dt; h.cool -= dt; h.sk -= dt; h.swing -= dt; h.rollCd -= dt;
@@ -463,8 +503,17 @@ function coopUpdate(dt) {
     if (dd < 19) { dr.got = true; if (dr.k === 'coin') { score += dr.v; k.sfx('coin'); k.float(`+${dr.v}`, dr.x, dr.y - 10, '#ffc928'); } else { tg.hp = Math.min(tg.max, tg.hp + 1); k.sfx('pop'); k.float('+1', dr.x, dr.y - 10, '#ff5f7a'); } }
   }
   drops = drops.filter((dr) => !dr.got && (dr.t > 0 || cleared));
+  if (CASTLE && plates.length) {
+    for (const q of plates) { const on = liveH.some((h) => Math.hypot(h.x - q.x, h.y - q.y) < 22); if (on !== q.on) k.sfx(on ? 'click' : 'pop'); q.on = on; }
+    if (gate) gate.open = unlocked || plates[1].on;
+    if (!unlocked && cleared && plates.every((q) => q.on)) { unlocked = true; door = true; if (gate) gate.open = true; k.sfx('win'); k.flash('rgba(255,201,40,.22)'); msg = '¡Puerta abierta!'; msgT = 1.8; }
+  }
   if (!liveH.length) { k.burst(W / 2, H / 2, '#ff5f7a', 30, 240); return k.lose(CFG.id, score, 'Equipo derrotado', `${TH.label} ${room} · ${kills} bajas · ${HE.length} héroes`); }
-  if (!cleared && !foes.length && !pend.length) { cleared = true; clearT = 0; score += 50 * room * HE.length; k.sfx('win'); door = true; msg = 'Sala despejada: salid por la puerta'; msgT = 2; }
+  if (!cleared && !foes.length && !pend.length && quota <= 0) { cleared = true; clearT = 0; score += 50 * room * HE.length; k.sfx('win');
+    if (CASTLE && plates.length) { msg = 'Pisad las dos placas a la vez'; msgT = 2.6; }
+    else if (!TH.door) { msg = `¡${TH.label} superada!`; msgT = 1.4; }
+    else { door = true; msg = 'Sala despejada: salid por la puerta'; msgT = 2; } }
+  if (cleared && !TH.door) { clearT += dt; if (clearT > 1.3) return coopChoice(); }
   if (door && liveH.some((h) => h.x > X1 - 22 && Math.abs(h.y - H / 2) < 36)) coopChoice(); /* los caídos se levantan con 1 corazón en la sala siguiente */
 }
 const CLSI = { knight: 'dmg', archer: 'multi', mage: 'rate', cleric: 'heal' };
@@ -491,6 +540,21 @@ function coopHero(h) {
   heroSprite(h, h.x, h.y, 0.72);
   label(h.cpu ? 'CPU' : h.name, h.x, h.y - 40, 13, h.cpu ? '#e8e4f4' : h.col, 'center');
 }
+function drawPlate(q) {
+  const on = q.on, r = 19;
+  c.beginPath(); c.ellipse(q.x, q.y + 3, r + 2, (r + 2) * 0.6, 0, 0, R2); c.fillStyle = 'rgba(0,0,0,.3)'; c.fill();
+  c.beginPath(); c.ellipse(q.x, q.y + (on ? 2 : 0), r, r * 0.6, 0, 0, R2); ART.fillOut(c, on ? '#7cf7a0' : '#8f88ad', 2.5);
+  c.beginPath(); c.ellipse(q.x, q.y + (on ? 2 : 0), r * 0.6, r * 0.36, 0, 0, R2); c.strokeStyle = on ? '#1a1530' : 'rgba(26,21,48,.55)'; c.lineWidth = 2; c.stroke();
+  if (!on) { c.globalAlpha = 0.45 + Math.sin(t * 5) * 0.2; c.strokeStyle = '#ffc928'; c.lineWidth = 2.5; c.beginPath(); c.ellipse(q.x, q.y, r + 5, (r + 5) * 0.6, 0, 0, R2); c.stroke(); c.globalAlpha = 1; }
+}
+function drawGate(w) {
+  const x = w.x, y = w.y, hh = w.h, op = w.open;
+  c.fillStyle = 'rgba(0,0,0,.3)'; c.fillRect(x + 4, y + 5, w.w, hh);
+  c.fillStyle = op ? 'rgba(26,21,48,.35)' : '#2b2440'; c.fillRect(x, y, w.w, hh);
+  c.strokeStyle = OUT; c.lineWidth = 2.5; c.strokeRect(x + 1, y + 1, w.w - 2, hh - 2);
+  c.strokeStyle = op ? 'rgba(200,190,230,.35)' : '#c9c2e6'; c.lineWidth = 3;
+  const n = op ? 2 : 5; for (let i = 0; i < n; i++) { const yy = y + 5 + i * ((hh - 10) / Math.max(1, n - 1)) * (op ? 0.25 : 1); c.beginPath(); c.moveTo(x + 2, yy); c.lineTo(x + w.w - 2, yy); c.stroke(); }
+}
 function coopDraw() {
   if (!floorCv) floorCv = renderFloor(); if (!vigCv) vigCv = renderVig();
   c.drawImage(floorCv, 0, 0, W, H); lights();
@@ -511,7 +575,8 @@ function coopDraw() {
     return;
   }
   drawDoor();
-  for (const w of [...walls].sort((a, b) => a.y + a.h - b.y - b.h)) block(w);
+  if (CASTLE) for (const q of plates) drawPlate(q);
+  for (const w of [...walls].sort((a, b) => a.y + a.h - b.y - b.h)) { if (w.gate) drawGate(w); else block(w); }
   for (const q of pend) { const k2 = 1 - q.t / Math.max(q.max, 0.9); c.save(); c.translate(q.x, q.y); c.rotate(t * 4); c.globalAlpha = 0.35 + k2 * 0.5; c.strokeStyle = q.boss ? '#ff3b5c' : '#b98cff'; c.lineWidth = 3; c.setLineDash([6, 6]); c.beginPath(); c.arc(0, 0, (q.boss ? 30 : 16) * (0.5 + k2 * 0.5), 0, R2); c.stroke(); c.setLineDash([]); c.restore(); c.globalAlpha = 1; }
   for (const d of drops) { if (d.t < 2 && Math.floor(d.t * 8) % 2) continue; if (d.k === 'coin') ART.coin(c, d.x, d.y, t, 7); else ART.heart(c, d.x, d.y + Math.sin(t * 4) * 2, 1.1, true); }
   const ents = foes.map((f) => ({ y: f.y, f })).concat(HE.map((h) => ({ y: h.y, h }))).sort((a, b) => a.y - b.y);

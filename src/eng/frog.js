@@ -1,5 +1,6 @@
 /* Frog Crossing — cruza la carretera y el río hasta las 5 charcas. Arte vectorial propio (ART).
  * Coches, camiones y bólidos por carril; troncos y tortugas (algunas se sumergen); mosca de bonificación. */
+const MODE = CFG.mode || 'clasico', INF = MODE === 'infinito'; /* 'infinito': filas sin fin para 1–4 jugadores */
 const W = 416, H = 480, S = 32, TOP = 64, OUT = ART.OUT, R2 = 6.2832, P = 640, LO = -180, JT = 0.13;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#101b2e' }), c = k.ctx;
 let f, lanes, homes, score, lives, level, timer, best, fly, t = 0, clearT = 0;
@@ -30,10 +31,10 @@ function build() {
   homes = [0, 1, 2, 3, 4].map((i) => ({ x: 36 + i * 88, filled: false, pop: 0 })); fly = { i: -1, t: 3 }; place();
 }
 function place() { f = { x: 6 * S, y: 12, fx: 6 * S, fy: 12, jt: 0, dir: 0, q: null, dead: 0, kind: '', land: 0 }; timer = 45; best = 12; }
-function reset() { score = 0; lives = 4; level = 1; build(); }
+function reset() { if (INF) return resetInf(); score = 0; lives = 4; level = 1; build(); }
 /* profundidad de una tortuga que bucea (0 = a flote, 1 = sumergida) */
 function depth(it) { if (!it.dive) return 0; const q = (t + it.ph) % 5; return q < 3.2 ? 0 : q < 3.8 ? (q - 3.2) / 0.6 : q < 4.5 ? 1 : 1 - (q - 4.5) / 0.5; }
-reset(); k.show(CFG.title, 'Cruza la carretera y el río hasta las 5 charcas. Sube a troncos y tortugas (¡algunas bucean!). Atrapa la mosca para ganar puntos extra. Desliza, toca o usa las flechas.');
+if (!INF) reset(); k.show(CFG.title, INF ? (CFG.help || 'Cruza sin parar: la pantalla sube sola y quien se queda atrás cae.') : 'Cruza la carretera y el río hasta las 5 charcas. Sube a troncos y tortugas (¡algunas bucean!). Atrapa la mosca para ganar puntos extra. Desliza, toca o usa las flechas.');
 
 function die(kind) {
   if (f.dead) return; f.dead = 0.9; f.kind = kind; lives--; const cx = f.x + S / 2, cy = rowY(f.y) + S / 2;
@@ -48,6 +49,7 @@ function jump(d) {
 }
 k.run((dt) => {
   if (!k.gate(reset)) return;
+  if (INF) { t += dt; return updInf(dt); }
   t += dt; clearT = Math.max(0, clearT - dt);
   for (const r in lanes) { const L = lanes[r]; for (const it of L.items) { it.x += L.dir * L.sp * dt; if (it.x >= LO + P) it.x -= P; else if (it.x < LO) it.x += P; } }
   for (const h of homes) h.pop = Math.max(0, h.pop - dt * 3);
@@ -146,21 +148,23 @@ function turtle(x, y, dp, dir, ph) {
   c.strokeStyle = 'rgba(26,21,48,.45)'; c.lineWidth = 1.3; c.beginPath(); c.moveTo(-4, -4); c.lineTo(6, -4); c.lineTo(6, 4); c.lineTo(-4, 4); c.closePath(); c.moveTo(-4, -4); c.lineTo(-9, -6); c.moveTo(6, -4); c.lineTo(10, -6); c.moveTo(-4, 4); c.lineTo(-9, 6); c.moveTo(6, 4); c.lineTo(10, 6); c.stroke();
   c.fillStyle = 'rgba(255,255,255,.3)'; c.beginPath(); c.ellipse(-1, -5, 5, 2, 0, 0, R2); c.fill(); c.restore();
 }
-function frog(x, y, dir, sc, sx, sy, jumpP, alpha) {
+function frog(x, y, dir, sc, sx, sy, jumpP, alpha, cl) {
   c.save(); c.translate(x, y); c.rotate(dir * Math.PI / 2); c.scale(sc * sx, sc * sy); c.globalAlpha = alpha;
-  const ext = jumpP > 0 ? Math.sin(jumpP * Math.PI) : 0, col = '#5ccf5a';
+  const ext = jumpP > 0 ? Math.sin(jumpP * Math.PI) : 0, col = cl || '#5ccf5a';
+  const leg = ART.dark(col, 0.18), spot = ART.dark(col, 0.3);
   [-1, 1].forEach((sd) => { // patas traseras (se estiran al saltar) y delanteras
-    c.beginPath(); c.ellipse(sd * 9, 6 + ext * 7, 4, 6 + ext * 4, sd * (0.5 - ext * 0.4), 0, R2); ART.fillOut(c, '#46b04a', 2);
-    c.beginPath(); c.ellipse(sd * 11, 11 + ext * 10, 4, 2.5, 0, 0, R2); ART.fillOut(c, '#46b04a', 1.5);
-    c.beginPath(); c.ellipse(sd * 8, -7 - ext * 3, 3, 4, sd * -0.5, 0, R2); ART.fillOut(c, '#46b04a', 1.5);
+    c.beginPath(); c.ellipse(sd * 9, 6 + ext * 7, 4, 6 + ext * 4, sd * (0.5 - ext * 0.4), 0, R2); ART.fillOut(c, leg, 2);
+    c.beginPath(); c.ellipse(sd * 11, 11 + ext * 10, 4, 2.5, 0, 0, R2); ART.fillOut(c, leg, 1.5);
+    c.beginPath(); c.ellipse(sd * 8, -7 - ext * 3, 3, 4, sd * -0.5, 0, R2); ART.fillOut(c, leg, 1.5);
   });
   c.beginPath(); c.ellipse(0, 1, 10, 12, 0, 0, R2); ART.fillOut(c, col, 2.5);
-  c.fillStyle = '#3f9f45'; [[-4, 5, 2.2], [4, 7, 1.8], [1, 1, 1.6]].forEach(([a, b, r]) => { c.beginPath(); c.arc(a, b, r, 0, R2); c.fill(); });
+  c.fillStyle = spot; [[-4, 5, 2.2], [4, 7, 1.8], [1, 1, 1.6]].forEach(([a, b, r]) => { c.beginPath(); c.arc(a, b, r, 0, R2); c.fill(); });
   c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.ellipse(-4, -2, 3, 6, 0.3, 0, R2); c.fill();
   [-1, 1].forEach((sd) => { c.beginPath(); c.arc(sd * 5, -9, 4.5, 0, R2); ART.fillOut(c, '#fff', 2); c.fillStyle = OUT; c.beginPath(); c.arc(sd * 5, -10, 2.2, 0, R2); c.fill(); c.fillStyle = '#fff'; c.beginPath(); c.arc(sd * 5 - 0.8, -11, 0.8, 0, R2); c.fill(); });
   c.restore();
 }
 function draw() {
+  if (INF) return drawInf();
   c.drawImage(BG, 0, 0, W, H);
   // olas animadas del río
   c.strokeStyle = 'rgba(255,255,255,.22)'; c.lineWidth = 2; c.lineCap = 'round';
@@ -200,3 +204,216 @@ function hud() {
   if (fr > 0) { ART.rr(c, bx + 2, by + 2, Math.max(6, (bw - 4) * fr), 6, 3); c.fillStyle = low ? (Math.sin(t * 12) > 0 ? '#ff5f7a' : '#ff9a5c') : fr > 0.5 ? '#7cf7a0' : '#f2d15c'; c.fill(); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(bx + 4, by + 3, Math.max(0, (bw - 8) * fr), 1.5); }
   if (clearT > 0) { c.globalAlpha = Math.min(1, clearT); label(`¡Nivel ${level}!`, W / 2, H / 2 - 20, 34, '#f2d15c', 'center'); c.globalAlpha = 1; }
 }
+
+/* ================= MODO INFINITO (CFG.mode='infinito'): filas sin fin, 1–4 jugadores =================
+ * La cámara sube sola y cada vez más rápido; quien se queda por debajo del borde pierde una vida.
+ * Puntúa la fila más alta alcanzada; al caer el último sale la clasificación (k.podium). */
+var IP = [], camN = 0, genN = 0, ROWS = {}, elapsed = 0, overI = 0, banner2 = '', bannerT = 0, CPUW = 0;
+try { CPUW = Math.min(8, +localStorage.getItem('cpu:' + CFG.id) || 0); } catch (e) { /* sin almacenamiento */ }
+var VIS = Math.floor((H - TOP - 32) / S); // filas visibles
+const BOT = 32; // franja inferior: la fila más baja no queda pegada al borde
+const yOf = (n) => H - BOT - S - (n - camN) * S;
+const iskill = () => Math.min(0.78, 0.26 + CPUW * 0.05);
+const hard = (n) => Math.min(1, n / 170); // dificultad por altura
+
+function mkRow(type) {
+  const n = genN++, d = hard(n), R = { n, type, items: [], dir: 0, sp: 0 };
+  if (type === 'road') {
+    const kind = ['car', 'truck', 'car', 'racer', 'dozer'][k.ri(0, 4)];
+    R.kind = kind; R.dir = k.pick([-1, 1]); R.sp = (34 + k.rnd(0, 26) + (kind === 'racer' ? 34 : 0)) * (0.62 + 0.72 * d);
+    const w = VW[kind] * S; let x = LO + k.rnd(0, 90);
+    for (;;) { const gap = (k.ri(2, 4) + (d < 0.25 ? 1 : 0)) * S - d * 16; if (R.items.length && x + w + S * 1.4 > LO + P) break; R.items.push({ x, w, col: k.pick(CARCOL) }); x += w + gap; }
+  } else if (type === 'river') {
+    const turtle = Math.random() < 0.42;
+    R.kind = turtle ? 'turtle' : 'log'; R.dir = k.pick([-1, 1]); R.sp = (30 + k.rnd(0, 26)) * (0.66 + 0.6 * d);
+    let x = LO + k.rnd(0, 90);
+    for (;;) { const len = turtle ? k.ri(2, 3) : k.ri(3, 5), w = len * S, gap = k.ri(2, 3) * S;
+      if (R.items.length && x + w + S * 1.4 > LO + P) break;
+      R.items.push({ x, w, n: len, ph: k.rnd(0, 5), dive: turtle && R.items.length > 0 && Math.random() < 0.12 + d * 0.3 }); x += w + gap; }
+  }
+  ROWS[n] = R; return R;
+}
+function ensure(upTo) {
+  while (genN <= upTo) {
+    if (genN < 4) { mkRow('grass'); continue; }
+    const d = hard(genN), r = Math.random();
+    if (r < 0.44) { const cnt = k.ri(1, 2 + Math.round(d * 2)); for (let i = 0; i < cnt; i++) mkRow('road'); mkRow('grass'); }
+    else if (r < 0.8) { const cnt = k.ri(1, 2 + Math.round(d * 1.6)); for (let i = 0; i < cnt; i++) mkRow('river'); mkRow('grass'); }
+    else mkRow('grass');
+  }
+}
+function rowAt(n) { if (n < 0) return null; ensure(n); return ROWS[n]; }
+function nSeatsI() { return k.party ? Math.max(1, Math.max.apply(null, k.party.map((x) => x.p)) + 1) : Math.min(2, k.mpMax || 1); }
+function resetInf() {
+  ROWS = {}; genN = 0; camN = 0; elapsed = 0; overI = 0; bannerT = 0; t = 0;
+  ensure(VIS + 4);
+  const seats = k.players(nSeatsI());
+  IP = seats.map((q, i) => ({ p: q.p, col: q.color, name: q.name, cpu: q.cpu, x: (3 + i * 2) * S, n: 1, fx: (3 + i * 2) * S, fn: 1, jt: 0, dir: 0, q: null,
+    lives: 3, best: 0, inv: 2.5, dead: 0, kind: '', out: false, land: 0, think: 0.4 + i * 0.1 }));
+}
+function jumpI(pl, d) {
+  const [dx, dy, a] = DIRS[d], nn = pl.n - dy, nx = k.clamp(pl.x + dx * S, 0, W - S);
+  if (nn < Math.floor(camN)) return;
+  pl.fx = pl.x; pl.fn = pl.n; pl.x = nx; pl.n = nn; pl.dir = a; pl.jt = JT; if (!pl.cpu) k.sfx('jump');
+  if (pl.n - 1 > pl.best) pl.best = pl.n - 1;
+}
+function hitI(pl, kind) {
+  if (pl.dead || pl.inv > 0 || pl.out) return;
+  pl.dead = 0.8; pl.kind = kind; pl.lives--;
+  const cx = pl.x + S / 2, cy = yOf(pl.n) + S / 2;
+  if (kind === 'splash') { k.burst(cx, cy, '#9fe7ff', 16, 140); k.sfx('hurt'); }
+  else if (kind === 'squash') { k.burst(cx, cy, '#7cf78a', 14, 170); k.sfx('hit'); k.shake(6); }
+  else { k.burst(cx, cy, '#ffb13d', 12, 150); k.sfx('lose'); }
+  if (!pl.cpu) navigator.vibrate && navigator.vibrate(90);
+}
+function depthI(it) { if (!it.dive) return 0; const q = (t + it.ph) % 5; return q < 3.4 ? 0 : q < 4 ? (q - 3.4) / 0.6 : q < 4.6 ? 1 : 1 - (q - 4.6) / 0.4; }
+function floatAt(R, cx) { return R.items.find((it) => cx > it.x - 3 && cx < it.x + it.w + 3 && depthI(it) < 0.7); }
+function safeAt(R, x, ahead) {
+  if (!R || R.type === 'grass') return true;
+  const cx = x + S / 2;
+  if (R.type === 'road') {
+    for (const it of R.items) for (const q of [0, 0.3, 0.6]) { const off = R.dir * R.sp * q * (ahead ? 1 : 0); if (cx > it.x - 11 + off && cx < it.x + it.w + 11 + off) return false; }
+    return true;
+  }
+  return !!floatAt(R, cx);
+}
+function cpuI(pl, dt) {
+  pl.think -= dt; if (pl.think > 0 || pl.jt > 0 || pl.dead) return;
+  const sk = iskill(); pl.think = 0.42 - sk * 0.2 + Math.random() * 0.22;
+  const here = rowAt(pl.n), up = rowAt(pl.n + 1), urge = pl.n - camN < 4;
+  if (here && here.type === 'river') { const on = floatAt(here, pl.x + S / 2);
+    if (on && (on.x < 6 || on.x + on.w > W - 6)) { const away = on.x < 6 ? 'right' : 'left'; if (Math.random() < 0.8) return jumpI(pl, away); } }
+  if (safeAt(up, pl.x, true)) return jumpI(pl, 'up');
+  if (urge && Math.random() < 0.5 - sk * 0.3) return jumpI(pl, 'up'); // con la cámara encima arriesga
+  for (const d of k.shuffle(['left', 'right'])) { const nx = k.clamp(pl.x + (d === 'left' ? -S : S), 0, W - S); if (safeAt(here, nx, false) && safeAt(up, nx, true)) return jumpI(pl, d); }
+}
+function updInf(dt) {
+  if (overI > 0) { overI -= dt; if (overI <= 0) { const win = IP.slice().sort((a, b) => b.best - a.best)[0];
+      if (win && !win.cpu) { CPUW++; try { localStorage.setItem('cpu:' + CFG.id, CPUW); } catch (e) { /* sin almacenamiento */ } }
+      k.podium(IP.map((q) => ({ p: q.p, score: q.best })), { fmt: (v) => v + ' m' }); } return; }
+  elapsed += dt; if (bannerT > 0) bannerT -= dt;
+  // cámara: sube sola tras 6 s de cortesía y sigue al que va delante
+  const rise = elapsed < 6 ? 0 : Math.min(1.15, 0.16 + (elapsed - 6) * 0.013);
+  camN += rise * dt;
+  const alive = IP.filter((q) => !q.out);
+  if (alive.length) { const lead = Math.max.apply(null, alive.map((q) => q.n)); camN = Math.max(camN, lead - VIS + 4); }
+  ensure(Math.ceil(camN) + VIS + 3);
+  for (const key in ROWS) { const R = ROWS[key]; if (+key < camN - 3 || +key > camN + VIS + 4) { if (+key < camN - 6) delete ROWS[key]; continue; }
+    if (R.sp) for (const it of R.items) { it.x += R.dir * R.sp * dt; if (it.x >= LO + P) it.x -= P; else if (it.x < LO) it.x += P; } }
+  for (const pl of IP) {
+    if (pl.out) continue;
+    if (pl.dead > 0) { pl.dead -= dt; if (pl.dead <= 0) { pl.dead = 0;
+        if (pl.lives <= 0) { pl.out = true; if (!pl.cpu) { banner2 = `${pl.name}: ${pl.best} m`; bannerT = 1.6; } }
+        else { pl.n = pl.fn = Math.ceil(camN) + 2; pl.x = pl.fx = k.clamp(pl.x, 0, W - S); pl.jt = 0; pl.inv = 2; } }
+      continue; }
+    pl.inv -= dt;
+    if (pl.cpu) cpuI(pl, dt);
+    else {
+      let d = ['up', 'down', 'left', 'right'].find((q) => k.phit(pl.p, q));
+      if (!k.party && pl.p === 0 && !d) d = k.swipe || (k.tap ? 'up' : null);
+      if (d) { if (pl.jt > 0) pl.q = d; else jumpI(pl, d); }
+    }
+    if (pl.jt > 0) { pl.jt -= dt; if (pl.jt <= 0) { pl.jt = 0; pl.land = 0.12; if (pl.q) { const q = pl.q; pl.q = null; jumpI(pl, q); } } }
+    pl.land = Math.max(0, pl.land - dt);
+    if (pl.jt > 0) continue;
+    const R = rowAt(pl.n), cx = pl.x + S / 2;
+    if (R && R.type === 'road' && pl.inv <= 0 && R.items.some((it) => cx + 8.5 > it.x + 3 && cx - 8.5 < it.x + it.w - 3)) { hitI(pl, 'squash'); continue; }
+    if (R && R.type === 'river') {
+      const on = floatAt(R, cx);
+      if (!on) { if (pl.inv <= 0) { hitI(pl, 'splash'); continue; } } else { pl.x += R.dir * R.sp * dt; pl.fx = pl.x; if (pl.x < -14 || pl.x > W - S + 14) { hitI(pl, 'splash'); continue; } }
+    }
+    if (pl.n < camN - 0.15) hitI(pl, 'atras');
+  }
+  if (IP.every((q) => q.out)) { overI = 1.2; k.sfx('win'); if (IP.some((q) => !q.cpu && q.best >= 40)) k.confetti(); }
+}
+
+/* ---------- Dibujo del modo infinito ---------- */
+var STRIP = {};
+function strip(type) {
+  if (STRIP[type]) return STRIP[type];
+  return (STRIP[type] = mk(W, S, (g) => {
+    if (type === 'grass') { const gr = g.createLinearGradient(0, 0, 0, S); gr.addColorStop(0, '#5cb85a'); gr.addColorStop(1, '#4aa34c'); g.fillStyle = gr; g.fillRect(0, 0, W, S);
+      for (let i = 0; i < 40; i++) { g.fillStyle = 'rgba(30,90,40,.45)'; g.fillRect(srnd(i) * W, 4 + srnd(i * 3) * (S - 10), 2, 5); }
+      for (let i = 0; i < 6; i++) { const x = 20 + srnd(i * 7) * (W - 40), y = 8 + srnd(i + 3) * (S - 16); g.fillStyle = ['#fff3a8', '#ff9ad5', '#ffffff'][i % 3];
+        for (let q = 0; q < 5; q++) { g.beginPath(); g.arc(x + Math.cos(q * 1.256) * 2.5, y + Math.sin(q * 1.256) * 2.5, 1.8, 0, R2); g.fill(); }
+        g.fillStyle = '#f2b705'; g.beginPath(); g.arc(x, y, 1.5, 0, R2); g.fill(); } }
+    else if (type === 'road') { const gr = g.createLinearGradient(0, 0, 0, S); gr.addColorStop(0, '#3a3a4e'); gr.addColorStop(1, '#434358'); g.fillStyle = gr; g.fillRect(0, 0, W, S);
+      for (let i = 0; i < 120; i++) { g.fillStyle = srnd(i) > 0.5 ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.12)'; g.fillRect(srnd(i * 1.3) * W, srnd(i * 2.7) * S, 2, 2); }
+      g.fillStyle = 'rgba(255,255,255,.7)'; for (let x = 6; x < W; x += 40) g.fillRect(x, S / 2 - 1.5, 22, 3); }
+    else { const gr = g.createLinearGradient(0, 0, 0, S); gr.addColorStop(0, '#1f6fb8'); gr.addColorStop(1, '#2b86c9'); g.fillStyle = gr; g.fillRect(0, 0, W, S);
+      g.fillStyle = 'rgba(10,30,80,.22)'; g.fillRect(0, S - 3, W, 3); }
+  }));
+}
+function drawInf() {
+  const gr = c.createLinearGradient(0, TOP, 0, H); gr.addColorStop(0, '#0d1428'); gr.addColorStop(1, '#101b2e'); c.fillStyle = gr; c.fillRect(0, 0, W, H);
+  const n0 = Math.floor(camN) - 1, n1 = Math.ceil(camN) + VIS + 1;
+  for (let n = n0; n <= n1; n++) { const R = rowAt(n); if (!R) continue; const y = yOf(n); if (y > H || y < TOP - S) continue;
+    c.drawImage(strip(R.type === 'grass' ? 'grass' : R.type), 0, y, W, S);
+    if (R.type === 'river') { c.strokeStyle = 'rgba(255,255,255,.2)'; c.lineWidth = 2; c.lineCap = 'round';
+      const off = ((t * R.sp * 0.35 * R.dir) % 52 + 52) % 52;
+      for (let i = -1; i < 9; i++) { c.beginPath(); c.arc(i * 52 + off + (n % 2) * 26, y + 12 + ((i + n) % 3) * 6, 6, 3.6, 5.8); c.stroke(); } }
+  }
+  for (let n = n0; n <= n1; n++) {
+    const R = rowAt(n); if (!R || !R.items.length) continue; const y = yOf(n); if (y > H || y < TOP - S) continue;
+    for (const it of R.items) {
+      if (it.x > W + 4 || it.x + it.w < -30) continue;
+      if (R.kind === 'log') { const cv = LOG[Math.min(5, it.n)]; c.fillStyle = 'rgba(10,30,80,.3)'; ART.rr(c, it.x + 4, y + 8, it.w - 4, 22, 10); c.fill();
+        if (R.dir > 0) c.drawImage(cv, it.x, y + 2, cv.lw, cv.lh); else { c.save(); c.translate(it.x + it.w, y + 2); c.scale(-1, 1); c.drawImage(cv, 0, 0, cv.lw, cv.lh); c.restore(); } }
+      else if (R.kind === 'turtle') { const dp = depthI(it);
+        if (dp < 1) for (let i = 0; i < it.n; i++) turtle(it.x + i * S + S / 2, y + S / 2, dp, R.dir, i + it.ph);
+        else { c.fillStyle = 'rgba(255,255,255,.5)'; for (let i = 0; i < it.n; i++) { c.beginPath(); c.arc(it.x + i * S + S / 2 + Math.sin(t * 6 + i) * 4, y + S / 2 - ((t * 20 + i * 5) % 10), 2, 0, R2); c.fill(); } } }
+      else { const cv = veh(R.kind, it.col); c.fillStyle = 'rgba(0,0,0,.28)'; ART.rr(c, it.x + 2, y + 7, it.w, S - 8, 6); c.fill();
+        if (R.dir > 0) c.drawImage(cv, it.x, y, cv.lw, cv.lh); else { c.save(); c.translate(it.x + it.w, y); c.scale(-1, 1); c.drawImage(cv, 0, 0, cv.lw, cv.lh); c.restore(); } }
+    }
+  }
+  for (const pl of IP) {
+    if (pl.out) continue;
+    const p = pl.jt > 0 ? 1 - pl.jt / JT : 1, vx = pl.fx + (pl.x - pl.fx) * (pl.jt > 0 ? p : 1);
+    const vn = pl.fn + (pl.n - pl.fn) * (pl.jt > 0 ? p : 1), vy = yOf(vn) + S / 2, cx = vx + S / 2;
+    if (vy < TOP - S || vy > H + S) continue;
+    if (!pl.dead) {
+      const arc = pl.jt > 0 ? Math.sin(p * Math.PI) : 0, sq = pl.land > 0 ? pl.land / 0.12 : 0;
+      c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(cx, vy + 8 + arc * 6, 11 - arc * 3, 5 - arc, 0, 0, R2); c.fill();
+      const al = pl.inv > 0 && Math.floor(t * 12) % 2 ? 0.35 : 1;
+      frog(cx, vy - arc * 6, pl.dir, 1 + arc * 0.22, 1 + sq * 0.18, 1 - sq * 0.15, pl.jt > 0 ? p : 0, al, pl.col);
+    } else if (pl.kind === 'squash') { c.save(); c.translate(cx, vy); c.scale(1.5, 0.45); c.beginPath(); c.ellipse(0, 0, 12, 12, 0, 0, R2); ART.fillOut(c, pl.col, 2.5); c.restore(); }
+    else { const q = 1 - pl.dead / 0.8; c.strokeStyle = `rgba(255,255,255,${1 - q})`; c.lineWidth = 3;
+      for (let i = 0; i < 3; i++) { c.beginPath(); c.ellipse(cx, vy, 6 + q * 20 + i * 7, (6 + q * 20 + i * 7) * 0.5, 0, 0, R2); c.stroke(); } }
+    // flecha si va por encima del borde visible
+    if (vn > camN + VIS - 0.5) { c.fillStyle = pl.col; c.beginPath(); c.moveTo(cx, TOP + 4); c.lineTo(cx - 7, TOP + 14); c.lineTo(cx + 7, TOP + 14); c.closePath(); ART.fillOut(c, pl.col, 2); }
+  }
+  // borde inferior: la cámara se come la fila de abajo
+  const gg = c.createLinearGradient(0, H - BOT - 14, 0, H - BOT); gg.addColorStop(0, 'rgba(12,8,28,0)'); gg.addColorStop(1, 'rgba(12,8,28,.55)'); c.fillStyle = gg; c.fillRect(0, H - BOT - 14, W, 14);
+  c.fillStyle = '#0c0a20'; c.fillRect(0, H - BOT, W, BOT);
+  hudInf();
+}
+function fitTxt(s, max, size, min) {
+  let sz = size;
+  for (; sz > (min || 8); sz--) { c.font = `800 ${sz}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; if (c.measureText(s).width <= max) return [s, sz]; }
+  let out = s; while (out.length > 1) { out = out.slice(0, -1); if (c.measureText(out + '…').width <= max) return [out + '…', sz]; }
+  return [out, sz];
+}
+function hudInf() {
+  c.fillStyle = '#0c0a20'; c.fillRect(0, 0, W, TOP); c.fillStyle = 'rgba(255,255,255,.08)'; c.fillRect(0, TOP - 2, W, 2);
+  const n = Math.max(1, IP.length), cw = W / n;
+  IP.forEach((pl, i) => {
+    const x = i * cw + 8, inner = cw - 16;
+    c.globalAlpha = pl.out ? 0.4 : 1;
+    c.fillStyle = pl.col; ART.rr(c, x, 7, 10, 10, 3); c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
+    const [nm, ns] = fitTxt(String(pl.name), inner - 15, 12, 8);
+    label(nm, x + 15, 7, ns, '#fff');
+    label(`${pl.best} m`, x, 24, 15, pl.col);
+    for (let v = 0; v < 3; v++) { c.beginPath(); c.arc(x + 5 + v * 11, 48, 3.4, 0, R2); c.fillStyle = v < pl.lives ? '#7cf78a' : 'rgba(255,255,255,.18)'; c.fill(); c.lineWidth = 1.4; c.strokeStyle = OUT; c.stroke(); }
+    c.globalAlpha = 1;
+  });
+  if (bannerT > 0) { c.globalAlpha = Math.min(1, bannerT * 3); const [bt, bs] = fitTxt(banner2, W - 60, 20, 12), bw = c.measureText(bt).width + 34;
+    ART.rr(c, W / 2 - bw / 2, H / 2 - 24, bw, 40, 12); c.fillStyle = '#171334'; c.fill(); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke();
+    c.textBaseline = 'middle'; label(bt, W / 2, H / 2 - 4, bs, '#ffc94d', 'center'); c.textBaseline = 'top'; c.globalAlpha = 1; }
+}
+if (INF) resetInf(); // el estado del modo infinito se crea tras declarar sus variables
+if (INF) k.onParty = () => { // la tele manda los jugadores después de cargar: rehacer plazas fuera de partida
+  if (k.st === 'play' && IP.length) { const seats = k.players(nSeatsI());
+    seats.forEach((q, i) => { const pl = IP[i]; if (pl) { pl.cpu = q.cpu; pl.name = q.name; pl.col = q.color; } });
+    if (seats.length !== IP.length) resetInf(); }
+  else resetInf();
+};

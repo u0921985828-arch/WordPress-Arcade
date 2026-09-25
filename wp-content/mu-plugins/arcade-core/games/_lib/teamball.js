@@ -4,12 +4,14 @@
  * laterales 'voley' (2v2, saque, tres toques como máximo) y 'cabezon' (1v1, cabezazos, chilenas y superdisparo).
  * Oleada 2: 'sala' (fútbol sala neón 2v2 + portero CPU, paredes que rebotan, porterías pequeñas, reloj de 5 min),
  * 'canasta' (baloncesto 2v2 a una canasta, a 21, tiros de 2 y de 3, tras rebote defensivo o robo hay que sacar el balón
+ * Oleada 3: 'balonmano' (2v2 + portero CPU, partidos de 2 minutos; el área semicircular es zona prohibida para los jugadores
+ * de campo, así que se tira desde fuera o se busca el hueco por la banda).
  * fuera de la línea de triple) y 'futbolin' (futbolín de 4 barras por equipo; con dos humanos en un equipo cada uno lleva
  * dos barras, si no, uno lleva las cuatro; A tira, B tira con efecto).
  * Cenitales: en vertical el campo se gira (ataca hacia arriba) y en horizontal va apaisado; la física es la misma.
  * Plazas: equipo 0 = J1 y J3, equipo 1 = J2 y J4 (en 1v1: J1 contra J2). CPU mejora con victorias (localStorage cpu:<id>). */
 const MODE = CFG.mode || 'futbol', SIDE = MODE === 'voley' || MODE === 'cabezon', OUT = ART.OUT, TAU = 6.2832;
-const TS = MODE === 'prisionero' || MODE === 'sala' ? 3 : MODE === 'cabezon' ? 1 : 2, DUR = CFG.time || 120;
+const TS = MODE === 'prisionero' || MODE === 'sala' || MODE === 'balonmano' ? 3 : MODE === 'cabezon' ? 1 : 2, DUR = CFG.time || 120;
 const TIMED = MODE !== 'voley' && MODE !== 'canasta' && MODE !== 'futbolin'; // los demás van por puntos
 const VERT = !SIDE && innerHeight > innerWidth * 1.08;
 const FW = 600, FH = 340, HUD = 56;
@@ -43,7 +45,7 @@ function inDir(p) { const d = k.pdir(p); if (!d.x && !d.y) return null; let x = 
 function slotOf(team, i) { return TS === 1 ? (team === 0 ? 0 : 1) : i < 2 ? team + i * 2 : -1; } // equipo 0: J1,J3 · equipo 1: J2,J4 · 3.º siempre CPU
 function mkBodies() {
   B = [];
-  for (let tm = 0; tm < 2; tm++) for (let i = 0; i < TS; i++) { const s = slotOf(tm, i); B.push({ team: tm, i, slot: s, ctl: s >= 0 && k.human(s) ? s : -1, x: 0, y: 0, vx: 0, vy: 0, a: tm ? Math.PI : 0, st: 0, cd: 0, chg: -1, anim: 0, gk: MODE === 'sala' && i === 2, hair: ['#3a2a4a', '#8a4b2a', '#f2d15c', '#1a1530', '#c94f3a', '#5a3a2a'][(tm * 3 + i) % 6] }); }
+  for (let tm = 0; tm < 2; tm++) for (let i = 0; i < TS; i++) { const s = slotOf(tm, i); B.push({ team: tm, i, slot: s, ctl: s >= 0 && k.human(s) ? s : -1, x: 0, y: 0, vx: 0, vy: 0, a: tm ? Math.PI : 0, st: 0, cd: 0, chg: -1, anim: 0, gk: (MODE === 'sala' || MODE === 'balonmano') && i === 2, hair: ['#3a2a4a', '#8a4b2a', '#f2d15c', '#1a1530', '#c94f3a', '#5a3a2a'][(tm * 3 + i) % 6] }); }
 }
 function refreshCtl() { for (const b of B) b.ctl = b.slot >= 0 && k.human(b.slot) ? b.slot : -1; }
 k.onParty = () => { if (k.st !== 'play') { reset(); return; } refreshCtl(); };
@@ -64,6 +66,7 @@ const M = {
   sala: { r: 11, br: 7, spd: 152, acc: 11, fr: 0.6, rest: 0.96, gw: 66, cut: 34, shot: [290, 640], pass: true, neon: true },
   canasta: { r: 11, br: 8, spd: 150, acc: 11, fr: 1.3, rest: 0.6, gw: 0, cut: 0 },
   futbolin: { r: 8, br: 7, spd: 0, acc: 0, fr: 0.32, rest: 0.86, gw: 100, cut: 22 },
+  balonmano: { r: 11, br: 7, spd: 158, acc: 12, fr: 1.7, rest: 0.55, gw: 74, cut: 26, shot: [330, 700], pass: true, area: 92 },
 }[MODE] || {};
 const GY0 = FH / 2 - (M.gw || 0) / 2, GY1 = FH / 2 + (M.gw || 0) / 2;
 const SEG = [];
@@ -85,6 +88,12 @@ function keepIn(b) { // jugadores dentro del campo (y de su zona en balón prisi
   const r = M.r; let x0 = r, x1 = FW - r;
   if (MODE === 'prisionero') { const z = zoneOf(b); x0 = z[0] + r; x1 = z[1] - r; }
   b.x = clamp(b.x, x0, x1); b.y = clamp(b.y, r, FH - r);
+  if (M.area) { const R = M.area; // balonmano: el área es zona prohibida para los de campo y casa del portero
+    if (b.gk) { const g0 = goalX(1 - b.team), dx = b.x - g0, dy = b.y - FH / 2, d = hyp(dx, dy) || 1;
+      if (d > R - r) { b.x = g0 + dx / d * (R - r); b.y = FH / 2 + dy / d * (R - r); b.vx *= 0.4; b.vy *= 0.4; } }
+    else for (const g0 of [0, FW]) { const dx = b.x - g0, dy = b.y - FH / 2, d = hyp(dx, dy) || 1;
+      if (d < R + r) { b.x = g0 + dx / d * (R + r); b.y = FH / 2 + dy / d * (R + r); } }
+    b.x = clamp(b.x, r, FW - r); b.y = clamp(b.y, r, FH - r); }
   if (M.cut) walls(b, r, 0.1);
 }
 
@@ -189,7 +198,7 @@ function aiField(b, dt) {
       const lead = own ? 0.15 : clamp(hyp(ball.vx, ball.vy) / 600, 0, 0.5); tx = ball.x + ball.vx * lead; ty = ball.y + ball.vy * lead;
       if (own && own.team !== b.team && hyp(own.x - b.x, own.y - b.y) < 42 && b.cd <= 0 && Math.random() < dt * (2 + skill * 6)) { b.a = Math.atan2(own.y - b.y, own.x - b.x); tackle(b); }
       if (!own) { tx -= s * 6; } // se coloca un poco por detrás para empujar hacia delante
-    } else if (MODE === 'sala') { const og = goalX(1 - b.team); tx = lerp(og, ball.x, 0.55); ty = lerp(FH / 2, ball.y, 0.6); run = 0.9; } // sala: el portero ya cubre, el otro defiende a media distancia
+    } else if (MODE === 'sala' || MODE === 'balonmano') { const og = goalX(1 - b.team); tx = lerp(og, ball.x, 0.55); ty = lerp(FH / 2, ball.y, 0.6); run = 0.9; } // sala: el portero ya cubre, el otro defiende a media distancia
     else { const og = goalX(1 - b.team); tx = og + s * (26 + 0.14 * Math.abs(ball.x - og)); ty = clamp(lerp(FH / 2, ball.y + ball.vy * 0.2, 0.65), GY0 - 12, GY1 + 12); run = 1; } // portero: entre balón y portería
   }
   const dx = tx - b.x, dy = ty - b.y, d = hyp(dx, dy);
@@ -748,7 +757,7 @@ k.run((dt) => {
   }
   if (golden && phase === 'play' && (goldT += dt) > 60) { if (MODE !== 'prisionero') return finish(); golden = false; clock = CFG.round || 60; msg = 'Ronda nula'; msgT = 2; kickoff(); return; } // la prórroga no es eterna: a los 60 s, empate
   glow = glow.filter((g) => (g.t -= dt) > 0);
-  if (MODE === 'futbol' || MODE === 'hockey' || MODE === 'sala') stepField(dt);
+  if (MODE === 'futbol' || MODE === 'hockey' || MODE === 'sala' || MODE === 'balonmano') stepField(dt);
   else if (MODE === 'canasta') stepHoop(dt);
   else if (MODE === 'futbolin') stepFoos(dt);
   else if (MODE === 'coches') stepCars(dt);
@@ -820,6 +829,9 @@ function fieldArt() {
     if (MODE === 'futbol') { for (let i = 0; i < 12; i++) { g.fillStyle = i % 2 ? '#47b358' : '#52c063'; g.fillRect(i * FW / 12, 0, FW / 12 + 1, FH); } }
     else if (MODE === 'sala') { g.fillStyle = '#18133a'; g.fillRect(0, 0, FW, FH); for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? 'rgba(110,98,245,.10)' : 'rgba(110,98,245,.04)'; g.fillRect(i * FW / 8, 0, FW / 8 + 1, FH); }
       g.strokeStyle = 'rgba(92,225,230,.06)'; g.lineWidth = 1; for (let x = 0; x < FW; x += 20) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, FH); g.stroke(); } for (let y = 0; y < FH; y += 20) { g.beginPath(); g.moveTo(0, y); g.lineTo(FW, y); g.stroke(); } }
+    else if (MODE === 'balonmano') { const gr = g.createLinearGradient(0, 0, 0, FH); gr.addColorStop(0, '#3f78c9'); gr.addColorStop(1, '#2f5da6'); g.fillStyle = gr; g.fillRect(0, 0, FW, FH);
+      for (let i = 0; i < FW; i += 26) { g.fillStyle = 'rgba(255,255,255,.045)'; g.fillRect(i, 0, 13, FH); }
+      g.fillStyle = 'rgba(255,255,255,.06)'; g.fillRect(0, 0, FW, 10); g.fillRect(0, FH - 10, FW, 10); }
     else if (MODE === 'hockey') { const gr = g.createLinearGradient(0, 0, 0, FH); gr.addColorStop(0, '#dfe9f5'); gr.addColorStop(1, '#c4d4e8'); g.fillStyle = gr; g.fillRect(0, 0, FW, FH); for (let i = 0; i < 40; i++) { g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 1; g.beginPath(); const x = rnd(i) * FW, y = rnd(i + 3) * FH; g.moveTo(x, y); g.lineTo(x + 30, y + 4); g.stroke(); } }
     else if (MODE === 'coches') { g.fillStyle = '#2b2d4a'; g.fillRect(0, 0, FW, FH); g.strokeStyle = 'rgba(255,255,255,.05)'; for (let x = 0; x < FW; x += 30) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, FH); g.stroke(); } for (let y = 0; y < FH; y += 30) { g.beginPath(); g.moveTo(0, y); g.lineTo(FW, y); g.stroke(); } }
     else { for (let i = 0; i < 26; i++) { g.fillStyle = i % 2 ? '#d9a066' : '#cf955a'; g.fillRect(0, i * FH / 26, FW, FH / 26 + 1); } for (let i = 0; i < 26; i++) { g.strokeStyle = 'rgba(120,70,30,.25)'; g.beginPath(); const y = i * FH / 26, x = rnd(i) * FW; g.moveTo(x, y); g.lineTo(x, y + FH / 26); g.stroke(); }
@@ -834,11 +846,16 @@ function fieldArt() {
     if (MODE === 'futbol') { g.strokeStyle = 'rgba(255,255,255,.85)'; g.strokeRect(0, FH / 2 - 90, 70, 180); g.strokeRect(FW - 70, FH / 2 - 90, 70, 180); g.beginPath(); g.arc(70, FH / 2, 30, -1.2, 1.2); g.stroke(); g.beginPath(); g.arc(FW - 70, FH / 2, 30, Math.PI - 1.2, Math.PI + 1.2); g.stroke(); }
     if (MODE === 'hockey') { g.strokeStyle = '#3f6fd9'; g.lineWidth = 4; for (const x of [FW * 0.33, FW * 0.67]) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, FH); g.stroke(); } g.strokeStyle = '#d94a5a'; g.lineWidth = 2; for (const [x, y] of [[110, 90], [110, 250], [490, 90], [490, 250]]) { g.beginPath(); g.arc(x, y, 30, 0, TAU); g.stroke(); } g.fillStyle = 'rgba(63,111,217,.3)'; g.beginPath(); g.arc(0, FH / 2, 50, -Math.PI / 2, Math.PI / 2); g.fill(); g.beginPath(); g.arc(FW, FH / 2, 50, Math.PI / 2, Math.PI * 1.5); g.fill(); }
     if (MODE === 'coches') { for (const [x, y] of [[80, 50], [80, 290], [520, 50], [520, 290], [300, 30], [300, 310]]) { g.fillStyle = 'rgba(255,209,102,.25)'; g.beginPath(); g.arc(x, y, 14, 0, TAU); g.fill(); g.strokeStyle = 'rgba(255,209,102,.6)'; g.lineWidth = 2; g.stroke(); } g.fillStyle = 'rgba(255,107,74,.15)'; g.fillRect(0, GY0, 60, M.gw); g.fillStyle = 'rgba(63,140,255,.15)'; g.fillRect(FW - 60, GY0, 60, M.gw); }
+    if (MODE === 'balonmano') { g.lineWidth = 3; g.strokeStyle = 'rgba(255,255,255,.9)';
+      for (const x of [0, FW]) { g.save(); g.beginPath(); g.arc(x, FH / 2, M.area, 0, TAU); g.clip(); g.fillStyle = 'rgba(255,209,102,.16)'; g.fillRect(x - M.area, FH / 2 - M.area, M.area * 2, M.area * 2); g.restore(); }
+      for (const [x, a0] of [[0, -Math.PI / 2], [FW, Math.PI / 2]]) { g.beginPath(); g.arc(x, FH / 2, M.area, a0, a0 + Math.PI); g.stroke();
+        g.setLineDash([9, 8]); g.beginPath(); g.arc(x, FH / 2, M.area + 40, a0, a0 + Math.PI); g.stroke(); g.setLineDash([]); }
+      for (const x of [0, FW]) { const s = x ? -1 : 1; g.beginPath(); g.moveTo(x + s * 132, FH / 2 - 9); g.lineTo(x + s * 132, FH / 2 + 9); g.stroke(); } }
     if (MODE === 'sala') { g.strokeStyle = '#5ce1e6'; for (const [x, a0] of [[0, -Math.PI / 2], [FW, Math.PI / 2]]) { g.beginPath(); g.arc(x, FH / 2, 78, a0, a0 + Math.PI); g.stroke(); } g.fillStyle = '#5ce1e6'; for (const x of [70, FW - 70]) { g.beginPath(); g.arc(x, FH / 2, 3, 0, TAU); g.fill(); } }
     if (M.neon) { g.shadowBlur = 0; g.shadowColor = 'transparent'; }
     if (MODE === 'prisionero') { g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 3; for (const x of [34, 566]) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, FH); g.stroke(); } g.beginPath(); g.arc(FW / 2, FH / 2, 40, 0, TAU); g.stroke(); }
     // vallas
-    path(); g.lineWidth = 9; g.strokeStyle = OUT; g.stroke(); g.lineWidth = 5; g.strokeStyle = MODE === 'hockey' ? '#ffd166' : MODE === 'coches' ? '#5ce1e6' : MODE === 'futbol' ? '#f5f1e6' : MODE === 'sala' ? '#ff4fd8' : '#8a5a3b';
+    path(); g.lineWidth = 9; g.strokeStyle = OUT; g.stroke(); g.lineWidth = 5; g.strokeStyle = MODE === 'hockey' ? '#ffd166' : MODE === 'coches' ? '#5ce1e6' : MODE === 'futbol' || MODE === 'balonmano' ? '#f5f1e6' : MODE === 'sala' ? '#ff4fd8' : '#8a5a3b';
     if (M.neon) { g.shadowColor = '#ff4fd8'; g.shadowBlur = 14; } g.stroke(); g.shadowBlur = 0; g.shadowColor = 'transparent';
     if (M.gw) for (const x of [0, FW]) for (const y of [GY0, GY1]) { g.beginPath(); g.arc(x, y, 5, 0, TAU); g.fillStyle = '#fff'; g.fill(); g.lineWidth = 2; g.strokeStyle = OUT; g.stroke(); }
     g.restore();
