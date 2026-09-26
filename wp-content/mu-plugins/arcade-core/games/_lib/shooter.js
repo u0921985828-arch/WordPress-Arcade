@@ -77,24 +77,35 @@ const EC = ['#f0647e', '#9b8afb', '#3cc7d0', '#e9b949'];
 /* patas y antenas salen del cuerpo como engrosamiento del mismo trazado: se trazan primero y se
    rellenan después, así el borde interior desaparece y el bicho es una sola silueta. */
 const limb = (g, x0, y0, x1, y1, x2, y2, w) => { g.moveTo(x0, y0); g.lineTo(x1, y1); g.lineTo(x2, y2); g.lineTo(x2 + w, y2); g.lineTo(x1 + w * 0.7, y1); g.lineTo(x0 + w, y0); g.closePath(); };
-function alien(x, y, kind, fr, flash) {
-  c.save(); c.translate(x, y); const col = flash ? '#fff' : EC[kind % 4];
-  const kk = kind % 3;
-  const body = kk === 0 ? (g) => g.ellipse(0, 0, 12, 8, 0, 0, 6.283)
-    : kk === 1 ? (g) => { g.moveTo(-12, 4); g.quadraticCurveTo(-11.4, -5.4, -8, -8); g.lineTo(8, -8); g.quadraticCurveTo(11.4, -5.4, 12, 4); g.quadraticCurveTo(9.6, 7.2, 6, 8); g.lineTo(-6, 8); g.quadraticCurveTo(-9.6, 7.2, -12, 4); g.closePath(); }
-    : (g) => { g.arc(0, 0, 10, Math.PI, 0); g.lineTo(10, 6); for (let i = 0; i < 4; i++) g.lineTo(10 - (i + 0.5) * 5, fr ? 10 : 7); g.lineTo(-10, 6); g.closePath(); };
+/* Sprite cacheado por (tipo, fotograma, destello): dibujar la silueta con recorte en cada
+   bicho y cada frame costaba ~4 ms con 40 invasores en pantalla. */
+const ASP = {};
+function alienSpr(kind, fr, flash) {
+  const key = kind + '|' + (fr ? 1 : 0) + '|' + (flash ? 1 : 0);
+  if (ASP[key]) return ASP[key];
+  const S = Math.min(3, Math.max(2, window.devicePixelRatio || 1) * 1.5), R = 20, cv = document.createElement('canvas');
+  cv.width = cv.height = R * 2 * S;
+  const g = cv.getContext('2d'); g.scale(S, S); g.translate(R, R);
+  const col = flash ? '#fff' : EC[kind % 4], kk = kind % 3;
+  const body = kk === 0 ? (q) => q.ellipse(0, 0, 12, 8, 0, 0, 6.283)
+    : kk === 1 ? (q) => { q.moveTo(-12, 4); q.quadraticCurveTo(-11.4, -5.4, -8, -8); q.lineTo(8, -8); q.quadraticCurveTo(11.4, -5.4, 12, 4); q.quadraticCurveTo(9.6, 7.2, 6, 8); q.lineTo(-6, 8); q.quadraticCurveTo(-9.6, 7.2, -12, 4); q.closePath(); }
+    : (q) => { q.arc(0, 0, 10, Math.PI, 0); q.lineTo(10, 6); for (let i = 0; i < 4; i++) q.lineTo(10 - (i + 0.5) * 5, fr ? 10 : 7); q.lineTo(-10, 6); q.closePath(); };
   const parts = [];
-  if (kk === 0) for (const sd of [-1, 1]) parts.push([(g) => limb(g, sd * 5.4, 3.4, sd * 8, 8, sd * (10 + fr * 3), 12, sd * 2.4), col]);
-  if (kk === 1) for (const sd of [-1, 1]) parts.push([(g) => limb(g, sd * 3.6, -6.6, sd * 5.6, -10, sd * (7 + fr * 2), -13.4, sd * 2.1), col]);
+  if (kk === 0) for (const sd of [-1, 1]) parts.push([(q) => limb(q, sd * 5.4, 3.4, sd * 8, 8, sd * (10 + fr * 3), 12, sd * 2.4), col]);
+  if (kk === 1) for (const sd of [-1, 1]) parts.push([(q) => limb(q, sd * 3.6, -6.6, sd * 5.6, -10, sd * (7 + fr * 2), -13.4, sd * 2.1), col]);
   parts.push([body, col]);
-  unite(c, parts, 1.05);
-  clipIn(c, body, (g) => {
-    const gr = g.createLinearGradient(-8, -9, 6, 9); gr.addColorStop(0, AL('#ffffff', 0.26)); gr.addColorStop(0.55, AL('#ffffff', 0)); gr.addColorStop(1, AL(OUT, 0.3));
-    g.fillStyle = gr; g.fillRect(-14, -14, 28, 28);
+  unite(g, parts, 1.05);
+  clipIn(g, body, (q) => {
+    const gr = q.createLinearGradient(-8, -9, 6, 9); gr.addColorStop(0, AL('#ffffff', 0.26)); gr.addColorStop(0.55, AL('#ffffff', 0)); gr.addColorStop(1, AL(OUT, 0.3));
+    q.fillStyle = gr; q.fillRect(-14, -14, 28, 28);
   });
-  c.fillStyle = '#fff'; c.beginPath(); c.arc(-4, -1, 3, 0, 6.283); c.arc(4, -1, 3, 0, 6.283); c.fill();
-  c.fillStyle = OUT; c.beginPath(); c.arc(-4, 0, 1.4, 0, 6.283); c.arc(4, 0, 1.4, 0, 6.283); c.fill();
-  c.restore();
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(-4, -1, 3, 0, 6.283); g.arc(4, -1, 3, 0, 6.283); g.fill();
+  g.fillStyle = OUT; g.beginPath(); g.arc(-4, 0, 1.4, 0, 6.283); g.arc(4, 0, 1.4, 0, 6.283); g.fill();
+  return (ASP[key] = { cv, r: R });
+}
+function alien(x, y, kind, fr, flash) {
+  const s = alienSpr(kind, fr, flash);
+  c.drawImage(s.cv, x - s.r, y - s.r, s.r * 2, s.r * 2);
 }
 function drone(x, y, r, big, flash) {
   c.save(); c.translate(x, y); c.rotate(t * (big ? 0.6 : 1.8)); c.strokeStyle = OUT; c.lineWidth = 2;
