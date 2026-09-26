@@ -81,10 +81,12 @@ const limb = (g, x0, y0, x1, y1, x2, y2, w) => { g.moveTo(x0, y0); g.lineTo(x1, 
    bicho y cada frame costaba ~4 ms con 40 invasores en pantalla. */
 const ASP = {};
 function alienSpr(kind, fr, flash) {
-  const key = kind + '|' + (fr ? 1 : 0) + '|' + (flash ? 1 : 0);
+  /* se cachea a la escala real del lienzo: así el blit es 1:1 y no hay remuestreo por bicho */
+  const tr = c.getTransform ? c.getTransform().a : 2, S = Math.min(3, Math.max(1, tr));
+  const key = kind + '|' + (fr ? 1 : 0) + '|' + (flash ? 1 : 0) + '|' + Math.round(S * 4);
   if (ASP[key]) return ASP[key];
-  const S = Math.min(3, Math.max(2, window.devicePixelRatio || 1) * 1.5), R = 20, cv = document.createElement('canvas');
-  cv.width = cv.height = R * 2 * S;
+  const R = 20, cv = document.createElement('canvas');
+  cv.width = cv.height = Math.ceil(R * 2 * S);
   const g = cv.getContext('2d'); g.scale(S, S); g.translate(R, R);
   const col = flash ? '#fff' : EC[kind % 4], kk = kind % 3;
   const body = kk === 0 ? (q) => q.ellipse(0, 0, 12, 8, 0, 0, 6.283)
