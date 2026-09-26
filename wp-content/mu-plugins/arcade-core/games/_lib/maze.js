@@ -469,7 +469,7 @@ function drawBug(f, x, y) {
     g.fillStyle = AL('#ffffff', 0.4); g.beginPath(); g.ellipse(-s * 0.55, -s * 0.45, s * 0.3, s * 0.13, -0.3, 0, R2); g.fill();
     g.fillStyle = AL(OUT, 0.2); g.beginPath(); g.ellipse(-s * 0.15, s * 0.7, s * 0.95, s * 0.28, 0, 0, R2); g.fill();
   });
-  clipIn(c, ojo, (g) => { g.fillStyle = OUT; g.beginPath(); g.arc(s * 1.1, -s * 0.2, s * 0.12, 0, R2); g.fill(); });
+  c.fillStyle = OUT; c.beginPath(); c.arc(s * 1.08, -s * 0.2, s * 0.12, 0, R2); c.fill();
   c.restore();
 }
 function drawMiner(x, y) {
@@ -778,8 +778,11 @@ function drawMinero(pl) {
   const cuerpo = (g) => ART.rr(g, -8, -4, 16, 15, 5), cara = (g) => { g.moveTo(7.5, -9); g.arc(0, -9, 7.5, 0, R2); };
   const casco = (g) => ART.rr(g, -9, -19, 18, 9, 4.5), farol = (g) => { g.moveTo(3.4, -19); g.arc(0, -19, 3.4, 0, R2); };
   unite(c, [[cuerpo, pl.col], [cara, '#f7d9b5'], [casco, ART.dark(pl.col, 0.25)], [farol, '#ffe89a']], 1.15);
-  clipIn(c, cara, (g) => { g.fillStyle = OUT; g.beginPath(); g.arc(-2.6, -9.5, 1.5, 0, R2); g.arc(2.6, -9.5, 1.5, 0, R2); g.fill(); g.fillStyle = AL(OUT, 0.16); g.fillRect(-9, -5.4, 18, 4); });
-  clipIn(c, cuerpo, (g) => { g.fillStyle = AL('#ffffff', 0.2); g.fillRect(-8, -4, 16, 2.4); g.fillStyle = AL(OUT, 0.18); g.fillRect(-8, 7.6, 16, 3.4); });
+  /* detalle sin recorte: todo cae dentro de la silueta, así no se paga un clip por jugador */
+  c.fillStyle = OUT; c.beginPath(); c.arc(-2.6, -9.5, 1.5, 0, R2); c.arc(2.6, -9.5, 1.5, 0, R2); c.fill();
+  c.fillStyle = AL(OUT, 0.16); c.beginPath(); c.moveTo(-7, -4.4); c.lineTo(7, -4.4); c.lineTo(6, -2.2); c.lineTo(-6, -2.2); c.closePath(); c.fill();
+  c.fillStyle = AL('#ffffff', 0.2); ART.rr(c, -7, -3.4, 14, 2.2, 1); c.fill();
+  c.fillStyle = AL(OUT, 0.18); ART.rr(c, -7, 7.4, 14, 3, 1.4); c.fill();
   if (pl.carry > 0) { c.font = '800 11px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
     const w2 = c.measureText(pl.carry).width + 12; c.beginPath(); ART.rr(c, -w2 / 2, -34, w2, 14, 6); ART.fillOut(c, '#1a1530', 2);
     c.fillStyle = '#ffd24d'; c.fillText(pl.carry, 0, -26.5); }

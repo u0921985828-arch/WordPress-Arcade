@@ -1808,14 +1808,22 @@ function humanArt(g, o) {
       q.quadraticCurveTo(bx + s2 * 2.6, by - 1, bx + s2 * 6.4 - dx * 1.4, by - 5.6);
       q.quadraticCurveTo(bx + s2 * 1.6, by - 1.6, bx + s2 * 2.4, by + 2.4); q.closePath();
     }, '#5c4736', 0, { f: 0.7 }]);
-  } else if (kind === 'thug') {                                    // gorra: visera + copa hundida
-    parts.push([(q) => { q.moveTo(hx0 - dx * 4, hy - hr * 0.5); q.quadraticCurveTo(-dx * 13, hy - hr * 0.56, -dx * 14.6, hy - hr * 0.02);
-      q.quadraticCurveTo(-dx * 8.6, hy - hr * 0.26, hx0 - dx * 3, hy - hr * 0.24); q.closePath(); }, '#c8352a', 0, { f: 0.7 }]);
-    parts.push([(q) => { q.moveTo(hx0 - hr - 1, hy - hr * 0.3); q.quadraticCurveTo(hx0, hy - hr - 4.4, hx0 + hr + 1, hy - hr * 0.3);
-      q.quadraticCurveTo(hx0, hy - hr * 0.62, hx0 - hr - 1, hy - hr * 0.3); q.closePath(); }, '#e0402f', 2.4, { f: 0.8 }]);
-  } else if (big && !o.zq) {                                       // casco de matón grande
-    parts.push([(q) => { q.moveTo(hx0 - hr - 0.8, hy - hr * 0.2); q.quadraticCurveTo(hx0, hy - hr - 4.6, hx0 + hr + 0.8, hy - hr * 0.2);
-      q.quadraticCurveTo(hx0, hy - hr * 0.52, hx0 - hr - 0.8, hy - hr * 0.2); q.closePath(); }, '#2a2540', 2.6, { f: 0.8 }]);
+  } else if (kind === 'thug') {                                    // gorra: copa alta con visera
+    parts.push([(q) => { q.moveTo(hx0 - dx * 4, hy - hr * 0.42); q.quadraticCurveTo(-dx * 13, hy - hr * 0.5, -dx * 15, hy + hr * 0.08);
+      q.quadraticCurveTo(-dx * 8.6, hy - hr * 0.14, hx0 - dx * 3, hy - hr * 0.14); q.closePath(); }, '#c8352a', 0, { f: 0.7 }]);
+    parts.push([(q) => {                                           // cúpula de verdad, hundida en la cabeza
+      q.moveTo(hx0 - hr - 1, hy - hr * 0.06);
+      q.quadraticCurveTo(hx0 - hr - 1.4, hy - hr - 4.6, hx0 + dx * 1.6, hy - hr - 4.8);
+      q.quadraticCurveTo(hx0 + hr + 1.4, hy - hr - 4.2, hx0 + hr + 1, hy - hr * 0.06);
+      q.quadraticCurveTo(hx0, hy - hr * 0.44, hx0 - hr - 1, hy - hr * 0.06); q.closePath();
+    }, '#e0402f', 2.4, { f: 0.8 }]);
+  } else if (big && !o.zq) {                                       // casco de matón grande: cúpula con reborde
+    parts.push([(q) => {
+      q.moveTo(hx0 - hr - 1.2, hy - hr * 0.16);
+      q.quadraticCurveTo(hx0 - hr - 1.6, hy - hr - 5, hx0 + dx * 1.2, hy - hr - 5.2);
+      q.quadraticCurveTo(hx0 + hr + 1.6, hy - hr - 4.6, hx0 + hr + 1.2, hy - hr * 0.16);
+      q.quadraticCurveTo(hx0, hy - hr * 0.52, hx0 - hr - 1.2, hy - hr * 0.16); q.closePath();
+    }, '#8f9ab8', 2.6, { f: 0.85 }]);
   }
   parts.push([L1.leg, pants, 3.6 * B, { f: 0.7 }], [L1.foot, boot, 0, { f: 0.8 }]);
   parts.push([A1.arm, zo ? skin : shirt, 3.8 * B, { f: 0.7 }],
@@ -1826,7 +1834,7 @@ function humanArt(g, o) {
     joint(q, L1.kx, R_KNEE, 3 * B, pants, 0);
   });
   within(g, blob(hx0, hy, hr + 0.4, hr * (zo ? 1.08 : 1.04)), (q) => {
-    spec(q, hx0 - 4.4, hy - 5.6, 4, 2.8, 0.4, 0.16);
+    spec(q, hx0 - 4.4, hy - 4.2, 3.4, 2.2, 0.26, 0.12);
     if (big && o.zq) {                                             // costurones del bruto zombi
       q.strokeStyle = AL('#000000', 0.4); q.lineWidth = INW;
       q.beginPath(); q.moveTo(hx0 - 5.6, hy - hr + 3.4); q.quadraticCurveTo(hx0, hy - hr + 4.8, hx0 + 5.6, hy - hr + 4.4); q.stroke();
@@ -1839,7 +1847,7 @@ function humanArt(g, o) {
         sq: zo ? 1.14 : 1, shut: hurt, iris: zo ? '#c8ff8a' : '#3a4f8f', white: zo ? '#e6f2cf' : '#fff',
         lidCol: skin, lid: hurt ? 0.5 : atk ? 0.42 : zo ? 0.12 : 0.28, tilt: atk ? 0.4 : zo ? -0.12 : 0.22,
       });
-      brows(q, hx0, hy - hr * 0.3, sep, er * 1.6, hurt ? -1.6 : atk ? 2.2 : zo ? -0.5 : 1.4, OUT, 1.5 * hB);
+      brows(q, hx0, ey - er * 1.45, sep, er * 1.15, hurt ? -1.4 : atk ? 1.8 : zo ? -0.4 : 1.1, OUT, 1.25 * hB);
       if (zo) {
         q.beginPath(); q.ellipse(hx0, hy + hr * 0.66, 2.8, 3.4, 0, 0, R2); q.fillStyle = '#4a2030'; q.fill();
         q.fillStyle = '#eee6cf'; q.fillRect(hx0 - 2.1, hy + hr * 0.42, 4.2, 1.4);
