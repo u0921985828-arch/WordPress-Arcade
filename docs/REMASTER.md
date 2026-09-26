@@ -86,3 +86,24 @@ Cada lente es una revisión independiente, con capturas, y puede devolver el tra
 - **R3** — gradación de color por región y paletas del universo.
 - **R4** — las 7 lentes sobre el piloto; se corrige hasta pasar todas.
 - **R5** — despliegue al resto de motores por familias, repitiendo las lentes en cada familia.
+
+## 7. Dificultad seleccionable (pedido por el usuario)
+Tres niveles en **todos** los juegos: **Fácil · Normal · Difícil** (Normal por defecto, que es la curva
+actual ya rebajada en 1.23, para no romper la experiencia de quien ya juega).
+
+- **Dónde se elige**: en la pantalla de inicio de `kit.js`, tres botones bajo «Tocar para jugar», y
+  también desde el menú de pausa del reproductor. Se recuerda por juego en localStorage
+  (`dif:<id>`), así que cada uno mantiene el suyo.
+- **Qué expone kit.js**: `k.dif` (0 fácil, 1 normal, 2 difícil) y un juego de factores ya calculados
+  para que los motores no inventen números: `k.D.spd` (velocidad), `k.D.rate` (frecuencia de
+  apariciones), `k.D.dmg` (daño recibido), `k.D.life` (vidas extra), `k.D.cpu` (nivel de la IA),
+  `k.D.time` (tiempo disponible). Valores de referencia — fácil `spd 0,8 · rate 0,75 · dmg 0,6 ·
+  life +1 · cpu −1 · time ×1,25`; normal, todo a 1; difícil `spd 1,18 · rate 1,3 · dmg 1,4 ·
+  life −0 · cpu +1 · time ×0,85`.
+- **Récords separados por nivel**: `k.best()` guarda una marca por dificultad y la pantalla final
+  dice en cuál se ha conseguido; en el podio de la tele se indica el nivel de la ronda.
+- **Modo tele**: el nivel lo fija quien monta la partida desde la tele, igual para todos.
+- **Puzzles y cartas**: donde no hay velocidad, el nivel cambia el tamaño o la ayuda (menos pistas,
+  más colores, tablero mayor), nunca hace irresoluble un generador con solución garantizada.
+- **Orden**: se implementa en `kit.js` en cuanto la fase R1 libere ese fichero, y luego se adopta
+  motor por motor junto con el despliegue de la fase R5, para no abrir dos veces cada archivo.
