@@ -193,9 +193,23 @@ else (function () {
     g.restore();
   }
   function inpath(g, parts, fn) { g.save(); g.beginPath(); for (let i = 0; i < parts.length; i++) parts[i][0](g); g.clip(); fn(g); g.restore(); }
+  /* caché de sprites: fichas, peones y dados no cambian de forma; se dibujan una vez por medida y color */
+  const SPRC = {};
+  function sprOf(key, w, h, ox, oy, fn) {
+    let sp = SPRC[key]; if (sp) return sp;
+    const dpr = Math.min(2, window.devicePixelRatio || 1), cv = document.createElement('canvas');
+    cv.width = Math.ceil(w * dpr); cv.height = Math.ceil(h * dpr);
+    const g = cv.getContext('2d'); g.scale(dpr, dpr); g.translate(ox, oy); fn(g);
+    return (SPRC[key] = { cv: cv, ox: ox, oy: oy, w: w, h: h });
+  }
   function token(x, y, r, col, lift, ring) {
     ART.shadow(c, x, y + r * 0.72, r * 0.95, 0.3);
     y -= lift || 0;
+    const sp = sprOf('t|' + Math.round(r * 2) / 2 + '|' + col, r * 2.6, r * 3.2, r * 1.3, r * 1.3, (g) => tokenDraw(g, 0, 0, r, col));
+    c.drawImage(sp.cv, x - sp.ox, y - sp.oy, sp.w, sp.h);
+    if (ring) { c.beginPath(); c.arc(x, y, r * 1.28 + Math.sin(T * 7) * 1.5, 0, TAU); c.lineWidth = 3; c.strokeStyle = ring; c.stroke(); }
+  }
+  function tokenDraw(c, x, y, r, col) {
     const TH = r * 0.3;
     const side = (g) => g.ellipse(x, y + TH, r * 0.95, r * 0.92, 0, 0, TAU), top = (g) => g.arc(x, y, r * 0.95, 0, TAU);
     const sg = c.createLinearGradient(x - r, 0, x + r, 0); sg.addColorStop(0, ART.dark(col, 0.3)); sg.addColorStop(0.45, ART.dark(col, 0.18)); sg.addColorStop(1, ART.dark(col, 0.48));
@@ -209,10 +223,14 @@ else (function () {
       g.fillStyle = gr; g.beginPath(); g.arc(x, y, r * 0.95, 0, TAU); g.fill();
       g.fillStyle = 'rgba(255,255,255,.4)'; g.beginPath(); g.ellipse(x - r * 0.33, y - r * 0.38, r * 0.3, r * 0.15, -0.5, 0, TAU); g.fill();
     });
-    if (ring) { c.beginPath(); c.arc(x, y, r * 1.28 + Math.sin(T * 7) * 1.5, 0, TAU); c.lineWidth = 3; c.strokeStyle = ring; c.stroke(); }
   }
   function pawn(x, y, s, col, lift, ring) {
     ART.shadow(c, x, y + s * 0.05, s * 0.42, 0.3); y -= lift || 0;
+    const sp = sprOf('p|' + Math.round(s * 2) / 2 + '|' + col, s * 1.1, s * 1.4, s * 0.55, s * 1.15, (g) => pawnDraw(g, 0, 0, s, col));
+    c.drawImage(sp.cv, x - sp.ox, y - sp.oy, sp.w, sp.h);
+    if (ring) { c.beginPath(); c.ellipse(x, y - s * 0.06, s * 0.52 + Math.sin(T * 7) * 1.5, s * 0.22, 0, 0, TAU); c.lineWidth = 3; c.strokeStyle = ring; c.stroke(); }
+  }
+  function pawnDraw(c, x, y, s, col) {
     const gr = c.createLinearGradient(x - s * 0.4, y - s * 0.9, x + s * 0.35, y);
     gr.addColorStop(0, ART.lite(col, 0.5)); gr.addColorStop(0.5, col); gr.addColorStop(1, ART.dark(col, 0.28));
     /* pie, fuste y cabeza fundidos: un solo cuerpo */
@@ -231,18 +249,22 @@ else (function () {
       g.fillStyle = sh; g.fillRect(x, y - s * 1.0, s * 0.45, s * 1.2);                               // costado en sombra
       g.fillStyle = 'rgba(255,255,255,.4)'; g.beginPath(); g.ellipse(x - s * 0.07, y - s * 0.8, s * 0.07, s * 0.05, -0.5, 0, TAU); g.fill();
     });
-    if (ring) { c.beginPath(); c.ellipse(x, y - s * 0.06, s * 0.52 + Math.sin(T * 7) * 1.5, s * 0.22, 0, 0, TAU); c.lineWidth = 3; c.strokeStyle = ring; c.stroke(); }
   }
   const PIPS = { 1: [[0, 0]], 2: [[-1, -1], [1, 1]], 3: [[-1, -1], [0, 0], [1, 1]], 4: [[-1, -1], [1, -1], [-1, 1], [1, 1]], 5: [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]], 6: [[-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]] };
   function die(x, y, s, v, ang, dim, glow) {
+    const sp = sprOf('d|' + Math.round(s * 2) / 2 + '|' + v, s * 1.5, s * 1.6, s * 0.75, s * 0.75, (g) => dieDraw(g, s, v));
     c.save(); c.translate(x, y); c.rotate(ang || 0); c.globalAlpha = dim ? 0.35 : 1;
     if (glow) { c.shadowColor = glow; c.shadowBlur = 18; }
+    c.drawImage(sp.cv, -sp.ox, -sp.oy, sp.w, sp.h);
+    c.shadowBlur = 0; c.restore();
+  }
+  function dieDraw(c, s, v) {
     const h = s / 2, TH = s * 0.1, rd = s * 0.2;
     const body = (g) => ART.rr(g, -h, -h, s, s + TH, rd), face = (g) => ART.rr(g, -h, -h, s, s, rd);
     const sg = c.createLinearGradient(-h, h - TH, h, h + TH); sg.addColorStop(0, '#cfc6df'); sg.addColorStop(1, '#a89fbd');
     const fg = c.createLinearGradient(-h, -h, h, h); fg.addColorStop(0, '#ffffff'); fg.addColorStop(1, '#e4dcf2');
     const parts = [[body, sg], [face, fg]];
-    uni(c, parts, 1.25); c.shadowBlur = 0;
+    uni(c, parts, 1.25);
     inpath(c, parts, (g) => {
       let gr = g.createLinearGradient(0, h - 1.5, 0, h + TH); gr.addColorStop(0, 'rgba(0,0,0,.3)'); gr.addColorStop(0.35, 'rgba(0,0,0,.05)'); gr.addColorStop(1, 'rgba(0,0,0,.24)');
       g.fillStyle = gr; g.fillRect(-h, h - 1.5, s, TH + 1.5);
@@ -257,7 +279,6 @@ else (function () {
       pg.addColorStop(0, ART.lite(col, 0.25)); pg.addColorStop(0.55, col); pg.addColorStop(1, ART.dark(col, 0.5));
       c.beginPath(); c.arc(px, py, pr, 0, TAU); c.fillStyle = pg; c.fill();
     }
-    c.restore();
   }
   let boardCv = null, boardKey = '';
   function boardCanvas() {

@@ -244,7 +244,7 @@ else (function () {
   const PIP = { 0: [], 1: [[0, 0]], 2: [[-1, -1], [1, 1]], 3: [[-1, -1], [0, 0], [1, 1]], 4: [[-1, -1], [1, -1], [-1, 1], [1, 1]], 5: [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]], 6: [[-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]] };
   const PCOL = ['#1a1530', '#e0344a', '#2f9e4f', '#2f5fd0', '#d4761c', '#7a3fc0', '#1a8f9e'];
   /* punto: un hoyo taladrado en el hueso (sombra dentro, luz en el filo inferior), no un disco encima */
-  function half(x, y, s, v) {
+  function half(c, x, y, s, v) {
     const r = s * 0.115;
     for (const [a, b] of PIP[v]) {
       const px = x + a * s * 0.26, py = y + b * s * 0.26, col = PCOL[v] || '#1a1530';
@@ -254,11 +254,29 @@ else (function () {
       c.beginPath(); c.arc(px, py, r, 0, TAU); c.fillStyle = g; c.fill();
     }
   }
+  /* caché de sprite: la ficha es siempre la misma, se dibuja una vez por (valores, medida, estado) */
+  const TSC = {};
   function tileArt(x, y, w, h, a, b, opt) {
     opt = opt || {};
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const key = a + '_' + b + '_' + Math.round(w) + '_' + Math.round(h) + '_' + (opt.dim ? 1 : 0) + '_' + (opt.lw || 0) + '_' + dpr;
+    let sp = TSC[key];
+    if (!sp) {
+      const TH0 = w * 0.085, pad = 6, cw = w + pad * 2, chh = h + TH0 + pad * 2;
+      const cv = document.createElement('canvas'); cv.width = Math.ceil(cw * dpr); cv.height = Math.ceil(chh * dpr);
+      const g = cv.getContext('2d'); g.scale(dpr, dpr); g.translate(cw / 2, pad + h / 2);
+      tileDraw(g, w, h, a, b, opt);
+      sp = TSC[key] = { cv: cv, ox: cw / 2, oy: pad + h / 2, w: cw, h: chh };
+    }
     c.save(); c.translate(x, y); if (opt.rot) c.rotate(opt.rot);
     const hw = w / 2, hh = h / 2, TH = w * 0.085, rd = w * 0.18;
     ART.shadow(c, 0, hh * 0.92, w * 0.5, 0.3);
+    c.drawImage(sp.cv, -sp.ox, -sp.oy, sp.w, sp.h);
+    if (opt.ring) { ART.rr(c, -hw - 3, -hh - 3, w + 6, h + TH + 6, rd + 4); c.lineWidth = 3.5; c.strokeStyle = opt.ring; c.stroke(); }
+    c.restore();
+  }
+  function tileDraw(c, w, h, a, b, opt) {
+    const hw = w / 2, hh = h / 2, TH = w * 0.085, rd = w * 0.18;
     const body = (g) => ART.rr(g, -hw, -hh, w, h + TH, rd), face = (g) => ART.rr(g, -hw, -hh, w, h, rd);
     const sg = c.createLinearGradient(-hw, hh - TH, hw, hh + TH); sg.addColorStop(0, opt.dim ? '#8a857d' : '#d7c9ad'); sg.addColorStop(1, opt.dim ? '#6e6a63' : '#a4967a');
     const fg = c.createLinearGradient(-hw, -hh, hw, hh); fg.addColorStop(0, opt.dim ? '#bdb6ad' : '#fff8ea'); fg.addColorStop(1, opt.dim ? '#9a948c' : '#e7dcc6');
@@ -277,9 +295,7 @@ else (function () {
       gr = g.createLinearGradient(0, -hh, 0, -hh + h * 0.22); gr.addColorStop(0, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
       g.fillStyle = gr; g.fillRect(-hw, -hh, w, h * 0.22);
     });
-    half(0, -h * 0.25, w, a); half(0, h * 0.25, w, b);
-    if (opt.ring) { ART.rr(c, -hw - 3, -hh - 3, w + 6, h + TH + 6, rd + 4); c.lineWidth = 3.5; c.strokeStyle = opt.ring; c.stroke(); }
-    c.restore();
+    half(c, 0, -h * 0.25, w, a); half(c, 0, h * 0.25, w, b);
   }
   function tileBack(x, y, w, h, rot) {
     c.save(); c.translate(x, y); if (rot) c.rotate(rot);

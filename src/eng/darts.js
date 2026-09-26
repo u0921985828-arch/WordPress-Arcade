@@ -1,6 +1,41 @@
 /* Darts Pro con arte propio: 501 con cierre en doble o bull. El punto de mira oscila; mantén pulsado para estabilizar (sin pasarte: el pulso se cansa) y suelta para lanzar.
  * Teclado: flechas mueven la mira, mantén A para estabilizar y suelta para lanzar. Si te pasas, quedas en 1 o cierras sin doble, el turno se anula. */
 /* CFG.mode 'cricket' → cricketGame() (al final del archivo); sin modo: 501 clásico. */
+/* ---------- Ley de la pieza única (REMASTER §8) ----------
+ * uni(): traza TODAS las partes y las rellena después, así los contornos interiores quedan
+ * tapados y solo sobrevive el borde exterior de la silueta. inw(): detalle interior recortado
+ * contra esa silueta. Las separaciones internas se leen por sombra propia o por cambio de
+ * color, nunca por stroke. Una pieza solo se separa cuando se mueve de verdad. */
+function uni(g, parts, ow) { g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = ow * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); } }
+const all = (parts) => (g) => { for (const p of parts) p(g); };
+function inw(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+const rp = (g, x, y, w, h, r) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+const cp = (g, x, y, r) => { g.moveTo(x + r, y); g.arc(x, y, r, 0, Math.PI * 2); g.closePath(); };
+const ep2 = (g, x, y, rx, ry, rot) => { g.moveTo(x + rx * Math.cos(rot || 0), y + rx * Math.sin(rot || 0)); g.ellipse(x, y, rx, ry, rot || 0, 0, Math.PI * 2); g.closePath(); };
+const ply = (pts) => (g) => { g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); };
+/* hueso de ancho variable: baja por un costado, redondea la punta y vuelve por el otro, así
+ * miembro y tronco se unen con tangente continua y sin escalón. */
+function bone(pts, ws) {
+  return (g) => {
+    const n = pts.length, L = [], R = [];
+    for (let i = 0; i < n; i++) {
+      const a = pts[i > 0 ? i - 1 : 0], b = pts[i < n - 1 ? i + 1 : n - 1];
+      let tx = b[0] - a[0], ty = b[1] - a[1]; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
+      L.push([pts[i][0] - ty * ws[i], pts[i][1] + tx * ws[i]]);
+      R.push([pts[i][0] + ty * ws[i], pts[i][1] - tx * ws[i]]);
+    }
+    g.moveTo(L[0][0], L[0][1]);
+    for (let i = 1; i < n - 1; i++) g.quadraticCurveTo(L[i][0], L[i][1], (L[i][0] + L[i + 1][0]) / 2, (L[i][1] + L[i + 1][1]) / 2);
+    g.lineTo(L[n - 1][0], L[n - 1][1]);
+    const e = pts[n - 1], w = ws[n - 1], a0 = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0]);
+    g.arc(e[0], e[1], w, a0, a0 - Math.PI, true);
+    for (let i = n - 2; i > 0; i--) g.quadraticCurveTo(R[i][0], R[i][1], (R[i][0] + R[i - 1][0]) / 2, (R[i][1] + R[i - 1][1]) / 2);
+    g.lineTo(R[0][0], R[0][1]);
+    g.closePath();
+  };
+}
 if (CFG.mode === 'cricket') cricketGame(); else {
 const OUT = ART.OUT, R2 = 6.2832, W = 360, H = 640;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#16202e' }), c = k.ctx;
@@ -74,41 +109,6 @@ k.run((dt) => {
   if (msgT > 0) { const e = Math.min(1, (0.9 - msgT) / 0.12), s = 0.6 + 0.4 * Math.min(1, e) + Math.sin(Math.min(1, e) * Math.PI) * 0.2; c.save(); c.translate(W / 2, 66); c.scale(s, s); c.globalAlpha = Math.min(1, msgT / 0.3); label(msg, 0, -14, 26, msgC, 'center'); c.restore(); c.globalAlpha = 1; }
 });
 /* Dardo clavado visto de frente-lado: punta en (x,y), barril metálico, varilla y plumas */
-/* ---------- Ley de la pieza única (REMASTER §8) ----------
- * uni(): traza TODAS las partes y las rellena después, así los contornos interiores quedan
- * tapados y solo sobrevive el borde exterior de la silueta. inw(): detalle interior recortado
- * contra esa silueta. Las separaciones internas se leen por sombra propia o por cambio de
- * color, nunca por stroke. Una pieza solo se separa cuando se mueve de verdad. */
-function uni(g, parts, ow) { g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = ow * 2;
-  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
-  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); } }
-const all = (parts) => (g) => { for (const p of parts) p(g); };
-function inw(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
-const rp = (g, x, y, w, h, r) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
-const cp = (g, x, y, r) => { g.moveTo(x + r, y); g.arc(x, y, r, 0, Math.PI * 2); g.closePath(); };
-const ep2 = (g, x, y, rx, ry, rot) => { g.moveTo(x + rx * Math.cos(rot || 0), y + rx * Math.sin(rot || 0)); g.ellipse(x, y, rx, ry, rot || 0, 0, Math.PI * 2); g.closePath(); };
-const ply = (pts) => (g) => { g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); };
-/* hueso de ancho variable: baja por un costado, redondea la punta y vuelve por el otro, así
- * miembro y tronco se unen con tangente continua y sin escalón. */
-function bone(pts, ws) {
-  return (g) => {
-    const n = pts.length, L = [], R = [];
-    for (let i = 0; i < n; i++) {
-      const a = pts[i > 0 ? i - 1 : 0], b = pts[i < n - 1 ? i + 1 : n - 1];
-      let tx = b[0] - a[0], ty = b[1] - a[1]; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
-      L.push([pts[i][0] - ty * ws[i], pts[i][1] + tx * ws[i]]);
-      R.push([pts[i][0] + ty * ws[i], pts[i][1] - tx * ws[i]]);
-    }
-    g.moveTo(L[0][0], L[0][1]);
-    for (let i = 1; i < n - 1; i++) g.quadraticCurveTo(L[i][0], L[i][1], (L[i][0] + L[i + 1][0]) / 2, (L[i][1] + L[i + 1][1]) / 2);
-    g.lineTo(L[n - 1][0], L[n - 1][1]);
-    const e = pts[n - 1], w = ws[n - 1], a0 = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0]);
-    g.arc(e[0], e[1], w, a0, a0 - Math.PI, true);
-    for (let i = n - 2; i > 0; i--) g.quadraticCurveTo(R[i][0], R[i][1], (R[i][0] + R[i - 1][0]) / 2, (R[i][1] + R[i - 1][1]) / 2);
-    g.lineTo(R[0][0], R[0][1]);
-    g.closePath();
-  };
-}
 function drawDart(x, y, s, a) {
   if (a <= 0) return; c.save(); c.globalAlpha = a; c.translate(x, y); c.scale(s, s);
   c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(0, 0); c.lineTo(-8, 16); c.stroke();

@@ -14,10 +14,6 @@ const MD = {
   patio: { hw: 54, off: 0.6, offGrip: 5, bg: '#2f5a26', car: 'kart', haz: ['barro', 'agua', 'barro'], obs: ['arbusto', 'piedra', 'pelota', 'arbusto'] },
 }[M];
 const k = Kit({ w: W, h: H, title: CFG.title, bg: MD.bg }), c = k.ctx;
-const { mix, lite, dark, alpha, rr, fillOut, glint, shadow } = ART;
-const clamp = (v, a, b) => (v < a ? a : v > b ? b : v), lerp = (a, b, t) => a + (b - a) * t;
-const wrapA = (a) => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
-function RNG(s) { return () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 /* ---------- Ley de la pieza única (REMASTER §8) ----------
  * uni(): traza todas las partes y las rellena después → solo sobrevive el borde exterior.
  * inw(): detalle interior recortado contra la silueta. Separaciones por sombra o color. */
@@ -29,6 +25,10 @@ function inw(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g
 const rp = (g, x, y, w, h, r) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
 const cp = (g, x, y, r) => { g.moveTo(x + r, y); g.arc(x, y, r, 0, TAU); g.closePath(); };
 const ep2 = (g, x, y, rx, ry, rot) => { g.moveTo(x + rx * Math.cos(rot || 0), y + rx * Math.sin(rot || 0)); g.ellipse(x, y, rx, ry, rot || 0, 0, TAU); g.closePath(); };
+const { mix, lite, dark, alpha, rr, fillOut, glint, shadow } = ART;
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v), lerp = (a, b, t) => a + (b - a) * t;
+const wrapA = (a) => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
+function RNG(s) { return () => { s |= 0; s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 function mk(w, h, res, draw) { const cv = document.createElement('canvas'); cv.width = Math.ceil(w * res); cv.height = Math.ceil(h * res); const q = cv.getContext('2d'); q.scale(res, res); if (draw) draw(q); return cv; }
 function label(s, x, y, size, col, align, base) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = base || 'top';

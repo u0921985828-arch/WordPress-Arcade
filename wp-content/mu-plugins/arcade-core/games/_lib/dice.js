@@ -95,7 +95,17 @@ const BG = (() => { const cv = document.createElement('canvas'); cv.width = W * 
   ART.rr(g, 44, 268, W - 88, 124, 18); g.strokeStyle = 'rgba(255,240,200,.2)'; g.lineWidth = 2; g.stroke(); g.restore();
   gr = g.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.75); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,.45)'); g.fillStyle = gr; g.fillRect(0, 0, W, H); return cv; })();
 function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
-function chip(x, y, r, col) { const TH = r * 0.26;
+const CHC = {};
+function chip(x, y, r, col) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1), key = Math.round(r * 2) / 2 + '|' + col + '|' + dpr;
+  let sp = CHC[key];
+  if (!sp) { const w = r * 3, h = r * 3.2, cv = document.createElement('canvas');
+    cv.width = Math.ceil(w * dpr); cv.height = Math.ceil(h * dpr);
+    const g = cv.getContext('2d'); g.scale(dpr, dpr); g.translate(w / 2, h / 2);
+    chipDraw(g, 0, 0, r, col); sp = CHC[key] = { cv: cv, ox: w / 2, oy: h / 2, w: w, h: h }; }
+  c.drawImage(sp.cv, x - sp.ox, y - sp.oy, sp.w, sp.h);
+}
+function chipDraw(c, x, y, r, col) { const TH = r * 0.26;
   /* pieza única: canto + cara en un trazado, sectores por color, sin contornos interiores */
   const side = (g) => g.ellipse(x, y + TH, r, r * 0.97, 0, 0, 6.283), top = (g) => g.arc(x, y, r, 0, 6.283);
   const sg = c.createLinearGradient(x, y, x, y + TH + r); sg.addColorStop(0, ART.dark(col, 0.32)); sg.addColorStop(1, ART.dark(col, 0.55));

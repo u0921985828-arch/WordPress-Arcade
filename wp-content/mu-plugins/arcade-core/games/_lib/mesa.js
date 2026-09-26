@@ -489,11 +489,24 @@ else (function () {
       head: [[(g) => { g.moveTo(-s * 0.235, -s * 0.10); g.bezierCurveTo(-s * 0.21, -s * 0.33, s * 0.21, -s * 0.33, s * 0.235, -s * 0.10); g.closePath(); }, 1],
         [pPoly([[-s * 0.048, -s * 0.28], [-s * 0.048, -s * 0.40], [-s * 0.135, -s * 0.40], [-s * 0.135, -s * 0.475], [-s * 0.048, -s * 0.475], [-s * 0.048, -s * 0.56], [s * 0.048, -s * 0.56], [s * 0.048, -s * 0.475], [s * 0.135, -s * 0.475], [s * 0.135, -s * 0.40], [s * 0.048, -s * 0.40], [s * 0.048, -s * 0.28]]), 2]], collar: -s * 0.09, cw: 0.24 };
   }
+  /* caché de sprite: la pieza no cambia de forma, así que se dibuja una vez por tipo y tamaño */
+  const PSC = {};
   function piece(x, y, s, p) {
+    const dpr = Math.min(2, window.devicePixelRatio || 1), key = p + '|' + Math.round(s) + '|' + dpr;
+    let sp = PSC[key];
+    if (!sp) {
+      const cv = document.createElement('canvas');
+      cv.width = Math.ceil(s * 1.5 * dpr); cv.height = Math.ceil(s * 2.0 * dpr);
+      const g = cv.getContext('2d'); g.scale(dpr, dpr); g.translate(s * 0.75, s * 1.25);
+      pieceDraw(g, s, p);
+      sp = PSC[key] = { cv: cv, ox: s * 0.75, oy: s * 1.25, w: s * 1.5, h: s * 2.0 };
+    }
+    ART.shadow(c, x, y + s * 0.42, s * 0.34, 0.3);
+    c.drawImage(sp.cv, x - sp.ox, y - sp.oy, sp.w, sp.h);
+  }
+  function pieceDraw(c, s, p) {
     const w = p === p.toUpperCase(), t = p.toLowerCase();
     const body = w ? '#f5efe0' : '#4a4160', lite = w ? '#ffffff' : '#6b5f8c', gold = w ? '#e8b64a' : '#c9962f';
-    c.save(); c.translate(x, y);
-    ART.shadow(c, 0, s * 0.42, s * 0.34, 0.3);
     const gr = c.createLinearGradient(-s * 0.34, -s * 0.5, s * 0.3, s * 0.38);
     gr.addColorStop(0, lite); gr.addColorStop(0.5, body); gr.addColorStop(1, ART.dark(body, 0.2));
     const P = chProfile(t, s), parts = [];
@@ -538,7 +551,6 @@ else (function () {
         mn = g.createLinearGradient(0, -s * 0.08, 0, s * 0.09); mn.addColorStop(0, ART.alpha(OUT, 0)); mn.addColorStop(1, ART.alpha(OUT, 0.26));
         g.fillStyle = mn; g.fillRect(-s * 0.3, -s * 0.08, s * 0.6, s * 0.2); }
     });
-    c.restore();
   }
   function chDraw() {
     const { G, x0, y0 } = chGeo(), S = CHS.S, fl = chFlip();

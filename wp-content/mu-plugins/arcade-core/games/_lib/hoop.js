@@ -2,6 +2,41 @@
  * Tablero, aro y red con física (se deforma al pasar el balón). Racha = multiplicador; con racha 3 el aro se mueve y el balón arde.
  * Canasta limpia (sin tocar aro ni tablero) = +1 punto y +2 s. 60 segundos. */
 /* CFG.mode 'duel' → duelGame() (al final del archivo); sin modo: Hoop Arc en solitario. */
+/* ---------- Ley de la pieza única (REMASTER §8) ----------
+ * uni(): traza TODAS las partes y las rellena después, así los contornos interiores quedan
+ * tapados y solo sobrevive el borde exterior de la silueta. inw(): detalle interior recortado
+ * contra esa silueta. Las separaciones internas se leen por sombra propia o por cambio de
+ * color, nunca por stroke. Una pieza solo se separa cuando se mueve de verdad. */
+function uni(g, parts, ow) { g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = ow * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); } }
+const all = (parts) => (g) => { for (const p of parts) p(g); };
+function inw(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+const rp = (g, x, y, w, h, r) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+const cp = (g, x, y, r) => { g.moveTo(x + r, y); g.arc(x, y, r, 0, Math.PI * 2); g.closePath(); };
+const ep2 = (g, x, y, rx, ry, rot) => { g.moveTo(x + rx * Math.cos(rot || 0), y + rx * Math.sin(rot || 0)); g.ellipse(x, y, rx, ry, rot || 0, 0, Math.PI * 2); g.closePath(); };
+const ply = (pts) => (g) => { g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); };
+/* hueso de ancho variable: baja por un costado, redondea la punta y vuelve por el otro, así
+ * miembro y tronco se unen con tangente continua y sin escalón. */
+function bone(pts, ws) {
+  return (g) => {
+    const n = pts.length, L = [], R = [];
+    for (let i = 0; i < n; i++) {
+      const a = pts[i > 0 ? i - 1 : 0], b = pts[i < n - 1 ? i + 1 : n - 1];
+      let tx = b[0] - a[0], ty = b[1] - a[1]; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
+      L.push([pts[i][0] - ty * ws[i], pts[i][1] + tx * ws[i]]);
+      R.push([pts[i][0] + ty * ws[i], pts[i][1] - tx * ws[i]]);
+    }
+    g.moveTo(L[0][0], L[0][1]);
+    for (let i = 1; i < n - 1; i++) g.quadraticCurveTo(L[i][0], L[i][1], (L[i][0] + L[i + 1][0]) / 2, (L[i][1] + L[i + 1][1]) / 2);
+    g.lineTo(L[n - 1][0], L[n - 1][1]);
+    const e = pts[n - 1], w = ws[n - 1], a0 = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0]);
+    g.arc(e[0], e[1], w, a0, a0 - Math.PI, true);
+    for (let i = n - 2; i > 0; i--) g.quadraticCurveTo(R[i][0], R[i][1], (R[i][0] + R[i - 1][0]) / 2, (R[i][1] + R[i - 1][1]) / 2);
+    g.lineTo(R[0][0], R[0][1]);
+    g.closePath();
+  };
+}
 if (CFG.mode === 'duel') duelGame(); else {
 const OUT = ART.OUT, R2 = 6.2832, W = 360, H = 640, FLOOR = 578, BR = 13, RIM = 26, NC = 7, NR = 5;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#241a3a' }), c = k.ctx;
@@ -71,41 +106,6 @@ function scored() {
 /* ---------- Red: nodos con muelle hacia su posición de reposo ---------- */
 function netRest(n) { const u = n.i / (NC - 1) * 2 - 1, taper = 1 - 0.45 * n.j / (NR - 1); return [hoop.x + u * RIM * taper, hoop.y + 2 + n.j * 11]; }
 function stepNet(dt) { for (const n of net) { if (n.j === 0) { n.dx = n.dy = 0; continue; } n.vx += (-n.dx * 90 - n.vx * 6) * dt; n.vy += (-n.dy * 90 - n.vy * 6) * dt; n.dx += n.vx * dt; n.dy += n.vy * dt; } }
-/* ---------- Ley de la pieza única (REMASTER §8) ----------
- * uni(): traza TODAS las partes y las rellena después, así los contornos interiores quedan
- * tapados y solo sobrevive el borde exterior de la silueta. inw(): detalle interior recortado
- * contra esa silueta. Las separaciones internas se leen por sombra propia o por cambio de
- * color, nunca por stroke. Una pieza solo se separa cuando se mueve de verdad. */
-function uni(g, parts, ow) { g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = ow * 2;
-  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
-  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); } }
-const all = (parts) => (g) => { for (const p of parts) p(g); };
-function inw(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
-const rp = (g, x, y, w, h, r) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
-const cp = (g, x, y, r) => { g.moveTo(x + r, y); g.arc(x, y, r, 0, Math.PI * 2); g.closePath(); };
-const ep2 = (g, x, y, rx, ry, rot) => { g.moveTo(x + rx * Math.cos(rot || 0), y + rx * Math.sin(rot || 0)); g.ellipse(x, y, rx, ry, rot || 0, 0, Math.PI * 2); g.closePath(); };
-const ply = (pts) => (g) => { g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); };
-/* hueso de ancho variable: baja por un costado, redondea la punta y vuelve por el otro, así
- * miembro y tronco se unen con tangente continua y sin escalón. */
-function bone(pts, ws) {
-  return (g) => {
-    const n = pts.length, L = [], R = [];
-    for (let i = 0; i < n; i++) {
-      const a = pts[i > 0 ? i - 1 : 0], b = pts[i < n - 1 ? i + 1 : n - 1];
-      let tx = b[0] - a[0], ty = b[1] - a[1]; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
-      L.push([pts[i][0] - ty * ws[i], pts[i][1] + tx * ws[i]]);
-      R.push([pts[i][0] + ty * ws[i], pts[i][1] - tx * ws[i]]);
-    }
-    g.moveTo(L[0][0], L[0][1]);
-    for (let i = 1; i < n - 1; i++) g.quadraticCurveTo(L[i][0], L[i][1], (L[i][0] + L[i + 1][0]) / 2, (L[i][1] + L[i + 1][1]) / 2);
-    g.lineTo(L[n - 1][0], L[n - 1][1]);
-    const e = pts[n - 1], w = ws[n - 1], a0 = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0]);
-    g.arc(e[0], e[1], w, a0, a0 - Math.PI, true);
-    for (let i = n - 2; i > 0; i--) g.quadraticCurveTo(R[i][0], R[i][1], (R[i][0] + R[i - 1][0]) / 2, (R[i][1] + R[i - 1][1]) / 2);
-    g.lineTo(R[0][0], R[0][1]);
-    g.closePath();
-  };
-}
 function drawNet() {
   const P = (i, j) => { const n = net[j * NC + i], [x, y] = netRest(n); return [x + n.dx, y + n.dy]; };
   c.lineCap = 'round'; for (const [lw, col] of [[3.2, 'rgba(26,21,48,.55)'], [1.6, '#f4f2ff']]) { c.lineWidth = lw; c.strokeStyle = col; c.beginPath();

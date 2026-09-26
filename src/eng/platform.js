@@ -618,12 +618,17 @@ function drawRoof(r) {
   const y = r.y, cr = Math.min(1, r.crack);
   c.save();
   if (r.fall) c.globalAlpha = Math.max(0.15, 1 - (r.y - r.base) / 220);
-  c.beginPath(); ART.rr(c, r.x, y, r.w, r.solid ? 26 : 16, 4); ART.fillOut(c, r.solid ? '#4a3a63' : ART.mix('#7a5f8f', '#e0603d', cr * 0.7), 2.4);
-  c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(r.x + 3, y + 3, r.w - 6, 3);
-  for (let x = r.x + 8; x < r.x + r.w - 6; x += 14) { c.fillStyle = 'rgba(0,0,0,.2)'; c.fillRect(x, y + 6, 2, (r.solid ? 26 : 16) - 9); }
-  if (!r.solid && cr > 0.25) { c.strokeStyle = `rgba(30,16,16,${0.35 + cr * 0.5})`; c.lineWidth = 1.6 + cr;
-    for (let i = 0; i < 3; i++) { const bx = r.x + r.w * (0.25 + i * 0.25);
-      c.beginPath(); c.moveTo(bx, y + 1); c.lineTo(bx - 4 - cr * 4, y + 8); c.lineTo(bx + 3, y + 15); c.stroke(); } }
+  const h = r.solid ? 26 : 16, tej = (g) => ART.rr(g, r.x, y, r.w, h, 4);
+  unite(c, [[tej, r.solid ? '#4a3a63' : ART.mix('#7a5f8f', '#e0603d', cr * 0.7)]], 1.2);
+  clipIn(c, tej, (g) => {
+    g.fillStyle = AL('#ffffff', 0.12); g.fillRect(r.x + 3, y + 3, r.w - 6, 3);
+    for (let x = r.x + 8; x < r.x + r.w - 6; x += 14) { g.fillStyle = AL(OUT, 0.2); g.fillRect(x, y + 6, 2, h - 9); }
+    g.fillStyle = AL(OUT, 0.2); g.fillRect(r.x, y + h - 4, r.w, 4);
+    /* grietas: hendidura (luz + sombra), no un trazo dentro de la silueta */
+    if (!r.solid && cr > 0.25) { const gr = (w2) => { g.lineWidth = w2; g.lineJoin = 'round'; for (let i = 0; i < 3; i++) { const bx = r.x + r.w * (0.25 + i * 0.25); g.beginPath(); g.moveTo(bx, y - 1); g.lineTo(bx - 4 - cr * 4, y + 8); g.lineTo(bx + 3, y + 17); g.stroke(); } };
+      g.strokeStyle = AL('#ffffff', 0.18 + cr * 0.2); g.save(); g.translate(1, 0.8); gr(1.6 + cr); g.restore();
+      g.strokeStyle = AL(OUT, 0.35 + cr * 0.4); gr(1.4 + cr); }
+  });
   c.restore();
 }
 function drawNinja(nj) {
@@ -633,7 +638,10 @@ function drawNinja(nj) {
   ART.hero(c, x, y + 3, 0.92, { face: nj.face, state: nj.state, t, col: nj.col, squash: 0 });
   c.globalAlpha = 1;
   // banda de color sobre la cabeza para reconocer al jugador
-  c.beginPath(); ART.rr(c, x - 9, y - nj.h - 6, 18, 5, 2); ART.fillOut(c, nj.col, 1.6);
+  /* la banda cruza por delante de la cabeza: solo lleva el borde que la separa */
+  ART.rr(c, x - 9, y - nj.h - 6, 18, 5.6, 2.4); c.fillStyle = nj.col; c.fill();
+  c.fillStyle = AL(OUT, 0.3); c.fillRect(x - 9, y - nj.h - 1.4, 18, 1.4);
+  c.fillStyle = AL('#ffffff', 0.25); c.fillRect(x - 8, y - nj.h - 5.4, 16, 1.2);
   c.restore();
 }
 function drawStar(st) {
