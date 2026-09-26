@@ -765,14 +765,22 @@ function stoneFloor(g, r) {
   for (let y = Y0, j = 0; y < Y1; y += 32, j++) for (let x = X0, i = 0; x < X1; x += 32, i++) {
     const tw = Math.min(32, X1 - x), th = Math.min(32, Y1 - y); if (tw < 6 || th < 6) continue;
     const px = x + 1.6, py = y + 1.6, pw = tw - 3.2, ph = th - 3.2;
-    const base = MXC((i + j) % 2 ? TH.f1 : TH.f2, r() < 0.5 ? '#ffffff' : '#000000', r() * 0.085);
+    const odd = r() < 0.07, sunk = !odd && r() < 0.06;
+    let base = MXC((i + j) % 2 ? TH.f1 : TH.f2, r() < 0.5 ? '#ffffff' : '#000000', 0.03 + r() * 0.15);
+    if (odd) base = MXC(base, r() < 0.5 ? grout : LT(TH.f1, 0.22), 0.4 + r() * 0.35);
+    if (sunk) base = DK(base, 0.16);
     g.save(); ART.rr(g, px, py, pw, ph, 2.6); g.clip();
     g.fillStyle = base; g.fillRect(px, py, pw, ph);
-    // bisel: luz arriba-izquierda, sombra abajo-derecha
-    g.fillStyle = AL('#ffffff', 0.085); g.fillRect(px, py, pw, 2.4);
-    g.fillStyle = AL('#ffffff', 0.05); g.fillRect(px, py, 2.4, ph);
-    g.fillStyle = AL('#000000', 0.2); g.fillRect(px, py + ph - 2.6, pw, 2.6);
-    g.fillStyle = AL('#000000', 0.13); g.fillRect(px + pw - 2.4, py, 2.4, ph);
+    // bisel: luz arriba-izquierda, sombra abajo-derecha (invertido si la losa está hundida)
+    if (sunk) {
+      g.fillStyle = AL('#000000', 0.26); g.fillRect(px, py, pw, 3); g.fillRect(px, py, 3, ph);
+      g.fillStyle = AL('#ffffff', 0.07); g.fillRect(px, py + ph - 2.2, pw, 2.2); g.fillRect(px + pw - 2.2, py, 2.2, ph);
+    } else {
+      g.fillStyle = AL('#ffffff', 0.085); g.fillRect(px, py, pw, 2.4);
+      g.fillStyle = AL('#ffffff', 0.05); g.fillRect(px, py, 2.4, ph);
+      g.fillStyle = AL('#000000', 0.2); g.fillRect(px, py + ph - 2.6, pw, 2.6);
+      g.fillStyle = AL('#000000', 0.13); g.fillRect(px + pw - 2.4, py, 2.4, ph);
+    }
     // desgaste con ruido
     for (let q = 0, n = 4 + (r() * 5 | 0); q < n; q++) {
       const bx = px + r() * pw, by = py + r() * ph, rr0 = 0.7 + r() * 2.8;
@@ -798,6 +806,15 @@ function stoneFloor(g, r) {
       for (let q = 0, n = 5 + (r() * 6 | 0); q < n; q++) { g.fillStyle = AL(r() < 0.5 ? MOSS : DK(MOSS, 0.3), 0.1 + r() * 0.22); g.beginPath(); g.ellipse(mx + (r() - 0.5) * 16, my + (r() - 0.5) * 12, 1.4 + r() * 3, 1 + r() * 2, r() * 3, 0, R2); g.fill(); }
     }
     g.restore();
+  }
+  // grietas largas que cruzan varias losas (fuera del recorte por losa)
+  for (let n = 0, m = 2 + (r() * 2 | 0); n < m; n++) {
+    let cx = X0 + 20 + r() * (X1 - X0 - 40), cy = Y0 + 10 + r() * (Y1 - Y0 - 60);
+    const dx = (r() - 0.5) * 1.4, seg = 5 + (r() * 4 | 0);
+    g.beginPath(); g.moveTo(cx, cy);
+    for (let q = 0; q < seg; q++) { cx += dx * 18 + (r() - 0.5) * 16; cy += 16 + r() * 20; g.lineTo(cx, cy); }
+    g.lineWidth = 1.6; g.strokeStyle = AL('#000000', 0.3); g.stroke();
+    g.save(); g.translate(-1.1, -1.1); g.lineWidth = 1; g.strokeStyle = AL('#ffffff', 0.07); g.stroke(); g.restore();
   }
   // charcos (cruzan las juntas, por eso van fuera del recorte)
   if (DAMP) for (let n = 0, m = 3 + (r() * 3 | 0); n < m; n++) {
@@ -1035,31 +1052,57 @@ function rim(g, x, y, w2, h2, rd) { // luz de borde arriba-izquierda + filo frí
   g.strokeStyle = AL('#4a3f7a', 0.4); g.beginPath(); g.moveTo(x + w2 - 2, y + h2 * 0.45); g.lineTo(x + w2 - 2, y + h2 - rd); g.quadraticCurveTo(x + w2 - 2, y + h2 - 2, x + w2 - rd, y + h2 - 2); g.lineTo(x + w2 * 0.45, y + h2 - 2); g.stroke();
 }
 function sStone(g, bw, bh, fl, r) {
-  const FH = 11, face = fl ? '#e9e6ff' : DK(TH.face, 0.12), top = fl ? '#ffffff' : DK(TH.top, 0.1);
+  const FH = 11, face = fl ? '#e9e6ff' : DK(MXC(TH.face, '#8d8474', 0.24), 0.14);
+  const base = DK(MXC(MXC(TH.top, TH.face, 0.45), '#8d8474', 0.3), 0.14), top = fl ? '#ffffff' : MXC(base, r() < 0.5 ? '#ffffff' : '#000000', r() * 0.14);
   const ty = -9, th = bh - FH + 7;
   // cuerpo: canto frontal en sombra
   ART.rr(g, 0, ty + 4, bw, th + FH - 2, 5); ART.fillOut(g, face, 3);
   g.fillStyle = AL('#000000', 0.26); g.fillRect(2, bh - 5, bw - 4, 4);
+  if (!fl) { // el canto también es piedra: hiladas y picado
+    g.save(); ART.rr(g, 1.5, bh - FH - 1, bw - 3, FH + 1, 3); g.clip();
+    for (let x2 = -8 + r() * 14; x2 < bw; x2 += 16 + r() * 16) { g.fillStyle = AL('#000000', 0.34); g.fillRect(x2, bh - FH - 2, 2.6, FH + 4); g.fillStyle = AL('#ffffff', 0.1); g.fillRect(x2 + 2.6, bh - FH - 2, 1.2, FH + 4); }
+    for (let q = 0, n = 6 + (r() * 6 | 0); q < n; q++) { g.fillStyle = r() < 0.5 ? AL('#000000', 0.08 + r() * 0.1) : AL('#ffffff', 0.05 + r() * 0.07); g.beginPath(); g.ellipse(r() * bw, bh - FH + r() * FH, 1 + r() * 2.4, 0.7 + r() * 1.6, r() * 3, 0, R2); g.fill(); }
+    g.restore();
+  }
   // cara superior
   ART.rr(g, 0, ty, bw, th, 4.5);
-  if (fl) g.fillStyle = '#ffffff'; else { const gr = g.createLinearGradient(0, ty, bw * 0.55, ty + th); gr.addColorStop(0, LT(top, 0.3)); gr.addColorStop(0.45, top); gr.addColorStop(1, DK(top, 0.3)); g.fillStyle = gr; }
+  if (fl) g.fillStyle = '#ffffff'; else { const gr = g.createLinearGradient(0, ty, bw * 0.55, ty + th); gr.addColorStop(0, LT(top, 0.16)); gr.addColorStop(0.4, top); gr.addColorStop(1, DK(top, 0.28)); g.fillStyle = gr; }
   g.fill(); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke();
   if (fl) return;
   g.save(); ART.rr(g, 1.8, ty + 1.8, bw - 3.6, th - 3.6, 3.5); g.clip();
-  // 2-3 sillares grandes, no una rejilla
-  const rows = th > 46 ? 2 : 1, cols = bw > 70 ? (bw > 100 ? 3 : 2) : 1;
-  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
-    const cw = bw / cols, chh = th / rows, x = i * cw, y = ty + j * chh;
-    g.fillStyle = AL(r() < 0.5 ? '#ffffff' : '#000000', 0.05 + r() * 0.09); g.fillRect(x, y, cw, chh);
-    if (cols > 1 || rows > 1) { g.fillStyle = AL('#000000', 0.34); g.fillRect(x - 1.6, y, 3.2, chh); g.fillRect(x, y - 1.6, cw, 3.2); g.fillStyle = AL('#ffffff', 0.16); g.fillRect(x + 1.6, y + 1.6, cw - 1.6, 1.6); }
-    for (let q = 0, n = 8 + (r() * 8 | 0); q < n; q++) { g.fillStyle = r() < 0.5 ? AL('#000000', 0.07 + r() * 0.11) : AL('#ffffff', 0.05 + r() * 0.08); g.beginPath(); g.ellipse(x + r() * cw, y + r() * chh, 1 + r() * 3.2, 0.8 + r() * 2.2, r() * 3, 0, R2); g.fill(); }
-    if (r() < 0.6) { let px = x + 3 + r() * (cw - 6), py = y + 2; g.beginPath(); g.moveTo(px, py); for (let q = 0, n = 3 + (r() * 2 | 0); q < n; q++) { px += (r() - 0.5) * 10; py += chh / 4 + r() * 5; g.lineTo(px, py); } g.lineWidth = 1.5; g.strokeStyle = AL('#000000', 0.4); g.stroke(); g.save(); g.translate(-1, -1); g.lineWidth = 1; g.strokeStyle = AL('#ffffff', 0.14); g.stroke(); g.restore(); }
+  // sillería a soga: hiladas desplazadas, nunca una cruz centrada
+  const rows = Math.max(1, Math.round(th / 19)), rh = th / rows, nom = bw / Math.max(bw >= 30 ? 2 : 1, Math.ceil(bw / 40));
+  for (let j = 0; j < rows; j++) {
+    const y = ty + j * rh;
+    let x = j % 2 ? -nom * (0.35 + r() * 0.3) : -nom * (r() * 0.2);
+    while (x < bw) {
+      const cw = nom * (0.8 + r() * 0.6), xa = Math.max(0, x), xb = Math.min(bw, x + cw), aw = xb - xa;
+      if (aw > 3) {
+        // tono propio del sillar (variación fuerte: nunca dos iguales)
+        g.fillStyle = AL(r() < 0.5 ? '#ffffff' : '#000000', 0.05 + r() * 0.17); g.fillRect(xa, y, aw, rh);
+        const sg = g.createLinearGradient(0, y, 0, y + rh); sg.addColorStop(0, AL('#ffffff', 0.12)); sg.addColorStop(0.5, AL('#ffffff', 0)); sg.addColorStop(1, AL('#000000', 0.16)); g.fillStyle = sg; g.fillRect(xa, y, aw, rh);
+        // junta: rehundida arriba/izquierda, filo iluminado debajo
+        g.fillStyle = AL('#000000', 0.5); g.fillRect(x - 1.8, y, 3.6, rh); g.fillRect(xa, y - 1.8, aw, 3.6);
+        g.fillStyle = AL('#ffffff', 0.17); g.fillRect(x + 1.7, y + 1.7, 1.4, rh - 1.7); g.fillRect(xa + 1.7, y + 1.7, aw - 1.7, 1.4);
+        // mordida en una esquina del sillar
+        if (r() < 0.34) { const ex = r() < 0.5 ? xa + 2 : xb - 2, ey = r() < 0.5 ? y + 2 : y + rh - 2, d = 3 + r() * 5;
+          g.fillStyle = AL('#000000', 0.3); g.beginPath(); g.moveTo(ex, ey); g.lineTo(ex + (r() - 0.5) * d * 2, ey + (r() < 0.5 ? d : -d)); g.lineTo(ex + (r() < 0.5 ? d : -d), ey); g.closePath(); g.fill(); }
+        // picado de la piedra
+        for (let q = 0, n = 5 + (r() * 7 | 0); q < n; q++) { g.fillStyle = r() < 0.5 ? AL('#000000', 0.07 + r() * 0.11) : AL('#ffffff', 0.05 + r() * 0.08); g.beginPath(); g.ellipse(xa + r() * aw, y + r() * rh, 1 + r() * 3, 0.8 + r() * 2, r() * 3, 0, R2); g.fill(); }
+      }
+      x += cw;
+    }
   }
+  // grieta larga que cruza varias hiladas
+  if (r() < 0.75) { let px = 4 + r() * (bw - 8), py = ty + 1; g.beginPath(); g.moveTo(px, py);
+    for (let q = 0, n = 4 + (r() * 3 | 0); q < n; q++) { px += (r() - 0.5) * 12; py += th / 4 + r() * 6; g.lineTo(px, py); }
+    g.lineWidth = 1.6; g.strokeStyle = AL('#000000', 0.42); g.stroke();
+    g.save(); g.translate(-1.1, -1.1); g.lineWidth = 1; g.strokeStyle = AL('#ffffff', 0.13); g.stroke(); g.restore(); }
   // sombra interior en todo el borde de la cara superior
-  g.strokeStyle = AL('#000000', 0.2); g.lineWidth = 5; ART.rr(g, 0, ty, bw, th, 4.5); g.stroke();
-  // chaflán: luz arriba-izquierda, sombra interior abajo-derecha
-  g.fillStyle = AL('#ffffff', 0.26); g.fillRect(0, ty, bw, 3); g.fillRect(0, ty, 3, th);
-  g.fillStyle = AL('#000000', 0.34); g.fillRect(0, ty + th - 4.5, bw, 4.5); g.fillRect(bw - 4.5, ty, 4.5, th);
+  g.strokeStyle = AL('#000000', 0.14); g.lineWidth = 4; ART.rr(g, 0, ty, bw, th, 4.5); g.stroke();
+  // chaflán: filo de luz corto y roto arriba-izquierda (no un reflejo liso)
+  g.fillStyle = AL('#ffffff', 0.17); g.fillRect(2, ty + 1, bw * (0.3 + r() * 0.25), 2); g.fillRect(1, ty + 2, 2, th * (0.45 + r() * 0.3));
+  g.fillStyle = AL('#000000', 0.2); g.fillRect(0, ty + th - 3, bw, 3); g.fillRect(bw - 3, ty, 3, th);
   if (DAMP) for (let q = 0, n = 10 + (r() * 10 | 0); q < n; q++) { g.fillStyle = AL(r() < 0.5 ? MOSS : DK(MOSS, 0.35), 0.14 + r() * 0.22); g.beginPath(); g.ellipse(r() * bw, ty + th - r() * th * 0.3, 1.8 + r() * 4, 1.2 + r() * 2.4, 0, 0, R2); g.fill(); }
   g.restore();
   rim(g, 0, ty, bw, th, 4.5);
@@ -1229,7 +1272,7 @@ function blockShadow(w) {
     w._dx = k.clamp((w.x + w.w / 2 - lx) / 7, -9, 9);
   }
   const pad = w._pad, sw = w.w + pad * 2, sh2 = w.h + pad * 2;
-  c.globalAlpha = 0.42; c.drawImage(w._sh, w.x - pad + w._dx * 0.7, w.y - pad + 7, sw, sh2 * 1.08);
+  c.globalAlpha = 0.5; c.drawImage(w._sh, w.x - pad + w._dx, w.y - pad + 10, sw * 1.02, sh2 * 1.1);
   c.globalAlpha = 1;
 }
 function block(w) {
