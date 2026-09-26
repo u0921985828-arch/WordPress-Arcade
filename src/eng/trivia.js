@@ -307,10 +307,14 @@ function panel(x, y, w, h, r, fill, o) {
   o = o || {};
   c.save();
   if (!o.flat) { c.fillStyle = 'rgba(8,4,24,.45)'; ART.rr(c, x, y + (o.drop || 5), w, h, r); c.fill(); }
-  ART.rr(c, x, y, w, h, r);
-  const g = c.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, ART.lite(fill, 0.16)); g.addColorStop(1, ART.dark(fill, 0.12)); c.fillStyle = g; c.fill();
+  /* §8: tres tonos planos con borde DURO (sin degradado), un solo contorno exterior */
+  ART.rr(c, x, y, w, h, r); c.fillStyle = fill; c.fill();
   c.lineWidth = o.lw || 3; c.strokeStyle = o.stroke || OUT; c.stroke();
-  c.save(); ART.rr(c, x, y, w, h, r); c.clip(); c.fillStyle = 'rgba(255,255,255,.13)'; c.fillRect(x, y, w, Math.min(10, h * 0.18)); c.restore();
+  c.save(); ART.rr(c, x, y, w, h, r); c.clip();
+  const bt = Math.min(9, h * 0.12), tt = Math.min(11, h * 0.16);
+  c.fillStyle = ART.dark(fill, 0.17); c.fillRect(x, y + h - bt, w, bt);
+  c.fillStyle = ART.lite(fill, 0.17); c.fillRect(x, y, w, tt);
+  c.restore();
   c.restore();
 }
 function wrap(txt, maxW, size, wt) {
@@ -339,12 +343,14 @@ function wheel(cx, cy, r, ang) {
   c.save(); c.translate(cx, cy);
   c.fillStyle = 'rgba(8,4,24,.4)'; c.beginPath(); c.arc(0, 6, r + 6, 0, TAU); c.fill();
   c.rotate(ang);
-  keys.forEach((kk, i) => { const a0 = (i * TAU) / n - TAU / 4, a1 = a0 + TAU / n; c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, r, a0, a1); c.closePath(); c.fillStyle = DATA.cats[kk].col; c.fill(); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke();
-    c.save(); c.rotate(a0 + TAU / n / 2 + TAU / 4); c.fillStyle = 'rgba(255,255,255,.9)'; c.beginPath(); c.arc(0, -r * 0.68, r * 0.1, 0, TAU); c.fill(); c.restore(); });
+  /* §8: la ruleta es UNA pieza — los sectores y el eje se leen por color, sin contornos interiores */
+  const parts = keys.map((kk, i) => { const a0 = (i * TAU) / n - TAU / 4, a1 = a0 + TAU / n;
+    return [(g) => { g.moveTo(0, 0); g.arc(0, 0, r, a0, a1); g.closePath(); }, DATA.cats[kk].col]; });
+  parts.push([(g) => { g.moveTo(r * 0.22, 0); g.arc(0, 0, r * 0.22, 0, TAU); }, '#fff4d6']);
+  unite8(c, parts, 2.4);
+  keys.forEach((kk, i) => { const a0 = (i * TAU) / n - TAU / 4; c.save(); c.rotate(a0 + TAU / n / 2 + TAU / 4); c.fillStyle = 'rgba(255,255,255,.9)'; c.beginPath(); c.arc(0, -r * 0.68, r * 0.1, 0, TAU); c.fill(); c.restore(); });
   c.restore();
-  c.beginPath(); c.arc(cx, cy, r, 0, TAU); c.lineWidth = 5; c.strokeStyle = OUT; c.stroke();
-  c.beginPath(); c.arc(cx, cy, r * 0.22, 0, TAU); c.fillStyle = '#fff4d6'; c.fill(); c.lineWidth = 3; c.stroke();
-  c.beginPath(); c.moveTo(cx - 13, cy - r - 12); c.lineTo(cx + 13, cy - r - 12); c.lineTo(cx, cy - r + 12); c.closePath(); c.fillStyle = '#ffd36b'; c.fill(); c.lineWidth = 3; c.stroke();
+  unite8(c, [[(g) => { g.moveTo(cx - 13, cy - r - 12); g.lineTo(cx + 13, cy - r - 12); g.lineTo(cx, cy - r + 12); g.closePath(); }, '#ffd36b', { dx: 1.6, dy: 1.6 }]], 1.6);
 }
 function catAt(ang) { const keys = Object.keys(DATA.cats), n = keys.length; let a = (-ang) % TAU; if (a < 0) a += TAU; return keys[Math.floor(a / (TAU / n)) % n]; }
 function lectern(i, s, t) {
@@ -355,7 +361,9 @@ function lectern(i, s, t) {
   /* pulsador */
   const bx = x + w / 2, by = y + 18 + up, br = LAND ? 20 : 17;
   if (glow) { c.save(); c.globalAlpha = 0.5 + 0.3 * Math.sin(t * 10); c.fillStyle = col; c.beginPath(); c.arc(bx, by, br + 10, Math.PI, 0); c.fill(); c.restore(); }
-  c.beginPath(); c.arc(bx, by, br, Math.PI, 0); c.closePath(); const g = c.createRadialGradient(bx - 6, by - 10, 2, bx, by, br); g.addColorStop(0, ART.lite(col, 0.55)); g.addColorStop(1, s.lock ? col : ART.dark(col, 0.25)); c.fillStyle = g; c.fill(); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke();
+  const dome = (g) => { g.moveTo(bx - br, by); g.arc(bx, by, br, Math.PI, 0); g.closePath(); };
+  unite8(c, [[dome, s.lock ? col : ART.dark(col, 0.18), { dx: br * 0.16, dy: br * 0.16 }]], 1.6);
+  shine8(c, bx - br * 0.34, by - br * 0.54, br * 0.3, br * 0.17, -0.5, 0.42);
   const nm = pl.cpu ? 'CPU' : k.party ? pl.name : 'Tú';
   if (LAND) {
     outlined(nm, x + 12, y + 44, 18, col, 'left', 4);
@@ -392,7 +400,7 @@ function drawOption(i, q, t) {
   const marks = seat.filter((s) => (phase === 'ask' ? hum(s.p) && !s.lock && s.sel === i : rev && s.lock && s.sel === i));
   marks.forEach((s, m) => {
     const col = k.pcol(s.p), mx = x + w - 16 - m * 28, my = y + 14;
-    if (phase === 'ask') { c.save(); c.lineWidth = 5; c.strokeStyle = col; c.shadowColor = col; c.shadowBlur = 12; ART.rr(c, x - 4, y - 4, w + 8, h + 8, 19); c.stroke(); c.restore(); }
+    if (phase === 'ask') { c.save(); c.strokeStyle = ART.alpha(col, 0.35); c.lineWidth = 9; ART.rr(c, x - 4, y - 4, w + 8, h + 8, 19); c.stroke(); c.strokeStyle = col; c.lineWidth = 5; c.stroke(); c.restore(); }
     c.beginPath(); c.arc(mx, my, 12, 0, TAU); c.fillStyle = col; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
     const pl = k.players(SEATS)[seat.indexOf(s)]; c.font = FONT(11, 900); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = OUT; c.fillText(pl.cpu ? 'C' : k.party ? 'J' + (s.p + 1) : 'Tú', mx, my + 1);
   });
@@ -406,7 +414,7 @@ function draw() {
     panel(cx0, cy0, cw, ch, 20, '#f6f1ff');
     outlined(CFG.title, W / 2, cy0 + ch * 0.38, LAND ? 40 : 34, '#ffd36b', 'center', 7);
     c.font = FONT(18, 700); c.textAlign = 'center'; c.fillStyle = OUT; c.fillText(!DATA ? 'Cargando preguntas…' : TF ? '¿Verdad o bulo?' : 'Seis categorías · diez preguntas', W / 2, cy0 + ch * 0.66);
-    for (let i = 0; i < (TF ? 2 : 4); i++) { const [x, y, w, h] = optRect(i); panel(x, y, w, h, 16, TF ? (i ? '#d9534f' : '#3fa55a') : '#2d2a5c'); if (TF) { (i ? cross : check)(x + w / 2, y + h * 0.4, 44, '#fff'); outlined(i ? 'BULO' : 'VERDAD', x + w / 2, y + h * 0.76, 30, '#fff', 'center', 6); } else { const bx = x + (LAND ? 30 : 24), by = LAND ? y + h / 2 : y + 24; c.beginPath(); c.arc(bx, by, 18, 0, TAU); c.fillStyle = OPC[i]; c.fill(); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke(); outlined(LET[i], bx, by + 1, 20, '#fff', 'center', 4); const smp = ['Geografía', 'Historia', 'Ciencia', 'Arte y cultura'][i]; if (LAND) textBlock(smp, x + 58, y + 6, w - 70, h - 12, L.of, 14, '#fff', 800, 'left'); else textBlock(smp, x + 10, y + 40, w - 20, h - 48, L.of, 13, '#fff', 800); } }
+    for (let i = 0; i < (TF ? 2 : 4); i++) { const [x, y, w, h] = optRect(i); panel(x, y, w, h, 16, TF ? (i ? '#d9534f' : '#3fa55a') : '#2d2a5c'); if (TF) { (i ? cross : check)(x + w / 2, y + h * 0.4, 44, '#fff'); outlined(i ? 'BULO' : 'VERDAD', x + w / 2, y + h * 0.76, 30, '#fff', 'center', 6); } else { const bx = x + (LAND ? 30 : 24), by = LAND ? y + h / 2 : y + 24; c.beginPath(); c.arc(bx, by, 18, 0, TAU); c.fillStyle = ART.dark(OPC[i], 0.42); c.fill(); c.beginPath(); c.arc(bx, by - 1.5, 16.5, 0, TAU); c.fillStyle = OPC[i]; c.fill(); outlined(LET[i], bx, by + 1, 20, '#fff', 'center', 4); const smp = ['Geografía', 'Historia', 'Ciencia', 'Arte y cultura'][i]; if (LAND) textBlock(smp, x + 58, y + 6, w - 70, h - 12, L.of, 14, '#fff', 800, 'left'); else textBlock(smp, x + 10, y + 40, w - 20, h - 48, L.of, 13, '#fff', 800); } }
     (seat || []).forEach((s, i) => lectern(i, s, t));
     return;
   }
@@ -991,7 +999,8 @@ function NEWGAME() {
       if (!rev) { c.font = FONT(LAND ? 14 : 15, 800); c.fillStyle = 'rgba(255,255,255,.7)'; c.fillText(i ? '→' : '←', x + w / 2 + sh, y + h - (LAND ? 20 : 26)); }
     } else {
       const bx = x + (LAND ? 30 : 24), by = LAND ? y + h / 2 : y + 24, lr = LAND ? 20 : 16;
-      c.beginPath(); c.arc(bx + sh, by, lr, 0, TAU); c.fillStyle = OPC[i]; c.fill(); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke();
+      c.beginPath(); c.arc(bx + sh, by, lr, 0, TAU); c.fillStyle = ART.dark(OPC[i], 0.42); c.fill();
+      c.beginPath(); c.arc(bx + sh, by - lr * 0.08, lr * 0.92, 0, TAU); c.fillStyle = OPC[i]; c.fill();
       outlined(LET[i], bx + sh, by + 1, LAND ? 22 : 18, '#fff', 'center', 4);
       const big = CAL ? (LAND ? 30 : 30) : L.of;
       if (LAND) textBlock(q.opts[i], x + 58 + sh, y + 6, w - 70, h - 12, big, 14, '#fff', 800, CAL ? 'center' : 'left');
@@ -1000,7 +1009,7 @@ function NEWGAME() {
     const marks = seats.filter((s) => (phase === 'ask' ? hum2(s.p) && !s.lock && s.sel === i : rev && s.lock && s.sel === i));
     marks.forEach((s, m) => {
       const col = k.pcol(s.p), mx = x + w - 16 - m * 28, my = y + 14;
-      if (phase === 'ask') { c.save(); c.lineWidth = 5; c.strokeStyle = col; c.shadowColor = col; c.shadowBlur = 12; ART.rr(c, x - 4, y - 4, w + 8, h + 8, 19); c.stroke(); c.restore(); }
+      if (phase === 'ask') { c.save(); c.strokeStyle = ART.alpha(col, 0.35); c.lineWidth = 9; ART.rr(c, x - 4, y - 4, w + 8, h + 8, 19); c.stroke(); c.strokeStyle = col; c.lineWidth = 5; c.stroke(); c.restore(); }
       c.beginPath(); c.arc(mx, my, 12, 0, TAU); c.fillStyle = col; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
       const pl = k.players(SEATS)[seats.indexOf(s)];
       c.font = FONT(11, 900); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = OUT; c.fillText(pl.cpu ? 'C' : k.party ? 'J' + (s.p + 1) : 'Tú', mx, my + 1);
@@ -1010,8 +1019,7 @@ function NEWGAME() {
     const s = big ? 1.25 : 1;
     c.save(); c.translate(x, y); c.scale(s, s);
     c.beginPath(); c.ellipse(0, 2, 7, 3, 0, 0, TAU); c.fillStyle = 'rgba(8,4,24,.35)'; c.fill();
-    c.beginPath(); c.moveTo(0, 0); c.lineTo(-6, -14); c.lineTo(6, -14); c.closePath(); c.fillStyle = ART.dark(col, 0.25); c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
-    c.beginPath(); c.arc(0, -19, 8, 0, TAU); c.fillStyle = col; c.fill(); c.lineWidth = 2.5; c.stroke();
+    unite8(c, [[(g) => { g.moveTo(0, 0); g.lineTo(-6, -14); g.lineTo(6, -14); g.closePath(); }, ART.dark(col, 0.25)], [(g) => { g.moveTo(8, -19); g.arc(0, -19, 8, 0, TAU); }, col, { dx: 1.4, dy: 1.4 }]], 1.4);
     if (lab) { c.font = FONT(10, 900); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = OUT; c.fillText(lab, 0, -18); }
     c.restore();
   }

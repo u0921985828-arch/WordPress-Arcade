@@ -103,17 +103,23 @@ function renderRock() {
 }
 function apple(x, y, s, kind) {
   c.save(); c.translate(x, y);
-  c.fillStyle = 'rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(0, 9, 8 * s, 3 * s, 0, 0, R2); c.fill();
+  contact(c, 0, 9 * s, 8 * s, 3 * s, 0.22);
   c.scale(s, s);
   if (kind === 'berry') {
-    for (const [bx, by] of [[-4, 2], [4, 2], [0, -4]]) { c.beginPath(); c.arc(bx, by, 5.2, 0, R2); ART.fillOut(c, '#4a7dff', 1.8); c.fillStyle = 'rgba(255,255,255,.5)'; c.beginPath(); c.arc(bx - 1.6, by - 1.8, 1.5, 0, R2); c.fill(); }
-    c.beginPath(); c.ellipse(4, -9, 5, 2.4, -0.5, 0, R2); ART.fillOut(c, '#5ccf5a', 1.6);
+    const bl = (q) => { for (const [bx, by] of [[-4, 2], [4, 2], [0, -4]]) { q.moveTo(bx + 5.2, by); q.arc(bx, by, 5.2, 0, R2); } };
+    const lf = (q) => { q.ellipse(4, -9, 5, 2.4, -0.5, 0, R2); };
+    unite(c, [[lf, '#5ccf5a'], [bl, '#4a7dff']], 1.7);
+    clipIn(c, bl, (q) => { q.fillStyle = PAL(PZO, 0.22); for (const [bx, by] of [[-4, 2], [4, 2], [0, -4]]) { q.beginPath(); q.arc(bx + 1.3, by + 1.6, 5.2, 0, R2); q.fill(); } });
+    for (const [bx, by] of [[-4, 2], [4, 2], [0, -4]]) spec(c, bx - 1.7, by - 1.9, 1.5, 1.1, -0.5, 0.6);
   } else {
     const col = kind === 'gold' ? '#ffc928' : '#ff4d5e';
-    c.beginPath(); c.moveTo(0, -6); c.bezierCurveTo(6, -11, 12, -4, 9, 4); c.bezierCurveTo(7, 10, 2, 10, 0, 8); c.bezierCurveTo(-2, 10, -7, 10, -9, 4); c.bezierCurveTo(-12, -4, -6, -11, 0, -6); ART.fillOut(c, col, 2);
-    c.fillStyle = kind === 'gold' ? '#fff6c2' : 'rgba(255,255,255,.55)'; c.beginPath(); c.ellipse(-4.5, -2, 2, 3.2, 0.4, 0, R2); c.fill();
-    c.strokeStyle = OUT; c.lineWidth = 2.4; c.lineCap = 'round'; c.beginPath(); c.moveTo(0, -6); c.lineTo(1, -11); c.stroke();
-    c.beginPath(); c.ellipse(5, -10, 4.5, 2.2, -0.4, 0, R2); ART.fillOut(c, '#5ccf5a', 1.6);
+    const body = (q) => { q.moveTo(0, -6); q.bezierCurveTo(6, -11, 12, -4, 9, 4); q.bezierCurveTo(7, 10, 2, 10, 0, 8); q.bezierCurveTo(-2, 10, -7, 10, -9, 4); q.bezierCurveTo(-12, -4, -6, -11, 0, -6); q.closePath(); };
+    const stem = (q) => { q.moveTo(-0.9, -6); q.lineTo(0.1, -11.4); q.lineTo(2, -11); q.lineTo(1, -5.6); q.closePath(); };
+    const leaf = (q) => { q.ellipse(5, -10, 4.5, 2.2, -0.4, 0, R2); };
+    unite(c, [[stem, '#7a4a22'], [leaf, '#5ccf5a'], [body, col]], 1.9);
+    clipIn(c, body, (q) => { q.fillStyle = PAL(PZO, kind === 'gold' ? 0.14 : 0.2); q.beginPath(); q.moveTo(2, -8); q.bezierCurveTo(8, -13, 14, -6, 11, 2); q.bezierCurveTo(9, 8, 4, 8, 2, 6); q.bezierCurveTo(4, 2, 5, -4, 2, -8); q.closePath(); q.fill(); });
+    clipIn(c, leaf, (q) => { q.fillStyle = PAL(PZO, 0.22); q.beginPath(); q.ellipse(5, -8.6, 4.5, 2.2, -0.4, 0, R2); q.fill(); });
+    spec(c, -4.5, -2.2, 2, 3.2, 0.4, kind === 'gold' ? 0.7 : 0.55);
   }
   c.restore();
 }

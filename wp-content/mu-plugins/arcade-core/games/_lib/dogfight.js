@@ -210,21 +210,21 @@ function planeSpr(col, fl) {
   const key = col + '|' + fl; if (PSPR[key]) return PSPR[key];
   const cv = document.createElement('canvas'); cv.width = PW * PSC; cv.height = PH * PSC;
   const g = cv.getContext('2d'); g.scale(PSC, PSC); g.translate(POX, POY);
-  const body = fl ? '#fff' : col, dk = fl ? '#d8d8e4' : dark(body, 0.16), lt = fl ? '#fff' : lite(body, 0.14);
+  const body = fl ? '#fff' : col, dk = fl ? '#d8d8e4' : dark(body, 0.16), lt = fl ? '#fff' : lite(body, 0.32);
   const fus = (q) => { q.moveTo(-21, -1); q.quadraticCurveTo(-10, -6, 8, -5); q.lineTo(13, -4); q.quadraticCurveTo(16.5, 0, 13, 4); q.lineTo(8, 5); q.quadraticCurveTo(-10, 5, -21, 2); q.closePath(); };
   const tail = (q) => { q.moveTo(-15, -1); q.lineTo(-22.5, -11); q.lineTo(-16.5, -11); q.lineTo(-10, -2); q.closePath(); };
   const tplane = (q) => { q.rect(-23, -1.4, 10, 3.4); };
   const wlow = (q) => { q.rect(-6, 2.6, 17, 4.2); };
-  const strut = (q) => { q.rect(-3.8, -11, 2.4, 7); q.rect(5.4, -11, 2.4, 7); };
-  const wup = (q) => { q.rect(-9, -15, 22, 4.2); };
+  const strut = (q) => { q.rect(-3.6, -13.4, 2.1, 9); q.rect(5.6, -13.4, 2.1, 9); };
+  const wup = (q) => { q.rect(-9, -17.4, 22, 4.2); };
   const hub = (q) => { q.rect(12.6, -2.4, 3.6, 4.8); };
-  unite(g, [[tail, dk], [tplane, dk], [wlow, dk], [strut, dk], [fus, body], [wup, lt], [hub, '#3d3752']], 1.5);
+  unite(g, [[tail, dk], [tplane, dk], [wlow, dk], [strut, PDK(body, 0.3)], [fus, body], [wup, lt], [hub, '#3d3752']], 1.2);
   /* separaciones y volumen solo por color, dentro de la silueta */
   clipIn(g, fus, (q) => {
     q.fillStyle = fl ? '#fff' : lite(body, 0.3); q.fillRect(-21, -5.4, 34, 2.4);
     q.fillStyle = PAL(PZO, 0.16); q.fillRect(-21, 2.2, 34, 3.4);
   });
-  clipIn(g, wup, (q) => { q.fillStyle = PAL(PZO, 0.18); q.fillRect(-9, -11.9, 22, 1.6); });
+  clipIn(g, wup, (q) => { q.fillStyle = PAL(PZO, 0.2); q.fillRect(-9, -14.4, 22, 1.6); });
   clipIn(g, wlow, (q) => { q.fillStyle = PAL(PZO, 0.2); q.fillRect(-6, 5.4, 17, 1.6); });
   /* escarapela */
   g.fillStyle = '#fff'; g.beginPath(); g.arc(-6, 0.4, 2.6, 0, TAU); g.fill();
@@ -234,7 +234,7 @@ function planeSpr(col, fl) {
   unite(g, [[head, '#8a5a3b']], 1.4);
   clipIn(g, head, (q) => { q.fillStyle = PAL(PZO, 0.2); q.beginPath(); q.arc(0, -4.6, 3.7, 0, TAU); q.fill(); q.fillStyle = '#5ce1e6'; q.fillRect(0.4, -9.2, 3.6, 2.2); });
   spec(g, -1.4, -9, 1.3, 0.8, -0.5, 0.45);
-  spec(g, 2, -13.6, 5.5, 1, -0.02, 0.32);
+  spec(g, 2, -16, 5.5, 1, -0.02, 0.36);
   PSPR[key] = cv; return cv;
 }
 function plane(pl) {
