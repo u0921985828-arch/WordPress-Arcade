@@ -85,9 +85,10 @@ function alienSpr(kind, fr, flash) {
   const tr = c.getTransform ? c.getTransform().a : 2, S = Math.min(3, Math.max(1, tr));
   const key = kind + '|' + (fr ? 1 : 0) + '|' + (flash ? 1 : 0) + '|' + Math.round(S * 4);
   if (ASP[key]) return ASP[key];
-  const R = 20, cv = document.createElement('canvas');
-  cv.width = cv.height = Math.ceil(R * 2 * S);
-  const g = cv.getContext('2d'); g.scale(S, S); g.translate(R, R);
+  /* caja ajustada a la silueta real (patas, antenas y contorno): menos píxeles que blitear */
+  const AX = 19, AT = 16, AB = 15, cv = document.createElement('canvas');
+  cv.width = Math.ceil(AX * 2 * S); cv.height = Math.ceil((AT + AB) * S);
+  const g = cv.getContext('2d'); g.scale(S, S); g.translate(AX, AT);
   const col = flash ? '#fff' : EC[kind % 4], kk = kind % 3;
   const body = kk === 0 ? (q) => q.ellipse(0, 0, 12, 8, 0, 0, 6.283)
     : kk === 1 ? (q) => { q.moveTo(-12, 4); q.quadraticCurveTo(-11.4, -5.4, -8, -8); q.lineTo(8, -8); q.quadraticCurveTo(11.4, -5.4, 12, 4); q.quadraticCurveTo(9.6, 7.2, 6, 8); q.lineTo(-6, 8); q.quadraticCurveTo(-9.6, 7.2, -12, 4); q.closePath(); }
@@ -103,11 +104,11 @@ function alienSpr(kind, fr, flash) {
   });
   g.fillStyle = '#fff'; g.beginPath(); g.arc(-4, -1, 3, 0, 6.283); g.arc(4, -1, 3, 0, 6.283); g.fill();
   g.fillStyle = OUT; g.beginPath(); g.arc(-4, 0, 1.4, 0, 6.283); g.arc(4, 0, 1.4, 0, 6.283); g.fill();
-  return (ASP[key] = { cv, r: R });
+  return (ASP[key] = { cv, x: AX, y: AT, w: AX * 2, h: AT + AB });
 }
 function alien(x, y, kind, fr, flash) {
   const s = alienSpr(kind, fr, flash);
-  c.drawImage(s.cv, x - s.r, y - s.r, s.r * 2, s.r * 2);
+  c.drawImage(s.cv, x - s.x, y - s.y, s.w, s.h);
 }
 function drone(x, y, r, big, flash) {
   c.save(); c.translate(x, y); c.rotate(t * (big ? 0.6 : 1.8)); c.strokeStyle = OUT; c.lineWidth = 2;
