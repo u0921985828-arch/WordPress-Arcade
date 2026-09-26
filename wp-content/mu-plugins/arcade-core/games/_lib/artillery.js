@@ -583,13 +583,24 @@ function drawKid(u) {
 }
 function drawShot(s) {
   const id = s.w.id;
-  if (id === 'bola') { c.beginPath(); c.arc(s.x, s.y, 4.2, 0, TAU); ART.fillOut(c, '#fff', 1.6); c.fillStyle = '#cfe2f6'; c.beginPath(); c.arc(s.x + 1, s.y + 1, 1.8, 0, TAU); c.fill(); return; }
+  if (id === 'bola') { const bl = (q) => { q.arc(s.x, s.y, 4.4, 0, TAU); }; unite(c, [[bl, '#fff']], 1.4); clipIn(c, bl, (q) => { q.fillStyle = '#cfe2f6'; q.beginPath(); q.arc(s.x + 1.6, s.y + 1.8, 4.4, 0, TAU); q.fill(); }); spec(c, s.x - 1.4, s.y - 1.6, 1.5, 1, -0.5, 0.75); return; }
   c.save(); c.translate(s.x, s.y);
-  if (id === 'granada') { c.rotate(s.t * 6); c.beginPath(); c.arc(0, 0, 5, 0, TAU); ART.fillOut(c, '#4f8a3a', 1.8); c.fillStyle = '#c9c9c9'; c.fillRect(-1.2, -8, 2.4, 3.5); c.restore(); label(String(Math.max(1, Math.ceil(3 - s.t))), s.x, s.y - 16, 12, '#fff'); return; }
+  if (id === 'granada') { c.rotate(s.t * 6);
+    const gr = (q) => { q.moveTo(-1.2, -8); q.lineTo(1.2, -8); q.lineTo(1.2, -4.6); q.arc(0, 0, 5, -1.2, 5.1); q.closePath(); };
+    unite(c, [[gr, '#4f8a3a']], 1.5);
+    clipIn(c, gr, (q) => { q.fillStyle = PAL(PZO, 0.26); q.beginPath(); q.arc(0, 2.6, 5, 0, TAU); q.fill(); q.fillStyle = '#c9c9c9'; q.fillRect(-1.2, -8, 2.4, 3.5); });
+    spec(c, -1.6, -2, 1.7, 1.1, -0.5, 0.45); c.restore(); label(String(Math.max(1, Math.ceil(3 - s.t))), s.x, s.y - 16, 12, '#fff'); return; }
   c.rotate(Math.atan2(s.vy, s.vx));
   const big = id === 'pesado' ? 1.5 : id === 'triple' ? 0.8 : 1;
-  c.scale(big, big); ART.rr(c, -7, -4, 13, 8, 4); ART.fillOut(c, id === 'bazuca' ? '#7a8a44' : '#3d3752', 1.8);
-  c.fillStyle = id === 'pesado' ? '#ff5f7a' : '#ffd166'; c.fillRect(-6, -3, 3, 6); c.fillStyle = 'rgba(255,255,255,.45)'; c.fillRect(-3, -2.5, 7, 1.5);
+  c.scale(big, big);
+  const bd = id === 'bazuca' ? '#7a8a44' : '#3d3752';
+  const sh = (q) => { q.moveTo(-7, -2.6); q.lineTo(-4.6, -4); q.lineTo(2, -4); q.quadraticCurveTo(6.6, -3.4, 7.4, 0); q.quadraticCurveTo(6.6, 3.4, 2, 4); q.lineTo(-4.6, 4); q.lineTo(-7, 2.6); q.closePath(); };
+  unite(c, [[sh, bd]], 1.6);
+  clipIn(c, sh, (q) => {
+    q.fillStyle = PAL(PZO, 0.3); q.fillRect(-8, 0.4, 18, 5);
+    q.fillStyle = id === 'pesado' ? '#ff5f7a' : '#ffd166'; q.fillRect(-6.4, -4, 3, 8);
+  });
+  spec(c, -0.5, -2.4, 3.6, 0.9, -0.05, 0.4);
   c.restore();
 }
 function drawWater(front) {
