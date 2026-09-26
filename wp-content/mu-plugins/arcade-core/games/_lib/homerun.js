@@ -13,6 +13,8 @@ const LT8 = (col, f) => (String(col)[0] === '#' ? _p8c(_p8h(col).map((v) => v + 
 const DK8 = (col, f) => (String(col)[0] === '#' ? _p8c(_p8h(col).map((v) => v * (1 - f))) : col);
 const AL8 = (col, a) => { const q = _p8h(col); return `rgba(${q[0]},${q[1]},${q[2]},${Math.max(0, a).toFixed(3)})`; };
 const CV8 = (w, h) => { const q = document.createElement('canvas'); q.width = Math.max(1, Math.ceil(w)); q.height = Math.max(1, Math.ceil(h)); return q; };
+/* como ART.rr pero SIN beginPath: imprescindible para componer subtrayectorias de una misma pieza */
+function rr8(c, x, y, w, h, r) { c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 const DPR8 = Math.min(2, (typeof devicePixelRatio === 'number' ? devicePixelRatio : 1) || 1);
 /* recorte contra la propia forma. Nunca `source-atop` en el lienzo vivo: obliga a un compuesto de
  * pantalla completa (medido 11–18 ms/frame). Aquí basta el clip. */
@@ -163,40 +165,91 @@ const BG = off(360, 640, (g) => {
 });
 
 /* ---------- personajes */
+/* ---------- §8: lanzador y bateador, cada uno UNA pieza ----------
+ * Solo se separa lo que de verdad articula: el brazo de lanzar, el bate y los brazos que lo llevan.
+ * Todo lo demás (piernas, tronco, cabeza, gorra, guante, casco, zapatillas) es un único trazado,
+ * contorneado una vez y relleno una vez; la camiseta, el cinturón y el pantalón se leen por color. */
+const SKIN = '#ffce9e', UNI = '#f2f2f8', UNI2 = '#d9dae6';
+/* cuerpo del lanzador sin el brazo (que sí gira) */
+function pitcherSpr() {
+  return spr8('pit', 80, 108, 40, 96, (g) => {
+    const body = (q) => {
+      bone8([[-7, 0], [-8, -14], [-9, -27]], [5.5, 5, 4.5])(q);
+      bone8([[7, 0], [8, -14], [8, -27]], [5.5, 5, 4.5])(q);
+      q.moveTo(-6, 2); q.ellipse(-9, 0, 7, 4, 0, 0, P8T); q.moveTo(12, 2); q.ellipse(9, 0, 7, 4, 0, 0, P8T);
+      rr8(q, -15, -58, 30, 34, 11);                                  // tronco
+      bone8([[-14, -50], [-18, -42], [-17, -35]], [5, 6, 7.5])(q);   // brazo del guante
+      q.moveTo(0, -68); q.arc(0, -68, 11.5, 0, P8T);                 // cabeza
+      q.moveTo(-12, -71); q.arc(0, -71, 12, Math.PI, 0); q.lineTo(15.5, -70); q.quadraticCurveTo(14, -66.5, 8, -67.5); q.closePath();  // gorra con visera fundida
+    };
+    unite8(g, [[body, UNI, { dx: 2, dy: 1.8 }, (q) => {
+      q.fillStyle = SKIN; q.beginPath(); q.arc(0, -68, 11.5, 0, P8T); q.fill();
+      q.fillStyle = '#e24b5b'; q.beginPath(); q.moveTo(-13, -71); q.arc(0, -71, 12.6, Math.PI, 0); q.lineTo(16, -70); q.quadraticCurveTo(14, -66, 8, -67.5); q.fill();
+      q.fillStyle = UNI2; q.fillRect(-16, -30, 32, 6);                                   // cinturón
+      q.fillStyle = '#e24b5b'; q.fillRect(-14, -45, 28, 4);
+      q.fillStyle = '#8a5a33'; q.beginPath(); q.arc(-17, -36, 8.5, 0, P8T); q.fill();     // guante
+      eyes8(q, 0, -68.5, 4.2, 2.6, { lid: 0.22, ly: 0.2, lidCol: SKIN, iris: '#2f2440' });
+      shine8(q, -5, -74, 3.4, 2.2, -0.5, 0.3);
+    }]], 1.45);
+  }, 3);
+}
 function pitcher() {
   const wind = !ball && !hit && wait < 0.6 ? 1 - wait / 0.6 : 0, rel = ball && ball.t < 0.12 ? 1 - ball.t / 0.12 : 0;
   c.save(); c.translate(180, PY + 8); c.scale(0.62, 0.62);
-  c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(0, 4, 20, 6, 0, 0, R2); c.fill();
-  const lift = wind * 10; ART.rr(c, -11, -26 - lift * 0.5, 9, 26 - lift * 0.3, 3); ART.fillOut(c, '#e8e8f0', 2.5); ART.rr(c, 2, -26, 9, 26, 3); ART.fillOut(c, '#e8e8f0', 2.5);
-  ART.rr(c, -15, -58, 30, 34, 8); ART.fillOut(c, '#f4f4f8'); c.fillStyle = '#e24b5b'; c.fillRect(-13, -44, 26, 4);
-  // brazo de lanzar
-  const a = rel ? -0.3 + (1 - rel) * 1.2 : -2.6 * wind - 0.3; c.save(); c.translate(12, -52); c.rotate(a); ART.rr(c, -3, -3, 22, 7, 3); ART.fillOut(c, '#ffd1a3', 2); c.restore();
-  c.beginPath(); c.arc(-16, -40, 8, 0, R2); ART.fillOut(c, '#8a5a33', 2); // guante
-  c.beginPath(); c.arc(0, -68, 11, 0, R2); ART.fillOut(c, '#ffd1a3');
-  c.beginPath(); c.arc(0, -71, 11.5, Math.PI, 0); c.lineTo(15, -71); c.lineTo(-11.5, -71); ART.fillOut(c, '#e24b5b', 2);
-  c.fillStyle = OUT; c.beginPath(); c.arc(-4, -66, 1.8, 0, R2); c.arc(4, -66, 1.8, 0, R2); c.fill();
+  drop8(c, 0, 4, 20, 6, 0.24);
+  blit8(c, pitcherSpr(), 0, 0);
+  const a = rel ? -0.3 + (1 - rel) * 1.2 : -2.6 * wind - 0.3;      // el brazo sí articula: pieza aparte
+  c.save(); c.translate(12, -52); c.rotate(a);
+  c.beginPath(); bone8([[0, 0], [12, -1], [21, 0]], [5.6, 5, 6.4])(c);
+  c.fillStyle = SKIN; c.fill(); c.lineWidth = 1.45; c.strokeStyle = P8OUT; c.stroke(); c.restore();
   c.restore();
 }
 function batAngle() { if (swing <= 0) return -1.95 + Math.sin(tm * 3) * 0.05; const p = 1 - swing / 0.3; return p < 0.55 ? -1.95 + Math.pow(p / 0.55, 1.6) * 2.35 : 0.4 + (p - 0.55) * 0.6; }
+/* bateador de espaldas: piernas, tronco, casco y zapatillas en una sola silueta */
+function batterSpr() {
+  return spr8('bat', 110, 140, 55, 128, (g) => {
+    const body = (q) => {
+      bone8([[-9, 0], [-10, -26], [-11, -46]], [8, 7.5, 9])(q);
+      bone8([[13, 0], [14, -26], [14, -46]], [8, 7.5, 9])(q);
+      rr8(q, -24, -6, 24, 11, 5); rr8(q, 4, -6, 24, 11, 5);                // zapatillas
+      rr8(q, -25, -84, 50, 48, 17);                                        // tronco
+      q.moveTo(-1, -104); q.arc(-1, -104, 18, 0, P8T);                     // casco
+      q.moveTo(16, -99); q.ellipse(16, -97, 10, 4.6, 0.3, 0, P8T);         // visera fundida
+    };
+    unite8(g, [[body, '#3056c9', { dx: 2.4, dy: 2.2 }, (q) => {
+      q.fillStyle = UNI; q.beginPath(); rr8(q, -12, -50, 28, 52, 9); q.fill();   // pantalón
+      q.fillStyle = '#2a2342'; q.beginPath(); rr8(q, -25, -8, 52, 13, 6); q.fill();
+      q.fillStyle = DK8('#3056c9', 0.3); q.fillRect(-25, -54, 50, 6);            // cinturón
+      q.fillStyle = 'rgba(255,255,255,.16)'; q.fillRect(-19, -78, 6, 36);
+      q.fillStyle = '#223c99'; q.beginPath(); q.arc(-1, -104, 18, 0, P8T); q.fill();
+      q.fillStyle = DK8('#223c99', 0.28); q.beginPath(); q.ellipse(16, -97, 10, 4.6, 0.3, 0, P8T); q.fill();
+      shine8(q, -9, -113, 5, 7, -0.5, 0.36);
+      q.font = '900 22px ui-rounded,system-ui,sans-serif'; q.textAlign = 'center'; q.textBaseline = 'middle';
+      q.fillStyle = '#fff'; q.fillText('7', 1, -62);
+    }]], 1.5);
+  }, 3);
+}
+/* el bate gira: pieza aparte, con un solo borde */
+function batSpr() {
+  return spr8('bate', BAT + 30, 28, 14, 14, (g) => {
+    const body = (q) => { q.moveTo(-6, -3.5); q.lineTo(BAT * 0.55, -4.8); q.quadraticCurveTo(BAT + 1, -8.4, BAT + 2, 0); q.quadraticCurveTo(BAT + 1, 8.4, BAT * 0.55, 4.8); q.lineTo(-6, 3.5); q.closePath(); };
+    unite8(g, [[body, '#d9a066', { dx: 0, dy: 1.6 }, (q) => {
+      q.fillStyle = '#2a2342'; q.fillRect(-8, -6, 16, 12);
+      q.fillStyle = 'rgba(255,255,255,.3)'; q.fillRect(BAT * 0.3, -3.4, BAT * 0.55, 2.2);
+    }]], 1.5);
+  }, 3);
+}
 function batter() {
   const a = batAngle(), tw = swing > 0 ? Math.min(1, (1 - swing / 0.3) * 1.6) : 0;
-  c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(118, 628, 34, 9, 0, 0, R2); c.fill();
-  // piernas
-  ART.rr(c, 96, 578, 15, 48, 6); ART.fillOut(c, '#e8e8f0'); ART.rr(c, 122, 578, 15, 48, 6); ART.fillOut(c, '#e8e8f0');
-  ART.rr(c, 92, 618, 22, 10, 4); ART.fillOut(c, '#2a2342', 2); ART.rr(c, 120, 618, 22, 10, 4); ART.fillOut(c, '#2a2342', 2);
-  // cuerpo (de espaldas) con giro
-  c.save(); c.translate(117, 560); c.scale(1 - tw * 0.12, 1); ART.rr(c, -24, -28, 48, 50, 14); ART.fillOut(c, '#3056c9', 3);
-  c.fillStyle = 'rgba(255,255,255,.18)'; c.fillRect(-18, -22, 6, 36);
-  c.font = '900 22px ui-rounded,system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 4; c.strokeStyle = OUT; c.strokeText('7', 2, -2); c.fillStyle = '#fff'; c.fillText('7', 2, -2); c.restore();
-  // bate
-  c.save(); c.translate(HX, HY); c.rotate(a); c.beginPath(); c.moveTo(-6, -3.5); c.lineTo(BAT * 0.55, -4.5); c.quadraticCurveTo(BAT, -8, BAT + 2, 0); c.quadraticCurveTo(BAT, 8, BAT * 0.55, 4.5); c.lineTo(-6, 3.5); c.closePath(); ART.fillOut(c, '#d9a066', 2.5);
-  c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(BAT * 0.35, -3, BAT * 0.5, 2); c.fillStyle = '#2a2342'; c.fillRect(-6, -4, 14, 8); c.restore();
+  drop8(c, 118, 628, 34, 9, 0.3);
+  c.save(); c.translate(117, 628); c.scale(1 - tw * 0.1, 1); blit8(c, batterSpr(), 0, 0); c.restore();
+  c.save(); c.translate(HX, HY); c.rotate(a); blit8(c, batSpr(), 0, 0); c.restore();
   if (swing > 0 && swing < 0.26) { c.globalAlpha = 0.25; c.strokeStyle = '#fff'; c.lineWidth = 10; c.beginPath(); c.arc(HX, HY, BAT * 0.8, a - 0.9, a); c.stroke(); c.globalAlpha = 1; }
-  // brazos y casco
-  c.strokeStyle = OUT; c.lineCap = 'round'; c.lineWidth = 11; c.beginPath(); c.moveTo(104, 548); c.lineTo(HX - 4, HY); c.moveTo(132, 546); c.lineTo(HX, HY + 2); c.stroke();
-  c.strokeStyle = '#3056c9'; c.lineWidth = 6.5; c.stroke(); c.beginPath(); c.arc(HX, HY, 6, 0, R2); ART.fillOut(c, '#f4f4f8', 2);
-  c.beginPath(); c.arc(116, 522, 17, 0, R2); ART.fillOut(c, '#223c99', 3); c.beginPath(); c.ellipse(132, 530, 9, 4, 0.3, 0, R2); ART.fillOut(c, '#223c99', 2);
-  c.fillStyle = 'rgba(255,255,255,.4)'; c.beginPath(); c.ellipse(109, 514, 5, 7, -0.5, 0, R2); c.fill();
+  // brazos: cruzan por delante y siguen al bate, así que son pieza aparte (un solo borde)
+  c.beginPath(); bone8([[104, 548], [(104 + HX) / 2 - 2, (548 + HY) / 2], [HX - 3, HY]], [7, 6, 5])(c);
+  bone8([[132, 546], [(132 + HX) / 2, (546 + HY) / 2 + 2], [HX + 1, HY + 2]], [7, 6, 5])(c);
+  c.fillStyle = '#3056c9'; c.fill(); c.lineWidth = 1.5; c.strokeStyle = P8OUT; c.stroke();
+  c.beginPath(); mitt8(HX, HY, a + 1.6, 6.4, 1)(c); c.fillStyle = UNI; c.fill(); c.stroke();
 }
 function baseball(x, y, r, spin) {
   c.beginPath(); c.arc(x, y, r, 0, R2); ART.fillOut(c, '#fbfbf5', Math.max(1.2, r * 0.25));

@@ -95,21 +95,46 @@ function label(t, x, y, size, col, align, base) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = base || 'top';
   c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(t, x, y); c.fillStyle = col || '#fff'; c.fillText(t, x, y);
 }
+/* Ley de la pieza única: la nave era cabina + etapa + tobera + 2 patas + 2 zapatas + ventana,
+   siete contornos apilados. Ahora es UNA silueta cacheada (las patas no articulan, así que se
+   funden con el cuerpo) y dentro solo hay color y sombra propia, ningún contorno cerrado.
+   Cartoon de estudio: cabina grande y redonda, zapatas gordas, 3 tonos con borde duro. */
+const SHW = 44, SHH = 44, SHOX = 22, SHOY = 28, SHSC = Math.min(2, window.devicePixelRatio || 1) * 2.4;
+let shipCv = null;
+function shipSpr() {
+  if (shipCv) return shipCv;
+  const cv = document.createElement('canvas'); cv.width = SHW * SHSC; cv.height = SHH * SHSC;
+  const g = cv.getContext('2d'); g.scale(SHSC, SHSC); g.translate(SHOX, SHOY); g.lineJoin = 'round'; g.lineCap = 'round';
+  const GOLD = '#e8b64a', HULL = '#eef0f8', MET = '#c2c7d8';
+  const leg = (sd) => (q) => { q.moveTo(sd * 5, 1); q.lineTo(sd * 11.5, 9.5); q.lineTo(sd * 15.5, 9.5); q.quadraticCurveTo(sd * 17, 9.5, sd * 17, 11); q.quadraticCurveTo(sd * 17, 12.6, sd * 15.5, 12.6); q.lineTo(sd * 8.5, 12.6); q.quadraticCurveTo(sd * 7, 12.6, sd * 7, 11); q.quadraticCurveTo(sd * 7, 10, sd * 8.2, 9.7); q.lineTo(sd * 8.6, 9.6); q.lineTo(sd * 2.4, 2.4); q.closePath(); };
+  const noz = (q) => { q.moveTo(-4.2, 3); q.lineTo(4.2, 3); q.lineTo(6.4, 8.4); q.quadraticCurveTo(0, 10.2, -6.4, 8.4); q.closePath(); };
+  const body = (q) => { q.moveTo(-10.4, -1.6); q.quadraticCurveTo(-10.4, -5.4, -7.6, -5.4); q.lineTo(7.6, -5.4); q.quadraticCurveTo(10.4, -5.4, 10.4, -1.6); q.lineTo(10.4, 1.6); q.quadraticCurveTo(10.4, 5.2, 7.6, 5.2); q.lineTo(-7.6, 5.2); q.quadraticCurveTo(-10.4, 5.2, -10.4, 1.6); q.closePath(); };
+  const cab = (q) => { q.moveTo(-8.4, -4.4); q.lineTo(-8, -11.4); q.quadraticCurveTo(-7.6, -16.6, -2.6, -17); q.lineTo(2.6, -17); q.quadraticCurveTo(7.6, -16.6, 8, -11.4); q.lineTo(8.4, -4.4); q.closePath(); };
+  const ant = (q) => { q.moveTo(4.2, -15.4); q.lineTo(5.4, -20.2); q.quadraticCurveTo(5.6, -22.6, 7.2, -22.6); q.quadraticCurveTo(8.8, -22.6, 8.8, -21); q.quadraticCurveTo(8.8, -19.6, 7.4, -19.4); q.lineTo(6.6, -14.8); q.closePath(); };
+  unite(g, [[leg(-1), MET], [leg(1), MET], [noz, '#6a7090'], [ant, '#ff5f7a'], [body, GOLD], [cab, HULL]], 1.55);
+  for (const sd of [-1, 1]) within(g, leg(sd), (q) => { q.fillStyle = PAL(PZO, 0.3); q.fillRect(-24, 4, 48, 12); q.fillStyle = PAL(PZO, 0.18); q.fillRect(-24, 10.6, 48, 4); });
+  within(g, noz, (q) => { q.fillStyle = PAL(PZO, 0.45); q.beginPath(); q.ellipse(0, 8.8, 6.6, 2.2, 0, 0, 6.283); q.fill(); });
+  within(g, body, (q) => {
+    cel3(q, body, GOLD, { dx: 2, dy: 1.8, r: 40, sh: 0.26, lt: 0.24 });
+    q.fillStyle = PAL(PZO, 0.22); q.fillRect(-4.6, -6, 1.8, 12); q.fillRect(2.8, -6, 1.8, 12);       // juntura por sombra, no por línea
+    q.fillStyle = 'rgba(255,255,255,.3)'; q.fillRect(-2.8, -6, 0.9, 12); q.fillRect(4.6, -6, 0.9, 12);
+  });
+  within(g, cab, (q) => {
+    cel3(q, cab, HULL, { dx: 2.2, dy: 2, r: 40, sh: 0.2, lt: 0.1 });
+    q.fillStyle = '#1e5fa8'; q.beginPath(); q.arc(0, -10, 4.1, 0, 6.283); q.fill();
+    q.fillStyle = '#3a86e0'; q.beginPath(); q.arc(-0.3, -10.4, 3.5, 0, 6.283); q.fill();
+    spec(q, -1.4, -11.6, 1.5, 0.9, -0.6, 0.85);
+    q.fillStyle = PAL(PZO, 0.16); q.fillRect(-9, -6.4, 18, 3);                                       // sombra propia en la base de la cabina
+  });
+  return (shipCv = cv);
+}
 function ship() {
   c.save(); c.translate(s.x, s.y); c.rotate(s.a); c.scale(1.2, 1.2);
-  if (s.thr) { const L = 14 + Math.random() * 9; c.beginPath(); c.moveTo(-6, 7); c.quadraticCurveTo(0, 7 + L * 1.4, 6, 7); c.fillStyle = '#ff7a2f'; c.fill(); c.lineWidth = 1.5; c.strokeStyle = OUT; c.stroke();
-    c.beginPath(); c.moveTo(-4, 7); c.quadraticCurveTo(0, 7 + L, 4, 7); c.fillStyle = '#ffd23d'; c.fill(); c.beginPath(); c.moveTo(-2, 7); c.quadraticCurveTo(0, 7 + L * 0.55, 2, 7); c.fillStyle = '#fff'; c.fill(); }
-  // patas
-  c.strokeStyle = OUT; c.lineWidth = 4; c.lineCap = 'round'; c.beginPath(); c.moveTo(-7, 2); c.lineTo(-12, 10); c.moveTo(7, 2); c.lineTo(12, 10); c.stroke();
-  c.strokeStyle = '#c9cede'; c.lineWidth = 2; c.stroke(); ART.rr(c, -15, 9, 7, 3, 1.5); ART.fillOut(c, '#c9cede', 1.5); ART.rr(c, 8, 9, 7, 3, 1.5); ART.fillOut(c, '#c9cede', 1.5);
-  // tobera y etapa de descenso dorada
-  c.beginPath(); c.moveTo(-4, 4); c.lineTo(4, 4); c.lineTo(6, 8); c.lineTo(-6, 8); c.closePath(); ART.fillOut(c, '#6a7090', 1.5);
-  c.beginPath(); c.moveTo(-10, -2); c.lineTo(-8, -5); c.lineTo(8, -5); c.lineTo(10, -2); c.lineTo(10, 3); c.lineTo(8, 5); c.lineTo(-8, 5); c.lineTo(-10, 3); c.closePath(); ART.fillOut(c, '#e8b64a', 2);
-  c.strokeStyle = 'rgba(120,70,0,.5)'; c.lineWidth = 1; c.beginPath(); c.moveTo(-4, -5); c.lineTo(-4, 5); c.moveTo(3, -5); c.lineTo(3, 5); c.stroke();
-  // cabina
-  c.beginPath(); c.moveTo(-8, -5); c.lineTo(-7, -12); c.lineTo(-3, -16); c.lineTo(3, -16); c.lineTo(7, -12); c.lineTo(8, -5); c.closePath(); ART.fillOut(c, '#eef0f8', 2);
-  c.beginPath(); c.arc(0, -10, 3.2, 0, R2); ART.fillOut(c, '#3a86e0', 1.5); c.fillStyle = '#bfe3ff'; c.beginPath(); c.arc(-1, -11, 1.2, 0, R2); c.fill();
-  c.strokeStyle = OUT; c.lineWidth = 1.5; c.beginPath(); c.moveTo(4, -16); c.lineTo(6, -21); c.stroke(); c.fillStyle = '#ff5f7a'; c.beginPath(); c.arc(6, -21, 1.6, 0, R2); c.fill();
+  if (s.thr) { const L = 14 + Math.random() * 9; c.lineJoin = 'round';
+    c.beginPath(); c.moveTo(-6, 7); c.quadraticCurveTo(0, 7 + L * 1.4, 6, 7); c.fillStyle = '#ff7a2f'; c.fill(); c.lineWidth = 1.5; c.strokeStyle = OUT; c.stroke();
+    c.beginPath(); c.moveTo(-4, 7); c.quadraticCurveTo(0, 7 + L, 4, 7); c.fillStyle = '#ffd23d'; c.fill();
+    c.beginPath(); c.moveTo(-2, 7); c.quadraticCurveTo(0, 7 + L * 0.55, 2, 7); c.fillStyle = '#fff'; c.fill(); }
+  c.drawImage(shipSpr(), -SHOX, -SHOY, SHW, SHH);
   c.restore();
 }
 function footY() { return Math.min(gy((s.x + W) % W), gy((s.x - 12 + W) % W), gy((s.x + 12) % W)); }

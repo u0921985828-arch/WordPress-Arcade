@@ -20,6 +20,7 @@ function celp(g, parts, base, dx, dy) {
     h.translate(-dx * 1.15, -dy * 1.15); h.fillStyle = ART.lite(base, 0.2); P();
   });
 }
+function celm(g, parts, dx, dy) { for (let i = 0; i < parts.length; i++) celp(g, [parts[i]], parts[i][1], dx, dy); }
 function spec(g, x, y, rx, ry, rot, a) { g.fillStyle = 'rgba(255,255,255,' + (a == null ? 0.7 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, 6.2832); g.fill(); }
 function contact(g, x, y, rx, ry, a) { g.fillStyle = 'rgba(14,8,30,' + (a == null ? 0.3 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.2832); g.fill(); }
 const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
@@ -101,23 +102,37 @@ function renderBg() {
   g.fillStyle = 'rgba(255,255,255,.05)'; for (let y = ty + 14; y < H - 10; y += 12) for (let x = 20 + (y % 24 ? 6 : 0); x < W - 16; x += 12) g.fillRect(x, y, 2, 2);
   return cv;
 }
+/* Pieza de tangram: silueta única cacheada, 3 tonos duros, sin trazos interiores (R5 §8) */
+const pieceCv = {};
+function pieceSprite(p, s, col) {
+  const key = p.sh.map((q) => q.join()).join(';') + '|' + col + '|' + Math.round(s);
+  let q = pieceCv[key]; if (q) return q;
+  const set = new Set(p.sh.map((r) => r.join())), has = (x, y) => set.has(x + ',' + y);
+  const w = pw(p) * s, h = ph(p) * s, pad = 5, d = Math.ceil((w + pad * 2) * CDPR), dh = Math.ceil((h + pad * 2) * CDPR);
+  q = document.createElement('canvas'); q.width = d; q.height = dh;
+  const g = q.getContext('2d'); g.scale(d / (w + pad * 2), dh / (h + pad * 2)); g.translate(pad, pad);
+  const body = (t) => { for (const [x, y] of p.sh) t.rect(x * s - 0.3, y * s - 0.3, s + 0.6, s + 0.6); }, parts = [[body, col]];
+  g.fillStyle = col; g.beginPath(); body(g); g.fill();
+  celp(g, parts, col, s * 0.22, s * 0.22);
+  g.strokeStyle = ART.OUT; g.lineWidth = 2.5; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath();
+  for (const [x, y] of p.sh) { const X = x * s, Y = y * s; if (!has(x, y - 1)) { g.moveTo(X, Y); g.lineTo(X + s, Y); } if (!has(x, y + 1)) { g.moveTo(X, Y + s); g.lineTo(X + s, Y + s); } if (!has(x - 1, y)) { g.moveTo(X, Y); g.lineTo(X, Y + s); } if (!has(x + 1, y)) { g.moveTo(X + s, Y); g.lineTo(X + s, Y + s); } }
+  g.stroke();
+  const [fx, fy] = p.sh.reduce((m, r) => (r[1] < m[1] || (r[1] === m[1] && r[0] < m[0]) ? r : m), p.sh[0]);
+  spec(g, fx * s + s * 0.42, fy * s + s * 0.3, s * 0.2, s * 0.09, -0.5, 0.5);
+  pieceCv[key] = q; return q;
+}
 function piece(p, ox, oy, s, o) {
   o = o || {}; const set = new Set(p.sh.map((q) => q.join())), has = (x, y) => set.has(x + ',' + y);
   const w = pw(p) * s, h = ph(p) * s, sc = 1 + p.pop * 0.1 + (o.lift ? 0.06 : 0);
   c.save(); c.translate(ox + w / 2, oy + h / 2); c.rotate(p.ang); c.scale(sc, sc); c.translate(-w / 2, -h / 2);
   if (o.lift) { c.fillStyle = 'rgba(0,0,0,.3)'; for (const [x, y] of p.sh) c.fillRect(x * s + 8, y * s + 12, s, s); }
-  if (o.ghost) { c.globalAlpha = 0.5; }
-  c.fillStyle = o.ghost || p.col; for (const [x, y] of p.sh) c.fillRect(x * s - 0.3, y * s - 0.3, s + 0.6, s + 0.6);
-  if (!o.ghost) { const b = Math.max(2, s * 0.1);
-    for (const [x, y] of p.sh) { const X = x * s, Y = y * s;
-      c.fillStyle = 'rgba(255,255,255,.5)'; if (!has(x, y - 1)) c.fillRect(X, Y, s, b); if (!has(x - 1, y)) c.fillRect(X, Y, b, s);
-      c.fillStyle = 'rgba(0,0,0,.3)'; if (!has(x, y + 1)) c.fillRect(X, Y + s - b, s, b); if (!has(x + 1, y)) c.fillRect(X + s - b, Y, b, s);
-      c.fillStyle = 'rgba(255,255,255,.18)'; c.beginPath(); c.arc(X + s / 2, Y + s / 2, s * 0.14, 0, R2); c.fill(); }
-    c.strokeStyle = 'rgba(0,0,0,.14)'; c.lineWidth = 1; c.beginPath(); for (const [x, y] of p.sh) { if (has(x + 1, y)) { c.moveTo((x + 1) * s, y * s + 3); c.lineTo((x + 1) * s, (y + 1) * s - 3); } if (has(x, y + 1)) { c.moveTo(x * s + 3, (y + 1) * s); c.lineTo((x + 1) * s - 3, (y + 1) * s); } } c.stroke(); }
-  // contorno exterior de la pieza
-  c.strokeStyle = o.ghost ? '#fff' : OUT; c.lineWidth = o.ghost ? 2.5 : 2.5; c.lineCap = 'round'; c.beginPath();
-  for (const [x, y] of p.sh) { const X = x * s, Y = y * s; if (!has(x, y - 1)) { c.moveTo(X, Y); c.lineTo(X + s, Y); } if (!has(x, y + 1)) { c.moveTo(X, Y + s); c.lineTo(X + s, Y + s); } if (!has(x - 1, y)) { c.moveTo(X, Y); c.lineTo(X, Y + s); } if (!has(x + 1, y)) { c.moveTo(X + s, Y); c.lineTo(X + s, Y + s); } }
-  c.stroke(); c.restore(); c.globalAlpha = 1;
+  if (o.ghost) {
+    c.globalAlpha = 0.5; c.fillStyle = o.ghost; c.beginPath(); for (const [x, y] of p.sh) c.rect(x * s - 0.3, y * s - 0.3, s + 0.6, s + 0.6); c.fill();
+    c.strokeStyle = '#fff'; c.lineWidth = 2.5; c.lineCap = 'round'; c.beginPath();
+    for (const [x, y] of p.sh) { const X = x * s, Y = y * s; if (!has(x, y - 1)) { c.moveTo(X, Y); c.lineTo(X + s, Y); } if (!has(x, y + 1)) { c.moveTo(X, Y + s); c.lineTo(X + s, Y + s); } if (!has(x - 1, y)) { c.moveTo(X, Y); c.lineTo(X, Y + s); } if (!has(x + 1, y)) { c.moveTo(X + s, Y); c.lineTo(X + s, Y + s); } }
+    c.stroke();
+  } else { const pad = 5, q = pieceSprite(p, s, p.col); c.drawImage(q, -pad, -pad, w + pad * 2, h + pad * 2); }
+  c.restore(); c.globalAlpha = 1;
 }
 function draw() {
   if (!bgCv) bgCv = renderBg(); c.drawImage(bgCv, 0, 0, W, H);

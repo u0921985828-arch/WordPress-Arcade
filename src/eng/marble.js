@@ -69,7 +69,18 @@ function bake() { const BW = N * S, P = 14, WH = Math.max(5, S * 0.24);
     // agujeros
     for (const ho of holes) { const x = ho.x - OX + o, y = ho.y - OY + o; q.fillStyle = '#b89a6c'; q.beginPath(); q.arc(x, y, ho.r + 3, 0, 6.283); q.fill(); const hg = q.createRadialGradient(x, y + ho.r * 0.3, 1, x, y, ho.r); hg.addColorStop(0, '#000'); hg.addColorStop(0.7, '#120b1e'); hg.addColorStop(1, '#3a2a3e'); q.fillStyle = hg; q.beginPath(); q.arc(x, y, ho.r, 0, 6.283); q.fill(); q.strokeStyle = OUT; q.lineWidth = 2; q.stroke(); }
     // meta
-    const gx = o + goal[0] * S + S / 2, gy = o + goal[1] * S + S / 2; q.beginPath(); q.arc(gx, gy, S * 0.4, 0, 6.283); ART.fillOut(q, '#ffc928', 2.5); q.beginPath(); q.arc(gx, gy, S * 0.26, 0, 6.283); ART.fillOut(q, '#2a1a0a', 2); q.fillStyle = 'rgba(255,255,255,.5)'; q.beginPath(); q.arc(gx - S * 0.18, gy - S * 0.2, S * 0.07, 0, 6.283); q.fill();
+    /* la meta es UNA pieza con agujero: aro dorado trazado y contorneado una vez (regla par-impar),
+       y el pozo oscuro relleno dentro sin contorno propio */
+    const gx = o + goal[0] * S + S / 2, gy = o + goal[1] * S + S / 2;
+    q.fillStyle = '#1e1208'; q.beginPath(); q.arc(gx, gy, S * 0.27, 0, 6.283); q.fill();
+    const ring = (w) => { w.moveTo(gx + S * 0.4, gy); w.arc(gx, gy, S * 0.4, 0, 6.283); w.moveTo(gx + S * 0.26, gy); w.arc(gx, gy, S * 0.26, 6.283, 0, true); };
+    q.beginPath(); ring(q); q.fillStyle = '#ffc928'; q.fill('evenodd'); q.lineWidth = 2.2; q.strokeStyle = OUT; q.stroke();
+    q.save(); q.beginPath(); ring(q); q.clip('evenodd');
+    q.fillStyle = PDK('#ffc928', 0.3); q.beginPath(); q.arc(gx + S * 0.05, gy + S * 0.06, S * 0.4, 0, 6.283); q.fill();
+    q.fillStyle = '#ffc928'; q.beginPath(); q.arc(gx - S * 0.02, gy - S * 0.02, S * 0.4, 0, 6.283); q.fill();
+    q.fillStyle = PLT('#ffc928', 0.35); q.beginPath(); q.arc(gx - S * 0.06, gy - S * 0.07, S * 0.4, 0, 6.283); q.fill();
+    q.restore();
+    spec(q, gx - S * 0.22, gy - S * 0.24, S * 0.08, S * 0.045, -0.7, 0.75);
     // sombras de los muros
     q.fillStyle = 'rgba(60,30,10,.28)'; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (g[y][x]) q.fillRect(o + x * S + WH * 0.6, o + y * S + WH * 0.8, S, S);
     // muros en relieve: cara frontal + tapa
@@ -80,7 +91,11 @@ function bake() { const BW = N * S, P = 14, WH = Math.max(5, S * 0.24);
       if (open(-1, 0)) { q.moveTo(X, Y); q.lineTo(X, Y + S + (open(0, 1) ? WH : 0)); } if (open(1, 0)) { q.moveTo(X + S, Y); q.lineTo(X + S, Y + S + (open(0, 1) ? WH : 0)); } } q.stroke();
     q.fillStyle = 'rgba(255,255,255,.22)'; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (g[y][x] && !(g[y - 1] && g[y - 1][x])) q.fillRect(o + x * S + 1, o + y * S - WH + 2, S - 2, 2);
   });
-  const r = S * 0.3; ballImg = mk(r * 2 + 4, r * 2 + 4, (q) => { const cx = r + 2; const bg = q.createRadialGradient(cx - r * 0.35, cx - r * 0.4, r * 0.1, cx, cx, r); bg.addColorStop(0, '#e8fdff'); bg.addColorStop(0.35, '#5ce1e6'); bg.addColorStop(1, '#1b5f8a'); q.fillStyle = bg; q.beginPath(); q.arc(cx, cx, r, 0, 6.283); q.fill(); q.lineWidth = 2; q.strokeStyle = OUT; q.stroke(); });
+  /* canica de cartoon: 3 tonos con borde duro (nada de degradado difuso) y un óvalo especular */
+  const r = S * 0.3; ballImg = mk(r * 2 + 4, r * 2 + 4, (q) => { const cx = r + 2, ball0 = (w) => { w.moveTo(cx + r, cx); w.arc(cx, cx, r, 0, 6.283); };
+    unite(q, [[ball0, '#5ce1e6']], 1.5);
+    within(q, ball0, (w) => cel3(w, ball0, '#5ce1e6', { dx: r * 0.16, dy: r * 0.17, r: r * 3, sh: 0.34, lt: 0.34 }));
+    spec(q, cx - r * 0.34, cx - r * 0.4, r * 0.24, r * 0.15, -0.6, 0.9); });
 }
 reset(); k.show(CFG.title, 'Inclina el móvil (o arrastra / flechas) para rodar la canica hasta la meta dorada. Evita los agujeros: tienes 3 canicas.');
 const solid = (tx, ty) => !g[ty] || g[ty][tx] === undefined || g[ty][tx];

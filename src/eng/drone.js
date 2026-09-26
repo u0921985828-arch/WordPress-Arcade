@@ -54,7 +54,19 @@ const SKY = mk(640, 190, (g) => { const gr = g.createLinearGradient(0, 0, 0, 190
   g.fillStyle = '#fff'; for (let i = 0; i < 60; i++) { g.globalAlpha = (0.2 + rs(i) * 0.8) * (1 - rs(i + 5) * 0.6); g.fillRect(rs(i + 1) * 640, rs(i + 2) * 100, 1.5, 1.5); } g.globalAlpha = 1;
   const sg = g.createRadialGradient(470, 150, 5, 470, 150, 70); sg.addColorStop(0, 'rgba(255,230,160,1)'); sg.addColorStop(0.3, 'rgba(255,190,120,.8)'); sg.addColorStop(1, 'rgba(255,160,110,0)'); g.fillStyle = sg; g.fillRect(380, 60, 180, 130); });
 const MW = 1280, MTN = mk(MW, 70, (g) => { for (const [col, amp, f1, f2, base] of [['#5a3a7a', 40, 5, 13, 60], ['#3b2a5c', 26, 9, 21, 70]]) { g.fillStyle = col; g.beginPath(); g.moveTo(0, 70); for (let x = 0; x <= MW; x += 8) g.lineTo(x, base - (Math.abs(Math.sin(x / MW * Math.PI * f1)) * amp) - Math.sin(x / MW * 6.283 * f2) * 6); g.lineTo(MW, 70); g.fill(); } });
-const TREE = mk(60, 90, (g) => { g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(30, 86, 22, 4, 0, 0, 6.283); g.fill(); ART.rr(g, 26, 58, 8, 28, 3); ART.fillOut(g, '#5a3a22', 2); for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(30, 4 + i * 18); g.lineTo(52 - i * 2, 40 + i * 14); g.lineTo(8 + i * 2, 40 + i * 14); g.closePath(); ART.fillOut(g, ['#2f8a5a', '#28794f', '#216a45'][i], 2); } });
+/* Ley de la pieza única: el árbol era tronco + 3 conos, cada uno contorneado. Ahora es UNA
+   silueta continua (unite traza y rellena después) y los pisos se leen por sombra propia. */
+const TREE = mk(60, 90, (g) => {
+  contact(g, 30, 86, 22, 4.5, 0.26);
+  const trunk = (q) => { q.moveTo(26, 52); q.lineTo(34, 52); q.lineTo(35, 86); q.lineTo(25, 86); q.closePath(); };
+  const tier = (i) => (q) => { q.moveTo(30, 4 + i * 18); q.lineTo(52 - i * 2, 42 + i * 14); q.lineTo(8 + i * 2, 42 + i * 14); q.closePath(); };
+  unite(g, [[trunk, '#6a4527'], [tier(2), '#216a45'], [tier(1), '#28794f'], [tier(0), '#2f8a5a']], 1.5);
+  for (let i = 0; i < 3; i++) within(g, tier(i), (q) => {
+    q.fillStyle = PAL(PZO, 0.22); q.fillRect(0, 34 + i * 14, 60, 10);      // sombra propia bajo cada piso
+    q.fillStyle = 'rgba(255,255,255,.16)'; q.beginPath(); q.moveTo(30, 6 + i * 18); q.lineTo(30, 42 + i * 14); q.lineTo(14 + i * 2, 42 + i * 14); q.closePath(); q.fill();
+  });
+  within(g, trunk, (q) => { q.fillStyle = PAL(PZO, 0.3); q.fillRect(30, 40, 30, 60); });
+});
 const P = (x, y, zz) => { const s = F / Math.max(1, zz - z + 250); return [320 + (x - camX) * s, 180 + (y - camY) * s, s]; };
 function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
 k.run((dt) => {
@@ -100,17 +112,44 @@ k.run((dt) => {
   label(`${score}`, 14, 10, 26); for (let i = 0; i < 4; i++) battery(626 - 34 - i * 40, 14, i < lives);
   if (combo > 1) label(`Combo x${combo}`, 320, 56, 18, '#f2d15c', 'center');
 });
-function battery(x, y, full) { ART.rr(c, x, y, 30, 16, 4); ART.fillOut(c, full ? '#2a2248' : 'rgba(42,34,72,.5)', 2.5); c.fillStyle = OUT; c.fillRect(x + 30, y + 4, 4, 8); if (full) { c.fillStyle = '#7cf7a0'; for (let i = 0; i < 3; i++) c.fillRect(x + 4 + i * 8, y + 4, 6, 8); } }
+/* la pila es un cuerpo con su borne, no dos rectángulos encajados */
+function battery(x, y, full) {
+  const body = (g) => { g.moveTo(x + 4, y); g.arcTo(x + 30, y, x + 30, y + 16, 4); g.lineTo(x + 30, y + 4); g.lineTo(x + 34, y + 4); g.lineTo(x + 34, y + 12); g.lineTo(x + 30, y + 12); g.arcTo(x + 30, y + 16, x, y + 16, 4); g.arcTo(x, y + 16, x, y, 4); g.arcTo(x, y, x + 30, y, 4); g.closePath(); };
+  unite(c, [[body, full ? '#2a2248' : 'rgba(42,34,72,.5)']], 1.5);
+  clipIn(c, body, (g) => { if (full) { g.fillStyle = '#7cf7a0'; for (let i = 0; i < 3; i++) g.fillRect(x + 4 + i * 8, y + 4, 6, 8); } g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(x + 2, y + 1.5, 26, 2.5); });
+}
+/* Ley de la pieza única: el dron era chasis + 2 brazos + 2 mástiles + carlinga + cámara, seis
+   contornos apilados. Ahora el chasis con brazos y mástiles es UNA silueta cacheada (solo cambia
+   con el cabeceo, en 5 tramos) y las hélices, que sí giran, van aparte encima. */
+const DSPR = {}, DSC = Math.min(2, window.devicePixelRatio || 1) * 2, DW = 108, DH = 52, DOX = 54, DOY = 26;
+function droneSpr(pb) {
+  if (DSPR[pb]) return DSPR[pb];
+  const pitch = (pb - 2) / 2 * 0.35;
+  const cv = document.createElement('canvas'); cv.width = DW * DSC; cv.height = DH * DSC;
+  const g = cv.getContext('2d'); g.scale(DSC, DSC); g.translate(DOX, DOY); g.lineJoin = 'round'; g.lineCap = 'round';
+  const BODY = '#f2f5ff', ARMC = '#454065';
+  const hull = (q) => { q.moveTo(-22, -2); q.quadraticCurveTo(-22, -12, -12, -12.5); q.lineTo(12, -12.5); q.quadraticCurveTo(22, -12, 22, -2); q.quadraticCurveTo(22, 8, 12, 10); q.lineTo(6, 10); q.quadraticCurveTo(6, 19, 0, 19); q.quadraticCurveTo(-6, 19, -6, 10); q.lineTo(-12, 10); q.quadraticCurveTo(-22, 8, -22, -2); q.closePath(); };
+  const arm = (sd) => (q) => { const y0 = -3 + pitch * 4, y1 = -12 + pitch * 6; q.moveTo(sd * 12, y0 - 3.4); q.lineTo(sd * 41, y1 - 1); q.lineTo(sd * 47, y1 - 1); q.lineTo(sd * 47, y1 + 11); q.lineTo(sd * 41, y1 + 11); q.lineTo(sd * 12, y0 + 3.4); q.closePath(); };
+  unite(g, [[arm(-1), ARMC], [arm(1), ARMC], [hull, BODY]], 1.5);
+  for (const sd of [-1, 1]) within(g, arm(sd), (q) => { q.fillStyle = PAL(PZO, 0.3); q.fillRect(-60, 1 + pitch * 5, 120, 14); q.fillStyle = 'rgba(255,255,255,.14)'; q.fillRect(-60, -14 + pitch * 6, 120, 3); });
+  within(g, hull, (q) => {
+    cel3(q, hull, BODY, { dx: 2.2, dy: 2, r: 60, sh: 0.2, lt: 0.12 });
+    q.fillStyle = '#2aa9b5'; q.beginPath(); q.moveTo(-14, -8.6); q.lineTo(14, -8.6); q.lineTo(12, 1); q.lineTo(-12, 1); q.closePath(); q.fill();
+    q.fillStyle = '#5ce1e6'; q.beginPath(); q.moveTo(-13, -8.2); q.lineTo(13, -8.2); q.lineTo(11, -1.4); q.lineTo(-11, -1.4); q.closePath(); q.fill();
+    spec(q, -7.5, -6.6, 3.6, 1.5, -0.2, 0.7);
+    q.fillStyle = PAL(PZO, 0.72); q.beginPath(); q.arc(0, 13, 6.4, 0, 6.283); q.fill();          // cúpula de la cámara, por color
+    q.fillStyle = '#5ce1e6'; q.beginPath(); q.arc(1, 12, 2, 0, 6.283); q.fill();
+    q.fillStyle = PAL(PZO, 0.16); q.fillRect(-24, 6, 48, 6);                                      // sombra propia bajo el chasis
+  });
+  return (DSPR[pb] = cv);
+}
 function drawDrone(x, y, s, roll, pitch) {
-  c.save(); c.translate(x, y); c.scale(s, s); c.rotate(roll); c.lineJoin = 'round';
+  c.save(); c.translate(x, y); c.scale(s, s); c.rotate(roll);
   const spin = t * 60, sy = 1 - Math.abs(pitch) * 0.3;
-  // brazos
-  for (const sd of [-1, 1]) { ART.rr(c, sd > 0 ? 10 : -46, -3 + pitch * 4, 36, 6, 3); ART.fillOut(c, '#3a3358', 2); }
-  // rotores (difuminado giratorio)
-  for (const sd of [-1, 1]) { const rx = sd * 44, ry = -12 + pitch * 6; ART.rr(c, rx - 3, ry, 6, 12, 2); ART.fillOut(c, '#3a3358', 2);
-    c.fillStyle = 'rgba(220,235,255,.35)'; c.beginPath(); c.ellipse(rx, ry, 24, 5 * sy, 0, 0, 6.283); c.fill(); c.strokeStyle = 'rgba(255,255,255,.8)'; c.lineWidth = 2; c.beginPath(); c.moveTo(rx + Math.cos(spin + sd) * 22, ry + Math.sin(spin + sd) * 4); c.lineTo(rx - Math.cos(spin + sd) * 22, ry - Math.sin(spin + sd) * 4); c.stroke(); }
-  // cuerpo
-  ART.rr(c, -22, -12, 44, 22, 10); ART.fillOut(c, '#f4f6ff', 2.5); ART.rr(c, -14, -8, 28, 9, 4); ART.fillOut(c, '#5ce1e6', 2); c.fillStyle = 'rgba(255,255,255,.7)'; c.fillRect(-10, -7, 6, 3);
-  c.beginPath(); c.arc(0, 12, 6, 0, 6.283); ART.fillOut(c, '#2a2248', 2); c.fillStyle = '#5ce1e6'; c.beginPath(); c.arc(1, 11, 2, 0, 6.283); c.fill();
-  c.fillStyle = Math.sin(t * 10) > 0 ? '#ff4d6d' : '#7a2436'; c.beginPath(); c.arc(-18, 2, 2.5, 0, 6.283); c.fill(); c.fillStyle = Math.sin(t * 10) > 0 ? '#3a8a55' : '#7cf7a0'; c.beginPath(); c.arc(18, 2, 2.5, 0, 6.283); c.fill();
+  c.drawImage(droneSpr(Math.max(0, Math.min(4, Math.round(pitch / 0.35 * 2) + 2))), -DOX, -DOY, DW, DH);
+  for (const sd of [-1, 1]) { const rx = sd * 44, ry = -12 + pitch * 6;                            // hélices: piezas que giran de verdad
+    c.fillStyle = 'rgba(220,235,255,.35)'; c.beginPath(); c.ellipse(rx, ry, 24, 5 * sy, 0, 0, 6.283); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,.8)'; c.lineWidth = 2; c.lineCap = 'round'; c.beginPath(); c.moveTo(rx + Math.cos(spin + sd) * 22, ry + Math.sin(spin + sd) * 4); c.lineTo(rx - Math.cos(spin + sd) * 22, ry - Math.sin(spin + sd) * 4); c.stroke(); }
+  c.fillStyle = Math.sin(t * 10) > 0 ? '#ff4d6d' : '#7a2436'; c.beginPath(); c.arc(-18, 2, 2.5, 0, 6.283); c.fill();
+  c.fillStyle = Math.sin(t * 10) > 0 ? '#3a8a55' : '#7cf7a0'; c.beginPath(); c.arc(18, 2, 2.5, 0, 6.283); c.fill();
   c.restore(); }

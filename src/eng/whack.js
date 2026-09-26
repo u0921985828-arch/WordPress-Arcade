@@ -13,6 +13,8 @@ const LT8 = (col, f) => (String(col)[0] === '#' ? _p8c(_p8h(col).map((v) => v + 
 const DK8 = (col, f) => (String(col)[0] === '#' ? _p8c(_p8h(col).map((v) => v * (1 - f))) : col);
 const AL8 = (col, a) => { const q = _p8h(col); return `rgba(${q[0]},${q[1]},${q[2]},${Math.max(0, a).toFixed(3)})`; };
 const CV8 = (w, h) => { const q = document.createElement('canvas'); q.width = Math.max(1, Math.ceil(w)); q.height = Math.max(1, Math.ceil(h)); return q; };
+/* como ART.rr pero SIN beginPath: imprescindible para componer subtrayectorias de una misma pieza */
+function rr8(c, x, y, w, h, r) { c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 const DPR8 = Math.min(2, (typeof devicePixelRatio === 'number' ? devicePixelRatio : 1) || 1);
 /* recorte contra la propia forma. Nunca `source-atop` en el lienzo vivo: obliga a un compuesto de
  * pantalla completa (medido 11–18 ms/frame). Aquí basta el clip. */
@@ -140,12 +142,12 @@ function board(n) { const saveN = N; N = n; const cv = off(360, 640, (g) => {
     const rim = (q) => { q.ellipse(hx, hy, rx * 1.22, ry * 1.5, 0, 0, R2); q.moveTo(hx + rx, hy); q.ellipse(hx, hy, rx, ry, 0, 0, R2, true); };
     g.beginPath(); rim(g); g.fillStyle = '#b9834c'; g.fill('evenodd');
     clip8(g, rim, (q) => { q.fillStyle = DK8('#b9834c', 0.3); q.fillRect(hx - rx * 2, hy - ry * 0.3, rx * 4, ry * 4);
-      q.fillStyle = LT8('#b9834c', 0.22); q.beginPath(); q.ellipse(hx, hy - ry * 0.6, rx * 1.16, ry * 1.1, 0, 0, R2); q.fill(); });
+      q.fillStyle = LT8('#b9834c', 0.15); q.beginPath(); q.ellipse(hx, hy - ry * 0.6, rx * 1.16, ry * 1.1, 0, 0, R2); q.fill(); });
     g.beginPath(); rim(g); g.lineWidth = 2.2; g.strokeStyle = OUT; g.stroke();
     g.beginPath(); g.ellipse(hx, hy, rx, ry, 0, 0, R2); const hg = g.createLinearGradient(0, hy - ry, 0, hy + ry); hg.addColorStop(0, '#120c20'); hg.addColorStop(1, '#3a2618'); g.fillStyle = hg; g.fill(); }
   // valla y arbustos al frente
-  const posts = (q) => { for (let x = 6; x < 360; x += 30) ART.rr(q, x, 590, 16, 50, 3); };
-  const rail = (q) => ART.rr(q, -4, 604, 368, 9, 3);
+  const posts = (q) => { for (let x = 6; x < 360; x += 30) rr8(q, x, 590, 16, 50, 3); };
+  const rail = (q) => rr8(q, -4, 604, 368, 9, 3);
   unite8(g, [[posts, '#e8d2a8', { dx: 1.6, dy: 0 }], [rail, '#d6bb8a']], 1.6);
   seam8(g, rail, '#d6bb8a', (q) => q.fillRect(-4, 604, 368, 2.4), 0.24);
   g.beginPath(); for (let i = 0; i < 7; i++) { const x = i * 60 + (i % 2) * 14 - 10, y = 634; g.moveTo(x + 24, y); g.arc(x, y, 24, 0, R2); g.moveTo(x + 48, y - 8); g.arc(x + 26, y - 8, 22, 0, R2); }
@@ -188,16 +190,16 @@ function moleSpr(gold, dazed) {
     const body = molePath(gold), col = gold ? '#e0a92c' : '#8a5f3c', belly = gold ? '#ffeaa0' : '#dcb489', hy = -BH * 0.72;
     unite8(g, [[body, col, { dx: 2.4, dy: 2.2 }, (q) => {
       q.fillStyle = belly; q.beginPath(); q.ellipse(0, -BH * 0.26, BW * 0.3, BH * 0.28, 0, 0, P8T); q.fill();
-      q.fillStyle = LT8(col, 0.3); q.beginPath(); q.ellipse(0, hy + BH * 0.04, BW * 0.36, BH * 0.25, 0, 0, P8T); q.fill();
+      q.fillStyle = LT8(col, 0.26); q.beginPath(); q.ellipse(0, hy + BW * 0.15, BW * 0.27, BW * 0.2, 0, 0, P8T); q.fill();   // hocico, por cambio de color
       if (gold) { q.fillStyle = '#ffe14d'; q.beginPath(); q.ellipse(0, -BH * 1.1, BW * 0.46, BH * 0.18, 0, 0, P8T); q.fill(); q.fillStyle = '#ff5f7a'; q.beginPath(); q.arc(0, -BH * 1.1, 2.6, 0, P8T); q.fill(); }
       q.fillStyle = 'rgba(255,150,150,.45)'; q.beginPath(); q.ellipse(-BW * 0.3, hy + BH * 0.11, BW * 0.085, BW * 0.06, 0, 0, P8T); q.ellipse(BW * 0.3, hy + BH * 0.11, BW * 0.085, BW * 0.06, 0, 0, P8T); q.fill();
       if (dazed) { q.strokeStyle = AL8(P8OUT, 0.92); q.lineWidth = 2.2; q.lineCap = 'round';
         for (const sx of [-1, 1]) { const ex = sx * BW * 0.18; q.beginPath(); q.moveTo(ex - 4, hy - 4); q.lineTo(ex + 4, hy + 4); q.moveTo(ex + 4, hy - 4); q.lineTo(ex - 4, hy + 4); q.stroke(); } }
       else { eyes8(q, 0, hy, BW * 0.185, BW * 0.105, { lid: 0.24, ly: 0.3, iris: '#2f2440', lidCol: LT8(col, 0.3) });
-        brow8(q, 0, hy - BW * 0.2, BW * 0.185, BW * 0.2, -1.1, DK8(col, 0.42), 1.5); }
+        brow8(q, 0, hy - BW * 0.185, BW * 0.185, BW * 0.16, -0.6, DK8(col, 0.5), 1.15); }
       q.fillStyle = '#ff8fb0'; q.beginPath(); q.ellipse(0, hy + BW * 0.17, BW * 0.12, BW * 0.085, 0, 0, P8T); q.fill();
       q.fillStyle = '#fff'; q.fillRect(-BW * 0.07, hy + BW * 0.25, BW * 0.062, BW * 0.1); q.fillRect(BW * 0.008, hy + BW * 0.25, BW * 0.062, BW * 0.1);
-      shine8(q, -BW * 0.25, hy - BH * 0.14, BW * 0.09, BW * 0.16, 0.35, 0.3);
+      shine8(q, -BW * 0.27, hy - BH * 0.16, BW * 0.085, BW * 0.14, 0.4, 0.24);
     }]], 1.5);
   }, 3);
 }
@@ -206,7 +208,7 @@ function moleSpr(gold, dazed) {
 function bombSpr() {
   return spr8('bomb', 96, 110, 48, 96, (g) => {
     const cy = -BR - 2;
-    const body = (q) => { q.moveTo(BR, cy); q.arc(0, cy, BR, 0, P8T); ART.rr(q, -5, cy - BR - 7, 10, 10, 3); };
+    const body = (q) => { q.moveTo(BR, cy); q.arc(0, cy, BR, 0, P8T); rr8(q, -5, cy - BR - 7, 10, 10, 3); };
     unite8(g, [[body, '#2f2c42', { dx: 2.6, dy: 2.4 }, (q) => {
       shine8(q, -BR * 0.4, cy - BR * 0.42, BR * 0.26, BR * 0.16, -0.6, 0.32);
       q.strokeStyle = '#ff5f5f'; q.lineWidth = 2.6; q.lineCap = 'round';
@@ -220,10 +222,10 @@ function bombSpr() {
 /* Mazo: mango y cabeza son la misma pieza; las franjas blancas son cambio de color, no contornos. */
 function malletSpr(L) {
   return spr8('mal' + Math.round(L), 84, L + 60, 42, L + 32, (g) => {
-    const body = (q) => { ART.rr(q, -4, -L, 8, L + 6, 3); ART.rr(q, -24, -L - 13, 44, 26, 8); };
-    const bandL = (q) => ART.rr(q, -26, -L - 9, 8, 18, 3), bandR = (q) => ART.rr(q, 14, -L - 9, 8, 18, 3);
+    const body = (q) => { rr8(q, -4, -L, 8, L + 6, 3); rr8(q, -24, -L - 13, 44, 26, 8); };
+    const bandL = (q) => rr8(q, -26, -L - 9, 8, 18, 3), bandR = (q) => rr8(q, 14, -L - 9, 8, 18, 3);
     unite8(g, [[body, '#e24b5b', { dx: 2.2, dy: 2 }], [bandL, '#f4efe6'], [bandR, '#f4efe6']], 1.6);
-    clip8(g, body, (q) => { q.fillStyle = '#c98a4b'; ART.rr(q, -4, -L + 12, 8, L, 3); q.fill();
+    clip8(g, body, (q) => { q.fillStyle = '#c98a4b'; q.beginPath(); rr8(q, -4, -L + 12, 8, L, 3); q.fill();
       q.fillStyle = 'rgba(255,255,255,.3)'; q.fillRect(-17, -L - 9, 30, 4.5); });
   }, 3);
 }

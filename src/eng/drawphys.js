@@ -21,6 +21,7 @@ function celp(g, parts, base, dx, dy) {
     h.translate(-dx * 1.15, -dy * 1.15); h.fillStyle = ART.lite(base, 0.2); P();
   });
 }
+function celm(g, parts, dx, dy) { for (let i = 0; i < parts.length; i++) celp(g, [parts[i]], parts[i][1], dx, dy); }
 function spec(g, x, y, rx, ry, rot, a) { g.fillStyle = 'rgba(255,255,255,' + (a == null ? 0.7 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, 6.2832); g.fill(); }
 function contact(g, x, y, rx, ry, a) { g.fillStyle = 'rgba(14,8,30,' + (a == null ? 0.3 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.2832); g.fill(); }
 const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
@@ -105,8 +106,33 @@ function icon(id, x, y) { c.strokeStyle = '#fff'; c.fillStyle = '#fff'; c.lineWi
   if (id === 'go') { if (running) { c.beginPath(); c.arc(x, y, 7, -Math.PI * 0.3, Math.PI * 1.5); c.stroke(); c.beginPath(); c.moveTo(x + 3, y - 11); c.lineTo(x + 9, y - 6); c.lineTo(x + 2, y - 3); c.fill(); } else { c.beginPath(); c.moveTo(x - 5, y - 8); c.lineTo(x + 8, y); c.lineTo(x - 5, y + 8); c.closePath(); c.fill(); } }
   if (id === 'undo') { c.beginPath(); c.arc(x + 2, y + 2, 7, -Math.PI * 0.9, Math.PI * 0.5); c.stroke(); c.beginPath(); c.moveTo(x - 9, y - 4); c.lineTo(x - 1, y - 6); c.lineTo(x - 6, y + 2); c.fill(); }
   if (id === 'clear') { c.save(); c.translate(x, y); c.rotate(-0.6); ART.rr(c, -9, -5, 18, 10, 3); c.fill(); c.fillStyle = '#e06a8a'; c.fillRect(-9, -5, 6, 10); c.restore(); } }
-function wheel(x, y, r, a) { c.save(); c.translate(x, y); c.rotate(a); c.beginPath(); c.arc(0, 0, r, 0, R2); ART.fillOut(c, '#3a3346', 2.5); c.beginPath(); c.arc(0, 0, r * 0.62, 0, R2); ART.fillOut(c, '#c7ccd8', 2); c.strokeStyle = '#6a7088'; c.lineWidth = 2; c.beginPath(); for (let i = 0; i < 5; i++) { const q = i * R2 / 5; c.moveTo(0, 0); c.lineTo(Math.cos(q) * r * 0.6, Math.sin(q) * r * 0.6); } c.stroke(); c.beginPath(); c.arc(0, 0, 3, 0, R2); ART.fillOut(c, '#ffd23d', 1.5); c.restore(); }
-function ballDraw(x, y, r, a) { c.save(); c.translate(x, y); c.beginPath(); c.arc(0, 0, r, 0, R2); ART.fillOut(c, '#ff8a3d', 2.5); c.save(); c.clip(); c.rotate(a); c.fillStyle = '#ffd23d'; c.fillRect(-r, -r * 0.3, r * 2, r * 0.6); c.restore(); c.beginPath(); c.arc(0, 0, r, 0, R2); c.strokeStyle = OUT; c.lineWidth = 2.5; c.stroke(); c.fillStyle = 'rgba(255,255,255,.6)'; c.beginPath(); c.ellipse(-r * 0.35, -r * 0.4, r * 0.22, r * 0.32, -0.6, 0, R2); c.fill(); c.restore(); }
+/* Rueda y bola: piezas únicas cacheadas (R5 §8). La rueda gira de verdad → su buje es pieza aparte. */
+const wCv = {}, bCv = {};
+function wheelSprite(r) {
+  const key = Math.round(r); let q = wCv[key]; if (q) return q;
+  const R = r + 4, d = Math.ceil(R * 2 * CDPR); q = document.createElement('canvas'); q.width = q.height = d;
+  const g = q.getContext('2d'); g.scale(d / (R * 2), d / (R * 2)); g.translate(R, R);
+  const tyre = [[(h) => { h.moveTo(r, 0); h.arc(0, 0, r, 0, R2); }, '#3a3346']];
+  uni(g, tyre, 1.6); celp(g, tyre, '#3a3346', r * 0.35, r * 0.35);
+  const hub = [[(h) => { h.moveTo(r * 0.62, 0); h.arc(0, 0, r * 0.62, 0, R2); }, '#c7ccd8']];
+  uni(g, hub, 1.2); celp(g, hub, '#c7ccd8', r * 0.22, r * 0.22);
+  g.strokeStyle = '#6a7088'; g.lineWidth = 2; g.beginPath(); for (let i = 0; i < 5; i++) { const qa = i * R2 / 5; g.moveTo(0, 0); g.lineTo(Math.cos(qa) * r * 0.6, Math.sin(qa) * r * 0.6); } g.stroke();
+  g.fillStyle = '#ffd23d'; g.beginPath(); g.arc(0, 0, 3, 0, R2); g.fill();
+  spec(g, -r * 0.34, -r * 0.42, r * 0.16, r * 0.09, -0.6, 0.5);
+  wCv[key] = q; return q;
+}
+function wheel(x, y, r, a) { contact(c, x, y + r * 0.92, r * 0.85, r * 0.24, 0.26); c.save(); c.translate(x, y); c.rotate(a); c.drawImage(wheelSprite(r), -(r + 4), -(r + 4), (r + 4) * 2, (r + 4) * 2); c.restore(); }
+function ballSprite(r) {
+  const key = Math.round(r); let q = bCv[key]; if (q) return q;
+  const R = r + 3, d = Math.ceil(R * 2 * CDPR); q = document.createElement('canvas'); q.width = q.height = d;
+  const g = q.getContext('2d'); g.scale(d / (R * 2), d / (R * 2)); g.translate(R, R);
+  const parts = [[(h) => { h.moveTo(r, 0); h.arc(0, 0, r, 0, R2); }, '#ff8a3d']];
+  uni(g, parts, 1.5); celp(g, parts, '#ff8a3d', r * 0.42, r * 0.42);
+  inpath(g, parts, (h) => { h.fillStyle = '#ffd23d'; h.fillRect(-r, -r * 0.3, r * 2, r * 0.6); });
+  spec(g, -r * 0.35, -r * 0.4, r * 0.22, r * 0.32, -0.6, 0.7);
+  bCv[key] = q; return q;
+}
+function ballDraw(x, y, r, a) { c.save(); c.translate(x, y); c.rotate(a); c.drawImage(ballSprite(r), -(r + 3), -(r + 3), (r + 3) * 2, (r + 3) * 2); c.restore(); }
 function draw() {
   if (!bgCv) bgCv = renderBg(); c.drawImage(bgCv, 0, 0, W, H);
   // estela del intento anterior y del actual
@@ -114,8 +140,10 @@ function draw() {
   c.fillStyle = 'rgba(255,120,60,.45)'; for (const p of path) { c.beginPath(); c.arc(p[0], p[1], 2.5, 0, R2); c.fill(); }
   // meta
   if (M === 'funnel') { const { x, y } = cup; c.fillStyle = 'rgba(0,0,0,.12)'; c.beginPath(); c.ellipse(x, y + 32, 30, 6, 0, 0, R2); c.fill();
-    c.beginPath(); c.moveTo(x - 32, y - 24); c.lineTo(x - 24, y + 30); c.lineTo(x + 24, y + 30); c.lineTo(x + 32, y - 24); c.closePath(); ART.fillOut(c, '#7cd6a0', 3); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(x - 24, y - 18, 6, 40);
-    c.beginPath(); c.ellipse(x, y - 24, 32, 6, 0, 0, R2); ART.fillOut(c, '#2f7a52', 2.5); label('META', x, y - 2, 12, '#fff', 'center'); }
+    { const parts = [[(h) => { h.moveTo(x - 32, y - 24); h.lineTo(x - 24, y + 30); h.lineTo(x + 24, y + 30); h.lineTo(x + 32, y - 24); h.closePath(); }, '#7cd6a0'],
+                     [(h) => { h.moveTo(x + 32, y - 24); h.ellipse(x, y - 24, 32, 6, 0, 0, R2); }, '#2f7a52']];
+      uni(c, parts, 1.6); celm(c, parts, 7, 7); spec(c, x - 20, y - 6, 4, 14, 0, 0.35); }
+    label('META', x, y - 2, 12, '#fff', 'center'); }
   else ART.flag(c, goalX + 12, fixed.ry, clk, '#7cf7a0', 64);
   // tinta del jugador
   c.lineCap = 'round'; c.lineJoin = 'round';

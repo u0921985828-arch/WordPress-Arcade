@@ -24,7 +24,7 @@ const k = Kit({ w: W, h: H, title: CFG.title, bg: '#120e26' }), c = k.ctx;
 const PZ = (() => {
   const O = ART.OUT, AL = ART.alpha, DK = ART.dark, LT = ART.lite, R2 = Math.PI * 2;
   const DPR = Math.min(2, (typeof devicePixelRatio === 'number' && devicePixelRatio) || 1);
-  const OW = 1.5, IW = 0.7, IA = 0.62, CH = {};
+  const OW = 1.5, IW = 0.7, IA = 0.62, CH = {}; let NCH = 0;
   const P = {
     O, R2, DPR,
     /* --- trazados reutilizables (sólo trazan; no rellenan ni contornean) --- */
@@ -150,6 +150,7 @@ const PZ = (() => {
     /* sprite de personaje/objeto: ×3 lógico para que la línea fina no se rompa. (0,0) = ancla */
     spr(key, w, h, ax, ay, fn) {
       let q = CH[key]; if (q) return q;
+      if (++NCH > 400) { for (const kk in CH) delete CH[kk]; NCH = 1; }   /* tope de memoria del caché */
       q = P.cv(w, h, 3, (g) => { g.translate(ax, ay); fn(g); });
       q.ax = ax; q.ay = ay; CH[key] = q; return q;
     },
@@ -218,41 +219,57 @@ function ik(x0, y0, x1, y1, l1, l2, bend) {
    contorno propio (son rasgos, no piezas), así que la silueta sigue siendo una sola. */
 function faceSpr(hr, f, col, skin, mouth, shut) {
   return PZ.spr(`f${hr}|${f}|${col}|${skin}|${mouth}|${shut ? 1 : 0}`, hr * 2.4, hr * 2.4, hr * 1.2, hr * 1.2, (g) => {
-    PZ.shine(g, -hr * 0.42, -hr * 0.48, hr * 0.32, hr * 0.18, -0.6, 0.4);
+    PZ.shine(g, -hr * 0.46, -hr * 0.08, hr * 0.26, hr * 0.15, -0.6, 0.34);
     const ex = hr * 0.24 * f, er = hr * 0.27, grr = mouth === 'grr';
     PZ.eyes(g, ex, -hr * 0.06, hr * 0.32, er, f, 0.1, { shut, lidCol: skin, lid: shut ? 0 : 0.22, tilt: grr ? 0.4 : 0.12 });
     PZ.brows(g, ex, -hr * 0.46, hr * 0.32, hr * 0.34, grr ? hr * 0.14 : mouth === 'sad' ? -hr * 0.1 : hr * 0.04, dark(col, 0.5), hr * 0.13);
-    PZ.mouth(g, ex * 1.3, hr * 0.42, hr * 0.34, FACE_EXPR[mouth] == null ? 0 : FACE_EXPR[mouth]);
+    PZ.mouth(g, ex * 1.3, hr * 0.44, hr * 0.52, FACE_EXPR[mouth] == null ? 0 : FACE_EXPR[mouth]);
   });
 }
 const FACE_EXPR = { o: 4, sad: 5, grr: 2, '': 0 };
 /* codo/rodilla con segmentos proporcionales: la articulación se insinúa y el hueso nunca se dobla
    sobre sí mismo (un bucle abriría un hueco en el relleno y rompería la pieza única). */
+/* la mano nunca queda tapada por el tronco: si el motor la pide muy cerca del eje, el brazo se
+   abre lo justo para que la silueta lea «brazo» (la mancha negra lo exige). */
+function arm(h) { const x = h[0]; return [Math.abs(x) < 12 ? (x < 0 ? -12 : 12) : x, h[1]]; }
 function joint(x0, y0, x1, y1, bend) { const l = Math.max(hyp(x1 - x0, y1 - y0) * 0.53 + 1.6, 5); return ik(x0, y0, x1, y1, l, l, bend * 0.38); }
+/* El muñeco se cachea por POSE: manos y pies se redondean a 2 px, así el ciclo de carrera cae en un
+   puñado de sprites y la silueta (que es lo caro: trazar, contornear y rellenar doce piezas) se
+   dibuja una sola vez por pose en vez de 60 veces por segundo y jugador. */
 function puppet(x, y, s, col, o) {
   o = o || {};
-  const hands = o.hands || [[-13, 1], [13, 1]], feet = o.feet || [[-6, 22], [6, 22]];
+  const q2 = (v) => Math.round(v / 2) * 2;
+  const hands = (o.hands || [[-15, -1], [15, -1]]).map((h) => [q2(h[0]), q2(h[1])]);
+  const feet = (o.feet || [[-7.5, 22], [7.5, 22]]).map((h) => [q2(h[0]), q2(h[1])]);
   const hr = o.hr == null ? 11 : o.hr + 2, hy = o.hy == null ? -22 : o.hy;
   const f = o.face === -1 ? -1 : 1, fr = o.front == null ? 1 : o.front;
-  const skin = o.skin || '#ffd9b5', leg = dark(col, 0.34), parts = [];
+  const skin = o.skin || '#ffd9b5';
+  const key = `P${col}|${skin}|${hr}|${hy}|${f}|${fr}|${o.helm ? 1 : 0}|${o.belt ? 1 : 0}|${o.hair === false ? 0 : 1}|${o.shadow === false ? 0 : 1}|${o.mouth || ''}|${o.shut ? 1 : 0}|${hands}|${feet}`;
+  const q = PZ.spr(key, 78, 88, 39, 58, (g) => bodyDraw(g, col, skin, hands, feet, hr, hy, f, fr, o));
   c.save(); c.translate(x, y); c.scale(s, s); if (o.rot) c.rotate(o.rot);
+  c.drawImage(q, -39, -58, 78, 88);
+  if (o.after) o.after();
+  c.restore();
+}
+function bodyDraw(c, col, skin, hands, feet, hr, hy, f, fr, o) {
+  const leg = dark(col, 0.46), parts = [];
   if (o.shadow !== false) { c.beginPath(); c.ellipse(0, 25, 13, 4.4, 0, 0, TAU); c.fillStyle = alpha(OUT, 0.26); c.fill(); }
   /* piernas: hueso grueso que nace DENTRO del tronco (tangente continua en la cadera) y bota redonda.
      La rodilla/codo se resuelve con segmentos proporcionales a la distancia: así la articulación se
      insinúa sin que el hueso se doble sobre sí mismo (y sin bucles que abrirían un hueco). */
   for (let i = 0; i < 2; i++) {
     const [fx2, fy2] = feet[i], hx0 = i ? 4.5 : -4.5, kn = joint(hx0, 4, fx2, fy2 - 3, i ? 1 : -1);
-    parts.push([PZ.bone([[hx0, -2], kn, [fx2, fy2 - 2.5]], [6, 4.8, 3.8]), leg]);
+    parts.push([PZ.bone([[hx0, -2], kn, [fx2, fy2 - 2.5]], [5.6, 4.4, 3.6]), leg]);
     parts.push([PZ.blob(fx2 + f * 1.8, fy2 - 0.6, 6, 4.4), leg]);
   }
   /* brazo de atrás (más oscuro: la separación se lee por valor, nunca por contorno) */
   for (let i = 0; i < 2; i++) if (i !== fr) {
-    const [hx2, hy2] = hands[i], sx = i ? 7.4 : -7.4, el = joint(sx, -13, hx2, hy2, i ? 1 : -1);
+    const [hx2, hy2] = arm(hands[i]), sx = i ? 6.4 : -6.4, el = joint(sx, -13, hx2, hy2, i ? 1 : -1);
     parts.push([PZ.bone([[sx, -15], el, [hx2, hy2]], [5.2, 4.2, 3.2]), dark(col, 0.32)]);
     parts.push([PZ.mitt(hx2, hy2, Math.atan2(hy2 - el[1], hx2 - el[0]), 4.3, i ? 1 : -1), dark(skin, 0.3)]);
   }
-  parts.push([PZ.box(-8.6, -18, 17.2, 27, 8.4), col]);                   /* tronco compacto */
-  if (o.belt) parts.push([PZ.box(-8.6, 1, 17.2, 5.2, 2.4), '#ffc94d']);
+  parts.push([PZ.box(-7.4, -18, 14.8, 27, 7.2), col]);                   /* tronco compacto */
+  if (o.belt) parts.push([PZ.box(-7.4, 1, 14.8, 5.2, 2.4), '#ffc94d']);
   parts.push([PZ.blob(0, hy, hr, hr * 1.02), skin]);                      /* cabeza grande */
   if (o.helm) {                                                           /* yelmo: se hunde en la cabeza */
     parts.push([(g) => { g.moveTo(-hr - 1.4, hy + 1.5); g.quadraticCurveTo(-hr - 1.4, hy - hr - 3, 0, hy - hr - 3); g.quadraticCurveTo(hr + 1.4, hy - hr - 3, hr + 1.4, hy + 1.5); g.closePath(); }, '#c8ccd8']);
@@ -269,16 +286,14 @@ function puppet(x, y, s, col, o) {
   }
   /* brazo de delante: cruza por encima, así que sí es pieza propia (se mueve de verdad) */
   for (let i = 0; i < 2; i++) if (i === fr) {
-    const [hx2, hy2] = hands[i], sx = i ? 7.4 : -7.4, el = joint(sx, -13, hx2, hy2, i ? 1 : -1);
-    parts.push([PZ.bone([[sx, -15], el, [hx2, hy2]], [5.4, 4.4, 3.4]), col]);
+    const [hx2, hy2] = arm(hands[i]), sx = i ? 6.4 : -6.4, el = joint(sx, -13, hx2, hy2, i ? 1 : -1);
+    parts.push([PZ.bone([[sx, -15], el, [hx2, hy2]], [5.4, 4.4, 3.4]), lite(col, 0.14)]);
     parts.push([PZ.mitt(hx2, hy2, Math.atan2(hy2 - el[1], hx2 - el[0]), 4.6, i ? 1 : -1), skin]);
   }
   const sil = PZ.unite(c, parts, 1.5);
   /* volumen en 2 planos de borde duro: un solo recorte contra la silueta ya trazada */
   PZ.cut(c, sil, (g) => { g.translate(2, 1); g.rotate(-0.5); g.fillStyle = alpha(OUT, 0.17); g.fillRect(-70, 2, 140, 140); });
   PZ.put(c, faceSpr(hr, f, col, skin, o.mouth || '', !!o.shut), 0, hy);
-  if (o.after) o.after();
-  c.restore();
 }
 
 /* ---------------------------------------------------------------- Jugadores, rondas y puntos */

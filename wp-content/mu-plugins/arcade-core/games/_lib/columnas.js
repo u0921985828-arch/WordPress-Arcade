@@ -24,6 +24,7 @@ function celp(g, parts, base, dx, dy) {
     h.translate(-dx * 1.15, -dy * 1.15); h.fillStyle = ART.lite(base, 0.2); P();
   });
 }
+function celm(g, parts, dx, dy) { for (let i = 0; i < parts.length; i++) celp(g, [parts[i]], parts[i][1], dx, dy); }
 function spec(g, x, y, rx, ry, rot, a) { g.fillStyle = 'rgba(255,255,255,' + (a == null ? 0.7 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, 6.2832); g.fill(); }
 function contact(g, x, y, rx, ry, a) { g.fillStyle = 'rgba(14,8,30,' + (a == null ? 0.3 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.2832); g.fill(); }
 const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
@@ -56,15 +57,11 @@ function gemSprite(i) {
   const o = GEM[i], r = CS * 0.42, S = CS + 6;
   return off(S, S, (g) => {
     g.translate(S / 2, S / 2);
-    g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.ellipse(1, r * 0.75, r * 0.85, r * 0.26, 0, 0, TAU); g.fill();
-    const gr = g.createLinearGradient(-r, -r, r, r);
-    gr.addColorStop(0, ART.lite(o.c, 0.55)); gr.addColorStop(0.5, o.c); gr.addColorStop(1, ART.dark(o.c, 0.32));
-    gemPath(g, o.s, r); g.fillStyle = gr; g.fill(); g.lineWidth = 2.4; g.strokeStyle = OUT; g.stroke();
-    g.save(); gemPath(g, o.s, r); g.clip();
-    g.fillStyle = 'rgba(255,255,255,.3)'; g.beginPath(); g.moveTo(-r, -r); g.lineTo(r * 0.3, -r); g.lineTo(-r, r * 0.3); g.closePath(); g.fill();
-    g.strokeStyle = ART.alpha(ART.dark(o.c, 0.45), 0.7); g.lineWidth = 1.6;
-    g.beginPath(); g.moveTo(-r, r * 0.25); g.lineTo(r, -r * 0.1); g.moveTo(0, -r); g.lineTo(0, r); g.stroke(); g.restore();
-    ART.glint(g, -r * 0.34, -r * 0.36, r * 0.3, 'rgba(255,255,255,.9)');
+    contact(g, 1, r * 0.78, r * 0.85, r * 0.24, 0.3);
+    const parts = [[(h) => gemPath(h, o.s, r), o.c]];
+    uni(g, parts, 1.5);
+    celp(g, parts, o.c, r * 0.42, r * 0.42);
+    spec(g, -r * 0.34, -r * 0.4, r * 0.26, r * 0.15, -0.6, 0.78);
   });
 }
 function rainbowSprite() {
