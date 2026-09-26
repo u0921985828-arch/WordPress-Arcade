@@ -585,9 +585,9 @@ void main(){
     function composite(t) {
       GOPT.emissive = eUse ? eCv : null; GOPT.height = hUse ? hCv : null; GOPT.nl = nL;
       GOPT.t = rmo ? 0.5 : (t * 0.0017) % 977;
-      /* Tres sondeos con gl.finish() (frames 40/70/100) para medir también el trabajo de GPU:
+      /* Tres sondeos con gl.finish() (frames 15/35/65) para medir también el trabajo de GPU:
          si la mediana pasa de 6 ms, este aparato no da y se apaga el compositor. */
-      const probe = ++gxN === 40 || gxN === 70 || gxN === 100, t0 = performance.now();
+      const probe = ++gxN === 15 || gxN === 35 || gxN === 65, t0 = performance.now();
       if (!GX.frame(cv, GOPT)) { gxDrop(); return; }
       if (probe) {
         GX.sync(); const ms = performance.now() - t0; gxProbe.push(ms); k.gfxSync = ms;
