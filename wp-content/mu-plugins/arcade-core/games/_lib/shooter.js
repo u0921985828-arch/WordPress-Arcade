@@ -165,25 +165,37 @@ function boss(b, flash) {
 }
 /* Búnker: UNA losa por búnker. Las celdas vivas se trazan juntas y se rellenan de una vez, así solo
    sobrevive el borde exterior (y el de los boquetes). Cacheado: solo se repinta al perder una celda. */
-let bkCv = null, bkN = -1, bkX = 0, bkY = 0, bkW = 0, bkH = 0;
+let bkC = [], bkN = -1;
 function drawBunkers() {
   if (!bunkers || !bunkers.length) return;
   const live = bunkers.filter((b) => !b.dead);
   if (!live.length) return;
   if (bkN !== live.length) {
     bkN = live.length;
-    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-    for (const b of live) { if (b.x < x0) x0 = b.x; if (b.y < y0) y0 = b.y; if (b.x > x1) x1 = b.x; if (b.y > y1) y1 = b.y; }
-    bkX = x0 - 4; bkY = y0 - 4; bkW = x1 - x0 + 14; bkH = y1 - y0 + 14;
-    if (!bkCv || bkCv.width < bkW * 2 || bkCv.height < bkH * 2) { bkCv = document.createElement('canvas'); bkCv.width = Math.ceil(bkW * 2); bkCv.height = Math.ceil(bkH * 2); }
-    const g = bkCv.getContext('2d'); g.setTransform(2, 0, 0, 2, -bkX * 2, -bkY * 2); g.clearRect(bkX, bkY, bkW, bkH);
-    const cell = (b) => (q) => q.rect(b.x - 0.5, b.y - 0.5, 6, 6);
-    unite(g, live.map((b) => [cell(b), '#4cc38a']), 1.05);
-    g.save(); g.globalCompositeOperation = 'source-atop';
-    for (const b of live) { g.fillStyle = AL('#ffffff', 0.3); g.fillRect(b.x - 0.5, b.y - 0.5, 6, 1.7); g.fillStyle = AL(OUT, 0.17); g.fillRect(b.x - 0.5, b.y + 3.6, 6, 1.9); }
-    g.restore();
+    /* un lienzo por búnker (los huecos entre búnkeres no se blitean) */
+    const gr = [];
+    for (const b of live) {
+      let g0 = null;
+      for (const q of gr) if (b.x >= q.x0 - 14 && b.x <= q.x1 + 14) { g0 = q; break; }
+      if (!g0) { g0 = { x0: b.x, x1: b.x, cells: [] }; gr.push(g0); }
+      if (b.x < g0.x0) g0.x0 = b.x; if (b.x > g0.x1) g0.x1 = b.x;
+      g0.cells.push(b);
+    }
+    bkC = gr.map((q) => {
+      let y0 = 1e9, y1 = -1e9;
+      for (const b of q.cells) { if (b.y < y0) y0 = b.y; if (b.y > y1) y1 = b.y; }
+      const x = q.x0 - 4, y = y0 - 4, w = q.x1 - q.x0 + 14, h = y1 - y0 + 14;
+      const cv = document.createElement('canvas'); cv.width = Math.ceil(w * 2); cv.height = Math.ceil(h * 2);
+      const g = cv.getContext('2d'); g.setTransform(2, 0, 0, 2, -x * 2, -y * 2);
+      const cell = (b) => (o) => o.rect(b.x - 0.5, b.y - 0.5, 6, 6);
+      unite(g, q.cells.map((b) => [cell(b), '#4cc38a']), 1.05);
+      g.save(); g.globalCompositeOperation = 'source-atop';
+      for (const b of q.cells) { g.fillStyle = AL('#ffffff', 0.3); g.fillRect(b.x - 0.5, b.y - 0.5, 6, 1.7); g.fillStyle = AL(OUT, 0.17); g.fillRect(b.x - 0.5, b.y + 3.6, 6, 1.9); }
+      g.restore();
+      return { cv, x, y, w, h };
+    });
   }
-  c.drawImage(bkCv, 0, 0, bkW * 2, bkH * 2, bkX, bkY, bkW, bkH);
+  for (const q of bkC) c.drawImage(q.cv, q.x, q.y, q.w, q.h);
 }
 /* Fondo cacheado a 2×: nebulosas, polvo estelar y planeta (espacio) o huerto nocturno (ciempiés) */
 function mkCv(w, h) { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const g = cv.getContext('2d'); g.scale(2, 2); return [cv, g]; }
