@@ -132,12 +132,22 @@ const BG = mk(W, H, (g) => {
 });
 function logCv(n) {
   const w = n * S - 4; return mk(w + 4, 28, (g) => {
-    ART.rr(g, 2, 3, w, 22, 10); ART.fillOut(g, '#8b5a2b', 2.5);
-    g.strokeStyle = 'rgba(60,32,14,.6)'; g.lineWidth = 2; g.lineCap = 'round';
-    for (let i = 0; i < n * 3; i++) { const x = 10 + srnd(i + n * 20) * (w - 26), y = 8 + (i % 3) * 5.5; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 8 + srnd(i) * 14, y); g.stroke(); }
-    g.fillStyle = 'rgba(255,255,255,.2)'; ART.rr(g, 8, 5, w - 22, 4, 2); g.fill();
-    g.beginPath(); g.ellipse(w - 6, 14, 7, 10, 0, 0, R2); ART.fillOut(g, '#d9a066', 2.5); g.strokeStyle = '#a8703a'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(w - 6, 14, 4, 6, 0, 0, R2); g.stroke(); g.beginPath(); g.ellipse(w - 6, 14, 1.5, 2.5, 0, 0, R2); g.stroke();
-    g.fillStyle = '#5a8f3a'; g.beginPath(); g.ellipse(w * 0.4, 5, 6, 3, 0, 0, R2); g.fill();
+    /* tronco de una pieza: cuerpo y testa se trazan juntos y se rellenan después */
+    const body = (q) => ART.rr(q, 2, 3, w, 22, 10), cap = (q) => { q.moveTo(w + 1, 14); q.ellipse(w - 6, 14, 7, 10, 0, 0, R2); };
+    unite(g, [[body, '#8b5a2b'], [cap, '#d9a066']], 1.15);
+    within(g, body, (q) => {
+      q.strokeStyle = AL('#3c200e', 0.6); q.lineWidth = 1.5; q.lineCap = 'round';
+      for (let i = 0; i < n * 3; i++) { const x = 10 + srnd(i + n * 20) * (w - 26), y = 8 + (i % 3) * 5.5; q.beginPath(); q.moveTo(x, y); q.lineTo(x + 8 + srnd(i) * 14, y); q.stroke(); }
+      q.fillStyle = 'rgba(255,255,255,.2)'; ART.rr(q, 8, 5, w - 22, 4, 2); q.fill();
+      q.fillStyle = AL(OUT, 0.2); ART.rr(q, 4, 19, w - 8, 5, 2.5); q.fill();
+      q.fillStyle = '#5a8f3a'; q.beginPath(); q.ellipse(w * 0.4, 5, 6, 3, 0, 0, R2); q.fill();
+    });
+    within(g, cap, (q) => { /* anillos por cambio de color, sin contorno */
+      q.fillStyle = '#c08a52'; q.beginPath(); q.ellipse(w - 6, 14, 4.6, 6.6, 0, 0, R2); q.fill();
+      q.fillStyle = '#d9a066'; q.beginPath(); q.ellipse(w - 6, 14, 3.4, 5, 0, 0, R2); q.fill();
+      q.fillStyle = '#a8703a'; q.beginPath(); q.ellipse(w - 6, 14, 1.5, 2.5, 0, 0, R2); q.fill();
+      q.fillStyle = AL('#ffffff', 0.22); q.beginPath(); q.ellipse(w - 7.6, 9.4, 3.4, 2.2, -0.5, 0, R2); q.fill();
+    });
   });
 }
 const LOG = { 2: logCv(2), 3: logCv(3), 4: logCv(4), 5: logCv(5) };
@@ -145,22 +155,38 @@ const LOG = { 2: logCv(2), 3: logCv(3), 4: logCv(4), 5: logCv(5) };
 function vehicle(type, col) {
   const w = VW[type] * S, h = S - 6; return mk(w + 22, S, (g) => {
     g.fillStyle = 'rgba(255,236,150,.14)'; g.beginPath(); g.moveTo(w, 8); g.lineTo(w + 22, 1); g.lineTo(w + 22, S - 1); g.lineTo(w, S - 8); g.fill(); // luces
-    const y = 3, wheel = (x) => { g.fillStyle = OUT; ART.rr(g, x, y - 2, 9, 5, 2); g.fill(); ART.rr(g, x, y + h - 3, 9, 5, 2); g.fill(); };
+    const y = 3;
+    /* las ruedas sí giran: van detrás, sin contorno propio */
+    const wheel = (x) => { g.fillStyle = OUT; ART.rr(g, x, y - 2, 9, 5, 2); g.fill(); ART.rr(g, x, y + h - 3, 9, 5, 2); g.fill(); };
+    const glass = (q, x, yy, ww, hh, r, cl) => { q.fillStyle = AL(OUT, 0.3); ART.rr(q, x, yy + 1.2, ww, hh, r); q.fill(); q.fillStyle = cl; ART.rr(q, x, yy, ww, hh, r); q.fill(); q.fillStyle = AL('#ffffff', 0.3); ART.rr(q, x + 1.5, yy + 1.5, ww * 0.45, hh * 0.3, r * 0.5); q.fill(); };
+    let body;
     if (type === 'truck') { wheel(8); wheel(30); wheel(w - 20);
-      ART.rr(g, 1, y, w - 22, h, 4); ART.fillOut(g, '#e8e6f2', 2.5); g.strokeStyle = 'rgba(26,21,48,.25)'; g.lineWidth = 1.5; for (let x = 10; x < w - 26; x += 9) { g.beginPath(); g.moveTo(x, y + 3); g.lineTo(x, y + h - 3); g.stroke(); }
-      ART.rr(g, w - 20, y + 1, 19, h - 2, 5); ART.fillOut(g, col, 2.5); ART.rr(g, w - 9, y + 4, 5, h - 8, 2); ART.fillOut(g, '#9fe7ff', 1.5); }
-    else if (type === 'dozer') { g.fillStyle = OUT; ART.rr(g, 4, y - 2, w - 14, 7, 3); g.fill(); ART.rr(g, 4, y + h - 5, w - 14, 7, 3); g.fill();
-      g.strokeStyle = '#6b6b80'; g.lineWidth = 1.5; for (let x = 7; x < w - 12; x += 5) { g.beginPath(); g.moveTo(x, y - 1); g.lineTo(x, y + 4); g.moveTo(x, y + h - 4); g.lineTo(x, y + h + 1); g.stroke(); }
-      ART.rr(g, 6, y + 4, w - 18, h - 8, 4); ART.fillOut(g, '#f2b705', 2.5); ART.rr(g, 12, y + 7, 14, h - 14, 3); ART.fillOut(g, '#9fe7ff', 2);
-      ART.rr(g, w - 10, y - 3, 8, h + 6, 2); ART.fillOut(g, '#9a98ac', 2.5); g.fillStyle = OUT; g.fillRect(w - 13, y + h / 2 - 2, 4, 4); }
-    else { const race = type === 'racer'; wheel(5); wheel(w - 15);
-      g.beginPath(); if (race) { g.moveTo(3, y + 2); g.lineTo(w - 12, y + 3); g.quadraticCurveTo(w, y + h / 2, w - 12, y + h - 3); g.lineTo(3, y + h - 2); g.closePath(); } else ART.rr(g, 2, y + 1, w - 3, h - 2, 8);
-      ART.fillOut(g, col, 2.5);
-      if (race) { g.fillStyle = '#fff'; g.fillRect(4, y + h / 2 - 2.5, w - 14, 5); ART.rr(g, 0, y - 1, 6, h + 2, 2); ART.fillOut(g, OUT, 1); }
-      ART.rr(g, race ? w * 0.45 : w * 0.3, y + 4, race ? 10 : w * 0.38, h - 8, 4); ART.fillOut(g, race ? '#2a2a40' : '#9fe7ff', 2);
-      g.fillStyle = 'rgba(255,255,255,.35)'; ART.rr(g, 6, y + 3, w * 0.5, 3, 1.5); g.fill(); }
-    g.fillStyle = '#fff6a8'; g.fillRect(w - 3, y + 3, 3, 4); g.fillRect(w - 3, y + h - 7, 3, 4); // faros
-    g.fillStyle = '#ff4d6d'; g.fillRect(1, y + 3, 2, 4); g.fillRect(1, y + h - 7, 2, 4);
+      const box = (q) => ART.rr(q, 1, y, w - 22, h, 4), cab = (q) => ART.rr(q, w - 21, y + 1, 20, h - 2, 5);
+      unite(g, [[box, '#e8e6f2'], [cab, col]], 1.15);
+      body = (q) => { box(q); cab(q); };
+      within(g, box, (q) => { q.strokeStyle = AL(OUT, 0.25); q.lineWidth = 1.3; for (let x = 10; x < w - 26; x += 9) { q.beginPath(); q.moveTo(x, y + 3); q.lineTo(x, y + h - 3); q.stroke(); } });
+      within(g, cab, (q) => glass(q, w - 9, y + 4, 5, h - 8, 2, '#9fe7ff'));
+    } else if (type === 'dozer') {
+      const hull = (q) => ART.rr(q, 6, y + 4, w - 18, h - 8, 4), blade = (q) => ART.rr(q, w - 11, y - 3, 9, h + 6, 2);
+      const trk = (q) => { ART.rr(q, 4, y - 2, w - 14, 7, 3); ART.rr(q, 4, y + h - 5, w - 14, 7, 3); };
+      unite(g, [[trk, '#2a2d4a'], [hull, '#f2b705'], [blade, '#9a98ac']], 1.15);
+      body = (q) => { trk(q); hull(q); blade(q); };
+      within(g, trk, (q) => { q.strokeStyle = '#6b6b80'; q.lineWidth = 1.4; for (let x = 7; x < w - 12; x += 5) { q.beginPath(); q.moveTo(x, y - 1); q.lineTo(x, y + 4); q.moveTo(x, y + h - 4); q.lineTo(x, y + h + 1); q.stroke(); } });
+      within(g, hull, (q) => glass(q, 12, y + 7, 14, h - 14, 3, '#9fe7ff'));
+      within(g, blade, (q) => { q.fillStyle = AL(OUT, 0.35); q.fillRect(w - 11, y + h / 2 - 2, 5, 4); });
+    } else { const race = type === 'racer'; wheel(5); wheel(w - 15);
+      const shell = race ? (q) => { q.moveTo(3, y + 2); q.lineTo(w - 12, y + 3); q.quadraticCurveTo(w, y + h / 2, w - 12, y + h - 3); q.lineTo(3, y + h - 2); q.closePath(); } : (q) => ART.rr(q, 2, y + 1, w - 3, h - 2, 8);
+      const spoil = race ? (q) => ART.rr(q, -1, y - 1, 7, h + 2, 2) : null;
+      unite(g, spoil ? [[spoil, '#2a2a40'], [shell, col]] : [[shell, col]], 1.15);
+      body = spoil ? (q) => { spoil(q); shell(q); } : shell;
+      within(g, shell, (q) => {
+        if (race) { q.fillStyle = '#fff'; q.fillRect(4, y + h / 2 - 2.5, w - 14, 5); }
+        glass(q, race ? w * 0.45 : w * 0.3, y + 4, race ? 10 : w * 0.38, h - 8, 4, race ? '#2a2a40' : '#9fe7ff');
+        q.fillStyle = 'rgba(255,255,255,.35)'; ART.rr(q, 6, y + 3, w * 0.5, 3, 1.5); q.fill();
+        q.fillStyle = AL(OUT, 0.18); q.fillRect(0, y + h - 4.5, w, 4.5);
+      });
+    }
+    within(g, body, (q) => { q.fillStyle = '#fff6a8'; q.fillRect(w - 4, y + 3, 4, 4); q.fillRect(w - 4, y + h - 7, 4, 4); q.fillStyle = '#ff4d6d'; q.fillRect(0, y + 3, 3, 4); q.fillRect(0, y + h - 7, 3, 4); });
   });
 }
 const VEH = {}; function veh(type, col) { const key = type + col; return VEH[key] || (VEH[key] = vehicle(type, col)); }
@@ -169,25 +195,40 @@ const VEH = {}; function veh(type, col) { const key = type + col; return VEH[key
 function turtle(x, y, dp, dir, ph) {
   const s = 1 - dp * 0.25; c.save(); c.translate(x, y); c.scale(dir * s, s); c.globalAlpha = 1 - dp * 0.75;
   const pad = Math.sin(t * 8 + ph) * 3;
-  c.fillStyle = '#4fae5a'; [[-7, -9 - pad], [-7, 9 + pad], [7, -9 + pad], [7, 9 - pad]].forEach(([a, b]) => { c.beginPath(); c.ellipse(a, b, 4.5, 3, 0, 0, R2); ART.fillOut(c, '#6fcf6a', 1.5); });
-  c.beginPath(); c.ellipse(-12, 0, 5, 4.5, 0, 0, R2); ART.fillOut(c, '#6fcf6a', 1.5); c.fillStyle = OUT; c.beginPath(); c.arc(-14, -2, 1.2, 0, R2); c.arc(-14, 2, 1.2, 0, R2); c.fill();
-  c.beginPath(); c.ellipse(1, 0, 11, 10, 0, 0, R2); ART.fillOut(c, dp > 0 ? '#a14a3a' : '#c0563f', 2);
-  c.strokeStyle = 'rgba(26,21,48,.45)'; c.lineWidth = 1.3; c.beginPath(); c.moveTo(-4, -4); c.lineTo(6, -4); c.lineTo(6, 4); c.lineTo(-4, 4); c.closePath(); c.moveTo(-4, -4); c.lineTo(-9, -6); c.moveTo(6, -4); c.lineTo(10, -6); c.moveTo(-4, 4); c.lineTo(-9, 6); c.moveTo(6, 4); c.lineTo(10, 6); c.stroke();
-  c.fillStyle = 'rgba(255,255,255,.3)'; c.beginPath(); c.ellipse(-1, -5, 5, 2, 0, 0, R2); c.fill(); c.restore();
+  /* tortuga de una pieza: aletas, cabeza y caparazón trazados juntos */
+  const fins = (q) => { [[-7, -9 - pad], [-7, 9 + pad], [7, -9 + pad], [7, 9 - pad]].forEach(([a, b]) => { q.moveTo(a + 4.5, b); q.ellipse(a, b, 4.5, 3.4, 0, 0, R2); }); };
+  const head = (q) => { q.moveTo(-7, 0); q.ellipse(-12, 0, 5.4, 4.5, 0, 0, R2); };
+  const shell = (q) => { q.moveTo(12, 0); q.ellipse(1, 0, 11, 10, 0, 0, R2); };
+  unite(c, [[fins, '#6fcf6a'], [head, '#6fcf6a'], [shell, dp > 0 ? '#a14a3a' : '#c0563f']], 1.1 / Math.max(0.5, s));
+  clipIn(c, head, (g) => { g.fillStyle = OUT; g.beginPath(); g.arc(-14, -2, 1.2, 0, R2); g.arc(-14, 2, 1.2, 0, R2); g.fill(); g.fillStyle = AL(OUT, 0.16); g.fillRect(-18, 2, 12, 4); });
+  clipIn(c, shell, (g) => {
+    /* placas del caparazón: hendidura por luz + sombra, nunca un trazo negro */
+    const scutes = (q) => { q.beginPath(); q.moveTo(-4, -4); q.lineTo(6, -4); q.lineTo(6, 4); q.lineTo(-4, 4); q.closePath(); q.moveTo(-4, -4); q.lineTo(-9, -6); q.moveTo(6, -4); q.lineTo(10, -6); q.moveTo(-4, 4); q.lineTo(-9, 6); q.moveTo(6, 4); q.lineTo(10, 6); q.stroke(); };
+    g.lineWidth = 1.4; g.lineJoin = 'round'; g.strokeStyle = AL('#ffffff', 0.22); g.save(); g.translate(0.7, 0.7); scutes(g); g.restore();
+    g.lineWidth = 1.2; g.strokeStyle = AL(OUT, 0.38); scutes(g);
+    g.fillStyle = AL('#ffffff', 0.3); g.beginPath(); g.ellipse(-1, -5, 5, 2, 0, 0, R2); g.fill();
+    g.fillStyle = AL(OUT, 0.18); g.beginPath(); g.ellipse(2, 8, 10, 3.4, 0, 0, R2); g.fill();
+  });
+  c.restore();
 }
 function frog(x, y, dir, sc, sx, sy, jumpP, alpha, cl) {
   c.save(); c.translate(x, y); c.rotate(dir * Math.PI / 2); c.scale(sc * sx, sc * sy); c.globalAlpha = alpha;
   const ext = jumpP > 0 ? Math.sin(jumpP * Math.PI) : 0, col = cl || '#5ccf5a';
   const leg = ART.dark(col, 0.18), spot = ART.dark(col, 0.3);
-  [-1, 1].forEach((sd) => { // patas traseras (se estiran al saltar) y delanteras
-    c.beginPath(); c.ellipse(sd * 9, 6 + ext * 7, 4, 6 + ext * 4, sd * (0.5 - ext * 0.4), 0, R2); ART.fillOut(c, leg, 2);
-    c.beginPath(); c.ellipse(sd * 11, 11 + ext * 10, 4, 2.5, 0, 0, R2); ART.fillOut(c, leg, 1.5);
-    c.beginPath(); c.ellipse(sd * 8, -7 - ext * 3, 3, 4, sd * -0.5, 0, R2); ART.fillOut(c, leg, 1.5);
+  /* rana de una pieza: patas, cuerpo y ojos forman una sola silueta */
+  const legs = (q) => { [-1, 1].forEach((sd) => {
+    q.moveTo(sd * 9 + 4, 6 + ext * 7); q.ellipse(sd * 9, 6 + ext * 7, 4.4, 6.4 + ext * 4, sd * (0.5 - ext * 0.4), 0, R2);
+    q.moveTo(sd * 11 + 4, 11 + ext * 10); q.ellipse(sd * 11, 11 + ext * 10, 4.2, 2.8, 0, 0, R2);
+    q.moveTo(sd * 8 + 3, -7 - ext * 3); q.ellipse(sd * 8, -7 - ext * 3, 3.2, 4.2, sd * -0.5, 0, R2); }); };
+  const body = (q) => { q.moveTo(10, 1); q.ellipse(0, 1, 10, 12, 0, 0, R2); };
+  const eyes = (q) => { [-1, 1].forEach((sd) => { q.moveTo(sd * 5 + 4.4, -9); q.arc(sd * 5, -9, 4.4, 0, R2); }); };
+  unite(c, [[legs, leg], [body, col], [eyes, '#fff']], 1.15 / Math.max(0.5, sc));
+  clipIn(c, body, (g) => {
+    g.fillStyle = spot; [[-4, 5, 2.2], [4, 7, 1.8], [1, 1, 1.6]].forEach(([a, b, r]) => { g.beginPath(); g.arc(a, b, r, 0, R2); g.fill(); });
+    g.fillStyle = AL('#ffffff', 0.35); g.beginPath(); g.ellipse(-4, -2, 3, 6, 0.3, 0, R2); g.fill();
+    g.fillStyle = AL(OUT, 0.15); g.beginPath(); g.ellipse(0, 12, 9, 4, 0, 0, R2); g.fill();
   });
-  c.beginPath(); c.ellipse(0, 1, 10, 12, 0, 0, R2); ART.fillOut(c, col, 2.5);
-  c.fillStyle = spot; [[-4, 5, 2.2], [4, 7, 1.8], [1, 1, 1.6]].forEach(([a, b, r]) => { c.beginPath(); c.arc(a, b, r, 0, R2); c.fill(); });
-  c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.ellipse(-4, -2, 3, 6, 0.3, 0, R2); c.fill();
-  [-1, 1].forEach((sd) => { c.beginPath(); c.arc(sd * 5, -9, 4.5, 0, R2); ART.fillOut(c, '#fff', 2); c.fillStyle = OUT; c.beginPath(); c.arc(sd * 5, -10, 2.2, 0, R2); c.fill(); c.fillStyle = '#fff'; c.beginPath(); c.arc(sd * 5 - 0.8, -11, 0.8, 0, R2); c.fill(); });
+  clipIn(c, eyes, (g) => { [-1, 1].forEach((sd) => { g.fillStyle = OUT; g.beginPath(); g.arc(sd * 5, -10, 2.2, 0, R2); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.arc(sd * 5 - 0.8, -11, 0.8, 0, R2); g.fill(); }); g.fillStyle = AL(OUT, 0.14); g.fillRect(-12, -6.4, 24, 3); });
   c.restore();
 }
 function draw() {

@@ -195,25 +195,40 @@ const VEH = {}; function veh(type, col) { const key = type + col; return VEH[key
 function turtle(x, y, dp, dir, ph) {
   const s = 1 - dp * 0.25; c.save(); c.translate(x, y); c.scale(dir * s, s); c.globalAlpha = 1 - dp * 0.75;
   const pad = Math.sin(t * 8 + ph) * 3;
-  c.fillStyle = '#4fae5a'; [[-7, -9 - pad], [-7, 9 + pad], [7, -9 + pad], [7, 9 - pad]].forEach(([a, b]) => { c.beginPath(); c.ellipse(a, b, 4.5, 3, 0, 0, R2); ART.fillOut(c, '#6fcf6a', 1.5); });
-  c.beginPath(); c.ellipse(-12, 0, 5, 4.5, 0, 0, R2); ART.fillOut(c, '#6fcf6a', 1.5); c.fillStyle = OUT; c.beginPath(); c.arc(-14, -2, 1.2, 0, R2); c.arc(-14, 2, 1.2, 0, R2); c.fill();
-  c.beginPath(); c.ellipse(1, 0, 11, 10, 0, 0, R2); ART.fillOut(c, dp > 0 ? '#a14a3a' : '#c0563f', 2);
-  c.strokeStyle = 'rgba(26,21,48,.45)'; c.lineWidth = 1.3; c.beginPath(); c.moveTo(-4, -4); c.lineTo(6, -4); c.lineTo(6, 4); c.lineTo(-4, 4); c.closePath(); c.moveTo(-4, -4); c.lineTo(-9, -6); c.moveTo(6, -4); c.lineTo(10, -6); c.moveTo(-4, 4); c.lineTo(-9, 6); c.moveTo(6, 4); c.lineTo(10, 6); c.stroke();
-  c.fillStyle = 'rgba(255,255,255,.3)'; c.beginPath(); c.ellipse(-1, -5, 5, 2, 0, 0, R2); c.fill(); c.restore();
+  /* tortuga de una pieza: aletas, cabeza y caparazón trazados juntos */
+  const fins = (q) => { [[-7, -9 - pad], [-7, 9 + pad], [7, -9 + pad], [7, 9 - pad]].forEach(([a, b]) => { q.moveTo(a + 4.5, b); q.ellipse(a, b, 4.5, 3.4, 0, 0, R2); }); };
+  const head = (q) => { q.moveTo(-7, 0); q.ellipse(-12, 0, 5.4, 4.5, 0, 0, R2); };
+  const shell = (q) => { q.moveTo(12, 0); q.ellipse(1, 0, 11, 10, 0, 0, R2); };
+  unite(c, [[fins, '#6fcf6a'], [head, '#6fcf6a'], [shell, dp > 0 ? '#a14a3a' : '#c0563f']], 1.1 / Math.max(0.5, s));
+  clipIn(c, head, (g) => { g.fillStyle = OUT; g.beginPath(); g.arc(-14, -2, 1.2, 0, R2); g.arc(-14, 2, 1.2, 0, R2); g.fill(); g.fillStyle = AL(OUT, 0.16); g.fillRect(-18, 2, 12, 4); });
+  clipIn(c, shell, (g) => {
+    /* placas del caparazón: hendidura por luz + sombra, nunca un trazo negro */
+    const scutes = (q) => { q.beginPath(); q.moveTo(-4, -4); q.lineTo(6, -4); q.lineTo(6, 4); q.lineTo(-4, 4); q.closePath(); q.moveTo(-4, -4); q.lineTo(-9, -6); q.moveTo(6, -4); q.lineTo(10, -6); q.moveTo(-4, 4); q.lineTo(-9, 6); q.moveTo(6, 4); q.lineTo(10, 6); q.stroke(); };
+    g.lineWidth = 1.4; g.lineJoin = 'round'; g.strokeStyle = AL('#ffffff', 0.22); g.save(); g.translate(0.7, 0.7); scutes(g); g.restore();
+    g.lineWidth = 1.2; g.strokeStyle = AL(OUT, 0.38); scutes(g);
+    g.fillStyle = AL('#ffffff', 0.3); g.beginPath(); g.ellipse(-1, -5, 5, 2, 0, 0, R2); g.fill();
+    g.fillStyle = AL(OUT, 0.18); g.beginPath(); g.ellipse(2, 8, 10, 3.4, 0, 0, R2); g.fill();
+  });
+  c.restore();
 }
 function frog(x, y, dir, sc, sx, sy, jumpP, alpha, cl) {
   c.save(); c.translate(x, y); c.rotate(dir * Math.PI / 2); c.scale(sc * sx, sc * sy); c.globalAlpha = alpha;
   const ext = jumpP > 0 ? Math.sin(jumpP * Math.PI) : 0, col = cl || '#5ccf5a';
   const leg = ART.dark(col, 0.18), spot = ART.dark(col, 0.3);
-  [-1, 1].forEach((sd) => { // patas traseras (se estiran al saltar) y delanteras
-    c.beginPath(); c.ellipse(sd * 9, 6 + ext * 7, 4, 6 + ext * 4, sd * (0.5 - ext * 0.4), 0, R2); ART.fillOut(c, leg, 2);
-    c.beginPath(); c.ellipse(sd * 11, 11 + ext * 10, 4, 2.5, 0, 0, R2); ART.fillOut(c, leg, 1.5);
-    c.beginPath(); c.ellipse(sd * 8, -7 - ext * 3, 3, 4, sd * -0.5, 0, R2); ART.fillOut(c, leg, 1.5);
+  /* rana de una pieza: patas, cuerpo y ojos forman una sola silueta */
+  const legs = (q) => { [-1, 1].forEach((sd) => {
+    q.moveTo(sd * 9 + 4, 6 + ext * 7); q.ellipse(sd * 9, 6 + ext * 7, 4.4, 6.4 + ext * 4, sd * (0.5 - ext * 0.4), 0, R2);
+    q.moveTo(sd * 11 + 4, 11 + ext * 10); q.ellipse(sd * 11, 11 + ext * 10, 4.2, 2.8, 0, 0, R2);
+    q.moveTo(sd * 8 + 3, -7 - ext * 3); q.ellipse(sd * 8, -7 - ext * 3, 3.2, 4.2, sd * -0.5, 0, R2); }); };
+  const body = (q) => { q.moveTo(10, 1); q.ellipse(0, 1, 10, 12, 0, 0, R2); };
+  const eyes = (q) => { [-1, 1].forEach((sd) => { q.moveTo(sd * 5 + 4.4, -9); q.arc(sd * 5, -9, 4.4, 0, R2); }); };
+  unite(c, [[legs, leg], [body, col], [eyes, '#fff']], 1.15 / Math.max(0.5, sc));
+  clipIn(c, body, (g) => {
+    g.fillStyle = spot; [[-4, 5, 2.2], [4, 7, 1.8], [1, 1, 1.6]].forEach(([a, b, r]) => { g.beginPath(); g.arc(a, b, r, 0, R2); g.fill(); });
+    g.fillStyle = AL('#ffffff', 0.35); g.beginPath(); g.ellipse(-4, -2, 3, 6, 0.3, 0, R2); g.fill();
+    g.fillStyle = AL(OUT, 0.15); g.beginPath(); g.ellipse(0, 12, 9, 4, 0, 0, R2); g.fill();
   });
-  c.beginPath(); c.ellipse(0, 1, 10, 12, 0, 0, R2); ART.fillOut(c, col, 2.5);
-  c.fillStyle = spot; [[-4, 5, 2.2], [4, 7, 1.8], [1, 1, 1.6]].forEach(([a, b, r]) => { c.beginPath(); c.arc(a, b, r, 0, R2); c.fill(); });
-  c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.ellipse(-4, -2, 3, 6, 0.3, 0, R2); c.fill();
-  [-1, 1].forEach((sd) => { c.beginPath(); c.arc(sd * 5, -9, 4.5, 0, R2); ART.fillOut(c, '#fff', 2); c.fillStyle = OUT; c.beginPath(); c.arc(sd * 5, -10, 2.2, 0, R2); c.fill(); c.fillStyle = '#fff'; c.beginPath(); c.arc(sd * 5 - 0.8, -11, 0.8, 0, R2); c.fill(); });
+  clipIn(c, eyes, (g) => { [-1, 1].forEach((sd) => { g.fillStyle = OUT; g.beginPath(); g.arc(sd * 5, -10, 2.2, 0, R2); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.arc(sd * 5 - 0.8, -11, 0.8, 0, R2); g.fill(); }); g.fillStyle = AL(OUT, 0.14); g.fillRect(-12, -6.4, 24, 3); });
   c.restore();
 }
 function draw() {

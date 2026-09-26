@@ -541,9 +541,9 @@ const ART = (() => {
    * Explorador ágil de proporción ~1:3,1: cabeza pequeña, hombros estrechos, cintura marcada y
    * extremidades finas. La tinta dura queda SOLO en la silueta exterior (≈1,05 de grosor).
    * Poses: reposo (respira y parpadea), carrera de 4 tiempos, salto, caída, pared y aterrizaje. */
-  const SKIN = '#ffdcbc', SKIND = '#e3a884', PANTS = '#554a92', PANTD = '#413879', HAIR = '#7d57a4', BOOTC = '#8776c9', BOOTD = '#3b3270';
-  const OLS = 1.05, OLI = 0.6, INK = alpha(OUT, 0.62), INKS = alpha(OUT, 0.34);
-  const HIPY = -15.6, SHY = -25, HEADY = -32.4, HEADR = 5.95, LEGL = 13.3;
+  const SKIN = '#ffc79a', SKIND = '#d9895d', PANTS = '#463ac4', PANTD = '#2b2280', HAIR = '#5b3fa8', HAIRD = '#33206b', BOOTC = '#241c4e', SOLE = '#ffc94d';
+  const OLS = 1.45, OLI = 0.7, INK = alpha(OUT, 0.62), INKS = alpha(OUT, 0.34);
+  const HIPY = -13.6, SHY = -23.6, HEADY = -33.4, HEADR = 8.3, LEGL = 13.6;
   /* curva suave que pasa cerca de todos los puntos (sin polilíneas: tangentes continuas) */
   function smooth(c, P) {
     c.moveTo(P[0][0], P[0][1]);
@@ -615,201 +615,260 @@ const ART = (() => {
   }
 
   /* ------------------------------------------------ Héroe (una sola silueta)
-   * Cuerpo continuo: cabeza → cuello → hombros → torso → cadera → piernas → pies, con los brazos
-   * fundidos en el hombro. Se rellena y se contornea UNA vez; ropa, pelo, cara y sombras van
-   * recortados dentro. El brazo y la pierna traseros forman su propia silueta detrás (se mueven
-   * por su cuenta) y quedan tapados por el cuerpo donde se cruzan: no hay contorno de juntura. */
-  const HX = -24, HY = -48, HW = 46, HH = 58; // caja local del cuerpo cacheado
+   * Cartoon de estudio: cabeza grande (proporción ≈1:2,4), cuerpo compacto, extremidades cortas
+   * y gruesas, manoplas y botas redondas. El cuerpo entero es UN trazado (§8): se rellena y se
+   * contornea una vez; ropa, pelo, cara y planos de luz van recortados dentro. El brazo y la
+   * pierna traseros forman su propia silueta detrás (se mueven por su cuenta).
+   * Color: 3 tonos por pieza (luz / base / sombra) con borde DURO — la sombra es la propia forma
+   * desplazada hacia abajo-derecha, así el terminador sigue el bulto en vez de difuminarse. */
+  const HX = -31, HY = -53, HW = 62, HH = 62; // caja local del cuerpo cacheado
+  /* dos planos duros por volumen: sombra propia + base desplazada hacia la luz (arriba-izquierda) */
+  function cel(c, P, base, shade, vx, vy) {
+    c.save(); c.clip(P);
+    c.fillStyle = shade; c.fill(P);
+    c.translate(-vx, -vy); c.fillStyle = base; c.fill(P);
+    c.restore();
+  }
+  /* toque especular: un óvalo claro en la parte alta de la pieza (uno por pieza, no más) */
+  function spec(c, x, y, rx, ry, a, al) { c.fillStyle = alpha('#ffffff', al == null ? 0.42 : al); c.beginPath(); c.ellipse(x, y, rx, ry, a || 0, 0, TAU); c.fill(); }
   function heroBody(c, st, t, col) {
-    const run = st === 'run', jump = st === 'jump', fall = st === 'fall', air = jump || fall, wall = st === 'wall', idle = !run && !air && !wall;
-    const ph = t * 12.5, br = idle ? Math.sin(t * 3) : 0;
-    const colD = dark(col, 0.26), colL = lite(col, 0.34);
+    const run = st === 'run', jump = st === 'jump', fall = st === 'fall', air = jump || fall, wall = st === 'wall';
+    const hurt = st === 'hurt', win = st === 'win', idle = !run && !air && !wall && !hurt && !win;
+    const ph = t * 12.5, br = (idle || win) ? Math.sin(t * 3) : 0;
+    const colD = dark(col, 0.34), colL = lite(col, 0.42);
     // --- pose
-    const bob = run ? -1.7 * Math.abs(Math.sin(ph)) + 0.7 : idle ? br * 0.5 : jump ? -0.8 : fall ? 0.6 : 0;
+    const hop = win ? Math.max(0, Math.sin(t * 4.4)) : 0;
+    const bob = run ? -1.9 * Math.abs(Math.sin(ph)) + 0.8 : idle ? br * 0.6 : jump ? -0.9 : fall ? 0.7 : win ? -hop * 2.6 : hurt ? 1.4 : 0;
     const hipY = HIPY + bob + (wall ? 0.6 : 0);
-    const lean = run ? 0.17 : jump ? 0.07 : fall ? -0.09 : wall ? -0.1 : br * 0.012;
-    const headA = run ? -0.09 : jump ? -0.14 : fall ? 0.16 : wall ? 0.1 : br * 0.02;
+    const lean = run ? 0.19 : jump ? 0.08 : fall ? -0.1 : wall ? -0.11 : hurt ? -0.3 : win ? -0.05 : br * 0.014;
+    const headA = run ? -0.1 : jump ? -0.16 : fall ? 0.18 : wall ? 0.12 : hurt ? -0.26 : win ? -0.12 : br * 0.025;
     const cl = Math.cos(lean), sl = Math.sin(lean), SHOFF = SHY - HIPY;
-    // del espacio del mundo al espacio del tronco (origen en la cadera, girado por lean)
     const inv = (X, Y) => { const dx = X, dy = Y - hipY; return [dx * cl + dy * sl, -dx * sl + dy * cl]; };
-    // --- piernas: objetivo del tobillo por estado (ciclo de 4 tiempos en carrera)
-    const legPose = (i) => { const p = ph + i * Math.PI, hx = i ? -1.9 : 1.9; let fx, fy, fa;
-      if (run) { fx = hx + 6.4 * Math.cos(p); fy = -2.6 - 5.6 * Math.max(0, Math.sin(p)); fa = -0.3 * Math.cos(p) + 0.12; }
-      else if (jump) { fx = hx + (i ? -2.6 : 3.8); fy = i ? -6.4 : -8.6; fa = i ? 0.5 : -0.35; }
-      else if (fall) { fx = hx + (i ? -4.6 : 4.2); fy = (i ? -1.4 : -3.2) + Math.sin(t * 16 + i) * 0.5; fa = i ? 0.25 : -0.15; }
-      else if (wall) { fx = hx + (i ? -3.2 : 2.6); fy = i ? -1.6 : -6.2; fa = i ? 0.1 : -0.5; }
-      else { fx = hx * 1.12; fy = -2.6 + (i ? 0 : br * 0.2); fa = 0; }
+    // --- piernas: cortas y gruesas, con bota grande de dibujo animado
+    const legPose = (i) => { const p = ph + i * Math.PI, hx = i ? -2.7 : 2.7; let fx, fy, fa;
+      if (run) { fx = hx + 5.8 * Math.cos(p); fy = -2.2 - 5.2 * Math.max(0, Math.sin(p)); fa = -0.26 * Math.cos(p) + 0.1; }
+      else if (jump) { fx = hx + (i ? -2.6 : 4.2); fy = i ? -6.2 : -8.4; fa = i ? 0.45 : -0.35; }
+      else if (fall) { fx = hx + (i ? -4.6 : 4.4); fy = (i ? -1.2 : -3.2) + Math.sin(t * 16 + i) * 0.5; fa = i ? 0.22 : -0.16; }
+      else if (wall) { fx = hx + (i ? -3.4 : 2.8); fy = i ? -1.4 : -6.4; fa = i ? 0.1 : -0.5; }
+      else if (hurt) { fx = hx + (i ? -1.4 : 5.4); fy = i ? -3.4 : -6.6; fa = i ? 0.3 : -0.5; }
+      else if (win) { fx = hx * 1.2 + (i ? -0.6 : 0.6); fy = -2 - hop * 3.4; fa = i ? 0.18 : -0.18; }
+      else { fx = hx * 1.06; fy = -2 + (i ? 0 : br * 0.2); fa = 0; }
       const d = Math.min(LEGL - 0.02, Math.hypot(fx - hx, fy - hipY)), hh = Math.sqrt(Math.max(0, LEGL * LEGL / 4 - d * d / 4));
-      const H = inv(hx, hipY), K = inv((hx + fx) / 2 + hh * 0.92, (hipY + fy) / 2), A = inv(fx, fy);
+      const H = inv(hx, hipY), K = inv((hx + fx) / 2 + hh * 0.9, (hipY + fy) / 2), A = inv(fx, fy);
       return { H, K, A, fa: fa - lean };
     };
-    // pierna completa (muslo grueso → tobillo fino) + pie con empeine y puntera, todo en un tubo
     const legPath = (L) => {
       const ca = Math.cos(L.fa), sa = Math.sin(L.fa), fp = (px, py) => [L.A[0] + px * ca - py * sa, L.A[1] + px * sa + py * ca];
-      const foot = polyP([fp(-1.9, -0.9), fp(-2.35, 1), fp(-1.6, 2.2), fp(1.2, 2.45), fp(3.9, 1.9), fp(4.25, 0.8), fp(2.2, -0.3), fp(0.3, -1)]);
-      return { leg: tubeP([L.H, L.K, L.A], [2.8, 1.95, 1.3]), foot };
+      // bota redonda: talón alto, empeine curvo y puntera roma
+      const foot = polyP([fp(-3.1, -1.4), fp(-3.6, 1.2), fp(-2.6, 3.2), fp(0.6, 3.7), fp(4.4, 3.2), fp(5.5, 1.4), fp(4.2, -0.5), fp(1.2, -1.6)]);
+      return { leg: tubeP([L.H, L.K, L.A], [3.9, 3.35, 2.7]), foot };
     };
-    // --- brazos: hombro → codo → muñeca, con la mano fundida en la muñeca
-    const armPose = (i) => { const back = i === 1, sx = back ? -3.2 : 2.6, sy = SHOFF + 1.2; let a, bend;
-      if (run) { a = (back ? 1 : -1) * Math.sin(ph) * 1.05 + 0.25; bend = 1.05; }
-      else if (jump) { a = back ? 3.0 : 2.62; bend = -0.5; }
-      else if (fall) { a = (back ? 2.45 : 2.05) + Math.sin(t * 18 + i * 2) * 0.22; bend = -0.75; }
-      else if (wall) { a = back ? 0.45 : 2.5; bend = back ? 0.6 : -0.5; }
-      else { a = (back ? -0.08 : 0.26) + br * 0.07; bend = 0.34; }
-      const ex = sx + Math.sin(a) * 4.5, ey = sy + Math.cos(a) * 4.5, hx = ex + Math.sin(a + bend) * 3.9, hy = ey + Math.cos(a + bend) * 3.9;
-      return { s: [sx, sy], e: [ex, ey], w: [hx, hy], a: a + bend, up: tubeP([[sx, sy], [ex, ey]], [2.15, 1.6]), lo: tubeP([[ex, ey], [hx, hy]], [1.55, 1.15]) };
+    // --- brazos: cortos y gruesos, acabados en manopla grande
+    const armPose = (i) => { const back = i === 1, sx = back ? -4.4 : 3.6, sy = SHOFF + 2; let a, bend;
+      if (run) { a = (back ? 1 : -1) * Math.sin(ph) * 1.1 + 0.25; bend = 1.0; }
+      else if (jump) { a = back ? 3.05 : 2.6; bend = -0.5; }
+      else if (fall) { a = (back ? 2.5 : 2.05) + Math.sin(t * 18 + i * 2) * 0.22; bend = -0.7; }
+      else if (wall) { a = back ? 0.45 : 2.55; bend = back ? 0.6 : -0.5; }
+      else if (hurt) { a = back ? 3.35 : 2.9; bend = -0.85; }
+      else if (win) { a = (back ? 3.15 : 2.95) - hop * 0.2; bend = -0.25; }
+      else { a = (back ? -0.1 : 0.3) + br * 0.08; bend = 0.3; }
+      const UL = 4.7, FL = 4.3;
+      const ex = sx + Math.sin(a) * UL, ey = sy + Math.cos(a) * UL, hx = ex + Math.sin(a + bend) * FL, hy = ey + Math.cos(a + bend) * FL;
+      return { s: [sx, sy], e: [ex, ey], w: [hx, hy], a: a + bend, up: tubeP([[sx, sy], [ex, ey]], [3.3, 2.75]), lo: tubeP([[ex, ey], [hx, hy]], [2.65, 2.3]) };
     };
-    const handP = (A) => { const ca = Math.cos(-A.a), sa = Math.sin(-A.a); // +y local = dirección del antebrazo
-      return polyP([[-1.25, -0.45], [-0.85, 1], [0.15, 1.8], [1.2, 1.1], [1.55, -0.2], [0.75, -1.2], [-0.5, -1.25]].map(([px, py]) => [A.w[0] + px * ca - py * sa, A.w[1] + px * sa + py * ca])); };
+    /* manopla: bola con pulgar marcado; +y local = dirección del antebrazo */
+    const handP = (A) => { const ca = Math.cos(-A.a), sa = Math.sin(-A.a);
+      const tp = (px, py) => [A.w[0] + px * ca - py * sa, A.w[1] + px * sa + py * ca];
+      const P = polyP([tp(-2.9, 0.1), tp(-3.3, 2.6), tp(-1.8, 4.8), tp(1.4, 5.1), tp(3.5, 3.4), tp(3.8, 0.6), tp(2.4, -1.6), tp(-0.6, -2.1)]);
+      const th = tp(-3.1, 1.1); addEll(P, th[0], th[1], 1.9, 1.45, -A.a + 0.5);
+      return P; };
     const L0 = legPose(0), L1 = legPose(1), A0 = armPose(0), A1 = armPose(1);
     const G0 = legPath(L0), G1 = legPath(L1);
-    // --- cabeza (en el espacio del tronco) y su transformación local
+    // --- cabeza (en el espacio del tronco)
     const hA = headA - lean * 0.45, chA = Math.cos(hA), shA = Math.sin(hA);
-    const hy0 = (HEADY - SHY) - 1.5 + (idle ? br * 0.3 : 0);
-    const hcx = 0.4 * chA - hy0 * shA, hcy = 0.4 * shA + hy0 * chA + SHOFF;
+    const hy0 = (HEADY - SHY) + (idle ? br * 0.35 : 0);
+    const hcx = 0.6 * chA - hy0 * shA, hcy = 0.6 * shA + hy0 * chA + SHOFF;
     const hp = (px, py) => [hcx + px * chA - py * shA, hcy + px * shA + py * chA];
-    const R = HEADR;
+    const R = HEADR, RY = R * 1.07;
     // ---------- dibujo: todo en el espacio del tronco
     c.translate(0, hipY); c.rotate(lean);
-    // bufanda que ondea (sí se mueve por su cuenta → pieza aparte, detrás del cuerpo)
-    const scarf = () => { const P = [[-1, SHOFF - 1.2]];
-      const base = (idle ? 2.62 : run ? 3.16 : jump ? 2.72 : fall ? 3.95 : 2.5) - lean;
-      const amp = idle ? 0.12 : run ? 0.34 : 0.26, len = run ? 2.2 : air ? 2.05 : 1.85, sp = run ? 15 : idle ? 5 : 11;
-      const droop = idle ? 0.17 : run ? 0.19 : air ? 0.1 : 0.15;
-      for (let i = 1; i <= 6; i++) { const a = base + Math.sin(t * sp - i * 0.85) * amp * (i / 6) * 2.4 + (idle ? Math.sin(t * 2 + i * 0.3) * 0.05 : 0) - i * droop;
+    // bufanda (ondea por su cuenta → pieza aparte, detrás del cuerpo)
+    const scarf = () => { const P = [[-1.6, SHOFF + 0.6]];
+      const base = (idle ? 2.62 : run ? 3.16 : jump ? 2.72 : fall ? 3.95 : hurt ? 2.2 : win ? 2.5 : 2.5) - lean;
+      const amp = idle ? 0.13 : run ? 0.36 : 0.28, len = run ? 3.1 : air ? 2.9 : 2.6, sp = run ? 15 : idle ? 5 : 11;
+      const droop = idle ? 0.19 : run ? 0.2 : air ? 0.11 : 0.16;
+      for (let i = 1; i <= 5; i++) { const a = base + Math.sin(t * sp - i * 0.85) * amp * (i / 5) * 2.4 + (idle ? Math.sin(t * 2 + i * 0.3) * 0.05 : 0) - i * droop;
         P.push([P[i - 1][0] + Math.cos(a) * len, P[i - 1][1] + Math.sin(a) * len]); }
-      const W = P.map((p, i) => 2.25 * (1 - i / P.length * 0.8));
-      const S = tubeP(P, W);
-      sil(c, S, lite(col, 0.1), OLS);
+      const S = tubeP(P, P.map((p, i) => 3.1 * (1 - i / P.length * 0.72)));
+      sil(c, S, lite(col, 0.16), OLS);
       c.save(); c.clip(S);
-      c.strokeStyle = alpha(colD, 0.55); c.lineWidth = 1.6; c.beginPath(); smooth(c, P.map((p) => [p[0] + 0.5, p[1] + 1.3])); c.stroke();
-      c.strokeStyle = alpha('#ffffff', 0.3); c.lineWidth = 1; c.beginPath(); smooth(c, P.map((p) => [p[0] - 0.4, p[1] - 1.1])); c.stroke();
-      silShade(c, S, 'scarf', [-6, SHOFF - 4, 10, 6], 0.28, 0.2); c.restore(); };
+      cel(c, S, lite(col, 0.16), dark(col, 0.42), 1.5, 1.8);
+      c.restore(); };
     scarf();
-    // ---------- silueta trasera (brazo y pierna de atrás): pieza propia, tapada por el cuerpo
+    // ---------- silueta trasera (brazo y pierna de atrás)
     const BACK = join(A1.up, A1.lo, handP(A1), G1.leg, G1.foot);
     sil(c, BACK, dark(SKIN, 0.3), OLS);
     c.save(); c.clip(BACK);
-    c.fillStyle = dark(PANTS, 0.28); c.fill(G1.leg); c.fillRect(-7, -5.4, 14, 7);
-    c.fillStyle = dark(BOOTC, 0.3); c.fill(G1.foot);
-    c.fillStyle = dark(col, 0.34); c.fill(A1.up);
-    joint(c, A1.e[0], A1.e[1], 1.5, colD, 0.12, A1.a); joint(c, L1.K[0], L1.K[1], 1.8, PANTD, 0.12);
-    silShade(c, BACK, 'hback', [-7, SHOFF, 7, 14], 0.12, 0.26); c.restore();
-    // ---------- silueta principal: cabeza + cuello + torso + cadera + pierna y brazo delanteros
-    const torso = polyP([[-3.2, SHOFF - 0.3], [-4.25, SHOFF + 2.6], [-2.95, -4.8], [-3.7, 0.4], [0, 1.2], [3.9, 0.4], [3.15, -4.8], [4.45, SHOFF + 2.6], [3.3, SHOFF - 0.3], [0, SHOFF - 1.1]]);
-    const neck = tubeP([[0.2, SHOFF + 0.6], hp(0.2, R * 0.7)], [1.8, 1.45]);
-    const head = nP(); addEll(head, hcx, hcy, R, R * 1.06, hA);
-    const ear = nP(); addEll(ear, hp(-R + 0.5, 1.2)[0], hp(-R + 0.5, 1.2)[1], 1.7, 2.1, hA - 0.2);
-    const tuft = air ? (jump ? 1.1 : -1) : run ? Math.sin(t * 13) * 0.7 - 0.3 : Math.sin(t * 3) * 0.25;
-    const lock = polyP([hp(-2.6, -R + 0.9), hp(-5 + tuft * 0.7, -R - 0.3), hp(-7.4 + tuft * 1.3, -R + 2.2), hp(-5.2, -R + 2.6), hp(-3.9, -R + 3.4)]);
-    const SILH = join(torso, neck, head, ear, lock, G0.leg, G0.foot, A0.up, A0.lo, handP(A0));
+    c.fillStyle = dark(PANTS, 0.3); c.fill(G1.leg); c.fillRect(-9, -5.4, 18, 7.4);
+    c.fillStyle = dark(BOOTC, 0.18); c.fill(G1.foot);
+    c.fillStyle = dark(col, 0.4); c.fill(A1.up);
+    c.fillStyle = dark(SKIN, 0.3); c.fill(A1.lo); c.fill(handP(A1));
+    c.restore();
+    // ---------- silueta principal
+    const torso = join(boxP(-7.2, SHOFF - 1.2, 14.4, 12.8, 4.8), (() => { const T = nP(); addEll(T, -5.2, SHOFF + 1.4, 3.1, 3.1, 0); addEll(T, 4.6, SHOFF + 1.4, 3.3, 3.3, 0); return T; })());
+    const neck = tubeP([[0.4, SHOFF - 0.6], hp(0.4, RY * 0.72)], [2.9, 2.5]);
+    const head = nP(); addEll(head, hcx, hcy, R, RY, hA);
+    const e0 = hp(-R + 1, 1.8); const ear = nP(); addEll(ear, e0[0], e0[1], 2.1, 2.7, hA - 0.15);
+    // pelo: gorro que nace en la frente + 3 mechones grandes con punta hacia atrás
+    const wag = air ? (jump ? 1.6 : -1.5) : run ? Math.sin(t * 13) * 1.1 - 0.4 : hurt ? 1.8 : win ? Math.sin(t * 8) * 1.2 : Math.sin(t * 3) * 0.4;
+    const cap = nP();
+    const q = (ax, ay, bx, by) => { const A = hp(ax, ay), B = hp(bx, by); cap.quadraticCurveTo(A[0], A[1], B[0], B[1]); };
+    const m0 = hp(-R * 1.0, R * 0.3); cap.moveTo(m0[0], m0[1]);
+    q(-R * 1.08, -R * 0.5, -R * 0.62, -R * 0.94);
+    q(-R * 0.16, -R * 1.22, R * 0.34, -R * 1.02);
+    q(R * 0.82, -R * 0.82, R * 0.99, -R * 0.24);
+    const p1 = hp(R * 1.0, R * 0.2); cap.lineTo(p1[0], p1[1]);                 // punta del flequillo
+    q(R * 0.72, -R * 0.06, R * 0.42, -R * 0.36);
+    q(R * 0.16, R * 0.12, -R * 0.14, -R * 0.3);
+    q(-R * 0.44, R * 0.16, -R * 0.76, -R * 0.18);
+    q(-R * 1.0, R * 0.02, -R * 1.0, R * 0.3);
+    cap.closePath();
+    // 3 mechones cortos y gruesos con punta, hacia atrás-arriba
+    const spike = (bx, by, tx, ty, ex2, ey2) => polyP([hp(bx, by), hp(tx, ty), hp(ex2, ey2)], true);
+    const hair = join(cap,
+      spike(-R * 0.72, -R * 0.9, -R * 0.86 + wag * 0.07, -R * 1.42, -R * 0.18, -R * 1.16),
+      spike(-R * 1.03, -R * 0.42, -R * 1.5 + wag * 0.08, -R * 0.82, -R * 0.68, -R * 0.88),
+      spike(-R * 1.04, R * 0.1, -R * 1.44 + wag * 0.06, -R * 0.06, -R * 1.0, -R * 0.38));
+    const SILH = join(torso, neck, head, ear, hair, G0.leg, G0.foot, A0.up, A0.lo, handP(A0));
     sil(c, SILH, SKIN, OLS);
     c.save(); c.clip(SILH);
-    // ropa: pantalón y camiseta por color, sin una sola línea
-    c.fillStyle = PANTS; c.fill(G0.leg); c.fillRect(-7, -5, 14, 7);
-    c.fillStyle = alpha(dark(PANTS, 0.4), 0.55); c.fillRect(-7, -5, 14, 1.1);
-    c.fillStyle = BOOTC; c.fill(G0.foot);
-    c.save(); c.clip(G0.foot); c.fillStyle = BOOTD; c.fillRect(-12, L0.A[1] + 1.1, 24, 3); c.restore(); // suela por color
-    c.fillStyle = grd(c, 'h.torso3' + SHOFF + col, [-5, SHOFF, 5, 1.5], [0, colL, 0.45, col, 1, colD]); c.fill(torso);
-    // cuello y mandíbula: sombra propia bajo la cabeza (así la cabeza sale del tronco, no se apoya)
-    c.fillStyle = alpha(dark(SKIN, 0.45), 0.4); c.beginPath(); c.ellipse(hp(0, R * 0.8)[0], hp(0, R * 0.8)[1] + 0.6, 2.6, 1.5, hA, 0, TAU); c.fill();
-    // cabeza: volumen, mejilla y pelo (todo dentro del recorte, sin contornos)
-    c.translate(hcx, hcy); c.rotate(hA);
-    c.fillStyle = grd(c, 'h.head3' + R, [-R * 0.4, -R * 0.55, 1, 0, 0, R * 1.5], [0, '#fff3e3', 0.55, SKIN, 1, SKIND]);
-    c.beginPath(); c.ellipse(0, 0, R + 0.4, R * 1.08, 0, 0, TAU); c.fill();
-    c.fillStyle = alpha('#c98f6e', 0.18); c.beginPath(); c.ellipse(R * 0.85, R * 0.55, R * 0.62, R * 0.8, 0, 0, TAU); c.fill();
-    c.fillStyle = alpha('#c07f63', 0.45); c.beginPath(); c.ellipse(-R + 0.4, 1.3, 0.75, 1.05, -0.2, 0, TAU); c.fill();
-    const hair = nP(); hair.moveTo(-R + 0.5, -2.2); hair.arc(0, -0.5, R + 0.45, Math.PI * 1.12, Math.PI * 1.94);
-    hair.quadraticCurveTo(5.1, -1.5, 3.4, -2.7); hair.quadraticCurveTo(2.3, -1.4, 0.6, -3.2);
-    hair.quadraticCurveTo(-1, -1.8, -2.6, -3.4); hair.quadraticCurveTo(-3.6, -2.2, -4.4, -2.5); hair.closePath();
-    c.fillStyle = grd(c, 'h.hair4', [-4.4, -R - 2, 4.4, 0], [0, lite(HAIR, 0.18), 1, dark(HAIR, 0.3)]); c.fill(hair);
-    c.save(); c.clip(hair); c.strokeStyle = alpha('#ffffff', 0.2); c.lineWidth = 0.9; c.beginPath(); c.arc(-0.5, -2, R - 2.2, Math.PI * 1.2, Math.PI * 1.44); c.stroke(); c.restore();
-    c.fillStyle = alpha(dark(SKIN, 0.5), 0.3); c.beginPath(); c.moveTo(-R + 0.7, -3); c.quadraticCurveTo(0, -1.4, 4.6, -2.6); c.quadraticCurveTo(0, -0.2, -R + 0.9, -1.8); c.fill(); // sombra del flequillo
-    c.rotate(-hA); c.translate(-hcx, -hcy);
-    // pelo de atrás (mechón) con el mismo color
-    c.fillStyle = dark(HAIR, 0.14); c.fill(lock);
-    // brazo delantero: cruza por delante del torso → solo la sombra que lo separa
-    c.translate(0.8, 1); c.fillStyle = alpha(OUT, 0.2); c.fill(A0.up); c.fill(A0.lo); c.translate(-0.8, -1);
-    c.fillStyle = lite(col, 0.06); c.fill(A0.up);
-    c.fillStyle = SKIN; c.fill(A0.lo); c.fill(handP(A0));
-    c.fillStyle = alpha(dark(SKIN, 0.35), 0.5); c.beginPath(); c.ellipse(A0.w[0], A0.w[1], 1.5, 1.1, A0.a, 0, TAU); c.fill(); // pulgar por sombra
-    // cinturón y hebilla (cambio de color, sin contorno)
-    c.fillStyle = alpha(dark(col, 0.5), 0.9); c.fillRect(-5.6, -2.3, 11, 2.1);
-    c.fillStyle = '#ffd24a'; rr(c, 0.2, -2.6, 2.6, 2.8, 0.8); c.fill();
-    c.fillStyle = alpha('#fff', 0.5); c.fillRect(0.7, -2.1, 0.8, 1.1);
-    // nudo de la bufanda: parte del cuerpo, por color
-    c.fillStyle = grd(c, 'h.knot4' + col, [-3.5, SHOFF - 3, 3.5, SHOFF], [0, lite(col, 0.34), 1, lite(col, 0.08)]);
-    c.beginPath(); c.moveTo(-3.5, SHOFF - 0.2); c.quadraticCurveTo(0, SHOFF + 1.5, 3.5, SHOFF - 0.3);
-    c.quadraticCurveTo(3.8, SHOFF - 2.6, 3.1, SHOFF - 3.1); c.quadraticCurveTo(0, SHOFF - 1.9, -3.1, SHOFF - 3);
-    c.quadraticCurveTo(-3.8, SHOFF - 2.5, -3.5, SHOFF - 0.2); c.closePath(); c.fill();
-    c.fillStyle = alpha(colD, 0.4); c.beginPath(); c.moveTo(-3.5, SHOFF - 0.4); c.quadraticCurveTo(0, SHOFF + 1.2, 3.5, SHOFF - 0.5); c.quadraticCurveTo(0, SHOFF + 0.2, -3.5, SHOFF - 0.4); c.fill();
-    // articulaciones por sombra (codo, rodilla, hombro, cadera)
-    joint(c, A0.e[0], A0.e[1], 1.55, col, 0.1, A0.a); joint(c, L0.K[0], L0.K[1], 1.85, PANTS, 0.11);
-    silShade(c, SILH, 'hero', [-7, SHOFF - 9, 7, 14], 0.34, 0.22);
+    // --- pantalón y bota (planos duros)
+    const legs = join(G0.leg, boxP(-6.9, -5.4, 13.8, 7.4, 2.2));
+    cel(c, legs, PANTS, PANTD, 1.7, 2.1);
+    cel(c, G0.foot, BOOTC, dark(BOOTC, 0.35), 1.5, 1.8);
+    c.save(); c.clip(G0.foot); c.fillStyle = SOLE; c.fillRect(-14, L0.A[1] + 2.1, 28, 2.2); c.restore();
+    // --- camiseta
+    cel(c, torso, col, colD, 1.8, 2.2);
+    spec(c, -3, SHOFF + 2.4, 2.4, 3.4, -0.3, 0.2);
+    // --- brazo delantero (cruza por delante del torso: solo la sombra que lo separa)
+    const ARM = join(A0.up, A0.lo, handP(A0));
+    c.translate(1.2, 1.5); c.fillStyle = alpha(OUT, 0.26); c.fill(ARM); c.translate(-1.2, -1.5);
+    cel(c, A0.up, col, colD, 1.6, 2);
+    const hand = join(A0.lo, handP(A0));
+    cel(c, hand, SKIN, SKIND, 1.5, 1.9);
+    spec(c, A0.w[0] - 1.4, A0.w[1] - 1, 1.5, 1, -A0.a, 0.32);
+    // --- cinturón y hebilla (cambio de color, sin contorno)
+    c.fillStyle = alpha(dark(col, 0.58), 0.92); c.fillRect(-6.8, -3.2, 13.6, 2.9);
+    c.fillStyle = SOLE; rr(c, -1.5, -3.7, 3.4, 3.8, 1); c.fill();
+    c.fillStyle = alpha('#fff', 0.55); c.fillRect(-0.9, -3.1, 1, 1.5);
+    // --- cabeza: piel, plano de sombra y pelo
+    cel(c, head, SKIN, SKIND, 2.3, 2.6);
+    const tmp = hp(-R * 0.42, -R * 0.36); spec(c, tmp[0], tmp[1], R * 0.3, R * 0.2, hA - 0.5, 0.3);
+    cel(c, hair, HAIR, HAIRD, 2, 2.4);
+    const th2 = hp(-R * 0.1, -R * 0.84); spec(c, th2[0], th2[1], R * 0.2, R * 0.09, hA - 0.2, 0.26);
+    // sombra del flequillo sobre la frente (forma dibujada, borde duro)
+    c.save(); c.clip(head); c.translate(0.2, 2.5); c.fillStyle = alpha(SKIND, 0.55); c.fill(cap); c.restore();
+    // oreja
+    cel(c, ear, SKIN, SKIND, 1, 1.2);
+    // --- nudo de la bufanda (parte del cuerpo, por color)
+    const knot = polyP([[-4.4, SHOFF + 1], [-4.8, SHOFF - 1.6], [-3.4, SHOFF - 3], [0, SHOFF - 2.4], [3.4, SHOFF - 3], [4.8, SHOFF - 1.6], [4.4, SHOFF + 1], [0, SHOFF + 2.2]]);
+    cel(c, knot, lite(col, 0.16), dark(col, 0.3), 1.4, 1.7);
     c.restore();
   }
+  /* --------------- cara: la mitad de la cabeza, expresión exagerada y distinta por estado ------ */
   function heroFace(c, st, t, P) {
     const run = st === 'run', jump = st === 'jump', fall = st === 'fall', wall = st === 'wall';
-    const hcx = P.hcx, hcy = P.hcy, hA = P.hA;
-    // ---------- cara (dentro de la cabeza, en su espacio local)
-    c.save(); c.translate(hcx, hcy); c.rotate(hA);
-    const bc = t % 3.6, blink = (bc < 0.11 || (bc > 0.28 && bc < 0.36)) && !fall;
-    const big = fall ? 1.2 : jump ? 1.08 : 1, ey = 0.4;
+    const hurt = st === 'hurt', win = st === 'win';
+    c.save(); c.translate(P.hcx, P.hcy); c.rotate(P.hA);
+    const R = HEADR;
+    const bc = t % 3.6, blink = (bc < 0.1 || (bc > 0.27 && bc < 0.34)) && !fall && !hurt;
+    // lid: cuánto baja el párpado superior (lo que da expresión y quita el «ojo de plato»)
+    const lid = blink ? 1 : fall ? 0.02 : jump ? 0.06 : hurt ? 0.9 : win ? 0.86 : run ? 0.34 : wall ? 0.44 : 0.22;
+    const look = fall ? -0.34 : run ? 0.1 : wall ? 0.16 : 0;
+    const big = fall ? 1.16 : jump ? 1.08 : 1;
+    const EY = 0.6;
     const eye = (ex, rx, ry) => {
-      if (blink) { c.strokeStyle = OUT; c.lineWidth = 0.85; c.beginPath(); c.moveTo(ex - rx, ey); c.quadraticCurveTo(ex, ey + ry * 0.8, ex + rx, ey); c.stroke(); return; }
-      c.beginPath(); c.ellipse(ex, ey, rx, ry, 0, 0, TAU); c.fillStyle = '#fdfbff'; c.fill(); c.lineWidth = 0.7; c.strokeStyle = INK; c.stroke();
-      const px = ex + rx * 0.22, py = ey - ry * (fall ? 0.3 : 0.12);
-      c.fillStyle = '#2f2a63'; c.beginPath(); c.ellipse(px, py, rx * 0.62, rx * 0.68, 0, 0, TAU); c.fill();
-      c.fillStyle = '#ffffff'; c.beginPath(); c.arc(px - rx * 0.24, py - rx * 0.3, rx * 0.26, 0, TAU); c.fill();
+      const E = nP(); E.ellipse(ex, EY, rx, ry, 0, 0, TAU);
+      const ly = EY - ry + ry * 2 * lid;
+      if (lid < 0.96) {
+        c.save(); c.clip(E);
+        c.fillStyle = '#fdfbff'; c.fill(E);
+        const px = ex + rx * 0.24, py = EY + ry * look + ry * 0.12;
+        c.fillStyle = '#241c4e'; c.beginPath(); c.ellipse(px, py, rx * 0.56, rx * 0.64, 0, 0, TAU); c.fill();
+        c.fillStyle = '#ffffff'; c.beginPath(); c.arc(px - rx * 0.3, py - rx * 0.38, rx * 0.3, 0, TAU); c.fill();
+        c.fillStyle = SKIN; c.fillRect(ex - rx - 1, EY - ry - 1, rx * 2 + 2, ly - (EY - ry - 1)); // párpado
+        c.restore();
+        c.strokeStyle = INK; c.lineWidth = 0.7; c.stroke(E);
+      }
+      c.strokeStyle = OUT; c.lineWidth = 1.25; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(ex - rx * 0.96, ly - (lid > 0.9 ? 0 : 0.25)); c.quadraticCurveTo(ex, ly + (lid > 0.9 ? 1.1 : 0.45), ex + rx * 0.96, ly - (lid > 0.9 ? 0 : 0.25)); c.stroke();
     };
-    eye(3.4, 1.12 * big, 1.4 * big); eye(-1.05, 1.02 * big, 1.32 * big);
-    c.strokeStyle = INK; c.lineWidth = 0.7; c.lineCap = 'round'; c.beginPath();
-    if (fall) { c.moveTo(1.9, -2.4); c.lineTo(5, -3.2); c.moveTo(-2.3, -3.1); c.lineTo(0.4, -2.4); }
-    else if (jump) { c.moveTo(1.9, -2.7); c.quadraticCurveTo(3.5, -3.7, 5, -2.8); c.moveTo(-2.3, -2.6); c.quadraticCurveTo(-0.9, -3.5, 0.4, -2.7); }
-    else if (run || wall) { c.moveTo(1.9, -2.6); c.lineTo(5, -1.9); c.moveTo(-2.3, -2); c.lineTo(0.4, -2.7); }
-    else { c.moveTo(1.9, -2.5); c.lineTo(5, -2.6); c.moveTo(-2.3, -2.5); c.lineTo(0.4, -2.4); }
-    c.stroke();
-    c.fillStyle = alpha('#d89873', 0.85); c.beginPath(); c.ellipse(5.3, 2, 1, 0.8, 0.3, 0, TAU); c.fill();
-    c.fillStyle = alpha('#ff7a8a', 0.22); c.beginPath(); c.ellipse(4.6, 3.6, 1.2, 0.7, 0, 0, TAU); c.fill(); c.beginPath(); c.ellipse(-2.7, 3.3, 1, 0.62, 0, 0, TAU); c.fill();
-    c.strokeStyle = OUT; c.lineWidth = 0.8;
-    if (jump || fall) { c.beginPath(); c.ellipse(2.2, 3.9, fall ? 1.25 : 1.05, fall ? 1.6 : 1.25, 0, 0, TAU); c.fillStyle = '#5a2436'; c.fill(); c.stroke(); }
-    else if (run) { c.beginPath(); c.moveTo(0.5, 3.1); c.quadraticCurveTo(2.4, 5.6, 4.3, 2.9); c.closePath(); c.fillStyle = OUT; c.fill(); c.fillStyle = alpha('#ff7a8a', 0.9); c.beginPath(); c.arc(2.4, 4.1, 0.7, 0, TAU); c.fill(); }
-    else if (wall) { c.beginPath(); c.moveTo(0.9, 3.8); c.lineTo(4, 3.2); c.stroke(); }
-    else { c.beginPath(); c.arc(2.3, 2.3, 1.7, 0.36, Math.PI - 0.5); c.stroke(); }
+    eye(4.6, 2.5 * big, 2.9 * big); eye(-0.7, 2.2 * big, 2.65 * big);
+    // cejas gruesas y muy móviles
+    c.strokeStyle = HAIRD; c.lineWidth = 1.7; c.lineCap = 'round';
+    const brow = (bx, dx, y0, y1) => { c.beginPath(); c.moveTo(bx - dx, y0); c.quadraticCurveTo(bx, (y0 + y1) / 2 - 0.7, bx + dx, y1); c.stroke(); };
+    if (fall) { brow(4.6, 2.4, -4.2, -5.9); brow(-0.7, 2.1, -5.3, -4.0); }
+    else if (jump) { brow(4.6, 2.4, -5.4, -6.1); brow(-0.7, 2.1, -5.9, -5.2); }
+    else if (hurt) { brow(4.6, 2.4, -5.2, -3.1); brow(-0.7, 2.1, -2.9, -5.0); }
+    else if (win) { brow(4.6, 2.4, -5.6, -6.2); brow(-0.7, 2.1, -6.1, -5.5); }
+    else if (run) { brow(4.6, 2.4, -5.4, -3.5); brow(-0.7, 2.1, -3.3, -4.8); }
+    else if (wall) { brow(4.6, 2.4, -5.8, -3.7); brow(-0.7, 2.1, -3.1, -4.3); }
+    else { brow(4.6, 2.4, -4.7, -4.4); brow(-0.7, 2.1, -4.5, -4.7); }
+    // nariz (bolita) y mofletes
+    c.fillStyle = SKIND; c.beginPath(); c.ellipse(6.6, 3.2, 1.25, 1, 0.3, 0, TAU); c.fill();
+    c.fillStyle = alpha('#ff6fb5', hurt ? 0.1 : 0.26); c.beginPath(); c.ellipse(6.0, 5.2, 1.7, 1, 0, 0, TAU); c.fill();
+    c.beginPath(); c.ellipse(-2.6, 4.5, 1.4, 0.85, 0, 0, TAU); c.fill();
+    // boca: grande y distinta en cada estado
+    c.strokeStyle = OUT; c.lineWidth = 1.2; c.lineJoin = 'round';
+    const mouth = (P2, fillC) => { c.beginPath(); P2(); c.fillStyle = fillC; c.fill(); c.stroke(); };
+    if (fall) { c.beginPath(); c.ellipse(3.2, 6.4, 2.1, 2.8, 0, 0, TAU); c.fillStyle = '#5a2436'; c.fill(); c.stroke();
+      c.fillStyle = '#ff7a8a'; c.beginPath(); c.ellipse(3.2, 7.8, 1.2, 0.9, 0, 0, TAU); c.fill(); }
+    else if (jump) { c.beginPath(); c.ellipse(3.4, 6.2, 2.4, 2.1, 0, 0, TAU); c.fillStyle = '#5a2436'; c.fill(); c.stroke();
+      c.fillStyle = '#ff7a8a'; c.beginPath(); c.ellipse(3.4, 7.2, 1.4, 0.8, 0, 0, TAU); c.fill(); }
+    else if (run || win) { mouth(() => { c.moveTo(0.4, 5.2); c.quadraticCurveTo(3.4, 9.4, 6.4, 4.9); c.quadraticCurveTo(3.4, 6.1, 0.4, 5.2); }, '#5a2436');
+      c.fillStyle = '#ff7a8a'; c.beginPath(); c.ellipse(3.6, 7.2, 1.5, 1, 0, 0, TAU); c.fill();
+      c.fillStyle = '#fff'; c.beginPath(); c.moveTo(0.8, 5.3); c.lineTo(6.2, 5.05); c.lineTo(6.1, 6.1); c.quadraticCurveTo(3.4, 6.6, 0.9, 6.2); c.fill(); }
+    else if (hurt) { mouth(() => { c.moveTo(0.6, 7.2); c.quadraticCurveTo(3.4, 3.6, 6.2, 7); c.quadraticCurveTo(3.4, 5.6, 0.6, 7.2); }, '#5a2436'); }
+    else if (wall) { c.beginPath(); c.moveTo(1, 6.4); c.lineTo(5.8, 5.6); c.stroke();
+      c.fillStyle = '#fff'; c.fillRect(1.6, 5.6, 3.8, 0.9); }
+    else { c.strokeStyle = OUT; c.lineWidth = 1.25; c.beginPath(); c.arc(3.4, 4.4, 2.5, 0.35, Math.PI - 0.55); c.stroke(); }
     c.restore();
   }
   /* Pose cacheada: el cuerpo entero se pinta una vez por fotograma de animación en un lienzo
-   * aparte (12 pasos de carrera, 10 de reposo/pared/caída, 1 de salto) y luego solo es un
-   * drawImage. La cara va viva encima (así el parpadeo no multiplica la caché) y la espada
-   * también (su ángulo es continuo). */
+   * aparte y luego solo es un drawImage. La cara va viva encima (así el parpadeo no multiplica
+   * la caché) y la espada también (su ángulo es continuo). */
   const HSPR = {}; let HN = 0;
   function heroQ(st, t) { // instante representativo del fotograma de animación
-    if (st === 'jump' || st === 'wall') return st === 'wall' ? qz(t, 3, 8) : 0;
+    if (st === 'jump') return 0;
+    if (st === 'wall') return qz(t, 3, 8);
     if (st === 'run') return qz(t, 12.5, 12);
     if (st === 'fall') return qz(t, 16, 10);
+    if (st === 'win') return qz(t, 4.4, 10);
+    if (st === 'hurt') return 0;
     return qz(t, 3, 10);
   }
   function qz(t, w, n) { const p = ((t * w) % TAU + TAU) % TAU; return Math.floor(p / TAU * n) / n * TAU / w; }
   /* solo lo que la cara y la espada necesitan de la pose (mismas fórmulas que heroBody) */
   function heroHead(st, t) {
-    const run = st === 'run', jump = st === 'jump', fall = st === 'fall', wall = st === 'wall', idle = !run && !jump && !fall && !wall;
-    const br = idle ? Math.sin(t * 3) : 0, ph = t * 12.5;
-    const bob = run ? -1.7 * Math.abs(Math.sin(ph)) + 0.7 : idle ? br * 0.5 : jump ? -0.8 : fall ? 0.6 : 0;
+    const run = st === 'run', jump = st === 'jump', fall = st === 'fall', wall = st === 'wall';
+    const hurt = st === 'hurt', win = st === 'win', idle = !run && !jump && !fall && !wall && !hurt && !win;
+    const br = (idle || win) ? Math.sin(t * 3) : 0, ph = t * 12.5, hop = win ? Math.max(0, Math.sin(t * 4.4)) : 0;
+    const bob = run ? -1.9 * Math.abs(Math.sin(ph)) + 0.8 : idle ? br * 0.6 : jump ? -0.9 : fall ? 0.7 : win ? -hop * 2.6 : hurt ? 1.4 : 0;
     const hipY = HIPY + bob + (wall ? 0.6 : 0);
-    const lean = run ? 0.17 : jump ? 0.07 : fall ? -0.09 : wall ? -0.1 : br * 0.012;
-    const headA = run ? -0.09 : jump ? -0.14 : fall ? 0.16 : wall ? 0.1 : br * 0.02;
+    const lean = run ? 0.19 : jump ? 0.08 : fall ? -0.1 : wall ? -0.11 : hurt ? -0.3 : win ? -0.05 : br * 0.014;
+    const headA = run ? -0.1 : jump ? -0.16 : fall ? 0.18 : wall ? 0.12 : hurt ? -0.26 : win ? -0.12 : br * 0.025;
     const SHOFF = SHY - HIPY, hA = headA - lean * 0.45, chA = Math.cos(hA), shA = Math.sin(hA);
-    const hy0 = (HEADY - SHY) - 1.5 + (idle ? br * 0.3 : 0);
-    return { hipY, lean, hA, SHOFF, hcx: 0.4 * chA - hy0 * shA, hcy: 0.4 * shA + hy0 * chA + SHOFF };
+    const hy0 = (HEADY - SHY) + (idle ? br * 0.35 : 0);
+    return { hipY, lean, hA, SHOFF, hcx: 0.6 * chA - hy0 * shA, hcy: 0.6 * shA + hy0 * chA + SHOFF };
   }
   function hero(c, x, y, s, o) {
-    // o: {face, state:'idle'|'run'|'jump'|'fall'|'wall', t, col, squash, sword, gy}
+    // o: {face, state:'idle'|'run'|'jump'|'fall'|'wall'|'hurt'|'win', t, col, squash, sword, gy}
     const f = o.face || 1, t = o.t || 0, st = o.state || 'idle', col = o.col || '#ff5f7a';
     const run = st === 'run', air = st === 'jump' || st === 'fall', sq = o.squash || 0;
     if (o.gy != null) { const d = Math.max(0, o.gy - y), k2 = Math.max(0.32, 1 - d / 160);
-      c.save(); c.translate(x + d * 0.06, o.gy); shadow(c, 0, 0.5, 9 * s * k2 * (1 + sq), 0.3 * k2 * k2); c.restore(); }
+      c.save(); c.translate(x + d * 0.06, o.gy); shadow(c, 0, 0.5, 10.5 * s * k2 * (1 + sq), 0.34 * k2 * k2); c.restore(); }
     c.save(); c.translate(x, y);
-    if (o.gy == null && !air) shadow(c, 0, 0.5, (run ? 7.6 : 8.8) * s * (1 + sq), 0.24);
+    if (o.gy == null && !air) shadow(c, 0, 0.5, (run ? 9 : 10.2) * s * (1 + sq), 0.28);
     c.scale(f * s * (1 + sq), s * (1 - sq)); c.lineJoin = 'round'; c.lineCap = 'round';
     const tq = heroQ(st, t), res = resOf(c, 2, 4), key = 'h' + st + col + tq.toFixed(4) + '#' + res;
     let e = HSPR[key];
@@ -821,14 +880,16 @@ const ART = (() => {
     const P = heroHead(st, tq); c.translate(0, P.hipY); c.rotate(P.lean);
     heroFace(c, st, t, P);
     // ---------- espada (objeto suelto: lleva su propia silueta)
-    if (o.sword) { c.save(); c.translate(6, P.SHOFF + 3); c.rotate(o.sword - P.lean);
-      const SW = polyP([[-1.1, -3], [-1.1, -20], [0.9, -24.4], [2.9, -20], [2.9, -3]], true);
-      const GR = join(polyP([[-3.6, -3.5], [6.2, -3.5], [6.2, -0.4], [-3.6, -0.4]]), polyP([[-0.2, -0.2], [2.4, -0.2], [2.4, 4.2], [-0.2, 4.2]]));
-      addEll(GR, 1.1, 5.2, 1.3, 1.3, 0);
-      sil(c, GR, '#f2d15c', OLS); c.save(); c.clip(GR); c.fillStyle = '#7a4a2a'; c.fillRect(-0.4, 0, 3, 4.4); silShade(c, GR, 'grip', [-4, -4, 7, 7], 0.3, 0.22); c.restore();
-      sil(c, SW, grd(c, 'h.sword3', [-1.1, 0, 2.9, 0], [0, '#ffffff', 0.5, '#dfe7f4', 0.51, '#aebbd0', 1, '#c9d3e4']), OLS);
-      c.save(); c.clip(SW); c.strokeStyle = alpha('#ffffff', 0.85); c.lineWidth = 0.55; c.beginPath(); c.moveTo(-0.2, -5); c.lineTo(-0.2, -18.4); c.stroke(); c.restore();
-      c.restore(); }    c.restore();
+    if (o.sword) { c.save(); c.translate(7.5, P.SHOFF + 4); c.rotate(o.sword - P.lean);
+      const SW = polyP([[-1.5, -3.6], [-1.5, -23], [1.1, -28], [3.7, -23], [3.7, -3.6]], true);
+      const GR = join(polyP([[-4.6, -4.4], [7.4, -4.4], [7.4, -0.5], [-4.6, -0.5]]), polyP([[-0.4, -0.4], [3, -0.4], [3, 5.2], [-0.4, 5.2]]));
+      addEll(GR, 1.3, 6.3, 1.7, 1.7, 0);
+      sil(c, GR, '#f2d15c', OLS); c.save(); c.clip(GR); c.fillStyle = '#7a4a2a'; c.fillRect(-0.5, 0, 3.8, 5.6);
+      cel(c, GR, '#f2d15c', '#b08a2c', 1.2, 1.4); c.restore();
+      sil(c, SW, '#dfe7f4', OLS);
+      c.save(); c.clip(SW); c.fillStyle = '#9fadc6'; c.fillRect(1.1, -30, 4, 30); c.fillStyle = alpha('#ffffff', 0.8); c.fillRect(-0.6, -22, 1, 16); c.restore();
+      c.restore(); }
+    c.restore();
   }
   /* ------------------------------------------------ Enemigos
    * Cada uno con su lenguaje corporal: el slime se agacha antes de saltar, el fantasma se abalanza con
