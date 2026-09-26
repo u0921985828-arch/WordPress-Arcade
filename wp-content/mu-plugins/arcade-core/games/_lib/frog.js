@@ -49,7 +49,7 @@ const CARCOL = ['#ff6b6b', '#5ce1e6', '#f2d15c', '#b98cff', '#ffa94d'];
 function build() {
   lanes = []; const lv = Math.min(1, (level - 1) / 12), sp = 0.64 + 0.72 * lv, dive = 0.1 + 0.45 * lv; // nivel 1 suave → máximo en el nivel 13 (1.23: más fácil)
   for (const r in LANE) {
-    const [type, dir, v, len] = LANE[r], river = type === 'log' || type === 'turtle', L = { type, dir, sp: v * sp, items: [], river };
+    const [type, dir, v, len] = LANE[r], river = type === 'log' || type === 'turtle', L = { type, dir, sp: v * sp * k.D.spd, items: [], river };
     const gap = () => (river ? k.ri(2, 3) : k.ri(2, 4) + (level < 3 ? 1 : 0)) * S, first = LO + k.rnd(0, 80); let x = first;
     for (;;) { const n = river ? len() : 0, w = river ? n * S : VW[type] * S; if (L.items.length && x + w + S * 1.5 > first + P) break;
       L.items.push({ x, w, n, col: k.pick(CARCOL), dive: type === 'turtle' && L.items.length > 0 && Math.random() < dive, ph: k.rnd(0, 5) }); x += w + gap(); }
@@ -57,8 +57,9 @@ function build() {
   }
   homes = [0, 1, 2, 3, 4].map((i) => ({ x: 36 + i * 88, filled: false, pop: 0 })); fly = { i: -1, t: 3 }; place();
 }
-function place() { f = { x: 6 * S, y: 12, fx: 6 * S, fy: 12, jt: 0, dir: 0, q: null, dead: 0, kind: '', land: 0 }; timer = 45; best = 12; }
-function reset() { if (INF) return resetInf(); score = 0; lives = 4; level = 1; build(); }
+const TLIM = () => 45 * k.D.time; /* tiempo por rana: fácil ×1,25 · difícil ×0,85 */
+function place() { f = { x: 6 * S, y: 12, fx: 6 * S, fy: 12, jt: 0, dir: 0, q: null, dead: 0, kind: '', land: 0 }; timer = TLIM(); best = 12; }
+function reset() { if (INF) return resetInf(); score = 0; lives = 4 + k.D.life; level = 1; build(); }
 /* profundidad de una tortuga que bucea (0 = a flote, 1 = sumergida) */
 function depth(it) { if (!it.dive) return 0; const q = (t + it.ph) % 5; return q < 3.2 ? 0 : q < 3.8 ? (q - 3.2) / 0.6 : q < 4.5 ? 1 : 1 - (q - 4.5) / 0.5; }
 if (!INF) reset(); k.show(CFG.title, INF ? (CFG.help || 'Cruza sin parar: la pantalla sube sola y quien se queda atrás cae.') : 'Cruza la carretera y el río hasta las 5 charcas. Sube a troncos y tortugas (¡algunas bucean!). Atrapa la mosca para ganar puntos extra. Desliza, toca o usa las flechas.');
@@ -265,9 +266,9 @@ function draw() {
 }
 function hud() {
   label(`${score}`, 12, 8, 22, '#fff'); label(`Nivel ${level}`, 12, 32, 12, '#9fe7ff');
-  for (let i = 0; i < 4; i++) { const x = W - 22 - i * 26, y = 20; c.save(); c.globalAlpha = i < lives ? 1 : 0.25; c.translate(x, y); c.beginPath(); c.ellipse(0, 2, 10, 8, 0, 0, R2); ART.fillOut(c, '#5ccf5a', 2);
+  for (let i = 0; i < 4 + k.D.life; i++) { const x = W - 22 - i * 26, y = 20; c.save(); c.globalAlpha = i < lives ? 1 : 0.25; c.translate(x, y); c.beginPath(); c.ellipse(0, 2, 10, 8, 0, 0, R2); ART.fillOut(c, '#5ccf5a', 2);
     [-1, 1].forEach((sd) => { c.beginPath(); c.arc(sd * 5, -4, 4, 0, R2); ART.fillOut(c, '#fff', 1.5); c.fillStyle = OUT; c.beginPath(); c.arc(sd * 5, -4, 1.8, 0, R2); c.fill(); }); c.strokeStyle = OUT; c.lineWidth = 1.5; c.beginPath(); c.arc(0, 3, 4, 0.3, Math.PI - 0.3); c.stroke(); c.restore(); }
-  const fr = timer / 45, bx = 12, by = 48, bw = W - 24, low = timer < 8;
+  const fr = timer / TLIM(), bx = 12, by = 48, bw = W - 24, low = timer < 8;
   ART.rr(c, bx, by, bw, 10, 5); ART.fillOut(c, '#0a0c20', 2);
   if (fr > 0) { ART.rr(c, bx + 2, by + 2, Math.max(6, (bw - 4) * fr), 6, 3); c.fillStyle = low ? (Math.sin(t * 12) > 0 ? '#ff5f7a' : '#ff9a5c') : fr > 0.5 ? '#7cf7a0' : '#f2d15c'; c.fill(); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(bx + 4, by + 3, Math.max(0, (bw - 8) * fr), 1.5); }
   if (clearT > 0) { c.globalAlpha = Math.min(1, clearT); label(`¡Nivel ${level}!`, W / 2, H / 2 - 20, 34, '#f2d15c', 'center'); c.globalAlpha = 1; }
@@ -281,19 +282,19 @@ try { CPUW = Math.min(8, +localStorage.getItem('cpu:' + CFG.id) || 0); } catch (
 var VIS = Math.floor((H - TOP - 32) / S); // filas visibles
 const BOT = 32; // franja inferior: la fila más baja no queda pegada al borde
 const yOf = (n) => H - BOT - S - (n - camN) * S;
-const iskill = () => Math.min(0.78, 0.26 + CPUW * 0.05);
+const iskill = () => Math.min(0.78, 0.26 + Math.max(0, Math.min(8, CPUW + k.D.cpu)) * 0.05);
 const hard = (n) => Math.min(1, n / 170); // dificultad por altura
 
 function mkRow(type) {
   const n = genN++, d = hard(n), R = { n, type, items: [], dir: 0, sp: 0 };
   if (type === 'road') {
     const kind = ['car', 'truck', 'car', 'racer', 'dozer'][k.ri(0, 4)];
-    R.kind = kind; R.dir = k.pick([-1, 1]); R.sp = (34 + k.rnd(0, 26) + (kind === 'racer' ? 34 : 0)) * (0.62 + 0.72 * d);
+    R.kind = kind; R.dir = k.pick([-1, 1]); R.sp = (34 + k.rnd(0, 26) + (kind === 'racer' ? 34 : 0)) * (0.62 + 0.72 * d) * k.D.spd;
     const w = VW[kind] * S; let x = LO + k.rnd(0, 90);
     for (;;) { const gap = (k.ri(2, 4) + (d < 0.25 ? 1 : 0)) * S - d * 16; if (R.items.length && x + w + S * 1.4 > LO + P) break; R.items.push({ x, w, col: k.pick(CARCOL) }); x += w + gap; }
   } else if (type === 'river') {
     const turtle = Math.random() < 0.42;
-    R.kind = turtle ? 'turtle' : 'log'; R.dir = k.pick([-1, 1]); R.sp = (30 + k.rnd(0, 26)) * (0.66 + 0.6 * d);
+    R.kind = turtle ? 'turtle' : 'log'; R.dir = k.pick([-1, 1]); R.sp = (30 + k.rnd(0, 26)) * (0.66 + 0.6 * d) * k.D.spd;
     let x = LO + k.rnd(0, 90);
     for (;;) { const len = turtle ? k.ri(2, 3) : k.ri(3, 5), w = len * S, gap = k.ri(2, 3) * S;
       if (R.items.length && x + w + S * 1.4 > LO + P) break;
@@ -317,7 +318,7 @@ function resetInf() {
   ensure(VIS + 4);
   const seats = k.players(nSeatsI());
   IP = seats.map((q, i) => ({ p: q.p, col: q.color, name: q.name, cpu: q.cpu, x: (3 + i * 2) * S, n: 1, fx: (3 + i * 2) * S, fn: 1, jt: 0, dir: 0, q: null,
-    lives: 3, best: 0, inv: 2.5, dead: 0, kind: '', out: false, land: 0, think: 0.4 + i * 0.1 }));
+    lives: 3, best: 0, inv: 2.5 / k.D.dmg, dead: 0, /* vidas fijas: el marcador del cruce infinito muestra 3 */ kind: '', out: false, land: 0, think: 0.4 + i * 0.1 }));
 }
 function jumpI(pl, d) {
   const [dx, dy, a] = DIRS[d], nn = pl.n - dy, nx = k.clamp(pl.x + dx * S, 0, W - S);
@@ -372,7 +373,7 @@ function updInf(dt) {
     if (pl.out) continue;
     if (pl.dead > 0) { pl.dead -= dt; if (pl.dead <= 0) { pl.dead = 0;
         if (pl.lives <= 0) { pl.out = true; if (!pl.cpu) { banner2 = `${pl.name}: ${pl.best} m`; bannerT = 1.6; } }
-        else { pl.n = pl.fn = Math.ceil(camN) + 2; pl.x = pl.fx = k.clamp(pl.x, 0, W - S); pl.jt = 0; pl.inv = 2; } }
+        else { pl.n = pl.fn = Math.ceil(camN) + 2; pl.x = pl.fx = k.clamp(pl.x, 0, W - S); pl.jt = 0; pl.inv = 2 / k.D.dmg; } }
       continue; }
     pl.inv -= dt;
     if (pl.cpu) cpuI(pl, dt);

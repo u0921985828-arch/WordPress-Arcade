@@ -86,7 +86,9 @@ function arcoiris() {
     ART.rr(g, 10, TOP - 9, W - 20, 9, 5); g.fillStyle = 'rgba(255,255,255,.12)'; g.fill();
   });
 
-  function colorsNow() { return Math.min(COL.length, 3 + Math.floor(drops / 4)); }
+  /* Dificultad: colores en juego y disparos antes de que baje el techo. */
+  function colorsNow() { return k.clamp(Math.min(COL.length, 3 + Math.floor(drops / 4)) + (k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0), 3, COL.length); }
+  const SH0 = () => Math.round(7 / k.D.rate);
   function pickColor() {
     const live = new Set();
     for (let r = 0; r < G.length; r++) for (let i = 0; i < G[r].length; i++) if (G[r][i]) live.add(G[r][i].c);
@@ -95,7 +97,7 @@ function arcoiris() {
   }
   function newRow(r) { const a = []; for (let i = 0; i < rowLen(r); i++) a.push({ c: k.ri(0, colorsNow() - 1), pop: 1 }); return a; }
   function reset() {
-    par = 0; G = []; score = 0; drops = 0; shots = 7; over = 0; slide = 0; fallers = []; t = 0; msg = ''; msgT = 0; shot = null; ang = 0;
+    par = 0; G = []; score = 0; drops = 0; shots = SH0(); over = 0; slide = 0; fallers = []; t = 0; msg = ''; msgT = 0; shot = null; ang = 0;
     for (let r = 0; r < 5; r++) { G.push([]); for (let i = 0; i < rowLen(r); i++) G[r].push(r < 4 || Math.random() < 0.45 ? { c: k.ri(0, 2), pop: 1 } : null); }
     cur = pickColor(); next = pickColor();
   }
@@ -150,7 +152,7 @@ function arcoiris() {
     return cl.length;
   }
   function pushRow() {
-    drops++; par ^= 1; G.unshift(newRow(0)); slide = RS; shots = Math.max(4, 7 - Math.floor(drops / 3));
+    drops++; par ^= 1; G.unshift(newRow(0)); slide = RS; shots = Math.max(Math.round(4 / k.D.rate), SH0() - Math.floor(drops / 3));
     k.sfx('hit'); k.shake(2);
   }
   function fire() {
@@ -250,6 +252,7 @@ function arcoiris() {
     if (msgT > 0) { c.globalAlpha = Math.min(1, msgT * 2); label(msg, W / 2, LINE - 44, 22, '#ffd166', 'center'); c.globalAlpha = 1; }
   }
   window.__bu = { get G() { return G; }, get score() { return score; }, get shot() { return shot; }, fire, get over() { return over; } };
+  k.onDif = () => { if (k.st !== 'play') reset(); };
   reset();
   k.show(CFG.title || 'Burbujas Arcoíris', 'Apunta con el dedo o el ratón y suelta para lanzar. Tres burbujas iguales estallan y las que se quedan sueltas caen. Cada pocos disparos baja el techo: no dejes que llegue a la línea rosa.<br>Toca para jugar');
   k.run(update, draw);
@@ -278,7 +281,9 @@ function fusion() {
     { n: 'Saturno', r: 56, c: '#ffd9a0', d: 'ring' }, { n: 'Enana roja', r: 66, c: '#ff7a59', d: 'star' },
     { n: 'Estrella', r: 78, c: '#fff1a8', d: 'star' },
   ];
-  const T = SOLAR ? PLAN : FRUIT, MAXSPAWN = SOLAR ? 3 : 4;
+  const T = SOLAR ? PLAN : FRUIT;
+  /* Dificultad: cuántos tamaños distintos pueden salir (menos variedad = más fácil fusionar). */
+  const MS = () => k.clamp((SOLAR ? 3 : 4) + (k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0), 2, T.length - 2);
   let B, score, best5, aim, cur, next, cool, over, danger, t, seq, spr = [];
 
   for (let i = 0; i < T.length; i++) spr.push(sprite(i));
@@ -322,14 +327,14 @@ function fusion() {
   function reset() {
     B = []; score = 0; over = 0; danger = 0; t = 0; cool = 0; seq = 0;
     aim = SOLAR ? -1.5708 : W / 2;
-    cur = k.ri(0, MAXSPAWN - 1); next = k.ri(0, MAXSPAWN - 1);
+    cur = k.ri(0, MS() - 1); next = k.ri(0, MS() - 1);
   }
   function add(tier, x, y, vx, vy) { const b = { t: tier, r: T[tier].r, x, y, vx: vx || 0, vy: vy || 0, age: 0, pop: 0, id: ++seq }; B.push(b); return b; }
   function drop() {
     if (cool > 0 || over) return;
     if (SOLAR) { const r = CEN.R - T[cur].r - 2; add(cur, CEN.x + Math.cos(aim) * r, CEN.y + Math.sin(aim) * r, -Math.cos(aim) * 60, -Math.sin(aim) * 60); }
     else add(cur, k.clamp(aim, BOX.l + T[cur].r + 1, BOX.r - T[cur].r - 1), BOX.top - 26, 0, 40);
-    cur = next; next = k.ri(0, MAXSPAWN - 1); cool = 0.45; k.sfx('pop');
+    cur = next; next = k.ri(0, MS() - 1); cool = 0.45; k.sfx('pop');
   }
   /* ---------- física: pasos fijos, impulsos amortiguados y recorte dentro del recipiente ---------- */
   function clampIn(b) {
@@ -483,6 +488,7 @@ function fusion() {
       return bad;
     },
   };
+  k.onDif = () => { if (k.st !== 'play') reset(); };
   reset();
   k.show(CFG.title || (SOLAR ? 'Fusión Solar' : 'Fusión de Frutas'),
     SOLAR ? 'Gira alrededor del anillo y suelta planetas hacia el sol. Dos iguales se funden en el siguiente. Si el montón toca el anillo, se acabó.<br>Toca para jugar'

@@ -133,7 +133,7 @@ function chestSprite() {
 /* ---------- Estado ---------- */
 let ships, balls, chests, fx, wakes, wind, windT, windTo, roundN, roundT, phase, phT, chestT, lastMsg, msgT, cdPend = false, streaks, bestOf;
 const spawnPts = () => [[62, 64, 0.6], [W - 62, H - 64, 0.6 + Math.PI], [W - 62, 64, Math.PI - 0.6], [62, H - 64, -0.6]].map(([x, y, a]) => ({ x, y, a: PORT ? a + 0.4 : a }));
-const skill = () => clamp(0.245 + LV * 0.06 + (roundN - 1) * 0.03, 0.2, 0.85); /* 1.23: más fácil (antes 0,35 + 0,12/victoria, tope 0,98) */
+const skill = () => clamp(0.245 + clamp(LV + k.D.cpu, 0, 9) * 0.06 + (roundN - 1) * 0.03, 0.2, 0.85);   /* k.D.cpu: ±1 nivel de CPU sin tocar lo guardado */ /* 1.23: más fácil (antes 0,35 + 0,12/victoria, tope 0,98) */
 function mkShip(p) { const hu = k.human(p); return { p, col: k.pcol(p), cpu: !hu, name: hu ? (k.party ? 'J' + (p + 1) : 'Tú') : 'CPU', x: 0, y: 0, a: 0, v: 0, vx: 0, vy: 0, hp: HP, rl: 0, rr: 0, pts: 0, total: 0, wins: 0, dead: 0, inv: 0, hurtT: 0, tack: 0, tackT: 0, goal: null, goalT: 0, react: 0, sail: 0, bump: 0 }; }
 function place(s, i) { const sp = spawnPts()[i]; Object.assign(s, { x: sp.x, y: sp.y, a: sp.a, v: 20, vx: 0, vy: 0, hp: HP, dead: 0, inv: 3, rl: 0.5, rr: 0.5 }); }
 function newRound() {

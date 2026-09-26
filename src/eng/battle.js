@@ -141,7 +141,7 @@ const ecell = (x, y) => [EX + x * S + S / 2, EY + y * S + S / 2], mcell = (x, y)
 function aiPick() {
   const free = (x, y) => x >= 0 && y >= 0 && x < N && y < N && !aiShots[y][x], hits = [];
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (aiShots[y][x] && mine[y][x] >= 0 && !sunk(mine, aiShots, mine[y][x])) hits.push([x, y]);
-  const sk = Math.min(0.9, 0.42 + wins * 0.05); // 1.23: más fácil (antes 0.6 + 0.1/victoria, tope 1)
+  const sk = k.clamp(0.42 + wins * 0.05 + k.D.cpu * 0.12, 0.2, 0.9); // 1.23: más fácil (antes 0.6 + 0.1/victoria, tope 1) · k.D.cpu: ±12 puntos de puntería
   if (hits.length && Math.random() < sk) { let cand = [], bw = 0;
     for (const [x, y] of hits) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { let nx = x + dx, ny = y + dy; const line = hits.some(([a, b]) => a === x - dx && b === y - dy); if (!free(nx, ny)) continue; const w = line ? 3 : 1; if (w > bw) { bw = w; cand = []; } if (w === bw) cand.push([nx, ny]); }
     if (cand.length) return k.pick(cand); }

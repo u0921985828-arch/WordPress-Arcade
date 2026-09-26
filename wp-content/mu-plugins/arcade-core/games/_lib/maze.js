@@ -93,7 +93,7 @@ function build() {
   if (M === 'muncher') buildMuncher(); else if (M === 'digger') buildDigger(); else buildIso();
   left = items.length;
 }
-function reset() { if (GEM) return resetGem(); score = 0; lives = 4; level = 1; swordT = 0; invT = 0; best = k.best(CFG.id, 0); build(); }
+function reset() { if (GEM) return resetGem(); score = 0; lives = 4 + k.D.life; level = 1; swordT = 0; invT = 0; best = k.best(CFG.id, 0); build(); }
 
 /* ================= COME-COCOS ================= */
 const GCOL = ['#ff4d5e', '#ff9ad5', '#4fd8e8', '#ffa94d'];
@@ -130,7 +130,7 @@ function buildMuncher() {
   foes = [[h, h - 1], [h, h], [h - 1, h], [h + 1, h]].map(([x, y], i) => { const f = ent(x, y, 4.6); f.id = i; return f; });
   homeReset(); ready = 1.6;
 }
-function homeReset() { const rel = [0.8, 2.4, 6, 10].map((v) => v * Math.max(0.45, 1 - (level - 1) * 0.1)); foes.forEach((f, i) => { respawnEnt(f); f.mode = 'house'; f.rel = rel[i]; f.scared = false; }); }
+function homeReset() { const rel = [0.8, 2.4, 6, 10].map((v) => v * Math.max(0.45, 1 - (level - 1) * 0.1) / k.D.rate); foes.forEach((f, i) => { respawnEnt(f); f.mode = 'house'; f.rel = rel[i]; f.scared = false; }); }
 function ghostTarget(f) {
   const corners = [[N - 2, -2], [1, -2], [N - 2, N + 1], [1, N + 1]], d = D[pl.dir || 'left'];
   if ((lvT < 6 || (lvT > 26 && lvT < 32)) && f.id < 3) return corners[f.id];
@@ -158,7 +158,7 @@ function eatAt(x, y) {
     it.got = true; left--;
     if (it.t === 'dot') { score += 10; eaten++; if (eaten % 2) k.sfx('pop'); if (eaten === 70 || eaten === 150) fruit = { x: home[0], y: home[1] + 2, t: 9 }; }
     else {
-      score += 50; fright = Math.max(2.5, 8.5 - (level - 1) * 0.6); chain = 0; k.sfx('coin'); k.burst(cellX(x), cellY(y), '#fff3d6', 14, 140);
+      score += 50; fright = Math.max(2.5, 8.5 - (level - 1) * 0.6) * k.D.time; chain = 0; k.sfx('coin'); k.burst(cellX(x), cellY(y), '#fff3d6', 14, 140);
       for (const f of foes) if (f.mode !== 'eyes') { if (f.mode === 'go' && !f.scared) reverse(f); f.scared = true; }
     }
     if (left <= 0) { clearT = 1.8; score += 300 * level; k.sfx('win'); k.confetti(); msg = '¡Nivel superado!'; msgT = 1.8; }
@@ -173,7 +173,7 @@ function updMuncher(dt) {
   if (stepEnt(pl, dt, (e) => { for (const d of [e.next, e.dir]) if (d && walk(e.x + D[d][0], e.y + D[d][1])) return d; return null; })) eatAt(pl.px, pl.py);
   if (clearT > 0) return;
   if (fright > 0 && (fright -= dt) <= 0) foes.forEach((f) => { f.scared = false; });
-  const base = Math.min(5.8, 3.3 + level * 0.2); // 1.23: más fácil (antes 4,4→6,8)
+  const base = Math.min(5.8, 3.3 + level * 0.2) * k.D.spd; // 1.23: más fácil (antes 4,4→6,8). k.D.spd por nivel de dificultad
   for (const f of foes) {
     if (f.mode === 'house') { f.fx = f.x; f.fy = f.y + Math.sin(t * 7 + f.id) * 0.18; if ((f.rel -= dt) <= 0) f.mode = 'go'; }
     else { f.sp = f.mode === 'eyes' ? 12 : base * (f.scared ? 0.55 : 1); stepEnt(f, dt, ghostPick); }
@@ -190,7 +190,7 @@ const GEMC = ['#4fe3ff', '#ff5fa2', '#7cf78a', '#ffc53d'];
 function buildDigger() {
   N = 15; S = 32; BX = 0; BY = TOP; g = Array.from({ length: N }, () => Array(N).fill(2));
   for (let x = 0; x < N; x++) g[0][x] = 0; for (let y = 1; y < 4; y++) g[y][7] = 0;
-  const nf = Math.min(5, 1 + Math.round(level * 0.8)), sp = Math.min(3.7, 1.76 + level * 0.2);
+  const nf = Math.max(1, Math.round(Math.min(5, 1 + Math.round(level * 0.8)) * k.D.rate)), sp = Math.min(3.7, 1.76 + level * 0.2) * k.D.spd;
   for (let i = 0; i < nf; i++) { const x = k.ri(2, N - 3), y = k.ri(5, N - 2); for (let j = -2; j <= 2; j++) g[y][x + j] = 0; const f = ent(x, y, sp); f.id = i; f.base = sp; f.gh = false; f.ghost = 0; f.gcd = k.rnd(5, 9) + Math.max(0, 4 - level * 2); foes.push(f); }
   const cells = []; for (let y = 3; y < N; y++) for (let x = 0; x < N; x++) if (g[y][x] === 2) cells.push([x, y]);
   k.shuffle(cells); for (let i = 0; i < 12 + level * 2 && cells.length; i++) { const [x, y] = cells.pop(); items.push({ x, y, t: 'gem', c: i % 4 }); }
@@ -260,7 +260,7 @@ function buildIso() {
   k.shuffle(cells); for (let i = 0; i < need; i++) { const [x, y] = cells.pop(); items.push({ x, y, t: 'key' }); }
   if (DG) { const kinds = level >= 3 ? ['slime', 'ghost', 'knight'] : level >= 2 ? ['slime', 'ghost'] : ['slime'];
     const dm = distMap(1, 1, walk), far = cells.filter(([x, y]) => (dm[x + ',' + y] || 0) >= 10), pool = far.length >= 3 ? far : cells; // lejos de la entrada
-    for (let i = 0; i < Math.min(9, 2 + Math.round((level - 1) * 0.8)) && pool.length; i++) { const [x, y] = pool.pop(); if (pool !== cells) cells.splice(cells.findIndex((q) => q[0] === x && q[1] === y), 1); const f = ent(x, y, Math.min(3.4, 1.6 + level * 0.2)); f.id = i; f.kind = kinds[i % kinds.length]; f.hp = f.max = f.kind === 'knight' ? 3 : 2; f.stun = 1.5; f.fl = 0; foes.push(f); } }
+    for (let i = 0; i < Math.max(1, Math.round(Math.min(9, 2 + Math.round((level - 1) * 0.8)) * k.D.rate)) && pool.length; i++) { const [x, y] = pool.pop(); if (pool !== cells) cells.splice(cells.findIndex((q) => q[0] === x && q[1] === y), 1); const f = ent(x, y, Math.min(3.4, 1.6 + level * 0.2) * k.D.spd); f.id = i; f.kind = kinds[i % kinds.length]; f.hp = f.max = f.kind === 'knight' ? 3 : 2; f.stun = 1.5; f.fl = 0; foes.push(f); } }
   else for (let i = 0; i < 5 && cells.length; i++) { const [x, y] = cells.pop(); drops.push({ x, y, t: 'coin' }); }
   torches = []; if (DG) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (g[y][x] === 1 && rnd(x * 31 + y * 7 + level) < 0.07) { if (walk(x, y + 1)) torches.push([x, y, -1]); else if (walk(x + 1, y)) torches.push([x, y, 1]); }
   cam = { x: PX(1, 1), y: PY(1, 1) }; ready = 0; msg = `Nivel ${level}`; msgT = 1.6;
@@ -274,7 +274,7 @@ function pickMon(f) {
   const nr = opts.filter((d) => d !== OPP[f.dir]); return nr.length ? k.pick(nr) : opts[0] || null;
 }
 const allKeys = () => items.every((q) => q.got);
-const isoLim = () => Math.round(60 + N * N * 0.45); // 1.23: +50 %
+const isoLim = () => Math.round((60 + N * N * 0.45) * k.D.time); // 1.23: +50 %
 function updIso(dt) {
   const hk = DIRS.find((d) => k.hit.has(d)); if (hk) pl.next = hk;
   invT -= dt; swordT -= dt; lvT += dt;
@@ -303,7 +303,7 @@ function updIso(dt) {
     f.fl -= dt; if (f.stun > 0) { f.stun -= dt; if (f.dir) continue; }
     stepEnt(f, dt, pickMon);
     if (invT <= 0 && f.stun <= 0 && Math.hypot(f.fx - pl.fx, f.fy - pl.fy) < 0.47) {
-      lives--; invT = 1.8; f.stun = 1.2; k.sfx('hurt'); k.shake(6); k.flash('rgba(255,60,80,.3)');
+      lives--; invT = 1.8 / k.D.dmg; f.stun = 1.2; k.sfx('hurt'); k.shake(6); k.flash('rgba(255,60,80,.3)');
       if (lives <= 0) { dying = 1.2; return; }
     }
   }
@@ -631,7 +631,7 @@ var darkCv = null, darkCx = null;
 var GN = 13, GS = 0, GBX = 0, GBY = 0, GTIME = 90, GBOT = 44;
 var GVAL = [{ v: 1, col: '#8fe1ff', r: 7 }, { v: 3, col: '#ff7fd0', r: 8.5 }, { v: 5, col: '#ffd24d', r: 10 }];
 try { gWin = Math.min(8, +localStorage.getItem('cpu:' + CFG.id) || 0); } catch (e) { /* sin almacenamiento */ }
-const gSkill = () => Math.min(0.8, 0.3 + gWin * 0.06);
+const gSkill = () => Math.min(0.8, 0.3 + Math.max(0, Math.min(8, gWin + k.D.cpu)) * 0.06);
 const gcx = (fx) => GBX + (fx + 0.5) * GS, gcy = (fy) => GBY + (fy + 0.5) * GS;
 function gSeats() { return k.party ? Math.max(1, Math.max.apply(null, k.party.map((q) => q.p)) + 1) : Math.min(2, k.mpMax || 1); }
 function gFree(x, y) { return inside(x, y) && g[y][x] === 0; }
@@ -662,7 +662,7 @@ function spawnGems(n) {
     GITEMS.push({ x: spots[i][0], y: spots[i][1], t: t2, ph: Math.random() * 6 });
   }
 }
-function resetGem() { GT = GTIME; gOver = 0; gMsgT = 0; t = 0; score = 0; build(); }
+function resetGem() { GT = GTIME * k.D.time; gOver = 0; gMsgT = 0; t = 0; score = 0; build(); }
 function gDrop(pl, amount, killer) {
   let leftv = amount, guard = 0;
   while (leftv > 0 && guard++ < 12) {

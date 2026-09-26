@@ -86,7 +86,8 @@ k.run((dt) => {
   hold = k.ptr.down || aDown; holdT = hold ? holdT + dt : 0;
   if (k.ptr.down) { aim.bx = k.ptr.x; aim.by = k.ptr.y - 80; }
   aim.bx = k.clamp(aim.bx, 20, 340); aim.by = k.clamp(aim.by, 90, 440);
-  const fat = Math.max(0, holdT - 3) * 0.5, amp = (19 + 10 * Math.min(1, darts / 22)) * (hold ? Math.min(1.3, 0.4 + fat) : 1); // 1.23: más fácil (oscilación 24–34 → 19–29, pulso firme 2,2→3 s)
+  /* Dificultad seleccionable: k.D.spd = 1 en normal → la mira oscila exactamente igual que siempre. */
+  const fat = Math.max(0, holdT - 3) * 0.5, amp = (19 + 10 * Math.min(1, darts / 22)) * (hold ? Math.min(1.3, 0.4 + fat) : 1) * k.D.spd; // 1.23: más fácil (oscilación 24–34 → 19–29, pulso firme 2,2→3 s)
   aim.x = aim.bx + Math.sin(t * 2.3) * amp + Math.sin(t * 5.1) * amp * 0.3; aim.y = aim.by + Math.cos(t * 1.9) * amp + Math.sin(t * 4.3) * amp * 0.3;
   if (k.ptr.up || (prevA && !aDown)) release(); prevA = aDown;
 }, () => {
@@ -144,6 +145,7 @@ function cricketGame() {
   const CNAME = ['roja', 'azul', 'amarilla', 'verde'];
   const clamp = k.clamp, gauss = () => { let u = 0; while (!u) u = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(R2 * Math.random()); };
   let LV = 0; try { LV = clamp(+localStorage.getItem('cpu:' + ID) || 0, 0, 10); } catch (e) { /* sin almacenamiento */ }
+  const lvD = () => clamp(LV + k.D.cpu * 2, -2, 12); // el nivel guardado no se toca: se suma al leerlo
   let seats = [], P = [], cur = 0, dartN = 0, round = 1, maxR = 20, thrown = [], turnLog = [], aim, t = 0, hold = false, holdT = 0, prevA = false, fly = null, turnT = 0, msg = '', msgT = 0, msgC = '#fff', cpu = null, bannerT = 0, winner = -1, endT = 0;
   const nPl = () => (k.party ? Math.max(2, ...k.party.map((q) => q.p + 1)) : 2);
   const nm = (i) => (seats[i].cpu ? 'CPU ' + CNAME[seats[i].p % 4] : String(seats[i].name).slice(0, 10));
@@ -208,7 +210,7 @@ function cricketGame() {
     return 20;
   }
   function cpuStart() {
-    const n = cpuTarget(cur), sig = R * Math.max(0.07, 0.19 - LV * 0.011);
+    const n = cpuTarget(cur), sig = R * Math.max(0.07, 0.19 - lvD() * 0.011);
     let p; if (n === 25) p = { x: CX, y: CY }; else p = segPt(n, LV >= 3 || Math.random() < 0.35 ? 0.615 : 0.78);
     cpu = { tx: p.x + gauss() * sig, ty: p.y + gauss() * sig, t: 0, dur: 0.75 + Math.random() * 0.35 };
   }
@@ -256,7 +258,7 @@ function cricketGame() {
     }
     aim.bx = clamp(aim.bx, CX - R * 1.25, CX + R * 1.25); aim.by = clamp(aim.by, CY - R * 1.25, CY + R * 1.25);
     holdT = hold ? holdT + dt : 0;
-    const fat = Math.max(0, holdT - 3) * 0.5, amp = (20 + 8 * Math.min(1, round / 12)) * (hold ? Math.min(1.3, 0.4 + fat) : 1) * (seats[cur].cpu ? 0.25 : 1);
+    const fat = Math.max(0, holdT - 3) * 0.5, amp = (20 + 8 * Math.min(1, round / 12)) * (hold ? Math.min(1.3, 0.4 + fat) : 1) * (seats[cur].cpu ? 0.25 : k.D.spd);
     aim.x = aim.bx + Math.sin(t * 2.3) * amp + Math.sin(t * 5.1) * amp * 0.3; aim.y = aim.by + Math.cos(t * 1.9) * amp + Math.sin(t * 4.3) * amp * 0.3;
     if (hu) { if ((local && k.ptr.up && !k._skipUp) || (prevA && !aDown)) throwDart(); prevA = aDown; }
     else if (cpu && cpu.t >= cpu.dur) { cpu = null; throwDart(); }

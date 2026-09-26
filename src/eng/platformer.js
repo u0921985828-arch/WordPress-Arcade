@@ -37,17 +37,17 @@ function gen() {
     const seg = A.swing ? k.ri(2, 4) : k.ri(4, 9);
     for (let i = 0; i < seg; i++) {
       col(x + i, nh);
-      if (CFG.spikes && i > 0 && i < seg - 1 && x > 16 && Math.random() < CFG.spikes * (0.32 + 0.48 * lv)) map[MH - nh - 1][x + i] = 3;
+      if (CFG.spikes && i > 0 && i < seg - 1 && x > 16 && Math.random() < CFG.spikes * (0.32 + 0.48 * lv) * k.D.rate) map[MH - nh - 1][x + i] = 3;
       else if (Math.random() < 0.22) coins.push({ x: (x + i + 0.5) * T, y: (MH - nh - 1) * T - 6 });
       else if (Math.random() < 0.12 && !A.swing) decos.push({ x: (x + i + 0.5) * T, y: (MH - nh) * T });
     }
-    const foe = () => ({ x: (x + 1) * T, y: (MH - nh) * T - 24, w: 26, h: 24, vx: (44 + 50 * lv) * k.pick([-1, 1]), min: x * T, max: (x + seg) * T - 26, alive: true, fly: TH.enemy === 'bird' });
-    if (CFG.enemies && seg >= 5 && x > 16) { if (Math.random() < CFG.enemies * (0.44 + 0.36 * lv)) enemies.push(foe()); else spare.push(foe()); }
+    const foe = () => ({ x: (x + 1) * T, y: (MH - nh) * T - 24, w: 26, h: 24, vx: (44 + 50 * lv) * k.D.spd * k.pick([-1, 1]), min: x * T, max: (x + seg) * T - 26, alive: true, fly: TH.enemy === 'bird' });
+    if (CFG.enemies && seg >= 5 && x > 16) { if (Math.random() < CFG.enemies * (0.44 + 0.36 * lv) * k.D.rate) enemies.push(foe()); else spare.push(foe()); }
     if (Math.random() < 0.22 && !A.swing && seg >= 4) { const py = MH - nh - 4; for (let i = 1; i < 4; i++) if (map[py] && !map[py][x + i]) map[py][x + i] = 2; for (let i = 1; i < 4; i++) coins.push({ x: (x + i + 0.5) * T, y: (py - 1) * T + 10 }); }
     x += seg; h = nh;
     if (checks.length < 2 && x > MW * (checks.length + 1) / 3) checks.push({ x: (x - 2) * T, y: (MH - h) * T, on: false }); // 1.23: dos puntos de control
   }
-  if (CFG.enemies) { k.shuffle(spare); while (enemies.length < 1 + Math.round(2 * lv) && spare.length) enemies.push(spare.pop()); }
+  if (CFG.enemies) { k.shuffle(spare); while (enemies.length < 1 + Math.round(2 * lv * k.D.rate) && spare.length) enemies.push(spare.pop()); }
   for (; x < MW; x++) col(x, h); flag = { x: (MW - 5) * T, y: (MH - h) * T };
   spawn = { x: 3 * T, y: (MH - 3) * T - 40 };
 }
@@ -55,9 +55,9 @@ function gen() {
 function groundY(o) { const tx = Math.floor((o.x + o.w / 2) / T); for (let ty = Math.max(0, Math.floor((o.y + o.h - 1) / T)); ty < MH; ty++) { const v = map[ty] && map[ty][tx]; if (v === 1 || v === 2 || v === 3) return ty * T; } return null; }
 function mkP(s) { return { x: s.x, y: s.y, vx: 0, vy: 0, w: 22, h: 30, face: 1, ground: false, state: 'idle', wall: 0 }; }
 function build() { check = null; checks = []; inv = 0; go = 0; gen(); p = mkP(spawn); t = 0; rope = null; dashT = 0; dashCd = 0; swordT = 0; jumpBuf = 0; coyote = 0; dead = 0; intro = 1.6; landSq = 0; cx = 0; cy = (MH * T - H); }
-function reset() { if (RACE) return raceNew(); level = 1; lives = 4; score = 0; coinsGot = 0; build(); }
+function reset() { if (RACE) return raceNew(); level = 1; lives = 4 + k.D.life; score = 0; coinsGot = 0; build(); }
 function die() { if (dead || inv > 0) return; dead = 1.1; p.vy = -600; k.sfx('hurt'); k.shake(8); k.flash('rgba(255,60,80,.35)'); }
-function respawn() { lives--; if (lives <= 0) return k.lose(CFG.id, score, 'Sin vidas', `Nivel ${level} · ${coinsGot} moneda${coinsGot === 1 ? '' : 's'}`); const s = check && check.on ? { x: check.x, y: check.y - 40 } : spawn; p = mkP(s); rope = null; dead = 0; dashT = 0; inv = 1.6; }
+function respawn() { lives--; if (lives <= 0) return k.lose(CFG.id, score, 'Sin vidas', `Nivel ${level} · ${coinsGot} moneda${coinsGot === 1 ? '' : 's'}`); const s = check && check.on ? { x: check.x, y: check.y - 40 } : spawn; p = mkP(s); rope = null; dead = 0; dashT = 0; inv = 1.6 / k.D.dmg; }
 /* subpasos: a pocos FPS (dt hasta 0,05 s) una caída a 1100 px/s recorre 55 px y atravesaría tablones de 1 casilla */
 function collide(o, dt) {
   const n = Math.min(4, Math.ceil(Math.max(Math.abs(o.vx), Math.abs(o.vy)) * dt / 20)) || 1;
@@ -137,7 +137,7 @@ function drw() {
   c.restore();
   ART.vignette(c, W, H);
   // HUD
-  for (let i = 0; i < 4; i++) ART.heart(c, 22 + i * 24, 22, 1.25, i < lives);
+  for (let i = 0; i < 4 + k.D.life; i++) ART.heart(c, 22 + i * 24, 22, 1.25, i < lives);
   ART.coin(c, 128, 22, 0, 8); label(`× ${coinsGot}`, 140, 13, 17, '#fff');
   label(`${score}`, W - 12, 8, 22, '#fff', 'right'); label(`Nivel ${level}`, W - 12, 34, 13, '#ffc928', 'right');
   if (intro > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, intro); ART.rr(c, W / 2 - 110, H / 2 - 38, 220, 64, 18); c.fillStyle = 'rgba(26,21,48,.8)'; c.fill(); label(`Nivel ${level}`, W / 2, H / 2 - 30, 30, '#fff', 'center'); label(CFG.title, W / 2, H / 2 + 4, 14, '#ffc928', 'center'); c.globalAlpha = 1; }
@@ -198,7 +198,7 @@ function raceRound() {
 }
 const colTop = (col) => { if (col < 0 || col >= MW) return 0; for (let y = 0; y < MH; y++) if (map[y][col] === 1) return y; return MH; };
 function raceCpu(r, dt) {
-  const lv = rcpu, ai = r.ai, fx = r.x + r.w, col = Math.floor((r.x + r.w / 2) / T), my = colTop(col);
+  const lv = k.clamp(rcpu + k.D.cpu, 0, 5), ai = r.ai, fx = r.x + r.w, col = Math.floor((r.x + r.w / 2) / T), my = colTop(col);
   let jump = false, dash = false; ai.hold -= dt;
   if (r.ground) {
     for (let c2 = col + 1; c2 <= col + 3; c2++) {

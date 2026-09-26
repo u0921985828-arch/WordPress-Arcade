@@ -40,11 +40,13 @@ function bone(pts, ws) {
 if (CFG.mode === 'duel') duelGame(); else {
 const OUT = ART.OUT, R2 = 6.2832, W = 360, H = 640, FLOOR = 578, BR = 13, RIM = 26, NC = 7, NR = 5;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#241a3a' }), c = k.ctx;
+/* Dificultad seleccionable: TIME = 60 en normal → cronómetro idéntico al de siempre. */
+const TIME = Math.round(60 * k.D.time);
 let shotN = 0, ball, hoop, score, time, streak, aim, msg, msgT, msgC, best, net, kAng, kPow, kb, t = 0, bgCv, ballSpr, fireT = 0, clankT = 0;
 /* los primeros lanzamientos salen cerca del aro; la zona se abre hasta la completa hacia el 18.º (1.23) */
 function newBall() { const d = Math.min(1, shotN++ / 18); ball = { x: k.rnd(190 - 140 * d, 190 - 10 * (1 - d)), y: k.rnd(440 - 40 * d, 480 + 40 * d), vx: 0, vy: 0, fly: false, scored: false, prevY: 0, rot: 0, sp: 0, touched: false, bounces: 0, pop: 0, done: 0 }; ball.sx = ball.x; ball.sy = ball.y;
   const dx = hoop.x - ball.x, hh = ball.y - hoop.y, a = 1.0, den = 2 * Math.cos(a) ** 2 * (dx * Math.tan(a) - hh); kAng = -a; kPow = den > 0 ? k.clamp(Math.sqrt(1300 * dx * dx / den) / 950 * 0.9, 0.2, 1) : 0.8; } /* el teclado parte de un tiro corto: hay que ajustarlo */
-function reset() { shotN = 0; hoop = { x: 280, y: 230, vx: 0 }; score = 0; time = 60; streak = 0; best = 0; msg = ''; msgT = 0; kb = false; net = []; for (let j = 0; j < NR; j++) for (let i = 0; i < NC; i++) net.push({ i, j, dx: 0, dy: 0, vx: 0, vy: 0 }); newBall(); }
+function reset() { shotN = 0; hoop = { x: 280, y: 230, vx: 0 }; score = 0; time = TIME; streak = 0; best = 0; msg = ''; msgT = 0; kb = false; net = []; for (let j = 0; j < NR; j++) for (let i = 0; i < NC; i++) net.push({ i, j, dx: 0, dy: 0, vx: 0, vy: 0 }); newBall(); }
 /* ---------- Cacheados: pabellón y balón ---------- */
 function buildArt() {
   bgCv = document.createElement('canvas'); bgCv.width = W * 2; bgCv.height = H * 2; const g = bgCv.getContext('2d'); g.scale(2, 2);
@@ -98,7 +100,7 @@ k.run((dt) => {
 }, draw);
 function scored() {
   const b = ball; b.scored = true; streak++; best = Math.max(best, streak); const far = Math.hypot(b.sx - hoop.x, b.sy - hoop.y) > 330, swish = !b.touched;
-  const pts = 2 * Math.min(5, streak) + (far ? 1 : 0) + (swish ? 1 : 0); score += pts; if (swish) time = Math.min(60, time + 2);
+  const pts = 2 * Math.min(5, streak) + (far ? 1 : 0) + (swish ? 1 : 0); score += pts; if (swish) time = Math.min(TIME, time + 2);
   msg = swish ? `¡Limpia! +${pts}` : streak > 1 ? `+${pts} ¡Racha x${streak}!` : `+${pts}`; msgC = swish ? '#5ce1e6' : '#f2d15c'; msgT = 1.1;
   k.burst(hoop.x, hoop.y + 20, streak >= 3 ? '#ff9a3d' : '#f2d15c', 18, 150); k.sfx(streak >= 3 ? 'win' : 'coin'); if (swish) k.float('+2 s', hoop.x, hoop.y + 60, '#5ce1e6'); if (streak === 3) { k.float('¡EN LLAMAS!', 180, 330, '#ff9a3d'); k.flash('rgba(255,150,60,.3)'); } navigator.vibrate && navigator.vibrate(20);
   for (const n of net) n.vy += 60 * (1 - n.j / NR);
@@ -146,10 +148,10 @@ function draw() {
   let a = null, p = 0; if (!ball.fly && aim && k.ptr.down) { const dx = k.ptr.sx - k.ptr.x, dy = k.ptr.sy - k.ptr.y; p = Math.min(1, Math.hypot(dx, dy) / 160); if (p > 0.1) a = Math.atan2(dy, dx); } else if (!ball.fly && kb) { a = kAng; p = kPow; }
   if (a !== null) { let x = ball.x, y = ball.y, vx = Math.cos(a) * p * 950, vy = Math.sin(a) * p * 950; const dots = Math.round(24 - 8 * Math.min(1, shotN / 12)); for (let i = 0; i < dots; i++) { for (let j = 0; j < 3; j++) { vy += 1300 * 0.012; x += vx * 0.012; y += vy * 0.012; } c.globalAlpha = 1 - i / (dots + 2); c.beginPath(); c.arc(x, y, 4 - i * 0.12, 0, R2); ART.fillOut(c, '#fff', 1.5); } c.globalAlpha = 1;
     c.strokeStyle = OUT; c.lineWidth = 7; c.beginPath(); c.arc(ball.x, ball.y, 22, -Math.PI / 2, -Math.PI / 2 + p * R2); c.stroke(); c.strokeStyle = `hsl(${120 - p * 120} 90% 60%)`; c.lineWidth = 4; c.stroke(); }
-  if (!ball.fly && !aim && !kb && score === 0 && time > 56) { const e = (t % 1.4) / 1.4; c.globalAlpha = 1 - e; c.fillStyle = '#fff'; c.beginPath(); c.arc(ball.x - 20 - e * 50, ball.y + 20 + e * 40, 9, 0, R2); c.fill(); c.globalAlpha = 1; }
+  if (!ball.fly && !aim && !kb && score === 0 && time > TIME - 4) { const e = (t % 1.4) / 1.4; c.globalAlpha = 1 - e; c.fillStyle = '#fff'; c.beginPath(); c.arc(ball.x - 20 - e * 50, ball.y + 20 + e * 40, 9, 0, R2); c.fill(); c.globalAlpha = 1; }
   // HUD
   panel(8, 6, 116, 48); label(`${score}`, 18, 10, 26, '#f2d15c'); label(streak > 1 ? `Racha x${streak}` : 'puntos', 114, 16, 11, streak >= 3 ? '#ffb13d' : '#e6e1ff', 'right'); label(`Mejor x${best}`, 114, 34, 10, 'rgba(230,225,255,.7)', 'right');
-  panel(W - 96, 6, 88, 48); const tl = Math.ceil(time), cx = W - 72, cy = 30; c.lineWidth = 6; c.strokeStyle = 'rgba(255,255,255,.15)'; c.beginPath(); c.arc(cx, cy, 15, 0, R2); c.stroke(); c.strokeStyle = time < 10 ? '#ff6b6b' : '#7cf7a0'; c.beginPath(); c.arc(cx, cy, 15, -Math.PI / 2, -Math.PI / 2 + R2 * time / 60); c.stroke();
+  panel(W - 96, 6, 88, 48); const tl = Math.ceil(time), cx = W - 72, cy = 30; c.lineWidth = 6; c.strokeStyle = 'rgba(255,255,255,.15)'; c.beginPath(); c.arc(cx, cy, 15, 0, R2); c.stroke(); c.strokeStyle = time < 10 ? '#ff6b6b' : '#7cf7a0'; c.beginPath(); c.arc(cx, cy, 15, -Math.PI / 2, -Math.PI / 2 + R2 * time / TIME); c.stroke();
   label(`${tl}`, W - 20, 16, 20, time < 10 ? '#ff6b6b' : '#fff', 'right');
   if (msgT > 0) { const e = Math.min(1, (1.1 - msgT) / 0.15), s = 0.5 + 0.5 * e + Math.sin(e * Math.PI) * 0.2; c.save(); c.translate(W / 2, 120); c.scale(s, s); c.globalAlpha = Math.min(1, msgT / 0.3); label(msg, 0, -14, 26, msgC, 'center'); c.restore(); c.globalAlpha = 1; }
 }
@@ -162,10 +164,12 @@ function panel(x, y, w, h) { ART.rr(c, x, y, w, h, 10); c.fillStyle = 'rgba(26,2
  * Mando: ← → ángulo (hacia tu canasta = más plano), ↑ ↓ fuerza, A lanza; guía de puntos. Táctil (J1): arrastra hacia atrás
  * en tu mitad y suelta. Física en coordenadas de media pista (u = 0 en el centro, crece hacia tu canasta). */
 function duelGame() {
-  const W = 800, H = 450, OUT = ART.OUT, R2 = 6.2832, HW = 400, FLOOR = 404, BR = 12, RIM = 24, NC = 7, NR = 5, G = 1000, VMAX = 800, TIME = 60, ID = CFG.id || 'canastas-a-duelo';
+  const W = 800, H = 450, OUT = ART.OUT, R2 = 6.2832, HW = 400, FLOOR = 404, BR = 12, RIM = 24, NC = 7, NR = 5, G = 1000, VMAX = 800, ID = CFG.id || 'canastas-a-duelo';
   const k = Kit({ w: W, h: H, title: CFG.title, bg: '#241a3a' }), c = k.ctx;
+  const TIME = Math.round(60 * k.D.time); // 60 s en normal
   const CNAME = ['roja', 'azul', 'amarilla', 'verde'], clamp = k.clamp, gauss = () => { let u = 0; while (!u) u = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(R2 * Math.random()); };
   let LV = 0; try { LV = clamp(+localStorage.getItem('cpu:' + ID) || 0, 0, 10); } catch (e) { /* sin almacenamiento */ }
+  const lvD = () => clamp(LV + k.D.cpu * 2, -2, 12); // el nivel guardado no se toca: se suma al leerlo
   let seats = [], S = [], time = TIME, t = 0, over = false, overT = 0, clankT = 0;
   const DIR = [-1, 1];   // pista 0 mira a la izquierda (espejo), pista 1 a la derecha
   const sx = (i, u) => HW + DIR[i] * u;   // local → pantalla
@@ -180,7 +184,7 @@ function duelGame() {
     const d = Math.min(1, s.shotN++ / 14), u = k.rnd(170 - 120 * d, 230 - 30 * d), y = k.rnd(318 - 20 * d, 350);
     s.ball = { u, y, vu: 0, vy: 0, fly: false, scored: false, prevY: 0, rot: 0, sp: 0, touched: false, bounces: 0, pop: 0, su: u, sy: y };
     const a0 = bestAng(s), need = solve(s, a0); s.kAng = a0; s.kPow = need ? clamp(need * 0.88, 0.3, 1) : 0.7;   // el mando parte de un tiro corto: hay que ajustarlo
-    s.cpuT = 1.2 + Math.random() * 0.6 - LV * 0.05; s.cpuP = null;
+    s.cpuT = 1.2 + Math.random() * 0.6 - lvD() * 0.05; s.cpuP = null;
   }
   /* ángulo de mínima fuerza (45° + mitad de la elevación), algo más tendido para que entre bajando */
   function bestAng(s) { const b = s.ball, dx = s.hoop.u - b.u, hh = b.y - s.hoop.y; return -clamp(Math.PI / 4 + Math.atan2(hh, dx) / 2 + 0.05, 0.6, 1.4); }
@@ -204,7 +208,7 @@ function duelGame() {
     const i = s.i, p = seats[i].p, local = !k.party && p === 0 && !seats[i].cpu;
     if (seats[i].cpu) {
       s.cpuT -= dt; if (s.cpuT > 0) return;
-      if (!s.cpuP) { const a = bestAng(s) - Math.random() * 0.12, need = solve(s, a) || 0.8, sig = Math.max(0.01, 0.04 - LV * 0.003); s.cpuP = { a: a + gauss() * sig * 0.4, p: clamp(need * (1 + gauss() * sig), 0.2, 1), t: 0 }; }
+      if (!s.cpuP) { const a = bestAng(s) - Math.random() * 0.12, need = solve(s, a) || 0.8, sig = Math.max(0.01, 0.04 - lvD() * 0.003); s.cpuP = { a: a + gauss() * sig * 0.4, p: clamp(need * (1 + gauss() * sig), 0.2, 1), t: 0 }; }
       s.cpuP.t += dt; s.kAng += (s.cpuP.a - s.kAng) * Math.min(1, dt * 5); s.kPow += (s.cpuP.p - s.kPow) * Math.min(1, dt * 5);
       if (s.cpuP.t > 0.55) { throwBall(s, s.cpuP.a, s.cpuP.p); s.cpuP = null; }
       return;

@@ -53,6 +53,8 @@ const keyset = (S) => (LAND ? { l: S.has('up'), r: S.has('down'), u: S.has('righ
 /* CPU: empieza floja (0,35; 1.23) y mejora con los puntos jugados del partido (+0,32 como máximo) y con cada victoria tuya (+0,02, hasta 5).
  * Si te saca 2 o más puntos afloja un poco. Antes: 0,55 + 0,03 por punto sin tope (1,15 al final de un partido largo). */
 let CPU = 0; try { CPU = Math.min(5, +localStorage.getItem('cpu:' + CFG.id) || 0); } catch (e) { /* sin almacenamiento */ }
+/* Dificultad seleccionable: DC = 0 en normal → la CPU juega exactamente igual que siempre (el nivel guardado no se toca). */
+const DC = k.D.cpu;
 let me, ai, puck, sMe, sAi, serveT, rally, trail, goalT, goalMe, tm, bounceMk, server, aiOff = 0, meOff = 0, cdPend = false;
 /* Modo tele: SLOT = [jugador abajo, jugador arriba] fijado al empezar el partido (J1 abajo/izquierda, J2 arriba/derecha).
    Un lado sin jugador, o cuyo jugador se ha ido, lo lleva la CPU; si vuelve (o llega otro), recupera el lado. */
@@ -149,7 +151,7 @@ k.run((dt) => {
   if (!k.gate(reset)) return;
   if (cdPend) { cdPend = false; k.count(3); }
   if (k.counting()) return;
-  const lvl = 0.35 + CPU * 0.02 + Math.min(0.32, (sMe + sAi) * (HK ? 0.026 : 0.016)) - (sAi - sMe >= 2 ? 0.1 : 0); // 1.23: más fácil (base 0,5→0,35, +0,04→+0,02 por victoria)
+  const lvl = Math.max(0.15, 0.35 + CPU * 0.02 + Math.min(0.32, (sMe + sAi) * (HK ? 0.026 : 0.016)) - (sAi - sMe >= 2 ? 0.1 : 0) + DC * 0.09); // 1.23: más fácil (base 0,5→0,35, +0,04→+0,02 por victoria)
   me.px = me.x; me.py = me.y; ai.px = ai.x; ai.py = ai.y;
   const botHum = k.party ? HUM(0) : true;
   if (k.ptr.down && (botHum || !k.party)) { const qx = LAND ? k.ptr.y : (k.ptr.x - OXT) / SCL, qy = LAND ? 640 - k.ptr.x : (k.ptr.y - TOP) / SCL; me.x += (qx - me.x) * Math.min(1, dt * 25); if (HK) me.y += (qy - me.y) * Math.min(1, dt * 25); }
@@ -266,6 +268,7 @@ function paddleX() {
   const lsGet = (key, d) => { try { const v = localStorage.getItem(key); return v == null ? d : +v; } catch (e) { return d; } };
   const lsSet = (key, v) => { try { localStorage.setItem(key, v); } catch (e) { /* sin almacenamiento */ } };
   const CPUK = 'cpu:' + CFG.id;
+  const DC = k.D.cpu; // dificultad seleccionable: 0 en normal
   function label(s, x, y, size, col, align, base) {
     c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'center'; c.textBaseline = base || 'middle';
     c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
@@ -289,7 +292,7 @@ function paddleX() {
     let trail = [];
     k.onParty = () => { if (k.st !== 'play') reset(); };
     const alive = () => PL4.filter((s) => !s.out);
-    const lvl = () => clamp(0.3 + CPU * 0.03 + Math.min(0.3, tm / 150), 0.3, 0.85);
+    const lvl = () => clamp(clamp(0.3 + CPU * 0.03 + Math.min(0.3, tm / 150), 0.3, 0.85) + DC * 0.09, 0.18, 0.95);
     let CPU = Math.min(8, lsGet(CPUK, 0));
     function launch() {
       const al = alive(); let cand = al.filter((s) => !k.human(s.p)); if (!cand.length || tm > 20) cand = al;
@@ -425,7 +428,7 @@ function paddleX() {
     const keyset = (d) => (LAND ? { x: d.y, y: -d.x } : d);
     let CPU = Math.min(8, lsGet(CPUK, 0)), pl, ball, turn, server, score, phase, phT, msg = '', msgC = '#fff', msgT = 0, rally = 0, cdPend = false, marks = [], wallFx = [], waitT = 0, tm = 0, plan = null, planT = 0;
     const hum = (p) => k.human(p);
-    const lvl = () => { const lead = score[1] - score[0]; return clamp(0.32 + CPU * 0.03 + Math.min(0.25, (score[0] + score[1]) * 0.012) - (!k.party && lead >= 3 ? 0.1 : 0), 0.25, 0.9); };
+    const lvl = () => { const lead = score[1] - score[0]; return clamp(clamp(0.32 + CPU * 0.03 + Math.min(0.25, (score[0] + score[1]) * 0.012) - (!k.party && lead >= 3 ? 0.1 : 0), 0.25, 0.9) + DC * 0.09, 0.15, 0.98); };
     function reset() {
       pl = [0, 1].map((p) => ({ p, x: p ? 230 : 140, y: p ? 520 : 440, px: 0, py: 0, sw: 0, anim: 0 }));
       score = [0, 0]; rally = 0; marks = []; wallFx = []; msgT = 0; tm = 0; cdPend = !!k.party;

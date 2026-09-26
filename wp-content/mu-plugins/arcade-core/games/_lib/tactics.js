@@ -144,7 +144,9 @@ function cellAt(px, py) { let best = null, bd = HEX ? S * 0.95 : S * 0.72; for (
 
 function build() {
   rocks = new Set(); for (let i = 0; i < 8 + level; i++) rocks.add(P(k.ri(2, LONG - 3), k.ri(0, SIDE - 1)).join());
-  const mk = (t, x, y, team) => ({ t, x, y, team, hp: TYPES[t].hp + (team === 'ai' ? Math.min(6, level - 3) : 2), max: TYPES[t].hp + (team === 'ai' ? Math.min(6, level - 3) : 2), /* 1.23: más fácil (rival antes level-2 tope 8; los tuyos +2 PV) */ moved: false, acted: false, face: team === 'me' ? 1 : -1, hf: 0, ph: Math.random() * 6 });
+  /* k.D.cpu: PV del rival; k.D.life: PV de los tuyos (fácil +2 más) */
+  const BON = (team) => (team === 'ai' ? Math.min(6, level - 3 + k.D.cpu) : 2 + 2 * k.D.life);
+  const mk = (t, x, y, team) => ({ t, x, y, team, hp: TYPES[t].hp + BON(team), max: TYPES[t].hp + BON(team), /* 1.23: más fácil (rival antes level-2 tope 8; los tuyos +2 PV) */ moved: false, acted: false, face: team === 'me' ? 1 : -1, hf: 0, ph: Math.random() * 6 });
   units = [mk('K', ...P(0, 2), 'me'), mk('A', ...P(0, 4), 'me'), mk('M', ...P(0, 6), 'me'), mk('K', ...P(LONG - 1, 1), 'ai'), mk('K', ...P(LONG - 1, 5), 'ai'), mk('A', ...P(LONG - 1, 3), 'ai')];
   if (level > 3) units.push(mk('M', ...P(LONG - 1, 7), 'ai')); if (level > 6) units.push(mk('A', ...P(LONG - 2, 0), 'ai'));
   units.forEach((u) => rocks.delete(u.x + ',' + u.y));
@@ -186,7 +188,7 @@ function tapCell(cell) {
 }
 /* IA: una unidad cada vez, con foco visible */
 /* IA que mejora con la batalla: al principio a veces no remata al más débil (1: 45 % → 100 % en la 7). */
-function aiTarget(u) { const ok = units.filter((f) => f.team === 'me' && f.hp > 0 && inRange(u, f)); if (!ok.length) return null; return Math.random() < Math.min(0.85, 0.3 + (level - 1) * 0.05) ? ok.sort((a, b) => a.hp - b.hp)[0] : k.pick(ok); }
+function aiTarget(u) { const ok = units.filter((f) => f.team === 'me' && f.hp > 0 && inRange(u, f)); if (!ok.length) return null; return Math.random() < Math.min(0.85, Math.max(0.05, 0.3 + (level - 1) * 0.05 + k.D.cpu * 0.15)) ? ok.sort((a, b) => a.hp - b.hp)[0] : k.pick(ok); }
 function aiThink(u) {
   const foes = units.filter((q) => q.team === 'me' && q.hp > 0); if (!foes.length) return null;
   let tg = foes.filter((f) => inRange(u, f)).sort((a, b) => a.hp - b.hp)[0]; if (tg) return { tg };

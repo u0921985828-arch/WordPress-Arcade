@@ -190,7 +190,7 @@ function build() {
   }
   bake();
 }
-function reset() { towers = []; foes = []; bullets = []; fxs = []; gold = 200; lives = 25; /* 1.23: más fácil (antes 150 oro, 20 vidas) */ wave = 0; spawnQ = []; spawnT = 0; pick = 0; score = 0; between = 12; sel = null; preview = null; banner = null; msg = null; tt = 0; cur = [2, 3]; kbd = false; build(); }
+function reset() { towers = []; foes = []; bullets = []; fxs = []; gold = 200 + 50 * k.D.life; lives = 25 + 5 * k.D.life; /* 1.23: más fácil (antes 150 oro, 20 vidas) · fácil: +50 oro y +5 vidas */ wave = 0; spawnQ = []; spawnT = 0; pick = 0; score = 0; between = 12; sel = null; preview = null; banner = null; msg = null; tt = 0; cur = [2, 3]; kbd = false; build(); }
 
 /* ---------- Fondo cacheado a 2× ---------- */
 const rnd = (s) => { const x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -281,7 +281,7 @@ function sell(tw) {
 function say(t) { msg = { t, life: 1.6 }; }
 function startWave() {
   if (between <= 0) return; if (wave > 0 && between > 1) { const b = Math.ceil(between) * 2; gold += b; const r = waveR(); k.float('+' + b, r.x + r.w / 2, r.y + 10, '#ffd23d'); }
-  between = 0; wave++; const n = Math.min(4 + wave * 2, 32);
+  between = 0; wave++; const n = Math.min(Math.round((4 + wave * 2) * k.D.rate), 32);   // k.D.rate: oleadas más o menos numerosas
   spawnQ = Array.from({ length: n }, (_, i) => (wave % 5 === 0 && i === n - 1 ? 'boss' : wave >= 4 && i % 5 === 2 ? 'armor' : wave >= 3 && i % 4 === 0 ? 'fast' : 'norm'));
   banner = { t: 2.4, head: 'Oleada ' + wave, sub: wave % 5 === 0 ? '¡Llega un jefe!' : wave === 3 ? 'Cuidado: pájaros rápidos' : wave === 4 ? 'Caballeros con armadura' : n + ' enemigos' };
   k.sfx(wave % 5 === 0 ? 'hurt' : 'start'); spawnT = 0.4;
@@ -334,8 +334,8 @@ k.run((dt) => {
   if (banner) { banner.t -= dt; if (banner.t <= 0) banner = null; }
   if (msg) { msg.life -= dt; if (msg.life <= 0) msg = null; }
   spawnT -= dt;
-  if (spawnQ.length && spawnT <= 0) { const ty = spawnQ.shift(), T = FT[ty]; spawnT = (ty === 'fast' ? 0.56 : 0.94) * (1 + 0.5 * (1 - easeW())); const hp = Math.round((18 + wave * 8 + wave * wave * 0.7) * T.hp * (0.5 + 0.5 * easeW()) * 0.9);
-    foes.push({ ty, i: 0, p: 0, hp, max: hp, slow: 0, hf: 0, face: 1, ph: Math.random() * 6, path: path.slice(), x: -20, y: 0, walked: 0, spk: 0.65 + 0.2 * easeW() }); }
+  if (spawnQ.length && spawnT <= 0) { const ty = spawnQ.shift(), T = FT[ty]; spawnT = (ty === 'fast' ? 0.56 : 0.94) * (1 + 0.5 * (1 - easeW())) / k.D.rate; const hp = Math.round((18 + wave * 8 + wave * wave * 0.7) * T.hp * (0.5 + 0.5 * easeW()) * 0.9);
+    foes.push({ ty, i: 0, p: 0, hp, max: hp, slow: 0, hf: 0, face: 1, ph: Math.random() * 6, path: path.slice(), x: -20, y: 0, walked: 0, spk: (0.65 + 0.2 * easeW()) * k.D.spd }); }
   /* --- enemigos --- */
   for (const f of foes) {
     f.slow -= dt; f.hf -= dt; const sp = FT[f.ty].sp * f.spk * (f.slow > 0 ? 0.5 : 1); f.p += sp * dt; f.walked += sp * dt;

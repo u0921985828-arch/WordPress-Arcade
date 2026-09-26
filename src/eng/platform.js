@@ -44,7 +44,7 @@ function genMore() {
       genY -= gap + h; const free = (s) => !plan.some((q) => q.side === s && q.y1 > genY && q.y0 < genY + h);
       let side = k.pick([-1, 1]); if (!free(side)) side = -side; if (free(side)) enemies.push({ side, y: genY, h });
       if (Math.random() < 0.55) coins.push({ x: W / 2 + k.rnd(-50, 50), y: genY + h + gap / 2 });
-      if (d > 0.08 && Math.random() < 0.1 + d * 0.24) foes.push({ x: k.rnd(WALL + 20, W - WALL - 20), y: genY - k.rnd(20, 60), vx: k.pick([-1, 1]) * (48 + d * 70), ph: Math.random() * 6 });
+      if (d > 0.08 && Math.random() < (0.1 + d * 0.24) * k.D.rate) foes.push({ x: k.rnd(WALL + 20, W - WALL - 20), y: genY - k.rnd(20, 60), vx: k.pick([-1, 1]) * (48 + d * 70) * k.D.spd, ph: Math.random() * 6 });
     }
     return;
   }
@@ -53,15 +53,15 @@ function genMore() {
     if (M === 'hopper') {
       genY -= k.rnd(46, 62 + d * 72); const w = cloudW(d), prev = platforms[platforms.length - 1];
       const kind = r < 0.07 + d * 0.13 ? 'move' : r < 0.14 + d * 0.2 && prev.kind !== 'break' ? 'break' : r < 0.19 + d * 0.2 ? 'spring' : 'n';
-      const q = { x: k.rnd(6, W - w - 6), y: genY, w, kind, vx: k.pick([-1, 1]) * (36 + d * 60), sq: 0 }; platforms.push(q);
+      const q = { x: k.rnd(6, W - w - 6), y: genY, w, kind, vx: k.pick([-1, 1]) * (36 + d * 60) * k.D.spd, sq: 0 }; platforms.push(q);
       if (kind !== 'break' && Math.random() < 0.28) coins.push({ x: q.x + w / 2, y: genY - 30 });
-      if (d > 0.05 && kind === 'n' && Math.random() < 0.04 + d * 0.1) foes.push({ x: k.rnd(30, W - 30), y: genY - 70, x0: 0, vx: k.pick([-1, 1]) * (32 + d * 51), ph: Math.random() * 6 });
+      if (d > 0.05 && kind === 'n' && Math.random() < (0.04 + d * 0.1) * k.D.rate) foes.push({ x: k.rnd(30, W - 30), y: genY - 70, x0: 0, vx: k.pick([-1, 1]) * (32 + d * 51) * k.D.spd, ph: Math.random() * 6 });
     } else {
       genY -= k.rnd(62, 78 + d * 24); const w = k.ri(Math.round(96 - d * 34), Math.round(132 - d * 44));
       const cx = k.clamp(lastX + k.pick([-1, 1]) * k.rnd(40, 105), w / 2 + 6, W - w / 2 - 6); lastX = cx;
       const prev = platforms[platforms.length - 1];
       const kind = d > 0.12 && r < 0.12 + d * 0.15 ? 'move' : d > 0.05 && r < 0.3 + d * 0.15 && prev.kind !== 'crumble' ? 'crumble' : 'n';
-      platforms.push({ x: cx - w / 2, y: genY, w, kind, vx: k.pick([-1, 1]) * (28 + d * 38), cr: 0, vy: 0 });
+      platforms.push({ x: cx - w / 2, y: genY, w, kind, vx: k.pick([-1, 1]) * (28 + d * 38) * k.D.spd, cr: 0, vy: 0 });
       if (Math.random() < 0.35) coins.push({ x: cx + k.rnd(-w / 3, w / 3), y: genY - 22 });
     }
   }
@@ -76,7 +76,7 @@ function build() { if (TEJ) return buildTej();
   t = 0; rope = null; dashT = 0; dashCd = 0; swordT = 0; jumpBuf = 0; coyote = 0; cam = 0; dead = 0; sq = 0; steer = 0; diffT = 0; if (M === 'barrels') genBarrels(); else genVert(); }
 let rec = 0;
 function reset() { if (TEJ) return resetTej();
-  try { rec = +localStorage.getItem(k.bkey(CFG.id)) || 0; } catch (e) { /* sin almacenamiento */ } level = 1; lives = 4; score = 0; got = 0; build(); }
+  try { rec = +localStorage.getItem(k.bkey(CFG.id)) || 0; } catch (e) { /* sin almacenamiento */ } level = 1; lives = 4 + k.D.life; score = 0; got = 0; build(); }
 if (!TEJ) reset(); k.show(CFG.title, CFG.help);
 
 /* ================= Muerte ================= */
@@ -144,8 +144,8 @@ function upBarrels(dt, L, R, U, D, kx) {
   if (intro > 0) return;
   // lanzador y barriles
   throwT -= dt; bT -= dt;
-  if (bT <= 0) { bT = Math.max(1.5, 4.5 - (level - 1) * 0.2) * k.rnd(0.8, 1.25); throwT = 0.45; k.sfx('pop'); barrels.push({ x: W - 78, y: fyRow(5) * T - 16, w: 16, h: 16, vy: 0, dir: -1, a: 0, blue: level >= 3 && Math.random() < Math.min(0.4, 0.12 + level * 0.03), seen: new Set(), ground: true }); }
-  const spd = Math.min(145, 62 + (level - 1) * 7.7);
+  if (bT <= 0) { bT = Math.max(1.5, 4.5 - (level - 1) * 0.2) * k.rnd(0.8, 1.25) / k.D.rate; throwT = 0.45; k.sfx('pop'); barrels.push({ x: W - 78, y: fyRow(5) * T - 16, w: 16, h: 16, vy: 0, dir: -1, a: 0, blue: level >= 3 && Math.random() < Math.min(0.4, 0.12 + level * 0.03), seen: new Set(), ground: true }); }
+  const spd = Math.min(145, 62 + (level - 1) * 7.7) * k.D.spd;
   for (const b of barrels) {
     const bcx = b.x + 8;
     if (b.lad) { b.y += 100 * dt; b.a += dt * 3; if (b.y + 16 >= b.lad.y1) { b.y = b.lad.y1 - 16; b.lad = null; b.ground = true; b.dir = floorDir(Math.round((MH - 1 - (b.y + 16) / T) / 3)); } }
@@ -169,7 +169,7 @@ function upBarrels(dt, L, R, U, D, kx) {
   }
 }
 function upNinja(dt, J) {
-  const d = diff(p.y), slide = 26 + d * 52;
+  const d = diff(p.y), slide = (26 + d * 52) * k.D.spd;
   if (p.cling) {
     p.y += slide * dt; p.face = -p.side; p.state = 'wall';
     if (Math.random() < dt * 8) fx.push({ x: p.side < 0 ? WALL + 2 : W - WALL - 2, y: p.y + p.h - 4, vx: -p.side * 10, vy: -20, t: 0, max: 0.4, k: 'dust' });
@@ -235,7 +235,7 @@ function upVert(dt, J, kx) {
   const tgt = p.y - H * (hop ? 0.42 : 0.5); if (tgt < cam) cam += (tgt - cam) * Math.min(1, dt * 6);
   score = Math.max(score, height() + got * 25);
   if (!hop) {
-    diffT += dt; const lq = Math.min(1, Math.max(0, diffT - 5) / 315); lava -= (diffT < 5 ? 3 : 11 + 66 * lq * lq * (3 - 2 * lq)) * dt; // 1.23: más fácil lava = Math.min(lava, cam + H + 50);
+    diffT += dt; const lq = Math.min(1, Math.max(0, diffT - 5) / 315); lava -= (diffT < 5 ? 3 : 11 + 66 * lq * lq * (3 - 2 * lq)) * k.D.spd * dt; // 1.23: más fácil lava = Math.min(lava, cam + H + 50);
     if (Math.random() < dt * 14) fx.push({ x: Math.random() * W, y: lava, vx: k.rnd(-12, 12), vy: -k.rnd(30, 70), t: 0, max: k.rnd(1, 2), k: 'ember' });
     if (Math.random() < dt * 5) fx.push({ x: Math.random() * W, y: lava + k.rnd(8, 30), vx: 0, vy: 0, t: 0, max: 0.7, k: 'bubble', r: k.rnd(3, 7) });
     if (p.y + p.h > lava + 10) return die('#ffb13d');
@@ -453,7 +453,7 @@ function drawBarrels() {
   for (const b of barrels) barrel(b.x + 8, b.y + 8, b.a, b.blue);
   hero(p, 0.68);
   // HUD
-  for (let i = 0; i < 4; i++) ART.heart(c, 14 + i * 20, 12, 1, i < lives);
+  for (let i = 0; i < 4 + k.D.life; i++) ART.heart(c, 14 + i * 20, 12, 1, i < lives);
   label(`${score}`, 8, 22, 16, '#fff');
   label(`Bonus ${Math.round(bonus / 100) * 100}`, W - 92, 5, 12, bonus < 1000 ? '#ff9a5c' : '#ffc928', 'right'); // lejos de pausa/sonido
   label(`Nivel ${level}`, 8, 42, 11, 'rgba(255,255,255,.9)');
@@ -473,7 +473,7 @@ function hud() {
 var NJ = [], ROOFS = [], STARS = [], TFX = [], round_ = 1, roundT = 0, tOver = 0, tMsg = '', tMsgT = 0, tWin = 0;
 var TBOT = 46, TGRAV = 1500, TJUMP = 520, TSPD = 172, TSTAR = 330, TTOP = 34;
 try { tWin = Math.min(8, +localStorage.getItem('cpu:' + CFG.id) || 0); } catch (e) { /* sin almacenamiento */ }
-const tSkill = () => Math.min(0.8, 0.28 + tWin * 0.06);
+const tSkill = () => Math.min(0.8, 0.28 + Math.max(0, Math.min(8, tWin + k.D.cpu)) * 0.06);
 function tSeats() { return k.party ? Math.max(1, Math.max.apply(null, k.party.map((q) => q.p)) + 1) : Math.min(2, k.mpMax || 1); }
 function mkRoof(x, y, w) { return { x, y, w, crack: 0, fall: 0, vy: 0, base: y }; }
 function layout() {

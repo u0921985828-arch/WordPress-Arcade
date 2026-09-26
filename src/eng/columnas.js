@@ -92,7 +92,8 @@ const bg = off(W, H, (g) => {
 });
 
 /* ---------- reglas ---------- */
-const colorsNow = () => Math.min(GEM.length, level < 4 ? 4 : level < 7 ? 5 : 6);
+/* Dificultad: un color menos o más y la velocidad de caída. */
+const colorsNow = () => k.clamp(Math.min(GEM.length, level < 4 ? 4 : level < 7 ? 5 : 6) + (k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0), 3, GEM.length);
 const free = (x, y) => x >= 0 && x < COLS && y < ROWS && (y < 0 || !F[y][x]);
 function newPiece() {
   const g = []; for (let i = 0; i < 3; i++) g.push(k.ri(0, colorsNow() - 1));
@@ -110,7 +111,7 @@ function reset() {
   score = 0; level = 1; cleared = 0; chain = 0; phase = 'fall'; phT = 0; t = 0; over = 0; msg = ''; msgT = 0; next = null;
   spawn();
 }
-function stepSpeed() { return Math.max(0.16, 0.95 * Math.pow(0.86, level - 1)); }
+function stepSpeed() { return Math.max(0.16, 0.95 * Math.pow(0.86, level - 1)) / k.D.spd; }
 const landRow = (x) => { let y = ROWS - 1; while (y >= 0 && F[y][x]) y--; return y; };
 function move(d) {
   if (phase !== 'fall' || over) return;
@@ -235,6 +236,7 @@ function draw() {
 }
 spr.push(...GEM.map((_, i) => gemSprite(i)));
 spr.rain = rainbowSprite();
+k.onDif = () => { if (k.st !== 'play') reset(); };
 reset();
 window.__co = { get F() { return F; }, get piece() { return piece; }, get score() { return score; }, get level() { return level; }, get phase() { return phase; } };
 k.show(CFG.title || 'Columnas de Joyas', 'Cae una columna de tres gemas. Muévela a los lados, tócala para rotar los colores y deslízala hacia abajo para soltarla. Tres iguales en línea (también en diagonal) desaparecen y lo de arriba cae: así se encadenan combos.<br>Toca para jugar');

@@ -96,18 +96,18 @@ function rockSprite(r, seed, ore) {
 const DF = () => Math.min(1, (wave - 1) / 12), /* 1.23: más fácil */ lerp = (a, b, q) => a + (b - a) * q;
 function mkRock(x, y, size, vx, vy) {
   const seed = Math.random() * 1000, ore = Math.random() < 0.08, sp = rockSprite(RS[size], seed, ore), r = RS[size];
-  if (vx === undefined) { const a = k.rnd(0, R2), v = k.rnd(30, 60) * (1 + (3 - size) * 0.45) * lerp(0.56, 1.19, DF()); vx = Math.cos(a) * v; vy = Math.sin(a) * v; }
+  if (vx === undefined) { const a = k.rnd(0, R2), v = k.rnd(30, 60) * (1 + (3 - size) * 0.45) * lerp(0.56, 1.19, DF()) * k.D.spd; vx = Math.cos(a) * v; vy = Math.sin(a) * v; }
   return { x, y, size, r, vx, vy, ang: k.rnd(0, R2), rot: k.rnd(-1, 1) * (1.4 - size * 0.3), ore, cv: sp.cv, hit: 0 };
 }
 
 /* ---------- estado ---------- */
-function newShip() { return { x: W / 2, y: H / 2, vx: 0, vy: 0, a: -Math.PI / 2, inv: 3, thr: 0, tilt: 0 }; }
+function newShip() { return { x: W / 2, y: H / 2, vx: 0, vy: 0, a: -Math.PI / 2, inv: 3 / k.D.dmg, thr: 0, tilt: 0 }; }
 function spawnWave() {
   wave++; bannerT = 2;
-  for (let i = 0; i < Math.min(2 + wave, 9); i++) { let x, y; do { x = k.rnd(0, W); y = k.rnd(0, H); } while (Math.hypot(x - ship.x, y - ship.y) < 190); rocks.push(mkRock(x, y, 3)); }
+  for (let i = 0; i < Math.max(1, Math.round(Math.min(2 + wave, 9) * k.D.rate)); i++) { let x, y; do { x = k.rnd(0, W); y = k.rnd(0, H); } while (Math.hypot(x - ship.x, y - ship.y) < 190); rocks.push(mkRock(x, y, 3)); }
 }
 function reset() {
-  ship = newShip(); rocks = []; shots = []; eshots = []; pups = []; ufo = null; ufoT = 20; score = 0; lives = 4; wave = 0; cool = 0; t = 0;
+  ship = newShip(); rocks = []; shots = []; eshots = []; pups = []; ufo = null; ufoT = 20; score = 0; lives = 4 + k.D.life; wave = 0; cool = 0; t = 0;
   dead = false; respT = 0; hyperCd = 0; warp = 0; trip = rapid = 0; shield = false; nextLife = 10000; spawnWave();
 }
 
@@ -141,7 +141,7 @@ function breakRock(r, byPlayer) {
 function dropPup(x, y) { const kind = lives < 4 && Math.random() < 0.25 ? 'life' : k.pick(['triple', 'rapid', 'shield']); pups.push({ x, y, vx: k.rnd(-30, 30), vy: k.rnd(-30, 30), kind, life: 9, pop: 0 }); }
 function addScore(p) { score += p; if (score >= nextLife) { nextLife += 10000; lives++; k.sfx('coin'); k.float('Vida extra', ship.x, ship.y - 30, '#ff4d6d'); } }
 function killShip() {
-  if (shield) { shield = false; ship.inv = 1.2; k.sfx('hit'); k.flash('rgba(124,247,160,.3)'); k.burst(ship.x, ship.y, '#7cf7a0', 20, 200); return; }
+  if (shield) { shield = false; ship.inv = 1.2 / k.D.dmg; k.sfx('hit'); k.flash('rgba(124,247,160,.3)'); k.burst(ship.x, ship.y, '#7cf7a0', 20, 200); return; }
   dead = true; respT = 1.8; lives--; trip = rapid = 0;
   navigator.vibrate && navigator.vibrate(120); k.sfx('explode'); k.burst(ship.x, ship.y, '#ffb347', 30, 240); k.burst(ship.x, ship.y, '#dfe6f5', 16, 200);
   ship.debris = [0, 1, 2, 3, 4].map((i) => ({ x: ship.x, y: ship.y, vx: ship.vx * 0.4 + Math.cos(i * 1.26) * 90, vy: ship.vy * 0.4 + Math.sin(i * 1.26) * 90, a: i, va: k.rnd(-6, 6) }));
@@ -196,13 +196,13 @@ function update(dt) {
   for (const s of eshots) { s.x += s.vx * dt; s.y += s.vy * dt; s.t -= dt; wrap(s); }
   for (const r of rocks) { r.x += r.vx * dt; r.y += r.vy * dt; r.ang += r.rot * dt; wrap(r); r.hit = Math.max(0, r.hit - dt); }
   // OVNI
-  if (!ufo && wave >= 2 && (ufoT -= dt) <= 0) { spawnUfo(); ufoT = k.rnd(20, 30); }
+  if (!ufo && wave >= 2 && (ufoT -= dt) <= 0) { spawnUfo(); ufoT = k.rnd(20, 30) / k.D.rate; }
   if (ufo) {
     ufo.x += ufo.vx * dt; ufo.y += ufo.vy * dt; ufo.y = (ufo.y + H) % H;
     if ((ufo.turn -= dt) <= 0) { ufo.turn = k.rnd(0.8, 1.6); ufo.vy = k.pick([-1, 0, 1]) * 60; }
     if ((ufo.cd -= dt) <= 0 && !dead) {
-      ufo.cd = (ufo.small ? lerp(2.13, 1.4, DF()) : lerp(2.67, 1.87, DF())); const a = ufo.small ? Math.atan2(ship.y - ufo.y, ship.x - ufo.x) + k.rnd(-0.12, 0.12) * Math.max(0.3, 1.5 - wave * 0.1) : k.rnd(0, R2);
-      eshots.push({ x: ufo.x, y: ufo.y, vx: Math.cos(a) * lerp(168, 200, DF()), vy: Math.sin(a) * lerp(168, 200, DF()), t: 1.6 }); k.sfx('shoot');
+      ufo.cd = (ufo.small ? lerp(2.13, 1.4, DF()) : lerp(2.67, 1.87, DF())) / k.D.rate; const a = ufo.small ? Math.atan2(ship.y - ufo.y, ship.x - ufo.x) + k.rnd(-0.12, 0.12) * Math.max(0.3, 1.5 - wave * 0.1) : k.rnd(0, R2);
+      eshots.push({ x: ufo.x, y: ufo.y, vx: Math.cos(a) * lerp(168, 200, DF()) * k.D.spd, vy: Math.sin(a) * lerp(168, 200, DF()) * k.D.spd, t: 1.6 }); k.sfx('shoot');
     }
     if (ufo.x < -40 || ufo.x > W + 40) ufo = null;
   }

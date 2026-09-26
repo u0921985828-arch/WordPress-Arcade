@@ -78,7 +78,7 @@ k.run((dt) => {
       for (const [px, py, pr] of POCKETS) if (Math.hypot(b.x - px, b.y - py) < pr + 3) /* 1.23: troneras algo más amables */ { b.in = true; b.px = px; b.py = py; } }
     for (let i = 0; i < balls.length; i++) for (let j = i + 1; j < balls.length; j++) { const a = balls[i], b = balls[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy); if (d < BR * 2 && d > 0) { const nx = dx / d, ny = dy / d, ov = (BR * 2 - d) / 2; a.x -= nx * ov; a.y -= ny * ov; b.x += nx * ov; b.y += ny * ov; const rv = ((a.vx - b.vx) * nx + (a.vy - b.vy) * ny) * 0.97; if (rv > 0) { a.vx -= rv * nx; a.vy -= rv * ny; b.vx += rv * nx; b.vy += rv * ny; if (rv > 40 && t - lastClick > 0.04) { lastClick = t; k.sfx('click'); } } } }
     for (const b of balls) if (b.in) { sinking.push({ n: b.n, x: b.x, y: b.y, px: b.px, py: b.py, t: 0, rot: b.rot });
-      if (b.n === 0) { shots += 2; msg = 'Falta: blanca dentro (+2)'; msgC = '#ff9a9a'; msgT = 1.4; navigator.vibrate && navigator.vibrate(60); }
+      if (b.n === 0) { const pen = Math.round(2 * k.D.dmg); shots += pen; msg = `Falta: blanca dentro (+${pen})`; msgC = '#ff9a9a'; msgT = 1.4; navigator.vibrate && navigator.vibrate(60); }
       else { potted++; shotPots++; k.sfx('coin'); k.burst(b.px, b.py, COL[b.n], 10, 90); msg = shotPots > 1 ? `¡${['', '', 'Doble', 'Triple', 'Cuádruple'][Math.min(4, shotPots)] || 'Combo'}!` : `Bola ${b.n}`; msgC = shotPots > 1 ? '#f2d15c' : '#fff'; msgT = 1; if (shotPots > 1) k.float(`x${shotPots}`, b.px, b.py - 20, '#f2d15c'); } }
     balls = balls.filter((b) => !b.in); }
 }, () => {
@@ -129,6 +129,7 @@ function eightGame() {
   const HX = TX + TW * 0.25, FX = TX + TW * 0.72, MY = TY + TH / 2, CNAME = ['roja', 'azul', 'amarilla', 'verde'];
   const clamp = k.clamp, gauss = () => { let u = 0; while (!u) u = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(R2 * Math.random()); };
   let LV = 0; try { LV = clamp(+localStorage.getItem('cpu:' + ID) || 0, 0, 10); } catch (e) { /* sin almacenamiento */ }
+  const lvD = () => clamp(LV + k.D.cpu * 2, -2, 12); // el nivel guardado no se toca: se suma al leerlo
   let seats = [], balls = [], sinking = [], cur = 0, breaker = 1, grp = [null, null], phase = 'aim', isBreak = true, shot = null, strike = null, kAng = 0, pw = 0, holdT = 0, prevA = false, aiming = false;
   let t = 0, msg = '', msgT = 0, msgC = '#fff', cpu = null, lastClick = 0, endT = 0, winner = -1, why = '', bannerT = 0;
   const nm = (i) => (seats[i].cpu ? 'CPU ' + CNAME[seats[i].p % 4] : String(seats[i].name).slice(0, 10));
@@ -207,7 +208,7 @@ function eightGame() {
     if (!pl) { const tg = targets(cur).sort((a, b) => Math.hypot(a.x - cue.x, a.y - cue.y) - Math.hypot(b.x - cue.x, b.y - cue.y)); const b = tg.find((q) => clearPath(cue.x, cue.y, q.x, q.y, [q, cue])) || tg[0];
       pl = b ? { a: Math.atan2(b.y - cue.y, b.x - cue.x) + gauss() * 0.03, p: 0.45 } : { a: Math.random() * R2, p: 0.5 }; }
     if (isBreak) pl = { a: Math.atan2(MY - cue.y, FX - cue.x) + gauss() * 0.01, p: 0.95 };
-    const sig = Math.max(0.005, 0.03 - LV * 0.0026);
+    const sig = Math.max(0.005, 0.03 - lvD() * 0.0026);
     cpu = { a: pl.a + gauss() * sig, p: clamp(pl.p * (1 + gauss() * 0.08), 0.15, 1), t: 0, from: kAng };
   }
   function cpuPlace() {
