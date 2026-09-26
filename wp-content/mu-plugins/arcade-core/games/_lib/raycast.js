@@ -93,11 +93,13 @@ function gemFrame(col, rot) {
     for (let i = 0; i < 6; i++) {
       const [x1, a1] = V[i], [x2] = V[(i + 1) % 6], n = a1 + Math.PI / 6; if (Math.sin(n) < 0) continue; // sólo caras visibles
       const l = Math.cos(n + 0.6) * 0.45;
-      g2.beginPath(); g2.moveTo(cx, top); g2.lineTo(x1, belt); g2.lineTo(x2, belt); g2.closePath(); g2.fillStyle = mix(col, l + 0.25); g2.fill(); g2.lineWidth = 1.2; g2.strokeStyle = 'rgba(26,21,48,.6)'; g2.stroke();
-      g2.beginPath(); g2.moveTo(x1, belt); g2.lineTo(x2, belt); g2.lineTo(cx, bot); g2.closePath(); g2.fillStyle = mix(col, l - 0.1); g2.fill(); g2.stroke();
+      /* las facetas se separan por color, nunca por línea (§8): dentro de la silueta del cristal
+         no queda ningún contorno cerrado */
+      g2.beginPath(); g2.moveTo(cx, top); g2.lineTo(x1, belt); g2.lineTo(x2, belt); g2.closePath(); g2.fillStyle = mix(col, l + 0.3); g2.fill();
+      g2.beginPath(); g2.moveTo(x1, belt); g2.lineTo(x2, belt); g2.lineTo(cx, bot); g2.closePath(); g2.fillStyle = mix(col, l - 0.15); g2.fill();
     }
     const xs = V.map((v) => v[0]), mn = Math.min(...xs), mxx = Math.max(...xs);
-    g2.beginPath(); g2.moveTo(cx, top); g2.lineTo(mxx, belt); g2.lineTo(cx, bot); g2.lineTo(mn, belt); g2.closePath(); g2.lineWidth = 2.5; g2.strokeStyle = OUT; g2.stroke();
+    g2.beginPath(); g2.moveTo(cx, top); g2.lineTo(mxx, belt); g2.lineTo(cx, bot); g2.lineTo(mn, belt); g2.closePath(); g2.lineWidth = 1.6; g2.strokeStyle = OUT; g2.stroke();
     g2.fillStyle = 'rgba(255,255,255,.85)'; g2.beginPath(); g2.moveTo(cx - 4, top + 8); g2.lineTo(cx - 8, belt - 3); g2.lineTo(cx - 5, belt - 3); g2.fill();
   });
 }
@@ -220,22 +222,56 @@ function portalFrame(t) {
   GEM.forEach((col, i) => { const x = 40 + i * 24, y = 30, on = crystals.some((cr) => cr.col === col && cr.got); q.beginPath(); q.moveTo(x, y - 8); q.lineTo(x + 6, y); q.lineTo(x, y + 8); q.lineTo(x - 6, y); q.closePath(); ART.fillOut(q, on ? col : '#2a2248', 2); });
 }
 /* Farol en la mano (abajo a la derecha), con balanceo al andar */
+/* Ley de la pieza única: el farol con la mano era arco + tapa + caja + base + manga + puño +
+   mano, siete contornos apilados; ahora es UNA silueta cacheada (unite traza y rellena después)
+   y dentro solo hay color, sombra propia y un óvalo especular. La llama, que sí se mueve sola,
+   se pinta encima recortada contra el cristal. */
+const LNW = 300, LNH = 156, LNOX = 34, LNOY = 108, LNSC = Math.min(2, window.devicePixelRatio || 1);
+const LSPR = {};
+const lrr = (x, y, w, h, r) => (g) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+const LGLASS = lrr(-20, -28, 40, 58, 8);
+function lanternSpr(on) {
+  if (LSPR[on]) return LSPR[on];
+  const cv = document.createElement('canvas'); cv.width = LNW * LNSC; cv.height = LNH * LNSC;
+  const g = cv.getContext('2d'); g.scale(LNSC, LNSC); g.translate(LNOX, LNOY); g.lineJoin = 'round'; g.lineCap = 'round';
+  const MET = '#4a3f74', GLS = on ? '#ffd98a' : '#6b5a45', SLV = '#3a4a8a', SKIN = '#f0c49c';
+  const bow = (q) => { const a0 = Math.PI * 1.05, a1 = Math.PI * 1.95; q.arc(0, -44, 19.5, a0, a1); q.arc(0, -44, 12.5, a1, a0, true); q.closePath(); };
+  const cap = lrr(-24, -40, 48, 12, 5), base = lrr(-24, 28, 48, 12, 5);
+  const sleeve = (q) => { q.moveTo(10, -74); q.quadraticCurveTo(50, -100, 266, -84); q.lineTo(266, 6); q.quadraticCurveTo(56, -30, 34, -50); q.closePath(); };
+  const fist = (q) => { const cx = 22, cy = -64, co = Math.cos(1.2), si = Math.sin(1.2), P = (u, v) => [cx + u * co - v * si, cy + u * si + v * co];
+    const p0 = P(-11, -6), p1 = P(11, -6), p2 = P(16, 0), p3 = P(11, 6), p4 = P(-11, 6), p5 = P(-16, 0);
+    q.moveTo(p0[0], p0[1]); q.lineTo(p1[0], p1[1]); q.quadraticCurveTo(p2[0], p2[1], p3[0], p3[1]); q.lineTo(p4[0], p4[1]); q.quadraticCurveTo(p5[0], p5[1], p0[0], p0[1]); q.closePath(); };
+  const hand = (q) => { q.moveTo(17, -60); q.ellipse(4, -60, 13, 11, -0.3, 0, 6.283); };
+  unite(g, [[bow, MET], [cap, MET], [LGLASS, GLS], [base, MET], [sleeve, SLV], [fist, '#2b3668'], [hand, SKIN]], 1.55);
+  within(g, bow, (q) => { q.fillStyle = PLT(MET, 0.3); q.fillRect(-22, -66, 12, 34); q.fillStyle = PAL(PZO, 0.3); q.fillRect(4, -50, 20, 24); });
+  for (const pc of [cap, base]) within(g, pc, (q) => { cel3(q, pc, MET, { dx: 2, dy: 2, r: 120, sh: 0.3, lt: 0.26 }); });
+  within(g, LGLASS, (q) => {
+    cel3(q, LGLASS, GLS, { dx: 2.4, dy: 2.2, r: 120, sh: 0.3, lt: 0.2 });
+    q.fillStyle = PAL(PZO, 0.3); q.fillRect(-8, -30, 2.6, 62); q.fillRect(5.4, -30, 2.6, 62);     // varillas por sombra propia
+    q.fillStyle = 'rgba(255,255,255,.28)'; q.fillRect(-5.4, -30, 1.4, 62); q.fillRect(8, -30, 1.4, 62);
+  });
+  within(g, sleeve, (q) => {
+    cel3(q, sleeve, SLV, { dx: 3, dy: 3, r: 300, sh: 0.28, lt: 0.2 });
+    q.fillStyle = 'rgba(255,255,255,.16)'; q.beginPath(); q.moveTo(30, -80); q.quadraticCurveTo(58, -90, 266, -78); q.lineTo(266, -71); q.quadraticCurveTo(58, -83, 30, -73); q.closePath(); q.fill();
+  });
+  within(g, fist, (q) => { q.fillStyle = PAL(PZO, 0.3); q.fillRect(6, -62, 40, 20); });
+  within(g, hand, (q) => {
+    cel3(q, hand, SKIN, { dx: 2, dy: 2, r: 60, sh: 0.22, lt: 0.16 });
+    q.fillStyle = PAL(PZO, 0.22); q.beginPath(); q.ellipse(0, -55, 12, 4, -0.3, 0, 6.283); q.fill();   // nudillos por sombra, no por línea
+    spec(q, 2, -66, 5, 2.5, -0.3, 0.4);
+  });
+  spec(g, -12, -22, 4.4, 10, 0.1, 0.34);
+  return (LSPR[on] = cv);
+}
 function lantern(t, bob, light) {
   const x = 408 + Math.cos(walk * 0.5) * 6, y = 372 + bob * 1.4, fl = 0.85 + Math.sin(t * 23) * 0.08 + Math.sin(t * 7) * 0.07;
   c.save(); c.globalAlpha = 0.25 * light * fl; c.drawImage(GLOW[GEM[2]], x - 90, y - 60, 180, 180); c.restore();
-  c.lineCap = 'round'; c.lineWidth = 7; c.strokeStyle = OUT; c.beginPath(); c.arc(x, y - 44, 16, Math.PI * 1.05, Math.PI * 1.95); c.stroke(); c.lineWidth = 3.5; c.strokeStyle = '#8f86b8'; c.stroke();
-  ART.rr(c, x - 24, y - 40, 48, 12, 5); ART.fillOut(c, '#3f3566', 2.5);
-  ART.rr(c, x - 20, y - 28, 40, 58, 8); ART.fillOut(c, light > 0.1 ? '#ffd98a' : '#6b5a45', 2.5);
-  c.fillStyle = `rgba(255,${Math.round(150 + 60 * fl)},60,${0.9 * light})`; c.beginPath(); c.moveTo(x, y - 18 - 6 * fl); c.quadraticCurveTo(x + 9, y + 4, x, y + 10); c.quadraticCurveTo(x - 9, y + 4, x, y - 18 - 6 * fl); c.fill();
-  c.fillStyle = 'rgba(255,255,255,.45)'; c.fillRect(x - 15, y - 24, 4, 44); c.strokeStyle = 'rgba(26,21,48,.6)'; c.lineWidth = 2; c.beginPath(); c.moveTo(x - 7, y - 28); c.lineTo(x - 7, y + 30); c.moveTo(x + 7, y - 28); c.lineTo(x + 7, y + 30); c.stroke();
-  ART.rr(c, x - 24, y + 28, 48, 12, 5); ART.fillOut(c, '#3f3566', 2.5);
-  // brazo con manga y puño que sujeta la argolla
-  c.beginPath(); c.moveTo(x + 10, y - 74); c.quadraticCurveTo(x + 50, y - 100, W + 10, y - 84); c.lineTo(W + 10, y + 6); c.quadraticCurveTo(x + 56, y - 30, x + 34, y - 50); c.closePath(); ART.fillOut(c, '#3a4a8a', 2.5);
-  c.strokeStyle = 'rgba(255,255,255,.18)'; c.lineWidth = 4; c.beginPath(); c.moveTo(x + 30, y - 78); c.quadraticCurveTo(x + 55, y - 88, W, y - 76); c.stroke();
-  c.save(); c.translate(x + 22, y - 64); c.rotate(1.2); ART.rr(c, -16, -6, 32, 12, 5); ART.fillOut(c, '#2b3668', 2.5); c.restore();
-  c.beginPath(); c.ellipse(x + 4, y - 60, 13, 11, -0.3, 0, R2); ART.fillOut(c, '#f0c49c', 2.5);
-  c.strokeStyle = 'rgba(26,21,48,.55)'; c.lineWidth = 1.8; c.beginPath(); c.moveTo(x - 6, y - 58); c.lineTo(x + 2, y - 52); c.moveTo(x - 3, y - 64); c.lineTo(x + 6, y - 57); c.stroke();
-  c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.ellipse(x + 2, y - 66, 5, 2.5, -0.3, 0, R2); c.fill();
+  c.drawImage(lanternSpr(light > 0.1 ? 1 : 0), x - LNOX, y - LNOY, LNW, LNH);
+  c.save(); c.translate(x, y); clipIn(c, LGLASS, (g) => {                                             // la llama es lo único que se mueve solo
+    g.fillStyle = `rgba(255,${Math.round(150 + 60 * fl)},60,${0.9 * light})`;
+    g.beginPath(); g.moveTo(0, -18 - 6 * fl); g.quadraticCurveTo(9, 4, 0, 10); g.quadraticCurveTo(-9, 4, 0, -18 - 6 * fl); g.fill();
+    g.fillStyle = `rgba(255,248,210,${0.8 * light})`; g.beginPath(); g.moveTo(0, -10 - 4 * fl); g.quadraticCurveTo(4.5, 3, 0, 7); g.quadraticCurveTo(-4.5, 3, 0, -10 - 4 * fl); g.fill();
+  }); c.restore();
 }
 /* Minimapa con niebla de guerra y cono de visión */
 function minimap(t) {

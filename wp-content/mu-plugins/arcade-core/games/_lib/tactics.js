@@ -264,42 +264,80 @@ function bake() {
   gr = g.createLinearGradient(0, 0, 0, 34); gr.addColorStop(0, 'rgba(0,0,0,.35)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, 34);
 }
 /* soldado por clase; team 'me' humano, 'ai' trasgo */
+/* §8 + cartoon de estudio: la unidad es UNA pieza. Piernas, botas, tronco, manoplas, cabeza,
+ * yelmo/capucha/sombrero, escudo y carcaj van en el mismo trazado, contorneado y relleno una sola
+ * vez; armadura, cinturón y visera se leen por color y sombra propia. Solo la espada se separa,
+ * porque de verdad gira al atacar. Horneado por (clase, bando, fotograma de paso). */
+function unitSpr(t, me, leg) {
+  const T = TYPES[t], col = me ? T.col : AICOL[t], skin = me ? '#ffd9b5' : '#a8dd72';
+  const walk = leg === 3 ? 0 : [3, 0, -3][leg];
+  return spr8(`u${t}${me ? 1 : 0}${leg}`, 66, 80, 33, 72, (g) => {
+    const arm = col, armor = t === 'K' ? '#c2cada' : col;
+    const body = (q) => {
+      rr8(q, -7 + walk * 0.3, -10, 7, 11, 3.2); rr8(q, 1 - walk * 0.3, -10, 7, 11, 3.2);          // piernas
+      q.moveTo(-3 + walk * 0.3, 0); q.ellipse(-3.5 + walk * 0.3, -0.5, 4.6, 3, 0, 0, P8T);
+      q.moveTo(8 - walk * 0.3, 0); q.ellipse(4.5 - walk * 0.3, -0.5, 4.6, 3, 0, 0, P8T);           // botas
+      if (t === 'A') rr8(q, -13, -27, 7, 17, 3);                                                   // carcaj
+      if (t === 'M') { q.moveTo(-5, -25); q.quadraticCurveTo(-15, -12, -13, -2); q.lineTo(0, -5); q.closePath(); }
+      rr8(q, -10, -26, 20, 19, 7);                                                                 // tronco
+      mitt8(-11.5, -17, -2.7, 4.4, -1)(q); mitt8(11, -17, -0.5, 4.4, 1)(q);                        // manoplas
+      if (t === 'K') { q.moveTo(4.5, -15); q.arc(-3, -15, 7.5, 0, P8T); }                          // escudo (no articula)
+      q.moveTo(12, -34); q.arc(1, -34, 11, 0, P8T);                                                // cabeza grande
+      if (t === 'K') { q.moveTo(1, -45); q.arc(1, -36, 12, Math.PI * 1.0, Math.PI * 2.0); q.lineTo(13, -31); q.lineTo(-11, -31); q.closePath();
+        q.moveTo(-2, -46); q.quadraticCurveTo(-9, -56, -15, -47); q.quadraticCurveTo(-9, -49, -3, -44); q.closePath(); }
+      else if (t === 'A') { q.moveTo(1, -46); q.arc(1, -35, 12.4, Math.PI * 0.88, Math.PI * 2.08); q.lineTo(11, -29); q.quadraticCurveTo(0, -39, -10, -28); q.closePath();
+        q.moveTo(-10, -33); q.lineTo(-16, -26); q.lineTo(-8, -27.5); q.closePath(); }
+      else { q.moveTo(-11, -39); q.quadraticCurveTo(0, -48, 13, -39); q.lineTo(13, -36); q.lineTo(-11, -36); q.closePath();
+        q.moveTo(-6, -40); q.quadraticCurveTo(2, -53, -4, -61); q.quadraticCurveTo(7, -53, 9, -40); q.closePath(); }
+    };
+    unite8(g, [[body, armor, { dx: 2.2, dy: 2, f: 0.9 }, (q) => {
+      q.fillStyle = me ? '#2c2748' : '#3d2a1e'; q.beginPath(); rr8(q, -7 + walk * 0.3, -10, 7, 11, 3.2); rr8(q, 1 - walk * 0.3, -10, 7, 11, 3.2); q.fill();
+      q.fillStyle = DK8(me ? '#2c2748' : '#3d2a1e', 0.25); q.beginPath(); q.ellipse(-3.5 + walk * 0.3, -0.5, 4.6, 3, 0, 0, P8T); q.ellipse(4.5 - walk * 0.3, -0.5, 4.6, 3, 0, 0, P8T); q.fill();
+      q.fillStyle = col; q.beginPath(); rr8(q, -10, -26, 20, 19, 7); q.fill();
+      q.fillStyle = DK8(col, 0.24); q.fillRect(-10, -16, 20, 4);                              // cinturón
+      q.fillStyle = arm; q.beginPath(); mitt8(-11.5, -17, -2.7, 4.4, -1)(q); mitt8(11, -17, -0.5, 4.4, 1)(q); q.fill();
+      q.fillStyle = skin; q.beginPath(); q.arc(1, -34, 11, 0, P8T); q.fill();
+      if (t === 'K') { q.fillStyle = '#c2cada'; q.beginPath(); q.arc(1, -36, 12, Math.PI, P8T / 2 * 2); q.lineTo(13, -31); q.lineTo(-11, -31); q.closePath(); q.fill();
+        q.fillStyle = P8OUT; q.beginPath(); rr8(q, -1, -36.6, 12, 3.4, 1.4); q.fill();        // visera: hueco oscuro
+        q.fillStyle = col; q.beginPath(); q.moveTo(-2, -46); q.quadraticCurveTo(-9, -56, -15, -47); q.quadraticCurveTo(-9, -49, -3, -44); q.fill();
+        q.fillStyle = '#f2d15c'; q.beginPath(); q.arc(-3, -15, 3, 0, P8T); q.fill();
+        q.fillStyle = DK8(armor, 0.2); q.beginPath(); q.arc(-3, -15, 7.5, 0.6, 2.9); q.lineTo(-3, -15); q.fill(); }
+      else { q.fillStyle = col; q.beginPath();
+        if (t === 'A') { q.moveTo(1, -46); q.arc(1, -35, 12.4, Math.PI * 0.88, Math.PI * 2.08); q.lineTo(11, -29); q.quadraticCurveTo(0, -39, -10, -28); q.closePath(); q.moveTo(-10, -33); q.lineTo(-16, -26); q.lineTo(-8, -27.5); q.closePath(); }
+        else { q.moveTo(-11, -39); q.quadraticCurveTo(0, -48, 13, -39); q.lineTo(13, -36); q.lineTo(-11, -36); q.closePath(); q.moveTo(-6, -40); q.quadraticCurveTo(2, -53, -4, -61); q.quadraticCurveTo(7, -53, 9, -40); q.closePath(); }
+        q.fill();
+        if (t === 'M') { q.fillStyle = '#f2d15c'; q.fillRect(-6, -43, 14, 2.8); }
+        if (t === 'A') { q.fillStyle = '#8a5a33'; q.beginPath(); rr8(q, -13, -27, 7, 17, 3); q.fill(); }
+        eyes8(q, 2.6, -33.4, 3.4, 2.5, { lid: 0.24, ly: 0.2, lidCol: skin, iris: me ? '#2f4aa8' : '#6b2a2a' });
+        brow8(q, 2.6, -37.4, 3.4, 3.2, me ? -0.5 : 0.9, DK8(skin, 0.55), 1.1); }
+      q.fillStyle = 'rgba(255,255,255,.22)'; q.fillRect(-6, -24, 4, 10);
+      shine8(q, -4, -40, 3.4, 4.4, -0.4, 0.28);
+    }]], 1.5);
+  }, 3);
+}
 function drawUnit(u, x, y, s, alpha) {
-  const T = TYPES[u.t], me = u.team === 'me', col = me ? T.col : AICOL[u.t], skin = me ? '#ffd9b5' : '#8fd06a', f = u.face;
+  const T = TYPES[u.t], me = u.team === 'me', col = me ? T.col : AICOL[u.t], f = u.face;
   const bob = Math.sin(tt * 3 + u.ph) * 1.2, fl = u.hf > 0 ? Math.sin(u.hf * 60) * 3 : 0;
   c.save(); c.translate(x + fl, y); c.globalAlpha = alpha;
   c.fillStyle = me ? 'rgba(92,168,255,.55)' : 'rgba(255,80,80,.5)'; c.beginPath(); c.ellipse(0, 2, 16 * s, 6 * s, 0, 0, R2); c.fill(); c.strokeStyle = OUT; c.lineWidth = 1.5; c.stroke();
   c.scale(s * f, s); c.translate(0, bob);
-  const walk = u.mv ? Math.sin(tt * 22) * 3 : 0;
-  // piernas
-  [[-4, walk], [4, -walk]].forEach(([lx, w]) => { ART.rr(c, lx - 3 + w * 0.3, -9, 6, 9, 2.5); ART.fillOut(c, me ? '#2c2748' : '#3d2a1e', 2); });
-  // capa trasera / carcaj
-  if (u.t === 'A') { ART.rr(c, -12, -26, 6, 16, 2); ART.fillOut(c, '#8a5a33', 2); c.strokeStyle = '#f4efe6'; c.lineWidth = 1.5; for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(-11 + i * 2, -26); c.lineTo(-11 + i * 2, -30); c.stroke(); } }
-  if (u.t === 'M') { c.beginPath(); c.moveTo(-5, -24); c.quadraticCurveTo(-14, -12, -12, -2); c.lineTo(0, -4); c.closePath(); ART.fillOut(c, col, 2); }
-  // cuerpo
-  ART.rr(c, -9, -24, 18, 17, 6); ART.fillOut(c, u.t === 'K' ? '#b8c0d2' : col); c.fillStyle = 'rgba(255,255,255,.3)'; c.fillRect(-6, -22, 4, 11);
-  if (u.t === 'K') { c.fillStyle = col; c.fillRect(-9, -15, 18, 4); }
-  // cabeza
-  c.beginPath(); c.arc(1, -33, 9.5, 0, R2); ART.fillOut(c, skin);
-  if (!me) { c.beginPath(); c.moveTo(-6, -35); c.lineTo(-15, -40); c.lineTo(-8, -30); ART.fillOut(c, skin, 2); }
-  c.fillStyle = OUT; const bl = Math.sin(tt * 2.1 + u.ph) > 0.97 ? 0.2 : 1; c.beginPath(); c.ellipse(5, -33, 1.6, 2.4 * bl, 0, 0, R2); c.ellipse(0.5, -33, 1.4, 2.2 * bl, 0, 0, R2); c.fill();
-  if (!me) { c.strokeStyle = OUT; c.lineWidth = 1.5; c.beginPath(); c.moveTo(-1, -37); c.lineTo(3, -36); c.moveTo(4, -36.5); c.lineTo(7, -37.5); c.stroke(); }
-  // equipo por clase
+  const leg = u.mv ? (Math.floor(tt * 7) % 3) : 3;
+  blit8(c, unitSpr(u.t, me, leg), 0, 0);
   const att = u.lunge ? Math.sin(Math.min(1, u.lunge.t / 0.3) * Math.PI) : 0;
-  if (u.t === 'K') { // yelmo, escudo y espada
-    c.beginPath(); c.arc(1, -35, 10.5, Math.PI * 1.02, Math.PI * 1.98); c.lineTo(11, -31); c.lineTo(-9, -31); ART.fillOut(c, '#c7cedc', 2); c.fillStyle = OUT; c.fillRect(2, -35, 9, 2.5);
-    c.beginPath(); c.moveTo(-2, -45); c.quadraticCurveTo(-8, -54, -14, -46); c.quadraticCurveTo(-8, -48, -3, -43); ART.fillOut(c, col, 1.8);
-    c.save(); c.translate(9, -18); c.rotate(-0.6 + att * 1.9); ART.rr(c, -1.5, -24, 5, 22, 2); ART.fillOut(c, '#eef2f8', 2); ART.rr(c, -4, -3, 11, 4, 1.5); ART.fillOut(c, '#f2d15c', 1.5); c.restore();
-    c.beginPath(); c.arc(-3, -15, 7.5, 0, R2); ART.fillOut(c, col, 2); c.beginPath(); c.arc(-3, -15, 3, 0, R2); ART.fillOut(c, '#f2d15c', 1.5);
-  } else if (u.t === 'A') { // capucha y arco
-    c.beginPath(); c.arc(1, -34, 11, Math.PI * 0.9, Math.PI * 2.05); c.lineTo(10, -29); c.quadraticCurveTo(0, -38, -9, -28); c.closePath(); ART.fillOut(c, col, 2);
-    c.beginPath(); c.moveTo(-9, -32); c.lineTo(-15, -26); c.lineTo(-8, -27); ART.fillOut(c, col, 1.8);
-    c.save(); c.translate(11, -18); c.beginPath(); c.arc(0, 0, 11, -1.25, 1.25); c.lineWidth = 5; c.strokeStyle = OUT; c.stroke(); c.lineWidth = 2.6; c.strokeStyle = '#c98a4b'; c.stroke();
+  if (u.t === 'K') {                       // la espada sí gira: pieza aparte, con un único borde
+    c.save(); c.translate(12, -16); c.rotate(-0.2 + att * 1.9);
+    const sw = (q) => { rr8(q, -1.6, -25, 5.2, 23, 2.2); rr8(q, -4.4, -3.4, 11.2, 4.4, 1.8); };
+    unite8(c, [[sw, '#eef2f8', 0, (q) => { q.fillStyle = '#f2d15c'; q.beginPath(); rr8(q, -4.4, -3.4, 11.2, 4.4, 1.8); q.fill(); q.fillStyle = 'rgba(255,255,255,.5)'; q.fillRect(-0.8, -24, 1.6, 20); }]], 1.4);
+    c.restore();
+  } else if (u.t === 'A') {                // el arco es un trazo abierto, no un contorno cerrado
+    c.save(); c.translate(11, -18); c.beginPath(); c.arc(0, 0, 11, -1.25, 1.25); c.lineWidth = 4.4; c.strokeStyle = OUT; c.stroke(); c.lineWidth = 2.4; c.strokeStyle = '#c98a4b'; c.stroke();
     c.strokeStyle = '#f4efe6'; c.lineWidth = 1; c.beginPath(); c.moveTo(Math.cos(-1.25) * 11, Math.sin(-1.25) * 11); c.lineTo(-2, 0); c.lineTo(Math.cos(1.25) * 11, Math.sin(1.25) * 11); c.stroke(); c.restore();
-  } else { // sombrero picudo y bastón
-    c.beginPath(); c.moveTo(-10, -38); c.quadraticCurveTo(0, -46, 12, -38); c.lineTo(12, -36); c.lineTo(-10, -36); ART.fillOut(c, col, 2);
-    c.beginPath(); c.moveTo(-6, -39); c.quadraticCurveTo(2, -52, -4, -60); c.quadraticCurveTo(6, -52, 8, -39); ART.fillOut(c, col, 2); c.fillStyle = '#f2d15c'; c.fillRect(-5, -42, 12, 2.5);
-    c.save(); c.translate(11, -10); ART.rr(c, -1.5, -30, 4, 34, 2); ART.fillOut(c, '#8a5a33', 1.8); const gl = 0.5 + Math.sin(tt * 5 + u.ph) * 0.2; c.fillStyle = me ? `rgba(200,160,255,${gl})` : `rgba(255,120,160,${gl})`; c.beginPath(); c.arc(0.5, -33, 8, 0, R2); c.fill(); c.beginPath(); c.arc(0.5, -33, 4.5, 0, R2); ART.fillOut(c, me ? '#e6d4ff' : '#ffc0d4', 1.8); c.restore();
+  } else {                                 // bastón: una pieza; el fulgor es luz viva, no forma
+    c.save(); c.translate(11, -10);
+    const st = (q) => { rr8(q, -1.6, -30, 4.2, 34, 2); q.moveTo(5, -33); q.arc(0.5, -33, 4.5, 0, P8T); };
+    unite8(c, [[st, '#8a5a33', 0, (q) => { q.fillStyle = me ? '#e6d4ff' : '#ffc0d4'; q.beginPath(); q.arc(0.5, -33, 4.5, 0, P8T); q.fill(); }]], 1.4);
+    const gl = 0.5 + Math.sin(tt * 5 + u.ph) * 0.2; c.fillStyle = me ? `rgba(200,160,255,${gl * 0.5})` : `rgba(255,120,160,${gl * 0.5})`; c.beginPath(); c.arc(0.5, -33, 8, 0, R2); c.fill();
+    c.restore();
   }
   if (u.hf > 0.12) { c.globalAlpha = alpha * 0.6; c.fillStyle = '#fff'; c.beginPath(); c.ellipse(0, -24, 13, 22, 0, 0, R2); c.fill(); }
   c.restore();

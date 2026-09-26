@@ -44,11 +44,9 @@ function block(col, s) {
   return (SPR[key] = off(s, s, (g) => {
     const lw = Math.max(1.4, s * 0.075), r = s * 0.22, i = lw / 2, e = s * 0.16;
     ART.rr(g, i, i, s - lw, s - lw, r); g.fillStyle = ART.dark(col, 0.3); g.fill();
-    g.save(); g.clip();
-    g.fillStyle = ART.lite(col, 0.42); g.beginPath(); g.moveTo(0, 0); g.lineTo(s, 0); g.lineTo(s - e, e); g.lineTo(e, e); g.lineTo(e, s - e); g.lineTo(0, s); g.fill();
-    const gr = g.createLinearGradient(0, e, 0, s - e); gr.addColorStop(0, ART.lite(col, 0.14)); gr.addColorStop(1, ART.dark(col, 0.06));
-    g.fillStyle = gr; ART.rr(g, e, e, s - 2 * e, s - 2 * e, r * 0.5); g.fill();
-    g.fillStyle = 'rgba(255,255,255,.55)'; ART.rr(g, e + s * 0.07, e + s * 0.07, s * 0.3, s * 0.11, s * 0.055); g.fill();
+    const bp = [[(h) => ART.rr(h, i, i, s - lw, s - lw, r), col]];
+    celp(g, bp, col, s * 0.2, s * 0.2);
+    inpath(g, bp, (h) => { h.fillStyle = 'rgba(255,255,255,.5)'; ART.rr(h, e + s * 0.07, e + s * 0.07, s * 0.3, s * 0.11, s * 0.055); h.fill(); });
     g.restore();
     ART.rr(g, i, i, s - lw, s - lw, r); g.lineWidth = lw; g.strokeStyle = OUT; g.stroke();
   }));
@@ -482,30 +480,42 @@ function jamGame() {
     g.fillStyle = '#ff4b55'; g.fillRect(X + BW + 2, ey - 2, 5, 6); g.fillRect(X + BW + 2, ey + CS - 4, 5, 6);
     if (!PORT) label('SALIDA', X + BW + 16, ey - 18, 11, '#ffd166', 'left', 'top', g);
   });
+  /* Coche/camión: silueta única cacheada (R5 §8); las ruedas son piezas aparte porque ruedan. */
+  const carCv = {};
+  function carSprite(col, len, Lw, Hh, isRed) {
+    const key = col + '|' + len + '|' + Math.round(Lw) + '|' + Math.round(Hh) + '|' + (isRed ? 1 : 0);
+    let q = carCv[key]; if (q) return q;
+    const m = 5, bw2 = Lw - m * 2, bh2 = Hh - m * 2, pad = 8;
+    const wpx = Lw + pad * 2, hpx = Hh + pad * 2, d = Math.ceil(wpx * CDPR), dh = Math.ceil(hpx * CDPR);
+    q = document.createElement('canvas'); q.width = d; q.height = dh;
+    const g = q.getContext('2d'); g.scale(d / wpx, dh / hpx); g.translate(wpx / 2, hpx / 2);
+    g.fillStyle = ART.OUT; for (const fx2 of len === 3 ? [-0.36, 0, 0.36] : [-0.3, 0.3]) for (const sy of [-1, 1]) { ART.rr(g, fx2 * bw2 - 7, sy * bh2 / 2 - 4, 14, 8, 3); g.fill(); }
+    const parts = [[(h) => ART.rr(h, -bw2 / 2, -bh2 / 2, bw2, bh2, 11), col]];
+    uni(g, parts, 1.5);
+    celp(g, parts, col, bh2 * 0.24, bh2 * 0.24);
+    inpath(g, parts, (h) => {
+      if (len === 3) { const cab = bw2 * 0.3;
+        h.fillStyle = ART.lite(col, 0.18); ART.rr(h, -bw2 / 2 + cab + 3, -bh2 / 2 + 4, bw2 - cab - 7, bh2 - 8, 6); h.fill();
+        h.strokeStyle = ART.dark(col, 0.3); h.lineWidth = 1.5; for (let i = 1; i < 5; i++) { const lx = -bw2 / 2 + cab + 3 + i * (bw2 - cab - 7) / 5; h.beginPath(); h.moveTo(lx, -bh2 / 2 + 7); h.lineTo(lx, bh2 / 2 - 7); h.stroke(); }
+        h.fillStyle = '#a8e4ff'; ART.rr(h, -bw2 / 2 + 6, -bh2 / 2 + 6, cab - 8, bh2 - 12, 4); h.fill();
+      } else {
+        h.fillStyle = ART.dark(col, 0.42); ART.rr(h, -bw2 * 0.22, -bh2 / 2 + 3.5, bw2 * 0.5, bh2 - 7, 7); h.fill();
+        h.fillStyle = '#a8e4ff'; ART.rr(h, bw2 * 0.1, -bh2 / 2 + 6, bw2 * 0.16, bh2 - 12, 4); h.fill();
+        h.fillStyle = '#86c6e6'; ART.rr(h, -bw2 * 0.32, -bh2 / 2 + 6.5, bw2 * 0.13, bh2 - 13, 3); h.fill();
+      }
+      h.fillStyle = '#fff6b0'; for (const sy of [-1, 1]) { h.beginPath(); h.arc(bw2 / 2 - 4, sy * (bh2 / 2 - 7), 3, 0, R2); h.fill(); }
+      h.fillStyle = '#ff4b55'; for (const sy of [-1, 1]) { ART.rr(h, -bw2 / 2 + 1, sy * (bh2 / 2 - 7) - 3, 4, 6, 1.5); h.fill(); }
+    });
+    spec(g, -bw2 * 0.1, -bh2 / 2 + 4.5, bw2 * 0.3, 2.2, 0, 0.42);
+    if (isRed && len !== 3) { g.save(); g.translate(bw2 * 0.36, 0); g.rotate(-Math.PI / 2); g.beginPath(); for (let i = 0; i < 10; i++) { const a2 = i * Math.PI / 5, r2 = i % 2 ? 3 : 7; g.lineTo(Math.sin(a2) * r2, -Math.cos(a2) * r2); } g.closePath(); ART.fillOut(g, '#ffd166', 1.6); g.restore(); }
+    carCv[key] = q; return q;
+  }
   function drawCar(v, x, y, w, h, isRed, selK) {
     const vert = !v.h, len = v.len;
     c.save(); c.translate(x + w / 2, y + h / 2); if (vert) c.rotate(Math.PI / 2);
-    const Lw = vert ? h : w, Hh = vert ? w : h, m = 5, bw2 = Lw - m * 2, bh2 = Hh - m * 2;
-    // sombra
+    const Lw = vert ? h : w, Hh = vert ? w : h, m = 5, bw2 = Lw - m * 2, bh2 = Hh - m * 2, pad = 8;
     c.fillStyle = 'rgba(0,0,0,.3)'; ART.rr(c, -bw2 / 2 + 3, -bh2 / 2 + 5, bw2, bh2, 10); c.fill();
-    // ruedas
-    c.fillStyle = OUT; for (const fx2 of len === 3 ? [-0.36, 0, 0.36] : [-0.3, 0.3]) for (const sy of [-1, 1]) { ART.rr(c, fx2 * bw2 - 7, sy * bh2 / 2 - 4, 14, 8, 3); c.fill(); }
-    // carrocería
-    const gr = c.createLinearGradient(0, -bh2 / 2, 0, bh2 / 2); gr.addColorStop(0, ART.lite(v.col, 0.3)); gr.addColorStop(0.5, v.col); gr.addColorStop(1, ART.dark(v.col, 0.25));
-    ART.rr(c, -bw2 / 2, -bh2 / 2, bw2, bh2, 11); c.fillStyle = gr; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
-    if (len === 3) { // camión: cabina delante y caja de carga
-      const cab = bw2 * 0.3; ART.rr(c, -bw2 / 2 + cab + 3, -bh2 / 2 + 4, bw2 - cab - 7, bh2 - 8, 6); c.fillStyle = ART.lite(v.col, 0.18); c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
-      c.strokeStyle = ART.dark(v.col, 0.3); c.lineWidth = 1.5; for (let i = 1; i < 5; i++) { const lx = -bw2 / 2 + cab + 3 + i * (bw2 - cab - 7) / 5; c.beginPath(); c.moveTo(lx, -bh2 / 2 + 7); c.lineTo(lx, bh2 / 2 - 7); c.stroke(); }
-      ART.rr(c, -bw2 / 2 + 6, -bh2 / 2 + 6, cab - 8, bh2 - 12, 4); ART.fillOut(c, '#a8e4ff', 2);
-    } else { // coche: parabrisas, techo y luna trasera
-      ART.rr(c, -bw2 * 0.2, -bh2 / 2 + 5, bw2 * 0.46, bh2 - 10, 7); c.fillStyle = ART.dark(v.col, 0.12); c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
-      ART.rr(c, bw2 * 0.12, -bh2 / 2 + 6, bw2 * 0.12, bh2 - 12, 4); ART.fillOut(c, '#a8e4ff', 1.8);
-      ART.rr(c, -bw2 * 0.3, -bh2 / 2 + 7, bw2 * 0.09, bh2 - 14, 3); ART.fillOut(c, '#86c6e6', 1.6);
-      if (isRed) { c.save(); c.translate(bw2 * 0.36, 0); c.rotate(-Math.PI / 2); c.beginPath(); for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5, r = i % 2 ? 3 : 7; c.lineTo(Math.sin(a) * r, -Math.cos(a) * r); } c.closePath(); ART.fillOut(c, '#ffd166', 1.6); c.restore(); }
-    }
-    c.fillStyle = 'rgba(255,255,255,.35)'; ART.rr(c, -bw2 / 2 + 6, -bh2 / 2 + 3, bw2 - 12, 3, 1.5); c.fill();
-    // faros delante (derecha) y pilotos detrás
-    for (const sy of [-1, 1]) { c.beginPath(); c.arc(bw2 / 2 - 4, sy * (bh2 / 2 - 7), 3, 0, R2); ART.fillOut(c, '#fff6b0', 1.5); ART.rr(c, -bw2 / 2 + 1, sy * (bh2 / 2 - 7) - 3, 4, 6, 1.5); ART.fillOut(c, '#ff4b55', 1.2); }
+    c.drawImage(carSprite(v.col, len, Lw, Hh, isRed), -Lw / 2 - pad, -Hh / 2 - pad, Lw + pad * 2, Hh + pad * 2);
     c.restore();
     if (selK) { ART.rr(c, x + 2, y + 2, w - 4, h - 4, 12); c.lineWidth = 3.5; c.strokeStyle = grab ? '#7cf7a0' : '#ffd166'; c.globalAlpha = 0.65 + 0.35 * Math.sin(t * 7); c.stroke(); c.globalAlpha = 1;
       if (grab) { c.fillStyle = '#7cf7a0'; const cx = x + w / 2, cy = y + h / 2; for (const s of [-1, 1]) { c.beginPath(); if (v.h) { c.moveTo(cx + s * (w / 2 + 12), cy); c.lineTo(cx + s * (w / 2 + 3), cy - 7); c.lineTo(cx + s * (w / 2 + 3), cy + 7); } else { c.moveTo(cx, cy + s * (h / 2 + 12)); c.lineTo(cx - 7, cy + s * (h / 2 + 3)); c.lineTo(cx + 7, cy + s * (h / 2 + 3)); } c.closePath(); c.fill(); c.lineWidth = 1.5; c.strokeStyle = OUT; c.stroke(); } } }

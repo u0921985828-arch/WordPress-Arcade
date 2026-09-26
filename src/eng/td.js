@@ -219,11 +219,23 @@ function bake() {
   }
   // entrada (cueva) y salida (castillo)
   const [sx, sy] = center(START), [ex, ey] = center(GOAL), s = SC;
-  g.save(); g.translate(sx - (PORT ? 0 : CELL * 0.35), sy - (PORT ? CELL * 0.1 : 0)); g.scale(s, s); g.beginPath(); g.moveTo(-20, 18); g.lineTo(-20, -6); g.quadraticCurveTo(-18, -26, 2, -24); g.quadraticCurveTo(16, -20, 14, 18); g.closePath(); ART.fillOut(g, '#77748f', 2.5); g.beginPath(); g.moveTo(-10, 18); g.lineTo(-10, 0); g.quadraticCurveTo(-8, -12, 1, -12); g.quadraticCurveTo(9, -10, 8, 18); g.closePath(); ART.fillOut(g, '#1a1530', 2); g.restore();
+    /* §8: la cueva es UNA roca; la boca es oscuridad (cambio de color), no otra forma con su contorno */
+  g.save(); g.translate(sx - (PORT ? 0 : CELL * 0.35), sy - (PORT ? CELL * 0.1 : 0)); g.scale(s, s);
+  const rock = (q) => { q.moveTo(-20, 18); q.lineTo(-20, -6); q.quadraticCurveTo(-18, -26, 2, -24); q.quadraticCurveTo(16, -20, 14, 18); q.closePath(); };
+  const mouth = (q) => { q.moveTo(-10, 18); q.lineTo(-10, 0); q.quadraticCurveTo(-8, -12, 1, -12); q.quadraticCurveTo(9, -10, 8, 18); q.closePath(); };
+  unite8(g, [[rock, '#77748f', { dx: 2.4, dy: 2.2 }, (q) => { q.fillStyle = '#17122a'; q.beginPath(); mouth(q); q.fill();
+    q.fillStyle = DK8('#77748f', 0.3); q.beginPath(); q.moveTo(-12, 18); q.lineTo(-12, -1); q.quadraticCurveTo(-9, -14, 1, -14); q.quadraticCurveTo(-6, -10, -7.6, 2); q.lineTo(-7.6, 18); q.closePath(); q.fill(); }]], 1.5);
+  g.restore();
   g.save(); g.translate(ex + (PORT ? 0 : CELL * 0.1), ey + 4 * s); g.scale(s, s);
   g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.ellipse(0, 16, 22, 6, 0, 0, R2); g.fill();
-  ART.rr(g, -16, -14, 32, 30, 3); ART.fillOut(g, '#c9c2dc', 2.5); for (let i = 0; i < 4; i++) { g.beginPath(); g.rect(-16 + i * 9, -20, 6, 7); ART.fillOut(g, '#c9c2dc', 2); }
-  g.beginPath(); g.moveTo(-6, 16); g.lineTo(-6, 4); g.arc(0, 4, 6, Math.PI, 0); g.lineTo(6, 16); ART.fillOut(g, '#6b4329', 2); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(-13, -11, 4, 18); g.restore();
+  /* §8: torre + almenas = un solo trazado; la puerta se lee por color, no por contorno */
+  const cas = (q) => { rr8(q, -16, -14, 32, 30, 3); for (let i = 0; i < 4; i++) rr8(q, -16 + i * 9, -20, 6, 8, 1); };
+  unite8(g, [[cas, '#c9c2dc', { dx: 2.2, dy: 2 }, (q) => {
+    q.fillStyle = '#6b4329'; q.beginPath(); q.moveTo(-6, 16); q.lineTo(-6, 4); q.arc(0, 4, 6, Math.PI, 0); q.lineTo(6, 16); q.closePath(); q.fill();
+    q.fillStyle = DK8('#6b4329', 0.3); q.beginPath(); q.moveTo(-6, 16); q.lineTo(-6, 4); q.arc(0, 4, 6, Math.PI, Math.PI * 1.5); q.lineTo(-1.5, 16); q.closePath(); q.fill();
+    q.fillStyle = DK8('#c9c2dc', 0.14); q.fillRect(-17, -13.4, 34, 1.6);
+    shine8(q, -11, -6, 3, 8, 0, 0.3); }]], 1.5);
+  g.restore();
   // barra superior y panel lateral
   gr = g.createLinearGradient(0, 0, 0, OY); gr.addColorStop(0, '#3a2b22'); gr.addColorStop(1, '#2a1f19'); g.fillStyle = gr; g.fillRect(0, 0, W, OY); g.fillStyle = OUT; g.fillRect(0, OY - 3, W, 3);
   if (PORT) { gr = g.createLinearGradient(0, BB, 0, H); gr.addColorStop(0, '#3e2f25'); gr.addColorStop(1, '#2d221b'); g.fillStyle = gr; g.fillRect(0, BB, W, H - BB); g.fillStyle = OUT; g.fillRect(0, BB, W, 3);
@@ -368,36 +380,65 @@ function label(s, x, y, size, col, align) {
   c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
 }
 function coinIcon(x, y, r) { c.beginPath(); c.arc(x, y, r, 0, R2); ART.fillOut(c, '#ffc928', 1.8); c.beginPath(); c.arc(x, y, r * 0.55, 0, R2); c.strokeStyle = '#e39b00'; c.lineWidth = 1.5; c.stroke(); c.fillStyle = '#fff6c2'; c.fillRect(x - r * 0.45, y - r * 0.5, r * 0.25, r * 0.55); }
-/* torre: base + torreta orientada. Se dibuja a escala 40 px y se reduce con s */
+/* §8: la torre son DOS piezas y solo dos, porque solo la torreta gira de verdad. Base (plataforma,
+ * bandas de nivel y remate) en un trazado; torreta (cubo, caña y bocacha) en otro. Dentro de cada
+ * una no queda ningún contorno cerrado: los planos se leen por sombra propia y cambio de color.
+ * Ambas se hornean en sprites cacheados por (tipo, nivel), así el coste por frame baja. */
+function towerBaseSpr(t, lv) {
+  const T = TOWERS[t], baseCol = T.kind === 'ice' ? '#a9c9e6' : T.kind === 'arrow' ? '#b48a5e' : T.kind === 'zap' ? '#7d7690' : '#9a98ad';
+  return spr8(`tb${t}${lv}${HEX ? 'h' : ''}`, 44, 44, 22, 26, (g) => {
+    const base = (q) => { if (HEX) { for (let i = 0; i < 6; i++) q.lineTo(Math.cos(i * 1.0472) * 17, 4 + Math.sin(i * 1.0472) * 17); q.closePath(); } else rr8(q, -16, -12, 32, 26, 6); };
+    unite8(g, [[base, baseCol, { dx: 2, dy: 1.8, f: 0.9 }, (q) => {
+      q.fillStyle = LT8(baseCol, 0.24);                                        // cara alta: cambio de color, no línea
+      q.beginPath(); if (HEX) { for (let i = 0; i < 6; i++) q.lineTo(Math.cos(i * 1.0472) * 15, Math.sin(i * 1.0472) * 15); q.closePath(); } else rr8(q, -16, -12, 32, 17, 6); q.fill();
+      q.fillStyle = DK8(baseCol, 0.2); q.fillRect(-17, 3, 34, 2.2);            // junta: sombra propia
+      if (!HEX) { q.fillStyle = DK8(baseCol, 0.12); q.fillRect(-8.6, -12, 1.4, 25); q.fillRect(5.4, -12, 1.4, 25); }
+      for (let i = 0; i < lv; i++) { q.fillStyle = '#ffd23d'; q.beginPath(); q.arc(-8 + i * 8, 10, 2.6, 0, P8T); q.fill(); }
+      shine8(q, -7, -7, 6, 3, -0.3, 0.26);
+    }]], 1.5);
+  }, 3);
+}
+function turretSpr(t, lv) {
+  const T = TOWERS[t];
+  return spr8(`tu${t}${lv}`, 60, 44, 22, 22, (g) => {
+    if (T.kind === 'arrow') {
+      const body = (q) => { q.moveTo(10, 0); q.arc(0, 0, 10, 0, P8T); rr8(q, -6, -3, 20, 6, 2.6); };
+      unite8(g, [[body, '#8a5a33', { dx: 1.8, dy: 1.6 }, (q) => { q.fillStyle = '#c98a4b'; q.beginPath(); rr8(q, -5, -3, 19, 6, 2.6); q.fill(); shine8(q, -3, -4, 5, 1.6, 0, 0.3); }]], 1.5);
+      g.beginPath(); g.moveTo(9, -13 - lv); g.quadraticCurveTo(16, 0, 9, 13 + lv); g.lineWidth = 4.2; g.strokeStyle = P8OUT; g.stroke(); g.lineWidth = 2.4; g.strokeStyle = lv > 2 ? '#ffd23d' : '#e8d3a8'; g.stroke();
+    } else if (T.kind === 'cannon') {
+      const body = (q) => { q.moveTo(11, 0); q.arc(0, 0, 11, 0, P8T); rr8(q, -4, -5 - lv * 0.5, 22 + lv, 10 + lv, 3.4); rr8(q, 16 + lv, -6 - lv * 0.5, 5, 12 + lv, 2); };
+      unite8(g, [[body, '#4a4e60', { dx: 2, dy: 1.8 }, (q) => {
+        q.fillStyle = '#3a3d4d'; q.beginPath(); rr8(q, -3, -5 - lv * 0.5, 21 + lv, 10 + lv, 3.4); q.fill();
+        if (lv > 2) { q.fillStyle = '#ffd23d'; q.beginPath(); rr8(q, 16 + lv, -6 - lv * 0.5, 5, 12 + lv, 2); q.fill(); }
+        q.fillStyle = 'rgba(255,255,255,.22)'; q.fillRect(0, -4, 14, 2);
+        q.fillStyle = LT8('#4a4e60', 0.24); q.beginPath(); q.arc(0, 0, 5.4, 0, P8T); q.fill();
+      }]], 1.5);
+    } else if (T.kind === 'ice') {
+      const cr = (q, dx, h, w) => { q.moveTo(dx, 4); q.lineTo(dx - w, -h * 0.55); q.lineTo(dx, -h); q.lineTo(dx + w, -h * 0.55); q.closePath(); };
+      const body = (q) => { cr(q, -7, 14, 4); cr(q, 7, 13, 4); cr(q, 0, 20 + lv * 2, 6); };
+      unite8(g, [[body, '#9fe3ff', { dx: 2, dy: 2.4 }, (q) => {
+        q.fillStyle = '#dff8ff'; q.beginPath(); cr(q, 0, 20 + lv * 2, 6); q.fill();
+        q.fillStyle = 'rgba(255,255,255,.75)'; q.fillRect(-1.5, -14 - lv * 2, 2, 9);
+      }]], 1.5);
+    } else {
+      const body = (q) => { rr8(q, -7, -14, 14, 18, 4); q.moveTo(5.5 + lv * 0.7, -20); q.arc(0, -20, 5.5 + lv * 0.7, 0, P8T); };
+      unite8(g, [[body, '#6d7390', { dx: 1.8, dy: 1.8 }, (q) => {
+        q.fillStyle = '#fff3a0'; q.beginPath(); q.arc(0, -20, 5.5 + lv * 0.7, 0, P8T); q.fill();
+        q.strokeStyle = '#d98b3a'; q.lineWidth = 2; q.lineCap = 'round';
+        for (let i = 0; i < 3; i++) { q.beginPath(); q.moveTo(-6, -10 + i * 5); q.lineTo(6, -8 + i * 5); q.stroke(); }
+      }]], 1.5);
+    }
+  }, 3);
+}
 function drawTower(x, y, t, lv, a, rec, s, ghost) {
   const T = TOWERS[t]; c.save(); c.translate(x, y); c.scale(s, s); if (ghost) c.globalAlpha = 0.55;
-  c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(0, 12, 17, 6, 0, 0, R2); c.fill();
-  // base de piedra (hexagonal en el mapa hex)
-  const baseCol = T.kind === 'ice' ? '#a9c9e6' : T.kind === 'arrow' ? '#b48a5e' : T.kind === 'zap' ? '#7d7690' : '#9a98ad';
-  if (HEX) { hexPath(c, 0, 4, 17); ART.fillOut(c, baseCol, 2.5); hexPath(c, 0, 0, 15); c.fillStyle = 'rgba(255,255,255,.22)'; c.fill(); }
-  else { ART.rr(c, -16, -12, 32, 26, 6); ART.fillOut(c, baseCol, 2.5); ART.rr(c, -16, -12, 32, 18, 6); c.fillStyle = 'rgba(255,255,255,.22)'; c.fill(); c.strokeStyle = 'rgba(26,21,48,.3)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(-8, -12); c.lineTo(-8, 13); c.moveTo(6, -12); c.lineTo(6, 13); c.moveTo(-16, 3); c.lineTo(16, 3); c.stroke(); }
-  // bandas de nivel
-  for (let i = 0; i < lv; i++) { c.beginPath(); c.arc(-8 + i * 8, 10, 2.6, 0, R2); ART.fillOut(c, '#ffd23d', 1.4); }
+  drop8(c, 0, 12, 17, 6, 0.25);
+  blit8(c, towerBaseSpr(t, lv), 0, 0);
   c.translate(0, -6); const bob = rec * 3;
-  if (T.kind === 'arrow') { // ballesta de madera
-    c.beginPath(); c.arc(0, 0, 10, 0, R2); ART.fillOut(c, '#8a5a33', 2); c.rotate(a); c.translate(-bob, 0);
-    ART.rr(c, -6, -3, 20, 6, 2); ART.fillOut(c, '#c98a4b', 2);
-    c.beginPath(); c.moveTo(9, -13 - lv); c.quadraticCurveTo(16, 0, 9, 13 + lv); c.lineWidth = 5; c.strokeStyle = OUT; c.stroke(); c.lineWidth = 2.5; c.strokeStyle = lv > 2 ? '#ffd23d' : '#e8d3a8'; c.stroke();
-    c.strokeStyle = '#f4efe6'; c.lineWidth = 1; c.beginPath(); c.moveTo(9, -13 - lv); c.lineTo(2 - rec * 4, 0); c.lineTo(9, 13 + lv); c.stroke();
-    if (rec < 0.5) { c.fillStyle = '#f4efe6'; c.fillRect(0, -1, 18, 2); c.fillStyle = '#ff5f7a'; c.fillRect(-1, -2, 4, 4); }
-  } else if (T.kind === 'cannon') {
-    c.beginPath(); c.arc(0, 0, 11, 0, R2); ART.fillOut(c, '#5d6275', 2.2); c.rotate(a); c.translate(-bob * 1.6, 0);
-    ART.rr(c, -4, -5 - lv * 0.5, 22 + lv, 10 + lv, 3); ART.fillOut(c, '#3a3d4d', 2.2); ART.rr(c, 16 + lv, -6 - lv * 0.5, 5, 12 + lv, 2); ART.fillOut(c, lv > 2 ? '#ffd23d' : '#5d6275', 2);
-    c.fillStyle = 'rgba(255,255,255,.25)'; c.fillRect(0, -4, 14, 2); c.rotate(-a); c.beginPath(); c.arc(0, 0, 5, 0, R2); ART.fillOut(c, '#8a93a6', 1.6);
-  } else if (T.kind === 'ice') { // cristales que laten
-    const pl = 1 + Math.sin(tt * 4 + x) * 0.06 + rec * 0.15; c.scale(pl, pl);
-    const cr = (dx, h, w, col) => { c.beginPath(); c.moveTo(dx, 4); c.lineTo(dx - w, -h * 0.55); c.lineTo(dx, -h); c.lineTo(dx + w, -h * 0.55); c.closePath(); ART.fillOut(c, col, 2); };
-    cr(-7, 14, 4, '#9fe3ff'); cr(7, 13, 4, '#9fe3ff'); cr(0, 20 + lv * 2, 6, '#dff8ff'); c.fillStyle = 'rgba(255,255,255,.7)'; c.fillRect(-1.5, -14 - lv * 2, 2, 9);
-  } else { // bobina de rayos
-    ART.rr(c, -7, -14, 14, 18, 3); ART.fillOut(c, '#6d7390', 2); c.strokeStyle = '#d98b3a'; c.lineWidth = 2.2; for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(-7, -10 + i * 5); c.lineTo(7, -8 + i * 5); c.stroke(); }
-    const gl = 0.5 + Math.sin(tt * 9 + x) * 0.25 + rec * 0.5; c.fillStyle = `rgba(255,236,120,${gl * 0.45})`; c.beginPath(); c.arc(0, -20, 10 + lv, 0, R2); c.fill();
-    c.beginPath(); c.arc(0, -20, 5.5 + lv * 0.7, 0, R2); ART.fillOut(c, '#fff3a0', 2);
-  }
+  if (T.kind === 'arrow' || T.kind === 'cannon') { c.rotate(a); c.translate(-bob * (T.kind === 'cannon' ? 1.6 : 1), 0); }
+  else if (T.kind === 'ice') { const pl = 1 + Math.sin(tt * 4 + x) * 0.06 + rec * 0.15; c.scale(pl, pl); }
+  else { const gl = 0.5 + Math.sin(tt * 9 + x) * 0.25 + rec * 0.5; c.fillStyle = `rgba(255,236,120,${gl * 0.45})`; c.beginPath(); c.arc(0, -20, 10 + lv, 0, R2); c.fill(); }
+  blit8(c, turretSpr(t, lv), 0, 0);
   c.restore();
 }
 function drawFoe(f) {

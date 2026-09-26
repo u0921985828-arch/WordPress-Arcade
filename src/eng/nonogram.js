@@ -72,10 +72,10 @@ function cellSprite(col) {
   const key = col + '|' + Math.round(S); let q = cellCv[key]; if (q) return q;
   const d = Math.ceil(S * CDPR); q = document.createElement('canvas'); q.width = q.height = d;
   const g = q.getContext('2d'); g.scale(d / S, d / S);
-  const body = (h) => ART.rr(h, 1.5, 1.5, S - 3, S - 3, S * 0.14), parts = [[body, col]];
+  const body = (h) => ART.rr(h, 1, 1, S - 2, S - 2, S * 0.1), parts = [[body, col]];
   uni(g, parts, 1.1);
-  celp(g, parts, col, S * 0.16, S * 0.16);
-  spec(g, S * 0.3, S * 0.26, S * 0.15, S * 0.07, -0.5, 0.42);
+  celp(g, parts, col, S * 0.12, S * 0.12);
+  if (S >= 26) spec(g, S * 0.32, S * 0.24, S * 0.14, S * 0.06, -0.5, 0.34);
   cellCv[key] = q; return q;
 }
 function cross(x, y, s, col, lw) { c.strokeStyle = col; c.lineWidth = lw; c.lineCap = 'round'; c.beginPath(); c.moveTo(x - s, y - s); c.lineTo(x + s, y + s); c.moveTo(x + s, y - s); c.lineTo(x - s, y + s); c.stroke(); }

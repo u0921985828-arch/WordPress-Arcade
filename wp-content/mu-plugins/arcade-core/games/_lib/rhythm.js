@@ -158,12 +158,12 @@ const BG = off(360, 640, (g) => {
   for (let i = 0; i < LANES; i++) { ART.rr(g, i * LW + 8, 590, LW - 16, 40, 12); g.fillStyle = '#1e1745'; g.fill(); g.lineWidth = 2.5; g.strokeStyle = OUT; g.stroke();
     g.fillStyle = COLS[i]; g.globalAlpha = 0.25; ART.rr(g, i * LW + 12, 594, LW - 24, 8, 4); g.fill(); g.globalAlpha = 1; }
 });
+/* §8: cápsula y punto central son UNA pieza — el punto se lee por cambio de color, sin contorno propio */
 const noteSpr = (col) => off(LW, 44, (g) => {
   const rg = g.createRadialGradient(LW / 2, 22, 4, LW / 2, 22, 44); rg.addColorStop(0, col); rg.addColorStop(1, 'rgba(0,0,0,0)'); g.globalAlpha = 0.45; g.fillStyle = rg; g.fillRect(0, 0, LW, 44); g.globalAlpha = 1;
-  ART.rr(g, 9, 9, LW - 18, 26, 13); const lg = g.createLinearGradient(0, 9, 0, 35); lg.addColorStop(0, '#fff'); lg.addColorStop(0.18, col); lg.addColorStop(1, col); g.fillStyle = lg; g.fill(); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke();
-  g.fillStyle = 'rgba(0,0,0,.18)'; ART.rr(g, 13, 25, LW - 26, 7, 3.5); g.fill();
-  g.fillStyle = 'rgba(255,255,255,.75)'; ART.rr(g, 18, 13, LW - 44, 5, 2.5); g.fill();
-  g.beginPath(); g.arc(LW / 2, 22, 5, 0, R2); g.fillStyle = '#fff'; g.fill(); g.lineWidth = 2; g.strokeStyle = OUT; g.stroke();
+  const cap = (q) => rr8(q, 9, 9, LW - 18, 26, 13), dot = (q) => { q.moveTo(LW / 2 + 5, 22); q.arc(LW / 2, 22, 5, 0, R2); };
+  unite8(g, [[cap, col, { dx: 0, dy: 2.6 }], [dot, DK8(col, 0.42)]], 1.5);
+  g.fillStyle = 'rgba(255,255,255,.62)'; ART.rr(g, 18, 12.5, LW - 44, 4, 2); g.fill();
 });
 const SPR = COLS.map(noteSpr), GREY = noteSpr('#5a5670');
 const GLOW = COLS.map((col) => off(LW, 300, (g) => { const lg = g.createLinearGradient(0, 300, 0, 0); lg.addColorStop(0, col); lg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = lg; g.fillRect(4, 0, LW - 8, 300); }));
@@ -363,19 +363,29 @@ function drumsGame() {
     c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = base || 'top';
     c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
   }
+  /* §8: el tambor (casco + aro + parche) es UNA silueta; dentro solo hay cambio de color. Horneado. */
+  const drumSpr = (col, lit) => spr8(`dh_${col}_${lit ? 1 : 0}`, 60, 48, 30, 26, (g) => {
+    const lo = (q) => { q.moveTo(23, 6); q.ellipse(0, 6, 23, 12, 0, 0, P8T); }, up = (q) => { q.moveTo(23, 0); q.ellipse(0, 0, 23, 12, 0, 0, P8T); },
+      pa = (q) => { q.moveTo(17, -1); q.ellipse(0, -1, 17, 8, 0, 0, P8T); };
+    unite8(g, [[lo, DK8(col, 0.38)], [up, col, { dx: 2.2, dy: 1.2 }], [pa, lit ? '#ffffff' : '#f4ecd8']], 1.45);
+    shine8(g, -7.5, -3.2, 5, 2.3, -0.4, 0.3);
+  }, 3);
   function drumHead(x, y, col, fl, key) {
     const s = 1 + fl * 0.12;
-    c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(x, y + 16, 24, 7, 0, 0, R2); c.fill();
-    c.beginPath(); c.ellipse(x, y + 6, 23 * s, 12 * s, 0, 0, R2); ART.fillOut(c, ART.dark(col, 0.35), 2.5);
-    c.beginPath(); c.ellipse(x, y, 23 * s, 12 * s, 0, 0, R2); ART.fillOut(c, col, 2.5);
-    c.beginPath(); c.ellipse(x, y - 1, 17 * s, 8 * s, 0, 0, R2); c.fillStyle = fl ? '#fff' : '#f4ecd8'; c.fill(); c.lineWidth = 1.5; c.strokeStyle = OUT; c.stroke();
+    drop8(c, x, y + 16, 24, 7, 0.3);
+    blit8(c, drumSpr(col, fl > 0), x, y, s);
     label(key, x, y - 1, 12, fl ? col : '#6d6590', 'center', 'middle');
   }
-  function noteDot(x, y, col, r) {
-    c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.arc(x + 1.5, y + 3, r, 0, R2); c.fill();
-    c.beginPath(); c.arc(x, y, r, 0, R2); ART.fillOut(c, col, 2.5);
-    c.fillStyle = 'rgba(255,255,255,.55)'; c.beginPath(); c.ellipse(x - r * 0.3, y - r * 0.38, r * 0.42, r * 0.24, -0.4, 0, R2); c.fill();
-  }
+  const dotSpr = (col, r) => spr8(`nd_${col}_${r}`, r * 2 + 8, r * 2 + 8, r + 4, r + 4, (g) => {
+    unite8(g, [[(q) => { q.moveTo(r, 0); q.arc(0, 0, r, 0, P8T); }, col, { dx: 1.8, dy: 1.6 }]], 1.45);
+    shine8(g, -r * 0.3, -r * 0.38, r * 0.42, r * 0.24, -0.4, 0.5);
+  }, 3);
+  function noteDot(x, y, col, r) { drop8(c, x + 1.5, y + 3, r * 0.96, r * 0.8, 0.22); blit8(c, dotSpr(col, r), x, y); }
+  /* nota doble A+B: barra y los dos puntos, una sola pieza */
+  const abSpr = () => spr8('ab_dr', 96, 34, 20, 17, (g) => {
+    const bar = (q) => rr8(q, -16, -10, 88, 20, 10), da = (q) => { q.moveTo(11, 0); q.arc(0, 0, 11, 0, P8T); }, db = (q) => { q.moveTo(67, 0); q.arc(56, 0, 11, 0, P8T); };
+    unite8(g, [[bar, CD, { dx: 0, dy: 2 }], [da, CA], [db, CB]], 1.45);
+  }, 3);
   function draw() {
     kicks();
     c.drawImage(BG, 0, 0, W, H);
@@ -393,7 +403,7 @@ function drumsGame() {
           if (y1 > TOP + 10 && y1 < HITY + 10) label('REDOBLE', xm, Math.min(y1, HITY) - 10, 14, '#fff', 'center', 'middle'); continue; }
         const st = n.st[q.p]; if (st === 'hit') continue; const y = Y(n.time); if (y < TOP - 20 || y > H) continue;
         if (st === 'miss') c.globalAlpha = 0.35;
-        if (n.kind === 'ab') { ART.rr(c, xa - 16, y - 10, xb - xa + 32, 20, 10); ART.fillOut(c, CD, 2.5); noteDot(xa, y, CA, 11); noteDot(xb, y, CB, 11); }
+        if (n.kind === 'ab') blit8(c, abSpr(), xa, y);
         else noteDot(n.kind === 'a' ? xa : xb, y, n.kind === 'a' ? CA : CB, 14);
         c.globalAlpha = 1;
       }
@@ -534,12 +544,13 @@ function danceGame() {
   }
   /* ---------- arte ---------- */
   function off(w, h, draw) { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const g = cv.getContext('2d'); g.scale(2, 2); g.lineJoin = 'round'; draw(g); return cv; }
-  function arrowPath(g, r) { g.beginPath(); g.moveTo(0, -r); g.lineTo(r, 0); g.lineTo(r * 0.42, 0); g.lineTo(r * 0.42, r * 0.9); g.lineTo(-r * 0.42, r * 0.9); g.lineTo(-r * 0.42, 0); g.lineTo(-r, 0); g.closePath(); }
+  /* §8: la flecha es una sola forma continua; el relieve es cel de 3 planos con borde duro, sin degradado */
+  const arrow = (r) => (g) => { g.moveTo(0, -r); g.lineTo(r, 0); g.lineTo(r * 0.42, 0); g.lineTo(r * 0.42, r * 0.9); g.lineTo(-r * 0.42, r * 0.9); g.lineTo(-r * 0.42, 0); g.lineTo(-r, 0); g.closePath(); };
+  function arrowPath(g, r) { g.beginPath(); arrow(r)(g); }
   const SZ = 48, AR = 17;
   const SPR = DIRS.map((_, d) => [0, 1].map((kind) => off(SZ, SZ, (g) => {
     g.translate(SZ / 2, SZ / 2); g.rotate(ROT[d]); g.translate(0, -2);
-    if (kind === 0) { arrowPath(g, AR); const gr = g.createLinearGradient(-AR, -AR, AR, AR); gr.addColorStop(0, ART.lite(DCOL[d], 0.35)); gr.addColorStop(1, ART.dark(DCOL[d], 0.2)); g.fillStyle = gr; g.fill(); g.lineWidth = 3; g.strokeStyle = OUT; g.stroke();
-      g.save(); arrowPath(g, AR * 0.55); g.fillStyle = 'rgba(255,255,255,.35)'; g.fill(); g.restore(); }
+    if (kind === 0) { unite8(g, [[arrow(AR), DCOL[d], { dx: 2.4, dy: 2.4 }]], 1.5); shine8(g, -AR * 0.1, -AR * 0.42, AR * 0.3, AR * 0.14, 0.5, 0.3); }
     else { arrowPath(g, AR); g.fillStyle = 'rgba(20,12,44,.75)'; g.fill(); g.lineWidth = 3; g.strokeStyle = 'rgba(210,200,255,.55)'; g.stroke(); }
   })));
   let BG = null, bgN = 0;

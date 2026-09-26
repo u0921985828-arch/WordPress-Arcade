@@ -212,17 +212,35 @@ function bake() {
   // panel derecho
   ART.rr(g, 212, MY - 5, W - 226, N * MS + 10, 10); ART.fillOut(g, '#1b3350', 2.5);
 }
-/* barco visto desde arriba; cs = tamaño de casilla */
+/* §8: el barco es UNA pieza. Casco, cubierta, superestructura y torretas van en el mismo trazado
+ * (nada de eso articula), se contornea una vez y se rellena una vez; la cubierta y la torre se leen
+ * por cambio de color y sombra propia, nunca por contorno. Cacheado por (eslora, casilla, estado). */
+function shipSpr(len, cs, sunkS) {
+  return spr8(`sh${len}_${cs}_${sunkS ? 1 : 0}`, len * cs + 8, cs + 8, 4, 4, (g) => {
+    const L = len * cs, w = cs * 0.72, y0 = (cs - w) / 2, pad = cs * 0.1;
+    const hull = sunkS ? '#4a4458' : '#9aa3b5', deck = sunkS ? '#5d5670' : '#c7cedc', up = sunkS ? '#3a3448' : '#7b8497';
+    const bx = pad + (len - 1) * cs * 0.4;
+    const body = (q) => {
+      q.moveTo(pad, y0 + 3); q.lineTo(L - cs * 0.55, y0);
+      q.quadraticCurveTo(L - pad * 0.5, cs / 2, L - cs * 0.55, y0 + w);
+      q.lineTo(pad, y0 + w - 3); q.quadraticCurveTo(pad - 3, cs / 2, pad, y0 + 3); q.closePath();
+      rr8(q, bx, y0 + w * 0.26, cs * 0.55, w * 0.48, w * 0.16);                       // puente, fundido al casco
+      for (let i = 0; i < len - 2; i++) { const tx = pad + cs * 0.5 + i * cs * (len > 3 ? 1.05 : 0.9) + (i >= 1 ? cs * 0.6 : 0); if (tx > L - cs * 0.6) break; q.moveTo(tx + w * 0.2, cs / 2); q.arc(tx, cs / 2, w * 0.2, 0, P8T); }
+    };
+    unite8(g, [[body, hull, { dx: 1.4, dy: 1.2, f: 0.8 }, (q) => {
+      q.fillStyle = deck; q.beginPath(); rr8(q, pad + 3, y0 + w * 0.22, L - cs * 0.9, w * 0.56, w * 0.2); q.fill();
+      q.fillStyle = up; q.beginPath(); rr8(q, bx, y0 + w * 0.26, cs * 0.55, w * 0.48, w * 0.16); q.fill();
+      q.fillStyle = DK8(up, 0.22); q.fillRect(bx, y0 + w * 0.62, cs * 0.55, w * 0.12);
+      for (let i = 0; i < len - 2; i++) { const tx = pad + cs * 0.5 + i * cs * (len > 3 ? 1.05 : 0.9) + (i >= 1 ? cs * 0.6 : 0); if (tx > L - cs * 0.6) break;
+        q.fillStyle = sunkS ? '#3a3448' : '#5d6275'; q.beginPath(); q.arc(tx, cs / 2, w * 0.2, 0, P8T); q.fill();
+        q.fillStyle = AL8(P8OUT, 0.8); q.fillRect(tx, cs / 2 - w * 0.05, w * 0.32, w * 0.1); }
+      if (!sunkS && cs > 20) shine8(q, pad + cs * 0.4, y0 + w * 0.3, cs * 0.22, w * 0.12, 0, 0.26);
+    }]], cs > 20 ? 1.5 : 1.1);
+  }, cs > 20 ? 2 : 3);
+}
 function ship(sh, ox, oy, cs, st) {
-  const L = sh.len * cs; c.save(); c.translate(ox + sh.x * cs, oy + sh.y * cs); if (!sh.h) { c.translate(cs, 0); c.rotate(Math.PI / 2); }
-  const w = cs * 0.72, y0 = (cs - w) / 2, pad = cs * 0.1, hull = st === 'sunk' ? '#4a4458' : '#9aa3b5', deck = st === 'sunk' ? '#5d5670' : '#c7cedc';
-  if (st !== 'sunk') { c.fillStyle = 'rgba(255,255,255,.25)'; c.beginPath(); c.ellipse(pad, cs / 2, cs * 0.25, w * 0.55, 0, 0, R2); c.fill(); }
-  c.beginPath(); c.moveTo(pad, y0 + 3); c.lineTo(L - cs * 0.55, y0); c.quadraticCurveTo(L - pad * 0.5, cs / 2, L - cs * 0.55, y0 + w); c.lineTo(pad, y0 + w - 3); c.quadraticCurveTo(pad - 3, cs / 2, pad, y0 + 3); c.closePath(); ART.fillOut(c, hull, cs > 20 ? 2.2 : 1.6);
-  ART.rr(c, pad + 3, y0 + w * 0.22, L - cs * 0.9, w * 0.56, w * 0.2); c.fillStyle = deck; c.fill();
-  // superestructura y torretas
-  const bx = pad + (sh.len - 1) * cs * 0.4; ART.rr(c, bx, y0 + w * 0.28, cs * 0.55, w * 0.44, 2); ART.fillOut(c, st === 'sunk' ? '#3a3448' : '#7b8497', 1.2);
-  for (let i = 0; i < sh.len - 2; i++) { const tx = pad + cs * 0.5 + i * cs * (sh.len > 3 ? 1.05 : 0.9) + (i >= 1 ? cs * 0.6 : 0); if (tx > L - cs * 0.6) break; c.beginPath(); c.arc(tx, cs / 2, w * 0.2, 0, R2); ART.fillOut(c, st === 'sunk' ? '#3a3448' : '#5d6275', 1.2); c.fillStyle = OUT; c.fillRect(tx, cs / 2 - 1, w * 0.32, 2); }
-  c.restore();
+  c.save(); c.translate(ox + sh.x * cs, oy + sh.y * cs); if (!sh.h) { c.translate(cs, 0); c.rotate(Math.PI / 2); }
+  blit8(c, shipSpr(sh.len, cs, st === 'sunk'), 0, 0); c.restore();
 }
 function fire(x, y, s) { const f = Math.sin(tt * 18 + x * 3 + y) * 0.15 + 1; c.fillStyle = 'rgba(40,30,40,.35)'; c.beginPath(); c.arc(x + 2 * s, y - 7 * s - (tt * 10 + x) % 6 * s, 4 * s, 0, R2); c.fill();
   c.beginPath(); c.moveTo(x - 5 * s, y + 4 * s); c.quadraticCurveTo(x - 6 * s, y - 4 * s, x, y - 10 * s * f); c.quadraticCurveTo(x + 6 * s, y - 4 * s, x + 5 * s, y + 4 * s); c.closePath(); ART.fillOut(c, '#ff7a2d', 1.5); c.beginPath(); c.moveTo(x - 2.5 * s, y + 3 * s); c.quadraticCurveTo(x, y - 5 * s * f, x + 2.5 * s, y + 3 * s); c.fillStyle = '#ffe07a'; c.fill(); }

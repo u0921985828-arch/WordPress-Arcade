@@ -150,7 +150,7 @@ const PZ = (() => {
     /* sprite de personaje/objeto: ×3 lógico para que la línea fina no se rompa. (0,0) = ancla */
     spr(key, w, h, ax, ay, fn) {
       let q = CH[key]; if (q) return q;
-      if (++NCH > 400) { for (const kk in CH) delete CH[kk]; NCH = 1; }   /* tope de memoria del caché */
+      if (++NCH > 600) { for (const kk in CH) delete CH[kk]; NCH = 1; }   /* tope de memoria del caché */
       q = P.cv(w, h, 3, (g) => { g.translate(ax, ay); fn(g); });
       q.ax = ax; q.ay = ay; CH[key] = q; return q;
     },
@@ -238,16 +238,16 @@ function joint(x0, y0, x1, y1, bend) { const l = Math.max(hyp(x1 - x0, y1 - y0) 
    dibuja una sola vez por pose en vez de 60 veces por segundo y jugador. */
 function puppet(x, y, s, col, o) {
   o = o || {};
-  const q2 = (v) => Math.round(v / 2) * 2;
+  const q2 = (v) => Math.round(v / 3) * 3;
   const hands = (o.hands || [[-15, -1], [15, -1]]).map((h) => [q2(h[0]), q2(h[1])]);
   const feet = (o.feet || [[-7.5, 22], [7.5, 22]]).map((h) => [q2(h[0]), q2(h[1])]);
   const hr = o.hr == null ? 11 : o.hr + 2, hy = o.hy == null ? -22 : o.hy;
   const f = o.face === -1 ? -1 : 1, fr = o.front == null ? 1 : o.front;
   const skin = o.skin || '#ffd9b5';
   const key = `P${col}|${skin}|${hr}|${hy}|${f}|${fr}|${o.helm ? 1 : 0}|${o.belt ? 1 : 0}|${o.hair === false ? 0 : 1}|${o.shadow === false ? 0 : 1}|${o.mouth || ''}|${o.shut ? 1 : 0}|${hands}|${feet}`;
-  const q = PZ.spr(key, 78, 88, 39, 58, (g) => bodyDraw(g, col, skin, hands, feet, hr, hy, f, fr, o));
+  const q = PZ.spr(key, 64, 78, 32, 50, (g) => bodyDraw(g, col, skin, hands, feet, hr, hy, f, fr, o));
   c.save(); c.translate(x, y); c.scale(s, s); if (o.rot) c.rotate(o.rot);
-  c.drawImage(q, -39, -58, 78, 88);
+  c.drawImage(q, -32, -50, 64, 78);
   if (o.after) o.after();
   c.restore();
 }

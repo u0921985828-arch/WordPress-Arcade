@@ -410,6 +410,31 @@ function block(col, s) {
   g.restore(); ART.rr(g, i, i, s - lw, s - lw, r); g.lineWidth = lw; g.strokeStyle = OUT; g.stroke();
   return (SPR[key] = cv);
 }
+/* §8: la PIEZA de tetra es una sola cosa, así que se dibuja como un solo trazado: la unión de sus
+ * cuatro casillas, contorneada una vez y rellena una vez. Los cuatro cuadros siguen leyéndose, pero
+ * por bisel (luz arriba-izquierda, sombra propia abajo-derecha), nunca por contorno interior.
+ * Cacheado por (tipo, rotación, tamaño): el coste por frame no sube. */
+function piecePath(t, r, S) {
+  const cells = ROT[t][r], xs = cells.map((q) => q[0]), ys = cells.map((q) => q[1]);
+  const x0 = Math.min(...xs), y0 = Math.min(...ys), rd = S * 0.19, g = rd * 0.72;
+  const path = (q) => { for (const [cx, cy] of cells) rr8(q, (cx - x0) * S - g, (cy - y0) * S - g, S + 2 * g, S + 2 * g, rd); };
+  return { path, cells, x0, y0, w: (Math.max(...xs) - x0 + 1) * S, h: (Math.max(...ys) - y0 + 1) * S };
+}
+function pieceSpr(t, r, S) {
+  const key = `p${t}${r}${Math.round(S * 10)}`; if (SPR[key]) return SPR[key];
+  const P = piecePath(t, r, S), col = COLORS[t], pad = Math.ceil(S * 0.3) + 3;
+  const cv = document.createElement('canvas'); cv.width = Math.ceil((P.w + pad * 2) * 2); cv.height = Math.ceil((P.h + pad * 2) * 2);
+  const g = cv.getContext('2d'); g.scale(2, 2); g.translate(pad, pad); g.lineJoin = 'round'; g.lineCap = 'round';
+  const e = S * 0.17;
+  unite8(g, [[P.path, col, 0, (q) => {
+    for (const [cx, cy] of P.cells) { const x = (cx - P.x0) * S, y = (cy - P.y0) * S;
+      q.fillStyle = ART.lite(col, 0.4); q.beginPath(); q.moveTo(x, y); q.lineTo(x + S, y); q.lineTo(x + S - e, y + e); q.lineTo(x + e, y + e); q.lineTo(x + e, y + S - e); q.lineTo(x, y + S); q.closePath(); q.fill();
+      q.fillStyle = ART.dark(col, 0.28); q.beginPath(); q.moveTo(x + S, y); q.lineTo(x + S, y + S); q.lineTo(x, y + S); q.lineTo(x + e, y + S - e); q.lineTo(x + S - e, y + S - e); q.lineTo(x + S - e, y + e); q.closePath(); q.fill();
+      if (col !== COLORS.G && S > 12) { q.fillStyle = 'rgba(255,255,255,.45)'; q.beginPath(); rr8(q, x + e + S * 0.07, y + e + S * 0.07, S * 0.3, S * 0.11, S * 0.055); q.fill(); } }
+  }]], Math.max(1.2, S * 0.075));
+  cv.iw = cv.width / 2; cv.ih = cv.height / 2; cv.ox = pad; cv.oy = pad;
+  return (SPR[key] = cv);
+}
 function panel(g, p, title) {
   g.fillStyle = 'rgba(0,0,0,.3)'; ART.rr(g, p.x, p.y + 3, p.w, p.h, 9); g.fill();
   ART.rr(g, p.x, p.y, p.w, p.h, 9); ART.fillOut(g, '#1a1740', 2.2);
@@ -438,10 +463,9 @@ function buildStatic() {
 }
 function mini(t, cx, cy, m, alpha, sc) {
   const cells = ROT[t][0], xs = cells.map((p) => p[0]), ys = cells.map((p) => p[1]), x0 = Math.min(...xs), y0 = Math.min(...ys);
-  const w = (Math.max(...xs) - x0 + 1) * m, h = (Math.max(...ys) - y0 + 1) * m, spr = block(COLORS[t], m);
+  const w = (Math.max(...xs) - x0 + 1) * m, h = (Math.max(...ys) - y0 + 1) * m;
   c.save(); c.globalAlpha = alpha; c.translate(cx, cy); if (sc) c.scale(sc, sc);
-  for (const [x, y] of cells) c.drawImage(spr, (x - x0) * m - w / 2, (y - y0) * m - h / 2, m, m);
-  c.restore();
+  blit8(c, pieceSpr(t, 0, m), -w / 2, -h / 2); c.restore();
 }
 function drawPlayer(q, l) {
   const S = l.S, BW = COLS * S, BH = ROWS * S, sx = q.shake ? (Math.random() - 0.5) * q.shake : 0, sy = q.shake ? (Math.random() - 0.5) * q.shake : 0;
@@ -457,9 +481,13 @@ function drawPlayer(q, l) {
   }
   if (q.cur && q.alive) {
     const gy = ghostY(q), col = COLORS[q.cur.t];
-    if (gy > q.cur.y && !l.mini) for (const [cx, cy] of ROT[q.cur.t][q.cur.r]) { ART.rr(c, px(q.cur.x + cx) + 1.5, py(gy + cy) + 1.5, S - 3, S - 3, S * 0.18); c.globalAlpha = 0.16; c.fillStyle = col; c.fill(); c.globalAlpha = 0.75; c.lineWidth = S > 12 ? 2 : 1.2; c.strokeStyle = col; c.stroke(); c.globalAlpha = 1; }
-    const spr = block(col, S), warn = grounded(q) ? Math.min(1, q.lockT / LOCK) : 0;
-    for (const [cx, cy] of ROT[q.cur.t][q.cur.r]) { const x = l.bx + (q.vis.x + cx) * S + sx, y = l.by + (q.vis.y + cy - HID) * S + sy; c.drawImage(spr, x, y, S, S); if (warn > 0) { c.globalAlpha = warn * 0.35; c.fillStyle = OUT; c.fillRect(x + 1, y + 1, S - 2, S - 2); c.globalAlpha = 1; } }
+    if (gy > q.cur.y && !l.mini) { const G = piecePath(q.cur.t, q.cur.r, S);   // la sombra también es una sola silueta
+      c.save(); c.translate(px(q.cur.x + G.x0), py(gy + G.y0)); c.beginPath(); G.path(c);
+      c.globalAlpha = 0.16; c.fillStyle = col; c.fill(); c.globalAlpha = 0.75; c.lineWidth = S > 12 ? 2 : 1.2; c.strokeStyle = col; c.stroke(); c.globalAlpha = 1; c.restore(); }
+    const P = piecePath(q.cur.t, q.cur.r, S), warn = grounded(q) ? Math.min(1, q.lockT / LOCK) : 0;
+    const ox = l.bx + (q.vis.x + P.x0) * S + sx, oy = l.by + (q.vis.y + P.y0 - HID) * S + sy;
+    blit8(c, pieceSpr(q.cur.t, q.cur.r, S), ox, oy);
+    if (warn > 0) { c.save(); c.translate(ox, oy); c.globalAlpha = warn * 0.35; c.fillStyle = OUT; c.beginPath(); P.path(c); c.fill(); c.restore(); c.globalAlpha = 1; }
   }
   if (q.lockFx) for (const [x, y] of q.lockFx.cells) { c.globalAlpha = (q.lockFx.t / 0.18) * 0.7; c.fillStyle = '#fff'; c.fillRect(px(x) + 1, py(y) + 1, S - 2, S - 2); c.globalAlpha = 1; }
   c.restore();

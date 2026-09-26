@@ -190,12 +190,26 @@ function update(dt) {
 }
 
 /* ---------- dibujo ---------- */
+/* Ley de la pieza única + cartoon de estudio: la pala es UN cuerpo cacheado (una silueta, un
+   contorno) con 3 tonos de borde duro y un óvalo especular; el halo neón va detrás. */
+const PSPR = {}, PSC = Math.min(2, window.devicePixelRatio || 1) * 2;
+function padSpr(side, h) {
+  const key = side + '|' + h + '|' + COL[side]; if (PSPR[key]) return PSPR[key];
+  const w = PWID + 6, ht = h + 6, cv = document.createElement('canvas'); cv.width = w * PSC; cv.height = ht * PSC;
+  const g = cv.getContext('2d'); g.scale(PSC, PSC); g.translate(w / 2, ht / 2);
+  const col = COL[side], body = (q) => { const x = -PWID / 2, y = -h / 2, r = 7; q.moveTo(x + r, y); q.arcTo(x + PWID, y, x + PWID, y + h, r); q.arcTo(x + PWID, y + h, x, y + h, r); q.arcTo(x, y + h, x, y, r); q.arcTo(x, y, x + PWID, y, r); q.closePath(); };
+  unite(g, [[body, col]], 1.55);
+  within(g, body, (q) => {
+    cel3(q, body, col, { dx: 2.4, dy: 2.2, r: h, sh: 0.34, lt: 0.3 });
+    q.fillStyle = PAL(PZO, 0.3); q.fillRect(side === 'p' ? 2 : -PWID / 2, -h / 2, 4, h);        // juntura por sombra propia
+  });
+  spec(g, -2.4, -h / 2 + 8, 2.4, Math.min(12, h * 0.18), 0, 0.8);
+  cv.w = w; cv.h = ht; return (PSPR[key] = cv);
+}
 function paddle(p, x) {
   const h = p.h, col = COL[p.side], bump = p.hitT > 0 ? (p.side === 'p' ? -1 : 1) * p.hitT * 14 : 0, px = x + bump;
   c.globalAlpha = 0.22 + (p.hitT > 0 ? 0.3 : 0); c.fillStyle = col; ART.rr(c, px - 13, p.y - h / 2 - 6, 26, h + 12, 13); c.fill(); c.globalAlpha = 1;
-  ART.rr(c, px - PWID / 2, p.y - h / 2, PWID, h, 7); ART.fillOut(c, col, 2.5);
-  c.fillStyle = 'rgba(255,255,255,.75)'; ART.rr(c, px - 2, p.y - h / 2 + 6, 4, h - 12, 2); c.fill();
-  c.fillStyle = 'rgba(26,21,48,.35)'; ART.rr(c, px + (p.side === 'p' ? 2 : -6), p.y - h / 2 + 5, 4, h - 10, 2); c.fill();
+  const q = padSpr(p.side, Math.round(h)); c.drawImage(q, px - q.w / 2, p.y - q.h / 2, q.w, q.h);
   if (p.shield) { const sx = p.side === 'p' ? 5 : FW - 5; c.globalAlpha = 0.55 + Math.sin(t * 8) * 0.2; c.strokeStyle = col; c.lineWidth = 5; c.lineCap = 'round'; c.beginPath(); c.moveTo(sx, 14); c.lineTo(sx, FH - 14); c.stroke(); c.strokeStyle = '#fff'; c.lineWidth = 2; c.stroke(); c.globalAlpha = 1; }
 }
 function puIcon(kind, x, y, s, col) {
@@ -238,8 +252,12 @@ function draw() {
     const col = b.last ? COL[b.last] : '#d9d6ff';
     b.trail.forEach(([x, y], i) => { const f = i / b.trail.length; c.globalAlpha = f * (b.smash ? 0.7 : 0.4); c.fillStyle = b.smash ? '#ffb347' : col; c.beginPath(); c.arc(x, y, BR * (0.3 + f * 0.7), 0, R2); c.fill(); });
     c.globalAlpha = 0.3; c.fillStyle = col; c.beginPath(); c.arc(b.x, b.y, BR + 6, 0, R2); c.fill(); c.globalAlpha = 1;
-    c.beginPath(); c.arc(b.x, b.y, BR, 0, R2); ART.fillOut(c, '#fff', 2.5);
-    c.save(); c.translate(b.x, b.y); c.rotate(b.rot); c.strokeStyle = col; c.lineWidth = 2.5; c.beginPath(); c.arc(0, 0, BR - 3, -0.9, 0.9); c.stroke(); c.restore();
+    const bs = (g) => { g.moveTo(BR, 0); g.arc(0, 0, BR, 0, R2); };
+    c.save(); c.translate(b.x, b.y);
+    unite(c, [[bs, '#fff']], 1.55);
+    clipIn(c, bs, (g) => { g.fillStyle = '#c9c6e6'; g.beginPath(); g.arc(1.4, 1.6, BR, 0, R2); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.arc(-0.6, -0.8, BR, 0, R2); g.fill(); });
+    c.rotate(b.rot); c.strokeStyle = col; c.lineWidth = 2.5; c.lineCap = 'round'; c.beginPath(); c.arc(0, 0, BR - 3, -0.9, 0.9); c.stroke();
+    c.restore(); spec(c, b.x - BR * 0.34, b.y - BR * 0.4, BR * 0.26, BR * 0.16, -0.6, 0.9);
   }
   c.restore();
   // franja superior: tú / rival (centro libre para pausa y sonido)

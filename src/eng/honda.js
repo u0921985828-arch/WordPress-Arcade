@@ -391,9 +391,9 @@ function drawBlock(b) {
   const m = MAT[b.mat], dmg = 1 - b.hp / b.max;
   c.save(); c.translate(b.x, b.y); c.rotate(b.tilt);
   c.fillStyle = 'rgba(20,12,40,.25)'; ART.rr(c, -b.hw + 2, -b.hh + 3, b.hw * 2, b.hh * 2, 4); c.fill();
-  ART.rr(c, -b.hw, -b.hh, b.hw * 2, b.hh * 2, 4);
-  const gr = c.createLinearGradient(-b.hw, -b.hh, b.hw, b.hh); gr.addColorStop(0, lite(b.col, 0.25)); gr.addColorStop(1, dark(b.col, 0.22));
-  c.fillStyle = gr; c.fill(); c.lineWidth = 2.4; c.strokeStyle = OUT; c.stroke();
+  const bp = [[(h) => ART.rr(h, -b.hw, -b.hh, b.hw * 2, b.hh * 2, 4), b.col]];
+  uni(c, bp, 1.5); celp(c, bp, b.col, b.hh * 0.45, b.hh * 0.45);
+  spec(c, -b.hw * 0.35, -b.hh * 0.6, b.hw * 0.3, b.hh * 0.1, 0, 0.4);
   if (b.mat === 'madera') { c.strokeStyle = alpha('#6b4020', 0.45); c.lineWidth = 1.2; for (let i = 1; i < 4; i++) { const q = -b.hh + (b.hh * 2 * i) / 4; c.beginPath(); c.moveTo(-b.hw + 2, q); c.lineTo(b.hw - 2, q + 1); c.stroke(); } }
   else if (b.mat === 'piedra') { c.fillStyle = 'rgba(26,21,48,.22)'; for (let i = 0; i < 3; i++) { c.beginPath(); c.arc(-b.hw + rs(b.seed + i) * b.hw * 2, -b.hh + rs(b.seed + i + 5) * b.hh * 2, 1.8, 0, TAU); c.fill(); } }
   else if (b.mat === 'hielo') { c.fillStyle = 'rgba(255,255,255,.35)'; ART.rr(c, -b.hw + 2.5, -b.hh + 2.5, b.hw * 0.7, b.hh * 1.1, 2); c.fill(); }
@@ -404,11 +404,10 @@ function drawBlock(b) {
 function drawBottle(b) {
   c.save(); c.translate(b.x, b.y); c.rotate(b.tilt + (b.down ? 1.45 : 0));
   const w = b.hw * 2, h = b.hh * 2;
-  c.beginPath(); c.moveTo(-w / 2, h / 2); c.lineTo(-w / 2, -h / 6); c.quadraticCurveTo(-w / 2, -h / 3, -w / 6, -h / 2.4);
-  c.lineTo(-w / 6, -h / 2); c.lineTo(w / 6, -h / 2); c.lineTo(w / 6, -h / 2.4); c.quadraticCurveTo(w / 2, -h / 3, w / 2, -h / 6); c.lineTo(w / 2, h / 2); c.closePath();
-  const gr = c.createLinearGradient(-w / 2, 0, w / 2, 0); gr.addColorStop(0, lite('#7fd8b0', 0.3)); gr.addColorStop(0.55, '#5fbf95'); gr.addColorStop(1, dark('#7fd8b0', 0.3));
-  c.fillStyle = gr; c.fill(); c.lineWidth = 2.2; c.strokeStyle = OUT; c.stroke();
-  c.fillStyle = '#ff6fb5'; ART.rr(c, -w / 6 - 1, -h / 2 - 3, w / 3 + 2, 4, 1.5); c.fill(); c.lineWidth = 1.6; c.strokeStyle = OUT; c.stroke();
+  const parts = [[(h2) => { h2.moveTo(-w / 2, h / 2); h2.lineTo(-w / 2, -h / 6); h2.quadraticCurveTo(-w / 2, -h / 3, -w / 6, -h / 2.4); h2.lineTo(-w / 6, -h / 2); h2.lineTo(w / 6, -h / 2); h2.lineTo(w / 6, -h / 2.4); h2.quadraticCurveTo(w / 2, -h / 3, w / 2, -h / 6); h2.lineTo(w / 2, h / 2); h2.closePath(); }, '#5fbf95'],
+                 [(h2) => ART.rr(h2, -w / 6 - 1, -h / 2 - 3, w / 3 + 2, 4, 1.5), '#ff6fb5']];
+  contact(c, 0, h / 2 + 1.5, w * 0.48, 2.6, 0.26);
+  uni(c, parts, 1.5); celm(c, parts, w * 0.22, w * 0.22);
   c.fillStyle = 'rgba(255,255,255,.4)'; c.fillRect(-w / 2 + 2.5, -h / 5, 2.2, h / 2.2);
   if (b.fl > 0) { c.fillStyle = `rgba(255,255,255,${b.fl * 2})`; ART.rr(c, -w / 2, -h / 2, w, h, 3); c.fill(); }
   c.restore();
@@ -418,14 +417,19 @@ function drawVeg(b) {
   const col = VCOL[b.veg] || VCOL.tomate, hurtF = 1 - b.hp / b.max;
   c.save(); c.translate(b.x, b.y); c.rotate(b.tilt);
   ART.shadow(c, 0, b.hh + 1, 13, 0.25);
-  const gr = c.createLinearGradient(-12, -14, 10, 14); gr.addColorStop(0, lite(col[0], 0.28)); gr.addColorStop(1, col[1]);
   if (b.veg === 'berenjena') { c.beginPath(); c.ellipse(0, 1, 12, 16, 0, 0, TAU); }
   else if (b.veg === 'brocoli') { c.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; c.arc(Math.cos(a) * 7, Math.sin(a) * 6 - 2, 7.5, 0, TAU); } }
   else if (b.veg === 'pimiento') { c.beginPath(); c.moveTo(-13, -4); c.quadraticCurveTo(-11, 16, 0, 15); c.quadraticCurveTo(12, 15, 13, -4); c.quadraticCurveTo(6, -14, 0, -12); c.quadraticCurveTo(-7, -14, -13, -4); c.closePath(); }
   else { c.beginPath(); c.arc(0, 1, 15, 0, TAU); }
-  c.fillStyle = gr; c.fill(); c.lineWidth = 2.6; c.strokeStyle = OUT; c.stroke();
-  c.strokeStyle = '#3f8f45'; c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(0, -13); c.lineTo(0, -19); c.stroke();
-  c.beginPath(); c.ellipse(-5, -17, 6, 3, -0.5, 0, TAU); c.ellipse(5, -17, 6, 3, 0.5, 0, TAU); ART.fillOut(c, '#4fae5a', 1.8);
+  c.fillStyle = col[0]; c.fill(); c.lineWidth = 2.6; c.strokeStyle = OUT; c.stroke();
+  c.save(); c.clip();
+  c.fillStyle = dark(col[0], 0.24); c.fillRect(-20, -22, 40, 44);
+  c.translate(-4, -4); c.fillStyle = col[0]; c.fill(); c.translate(-4.5, -4.5); c.fillStyle = lite(col[0], 0.2); c.fill(); c.restore();
+  const leaf = [[(h2) => { h2.moveTo(1.2, -13); h2.lineTo(1.2, -19); h2.lineTo(-1.2, -19); h2.lineTo(-1.2, -13); h2.closePath(); }, '#3f8f45'],
+                [(h2) => { h2.moveTo(1, -17); h2.ellipse(-5, -17, 6, 3, -0.5, 0, TAU); }, '#4fae5a'],
+                [(h2) => { h2.moveTo(11, -17); h2.ellipse(5, -17, 6, 3, 0.5, 0, TAU); }, '#4fae5a']];
+  uni(c, leaf, 1.5);
+  spec(c, -5, -18, 2.4, 1.1, -0.5, 0.45);
   ART.eyes(c, 0, -2, 2.6);
   c.strokeStyle = OUT; c.lineWidth = 1.6; c.beginPath();
   if (hurtF > 0.4) c.arc(0, 9, 4, Math.PI + 0.4, -0.4); else c.arc(0, 6, 4, 0.3, Math.PI - 0.3);
@@ -435,8 +439,9 @@ function drawVeg(b) {
 }
 function drawFruit(x, y, kind, s, ang) {
   const f = FR[kind]; c.save(); c.translate(x, y); c.rotate(ang || 0); c.scale(s || 1, s || 1);
-  if (kind === 'cereza') { c.strokeStyle = '#4f8f3a'; c.lineWidth = 2; c.beginPath(); c.moveTo(-3, -6); c.quadraticCurveTo(0, -13, 4, -8); c.stroke();
-    c.beginPath(); c.arc(-4, 1, 6, 0, TAU); ART.fillOut(c, '#ff4d6d', 2.2); c.beginPath(); c.arc(4, 3, 6, 0, TAU); ART.fillOut(c, '#e0304f', 2.2); }
+  if (kind === 'cereza') { c.strokeStyle = '#4f8f3a'; c.lineWidth = 2; c.lineCap = 'round'; c.beginPath(); c.moveTo(-3, -6); c.quadraticCurveTo(0, -13, 4, -8); c.stroke();
+    const ch = [[(h) => { h.moveTo(2, 1); h.arc(-4, 1, 6, 0, TAU); }, '#ff4d6d'], [(h) => { h.moveTo(10, 3); h.arc(4, 3, 6, 0, TAU); }, '#e0304f']];
+    uni(c, ch, 1.4); celm(c, ch, 2.6, 2.6); spec(c, -6, -1.6, 2, 1.2, -0.6, 0.7); }
   else if (kind === 'sandia') { c.beginPath(); c.arc(0, 0, 17, 0, TAU); ART.fillOut(c, '#4fb14f', 2.6); c.strokeStyle = '#2f7a3a'; c.lineWidth = 3; for (let i = 0; i < 4; i++) { c.beginPath(); c.arc(0, 0, 17, i * 1.57 - 0.35, i * 1.57 + 0.35); c.stroke(); } }
   else if (kind === 'kiwi') { c.beginPath(); c.ellipse(0, 0, 11, 9, 0, 0, TAU); ART.fillOut(c, '#8fbf3f', 2.2); c.fillStyle = '#d9f0a8'; c.beginPath(); c.ellipse(0, 0, 5, 4, 0, 0, TAU); c.fill(); c.fillStyle = OUT; for (let i = 0; i < 6; i++) { c.beginPath(); c.arc(Math.cos(i) * 5.5, Math.sin(i) * 4.5, 0.9, 0, TAU); c.fill(); } }
   else { c.beginPath(); c.arc(0, 0, 12, 0, TAU); ART.fillOut(c, '#ffa23d', 2.4); c.fillStyle = 'rgba(255,255,255,.3)'; c.beginPath(); c.ellipse(-4, -4, 4, 2.5, -0.6, 0, TAU); c.fill(); c.strokeStyle = '#4f8f3a'; c.lineWidth = 2; c.beginPath(); c.moveTo(0, -11); c.lineTo(2, -15); c.stroke(); }
@@ -472,10 +477,12 @@ function drawFeria() {
 function drawDuck(d) {
   c.save(); c.translate(d.x, d.y + d.fall * 26); c.scale(d.dir, 1); if (!d.alive) c.rotate(d.fall * 1.5);
   c.globalAlpha = d.alive ? 1 : Math.max(0, 1 - d.fall);
-  c.beginPath(); c.ellipse(0, 2, 17, 11, 0, 0, TAU); ART.fillOut(c, '#ffc94d', 2.4);
-  c.beginPath(); c.moveTo(-6, -2); c.quadraticCurveTo(-18, -6, -14, 4); c.quadraticCurveTo(-10, 6, -6, 2); c.closePath(); ART.fillOut(c, '#f0ae2a', 2);
-  c.beginPath(); c.arc(11, -8, 8, 0, TAU); ART.fillOut(c, '#ffd869', 2.4);
-  c.beginPath(); c.moveTo(17, -8); c.lineTo(26, -5); c.lineTo(17, -2); c.closePath(); ART.fillOut(c, '#ff8a3d', 2);
+  const dp = [[(h) => { h.moveTo(17, 2); h.ellipse(0, 2, 17, 11, 0, 0, TAU); }, '#ffc94d'],
+              [(h) => { h.moveTo(19, -8); h.arc(11, -8, 8, 0, TAU); }, '#ffd869'],
+              [(h) => { h.moveTo(17, -8); h.lineTo(26, -5); h.lineTo(17, -2); h.closePath(); }, '#ff8a3d']];
+  uni(c, dp, 1.5); celm(c, dp, 4, 4);
+  c.fillStyle = '#f0ae2a'; c.beginPath(); c.moveTo(-6, -2); c.quadraticCurveTo(-18, -6, -14, 4); c.quadraticCurveTo(-10, 6, -6, 2); c.closePath(); c.fill();
+  spec(c, 7, -12, 3.2, 1.8, -0.5, 0.55);
   c.fillStyle = OUT; c.beginPath(); c.arc(13, -10, 1.8, 0, TAU); c.fill();
   c.restore();
 }

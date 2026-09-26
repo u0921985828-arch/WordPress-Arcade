@@ -204,21 +204,46 @@ k.run((dt) => {
 }, draw);
 
 /* ---------------------------------------------------------------- dibujo */
+/* avión: pieza única cacheada por color+destello; hélice y bufanda en vivo */
+const PSPR = {}, PSC = Math.min(2, window.devicePixelRatio || 1) * 2, PW = 56, PH = 38, POX = 28, POY = 23;
+function planeSpr(col, fl) {
+  const key = col + '|' + fl; if (PSPR[key]) return PSPR[key];
+  const cv = document.createElement('canvas'); cv.width = PW * PSC; cv.height = PH * PSC;
+  const g = cv.getContext('2d'); g.scale(PSC, PSC); g.translate(POX, POY);
+  const body = fl ? '#fff' : col, dk = fl ? '#d8d8e4' : dark(body, 0.16), lt = fl ? '#fff' : lite(body, 0.14);
+  const fus = (q) => { q.moveTo(-21, -1); q.quadraticCurveTo(-10, -6, 8, -5); q.lineTo(13, -4); q.quadraticCurveTo(16.5, 0, 13, 4); q.lineTo(8, 5); q.quadraticCurveTo(-10, 5, -21, 2); q.closePath(); };
+  const tail = (q) => { q.moveTo(-15, -1); q.lineTo(-22.5, -11); q.lineTo(-16.5, -11); q.lineTo(-10, -2); q.closePath(); };
+  const tplane = (q) => { q.rect(-23, -1.4, 10, 3.4); };
+  const wlow = (q) => { q.rect(-6, 2.6, 17, 4.2); };
+  const strut = (q) => { q.rect(-3.8, -11, 2.4, 7); q.rect(5.4, -11, 2.4, 7); };
+  const wup = (q) => { q.rect(-9, -15, 22, 4.2); };
+  const hub = (q) => { q.rect(12.6, -2.4, 3.6, 4.8); };
+  unite(g, [[tail, dk], [tplane, dk], [wlow, dk], [strut, dk], [fus, body], [wup, lt], [hub, '#3d3752']], 1.5);
+  /* separaciones y volumen solo por color, dentro de la silueta */
+  clipIn(g, fus, (q) => {
+    q.fillStyle = fl ? '#fff' : lite(body, 0.3); q.fillRect(-21, -5.4, 34, 2.4);
+    q.fillStyle = PAL(PZO, 0.16); q.fillRect(-21, 2.2, 34, 3.4);
+  });
+  clipIn(g, wup, (q) => { q.fillStyle = PAL(PZO, 0.18); q.fillRect(-9, -11.9, 22, 1.6); });
+  clipIn(g, wlow, (q) => { q.fillStyle = PAL(PZO, 0.2); q.fillRect(-6, 5.4, 17, 1.6); });
+  /* escarapela */
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(-6, 0.4, 2.6, 0, TAU); g.fill();
+  g.fillStyle = dark(body, 0.35); g.beginPath(); g.arc(-6, 0.4, 1.2, 0, TAU); g.fill();
+  /* piloto: pieza propia */
+  const head = (q) => { q.arc(0, -7.4, 3.7, 0, TAU); };
+  unite(g, [[head, '#8a5a3b']], 1.4);
+  clipIn(g, head, (q) => { q.fillStyle = PAL(PZO, 0.2); q.beginPath(); q.arc(0, -4.6, 3.7, 0, TAU); q.fill(); q.fillStyle = '#5ce1e6'; q.fillRect(0.4, -9.2, 3.6, 2.2); });
+  spec(g, -1.4, -9, 1.3, 0.8, -0.5, 0.45);
+  spec(g, 2, -13.6, 5.5, 1, -0.02, 0.32);
+  PSPR[key] = cv; return cv;
+}
 function plane(pl) {
-  const col = pl.col, fl = pl.hurt > 0 && Math.floor(pl.hurt * 20) % 2, left = Math.cos(pl.a) < 0;
+  const col = pl.col, fl = pl.hurt > 0 && Math.floor(pl.hurt * 20) % 2 ? 1 : 0, left = Math.cos(pl.a) < 0;
   c.save(); c.translate(pl.x, pl.y); c.rotate(pl.a); if (left) c.scale(1, -1);
-  const body = fl ? '#fff' : col;
-  /* cola */ c.beginPath(); c.moveTo(-16, -1); c.lineTo(-22, -10); c.lineTo(-17, -10); c.lineTo(-11, -2); c.closePath(); ART.fillOut(c, dark(body, 0.12), 1.8);
-  ART.rr(c, -22, 0, 9, 3, 1.5); ART.fillOut(c, dark(body, 0.2), 1.4);
-  /* ala inferior */ ART.rr(c, -6, 3, 16, 4, 2); ART.fillOut(c, dark(body, 0.18), 1.8);
-  /* fuselaje */ c.beginPath(); c.moveTo(-20, -1); c.quadraticCurveTo(-10, -6, 8, -5); c.lineTo(13, -4); c.quadraticCurveTo(16, 0, 13, 4); c.lineTo(8, 5); c.quadraticCurveTo(-10, 5, -20, 2); c.closePath(); ART.fillOut(c, body, 2);
-  c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(-12, -4, 18, 1.6);
-  c.fillStyle = '#fff'; c.beginPath(); c.arc(-6, 0.5, 2.6, 0, TAU); c.fill(); c.fillStyle = dark(body, 0.3); c.beginPath(); c.arc(-6, 0.5, 1.2, 0, TAU); c.fill();
-  /* piloto */ c.beginPath(); c.arc(0, -7, 3.6, 0, TAU); ART.fillOut(c, '#8a5a3b', 1.6); c.fillStyle = '#5ce1e6'; c.fillRect(0.5, -9, 3, 2);
-  c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(-2, -6); c.quadraticCurveTo(-7, -8 + Math.sin(T * 18) * 2, -11, -6 + Math.sin(T * 18 + 1) * 2); c.stroke();
-  /* ala superior y montantes */ c.strokeStyle = OUT; c.lineWidth = 1.4; c.beginPath(); c.moveTo(-3, -5); c.lineTo(-3, -11); c.moveTo(6, -5); c.lineTo(6, -11); c.stroke();
-  ART.rr(c, -8, -14, 20, 4, 2); ART.fillOut(c, lite(body, 0.12), 1.8);
-  /* hélice */ ART.rr(c, 13.5, -2, 3, 4, 1); ART.fillOut(c, '#3d3752', 1.2);
+  c.drawImage(planeSpr(col, fl), -POX, -POY, PW, PH);
+  /* bufanda al viento */
+  c.strokeStyle = '#fff'; c.lineWidth = 2; c.lineCap = 'round'; c.beginPath(); c.moveTo(-2, -6); c.quadraticCurveTo(-7, -8 + Math.sin(T * 18) * 2, -11, -6 + Math.sin(T * 18 + 1) * 2); c.stroke();
+  /* hélice girando */
   c.fillStyle = 'rgba(230,230,240,.55)'; c.beginPath(); c.ellipse(17, 0, 2, 9 * Math.abs(Math.sin(pl.prop)), 0, 0, TAU); c.fill();
   c.restore();
 }

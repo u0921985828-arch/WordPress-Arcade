@@ -418,39 +418,61 @@ const FLOOR = mk(W, H, (g) => {
   g.strokeStyle = OUT; g.lineWidth = 5; g.strokeRect(GX - 2, GY - 2, COLS * S + 4, ROWS * S + 4);
   g.fillStyle = 'rgba(255,255,255,.04)'; g.fillRect(GX, GY, COLS * S, Math.min(40, ROWS * S));
 });
+/* §8: cada ingrediente es UNA silueta (los trozos cortados se funden en una sola forma, el champiñón
+ * no lleva contorno entre pie y sombrero). Todo horneado por (tipo, estado, radio). */
 function ingShape(g, x, y, r, kind, st) {
   const I = ING[kind], col = st >= 2 ? dark(I.c, 0.3) : I.c;
-  g.lineWidth = 2.2; g.strokeStyle = OUT;
-  if (st === 1) { /* cortado: tres trozos */
-    for (let i = 0; i < 3; i++) { const a = -0.6 + i * 0.6; g.beginPath(); g.ellipse(x + Math.cos(a) * r * 0.5, y + Math.sin(a) * r * 0.45, r * 0.42, r * 0.3, a, 0, TAU); fillOut(g, i === 1 ? lite(col, 0.12) : col, 2); }
-    return;
+  g.save(); g.translate(x, y);
+  if (st === 1) { /* cortado: tres trozos, una sola silueta */
+    const pc = (i) => (q) => { const a = -0.6 + i * 0.6; q.moveTo(Math.cos(a) * r * 0.5 + r * 0.42, Math.sin(a) * r * 0.45); q.ellipse(Math.cos(a) * r * 0.5, Math.sin(a) * r * 0.45, r * 0.42, r * 0.3, a, 0, TAU); };
+    unite8(g, [[pc(0), col], [pc(2), col], [pc(1), lite(col, 0.16), { dx: 1.2, dy: 1.2 }]], 1.4);
+  } else if (I.sh === 'bun') {
+    const b = (q) => { q.moveTo(-r, 0); q.arc(0, 0, r, Math.PI, 0); q.lineTo(r, r * 0.45); q.lineTo(-r, r * 0.45); q.closePath(); };
+    unite8(g, [[b, col, { dx: 1.6, dy: 1.6 }]], 1.4);
+    g.fillStyle = 'rgba(255,255,255,.55)'; for (let i = -1; i < 2; i++) { g.beginPath(); g.arc(i * r * 0.45, -r * 0.35, 1.4, 0, TAU); g.fill(); }
+  } else if (I.sh === 'patty') {
+    unite8(g, [[(q) => { q.moveTo(r, 0); q.ellipse(0, 0, r, r * 0.62, 0, 0, TAU); }, col, { dx: 1.4, dy: 1.4 }]], 1.4);
+    if (st >= 2) { g.strokeStyle = lite(col, 0.4); g.lineWidth = 1.6; for (let i = -1; i < 2; i++) { g.beginPath(); g.moveTo(-r * 0.5, i * 4); g.lineTo(r * 0.5, i * 4); g.stroke(); } }
+  } else if (I.sh === 'wedge') {
+    unite8(g, [[(q) => { q.moveTo(-r, r * 0.6); q.lineTo(r, r * 0.6); q.lineTo(0, -r * 0.7); q.closePath(); }, col, { dx: 1.6, dy: 1.6 }]], 1.4);
+  } else if (I.sh === 'leaf') {
+    unite8(g, [[(q) => { q.moveTo(r, 0); q.ellipse(0, 0, r, r * 0.78, 0.3, 0, TAU); }, col, { dx: 1.4, dy: 1.4 }]], 1.4);
+    g.strokeStyle = dark(col, 0.35); g.lineWidth = 1.4; g.beginPath(); g.moveTo(-r * 0.6, r * 0.3); g.lineTo(r * 0.6, -r * 0.3); g.stroke();
+  } else if (I.sh === 'mush') {
+    const stem = (q) => rr8(q, -r * 0.28, -r * 0.1, r * 0.56, r * 0.8, 3), cap = (q) => { q.moveTo(-r * 0.85, -r * 0.1); q.arc(0, -r * 0.1, r * 0.85, Math.PI, 0); q.closePath(); };
+    unite8(g, [[stem, '#efe4d0'], [cap, col, { dx: 1.4, dy: 1.2 }]], 1.4);
+  } else {
+    unite8(g, [[(q) => { q.moveTo(r * 0.9, 0); q.arc(0, 0, r * 0.9, 0, TAU); }, col, { dx: 1.6, dy: 1.6 }]], 1.4);
+    shine8(g, -r * 0.3, -r * 0.35, r * 0.24, r * 0.16, -0.6, 0.42);
   }
-  if (I.sh === 'bun') { g.beginPath(); g.arc(x, y, r, Math.PI, 0); g.lineTo(x + r, y + r * 0.45); g.lineTo(x - r, y + r * 0.45); g.closePath(); fillOut(g, col, 2.4); g.fillStyle = 'rgba(255,255,255,.5)'; for (let i = -1; i < 2; i++) { g.beginPath(); g.arc(x + i * r * 0.45, y - r * 0.35, 1.4, 0, TAU); g.fill(); } return; }
-  if (I.sh === 'patty') { g.beginPath(); g.ellipse(x, y, r, r * 0.62, 0, 0, TAU); fillOut(g, col, 2.4); if (st >= 2) { g.strokeStyle = lite(col, 0.4); g.lineWidth = 1.6; for (let i = -1; i < 2; i++) { g.beginPath(); g.moveTo(x - r * 0.5, y + i * 4); g.lineTo(x + r * 0.5, y + i * 4); g.stroke(); } } return; }
-  if (I.sh === 'wedge') { g.beginPath(); g.moveTo(x - r, y + r * 0.6); g.lineTo(x + r, y + r * 0.6); g.lineTo(x, y - r * 0.7); g.closePath(); fillOut(g, col, 2.4); return; }
-  if (I.sh === 'leaf') { g.beginPath(); g.ellipse(x, y, r, r * 0.78, 0.3, 0, TAU); fillOut(g, col, 2.4); g.strokeStyle = dark(col, 0.35); g.lineWidth = 1.4; g.beginPath(); g.moveTo(x - r * 0.6, y + r * 0.3); g.lineTo(x + r * 0.6, y - r * 0.3); g.stroke(); return; }
-  if (I.sh === 'mush') { g.beginPath(); rr(g, x - r * 0.28, y - r * 0.1, r * 0.56, r * 0.8, 3); fillOut(g, '#efe4d0', 2); g.beginPath(); g.arc(x, y - r * 0.1, r * 0.85, Math.PI, 0); g.closePath(); fillOut(g, col, 2.2); return; }
-  g.beginPath(); g.arc(x, y, r * 0.9, 0, TAU); fillOut(g, col, 2.4);
-  g.fillStyle = 'rgba(255,255,255,.4)'; g.beginPath(); g.ellipse(x - r * 0.3, y - r * 0.35, r * 0.24, r * 0.16, -0.6, 0, TAU); g.fill();
+  g.restore();
 }
+/* sprite por (tipo, estado, radio): los radios en juego son pocos (15, 11, 6…) */
+function ingSpr(kind, st, r) {
+  const q = Math.round(r * 2) / 2, z = q * 1.5 + 8;
+  return spr8(`ing_${kind}_${st}_${q}`, z * 2, z * 2, z, z, (g) => ingShape(g, 0, 0, q, kind, st), 3);
+}
+const ing8 = (g, x, y, r, kind, st) => blit8(g, ingSpr(kind, st, r), x, y);
 function drawItem(g, x, y, it, s) {
   s = s || 1;
   if (it.bad) { g.beginPath(); g.arc(x, y, 11 * s, 0, TAU); fillOut(g, '#3a3350', 2.4); g.fillStyle = '#6a6285'; for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(x - 5 + i * 5, y - 2 - (i % 2) * 4, 2.6, 0, TAU); g.fill(); } return; }
-  if (it.ext) { rr(g, x - 6 * s, y - 11 * s, 12 * s, 20 * s, 4 * s); fillOut(g, '#e8404f', 2.4); rr(g, x - 3 * s, y - 15 * s, 6 * s, 5 * s, 2); fillOut(g, '#c9ccd6', 2); g.fillStyle = '#ffd9a0'; g.fillRect(x - 4 * s, y - 4 * s, 8 * s, 3 * s); return; }
+  if (it.ext) { unite8(g, [[(q) => rr8(q, x - 3 * s, y - 15 * s, 6 * s, 5 * s, 2), '#c9ccd6'], [(q) => rr8(q, x - 6 * s, y - 11 * s, 12 * s, 20 * s, 4 * s), '#e8404f', { dx: 1.6, dy: 1.6 }, (q) => { q.fillStyle = '#ffd9a0'; q.fillRect(x - 4 * s, y - 4 * s, 8 * s, 3 * s); }]], 1.5); return; }
   if (it.plate) {
     if (PIZZA) {
-      g.beginPath(); g.arc(x, y, 15 * s, 0, TAU); fillOut(g, it.baked ? '#e8b25e' : '#f2dfae', 2.6);
-      if (it.baked) { g.beginPath(); g.arc(x, y, 11.5 * s, 0, TAU); fillOut(g, '#d9803f', 1.8); }
-      it.on.forEach((o, i) => { if (o.kind === 'masa') return; const a = i * 1.7, R = 6.5 * s; g.beginPath(); g.arc(x + Math.cos(a) * R, y + Math.sin(a) * R, 3.4 * s, 0, TAU); fillOut(g, ING[o.kind].c, 1.6); });
+      /* §8: corteza, salsa y tropiezos son una sola silueta; dentro solo hay cambio de color */
+      const parts = [[(q) => { q.moveTo(x + 15 * s, y); q.arc(x, y, 15 * s, 0, TAU); }, it.baked ? '#e8b25e' : '#f2dfae', { dx: 1.6, dy: 1.6 }]];
+      if (it.baked) parts.push([(q) => { q.moveTo(x + 11.5 * s, y); q.arc(x, y, 11.5 * s, 0, TAU); }, '#d9803f']);
+      it.on.forEach((o, i) => { if (o.kind === 'masa') return; const a = i * 1.7, R = 6.5 * s; parts.push([(q) => { q.moveTo(x + Math.cos(a) * R + 3.4 * s, y + Math.sin(a) * R); q.arc(x + Math.cos(a) * R, y + Math.sin(a) * R, 3.4 * s, 0, TAU); }, ING[o.kind].c]); });
+      unite8(g, parts, 1.5);
       if (!it.on.length) { g.fillStyle = 'rgba(0,0,0,.2)'; g.beginPath(); g.arc(x, y, 6 * s, 0, TAU); g.fill(); }
       return;
     }
     g.beginPath(); g.ellipse(x, y + 2 * s, 16 * s, 9 * s, 0, 0, TAU); fillOut(g, '#eef1f7', 2.6);
     g.beginPath(); g.ellipse(x, y + 2 * s, 11 * s, 6 * s, 0, 0, TAU); g.strokeStyle = '#bfc6d8'; g.lineWidth = 1.6; g.stroke();
-    it.on.forEach((o, i) => { const dx = (i - (it.on.length - 1) / 2) * 8 * s; ingShape(g, x + dx, y - 2 * s, 6 * s, o.kind, o.st); });
+    it.on.forEach((o, i) => { const dx = (i - (it.on.length - 1) / 2) * 8 * s; ing8(g, x + dx, y - 2 * s, 6 * s, o.kind, o.st); });
     return;
   }
-  ingShape(g, x, y, 11 * s, it.kind, it.st);
+  ing8(g, x, y, 11 * s, it.kind, it.st);
 }
 function station(s) {
   const x = s.x, y = s.y, w = s.w, h = s.h, cx = x + w / 2, cy = y + h / 2;
@@ -458,7 +480,7 @@ function station(s) {
   rr(c, x + 3, y + 3, w - 6, h - 6, 9); fillOut(c, base, 3);
   rr(c, x + 6, y + 6, w - 12, h * 0.34, 6); c.fillStyle = 'rgba(255,255,255,.14)'; c.fill();
   if (s.t === 'crate') {
-    ingShape(c, cx, cy + 4, 15, s.ing, 0);
+    ing8(c, cx, cy + 4, 15, s.ing, 0);
     label(ING[s.ing].n, cx, y + h - 9, 10, '#ffeccd');
   } else if (s.t === 'board') {
     rr(c, x + 9, cy - 10, w - 18, 22, 5); fillOut(c, '#d8a765', 2.4);
@@ -476,7 +498,7 @@ function station(s) {
     c.fillStyle = OUT; for (let i = 0; i < 3; i++) c.fillRect(x + 13 + i * 12, cy - 8, 3, 12);
     plain('Servir', cx, y + h - 9, 10, '#1a1530');
   } else if (s.t === 'bin') {
-    rr(c, x + 12, cy - 10, w - 24, 24, 5); fillOut(c, '#3c3660', 2.4); rr(c, x + 9, cy - 15, w - 18, 7, 3); fillOut(c, '#2b2650', 2.2);
+    unite8(c, [[(q) => rr8(q, x + 12, cy - 10, w - 24, 24, 5), '#3c3660', { dx: 1.8, dy: 1.8 }], [(q) => rr8(q, x + 9, cy - 15, w - 18, 7, 3), '#2b2650']], 1.5);
     label('Basura', cx, y + h - 9, 10, '#ffeccd');
   } else if (s.t === 'ext') {
     drawItem(c, cx, cy - 2, { ext: 1 }, 1.1);
@@ -499,19 +521,32 @@ function bar(x, y, w, h, p, col) {
   rr(c, x, y, w, h, h / 2); fillOut(c, 'rgba(12,8,28,.75)', 1.6);
   if (p > 0.02) { rr(c, x + 1.5, y + 1.5, Math.max(2, (w - 3) * clamp(p, 0, 1)), h - 3, (h - 3) / 2); c.fillStyle = col; c.fill(); }
 }
+/* §8: el cocinero (manoplas, cuerpo, cabeza y gorro) es UNA sola silueta; delantal y gorro se leen por
+ * cambio de color, nunca por contorno. Horneado por color de traje: el coste por frame no sube. */
+const SKIN8 = '#ffd9b0';
+function chefSpr(col, hc) {
+  return spr8(`chef_${col}_${hc}`, 62, 80, 31, 60, (g) => {
+    const body = (q) => rr8(q, -13, -10, 26, 26, 9),
+      armL = mitt8(-15.6, 3, Math.PI * 0.86, 5.1, 1), armR = mitt8(15.6, 3, Math.PI * 0.14, 5.1, -1),
+      head = (q) => { q.moveTo(11, -16); q.arc(0, -16, 11, 0, P8T); },
+      puff = (q) => { q.moveTo(0, -33); q.ellipse(-6, -33, 6, 5.5, 0, 0, P8T); q.moveTo(12, -33); q.ellipse(6, -33, 6, 5.5, 0, 0, P8T); q.moveTo(7, -36); q.ellipse(0, -36, 7, 6.5, 0, 0, P8T); },
+      brim = (q) => rr8(q, -11, -30, 22, 7, 3);
+    unite8(g, [
+      [armL, SKIN8], [armR, SKIN8],
+      [body, col, { dx: 2, dy: 2 }, (q) => { q.fillStyle = 'rgba(255,255,255,.78)'; q.beginPath(); rr8(q, -13, 2, 26, 14, 8); q.fill(); }],
+      [head, SKIN8, { dx: 1.8, dy: 1.8 }],
+      [puff, hc, { dx: 1.8, dy: 1.8 }], [brim, DK8(hc, 0.16)],
+    ], 1.5);
+    shine8(g, -4.5, -21, 3.2, 2, -0.5, 0.3);
+  }, 3);
+}
 function chef(ch) {
-  const bob = Math.sin(ch.bob) * 2 * (hyp(ch.vx, ch.vy) > 10 ? 1 : 0);
+  const bob = Math.sin(ch.bob) * 2 * (hyp(ch.vx, ch.vy) > 10 ? 1 : 0), hc = HAT[ch.p % 4];
   ART.shadow(c, ch.x, ch.y + 15, 14, 0.25);
-  /* cuerpo */
-  rr(c, ch.x - 13, ch.y - 10 + bob, 26, 26, 9); fillOut(c, ch.col, 3);
-  rr(c, ch.x - 13, ch.y + 2 + bob, 26, 14, 8); c.fillStyle = 'rgba(255,255,255,.75)'; c.fill();
-  /* cabeza */
-  c.beginPath(); c.arc(ch.x, ch.y - 16 + bob, 11, 0, TAU); fillOut(c, '#ffd9b0', 2.6);
-  ART.eyes(c, ch.x + ch.fx * 2.5, ch.y - 17 + bob + ch.fy * 1.5, 2.1);
-  /* gorro */
-  const hc = HAT[ch.p % 4];
-  rr(c, ch.x - 11, ch.y - 30 + bob, 22, 7, 3); fillOut(c, hc, 2.4);
-  c.beginPath(); c.ellipse(ch.x - 6, ch.y - 33 + bob, 6, 5.5, 0, 0, TAU); c.ellipse(ch.x + 6, ch.y - 33 + bob, 6, 5.5, 0, 0, TAU); c.ellipse(ch.x, ch.y - 36 + bob, 7, 6.5, 0, 0, TAU); fillOut(c, hc, 2.4);
+  blit8(c, chefSpr(ch.col, hc), ch.x, ch.y + bob);
+  eyes8(c, ch.x, ch.y - 17.5 + bob, 3.6, 2.6, { lx: ch.fx, ly: ch.fy, lid: 0.1, lidCol: '#f0b98d', sq: 0.95 });
+  brow8(c, ch.x, ch.y - 21.5 + bob, 3.6, 3.4, -0.5, DK8(SKIN8, 0.55), 1.15);
+  mouth8(c, ch.x + ch.fx * 1.2, ch.y - 11.8 + bob, 4.4, ch.hold ? 1 : 0);
   if (ch.dash > 0) { c.globalAlpha = 0.5; c.beginPath(); c.arc(ch.x - ch.fx * 18, ch.y - ch.fy * 18, 9, 0, TAU); c.fillStyle = '#fff'; c.fill(); c.globalAlpha = 1; }
   if (ch.hold) drawItem(c, ch.x, ch.y - 44 + bob, ch.hold, 0.95);
   /* indicador de jugador */
@@ -524,7 +559,7 @@ function ticket(o, x, y, w, h) {
   const n = o.r.it.length, sp = Math.min(24, (w - 10) / n);
   o.r.it.forEach(([kind, st], i) => {
     const ix = x + w / 2 + (i - (n - 1) / 2) * sp, iy = y + 31;
-    ingShape(c, ix, iy, 9, kind, st);
+    ing8(c, ix, iy, 9, kind, st);
     if (st >= 2) { c.fillStyle = '#ff8a3c'; c.beginPath(); c.arc(ix + 7, iy + 7, 3, 0, TAU); c.fill(); c.lineWidth = 1.4; c.strokeStyle = OUT; c.stroke(); }
     else if (st === 1) { c.strokeStyle = '#8a8fa8'; c.lineWidth = 2; c.beginPath(); c.moveTo(ix + 4, iy + 9); c.lineTo(ix + 10, iy + 5); c.stroke(); }
   });

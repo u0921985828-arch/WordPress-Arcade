@@ -72,11 +72,20 @@ const BG = off(480, 360, (g) => {
   g.strokeStyle = OUT; g.lineWidth = 2.5; g.beginPath(); for (let x = 0; x <= 480; x += 10) g.lineTo(x, GY - Math.sin(x / 40) * 2); g.stroke();
   g.strokeStyle = 'rgba(255,255,255,.2)'; g.lineWidth = 1.5; g.beginPath(); for (let x = 0; x <= 480; x += 10) g.lineTo(x, GY + 2 - Math.sin(x / 40) * 2); g.stroke();
 });
+/* Ley de la pieza única: la ciudad se lee como UNA cosa, así que sus tres torres van en un solo
+   trazado (unite traza todo y rellena después) y se separan por color y sombra propia. */
 const CITY = [0, 1, 2].map((v) => off(40, 34, (g) => {
   const B = [[[2, 14, 10, 20], [13, 4, 12, 30], [26, 18, 11, 16]], [[1, 18, 12, 16], [14, 10, 10, 24], [25, 2, 13, 32]], [[3, 8, 12, 26], [16, 16, 10, 18], [27, 12, 10, 22]]][v];
   const cols = ['#5ce1e6', '#7aa0ff', '#b98cff'];
-  B.forEach(([x, y, w, h], i) => { ART.rr(g, x, y, w, h, 2); ART.fillOut(g, cols[(i + v) % 3], 2); g.fillStyle = 'rgba(255,255,255,.3)'; g.fillRect(x + 2, y + 2, 2, h - 4);
-    for (let wy = y + 4; wy < 30; wy += 5) for (let wx = x + 3; wx < x + w - 3; wx += 4) { g.fillStyle = rnd(wx * 3 + wy + v) > 0.35 ? '#fff3a8' : 'rgba(26,21,48,.6)'; g.fillRect(wx, wy, 2, 2.5); } });
+  const tw = ([x, y, w, h]) => (q) => { const r = 2; q.moveTo(x + r, y); q.arcTo(x + w, y, x + w, y + h, r); q.lineTo(x + w, y + h + 2); q.lineTo(x, y + h + 2); q.lineTo(x, y + r); q.arcTo(x, y, x + w, y, r); q.closePath(); };
+  unite(g, B.map((b, i) => [tw(b), cols[(i + v) % 3]]), 1.5);
+  B.forEach(([x, y, w, h], i) => within(g, tw([x, y, w, h]), (q) => {
+    const col = cols[(i + v) % 3];
+    q.fillStyle = PDK(col, 0.3); q.fillRect(x + w * 0.55, y - 2, w, h + 6);                 // el lado en sombra, por color
+    q.fillStyle = PLT(col, 0.28); q.fillRect(x, y - 2, 2.6, h + 6);                          // luz de borde
+    for (let wy = y + 4; wy < 30; wy += 5) for (let wx = x + 3; wx < x + w - 3; wx += 4) { q.fillStyle = rnd(wx * 3 + wy + v) > 0.35 ? '#fff3a8' : 'rgba(26,21,48,.6)'; q.fillRect(wx, wy, 2, 2.5); }
+    q.fillStyle = PAL(PZO, 0.22); q.fillRect(x - 2, y + h - 2, w + 4, 6);                    // sombra de contacto en la base
+  }));
 }));
 const RUBBLE = off(40, 16, (g) => { g.beginPath(); g.moveTo(2, 16); g.lineTo(6, 8); g.lineTo(11, 11); g.lineTo(16, 4); g.lineTo(22, 10); g.lineTo(28, 6); g.lineTo(34, 12); g.lineTo(38, 16); g.closePath(); ART.fillOut(g, '#4a4060', 2); g.fillStyle = '#ff7a3d'; g.fillRect(14, 10, 3, 3); g.fillRect(26, 11, 3, 2); });
 const CLOUD = off(120, 40, (g) => { g.fillStyle = 'rgba(160,140,230,.16)'; for (const [x, y, r] of [[30, 26, 14], [52, 18, 18], [76, 22, 15], [96, 28, 11], [60, 30, 14]]) { g.beginPath(); g.arc(x, y, r, 0, R2); g.fill(); } });
@@ -129,8 +138,13 @@ k.run((dt) => {
   for (const q of cities) { if (q.alive) c.drawImage(CITY[q.v % 3], q.x - 20, GY - 32, 40, 34); else c.drawImage(RUBBLE, q.x - 20, GY - 14, 40, 16); }
   // búnkeres con torreta y munición
   for (const b of bases) { const by = GY - 14, kick = (b.kick || 0) * 20;
-    c.save(); c.translate(b.x, by); c.rotate(b.a); ART.rr(c, 2 - kick, -3.5, 18, 7, 3); ART.fillOut(c, b.ammo ? '#c9d2ea' : '#6a6f88', 2); c.restore();
-    c.beginPath(); c.arc(b.x, GY, 16, Math.PI, 0); c.closePath(); ART.fillOut(c, b.ammo ? '#f2d15c' : '#7a6a5a', 2.5); c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.arc(b.x - 5, GY - 9, 4, 0, R2); c.fill();
+    /* el cañón gira de verdad: es la única pieza separada; la cúpula es un cuerpo con 3 tonos */
+    c.save(); c.translate(b.x, by); c.rotate(b.a); const bar = (g) => { g.moveTo(5 - kick, -3.5); g.arcTo(20 - kick, -3.5, 20 - kick, 3.5, 3); g.arcTo(20 - kick, 3.5, 2 - kick, 3.5, 3); g.lineTo(2 - kick, 3.5); g.lineTo(2 - kick, -3.5); g.closePath(); };
+    unite(c, [[bar, b.ammo ? '#c9d2ea' : '#6a6f88']], 1.5); clipIn(c, bar, (g) => { g.fillStyle = PAL(PZO, 0.26); g.fillRect(0, 1, 24, 4); g.fillStyle = 'rgba(255,255,255,.4)'; g.fillRect(0, -3, 24, 1.6); }); c.restore();
+    const dome = (g) => { g.moveTo(b.x - 16, GY); g.arc(b.x, GY, 16, Math.PI, 0); g.closePath(); }, dc = b.ammo ? '#f2d15c' : '#7a6a5a';
+    unite(c, [[dome, dc]], 1.6);
+    clipIn(c, dome, (g) => { g.fillStyle = PDK(dc, 0.28); g.beginPath(); g.arc(b.x + 3, GY + 3, 16, Math.PI, 0); g.fill(); g.fillStyle = dc; g.beginPath(); g.arc(b.x - 1, GY - 1, 16, Math.PI, 0); g.fill(); g.fillStyle = PLT(dc, 0.26); g.beginPath(); g.arc(b.x - 3, GY - 3, 16, Math.PI, 0); g.fill(); });
+    spec(c, b.x - 5.5, GY - 9.5, 4.2, 2.4, -0.6, 0.6);
     for (let i = 0; i < b.ammo; i++) { const x = b.x - 12 + (i % 5) * 6, y = GY + 6 + Math.floor(i / 5) * 10; c.beginPath(); c.moveTo(x, y); c.lineTo(x + 2, y + 2); c.lineTo(x + 2, y + 7); c.lineTo(x - 2, y + 7); c.lineTo(x - 2, y + 2); c.closePath(); ART.fillOut(c, '#dfe6f2', 1.2); } }
   // estelas: misiles enemigos (rojo) e interceptores (verde)
   c.lineCap = 'round';

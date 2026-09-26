@@ -261,9 +261,17 @@ function drawSnakeOf(o) {
   };
   const flashOn = dying > 0 && Math.floor(dying * 12) % 2;
   if (o.ghost) c.globalAlpha = 0.45;
-  const pass = (col, extra, ox, oy, sc) => { c.fillStyle = col; c.beginPath(); for (const [x, y, d] of S) { const r = rad(d) * (sc || 1) + extra; c.moveTo(x + ox + r, y + oy); c.arc(x + ox, y + oy, r, 0, R2); } c.fill(); };
-  c.fillStyle = 'rgba(0,0,0,.16)'; c.beginPath(); for (const [x, y, d] of S) { const r = rad(d); c.moveTo(x + 2 + r, y + 5); c.arc(x + 2, y + 5, r, 0, R2); } c.fill();
-  pass(OUT, 2.4, 0, 0); pass(flashOn ? '#fff' : SK.body, 0, 0, 0);
+  /* Ley de la pieza única: antes la cabeza era una elipse con SU contorno pegada encima del
+     cuerpo, y se veía la juntura en el cuello. Ahora cabeza y cuerpo entran en el mismo trazado:
+     un solo relleno de contorno y un solo relleno de color; dentro no queda ninguna línea. */
+  const [hx0, hy0] = pts[0], nk0 = pts[1];
+  const ang = Math.atan2(hy0 - nk0[1], hx0 - nk0[0]) || (DIRS[dir][1] ? DIRS[dir][1] * 1.5708 : DIRS[dir][0] < 0 ? Math.PI : 0);
+  const sq = 1 + (bulges.length && bulges[bulges.length - 1].d < 0.6 ? 0.12 : 0);
+  const headIn = (g, ox, oy) => { g.save(); g.translate(hx0 + (ox || 0), hy0 + (oy || 0)); g.rotate(ang); g.scale(sq, 1 / sq); };
+  const addHead = (g, extra, ox, oy, sc) => { headIn(g, ox, oy); const rx = R * 1.4 * (sc || 1) + (extra || 0), ry = R * 1.2 * (sc || 1) + (extra || 0); g.moveTo(2 + rx, 0); g.ellipse(2, 0, rx, ry, 0, 0, R2); g.restore(); };
+  const pass = (col, extra, ox, oy, sc) => { c.fillStyle = col; c.beginPath(); for (const [x, y, d] of S) { const r = rad(d) * (sc || 1) + extra; c.moveTo(x + ox + r, y + oy); c.arc(x + ox, y + oy, r, 0, R2); } addHead(c, extra, ox, oy, sc); c.fill(); };
+  c.fillStyle = 'rgba(0,0,0,.16)'; c.beginPath(); for (const [x, y, d] of S) { const r = rad(d); c.moveTo(x + 2 + r, y + 5); c.arc(x + 2, y + 5, r, 0, R2); } addHead(c, 0, 2, 5); c.fill();
+  pass(OUT, 2.2, 0, 0); pass(flashOn ? '#fff' : SK.body, 0, 0, 0);
   // bandas del cuerpo ancladas a la cola (se mueven con él)
   c.fillStyle = SK.dark;
   for (let d = total - CS * 0.6; d > CS * 0.9; d -= CS * 0.62) {
@@ -271,15 +279,17 @@ function drawSnakeOf(o) {
     c.beginPath(); c.ellipse(s[0], s[1], r * 0.42, r * 0.42, 0, 0, R2); c.fill();
   }
   pass('rgba(255,255,255,.3)', 0, -R * 0.25, -R * 0.35, 0.38);
-  // cabeza
-  const [hx, hy] = pts[0], nk = pts[1], ang = Math.atan2(hy - nk[1], hx - nk[0]) || (DIRS[dir][1] ? DIRS[dir][1] * 1.5708 : DIRS[dir][0] < 0 ? Math.PI : 0);
+  // cara: solo color y sombra dentro de la silueta ya pintada (la cabeza ya está en ella)
   const fr = foods.some((q) => q.x === snake[0].x + DIRS[dir][0] && q.y === snake[0].y + DIRS[dir][1]);
-  c.save(); c.translate(hx, hy); c.rotate(ang);
-  const sq = 1 + (bulges.length && bulges[bulges.length - 1].d < 0.6 ? 0.12 : 0);
-  c.scale(sq, 1 / sq);
+  headIn(c);
   if (!dying && Math.sin(t * 3.1) > 0.93) { c.strokeStyle = '#ff4d6d'; c.lineWidth = 2; c.lineCap = 'round'; c.beginPath(); c.moveTo(R + 5, 0); c.lineTo(R + 13, 0); c.lineTo(R + 16, -3); c.moveTo(R + 13, 0); c.lineTo(R + 16, 3); c.stroke(); }
-  c.beginPath(); c.ellipse(2, 0, R * 1.4, R * 1.2, 0, 0, R2); ART.fillOut(c, flashOn ? '#fff' : SK.body, 2.4);
-  c.fillStyle = 'rgba(255,255,255,.3)'; c.beginPath(); c.ellipse(-1, -R * 0.55, R * 0.7, R * 0.28, 0, 0, R2); c.fill();
+  const hp = (g) => { g.moveTo(2 + R * 1.4, 0); g.ellipse(2, 0, R * 1.4, R * 1.2, 0, 0, R2); };
+  clipIn(c, hp, (g) => {
+    g.fillStyle = PDK(flashOn ? '#ffffff' : SK.body, 0.2); g.beginPath(); g.ellipse(2.6, 1.6, R * 1.4, R * 1.2, 0, 0, R2); g.fill();
+    g.fillStyle = flashOn ? '#fff' : SK.body; g.beginPath(); g.ellipse(1.2, -0.8, R * 1.4, R * 1.2, 0, 0, R2); g.fill();
+    g.fillStyle = PLT(flashOn ? '#ffffff' : SK.body, 0.22); g.beginPath(); g.ellipse(0.2, -2.2, R * 1.4, R * 1.2, 0, 0, R2); g.fill();
+  });
+  spec(c, -1, -R * 0.62, R * 0.62, R * 0.24, 0, 0.42);
   if (fr && !dying) { c.fillStyle = OUT; c.beginPath(); c.ellipse(R * 1.05, 0, 3.5, 4.5, 0, 0, R2); c.fill(); c.fillStyle = '#ff6b7a'; c.beginPath(); c.ellipse(R * 1.05, 1, 2, 2.2, 0, 0, R2); c.fill(); }
   else { c.fillStyle = OUT; c.beginPath(); c.arc(R * 1.1, -2.5, 1, 0, R2); c.arc(R * 1.1, 2.5, 1, 0, R2); c.fill(); }
   const blink = !dying && (t % 3.3) < 0.12;
@@ -287,8 +297,9 @@ function drawSnakeOf(o) {
     const ex = 2, ey = s * R * 0.62;
     if (dying) { c.strokeStyle = OUT; c.lineWidth = 2; c.beginPath(); c.moveTo(ex - 3, ey - 3); c.lineTo(ex + 3, ey + 3); c.moveTo(ex + 3, ey - 3); c.lineTo(ex - 3, ey + 3); c.stroke(); continue; }
     if (blink) { c.strokeStyle = OUT; c.lineWidth = 2; c.beginPath(); c.moveTo(ex - 3.5, ey); c.lineTo(ex + 3.5, ey); c.stroke(); continue; }
-    c.beginPath(); c.arc(ex, ey, 4.4, 0, R2); ART.fillOut(c, '#fff', 1.8);
+    c.fillStyle = '#fff'; c.beginPath(); c.arc(ex, ey, 4.4, 0, R2); c.fill();
     c.fillStyle = OUT; c.beginPath(); c.arc(ex + 1.6, ey, 2.3, 0, R2); c.fill(); c.fillStyle = '#fff'; c.fillRect(ex + 1.6, ey - 1.8, 1.2, 1.2);
+    c.fillStyle = PAL(PZO, 0.5); c.beginPath(); c.ellipse(ex - 0.6, ey - 3.4, 4.4, 1.5, 0, 0, R2); c.fill();   // párpado superior, por sombra
   }
   c.restore(); c.globalAlpha = 1;
 }

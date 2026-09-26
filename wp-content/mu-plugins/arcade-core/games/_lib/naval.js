@@ -95,19 +95,29 @@ function makeIsles(seed) {
 
 /* ---------- Sprites ---------- */
 const SPR = {};
+/* Ley de la pieza única: el casco llevaba encima el timón y las bases de los palos con su propio
+   contorno cerrado. Ahora casco + timón + bauprés son UN solo trazado (unite traza todo y rellena
+   después) y lo de dentro es color y sombra propia. Las velas, que sí giran con el viento, siguen
+   siendo piezas aparte. */
 function hullSprite(col) {
   if (SPR[col]) return SPR[col];
-  return (SPR[col] = mk(56, 32, 3, (g) => {
-    g.translate(28, 16); g.lineJoin = 'round';
-    const hull = () => { g.beginPath(); g.moveTo(24, 0); g.bezierCurveTo(16, -9, 4, -10, -14, -9); g.lineTo(-20, -6); g.lineTo(-20, 6); g.lineTo(-14, 9); g.bezierCurveTo(4, 10, 16, 9, 24, 0); g.closePath(); };
-    g.fillStyle = OUT; for (const s of [-1, 1]) for (const x of [-9, 0, 9]) { rr(g, x - 2.5, s * 9 - 2.5 + s * 1.5, 5, 5, 1.2); g.fill(); }
-    hull(); const gr = g.createLinearGradient(0, -10, 0, 10); gr.addColorStop(0, '#b77a45'); gr.addColorStop(1, '#6e4222'); g.fillStyle = gr; g.fill(); g.lineWidth = 2.4; g.strokeStyle = OUT; g.stroke();
-    g.save(); hull(); g.clip(); g.fillStyle = col; g.fillRect(-22, -11, 50, 3); g.fillRect(-22, 8, 50, 3);
-    g.beginPath(); g.moveTo(20, 0); g.bezierCurveTo(13, -6, 3, -7, -12, -6); g.lineTo(-16, -4); g.lineTo(-16, 4); g.lineTo(-12, 6); g.bezierCurveTo(3, 7, 13, 6, 20, 0); g.fillStyle = '#d9a86c'; g.fill();
-    g.strokeStyle = 'rgba(110,66,34,.5)'; g.lineWidth = 0.8; for (let y = -4; y <= 4; y += 2.6) { g.beginPath(); g.moveTo(-16, y); g.lineTo(18, y * 0.7); g.stroke(); } g.restore();
-    rr(g, -18, -5, 7, 10, 2); g.fillStyle = '#8a5530'; g.fill(); g.lineWidth = 1.5; g.strokeStyle = OUT; g.stroke();
-    for (const x of [-4, 10]) { g.beginPath(); g.arc(x, 0, 2.2, 0, TAU); g.fillStyle = '#5a3a20'; g.fill(); g.lineWidth = 1.2; g.stroke(); }
-    g.beginPath(); g.moveTo(24, 0); g.lineTo(30, 0); g.lineWidth = 2; g.strokeStyle = OUT; g.stroke();
+  return (SPR[col] = mk(64, 32, 3, (g) => {
+    g.translate(30, 16); g.lineJoin = 'round'; g.lineCap = 'round';
+    const hull = (q) => { q.moveTo(24, 0); q.bezierCurveTo(16, -9, 4, -10, -14, -9); q.lineTo(-20, -6); q.lineTo(-20, 6); q.lineTo(-14, 9); q.bezierCurveTo(4, 10, 16, 9, 24, 0); q.closePath(); };
+    const rudder = (q) => { q.moveTo(-26.5, -4.4); q.lineTo(-18, -4.4); q.lineTo(-18, 4.4); q.lineTo(-26.5, 4.4); q.quadraticCurveTo(-28, 4.4, -28, 2.6); q.lineTo(-28, -2.6); q.quadraticCurveTo(-28, -4.4, -26.5, -4.4); q.closePath(); };
+    const bow = (q) => { q.moveTo(20, -1.4); q.lineTo(30, -1); q.quadraticCurveTo(31.8, -0.4, 31.4, 1); q.lineTo(20, 1.4); q.closePath(); };
+    g.fillStyle = OUT; for (const sd of [-1, 1]) for (const x of [-9, 0, 9]) { rr(g, x - 2.5, sd * 9 - 2.5 + sd * 1.5, 5, 5, 1.2); g.fill(); }   // troneras, antes del casco
+    unite(g, [[rudder, '#8a5530'], [bow, '#6e4222'], [hull, '#966134']], 1.55);
+    within(g, hull, (q) => {
+      cel3(q, hull, '#966134', { dx: 1.8, dy: 2.4, r: 40, sh: 0.3, lt: 0.26 });
+      q.fillStyle = col; q.fillRect(-22, -11, 50, 3); q.fillRect(-22, 8, 50, 3);                     // banda del jugador
+      q.beginPath(); q.moveTo(20, 0); q.bezierCurveTo(13, -6, 3, -7, -12, -6); q.lineTo(-16, -4); q.lineTo(-16, 4); q.lineTo(-12, 6); q.bezierCurveTo(3, 7, 13, 6, 20, 0); q.fillStyle = '#d9a86c'; q.fill();
+      q.fillStyle = 'rgba(110,66,34,.4)'; for (let y = -4; y <= 4; y += 2.6) { q.save(); q.beginPath(); q.moveTo(-16, y); q.lineTo(18, y * 0.7); q.lineTo(18, y * 0.7 + 0.7); q.lineTo(-16, y + 0.7); q.closePath(); q.fill(); q.restore(); }
+      q.fillStyle = PAL(PZO, 0.36); for (const x of [-4, 10]) { q.beginPath(); q.arc(x, 0, 2.4, 0, TAU); q.fill(); }   // palos, por color
+      q.fillStyle = PAL(PZO, 0.2); q.fillRect(-24, 5.5, 52, 5);                                       // sombra propia en la banda baja
+    });
+    within(g, rudder, (q) => { q.fillStyle = PAL(PZO, 0.3); q.fillRect(-30, 0.5, 14, 8); });
+    spec(g, -2, -6.2, 9, 1.8, -0.06, 0.34);
   }));
 }
 function chestSprite() {
@@ -115,7 +125,7 @@ function chestSprite() {
   return (SPR.chest = mk(26, 22, 3, (g) => {
     g.lineJoin = 'round'; rr(g, 3, 7, 20, 13, 2.5); const gr = g.createLinearGradient(0, 7, 0, 20); gr.addColorStop(0, '#b77a45'); gr.addColorStop(1, '#7a4a26'); g.fillStyle = gr; g.fill(); g.lineWidth = 2; g.strokeStyle = OUT; g.stroke();
     g.beginPath(); g.moveTo(3, 9); g.quadraticCurveTo(13, -1, 23, 9); g.closePath(); g.fillStyle = '#c98a4b'; g.fill(); g.stroke();
-    g.fillStyle = '#ffd166'; g.fillRect(3, 9, 20, 2.2); g.fillRect(11.5, 6, 3, 14); g.strokeStyle = OUT; g.lineWidth = 1; g.strokeRect(11.5, 11, 3, 4);
+    g.fillStyle = '#ffd166'; g.fillRect(3, 9, 20, 2.2); g.fillRect(11.5, 6, 3, 14); g.fillStyle = PAL(PZO, 0.75); g.fillRect(11.8, 11.4, 2.4, 3.4);
     g.fillStyle = '#fff2b0'; g.beginPath(); g.arc(8, 5, 1.6, 0, TAU); g.fill();
   }));
 }

@@ -61,10 +61,11 @@ function arcoiris() {
     const S = R * 2 + 8;
     return off(S, S, (g) => {
       g.translate(S / 2, S / 2);
-      const gr = g.createRadialGradient(-R * 0.35, -R * 0.45, R * 0.15, 0, 0, R * 1.15);
-      gr.addColorStop(0, ART.lite(cc.c, 0.45)); gr.addColorStop(0.55, cc.c); gr.addColorStop(1, ART.dark(cc.c, 0.3));
-      g.beginPath(); g.arc(0, 0, R - 1, 0, TAU); g.fillStyle = gr; g.fill(); g.lineWidth = 2.4; g.strokeStyle = OUT; g.stroke();
-      g.fillStyle = 'rgba(255,255,255,.55)'; g.beginPath(); g.ellipse(-R * 0.34, -R * 0.4, R * 0.3, R * 0.19, -0.6, 0, TAU); g.fill();
+      contact(g, 0, R * 0.86, R * 0.78, R * 0.22, 0.28);
+      const parts = [[(h) => { h.moveTo(R - 1, 0); h.arc(0, 0, R - 1, 0, TAU); }, cc.c]];
+      uni(g, parts, 1.5);
+      celp(g, parts, cc.c, R * 0.42, R * 0.42);
+      spec(g, -R * 0.34, -R * 0.4, R * 0.3, R * 0.19, -0.6, 0.72);
       // símbolo interior (también distingue los colores sin depender del tono)
       g.fillStyle = ART.dark(cc.c, 0.55); g.strokeStyle = ART.dark(cc.c, 0.55); g.lineWidth = 2.6; g.lineCap = 'round';
       const s = cc.s;
@@ -286,9 +287,10 @@ function fusion() {
     return off(S, S, (g) => {
       g.translate(S / 2, S / 2);
       if (o.d === 'ring') { g.save(); g.rotate(-0.35); g.beginPath(); g.ellipse(0, 0, r * 1.5, r * 0.42, 0, 0, TAU); g.lineWidth = r * 0.22; g.strokeStyle = ART.dark('#ffd9a0', 0.25); g.stroke(); g.restore(); }
-      const gr = g.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r * 1.2);
-      gr.addColorStop(0, ART.lite(o.c, 0.5)); gr.addColorStop(0.55, o.c); gr.addColorStop(1, ART.dark(o.c, 0.32));
-      g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fillStyle = gr; g.fill(); g.lineWidth = 2.6; g.strokeStyle = OUT; g.stroke();
+      contact(g, 0, r * 0.9, r * 0.8, r * 0.2, 0.26);
+      const bparts = [[(h) => { h.moveTo(r, 0); h.arc(0, 0, r, 0, TAU); }, o.c]];
+      uni(g, bparts, 1.6);
+      celp(g, bparts, o.c, r * 0.4, r * 0.4);
       g.save(); g.beginPath(); g.arc(0, 0, r - 1, 0, TAU); g.clip();
       const D = ART.dark(o.c, 0.34), L = ART.lite(o.c, 0.4);
       if (o.d === 'stripe') { g.strokeStyle = D; g.lineWidth = r * 0.17; for (let j = -3; j <= 3; j++) { g.beginPath(); g.moveTo(j * r * 0.42, -r); g.quadraticCurveTo(j * r * 0.55, 0, j * r * 0.42, r); g.stroke(); } }
@@ -299,12 +301,12 @@ function fusion() {
       else if (o.d === 'rock') { g.fillStyle = ART.alpha(D, 0.7); for (let j = 0; j < 5; j++) { const a = j * 1.4, rr = r * 0.55; g.beginPath(); g.arc(Math.cos(a) * rr, Math.sin(a) * rr, r * (0.1 + R2(i * 7 + j) * 0.12), 0, TAU); g.fill(); } }
       else if (o.d === 'star') { g.fillStyle = ART.alpha(L, 0.8); for (let j = 0; j < 7; j++) { const a = j * 0.9; g.beginPath(); g.arc(Math.cos(a) * r * 0.5, Math.sin(a) * r * 0.5, r * 0.16, 0, TAU); g.fill(); } }
       g.restore();
-      g.fillStyle = 'rgba(255,255,255,.5)'; g.beginPath(); g.ellipse(-r * 0.33, -r * 0.4, r * 0.28, r * 0.17, -0.6, 0, TAU); g.fill();
+      spec(g, -r * 0.33, -r * 0.4, r * 0.28, r * 0.17, -0.6, 0.62);
       if (!SOLAR && (o.d === 'stem')) { g.strokeStyle = '#7a4a2a'; g.lineWidth = Math.max(2, r * 0.09); g.lineCap = 'round'; g.beginPath(); g.moveTo(0, -r + 2); g.lineTo(r * 0.12, -r - r * 0.22); g.stroke(); g.beginPath(); g.ellipse(r * 0.3, -r - r * 0.16, r * 0.26, r * 0.12, -0.45, 0, TAU); ART.fillOut(g, '#5ccf5a', 1.8); }
       // carita amable en las piezas grandes
       if (r >= 26) {
         const ey = r * 0.1;
-        for (const s of [-1, 1]) { g.beginPath(); g.arc(s * r * 0.3, ey, r * 0.13, 0, TAU); ART.fillOut(g, '#fff', 1.5); g.fillStyle = OUT; g.beginPath(); g.arc(s * r * 0.3 + r * 0.04, ey, r * 0.07, 0, TAU); g.fill(); }
+        for (const s of [-1, 1]) { g.fillStyle = '#fff'; g.beginPath(); g.arc(s * r * 0.3, ey, r * 0.13, 0, TAU); g.fill(); g.fillStyle = OUT; g.beginPath(); g.arc(s * r * 0.3 + r * 0.04, ey, r * 0.07, 0, TAU); g.fill(); }
         g.strokeStyle = OUT; g.lineWidth = Math.max(1.8, r * 0.05); g.lineCap = 'round'; g.beginPath(); g.arc(0, ey + r * 0.12, r * 0.22, 0.5, 2.64); g.stroke();
       }
     });
