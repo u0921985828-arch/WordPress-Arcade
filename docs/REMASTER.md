@@ -107,3 +107,41 @@ actual ya rebajada en 1.23, para no romper la experiencia de quien ya juega).
   más colores, tablero mayor), nunca hace irresoluble un generador con solución garantizada.
 - **Orden**: se implementa en `kit.js` en cuanto la fase R1 libere ese fichero, y luego se adopta
   motor por motor junto con el despliegue de la fase R5, para no abrir dos veces cada archivo.
+
+## §8 Ley de la pieza única (aplica a TODO el arte del proyecto, no solo a los personajes)
+
+Origen: el usuario, sobre los personajes primero y sobre el conjunto después — «no es un cuerpo
+humano o una sola pieza que se articula, sino todo montados encima de otro» / «esto también se
+aplica a toda la arquitectura de los juegos».
+
+El defecto de fondo de todo el arte del proyecto es el mismo: cada objeto se dibuja como un montón
+de formas apiladas, cada una con su propio contorno cerrado, así que se ven las junturas y todo
+parece un collage de piezas en vez de un objeto.
+
+**Regla.** Todo objeto que el jugador lee como **una sola cosa** se dibuja como **un solo trazado
+continuo**, relleno una vez y contorneado una vez. Dentro de esa silueta no puede quedar ningún
+contorno cerrado más.
+
+Se aplica a:
+- **Personajes y criaturas**: un cuerpo, no cabeza + torso + extremidades apiladas (§ brief
+  `SILUETA-UNICA`).
+- **Vehículos**: coche, moto, tanque, nave, avión, barco, trineo, tabla — carrocería en una pieza;
+  las ruedas y la torreta, que sí articulan, son piezas aparte **porque de verdad giran**.
+- **Objetos y decorado**: árbol (tronco + copa fundidos), casa, barril, caja, torre, cañón, portería,
+  raqueta, palo, arco, cesta, olla, mueble, cofre.
+- **Interfaz dibujada en el lienzo**: marcador, placa, botón, medallón, panel — un cuerpo con borde,
+  no rectángulos encajados.
+
+**Criterios de aplicación** (los mismos que para el cuerpo):
+1. Un único `Path2D` por objeto. Relleno una vez, `stroke` una vez.
+2. Uniones con **tangente continua**: donde dos partes se encuentran no puede haber escalón.
+3. Detalle interior **recortado** (`clip()`) contra la silueta; nada asoma ni crea borde duro dentro.
+4. Las separaciones internas se leen por **sombra propia** (base oscurecida ~16 %) o por cambio de
+   color, nunca por `stroke`.
+5. Una pieza solo se separa de la silueta cuando **se mueve de forma independiente** (rueda que gira,
+   torreta que apunta, tapa que se abre, brazo que cruza por delante). En ese caso lleva únicamente
+   el borde que la separa, no un contorno completo.
+6. **Prueba de la mancha negra**: pintar el objeto en negro puro sobre blanco. Tiene que leerse como
+   ese objeto. Si se ven bultos sueltos o junturas, está mal construido.
+
+**Alcance.** Piloto en `art.js` y `topdown.js`; después, motor a motor, en los 78 restantes (fase R5).
