@@ -140,7 +140,7 @@ function freeOk() {
 }
 function buildLevel() {
   th = THM[(level - 1) % THM.length]; floorCv = renderFloor(); rockCv = renderRock();
-  rocks = []; const n = Math.min(2 * (level - 1), Math.floor(COLS * ROWS * 0.08)), h = snake[0], d = DIRS[dir];
+  rocks = []; const n = Math.min(Math.round(2 * (level - 1) * k.D.rate), Math.floor(COLS * ROWS * 0.08)), h = snake[0], d = DIRS[dir];   // k.D.rate: menos rocas en fácil
   for (let tries = 0; rocks.length < n && tries < 400; tries++) {
     const x = k.ri(0, COLS - 1), y = k.ri(0, ROWS - 1);
     if (onSnake(x, y) || rockAt(x, y) || foods.some((f) => f.x === x && f.y === y)) continue;
@@ -163,7 +163,7 @@ function reset() {
   dir = PORT ? 'up' : 'right'; const d = DIRS[dir], sx = PORT ? Math.floor(COLS / 2) : 6, sy = PORT ? ROWS - 6 : Math.floor(ROWS / 2);
   snake = []; for (let i = 0; i < 4; i++) snake.push({ x: sx - d[0] * i, y: sy - d[1] * i });
   prev = snake.map((s) => ({ x: s.x - d[0], y: s.y - d[1] }));
-  step = 1 / 3.6; acc = step * 0.999; foods = []; rocks = [];
+  step = 1 / (3.6 * k.D.spd); acc = step * 0.999; foods = []; rocks = [];
   buildLevel(); spawnFood('apple');
 }
 
@@ -233,7 +233,7 @@ function update(dt) {
   slowT = Math.max(0, slowT - dt);
   /* velocidad continua por manzanas comidas: 4,5 casillas/s al empezar → 11,5 hacia la manzana 64 (nivel 9) */
   const dq = Math.min(1, eatenTotal / 96); // 1.23: más fácil (antes 4,5 → 11,5 en 64 manzanas)
-  step = 1 / (3.6 + 6.2 * dq) * (slowT > 0 ? 1.45 : 1);
+  step = 1 / ((3.6 + 6.2 * dq) * k.D.spd) * (slowT > 0 ? 1.45 : 1);   // k.D.spd: la serpiente corre menos en fácil
   for (const b of bulges) b.d += dt / step; bulges = bulges.filter((b) => b.d < snake.length + 1);
   acc += dt; if (acc >= step) { acc -= step; if (acc > step) acc = 0; tick(); }
 }
@@ -406,7 +406,7 @@ function snakeMP() {
   }
   k.onParty = () => setup();
   function reset() {
-    cpuLv = Math.min(8, lsGet('cpu:' + ID)); S = []; setup(); clock = 0; over = false; overT = 0; goldT = 6; warned = 0; foods = []; t = 0;
+    cpuLv = k.clamp(lsGet('cpu:' + ID) + k.D.cpu, 0, 8); /* k.D.cpu sin tocar lo guardado */ S = []; setup(); clock = 0; over = false; overT = 0; goldT = 6; warned = 0; foods = []; t = 0;
     S.forEach((s, i) => { s.score = 0; s.alive = true; s.inv = 0; s.dying = 0; s.down = 0; place(s, START[i][0], START[i][1], START[i][2], 4); s.len0 = 4; });
     for (let i = 0; i < APPLES; i++) spawnApple('apple');
     step = 1 / 3.0; acc = 0; k.count(3);
@@ -603,7 +603,7 @@ function comilona() {
   }
   k.onParty = () => setup();
   function reset() {
-    cpuLv = Math.min(8, lsGet('cpu:' + ID)); E = []; setup(); buildMaze(); seed();
+    cpuLv = k.clamp(lsGet('cpu:' + ID) + k.D.cpu, 0, 8); /* k.D.cpu sin tocar lo guardado */ E = []; setup(); buildMaze(); seed();
     clock = 0; over = false; overT = 0; scared = 0; warned = 0; banner = ''; bannerT2 = 0; t = 0;
     E.forEach((e, i) => { e.score = 0; e.acc = 0; e.down = 0; e.inv = 0; e.cool = 0; e.eaten = 0; place(e, HOME[i][0], HOME[i][1]); });
     k.count(3);

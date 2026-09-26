@@ -44,12 +44,12 @@ function buildTrack() {
   if (M === 'race') segs[GS].items.push({ t: 'gate', x: 0, w: 2.6 }); // pórtico de salida/meta
 }
 const DW = { tree: 0.95, pine: 0.7, bush: 0.6, lamp: 0.3, palm: 0.9, cactus: 0.42, rock: 0.62, vtree: 0.7, vrock: 0.5, slamp: 0.28, hydrant: 0.2, planter: 0.62 };
-function reset() { buildTrack(); pos = 0; speed = 0; px = 0; py = 0; pvy = 0; lap = 1; time = 0; score = 0; lives = 4; lane = 0; boost = 0; drift = 0; over = false; place = 7; lastSeg = 0;
+function reset() { buildTrack(); pos = 0; speed = 0; px = 0; py = 0; pvy = 0; lap = 1; time = 0; score = 0; lives = LIVES; lane = 0; boost = 0; drift = 0; over = false; place = 7; lastSeg = 0;
   cd = M === 'race' ? 2.4 : 0; lastHit = null; skyX = 0; dist = 0; nextRow = 50; rowN = 0; coins = 0; fx = []; driftT = 0; bump = 0; lean = 0; hitT = 0; inv = 0;
   maxSpeed = M === 'race' ? (TH === 'neon' ? 13000 : TH === 'canyon' ? 10500 : 12000) : 5200;
   const cols = ['#ff6b6b', '#f2d15c', '#5ce1e6', '#b98cff', '#ffa94d', '#7cf7a0'];
-  cars = M === 'race' ? cols.map((col, i) => { const z = PLZ + (Math.floor(i / 2) + 1) * SEG * 3; return { z, dist: z, x: i % 2 ? 0.45 : -0.45, tx: i % 2 ? 0.45 : -0.45, base: maxSpeed * (0.62 + CUP * 0.0175 + (5 - i) * 0.035), sp: 0, col, img: TH === 'canyon' ? kartSpr(col, k.pick(['#fff', '#1a1530', '#f2d15c'])) : carSpr(col) }; }) : [];
-  if (M === 'lanes') { speed = vmax = LV0 * maxSpeed; placeRows(); }
+  cars = M === 'race' ? cols.map((col, i) => { const z = PLZ + (Math.floor(i / 2) + 1) * SEG * 3; return { z, dist: z, x: i % 2 ? 0.45 : -0.45, tx: i % 2 ? 0.45 : -0.45, base: maxSpeed * (0.62 + CUP * 0.0175 + (5 - i) * 0.035) * RIV, sp: 0, col, img: TH === 'canyon' ? kartSpr(col, k.pick(['#fff', '#1a1530', '#f2d15c'])) : carSpr(col) }; }) : [];
+  if (M === 'lanes') { speed = vmax = LV0 * maxSpeed * k.D.spd; placeRows(); }
   if (M === 'race' && CUP) k.float(`Copa ${CUP + 1}: rivales más rápidos`, W / 2, H * 0.3, '#f2d15c');
 }
 /* ---------- Filas de obstáculos (lanes): siempre queda un carril libre ---------- */
@@ -57,13 +57,15 @@ const LX = [-0.66, 0, 0.66]; let prevFree = 1, rowN = 0;
 /* Dificultad en lanes: velocidad de 0,6× a 2× la base en ~3,5 min (suavizado), filas separadas en tiempo (0,8 s → 0,42 s) y respiro cada 10 filas */
 const LV0 = 0.48, LV1 = 1.7, LT = 315, // 1.23: más fácil (antes 0,6 → 2 en 210 s; filas 0,8 → 0,42 s; 3 vidas)
   ease = (d) => d * d * (3 - 2 * d), lanesD = () => ease(Math.min(1, time / LT));
+/* Dificultad seleccionable: en normal todos los factores valen 1 y nada cambia. */
+const LIVES = 4 + k.D.life, RIV = 1 + k.D.cpu * 0.07;
 /* Carreras: los rivales empiezan flojos y mejoran con cada victoria (hasta 4 copas) */
 let CUP = 0; try { CUP = Math.min(4, +localStorage.getItem('cup:' + CFG.id) || 0); } catch (e) { /* sin almacenamiento */ } // el carril libre solo se desplaza uno por fila
-function spawnRow(i) { const s = segs[i % segs.length], d = lanesD(), free = prevFree = k.clamp(prevFree + k.ri(-1, 1), 0, 2), n = Math.random() < 0.12 + d * 0.52 ? 2 : 1;
+function spawnRow(i) { const s = segs[i % segs.length], d = lanesD(), free = prevFree = k.clamp(prevFree + k.ri(-1, 1), 0, 2), n = Math.random() < (0.12 + d * 0.52) * k.D.rate ? 2 : 1;
   s.items = s.items.filter((q) => q.t === 'deco'); const used = k.shuffle([0, 1, 2].filter((j) => j !== free)).slice(0, n);
   for (const j of used) { const r = Math.random(); s.items.push(r < 0.45 ? { t: 'block', x: LX[j], w: 0.52 } : TH === 'skate' && r < 0.72 ? { t: 'ramp', x: LX[j], w: 0.5 } : { t: 'bar', x: LX[j], w: 0.58 }); }
   if (Math.random() < 0.75) for (let q = -2; q <= 2; q++) segs[(i + q + segs.length) % segs.length].items.push({ t: 'coin', x: LX[free], w: 0.16, ph: q }); }
-function placeRows() { const ahead = Math.floor((dist + PLZ) / SEG) + DRAW - 4; while (nextRow < ahead) { spawnRow(nextRow); const e = lanesD(), v = Math.max(speed, vmax * 0.9); rowN++; nextRow += Math.max(8, Math.round((1.0 - 0.475 * e) * v / SEG)) + (Math.random() < 0.3 ? 2 : 0) + (rowN % 10 === 0 ? Math.round(1.2 * v / SEG) : 0); } }
+function placeRows() { const ahead = Math.floor((dist + PLZ) / SEG) + DRAW - 4; while (nextRow < ahead) { spawnRow(nextRow); const e = lanesD(), v = Math.max(speed, vmax * 0.9); rowN++; nextRow += Math.max(8, Math.round((1.0 - 0.475 * e) * v / SEG / k.D.rate)) + (Math.random() < 0.3 ? 2 : 0) + (rowN % 10 === 0 ? Math.round(1.2 * v / SEG) : 0); } }
 /* ---------- Sprites cacheados ---------- */
 const mk = (w, h, f) => { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const g = cv.getContext('2d'); g.scale(2, 2); g.lineJoin = 'round'; g.lineCap = 'round'; f(g, w, h); return cv; };
 const sh = (g, x, y, rx, ry) => { g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.283); g.fill(); };
@@ -308,7 +310,7 @@ k.run((dt) => {
     const oldPos = pos; pos = (pos + adv) % len; if (pos < oldPos) { lap++; if (lap <= 3) { k.sfx('coin'); k.float(lap === 3 ? '¡Última vuelta!' : `Vuelta ${lap}`, W / 2, H * 0.35, '#f2d15c'); }
       else { over = true; const pts = Math.max(0, 7 - place) * 300 + Math.max(0, 180 - Math.floor(time)) * 10; k.st = 'over'; if (place === 1) try { CUP = Math.min(4, CUP + 1); localStorage.setItem('cup:' + CFG.id, CUP); } catch (e) { /* sin almacenamiento */ } k.end(CFG.id, pts, place === 1 ? '¡Victoria!' : `Llegaste ${place}º`, `Tiempo ${time.toFixed(1)} s`); if (place > 1) k.sfx('lose'); } }
   } else {
-    time += dt; vmax = maxSpeed * (LV0 + (LV1 - LV0) * lanesD()); speed = Math.min(vmax, speed + 2500 * dt); const adv = speed * dt, z0 = dist + PLZ;
+    time += dt; vmax = maxSpeed * (LV0 + (LV1 - LV0) * lanesD()) * k.D.spd; speed = Math.min(vmax, speed + 2500 * dt); const adv = speed * dt, z0 = dist + PLZ;
     const sw = k.swipe || (k.hit.has('left') ? 'left' : k.hit.has('right') ? 'right' : k.hit.has('up') || k.hit.has('a') ? 'up' : k.hit.has('down') ? 'down' : null);
     if (sw === 'left' && lane > -1) { lane--; k.sfx('click'); } if (sw === 'right' && lane < 1) { lane++; k.sfx('click'); }
     if ((sw === 'up' || k.tap) && py === 0) { pvy = 1700; k.sfx('jump'); } if (sw === 'down' && py > 0) pvy = Math.min(pvy, -2600);
@@ -318,7 +320,7 @@ k.run((dt) => {
     eachSeg(z0, z0 + adv, (s) => { for (const it of s.items) { if (it.hit || Math.abs(px - it.x) > (it.t === 'coin' ? 0.31 : 0.22)) continue;
       if (it.t === 'coin') { if (py > 260) continue; it.hit = true; coins++; score += 25; k.sfx('coin'); k.burst(W / 2, PLY - 50 - py * 0.16, '#ffd23f', 8, 120); }
       else if (it.t === 'ramp') { it.hit = true; pvy = 2400; score += 50; k.sfx('jump'); k.float('+50', W / 2, PLY - 110, '#f2d15c'); }
-      else if (inv <= 0 && ((it.t === 'block' && py < 380) || (it.t === 'bar' && py < 110))) { it.hit = true; inv = 1.6; lives--; speed *= 0.5; lastHit = { t: it.t, py, x: it.x, px }; hitT = 0.3; k.sfx('hurt'); k.shake(8); k.flash('rgba(255,60,80,.35)'); k.burst(W / 2, PLY - 40, '#fff', 14, 200);
+      else if (inv <= 0 && ((it.t === 'block' && py < 380) || (it.t === 'bar' && py < 110))) { it.hit = true; inv = 1.6 / k.D.dmg; lives--; speed *= 0.5; lastHit = { t: it.t, py, x: it.x, px }; hitT = 0.3; k.sfx('hurt'); k.shake(8); k.flash('rgba(255,60,80,.35)'); k.burst(W / 2, PLY - 40, '#fff', 14, 200);
         if (lives <= 0) return k.lose(CFG.id, Math.floor(score), 'Chocaste', `${Math.floor(score)} m · ${coins} monedas`); }
       else if (it.t === 'bar' && !it.hit) { it.hit = true; score += 10; } } });
     if (k.st !== 'play') return;
@@ -441,7 +443,7 @@ function hud() {
       label(cd > 0 ? String(n) : '¡YA!', W / 2, 112, 34, cd > 0 ? '#fff' : '#7cf7a0', 'center'); }
   } else {
     label(`${Math.floor(score)}`, 14, 10, 28); ART.coin(c, 24, 58, time, 9); label(`${coins}`, 40, 48, 18, '#ffe27a');
-    for (let i = 0; i < 4; i++) ART.heart(c, W - 22 - i * 28, 26, 1.5, i < lives);
+    for (let i = 0; i < LIVES; i++) ART.heart(c, W - 22 - i * 28, 26, 1.5, i < lives);
     if (time < 3 && k.st === 'play') { c.globalAlpha = Math.min(1, 3 - time); label('Desliza para cambiar de carril', W / 2, H * 0.3, 17, '#fff', 'center'); label('Toca para saltar', W / 2, H * 0.3 + 26, 17, '#fff', 'center'); c.globalAlpha = 1; }
   }
 }

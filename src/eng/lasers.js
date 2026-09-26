@@ -33,19 +33,23 @@ function build() {
   N = Math.min(9, 5 + Math.floor((level - 1) / 3)); S = Math.floor(430 / (N + 0.8)); OX = Math.round((480 - (N + 0.8) * S) / 2 + 0.8 * S); done = false;
   for (let tries = 0; tries < 500; tries++) {
     grid = Array.from({ length: N }, () => Array.from({ length: N }, () => ({ m: 0 }))); emit = { x: -1, y: k.ri(0, N - 1), d: 0 };
-    let x = emit.x, y = emit.y, d = 0, turns = 0; const used = new Set(); let ok = false; const want = Math.min(6, 2 + Math.floor((level - 1) / 2)); /* 1.23: nivel 1-2: 2 espejos; sube cada 2 niveles */
+    let x = emit.x, y = emit.y, d = 0, turns = 0; const used = new Set(); let ok = false; const want = k.clamp(Math.min(6, 2 + Math.floor((level - 1) / 2)) + DW(), 1, 7); /* 1.23: nivel 1-2: 2 espejos; sube cada 2 niveles */
     for (let s = 0; s < N * 4; s++) { x += DIRS[d][0]; y += DIRS[d][1]; if (x < 0 || y < 0 || x >= N || y >= N || used.has(x + ',' + y)) break; used.add(x + ',' + y);
       if (turns >= want && Math.random() < 0.4) { target = [x, y]; ok = true; break; }
       if (Math.random() < 0.35) { const nd = (d + (Math.random() < 0.5 ? 1 : 3)) % 4; const m = [1, 2].find((mm) => reflect(d, mm) === nd); grid[y][x].m = m; grid[y][x].fixed = true; d = nd; turns++; } }
     if (!ok) continue;
-    for (let i = 0; i < Math.min(N, 1 + Math.floor(level / 2)); i++) { const rx = k.ri(0, N - 1), ry = k.ri(0, N - 1); if (!used.has(rx + ',' + ry) && !(rx === target[0] && ry === target[1])) { if (Math.random() < 0.5) grid[ry][rx].m = k.ri(1, 2); else grid[ry][rx].block = true; } }
+    for (let i = 0; i < Math.max(0, Math.round(Math.min(N, 1 + Math.floor(level / 2)) * DD2())); i++) { const rx = k.ri(0, N - 1), ry = k.ri(0, N - 1); if (!used.has(rx + ',' + ry) && !(rx === target[0] && ry === target[1])) { if (Math.random() < 0.5) grid[ry][rx].m = k.ri(1, 2); else grid[ry][rx].block = true; } }
     for (const row of grid) for (const cl of row) { if (cl.fixed) cl.sol = cl.m; if (cl.m && Math.random() < 0.6) cl.m = 3 - cl.m; }
     if (!trace().hit) break;
   }
   for (const row of grid) for (const cl of row) if (cl.m) { cl.ang = cl.m === 1 ? -Math.PI / 4 : Math.PI / 4; cl.a = cl.ang; cl.p = 0; }
   beam = trace(); taps = 0; hitT = 0; cur = [0, emit.y]; boardCv = null; sparkT = 0;
 }
+/* Dificultad: espejos del camino (±1) y cuántos señuelos se reparten. */
+const DW = () => (k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0);
+const DD2 = () => (k.dif === 0 ? 0.5 : k.dif === 2 ? 1.5 : 1);
 function reset() { if (!level) { level = 1; score = 0; } build(); }
+k.onDif = () => { if (k.st !== 'play') { level = 1; score = 0; build(); } };
 function rotate(x, y) { const cl = grid[y] && grid[y][x]; if (!cl || !cl.m) return; cl.m = 3 - cl.m; cl.ang += Math.PI / 2; cl.p = 1; taps++; beam = trace(); k.sfx('click');
   if (beam.hit) { done = true; const bonus = Math.max(0, 50 - taps * 5); score += 100 * level + bonus; const rec = k.best(CFG.id, score); hitT = 0.001; const [tx, ty] = P(target); k.burst(tx, ty, '#7cf7a0', 24, 200); k.sfx('coin'); k.flash('rgba(124,247,160,.25)');
     later(() => { k.st = 'over'; k.show('¡Objetivo alcanzado!', `Nivel ${level} · ${taps} giros · ${score} puntos · Récord ${rec}<br>Toca para el siguiente`); level++; }, 900); } }

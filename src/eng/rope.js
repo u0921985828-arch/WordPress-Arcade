@@ -45,7 +45,10 @@ function build() {
   stars = L.stars.map(([x, y]) => ({ x, y, got: false, gt: 0 })); got = 0; state = 'play'; t = 0; trail = []; winT = 0; kbSel = 0; chew = 0;
 }
 /* si el caramelo se cae se repite el mismo nivel (con los puntos que tenías al empezarlo), no se vuelve al 1 */
-let s0 = 0; function reset() { if (!lv) { lv = 1; score = 0; } else if (k.st === 'over' && state === 'lost') score = s0; s0 = score; build(); }
+/* Dificultad: los niveles están verificados por simulador y no se tocan; difícil empieza en el 4. */
+const LV0 = () => (k.dif === 2 ? 4 : 1);
+let s0 = 0; function reset() { if (!lv) { lv = LV0(); score = 0; } else if (k.st === 'over' && state === 'lost') score = s0; s0 = score; build(); }
+k.onDif = () => { if (k.st !== 'play') { lv = LV0(); score = 0; s0 = 0; build(); } };
 reset(); k.show(CFG.title, 'Desliza el dedo a través de las cuerdas para cortarlas. Mete el caramelo en la cesta y recoge estrellas. Teclado: flechas eligen cuerda, A corta.');
 function segInt(a, b, p, q) { const d = (b.x - a.x) * (q.y - p.y) - (b.y - a.y) * (q.x - p.x); if (!d) return false; const u = ((p.x - a.x) * (q.y - p.y) - (p.y - a.y) * (q.x - p.x)) / d, v = ((p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x)) / d; return u >= 0 && u <= 1 && v >= 0 && v <= 1; }
 function cutRope(r, i) { r.cut = i; k.sfx('shoot'); navigator.vibrate && navigator.vibrate(15); const p = r.pts[i]; k.burst(p.x, p.y, '#e8c890', 10, 90); }

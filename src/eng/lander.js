@@ -57,8 +57,9 @@ function build() {
   for (let x = 0; x <= W; x += 20) { const p = pads.find((q) => x > q.x && x <= q.x + q.w); if (!p) y = k.clamp(y + k.rnd(-28, 28) + (y > GMAX - 20 ? -10 : 0), GMIN, GMAX); ground.push([x, y]); }
   for (const p of pads) { const py = ground[p.x / 20][1]; for (let i = p.x / 20; i <= (p.x + p.w) / 20; i++) ground[i][1] = py; p.y = py; }
   const v0 = Math.min(0.85, 0.2 + (level - 1) * 0.1); // 1.23: más fácil (antes 0.25+0.15/nivel, tope 1)
-  s = { x: PORT ? 70 : 200, y: PORT ? 90 : 40, vx: (PORT ? 30 : 40) * v0, vy: 0, a: 0, thr: false }; maxFuel = fuel = Math.max(48, 124 - level * 7);
-  VYL = Math.max(44, 58 - (level - 1) * 3); VXL = Math.max(28, 35 - (level - 1) * 1.5); landed = 0; crash = 0; smoke = []; debris = [];
+  /* dificultad: deriva inicial ×spd, combustible ×time y margen de aterrizaje ×time (1,25 / 1 / 0,85) */
+  s = { x: PORT ? 70 : 200, y: PORT ? 90 : 40, vx: (PORT ? 30 : 40) * v0 * k.D.spd, vy: 0, a: 0, thr: false }; maxFuel = fuel = Math.max(48, 124 - level * 7) * k.D.time;
+  VYL = Math.max(44, 58 - (level - 1) * 3) * k.D.time; VXL = Math.max(28, 35 - (level - 1) * 1.5) * k.D.time; landed = 0; crash = 0; smoke = []; debris = [];
   terrCv = off(W, H, (g) => {
     g.beginPath(); g.moveTo(0, H); ground.forEach(([x, yy]) => g.lineTo(x, yy)); g.lineTo(W, H); g.closePath();
     const gr = g.createLinearGradient(0, GMIN - 5, 0, H); gr.addColorStop(0, '#8d8fa8'); gr.addColorStop(1, '#3b3d56'); g.fillStyle = gr; g.fill();
@@ -151,7 +152,7 @@ k.run((dt) => {
   s.thr = (k.held.has('up') || k.held.has('a') || k.ptr.down) && fuel > 0;
   if (s.thr) { s.vx += Math.sin(s.a) * 70 * dt; s.vy -= Math.cos(s.a) * 70 * dt; fuel = Math.max(0, fuel - 12 * dt);
     if (Math.random() < dt * 40) { const d = 24 + Math.random() * 8; smoke.push({ x: s.x - Math.sin(s.a) * d, y: s.y + Math.cos(s.a) * d, vx: -Math.sin(s.a) * 60 + k.rnd(-15, 15) + s.vx * 0.3, vy: Math.cos(s.a) * 60 + s.vy * 0.3, r: 3, t: 0.7 }); } }
-  s.vy += 25 * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.x = (s.x + W) % W;
+  s.vy += 25 * k.D.spd * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.x = (s.x + W) % W;
   if (s.y + 13 >= footY()) {
     const p = pads.find((q) => s.x > q.x + 5 && s.x < q.x + q.w - 5), ok = p && s.vy < VYL && Math.abs(s.vx) < VXL && Math.abs(s.a) < 0.36;
     if (ok) { const soft = s.vy < 15; lastPts = Math.round((100 + fuel * 5) * level * p.m * (soft ? 1.5 : 1)); score += lastPts; landed = 2; s.thr = false; s.y = p.y - 13; s.vy = 0; s.vx = 0; s.a = 0;

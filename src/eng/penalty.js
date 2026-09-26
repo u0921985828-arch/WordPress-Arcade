@@ -41,6 +41,8 @@ function bone(pts, ws) {
   };
 }
 const GX = VS ? 170 : 40, GY = VS ? 96 : 160, GW = VS ? 300 : 280, GH = 110, GL = GY + GH, SPOT = VS ? [CX, 326] : [180, 548], VP = [CX, GY - 40];
+/* Dificultad seleccionable: DC = 0 y MISS = 4 en normal → portero y tanda idénticos a siempre. */
+const DC = k.D.cpu, MISS = 4 + k.D.life, lvK = () => Math.max(0, level + DC);
 let kcol = '#ff9a3d', ball, keeper, goals, pts, shots, misses, state, msg, msgT, msgC, level, target, path, net, cheer, kb, aimK, t = 0, bgCv;
 function setup() { ball = { x: SPOT[0], y: SPOT[1] - 14, gy: SPOT[1], s: 1, e: 0, rot: 0, a: 1, h: 0 }; keeper = { x: CX, tx: CX, a: 0, ta: 0, dive: 0, delay: 0, dir: 0 }; state = 'aim'; path = [];
   target = level >= 2 ? { x: Math.random() < 0.5 ? GX + 34 : GX + GW - 34, y: GY + 30, r: 22 } : null; }
@@ -267,9 +269,9 @@ if (!VS) { reset(); buildAll(); k.show(CFG.title, 'Desliza desde el balón hacia
 function shoot(tx, ty, curve) {
   ball.from = [ball.x, ball.gy]; ball.tx = tx; ball.ty = ty; ball.curve = curve; ball.e = 0; state = 'fly'; shots++; k.sfx('shoot');
   // el portero lee la dirección inicial (sin el efecto) y se lanza tras un pequeño retraso
-  const skill = Math.min(0.64, 0.04 + level * 0.065), px = tx - curve * 0.5, py = ty, guess = Math.random() < skill; // 1.23: más fácil (antes 0,06+0,09·nivel, tope 0,75)
-  const ex = guess ? px + k.rnd(-1, 1) * (48 - Math.min(25, level * 2.5)) : 180 + k.pick([-1, 1, 0]) * k.rnd(40, 130), ey = guess ? py : k.rnd(GY + 30, GL - 20);
-  keeper.dir = Math.sign(ex - 180); keeper.tx = 180 + k.clamp(ex - 180, -40, 40); keeper.ta = Math.atan2(ex - keeper.tx, GL - ey) * (Math.abs(ex - 180) < 25 ? 0.2 : 1); keeper.ta = k.clamp(keeper.ta, -1.35, 1.35); keeper.delay = Math.max(0.07, 0.27 - level * 0.016); keeper.dive = 0;
+  const LK = lvK(), skill = Math.min(0.64, 0.04 + LK * 0.065), px = tx - curve * 0.5, py = ty, guess = Math.random() < skill; // 1.23: más fácil (antes 0,06+0,09·nivel, tope 0,75)
+  const ex = guess ? px + k.rnd(-1, 1) * (48 - Math.min(25, LK * 2.5)) : 180 + k.pick([-1, 1, 0]) * k.rnd(40, 130), ey = guess ? py : k.rnd(GY + 30, GL - 20);
+  keeper.dir = Math.sign(ex - 180); keeper.tx = 180 + k.clamp(ex - 180, -40, 40); keeper.ta = Math.atan2(ex - keeper.tx, GL - ey) * (Math.abs(ex - 180) < 25 ? 0.2 : 1); keeper.ta = k.clamp(keeper.ta, -1.35, 1.35); keeper.delay = Math.max(0.07, 0.27 - LK * 0.016); keeper.dive = 0;
 }
 function result(kind) {
   state = 'after'; ball.wait = 1.4; msgT = 1.3;
@@ -297,7 +299,7 @@ if (!VS) k.run((dt) => {
   if (state === 'fly' || state === 'after') { keeper.delay -= dt; if (keeper.delay <= 0 && keeper.dive < 1) { keeper.dive = Math.min(1, keeper.dive + dt * 3.4); keeper.x += (keeper.tx - keeper.x) * Math.min(1, dt * 7); keeper.a += (keeper.ta - keeper.a) * Math.min(1, dt * 9); } }
   if (state === 'fly') { const r = flyStep(dt); if (r) result(r); }
   else if (state === 'after') { const b = ball; afterMove(dt);
-    b.wait -= dt; if (b.wait <= 0) { if (misses >= 4) return k.lose(CFG.id, pts, 'Fin de la tanda', `${goals} goles de ${shots}`); setup(); } }
+    b.wait -= dt; if (b.wait <= 0) { if (misses >= MISS) return k.lose(CFG.id, pts, 'Fin de la tanda', `${goals} goles de ${shots}`); setup(); } }
 }, () => {
   backdrop();
   drawGoalBack();
@@ -314,7 +316,7 @@ if (!VS) k.run((dt) => {
   put(fgCv, 0, 0);
   // HUD
   panel(8, 6, 112, 44); label(`${pts}`, 20, 10, 24, '#f2d15c'); label(`Nivel ${level}`, 108, 12, 11, '#b8f0a8', 'right'); label(`${goals}/${shots} goles`, 108, 30, 11, '#e6e1ff', 'right');
-  panel(W - 140, 6, 132, 44); for (let i = 0; i < 4; i++) { const x = W - 116 + i * 32, y = 28; miniBall(x, y, 11, i < misses ? 0.35 : 1); if (i < misses) { c.strokeStyle = OUT; c.lineWidth = 6; c.lineCap = 'round'; c.beginPath(); c.moveTo(x - 8, y - 8); c.lineTo(x + 8, y + 8); c.moveTo(x + 8, y - 8); c.lineTo(x - 8, y + 8); c.stroke(); c.strokeStyle = '#ff4d5e'; c.lineWidth = 3.5; c.stroke(); } }
+  panel(W - 140, 6, 132, 44); for (let i = 0, sp = MISS <= 4 ? 32 : 25, x0 = MISS <= 4 ? W - 116 : W - 128; i < MISS; i++) { const x = x0 + i * sp, y = 28; miniBall(x, y, 11, i < misses ? 0.35 : 1); if (i < misses) { c.strokeStyle = OUT; c.lineWidth = 6; c.lineCap = 'round'; c.beginPath(); c.moveTo(x - 8, y - 8); c.lineTo(x + 8, y + 8); c.moveTo(x + 8, y - 8); c.lineTo(x - 8, y + 8); c.stroke(); c.strokeStyle = '#ff4d5e'; c.lineWidth = 3.5; c.stroke(); } }
   if (msgT > 0) { const e = Math.min(1, (1.3 - msgT) / 0.16), s = 0.5 + 0.5 * e + Math.sin(e * Math.PI) * 0.2; c.save(); c.translate(W / 2, 360); c.scale(s, s); c.rotate(-0.05); c.globalAlpha = Math.min(1, msgT / 0.3); label(msg, 0, -22, 42, msgC, 'center'); c.restore(); c.globalAlpha = 1; }
 });
 /* ---------- Fondo en vivo: caché + público con ola y flashes ---------- */
@@ -331,7 +333,7 @@ function backdrop() {
 function flyStep(dt) { ball.e += dt * 2.3 * (ball.sp || 1); const e = Math.min(1, ball.e), b = ball;
     b.x = b.from[0] + (b.tx - b.from[0]) * e + b.curve * (e * e * 0.5 + Math.sin(e * Math.PI) * 0.6); b.gy = b.from[1] + (GL + 2 - b.from[1]) * e;
     b.h = (GL - b.ty) * e + Math.sin(e * Math.PI) * 26; b.y = b.gy - 14 * (1 - e * 0.55) - Math.max(0, b.h); b.s = 1 - e * 0.55; b.rot += dt * 14;
-    if (ball.e >= 1) { const bx = b.x, by = b.y, a = keeper.a, kx = keeper.x, p0 = [kx + Math.sin(a) * 12, GL - Math.cos(a) * 12], R = Math.min(102, 78 + level * 3), p1 = [kx + Math.sin(a) * R, GL - Math.cos(a) * R];
+    if (ball.e >= 1) { const bx = b.x, by = b.y, a = keeper.a, kx = keeper.x, p0 = [kx + Math.sin(a) * 12, GL - Math.cos(a) * 12], R = Math.min(102, 78 + lvK() * 3), p1 = [kx + Math.sin(a) * R, GL - Math.cos(a) * R];
       const vx = p1[0] - p0[0], vy = p1[1] - p0[1], u = k.clamp(((bx - p0[0]) * vx + (by - p0[1]) * vy) / (vx * vx + vy * vy), 0, 1), dk = Math.hypot(bx - p0[0] - vx * u, by - p0[1] - vy * u);
       const post = (Math.abs(bx - GX) < 7 || Math.abs(bx - GX - GW) < 7) && by > GY - 6 && by < GL || Math.abs(by - GY) < 6 && bx > GX - 6 && bx < GX + GW + 6;
       const inGoal = bx > GX + 6 && bx < GX + GW - 6 && by > GY + 6 && by < GL;
@@ -476,6 +478,7 @@ function panel(x, y, w, h) { ART.rr(c, x, y, w, h, 10); c.fillStyle = 'rgba(26,2
  * Sin segundo humano, la CPU ocupa la plaza: guarda el nivel en localStorage (cpu:<id>) y lee las manías del rival. */
 function vsMain() {
   level = 5; const LS = 'cpu:' + CFG.id; let lvl = 0; try { lvl = +localStorage.getItem(LS) || 0; } catch (e) {}
+  const lvD = () => k.clamp(lvl + DC, -1, 7); // el nivel guardado no se toca: solo se suma al leerlo
   let seats, kicks, first = 0, sh = 0, kp = 1, pw = 0, pwOn = false, pwT = 0, aimT = 0, runT = 0, readT = -1, introT = 0, over = false, cpuT = 0, cpuZ = null, cpuPw = 0.7, tapZ = null, flick = null, kz = null, shotZ = null, hist = [[], []], started = false, endT = 0;
   const seat = () => (seats = k.players(2)), nm = (p) => (seats[p].cpu ? 'CPU' : String(seats[p].name).slice(0, 8));
   const goalsOf = (p) => kicks[p].filter(Boolean).length;
@@ -496,7 +499,7 @@ function vsMain() {
     else { z = zoneOf(sh); [tx, ty] = aimPoint(z, p); }
     shotZ = z; hist[sh].push(z.x); ball.from = [ball.x, ball.gy]; ball.tx = tx; ball.ty = ty; ball.curve = curve; ball.e = 0; ball.sp = 0.75 + p * 0.75; state = 'fly'; k.sfx('shoot'); k.shake(2); k.burst(ball.x, ball.gy, '#b6f0a0', 8, 90);
     if (seats[kp].cpu) { // la CPU adivina: acierta más con nivel alto, lee las manías del tirador y no falla con los tiros flojos
-      const hs = hist[sh].slice(-6), fav = hs.length >= 3 ? Math.sign(hs.reduce((a, b) => a + b, 0)) : 0, right = Math.random() < Math.min(0.42, 0.18 + lvl * 0.018) || p < 0.24; // 1.23: más fácil (0,26+0,035·nivel → 0,18+0,018·nivel)
+      const hs = hist[sh].slice(-6), fav = hs.length >= 3 ? Math.sign(hs.reduce((a, b) => a + b, 0)) : 0, right = Math.random() < Math.min(0.42, 0.18 + lvD() * 0.018) || p < 0.24; // 1.23: más fácil (0,26+0,035·nivel → 0,18+0,018·nivel)
       kz = right ? { x: z.x, y: z.y } : { x: fav && Math.random() < 0.5 ? fav : k.pick([-1, 0, 1]), y: Math.random() < 0.45 ? 1 : 0 }; dive(kz, 0.12); }
     else readT = 0.1; } // el humano tiene una décima de reacción
   function dive(z, delay) { const [ex, ey] = aimPoint(z, 0, true); keeper.dir = z.x; keeper.tx = CX + k.clamp(ex - CX, -40, 40); keeper.ta = k.clamp(Math.atan2(ex - keeper.tx, GL - ey) * (z.x ? 1 : 0.2), -1.35, 1.35); keeper.delay = delay; keeper.dive = 0; }
@@ -522,7 +525,7 @@ function vsMain() {
     if (state === 'aim') { aimT += dt;
       // portero humano en el móvil local: toca un lado de la portería
       if (!k.party && !seats[kp].cpu && k.ptr.hit && k.ptr.y < GL + 30) tapZ = { x: k.ptr.x < CX - GW / 6 ? -1 : k.ptr.x > CX + GW / 6 ? 1 : 0, y: k.ptr.y < GY + GH / 2 ? 1 : 0 };
-      if (seats[sh].cpu) { cpuT -= dt; if (!cpuZ) { const hk = hist[kp].slice(-4); const bias = lvl > 1 && hk.length ? -Math.sign(hk.reduce((a, b) => a + b, 0)) : 0; cpuZ = { x: bias && Math.random() < 0.3 ? bias : k.pick([-1, -1, 0, 1, 1]), y: Math.random() < 0.4 ? 1 : 0 }; cpuPw = k.clamp(0.66 + (Math.random() - 0.5) * Math.max(0.12, 0.6 - lvl * 0.04), 0.25, 0.97); }
+      if (seats[sh].cpu) { cpuT -= dt; if (!cpuZ) { const hk = hist[kp].slice(-4), lvc = lvD(); const bias = lvc > 1 && hk.length ? -Math.sign(hk.reduce((a, b) => a + b, 0)) : 0; cpuZ = { x: bias && Math.random() < 0.3 ? bias : k.pick([-1, -1, 0, 1, 1]), y: Math.random() < 0.4 ? 1 : 0 }; cpuPw = k.clamp(0.66 + (Math.random() - 0.5) * Math.max(0.12, 0.6 - lvc * 0.04), 0.25, 0.97); }
         if (cpuT < 0.9) { pwOn = true; pwT += dt; pw = Math.min(cpuPw, pwT * 1.1); } if (cpuT <= 0) { runT = 0.35; state = 'run'; } }
       else { const p = sh;
         if (!k.party && k.ptr.down && k.ptr.sy > GL + 40) path.push([k.ptr.x, k.ptr.y]);

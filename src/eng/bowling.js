@@ -26,7 +26,7 @@ function buildSprites() {
 }
 buildSprites(); reset();
 if (TURN) k.show(CFG.title, 'Bolos por turnos para 1–4 con marcador oficial. Joystick ← → coloca la bola, ↑ ↓ elige el efecto y mantén A: suelta cuando la barra de fuerza esté en verde. En el móvil también puedes arrastrar y deslizar hacia arriba.'); else k.show(CFG.title, 'Arrastra la bola a los lados para colocarla y desliza hacia arriba para lanzar: cuanto más rápido, más fuerte; un desliz curvo le da efecto. Teclado: ← → colocar, ↑ ↓ ángulo, A lanzar. 10 frames con puntuación oficial.');
-function launch(vy, ang, hook) { ball.vy = vy; ball.vx = Math.tan(ang) * vy + k.rnd(-9, 9); /* la pista nunca es perfecta (1.23: ±12→±9) */ ball.hook = hook; ball.rolling = true; state = 'roll'; k.sfx('shoot'); k.shake(2); }
+function launch(vy, ang, hook) { ball.vy = vy; ball.vx = Math.tan(ang) * vy + k.rnd(-9, 9) * NOISE; /* la pista nunca es perfecta (1.23: ±12→±9; NOISE = 1 en normal) */ ball.hook = hook; ball.rolling = true; state = 'roll'; k.sfx('shoot'); k.shake(2); }
 k.run((dt) => {
   t += dt; msgT -= dt; if (!k.gate(reset)) return;
   if (TURN && turnAim(dt)) return;
@@ -157,6 +157,7 @@ function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"
  * Mando: ← → posición, ↑ ↓ efecto (−3..3, la bola engancha en el último tramo), A mantenido = barra de fuerza (se suelta para tirar; en rojo la bola sale torcida).
  * La CPU rellena plazas: calcula la posición para entrar en el hueco 1-3 según efecto y fuerza, con un error que baja con su nivel (cpu:<id>). */
 const LSB = 'cpu:' + CFG.id; try { lvlB = +localStorage.getItem(LSB) || 0; } catch (e) {}
+const lvD = () => k.clamp(lvlB + k.D.cpu, -1, 6.5); // nivel de la CPU leído con la dificultad; lo guardado no se toca
 function nPl() { if (!k.party) return 2; return Math.max(2, ...k.party.map((q) => q.p + 1)); }
 function resetT() { seats = k.players(nPl()); PL = seats.map((q) => ({ p: q.p, frames: [], st: 0, sp: 0, ax: 0, hk: 0 })); frame = 0; loadT(0); }
 function loadT(i) { cur = i; const q = PL[i]; frames = q.frames; strikes = q.st; spares = q.sp; aimX = q.ax; hookS = q.hk; roll = 0; rackPins(); standing = 10; setBall(); state = 'intro'; introT = 1.2; pw = 0; pwOn = false; aimT = 0; plan = null; }
@@ -183,8 +184,8 @@ function turnAim(dt) {
   return !!k.party; // en local el puntero (arrastrar y deslizar) sigue funcionando
 }
 function cpuBowl(dt) {
-  if (!plan) { const hk = k.pick([-2, -1, 0, 1, 2, lvlB > 2 ? 2 : 1]), p = k.clamp(0.66 + (Math.random() - 0.5) * Math.max(0.1, 0.5 - lvlB * 0.04), 0.35, 0.86), vy = 700 + p * 1000, T = (1500 - 750) / vy;
-    const tgt = (hk >= 0 ? 1 : -1) * 9, x0 = tgt - 0.5 * hk * 45 * T * T + k.rnd(-1, 1) * Math.max(5, 23 - lvlB * 1.6); /* 1.23: CPU más fallona (17→23) */ plan = { x0: k.clamp(x0, -LANE_W + BR, LANE_W - BR), hk, p, t: 0, st: 0 }; }
+  if (!plan) { const LB = lvD(), hk = k.pick([-2, -1, 0, 1, 2, LB > 2 ? 2 : 1]), p = k.clamp(0.66 + (Math.random() - 0.5) * Math.max(0.1, 0.5 - LB * 0.04), 0.35, 0.86), vy = 700 + p * 1000, T = (1500 - 750) / vy;
+    const tgt = (hk >= 0 ? 1 : -1) * 9, x0 = tgt - 0.5 * hk * 45 * T * T + k.rnd(-1, 1) * Math.max(5, 23 - LB * 1.6); /* 1.23: CPU más fallona (17→23) */ plan = { x0: k.clamp(x0, -LANE_W + BR, LANE_W - BR), hk, p, t: 0, st: 0 }; }
   plan.t += dt; const d = plan.x0 - aimX; if (Math.abs(d) > 1) { aimX += Math.sign(d) * Math.min(Math.abs(d), 70 * dt); ball.x = aimX; }
   if (hookS !== plan.hk && (plan.st += dt) > 0.25) { plan.st = 0; hookS += Math.sign(plan.hk - hookS); k.sfx('click'); }
   if (Math.abs(d) <= 1 && hookS === plan.hk && plan.t > 1) { pwOn = true; pw = Math.min(plan.p, pw + dt * 0.8); if (pw >= plan.p) launchT(plan.p); }

@@ -33,7 +33,7 @@ const COLS = ['#ff6b6b', '#ffa94d', '#f2d15c', '#7cf7a0', '#5ce1e6', '#b98cff'],
 const PW = { W: ['#5ce1e6', 'PALA ANCHA'], M: ['#ff5fa2', 'MULTIBOLA'], S: ['#7cf7a0', 'BOLA LENTA'], V: ['#ff6b6b', '+1 VIDA'] };
 /* Velocidad de bola: saque 230 (nivel 1) → 350 (nivel 9); tope 400 → 560 según nivel; +1,5 % por golpe de pala.
  * Antes: saque 315 y tope 560 ya en el nivel 1 (+2 % por golpe). */
-const BCAP = () => 340 + 136 * Math.min(1, (level - 1) / 12); // 1.23: más fácil (antes 400→560 en 8 niveles; saque 230→350)
+const BCAP = () => (340 + 136 * Math.min(1, (level - 1) / 12)) * k.D.spd; // 1.23: más fácil (antes 400→560 en 8 niveles; saque 230→350). k.D.spd: fácil ×0,8 · difícil ×1,18
 let pad, pwD, balls, bricks, drops, score, lives, level, wide, shards, banner, tm;
 function build() {
   bricks = []; const rows = Math.min(6, 3 + level), pat = (level - 1) % 4;
@@ -46,7 +46,7 @@ function build() {
   }
   balls = [{ x: 240, y: 330, vx: 0, vy: 0, stuck: true, tr: [] }]; drops = []; banner = 1.6;
 }
-function reset() { pad = 240; pwD = 64; score = 0; lives = 4; level = 1; wide = 0; shards = []; tm = 0; build(); }
+function reset() { pad = 240; pwD = 64; score = 0; lives = 4 + k.D.life; level = 1; wide = 0; shards = []; tm = 0; build(); }
 reset(); k.show(CFG.title, 'Arrastra o usa ← → para mover la pala. Toca o A para lanzar. Recoge las cápsulas: pala ancha, multibola, bola lenta y vida extra.');
 
 /* ---------- gráficos cacheados */
@@ -96,7 +96,7 @@ function paddle(x, y, w) {
 function breakBrick(br) {
   br.dead = true; score += 10 * level; k.burst(br.x + 21, br.y + 8, br.col, 10, 140);
   for (let j = 0; j < 5; j++) shards.push({ x: br.x + 6 + j * 8, y: br.y + 8, vx: k.rnd(-70, 70), vy: k.rnd(-110, -20), a: 0, va: k.rnd(-9, 9), s: k.rnd(4, 7), col: br.max > 1 ? '#b8c2d8' : br.col, t: 0.9 });
-  if (Math.random() < 0.15) drops.push({ x: br.x + 22, y: br.y + 8, t: Math.random() < 0.08 ? 'V' : k.pick(['W', 'M', 'S']) });
+  if (Math.random() < 0.15 / k.D.rate) drops.push({ x: br.x + 22, y: br.y + 8, t: Math.random() < 0.08 ? 'V' : k.pick(['W', 'M', 'S']) });
 }
 
 k.run((dt) => {
@@ -110,7 +110,7 @@ k.run((dt) => {
   pad = k.clamp(pad, WL + pw / 2, WR - pw / 2);
   for (const br of bricks) br.fl = Math.max(0, br.fl - dt);
   for (const b of balls) {
-    if (b.stuck) { b.x = pad; b.y = 330; if (k.hit.has('a') || k.tap || k.hit.has('up')) { b.stuck = false; b.vx = k.rnd(-100, 100); b.vy = -(185 + Math.min(12, level - 1) * 9.5); k.sfx('shoot'); } continue; }
+    if (b.stuck) { b.x = pad; b.y = 330; if (k.hit.has('a') || k.tap || k.hit.has('up')) { b.stuck = false; b.vx = k.rnd(-100, 100); b.vy = -(185 + Math.min(12, level - 1) * 9.5) * k.D.spd; k.sfx('shoot'); } continue; }
     const steps = 3, h = dt / steps;
     for (let s = 0; s < steps && !b.dead; s++) {
       b.x += b.vx * h; b.y += b.vy * h;
@@ -132,7 +132,7 @@ k.run((dt) => {
   }
   balls = balls.filter((b) => !b.dead); bricks = bricks.filter((b) => !b.dead);
   for (const d of drops) { d.y += 120 * dt; if (d.y > 330 && d.y < 350 && Math.abs(d.x - pad) < pw / 2 + 8) { d.dead = true; k.sfx('coin'); k.float(PW[d.t][1], d.x, 312, PW[d.t][0]);
-      if (d.t === 'W') wide = 12; else if (d.t === 'V') lives = Math.min(6, lives + 1);
+      if (d.t === 'W') wide = 12; else if (d.t === 'V') lives = Math.min(6 + k.D.life, lives + 1);
       else if (d.t === 'S') { for (const b of balls) if (!b.stuck) { b.vx *= 0.7; b.vy *= 0.7; if (Math.abs(b.vy) < 180) b.vy = Math.sign(b.vy || -1) * 180; } }
       else if (balls[0]) { const b = balls[0]; balls.push({ ...b, tr: [], vx: -b.vx || 150, vy: b.vy || -300, stuck: false }, { ...b, tr: [], vx: b.vx * 0.5 + 90, vy: b.vy || -300, stuck: false }); } }
     if (d.y > 370) d.dead = true; }

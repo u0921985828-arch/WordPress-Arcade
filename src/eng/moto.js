@@ -53,7 +53,9 @@ function label(s, x, y, size, col, align, base) {
 }
 const fmtT = (t) => { t = Math.max(0, t); const m = Math.floor(t / 60), s = t - m * 60; return `${m}:${s < 10 ? '0' : ''}${s.toFixed(1)}`; };
 let CUP = 0; try { CUP = clamp(+localStorage.getItem('cup:' + CFG.id) || 0, 0, 5); } catch (e) { /* sin almacenamiento */ }
-const skill = () => clamp(0.3 + CUP * 0.06, 0.3, 0.6);
+/* Dificultad seleccionable: DC = 0 en normal → la CPU se comporta exactamente igual que siempre. */
+const DC = k.D.cpu;
+const skill = () => clamp(clamp(0.3 + CUP * 0.06, 0.3, 0.6) + DC * 0.07, 0.18, 0.72);
 
 /* ---------- Terreno ---------- */
 const SEG = 8, X0 = -480, NAMES = ['Lomas del Pinar', 'Cañada al Atardecer', 'Selva de Barro'], THEMES = ['meadow', 'dusk', 'jungle'];
@@ -154,7 +156,7 @@ function rubber(b) { const hs = humans(); if (!b.cpu || !hs.length) return 0; co
 /* ---------- Física ---------- */
 function physics(b, h, inp) {
   let fx = 0, fy = G, tq = 0; const con = [0, 0];
-  const vf = b.cpu ? (0.84 + CUP * 0.014) * (1 + rubber(b)) : 1, boost = b.boost > 0 ? 1.4 : 1;
+  const vf = b.cpu ? (0.84 + CUP * 0.014 + DC * 0.05) * (1 + rubber(b)) : 1, boost = b.boost > 0 ? 1.4 : 1;
   for (let i = 0; i < 2; i++) {
     const o = rot(b.th, WH[i]), px = b.x + o[0], py = b.y + o[1], vx = b.vx - b.w * o[1], vy = b.vy + b.w * o[0];
     const s = T.sl(px), nl = Math.sqrt(1 + s * s), nx = s / nl, ny = -1 / nl, tx = 1 / nl, ty = s / nl, dist = (T.gy(px) - py) / nl, pen = R - dist;

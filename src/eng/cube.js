@@ -47,14 +47,17 @@ function roll(s, d) { const [dx, dy] = d; if (s.o === 0) { if (dx) return { x: d
   if (dy) return { x: s.x, y: dy > 0 ? s.y + 2 : s.y - 1, o: 0 }; return { x: s.x + dx, y: s.y, o: 2 }; }
 const ok = (s) => cellsOf(s).every(([x, y]) => tiles.has(x + ',' + y));
 const DD = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+/* dificultad: el nivel efectivo del generador baja uno en fácil y sube uno en difícil (normal igual que siempre) */
+const DLV = k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0;
 function build() {
-  NX = Math.min(14, 8 + Math.floor(level * 0.7)); NY = Math.min(9, 5 + Math.floor(level / 3)); // 1.23: más fácil (antes 8+nivel, 5+nivel/2)
+  const lvd = Math.max(1, level + DLV);
+  NX = Math.min(14, 8 + Math.floor(lvd * 0.7)); NY = Math.min(9, 5 + Math.floor(lvd / 3)); // 1.23: más fácil (antes 8+nivel, 5+nivel/2)
   // Se repite hasta encontrar un nivel resoluble (BFS); tras 300 intentos se relaja la distancia mínima
   /* recorrido mínimo del nivel en una franja creciente: 5-8 (nivel 1), 6-9, 8-11 … hasta 14-17 desde el nivel 7 (antes ≥7 y la meta más lejana posible)
    * y tablero más lleno al principio (56 % → 35 %) */
-  const LO = Math.min(14, 3 + Math.round(level * 1.0)), HI = LO + 3; // 1.23: rampa más lenta (antes ×1,5)
+  const LO = Math.min(14, 3 + Math.round(lvd * 1.0)), HI = LO + 3; // 1.23: rampa más lenta (antes ×1,5)
   for (let tries = 0; ; tries++) {
-    tiles = new Set(); let x = 1, y = Math.floor(NY / 2); const target = Math.floor(NX * NY * (0.56 - Math.min(0.21, level * 0.02)));
+    tiles = new Set(); let x = 1, y = Math.floor(NY / 2); const target = Math.floor(NX * NY * (0.56 - Math.min(0.21, lvd * 0.02)));
     while (tiles.size < target) { tiles.add(x + ',' + y); const d = k.pick([[1, 0], [1, 0], [0, 1], [0, -1], [-1, 0]]); x = k.clamp(x + d[0], 0, NX - 1); y = k.clamp(y + d[1], 0, NY - 1); if (Math.random() < 0.3) tiles.add(k.clamp(x + 1, 0, NX - 1) + ',' + y); }
     const start = { x: 1, y: Math.floor(NY / 2), o: 0 }; if (!ok(start)) continue;
     const K = (s) => s.x + ',' + s.y + ',' + s.o, seen = new Map([[K(start), 0]]), q = [start]; let far = null, fd = 0;
@@ -163,7 +166,7 @@ k.run((dt) => {
 }, () => {
   c.drawImage(board, 0, 0, 640, 480);
   // pistas de dirección al principio
-  if (level === 1 && moves < 3 && !anim && !fall && k.st === 'play') { const b = boxOf(st), cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2; c.globalAlpha = 0.55 + 0.3 * Math.sin(t * 5);
+  if (level <= (k.dif === 0 ? 3 : 1) && moves < 3 && !anim && !fall && k.st === 'play') { const b = boxOf(st), cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2; c.globalAlpha = 0.55 + 0.3 * Math.sin(t * 5);
     for (const [nm, [dx, dy]] of Object.entries(DD)) { const [a, bb] = Q(cx + dx * 1.3, cy + dy * 1.3, 0), [a0, b0] = Q(cx + dx * 0.8, cy + dy * 0.8, 0), an = Math.atan2(bb - b0, a - a0); c.save(); c.translate(a, bb); c.rotate(an); c.beginPath(); c.moveTo(8, 0); c.lineTo(-6, -7); c.lineTo(-6, 7); c.closePath(); ART.fillOut(c, '#7cf7a0', 2); c.restore(); } c.globalAlpha = 1; }
   const sink = fall > 0 ? fall * fall * (st.won ? 3.2 : 6) : 0;
   if (anim) drawBlock(anim.from, anim, 0, 1);

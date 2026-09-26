@@ -27,7 +27,8 @@ const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 const COL = ['#ff5f5f', '#4cc3ff', '#ffd23d', '#5fe08a', '#b77cff', '#ff9a3d', '#ff8ad0', '#5a78ff', '#b8e05a', '#f2f2f2'];
 let sol, N, S, OX, OY = 104, ends, paths, drag, level, score, done, cur, kbd, winT, conn, boardCv, bestL;
 function build() {
-  N = Math.min(9, 5 + Math.floor((level - 1) / 3)); /* 1.23: crece cada 3 niveles */ S = Math.floor(440 / N); OX = (480 - S * N) / 2; done = false;
+  /* Dificultad: el tablero de partida (fácil 4×4, normal 5×5, difícil 6×6); crece cada 3 niveles igual que siempre. */
+  N = Math.min(9, N0() + Math.floor((level - 1) / 3)); /* 1.23: crece cada 3 niveles */ S = Math.floor(440 / N); OX = (480 - S * N) / 2; done = false;
   let path = []; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) path.push([y % 2 ? N - 1 - x : x, y]);
   for (let it = 0; it < N * N * 30; it++) { if (Math.random() < 0.5) path.reverse(); const end = path[path.length - 1]; const nbs = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [end[0] + dx, end[1] + dy]).filter(([x, y]) => x >= 0 && y >= 0 && x < N && y < N);
     const nb = k.pick(nbs); const i = path.findIndex((p) => p[0] === nb[0] && p[1] === nb[1]); if (i < 0 || i === path.length - 2) continue; path = path.slice(0, i + 1).concat(path.slice(i + 1).reverse()); }
@@ -40,7 +41,9 @@ const K = (p) => p[0] + ',' + p[1];
 function owner(p) { for (let i = 0; i < paths.length; i++) if (paths[i].some((q) => q[0] === p[0] && q[1] === p[1])) return i; return -1; }
 function endOf(p) { return ends.findIndex((e) => (e[0][0] === p[0] && e[0][1] === p[1]) || (e[1][0] === p[0] && e[1][1] === p[1])); }
 function connected(i) { const pa = paths[i]; if (pa.length < 2) return false; const a = pa[0], b = pa[pa.length - 1], [e1, e2] = ends[i]; return (K(a) === K(e1) && K(b) === K(e2)) || (K(a) === K(e2) && K(b) === K(e1)); }
+const N0 = () => (k.dif === 0 ? 4 : k.dif === 2 ? 6 : 5);
 function reset() { if (!level || k.st === 'over' && !done) { level = 1; score = 0; } build(); }
+k.onDif = () => { if (k.st !== 'play') { level = 1; score = 0; build(); } };
 
 /* ---------- Acciones (comunes a táctil y teclado) ---------- */
 function grab(cell) { const e = endOf(cell), o = owner(cell);
