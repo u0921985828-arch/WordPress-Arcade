@@ -7,9 +7,12 @@ Abre cada juego con Playwright igual que smoke.py / audit.py (servidor estático
 games/), captura inicio / partida / fin en 390×844 y 800×450 y aplica seis lentes:
 
   1 jerarquía de lectura   los actores en movimiento se separan del fondo por VALOR (B/N)
-  2 contraste de texto     zonas de texto del HUD con contraste WCAG < 4,5:1
-  3 recortes y solapes     texto pegado al borde, DOM fuera de pantalla, choques con
-                           los botones de pausa/sonido (#hud de kit.js)
+  2 contraste de texto     contraste WCAG de cada texto realmente dibujado (se enganchan
+                           fillText/strokeText y se leen los overlays del DOM): < 4,5:1
+                           (< 3:1 si el texto es grande)
+  3 recortes y solapes     texto pegado al borde (< 4 px), texto fuera de pantalla y
+                           textos del juego bajo los botones de pausa/sonido del
+                           reproductor, cuyas cajas se leen del DOM (#hud de kit.js)
   4 daltonismo             protanopía / deuteranopía / tritanopía: colores que se
                            distinguían por tono y dejan de distinguirse
   5 rendimiento gama baja  fps con CPU ×4 (CDP Emulation.setCPUThrottlingRate)
@@ -19,7 +22,7 @@ Salida: <out>/lentes/<slug>/ con las capturas y sus derivados (B/N, daltonismo) 
 informe.json; por consola, un resumen con el recuento de PASA/FALLA.
 Requiere numpy y Pillow (audit.py ya usa Pillow).
 """
-import os, sys, io, json, math, functools, http.server, threading
+import os, sys, io, json, functools, http.server, threading
 from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
@@ -48,7 +51,8 @@ if(!window.__txtOn) return o.apply(this,arguments);
 var c=(n==='fillText'?this.fillStyle:this.strokeStyle), m=this.getTransform(), w=0;
 if(typeof c==='string'&&String(t).trim()){ try{w=this.measureText(String(t)).width}catch(e){}
 window.__txt.push({n:n,t:String(t),x:arguments[1],y:arguments[2],w:w,f:this.font,
-al:this.textAlign,bl:this.textBaseline,c:c,m:[m.a,m.b,m.c,m.d,m.e,m.f],cw:this.canvas.width});
+al:this.textAlign,bl:this.textBaseline,c:c,m:[m.a,m.b,m.c,m.d,m.e,m.f],
+cw:this.canvas.width,dc:(this.canvas.isConnected?1:0)});
 if(window.__txt.length>3000)window.__txt.length=0;}}catch(e){}
 return o.apply(this,arguments);};});})();"""
 
@@ -147,71 +151,81 @@ def caja(celdas, c):
 
 
 # ────────────────────────────── lente 1: jerarquía ───────────────────────────
-def lente_jerarquia(a, b, dest, pref):
-    """Los actores (lo que se mueve entre dos frames) deben separarse del fondo por valor.
-
-    Se trabaja sobre la imagen en blanco y negro: se localizan los grupos de celdas con
-    movimiento (umbral adaptativo, así funciona también con cámara que hace scroll) y se
-    compara la luma del actor con la del anillo de fondo que lo rodea.
-    """
+def actores(a, b, C=8):
+    """Actores de un instante: grupos de celdas que se mueven entre dos frames, con su
+    luma media y la del anillo de fondo que los rodea. Devuelve (dets, imagen B/N)."""
     ga, gb = luma(np.asarray(a)), luma(np.asarray(b))
-    Image.fromarray(ga.astype(np.uint8)).save(dest / f'{pref}-bn.png')
-    C = 8
     h, w = ga.shape
     hy, wx = h // C, w // C
-    mov = np.abs(ga - gb)[:hy * C, :wx * C].reshape(hy, C, wx, C).mean(axis=(1, 3))
-    # umbral adaptativo: por encima del percentil 92 y de 10 niveles — en juegos con
+    rec = lambda m: m[:hy * C, :wx * C].reshape(hy, C, wx, C).mean(axis=(1, 3))
+    mov, mediaL = rec(np.abs(ga - gb)), rec(ga)
+    # umbral adaptativo: por encima del percentil 92 y de 10 niveles — en los juegos con
     # scroll el fondo entero cambia un poco y solo los actores destacan sobre ese fondo.
-    thr = max(10.0, float(np.percentile(mov, 92)))
-    mask = mov > thr
+    mask = mov > max(10.0, float(np.percentile(mov, 92)))
     peq = hy * wx * 0.12                       # descarta cambios de pantalla completa
     dets = []
-    mediaL = ga.reshape(hy, C, wx, C).mean(axis=(1, 3)) if (h % C == 0 and w % C == 0) else \
-        ga[:hy * C, :wx * C].reshape(hy, C, wx, C).mean(axis=(1, 3))
     for g in blobs(mask):
         if len(g) < 3 or len(g) > peq: continue
-        ys = [p[0] for p in g]; xs = [p[1] for p in g]
+        ys = [q[0] for q in g]; xs = [q[1] for q in g]
         y0, y1, x0, x1 = min(ys), max(ys), min(xs), max(xs)
         bw, bh = x1 - x0 + 1, y1 - y0 + 1
-        # los actores son compactos: se descartan las franjas del suelo/paralaje que
-        # «se mueven» por el scroll de la cámara y ocupan media pantalla
+        # los actores son compactos: fuera las franjas de suelo o paralaje que «se
+        # mueven» por el scroll de la cámara y ocupan media pantalla
         if bw > wx * 0.45 or bh > hy * 0.45 or len(g) / (bw * bh) < 0.35: continue
-        act = float(np.mean([mediaL[y, x] for y, x in g]))
-        # anillo de fondo: celdas alrededor de la caja que no son actor
-        anillo = []
-        for y in range(y0 - 2, y1 + 3):
-            for x in range(x0 - 2, x1 + 3):
-                if 0 <= y < hy and 0 <= x < wx and not mask[y, x] and not (y0 <= y <= y1 and x0 <= x <= x1):
-                    anillo.append(mediaL[y, x])
+        anillo = [mediaL[y, x] for y in range(y0 - 2, y1 + 3) for x in range(x0 - 2, x1 + 3)
+                  if 0 <= y < hy and 0 <= x < wx and not mask[y, x]
+                  and not (y0 <= y <= y1 and x0 <= x <= x1)]
         if len(anillo) < 6: continue
-        dv = abs(act - float(np.mean(anillo)))
-        cj = caja(g, C)
-        dets.append(dict(caja=[int(v) for v in cj], dv=round(dv, 1), cel=len(g)))
-    # imagen de apoyo: B/N con los actores medidos y su ΔV, para poder mirarla
-    vis = Image.fromarray(ga.astype(np.uint8)).convert('RGB')
-    dj = ImageDraw.Draw(vis)
-    for d in dets:
-        dj.rectangle(d['caja'], outline=(255, 60, 60) if d['dv'] < L1_DV else (60, 220, 60))
-        dj.text((d['caja'][0], max(0, d['caja'][1] - 10)), str(d['dv']),
-                fill=(255, 60, 60) if d['dv'] < L1_DV else (60, 220, 60))
-    vis.save(dest / f'{pref}-bn-actores.png')
+        dv = abs(float(np.mean([mediaL[y, x] for y, x in g])) - float(np.mean(anillo)))
+        dets.append(dict(caja=[int(v) for v in caja(g, C)], dv=round(dv, 1), cel=len(g)))
+    return dets, ga
+
+
+def lente_jerarquia(pares, dest, pref):
+    """Los actores (lo que se mueve) deben separarse del fondo por VALOR, no por tono.
+
+    Se mira la captura en blanco y negro —la comprobación obligatoria del brief— en tres
+    instantes de la partida, para no depender de lo que hubiera en pantalla en un frame
+    suelto. Se guardan la imagen B/N y otra con los actores medidos y su ΔV.
+
+    Límite conocido: un protagonista al que sigue la cámara no se mueve respecto a la
+    pantalla y no se detecta; se juzga entonces por enemigos, botín y proyectiles. Si no
+    se aísla ningún actor (tableros quietos, solitarios) el veredicto es N/D.
+    """
+    dets = []
+    for i, (a, b) in enumerate(pares):
+        d, ga = actores(a, b)
+        dets += d
+        if i: continue
+        Image.fromarray(ga.astype(np.uint8)).save(dest / f'{pref}-bn.png')
+        vis = Image.fromarray(ga.astype(np.uint8)).convert('RGB')
+        dj = ImageDraw.Draw(vis)
+        for q in d:
+            col = (255, 60, 60) if q['dv'] < L1_DV else (60, 220, 60)
+            dj.rectangle(q['caja'], outline=col)
+            dj.text((q['caja'][0], max(0, q['caja'][1] - 10)), str(q['dv']), fill=col)
+        vis.save(dest / f'{pref}-bn-actores.png')
     if len(dets) < L1_MIN:
         return dict(estado='N/D', nota='no se aislaron actores en movimiento', actores=len(dets))
-    # se juzgan los 10 actores más grandes: los trocitos sueltos son ruido del fondo
-    dets = sorted(dets, key=lambda d: -d['cel'])[:10]
-    fallos = sorted([d for d in dets if d['dv'] < L1_DV], key=lambda d: d['dv'])
-    dets.sort(key=lambda d: d['dv'])
-    ok = len(fallos) * 2 < len(dets)           # falla si la mayoría de actores se funde con el fondo
-    return dict(estado='PASA' if ok else 'FALLA', actores=len(dets),
-                dv_min=dets[0]['dv'], dv_mediana=round(float(np.median([d['dv'] for d in dets])), 1),
-                flojos=[dict(caja=d['caja'], dv=d['dv']) for d in fallos[:6]])
+    dets = sorted(dets, key=lambda q: -q['cel'])[:12]   # los trocitos sueltos son ruido
+    fallos = sorted([q for q in dets if q['dv'] < L1_DV], key=lambda q: q['dv'])
+    dets.sort(key=lambda q: q['dv'])
+    ok = len(fallos) * 2 < len(dets)          # falla si la mayoría se funde con el fondo
+    return dict(estado='PASA' if ok else 'FALLA', actores=len(dets), dv_min=dets[0]['dv'],
+                dv_mediana=round(float(np.median([q['dv'] for q in dets])), 1),
+                flojos=[dict(caja=q['caja'], dv=q['dv']) for q in fallos[:6]])
 
 
 # ─────────────────────── lente 2: contraste de texto / HUD ───────────────────
 def textos(pg, cv):
     """Devuelve los textos realmente dibujados en el último frame, con su caja en px de
     pantalla: los del lienzo (enganchando fillText/strokeText) y los del DOM (overlays de
-    kit.js). Es exacto, no adivina: nada de confundir monedas o cartas con letras."""
+    kit.js). Es exacto, no adivina: nada de confundir monedas o cartas con letras.
+
+    Solo se mide el texto pintado sobre el lienzo visible; el que un motor escriba en un
+    lienzo cacheado fuera de pantalla no se puede situar y se omite. La muestra es la del
+    frame justo anterior a la captura, así que un texto fugaz puede salir en el informe y
+    no verse en la imagen guardada."""
     datos = pg.evaluate("""() => new Promise(res => requestAnimationFrame(() => {
       window.__txt = []; window.__txtOn = 1;
       requestAnimationFrame(() => {
@@ -223,7 +237,7 @@ def textos(pg, cv):
             return {dom: 1, t: (e.textContent || '').trim(),
                     x: b.x, y: b.y, w: b.width, h: b.height, c: cs.color,
                     sel: e.id === 'ov' ? 'ov' : (e.tagName + (e.className ? '.' + e.className : ''))}; });
-        res({canvas: window.__txt.slice(), dom, dpr: devicePixelRatio || 1});
+        res({canvas: window.__txt.slice(), dom});
       });
     }))""")
     out = []
@@ -232,10 +246,10 @@ def textos(pg, cv):
         out.append(dict(tipo='dom', texto=d['t'][:40], sel=d['sel'], color=css_rgb(d['c']),
                         caja=[d['x'], d['y'], d['x'] + d['w'], d['y'] + d['h']]))
     if not cv: return out
-    ratio = cv['w'] / max(1, datos['canvas'][0]['cw']) if datos['canvas'] else 1
+    lienzo = [d for d in datos['canvas'] if d['dc'] and d['n'] == 'fillText']  # strokeText = contorno
+    ratio = cv['w'] / max(1, lienzo[0]['cw']) if lienzo else 1
     vistos = set()
-    for d in datos['canvas']:
-        if d['n'] != 'fillText': continue                  # el strokeText es el contorno
+    for d in lienzo:
         a, b_, c_, dd, e, f = d['m']
         try: fs = float([w for w in d['f'].replace('px', 'px ').split() if w.endswith('px')][0][:-2])
         except Exception: fs = 14.0
@@ -371,14 +385,16 @@ def lente_daltonismo(img, dest, pref):
 def lente_fps(base, x4):
     """fps sin freno (referencia de la máquina) y con CPU ×4 (gama baja) vía CDP."""
     def stat(d):
-        d = [x for x in d if x > 0][8:]          # se descartan los primeros frames (arranque)
-        if len(d) < 15: return None
+        d = [x for x in d if x > 0][5:]          # se descartan los primeros frames (arranque)
+        if len(d) < 8: return None
         d = np.array(d, np.float32)
         return dict(fps=round(1000.0 / float(d.mean()), 1), frames=int(len(d)),
                     p95_ms=round(float(np.percentile(d, 95)), 1),
                     max_ms=round(float(d.max()), 1), picos_32ms=int((d > L5_SPIKE).sum()))
     b, t = stat(base), stat(x4)
-    if not t: return dict(estado='N/D', nota='muestras insuficientes')
+    if not t:                                    # tan pocos frames que ni se puede medir
+        return dict(estado='FALLA', nota='apenas hubo frames con CPU ×4 (menos de ~5 fps)',
+                    frames=len(x4), fps_libre=b['fps'] if b else None)
     r = dict(fps_x4=t['fps'], picos_32ms=t['picos_32ms'], max_ms=t['max_ms'], p95_ms=t['p95_ms'],
              frames=t['frames'], fps_libre=b['fps'] if b else None)
     ok = t['fps'] >= L5_FPS and t['picos_32ms'] <= L5_SPIKES_OK
@@ -410,7 +426,7 @@ def jugar(pg):
     pg.mouse.move(b['width'] * .6, b['height'] * .35, steps=6); pg.mouse.up()
 
 
-def revisar(br, slug, vista, vw, vh, dest, url):
+def revisar(br, vista, vw, vh, dest, url):
     pg = br.new_page(viewport={'width': vw, 'height': vh})
     errs = []
     pg.on('pageerror', lambda e: errs.append('EXC ' + str(e).split('\n')[0][:180]))
@@ -418,6 +434,7 @@ def revisar(br, slug, vista, vw, vh, dest, url):
     pg.add_init_script(FPS_PROBE); pg.add_init_script(TXT_PROBE)
     cdp = pg.context.new_cdp_session(pg)
     shot = lambda: Image.open(io.BytesIO(pg.screenshot())).convert('RGB')
+    pg.bring_to_front()          # si la pestaña queda oculta, el navegador para el rAF
     pg.goto(url); pg.wait_for_timeout(700)
 
     geo_ini = geometria(pg); txt_ini = textos(pg, geo_ini['cv'])
@@ -428,9 +445,12 @@ def revisar(br, slug, vista, vw, vh, dest, url):
     geo_jue = geometria(pg); txt_jue = textos(pg, geo_jue['cv'])
     im_a = shot(); pg.wait_for_timeout(110); im_b = shot()
     im_a.save(dest / f'{vista}-partida.png'); im_b.save(dest / f'{vista}-partida2.png')
+    mov_pares = [(im_a, im_b)]                      # tres instantes para la lente 1
+    for _ in range(2):
+        pg.wait_for_timeout(300); x = shot(); pg.wait_for_timeout(110); mov_pares.append((x, shot()))
 
     # rendimiento: CPU ×4 y unos segundos jugando
-    pg.wait_for_timeout(900)                                          # que se calme la máquina
+    pg.bring_to_front(); pg.wait_for_timeout(900)                                          # que se calme la máquina
     pg.evaluate('window.__fr=[]'); pg.wait_for_timeout(1800)          # referencia sin freno
     base = pg.evaluate('window.__fr') or []
     cdp.send('Emulation.setCPUThrottlingRate', {'rate': 4})
@@ -451,18 +471,18 @@ def revisar(br, slug, vista, vw, vh, dest, url):
     pg.close()
 
     # ── análisis ──
-    pares = ((im_ini, txt_ini, geo_ini), (im_a, txt_jue, geo_jue), (im_fin, txt_fin, geo_fin))
-    t2 = [lente_texto(im, tx, vw, vh) for im, tx, _ in pares]
+    estados = ((im_ini, txt_ini, geo_ini), (im_a, txt_jue, geo_jue), (im_fin, txt_fin, geo_fin))
+    t2 = [lente_texto(im, tx, vw, vh) for im, tx, _ in estados]
     peores = sorted([q for r in t2 for q in r.get('peores', [])], key=lambda q: q['ratio'])
     n_txt = sum(r.get('textos', 0) for r in t2)
     avisos, vistos = [], set()
-    for _, tx, geo in pares:                       # inicio, partida y fin, sin repetir avisos
+    for _, tx, geo in estados:                       # inicio, partida y fin, sin repetir avisos
         for a in lente_recortes(tx, geo['cv'], geo['hud'], vw, vh):
-            k = (a['tipo'], a.get('texto', ''), tuple(a.get('caja', [])))
-            if k in vistos: continue
-            vistos.add(k); avisos.append(a)
+            clave = (a['tipo'], a.get('texto', ''), tuple(a.get('caja', [])))
+            if clave in vistos: continue
+            vistos.add(clave); avisos.append(a)
     return dict(
-        jerarquia=lente_jerarquia(im_a, im_b, dest, vista),
+        jerarquia=lente_jerarquia(mov_pares, dest, vista),
         texto=dict(estado='FALLA' if peores else ('N/D' if not n_txt else 'PASA'),
                    textos=n_txt, flojos=len(peores), peores=peores[:6]),
         recortes=dict(estado='FALLA' if avisos else 'PASA', total=len(avisos), avisos=avisos[:8]),
@@ -492,7 +512,11 @@ def main():
             dest = OUT / s; dest.mkdir(parents=True, exist_ok=True)
             informe[s] = {}
             for vista, vw, vh in VIEWS:
-                r = revisar(br, s, vista, vw, vh, dest, f'http://127.0.0.1:{PORT}/{s}/index.html')
+                try:
+                    r = revisar(br, vista, vw, vh, dest, f'http://127.0.0.1:{PORT}/{s}/index.html')
+                except Exception as e:      # un juego roto no debe tumbar la tanda entera
+                    r = {k: dict(estado='N/D', nota='la revisión falló') for k in NOM}
+                    r['estabilidad'] = dict(estado='FALLA', errores=['REV ' + str(e)[:180]])
                 informe[s][vista] = r
                 for l in r.values():
                     tot[l['estado']] = tot.get(l['estado'], 0) + 1
@@ -525,10 +549,15 @@ def resumen(informe, tot):
                 elif k == 'daltonismo':
                     det = ', '.join(f"{t[:5]} {len(v)}" for t, v in l['pares'].items()) if l.get('pares') else ''
                 elif k == 'rendimiento':
-                    det = f"{l.get('fps_x4','?')} fps con CPU ×4 ({l.get('fps_libre','?')} sin freno), " \
-                          f"picos>32ms {l.get('picos_32ms','?')}, máx {l.get('max_ms','?')} ms"
+                    det = l.get('nota', '') if 'fps_x4' not in l else \
+                        f"{l['fps_x4']} fps con CPU ×4 ({l.get('fps_libre','?')} sin freno), " \
+                        f"picos>32ms {l['picos_32ms']}, máx {l['max_ms']} ms"
+                    if 'fps_x4' in l and l.get('nota'): det += ' — ' + l['nota']
                 elif k == 'estabilidad': det = l['errores'][0] if l['errores'] else 'sin errores'
                 print(f"    {l['estado']:<5} {n:<14} {det}")
+            cnt = {}
+            for l in r.values(): cnt[l['estado']] = cnt.get(l['estado'], 0) + 1
+            print(f"    → {cnt.get('PASA',0)} PASA · {cnt.get('FALLA',0)} FALLA · {cnt.get('N/D',0)} N/D")
     print(f"\nTotal: {tot.get('PASA',0)} PASA · {tot.get('FALLA',0)} FALLA · {tot.get('N/D',0)} N/D")
     print(f'Capturas e informes en {OUT}')
 

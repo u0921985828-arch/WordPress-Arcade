@@ -578,12 +578,22 @@ void main(){
     let rmo = false; try { rmo = matchMedia('(prefers-reduced-motion:reduce)').matches; } catch (e) {}
     const GOPT = { emissive: null, height: null, nl: 0, asp: w / h, t: 0,
       grain: rmo ? 0.012 : 0.02, vig: 0.28, ca: rmo ? 0 : 0.0009, mix: 1, bloom: 0.85, str: 4.2, ao: 0.72, spec: 0.5 };
+    /* Repliegue: si el contexto se pierde, o si en este aparato el compositor no cabe en el
+       presupuesto, se vuelve al lienzo 2D de siempre sin decir nada por consola. */
+    const gxDrop = () => { gxOn = false; k.gfx = false; cv.style.visibility = ''; GX.el.style.display = 'none'; };
+    let gxN = 0; const gxProbe = [];
     function composite(t) {
       GOPT.emissive = eUse ? eCv : null; GOPT.height = hUse ? hCv : null; GOPT.nl = nL;
       GOPT.t = rmo ? 0.5 : (t * 0.0017) % 977;
-      const t0 = performance.now();
-      if (!GX.frame(cv, GOPT)) { gxOn = false; k.gfx = false; cv.style.visibility = ''; GX.el.style.display = 'none'; return; }
-      gxMs += (performance.now() - t0 - gxMs) * 0.08; k.gfxMs = gxMs;
+      /* Tres sondeos con gl.finish() (frames 40/70/100) para medir también el trabajo de GPU:
+         si la mediana pasa de 6 ms, este aparato no da y se apaga el compositor. */
+      const probe = ++gxN === 40 || gxN === 70 || gxN === 100, t0 = performance.now();
+      if (!GX.frame(cv, GOPT)) { gxDrop(); return; }
+      if (probe) {
+        GX.sync(); const ms = performance.now() - t0; gxProbe.push(ms); k.gfxSync = ms;
+        if (gxProbe.length === 3) { const m = gxProbe.slice().sort((a, b) => a - b)[1]; if (m > 6) { gxDrop(); return; } }
+      } else gxMs += (performance.now() - t0 - gxMs) * 0.08;
+      k.gfxMs = gxMs;
     }
     k.run = (update, draw) => {
       let last = performance.now();

@@ -155,7 +155,8 @@ function gfx() {
     const x0 = Math.max(0, Math.floor(cx / T) - 1), x1 = Math.min(MW, x0 + Math.ceil(W / T) + 3);
     for (let y = 0; y < MH; y++) for (let x = x0; x < x1; x++) { const v = map[y][x]; if (!v) continue;
       g.fillStyle = v === 1 ? '#8c8c8c' : v === 2 ? '#b4b4b4' : '#a0a0a0';
-      g.fillRect(x * T, y * T, T, v === 1 ? T : T * 0.45); }
+      g.fillRect(x * T, y * T, T, v === 1 ? T : T * 0.45);
+      if (v === 1 && (!map[y - 1] || map[y - 1][x] !== 1)) { g.fillStyle = '#a8a8a8'; g.fillRect(x * T, y * T, T, 7); } }
     g.fillStyle = '#c4c4c4';
     for (const a of anchors) { g.beginPath(); g.arc(a.x, a.y, 9, 0, 6.283); g.fill(); }
     for (const co of coins) if (!co.got && co.x > cx - 20 && co.x < cx + W + 20) { g.beginPath(); g.arc(co.x, co.y, 9, 0, 6.283); g.fill(); }
@@ -165,7 +166,7 @@ function gfx() {
     g.restore();
   });
   k.glow((g) => {
-    ART.glow(g, KL.x, KL.y, 62, KL.col, 0.5);
+    ART.glow(g, KL.x, KL.y, 50, KL.col, 0.34);
     g.save(); g.translate(ox, oy);
     for (const co of coins) if (!co.got && co.x > cx - 20 && co.x < cx + W + 20) ART.glow(g, co.x, co.y, 15, '#ffd23d', 0.9);
     ART.glow(g, flag.x + 8, flag.y - 78, 24, '#ff7f96', 0.55);
