@@ -643,6 +643,8 @@ function coopDraw() {
 }
 
 reset(); k.show(CFG.title, CFG.help);
+/* si el jugador cambia de nivel en la pantalla de inicio, la partida se prepara de nuevo con los valores de k.D */
+k.onDif = () => { if (k.st !== 'play') reset(); };
 function hurt(n, sx, sy) {
   if (p.inv > 0 || k.st !== 'play') return;
   p.hp -= n; p.inv = 1.5 / k.D.dmg; k.shake(6); k.flash('rgba(255,60,80,.3)'); k.sfx('hurt');

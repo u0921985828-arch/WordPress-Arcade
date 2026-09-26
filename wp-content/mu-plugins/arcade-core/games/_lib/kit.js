@@ -15,7 +15,7 @@
 html,body{margin:0;height:100%;background:${bg};overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;font-family:ui-rounded,"Trebuchet MS",system-ui,sans-serif;color:#f5f1e6}
 canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-action:none}
 #ov{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:16px;pointer-events:none;background:color-mix(in srgb,var(--bg) 55%,rgba(4,4,10,.78));backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
-#ov .card{display:flex;flex-direction:column;align-items:center;gap:10px;padding:24px 22px 22px;min-width:min(300px,84vw);max-width:420px;border-radius:20px;background:linear-gradient(180deg,color-mix(in srgb,var(--bg) 45%,#241d44),color-mix(in srgb,var(--bg) 30%,#14102a));border:3px solid #1a1530;box-shadow:inset 0 2px 0 rgba(255,255,255,.14),0 7px 0 #1a1530,0 18px 40px rgba(0,0,0,.45);animation:pop .28s cubic-bezier(.2,1.2,.4,1)}
+#ov .card{max-height:100%;overflow:hidden;display:flex;flex-direction:column;align-items:center;gap:10px;padding:24px 22px 22px;min-width:min(300px,84vw);max-width:420px;border-radius:20px;background:linear-gradient(180deg,color-mix(in srgb,var(--bg) 45%,#241d44),color-mix(in srgb,var(--bg) 30%,#14102a));border:3px solid #1a1530;box-shadow:inset 0 2px 0 rgba(255,255,255,.14),0 7px 0 #1a1530,0 18px 40px rgba(0,0,0,.45);animation:pop .28s cubic-bezier(.2,1.2,.4,1)}
 #ov h1{margin:0;font:900 clamp(26px,7vmin,40px)/1.05 ui-rounded,"Trebuchet MS",system-ui,sans-serif;letter-spacing:-.01em;color:#fff;text-shadow:0 3px 0 #1a1530,0 0 18px color-mix(in srgb,var(--ac) 45%,transparent)}
 #ov p{margin:0;font:600 clamp(13px,3.4vmin,16px)/1.45 ui-rounded,"Trebuchet MS",system-ui,sans-serif;color:color-mix(in srgb,#fff 78%,var(--ac));max-width:36ch}#ov.hide{display:none}
 #ov .go{margin-top:8px;padding:13px 30px;border-radius:14px;background:var(--ac);color:#fff;font:800 clamp(15px,4vmin,18px)/1 ui-rounded,"Trebuchet MS",system-ui,sans-serif;border:3px solid #1a1530;box-shadow:inset 0 2px 0 rgba(255,255,255,.3),0 5px 0 #1a1530;text-shadow:0 2px 0 rgba(26,21,48,.5);animation:bob 1.6s ease-in-out infinite}
@@ -26,6 +26,8 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-acti
 #ov .dif button:disabled{opacity:.55;cursor:default}
 body.party #ov .dif button{font-size:clamp(13px,3.2vmin,30px);padding:1.5vmin 3vmin;border-radius:2vmin}
 @keyframes pop{from{transform:scale(.9);opacity:0}}@keyframes bob{50%{transform:translateY(-2px)}}
+@media (max-height:430px){#ov{padding:6px;gap:4px}#ov .card{padding:10px 14px 11px;gap:6px;border-radius:14px;border-width:2px;min-width:min(260px,88vw)}#ov h1{font-size:clamp(17px,5.6vmin,24px);text-shadow:0 2px 0 #1a1530}#ov p{font-size:clamp(11px,3vmin,13px);line-height:1.3;max-width:46ch}#ov .go{margin-top:2px;padding:8px 20px;font-size:14px;box-shadow:inset 0 2px 0 rgba(255,255,255,.3),0 3px 0 #1a1530}#ov .rec{font-size:11px;padding:4px 8px}#ov .dif{margin-top:0;gap:4px}#ov .dif button{font-size:11px;padding:6px 10px;border-width:2px;border-radius:9px}}
+@media (max-height:300px){#ov .card{padding:7px 12px 8px;gap:4px}#ov h1{font-size:clamp(15px,5vmin,20px)}#ov p{font-size:11px;line-height:1.25}#ov .go{padding:6px 16px;font-size:13px}}
 @media (prefers-reduced-motion:reduce){#ov .go{animation:none}}
 #hud{position:fixed;top:max(6px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:5}
 #hud.ext{display:none}
@@ -313,7 +315,15 @@ void main(){
         pass(P_FINAL, null);
         return true;
       }
-      return { el: glc, resize, frame, lights: { LP, LC }, sync: () => gl.finish(), dead: () => lost };
+      /* Lectura de control: si en este aparato el compositor devuelve negro puro (driver que no
+         traga alguna extensión, textura que no sube), se apaga y se vuelve al lienzo 2D. */
+      const pbuf = new Uint8Array(4 * 64);
+      const probe = () => { if (lost) return 1; try {
+          const x0 = Math.max(0, (glc.width >> 1) - 4), y0 = Math.max(0, (glc.height >> 1) - 4);
+          gl.readPixels(x0, y0, 8, 8, gl.RGBA, gl.UNSIGNED_BYTE, pbuf);
+          let m = 0; for (let i = 0; i < pbuf.length; i += 4) { const v = pbuf[i] + pbuf[i + 1] + pbuf[i + 2]; if (v > m) m = v; }
+          return m; } catch (e) { return 1; } };
+      return { el: glc, resize, frame, lights: { LP, LC }, sync: () => gl.finish(), dead: () => lost, probe };
     })();
     let gxOn = !!GX;
     if (gxOn) { document.body.insertBefore(GX.el, ov); cv.style.visibility = 'hidden'; }
@@ -633,7 +643,7 @@ void main(){
     k._gx = (on) => { if (!GX || GX.dead()) return false; if (on === false && gxOn) gxDrop();
       else if (on === true && !gxOn) { gxOn = true; k.gfx = true; cv.style.visibility = 'hidden'; GX.el.style.display = ''; fit(); }
       return gxOn; };
-    let gxN = 0; const gxProbe = [];
+    let gxN = 0, gxBlack = 0; const gxProbe = [];
     function composite(t) {
       GOPT.emissive = eUse ? eCv : null; GOPT.height = hUse ? hCv : null; GOPT.nl = nL;
       GOPT.t = rmo ? 0.5 : (t * 0.0017) % 977;
@@ -641,6 +651,8 @@ void main(){
          si la mediana pasa de 6 ms, este aparato no da y se apaga el compositor. */
       const probe = ++gxN === 15 || gxN === 35 || gxN === 65, t0 = performance.now();
       if (!GX.frame(cv, GOPT)) { gxDrop(); return; }
+      /* Tres lecturas seguidas en negro puro = el compositor no está pintando en este aparato. */
+      if (gxN === 8 || gxN === 12 || gxN === 16) { if (GX.probe() < 6) { if (++gxBlack >= 3) { gxDrop(); return; } } else gxBlack = 4e3; }
       if (probe) {
         GX.sync(); const ms = performance.now() - t0; gxProbe.push(ms); k.gfxSync = ms;
         if (gxProbe.length === 3) { const m = gxProbe.slice().sort((a, b) => a - b)[1]; if (m > 6) { gxDrop(); return; } }

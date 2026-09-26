@@ -186,7 +186,7 @@ function panel(x, y, w, h, r, fill, lw) { ART.rr(c, x, y, w, h, r); ART.fillOut(
 
 /* ---------------- Jugadores y CPU ---------------- */
 let LV = 0; try { LV = clamp(+localStorage.getItem('cpu:' + ID) || 0, 0, 9); } catch (e) { /* sin almacenamiento */ }
-const SK = () => 0.175 + LV * 0.075; // 1.23: más fácil — 0,175 … 0,85 (antes 0,25 … 1)
+const SK = () => 0.175 + clamp(LV + k.D.cpu, 0, 9) * 0.075; // 1.23: más fácil — 0,175 … 0,85 (antes 0,25 … 1) · k.D.cpu: ±1 nivel
 let demo = true, t = 0;
 const CNAME = ['roja', 'azul', 'amarilla', 'verde'];
 const cpu = (p) => demo || !k.human(p);

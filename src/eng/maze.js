@@ -311,6 +311,8 @@ function updIso(dt) {
 
 /* ================= Bucle ================= */
 if (!GEM) reset(); k.show(CFG.title, CFG.help);
+/* si el jugador cambia de nivel en la pantalla de inicio, la partida se prepara de nuevo con los valores de k.D */
+k.onDif = () => { if (k.st !== 'play') reset(); };
 k.run((dt) => {
   t += dt; if (k.ptr.hit) dragged = false;
   if (!k.gate(reset)) return;

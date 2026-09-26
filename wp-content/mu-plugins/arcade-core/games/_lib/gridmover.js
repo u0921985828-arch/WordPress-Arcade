@@ -112,6 +112,8 @@ k.onParty = () => {
   for (const q of k.party || []) if (!SLOTS.includes(q.p)) { const i = SLOTS.indexOf(null); if (i >= 0) SLOTS[i] = q.p; }
 };
 reset(); k.show(CFG.title, CFG.help);
+/* si el jugador cambia de nivel en la pantalla de inicio, la partida se prepara de nuevo con los valores de k.D */
+k.onDif = () => { if (k.st !== 'play') reset(); };
 
 const free = (x, y) => x >= 0 && y >= 0 && x < N && y < N && !g[y][x];
 function space(x, y, lim) { const seen = new Set([x * 64 + y]), q = [[x, y]]; let h = 0; while (h < q.length && seen.size < lim) { const [a, b] = q[h++]; for (const [dx, dy] of Object.values(D)) { const nx = a + dx, ny = b + dy, key = nx * 64 + ny; if (!seen.has(key) && free(nx, ny)) { seen.add(key); q.push([nx, ny]); } } } return seen.size; }

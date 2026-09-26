@@ -384,7 +384,7 @@ function refreshCtl() { const P = k.players(4); pl.forEach((q) => { const hu = !
 k.onParty = () => { if (k.st !== 'play') { reset(); return; } refreshCtl(); };
 
 function reset() {
-  skill = Math.max(0.15, Math.min(0.75, 0.21 + lsGet(CPUK, 0) * 0.03)); /* 1.23: más fácil (antes 0,3 + 0,06/victoria, tope 0,88) */
+  skill = Math.max(0.15, Math.min(0.75, 0.21 + Math.max(0, lsGet(CPUK, 0) + k.D.cpu) * 0.03));   /* k.D.cpu: nivel de las CPU, sin tocar lo guardado */ /* 1.23: más fácil (antes 0,3 + 0,06/victoria, tope 0,88) */
   pl = null; newPlayers(); round = 0; newRound();
 }
 function newRound() {

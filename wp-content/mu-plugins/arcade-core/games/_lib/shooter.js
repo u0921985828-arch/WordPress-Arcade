@@ -252,7 +252,9 @@ function spawnWave() {
 }
 function makeBunkers() { bunkers = []; for (let b = 0; b < 4; b++) { const bx = 70 + b * 110, by = H - 100; for (let y = 0; y < 5; y++) for (let x = 0; x < 8; x++) { if ((y === 4 && x > 2 && x < 5) || (y === 0 && (x === 0 || x === 7))) continue; bunkers.push({ x: bx + x * 5, y: by + y * 5 }); } } }
 function reset() { p = { x: W / 2, y: H - 50, tilt: 0 }; shots = []; foes = []; eb = []; pups = []; score = 0; lives = 4 + k.D.life; wave = 0; cool = 0; inv = 3 / k.D.dmg; t = 0; pt = 0; calm = 0; power = 1; shield = 0; ufo = null; bunkers = []; stars = Array.from({ length: 70 }, () => ({ x: k.rnd(0, W), y: k.rnd(0, H), z: k.rnd(0.2, 1) })); spawnWave(); }
-if (M !== 'coop') { reset(); k.show(CFG.title, CFG.help); }
+if (M !== 'coop') { reset(); k.show(CFG.title, CFG.help);
+/* si el jugador cambia de nivel en la pantalla de inicio, la partida se prepara de nuevo con los valores de k.D */
+k.onDif = () => { if (k.st !== 'play') reset(); }; }
 function hitPlayer() { if (inv > 0) return; if (shield > 0) { shield = 0; inv = 1 / k.D.dmg; k.sfx('hit'); k.burst(p.x, p.y, '#5ce1e6', 16); return; } lives--; inv = 2 / k.D.dmg; eb = []; power = Math.max(1, power - 1); k.burst(p.x, p.y, '#ffb347', 30, 220); k.sfx('explode'); k.shake(8); k.flash('rgba(255,80,90,.35)'); if (lives <= 0) k.lose(CFG.id, Math.floor(score), 'Nave destruida', `Oleada ${wave}`); }
 function killFoe(f) { f.dead = true; score += f.pts; k.burst(f.x, f.y, f.boss ? '#f0647e' : EC[(f.kind || 0) % 4], f.boss ? 70 : 14, f.boss ? 260 : 160); k.sfx(f.boss ? 'explode' : 'hit'); if (f.boss) { k.shake(12); k.float(`+${f.pts}`, f.x, f.y, '#e9b949'); pups.push({ x: f.x, y: f.y, t: 'P' }); }
   if (M === 'centipede' && f.seg) mush.push({ x: Math.round((f.x - 10) / 20) * 20 + 10, y: f.y, hp: 3 });
@@ -372,6 +374,7 @@ if (M === 'coop') {
   function coopReset() { t = 0; pt = 0; score = 0; wave = 0; shots = []; eb = []; pups = []; shE = 100; shT = 0; reserve = 3 + k.D.life; kills = [0, 0]; stars = Array.from({ length: 70 }, () => ({ x: k.rnd(0, W), y: k.rnd(0, H), z: k.rnd(0.2, 1) })); mkShips(); coopWave(); }
   k.onParty = () => { if (k.st !== 'play') coopReset(); else syncShips(); };
   coopReset(); k.show(CFG.title, CFG.help);
+  k.onDif = () => { if (k.st !== 'play') coopReset(); };
   window.__coop = (kill) => (kill && ships.forEach((s) => { s.inv = 0; shE = 0; hitShip(s); }), { ships: ships.map((s) => ({ x: s.x, y: s.y, down: s.down, cpu: s.cpu, name: s.name })), shE, reserve, wave, score, foes: foes.length, eb: eb.length, kills }); /* pruebas */
   const alive = () => ships.filter((s) => !s.down);
   function gameOver(why) { const nm = ships.map((s, i) => `${s.name} ${kills[i]}`).join(' · '); k.lose(CFG.id, Math.floor(score), why, `Oleada ${wave} · derribos: ${nm}`); }

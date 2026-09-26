@@ -187,7 +187,7 @@ function mk(w, h, draw) { const cv = document.createElement('canvas'); cv.width 
 
 /* ---------------- Jugadores, CPU y entrada ---------------- */
 let LV = 0; try { LV = clamp(+localStorage.getItem('cpu:' + ID) || 0, 0, 11); } catch (e) { /* sin almacenamiento */ }
-const SK = () => -0.3 + LV * 0.1; /* 1.23: más fácil (antes LV/5: 0…1; ahora −0,3…0,8, media subida por victoria) */
+const SK = () => -0.3 + clamp(LV + k.D.cpu, 0, 11) * 0.1;   /* k.D.cpu: nivel de las CPU, sin tocar lo guardado */ /* 1.23: más fácil (antes LV/5: 0…1; ahora −0,3…0,8, media subida por victoria) */
 let demo = true, t = 0;
 const CNAME = ['roja', 'azul', 'amarilla', 'verde'];
 const cpu = (p) => demo || !k.human(p);

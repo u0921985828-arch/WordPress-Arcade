@@ -448,7 +448,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       const pool = [0, 1, 2, 3, 4, 5].slice(0, S.nc);
       if (rep) S.code = Array.from({ length: 4 }, () => pool[k.ri(0, S.nc - 1)]);
       else { const sh = k.shuffle(pool.slice()); S.code = sh.slice(0, 4); }
-      S.tries = lv <= 1 ? 10 : lv === 2 ? 10 : 9;
+      S.tries = (lv <= 1 ? 10 : lv === 2 ? 10 : 9) + (k.party ? 0 : k.dif === 0 ? 2 : k.dif === 2 ? -2 : 0); /* dificultad: intentos (en la tele manda la tele) */
       S.rows = S.rows.map(() => []); S.guess = S.guess.map(() => [0, 0, 0, 0]); S.slot = S.slot.map(() => 0);
       S.done = S.done.map(() => false); S.phase = 'play'; S.t = 0;
       S.think = Array.from({ length: S.n }, () => 3.2 + Math.random() * 2.6);

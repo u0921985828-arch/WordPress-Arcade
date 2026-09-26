@@ -78,6 +78,8 @@ let rec = 0;
 function reset() { if (TEJ) return resetTej();
   try { rec = +localStorage.getItem(k.bkey(CFG.id)) || 0; } catch (e) { /* sin almacenamiento */ } level = 1; lives = 4 + k.D.life; score = 0; got = 0; build(); }
 if (!TEJ) reset(); k.show(CFG.title, CFG.help);
+/* si el jugador cambia de nivel en la pantalla de inicio, la partida se prepara de nuevo con los valores de k.D */
+k.onDif = () => { if (k.st !== 'play') reset(); };
 
 /* ================= Muerte ================= */
 function die(col) {

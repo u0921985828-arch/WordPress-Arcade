@@ -47,7 +47,10 @@ function build() {
   balls = [{ x: 240, y: 330, vx: 0, vy: 0, stuck: true, tr: [] }]; drops = []; banner = 1.6;
 }
 function reset() { pad = 240; pwD = 64; score = 0; lives = 4 + k.D.life; level = 1; wide = 0; shards = []; tm = 0; build(); }
-reset(); k.show(CFG.title, 'Arrastra o usa ← → para mover la pala. Toca o A para lanzar. Recoge las cápsulas: pala ancha, multibola, bola lenta y vida extra.');
+reset();
+/* si el jugador cambia de nivel en la pantalla de inicio, la partida se prepara de nuevo con los valores de k.D */
+k.onDif = () => { if (k.st !== 'play') reset(); };
+k.show(CFG.title, 'Arrastra o usa ← → para mover la pala. Toca o A para lanzar. Recoge las cápsulas: pala ancha, multibola, bola lenta y vida extra.');
 
 /* ---------- gráficos cacheados */
 function off(w, h, draw) { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const g = cv.getContext('2d'); g.scale(2, 2); draw(g); return cv; }

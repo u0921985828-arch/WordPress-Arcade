@@ -20,6 +20,8 @@ function reset() {
   if (!port && !cave) for (let i = 1; i < 20; i += k.ri(3, 6)) decos.push({ x: i * T + 16, s: Math.random() });
 }
 reset(); k.show(CFG.title, CFG.help);
+/* si el jugador cambia de nivel en la pantalla de inicio, la partida se prepara de nuevo con los valores de k.D */
+k.onDif = () => { if (k.st !== 'play') reset(); };
 const act = () => k.hit.has('a') || k.hit.has('up') || k.ptr.hit;
 const held = () => k.held.has('a') || k.held.has('up') || k.ptr.down;
 const holeAt = (i) => holes.some((h) => i >= h.a && i < h.b);

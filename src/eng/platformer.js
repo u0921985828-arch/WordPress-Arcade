@@ -305,4 +305,6 @@ function raceDraw() {
 }
 k.onParty = () => { if (!RACE) return; if (k.st !== 'play' || !R) { reset(); return; } const pl = k.players(4); for (const r of R.rs) { r.cpu = pl[r.pl].cpu; r.name = r.cpu ? 'CPU' : pl[r.pl].name; } };
 reset(); k.show(CFG.title, CFG.help);
+/* si el jugador cambia de nivel en la pantalla de inicio, la partida se prepara de nuevo con los valores de k.D */
+k.onDif = () => { if (k.st !== 'play') reset(); };
 k.run(RACE ? raceUpdate : upd, RACE ? raceDraw : drw);

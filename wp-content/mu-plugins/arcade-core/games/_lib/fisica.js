@@ -193,7 +193,7 @@ const adiff = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const rs = (i) => { const v = Math.sin(i * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
 const FX = 1 / 120; /* subpaso fijo de la física */
 let CPU = 0; try { CPU = clamp(+localStorage.getItem('cpu:' + CFG.id) || 0, 0, 8); } catch (e) { /* sin almacenamiento */ }
-const skill = () => Math.min(0.78, 0.2 + CPU * 0.05 + (round - 1) * 0.03);
+const skill = () => Math.min(0.78, Math.max(0.05, 0.2 + clamp(CPU + k.D.cpu, 0, 8) * 0.05 + (round - 1) * 0.03));   /* k.D.cpu: nivel de las CPU */
 const soft = () => lerp(0.75, 1, rt / 8); /* arranque suave: nada va a tope en los primeros segundos */
 
 function mk(w, h, fn) { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const q = cv.getContext('2d'); q.scale(2, 2); if (fn) fn(q); return cv; }

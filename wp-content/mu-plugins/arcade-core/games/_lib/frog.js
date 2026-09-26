@@ -62,6 +62,7 @@ function place() { f = { x: 6 * S, y: 12, fx: 6 * S, fy: 12, jt: 0, dir: 0, q: n
 function reset() { if (INF) return resetInf(); score = 0; lives = 4 + k.D.life; level = 1; build(); }
 /* profundidad de una tortuga que bucea (0 = a flote, 1 = sumergida) */
 function depth(it) { if (!it.dive) return 0; const q = (t + it.ph) % 5; return q < 3.2 ? 0 : q < 3.8 ? (q - 3.2) / 0.6 : q < 4.5 ? 1 : 1 - (q - 4.5) / 0.5; }
+k.onDif = () => { if (k.st !== 'play') reset(); }; /* nueva preparación al cambiar de nivel en la pantalla de inicio */
 if (!INF) reset(); k.show(CFG.title, INF ? (CFG.help || 'Cruza sin parar: la pantalla sube sola y quien se queda atrás cae.') : 'Cruza la carretera y el río hasta las 5 charcas. Sube a troncos y tortugas (¡algunas bucean!). Atrapa la mosca para ganar puntos extra. Desliza, toca o usa las flechas.');
 
 function die(kind) {

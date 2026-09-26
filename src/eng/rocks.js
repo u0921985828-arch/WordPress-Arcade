@@ -345,6 +345,8 @@ function draw() {
 
 if (!MP) {
 bgCv = renderBg(); reset();
+/* si el jugador cambia de nivel en la pantalla de inicio, la partida se prepara de nuevo con los valores de k.D */
+k.onDif = () => { if (k.st !== 'play') reset(); };
 k.show(CFG.title || 'Rock Belt', 'Destruye las rocas: se parten al disparar. Cuidado con los OVNIs. Móvil: joystick a la izquierda, dispara tocando a la derecha, botón morado = hiperespacio. Teclado: ← → girar, ↑ propulsar, A disparar, B salto.<br>Toca para empezar');
 k.run((dt) => { if (!k.gate(reset)) { t += dt; for (const r of rocks) { r.x += r.vx * dt * 0.5; r.y += r.vy * dt * 0.5; r.ang += r.rot * dt; wrap(r); } return; } update(dt); }, draw);
 addEventListener('resize', () => { clearTimeout(window.__ot); window.__ot = setTimeout(() => { if ((innerHeight > innerWidth) !== PORT && k.st !== 'play') location.reload(); }, 400); });
