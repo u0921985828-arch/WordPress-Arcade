@@ -974,9 +974,8 @@ function glowSprite() {
 function lights() {
   if (!TH.light) return;
   if (!glowCv) glowCv = glowSprite();
-  c.save(); c.globalCompositeOperation = 'lighter';
-  for (const x of LPOS) { const fl = 0.86 + Math.sin(t * 13 + x) * 0.08 + Math.sin(t * 7.3 + x * 2) * 0.07, rr0 = 92 * fl; c.globalAlpha = 0.38 * fl; c.drawImage(glowCv, x - rr0, Y0 + 2 - rr0, rr0 * 2, rr0 * 2); }
-  c.restore();
+  for (const x of LPOS) { const fl = 0.86 + Math.sin(t * 13 + x) * 0.08 + Math.sin(t * 7.3 + x * 2) * 0.07, rr0 = 78 * fl; c.globalAlpha = 0.5 * fl; c.drawImage(glowCv, x - rr0, Y0 + 2 - rr0, rr0 * 2, rr0 * 2); }
+  c.globalAlpha = 1;
   for (const x of LPOS) {
     const fl = 0.86 + Math.sin(t * 13 + x) * 0.08 + Math.sin(t * 7.3 + x * 2) * 0.07;
     if (TH.light === 'torch') {
@@ -1227,8 +1226,7 @@ function blockShadow(w) {
     w._dx = k.clamp((w.x + w.w / 2 - lx) / 7, -9, 9);
   }
   const pad = w._pad, sw = w.w + pad * 2, sh2 = w.h + pad * 2;
-  c.globalAlpha = 0.3; c.drawImage(w._sh, w.x - pad + w._dx, w.y - pad + 9, sw, sh2 * 1.1);
-  c.globalAlpha = 0.26; c.drawImage(w._sh, w.x - pad + w._dx * 0.4, w.y - pad + 4, sw, sh2);
+  c.globalAlpha = 0.42; c.drawImage(w._sh, w.x - pad + w._dx * 0.7, w.y - pad + 7, sw, sh2 * 1.08);
   c.globalAlpha = 1;
 }
 function block(w) {

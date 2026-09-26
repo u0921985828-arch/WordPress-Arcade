@@ -220,12 +220,17 @@ const ART = (() => {
   function vigSprite(W, H, res) {
     const key = 'vig' + W + 'x' + H + '@' + res; if (cache[key]) return cache[key];
     const cv = mk(W * res, H * res), g = cv.getContext('2d'); g.scale(res, res);
-    const r = Math.hypot(W, H) / 2, gr = g.createRadialGradient(W / 2, H * 0.46, r * 0.42, W / 2, H * 0.5, r * 0.95);
+    const r = Math.hypot(W, H) / 2, gr = g.createRadialGradient(W / 2, H * 0.46, r * 0.44, W / 2, H * 0.5, r * 0.95);
     gr.addColorStop(0, alpha(OUT, 0)); gr.addColorStop(0.7, alpha(OUT, 0.09)); gr.addColorStop(1, alpha(OUT, 0.3));
     g.fillStyle = gr; g.fillRect(0, 0, W, H);
     return (cache[key] = cv);
   }
-  function vignette(c, W, H) { c.drawImage(vigSprite(W, H, 1), 0, 0, W, H); }
+  function vignette(c, W, H) { // se copia 1:1 en píxeles del dispositivo: sin remuestrear (es lo caro)
+    let m = null; try { m = c.getTransform(); } catch (e) { /* sin getTransform */ }
+    const res = m ? Math.min(2, Math.max(1, Math.round(Math.hypot(m.a, m.b) * 100) / 100)) : 1, img = vigSprite(W, H, res);
+    if (m && !m.b && !m.c && Math.abs(m.a - res) < 0.005 && Math.abs(m.d - res) < 0.005) { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(img, Math.round(m.e), Math.round(m.f)); c.restore(); }
+    else c.drawImage(img, 0, 0, W, H);
+  }
 
   function sunSprite(kind, col, res) {
     const key = 'sun' + kind + col + res; if (cache[key]) return cache[key];
@@ -256,9 +261,10 @@ const ART = (() => {
       layer(0.3, H * 0.74, 230, (g, bot) => skyline(g, H * 0.74, th.mid, { bot, haze, saw: true, tall: 70, gap: true, pipes: true, seed: 7, hz: 0.25 }, B.chim));
     } else {
       const peaks = { round: id === 'jungle', snow: id === 'jungle' ? 0 : id === 'snow' ? 0.42 : id === 'night' || id === 'dusk' ? 0.8 : 0.66, seed: id.length, haze, shade: id === 'night' ? 0.3 : 0.2 };
-      // cordillera lejanísima: casi disuelta en la niebla aérea, da una capa más de profundidad
-      layer(0.05, H * 0.56, 78, (g, bot) => mountains(g, H * 0.56, 72, mix(far, haze, 0.55), { ...peaks, seed: id.length + 6, shade: 0.1, bot }));
-      layer(0.1, H * 0.6, 110, (g, bot) => mountains(g, H * 0.6, 100, far, { ...peaks, bot }));
+      // dos cordilleras en el MISMO lienzo cacheado: la de atrás casi disuelta en la niebla aérea
+      // (más profundidad sin pagar un blit más por fotograma)
+      layer(0.1, H * 0.6, 126, (g, bot) => { mountains(g, H * 0.575, 74, mix(far, haze, 0.6), { ...peaks, seed: id.length + 6, shade: 0.1, bot });
+        return mountains(g, H * 0.6, 100, far, { ...peaks, bot }); });
       if (id === 'castle') layer(0.25, H * 0.72, 200, (g, bot) => castles(g, H * 0.72, th.mid, { bot, haze }));
       else { const tree = id === 'jungle' ? 'palm' : th.deco === 'pine' ? 'pine' : 'round', c2 = mix(th.mid, far, 0.45);
         layer(0.2, H * 0.68, 90, (g, bot) => hills(g, H * 0.68, 45, c2, { bot, seed: 4, trees: 22, tree, ts: 0.8, tcol: dark(c2, 0.1), haze, hz: 0.35, snowy: id === 'snow' })); }
