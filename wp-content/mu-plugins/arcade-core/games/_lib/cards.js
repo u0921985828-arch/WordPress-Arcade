@@ -213,11 +213,16 @@ const PIPS = { 2: [[1, 0], [1, 1]], 3: [[1, 0], [1, 0.5], [1, 1]], 4: [[0, 0], [
   7: [[0, 0], [2, 0], [1, 0.25], [0, 0.5], [2, 0.5], [0, 1], [2, 1]], 8: [[0, 0], [2, 0], [1, 0.25], [0, 0.5], [2, 0.5], [1, 0.75], [0, 1], [2, 1]],
   9: [[0, 0], [2, 0], [0, 1 / 3], [2, 1 / 3], [1, 0.5], [0, 2 / 3], [2, 2 / 3], [0, 1], [2, 1]], 10: [[0, 0], [2, 0], [1, 1 / 6], [0, 1 / 3], [2, 1 / 3], [0, 2 / 3], [2, 2 / 3], [1, 5 / 6], [0, 1], [2, 1]] };
 /* índice de esquina: lo más importante, se lee antes que el adorno */
-function index(g, cd, col) { const fs = Math.round(CW * 0.32), rs = RN[cd.r];
+const IY = CW * 0.035, IFS = Math.round(CW * 0.3);
+function index(g, cd, col) { const fs = IFS, rs = RN[cd.r];
   g.font = `800 ${fs}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; g.textAlign = 'left'; g.textBaseline = 'top';
-  const w = g.measureText(rs).width, mx = CW * 0.42; g.save(); g.translate(CW * 0.065, CW * 0.05); if (w > mx) g.scale(mx / w, 1);
-  g.fillStyle = 'rgba(120,95,60,.22)'; g.fillText(rs, 0.7, 0.9); g.fillStyle = col; g.fillText(rs, 0, 0); g.restore();
-  suit(g, cd.s, CW - CW * 0.16, CW * 0.05 + fs * 0.44, fs * 0.7, col);
+  const w = g.measureText(rs).width, mx = CW * 0.42; g.save(); g.translate(CW * 0.065, IY); if (w > mx) g.scale(mx / w, 1);
+  g.fillStyle = 'rgba(120,95,60,.22)'; g.fillText(rs, 0.7, 0.9); g.fillStyle = col; g.fillText(rs, 0, 0);
+  /* la Q necesita su rabito aunque la fuente de respaldo lo dibuje corto: se refuerza a mano */
+  if (cd.r === 12) { g.lineCap = 'round'; g.lineWidth = Math.max(1.2, fs * 0.12); g.strokeStyle = col;
+    g.beginPath(); g.moveTo(w * 0.56, fs * 0.6); g.lineTo(w * 0.82, fs * 0.84); g.stroke(); g.lineCap = 'butt'; }
+  g.restore();
+  suit(g, cd.s, CW - CW * 0.16, IY + fs * 0.46, fs * 0.7, col);
 }
 /* --- figuras J/Q/K: medio cuerpo, simetría especular como una baraja real --- */
 function half(g, cd, col, x0, y0, w, h) {
@@ -310,7 +315,7 @@ function half(g, cd, col, x0, y0, w, h) {
   }
 }
 function court(g, cd, col) {
-  const R = red(cd), mx = CW * 0.12, y0 = CH * 0.2, y1 = CH * 0.8, pw = CW - mx * 2, ph = y1 - y0, cx = CW / 2, cy = (y0 + y1) / 2;
+  const R = red(cd), mx = CW * 0.12, y0 = CH * 0.235, y1 = CH * 0.765, pw = CW - mx * 2, ph = y1 - y0, cx = CW / 2, cy = (y0 + y1) / 2;
   const bg = R ? '#fdeee7' : '#eceffa';
   ART.rr(g, mx, y0, pw, ph, 2.5); g.fillStyle = bg; g.fill();
   g.save(); ART.rr(g, mx, y0, pw, ph, 2.5); g.clip();
@@ -343,12 +348,12 @@ function mkFace(cd) {
   return sprite((g) => {
     body(g, '#fdfaf1', cd.r * 4 + cd.s);
     const col = red(cd) ? '#cf2439' : '#221f3c';
-    index(g, cd, col); g.save(); g.translate(CW, CH); g.rotate(Math.PI); index(g, cd, col); g.restore();
     if (cd.r >= 11) court(g, cd, col);
     else if (cd.r === 1) ace(g, cd, col);
     else if (CW >= 54) { const xs = [CW * 0.31, CW * 0.5, CW * 0.69], y0 = CH * 0.27, y1 = CH * 0.73, z = CW * 0.18;
       for (const [cx, f] of PIPS[cd.r]) { const x = xs[cx], y = y0 + (y1 - y0) * f; if (f > 0.5) { g.save(); g.translate(x, y); g.rotate(Math.PI); suit(g, cd.s, 0, 0, z, col); g.restore(); } else suit(g, cd.s, x, y, z, col); } }
     else { suit(g, cd.s, CW / 2, CH * 0.58, CW * 0.46, col); }
+    index(g, cd, col); g.save(); g.translate(CW, CH); g.rotate(Math.PI); index(g, cd, col); g.restore();
   });
 }
 const FC = {}, face = (cd) => FC[cd.r * 4 + cd.s] || (FC[cd.r * 4 + cd.s] = mkFace(cd));
