@@ -28,7 +28,7 @@ const COL = ['#ff5f5f', '#4cc3ff', '#ffd23d', '#5fe08a', '#b77cff', '#ff9a3d', '
 let sol, N, S, OX, OY = 104, ends, paths, drag, level, score, done, cur, kbd, winT, conn, boardCv, bestL;
 function build() {
   /* Dificultad: el tablero de partida (fácil 4×4, normal 5×5, difícil 6×6); crece cada 3 niveles igual que siempre. */
-  N = Math.min(9, N0() + Math.floor((level - 1) / 3)); /* 1.23: crece cada 3 niveles */ S = Math.floor(440 / N); OX = (480 - S * N) / 2; done = false;
+  N = Math.min(k.dif === 0 ? 7 : 9, N0() + Math.floor((level - 1) / (k.dif === 0 ? 4 : 3))); /* 1.23: crece cada 3 niveles */ S = Math.floor(440 / N); OX = (480 - S * N) / 2; done = false;
   let path = []; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) path.push([y % 2 ? N - 1 - x : x, y]);
   for (let it = 0; it < N * N * 30; it++) { if (Math.random() < 0.5) path.reverse(); const end = path[path.length - 1]; const nbs = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [end[0] + dx, end[1] + dy]).filter(([x, y]) => x >= 0 && y >= 0 && x < N && y < N);
     const nb = k.pick(nbs); const i = path.findIndex((p) => p[0] === nb[0] && p[1] === nb[1]); if (i < 0 || i === path.length - 2) continue; path = path.slice(0, i + 1).concat(path.slice(i + 1).reverse()); }

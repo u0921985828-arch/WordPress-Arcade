@@ -30,7 +30,7 @@ let S, OX, OY, boardCv, bgCv, pr, boxR, face = 1, walkT = 0, t = 0, queued = nul
 const K = (x, y) => x + ',' + y, rnd = (s) => { const x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 function genPush() {
   /* Dificultad: fácil una caja menos y menos revuelto; difícil una más. */
-  N = 7 + Math.min(3, Math.floor(level / 4)); const nb = k.clamp(Math.min(5, 1 + Math.floor(level / 3)) + (k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0), 1, 6);
+  N = (k.dif === 0 ? 6 : k.dif === 2 ? 8 : 7) + Math.min(3, Math.floor(level / (k.dif === 0 ? 5 : 4))); /* fácil: tablero menor y crece más despacio */ const nb = k.clamp(Math.min(5, 1 + Math.floor(level / 3)) + (k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0), 1, 6);
   for (let tries = 0; tries < 200; tries++) {
     wall = new Set(); for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (x === 0 || y === 0 || x === N - 1 || y === N - 1 || Math.random() < 0.12) wall.add(K(x, y));
     const free = []; for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) if (!wall.has(K(x, y))) free.push([x, y]); if (free.length < nb + 6) continue;
@@ -43,14 +43,19 @@ function genPush() {
 }
 function slideEnd(x, y, d) { while (true) { const nx = x + d[0], ny = y + d[1]; if (wall.has(K(nx, ny))) return [x, y]; x = nx; y = ny; if (x === exitC[0] && y === exitC[1]) return [x, y]; } }
 function genIce() {
-  N = 9 + Math.min(4, Math.floor(level / 3));
+  N = (k.dif === 0 ? 8 : k.dif === 2 ? 10 : 9) + Math.min(k.dif === 0 ? 3 : k.dif === 2 ? 3 : 4, Math.floor(level / (k.dif === 0 ? 4 : 3))); /* fácil: pista menor y crece más despacio */
+  let bestTry = null;
   for (let tries = 0; tries < 400; tries++) {
     wall = new Set(); for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (x === 0 || y === 0 || x === N - 1 || y === N - 1 || Math.random() < 0.13) wall.add(K(x, y));
     pl = [k.ri(1, N - 2), k.ri(1, N - 2)]; if (wall.has(K(...pl))) continue; exitC = [k.ri(1, N - 2), k.ri(1, N - 2)]; if (wall.has(K(...exitC))) continue;
     const seen = new Map([[K(...pl), 0]]), q = [pl]; let found = -1;
     while (q.length) { const cur = q.shift(), dd = seen.get(K(...cur)); if (cur[0] === exitC[0] && cur[1] === exitC[1]) { found = dd; break; } for (const d of Object.values(D)) { const e = slideEnd(cur[0], cur[1], d), ke = K(...e); if (!seen.has(ke)) { seen.set(ke, dd + 1); q.push(e); } } }
-    if (found >= Math.max(2, Math.round(Math.min(9, 1 + Math.ceil(level * 2 / 3)) * (k.dif === 0 ? 0.7 : k.dif === 2 ? 1.4 : 1))) && (level >= 8 || found <= 3 + level * 2 || tries > 300)) { par = found; return; } /* nivel 1: 2-5 deslizamientos */
+    /* Dificultad: fácil pide menos deslizamientos mínimos, difícil más (con tope para que el generador no se quede sin salidas). */
+    const want = Math.max(2, Math.min(k.dif === 2 ? 10 : 9, Math.round((1 + Math.ceil(level * 2 / 3)) * (k.dif === 0 ? 0.7 : k.dif === 2 ? 1.4 : 1))));
+    if (found > 1 && (!bestTry || found > bestTry.par)) bestTry = { wall, pl, exitC, par: found };
+    if (found >= want && (level >= 8 || found <= 3 + level * 2 || tries > 300)) { par = found; return; } /* nivel 1: 2-5 deslizamientos */
   }
+  if (bestTry) { wall = bestTry.wall; pl = bestTry.pl; exitC = bestTry.exitC; par = bestTry.par; } /* red de seguridad: nunca se devuelve un tablero inválido */
 }
 function build() {
   moves = 0; hist = []; goals = []; boxes = []; winT = 0; queued = null; trail = [];
@@ -219,7 +224,7 @@ function draw() {
   label(`${total}`, W - 14, 10, 20, '#ffd23d', 'right');
   if (ICE) label(`Mínimo ${par}`, W - 14, 34, 14, '#b6ffcc', 'right'); else label(`Cajas ${boxes.filter(onG).length}/${boxes.length}`, W - 14, 34, 14, '#ffd9a0', 'right');
   for (const b of BTN) btn(b[0], b[1], b[2]);
-  if (!ICE && !winT && !moving() && stuck()) { ART.rr(c, W / 2 - 130, BY - 34, 260, 28, 12); ART.fillOut(c, 'rgba(34,28,66,.92)', 2); label('Caja atascada: deshaz o reinicia', W / 2, BY - 28, 15, '#ffd23d', 'center'); }
+  if (!ICE && !winT && !moving() && k.dif !== 2 && stuck()) { ART.rr(c, W / 2 - 130, BY - 34, 260, 28, 12); ART.fillOut(c, 'rgba(34,28,66,.92)', 2); label('Caja atascada: deshaz o reinicia', W / 2, BY - 28, 15, '#ffd23d', 'center'); }
   if (winT > 0) { const p = Math.min(1, (1.6 - winT) * 5), sc = p < 1 ? 0.6 + p * 0.5 - Math.sin(p * 3.14) * 0.1 : 1; c.save(); c.translate(W / 2, H / 2 - 20); c.scale(sc, sc);
     ART.rr(c, -150, -58, 300, 116, 22); ART.fillOut(c, 'rgba(34,28,66,.94)', 3); label('¡Nivel superado!', 0, -44, 28, '#7cf7a0', 'center');
     for (let i = 0; i < 3; i++) star(-44 + i * 44, 20, i < winStars ? 15 : 12, i < winStars && p > i * 0.3);

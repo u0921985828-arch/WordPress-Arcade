@@ -36,7 +36,7 @@ const LEVELS = [
   { pins: [[80, 60], [280, 160], [80, 300]], basket: 180, stars: [[150, 470], [175, 530]] },
   { pins: [[180, 60]], basket: 250, bumper: [120, 360], stars: [[190, 300], [240, 450]], wind: 180 },
 ];
-let lv, candy, ropes, stars, got, state, score, cutLine, t, L, trail = [], bumpT = 0, winT = 0, kbSel = 0, chew = 0, bgCv;
+let lv, candy, ropes, stars, got, state, score, cutLine, t, L, trail = [], bumpT = 0, winT = 0, kbSel = 0, chew = 0, bgCv, extra = 0;
 function level(n) { const b = LEVELS[(n - 1) % LEVELS.length], m = Math.floor((n - 1) / LEVELS.length) % 2 === 1, fx = (x) => (m ? W - x : x);
   return { pins: b.pins.map(([x, y]) => [fx(x), y]), basket: fx(b.basket), stars: b.stars.map(([x, y]) => [fx(x), y]), bumper: b.bumper && [fx(b.bumper[0]), b.bumper[1]], wind: b.wind ? (m ? -b.wind : b.wind) : 0 }; }
 function build() {
@@ -45,10 +45,14 @@ function build() {
   stars = L.stars.map(([x, y]) => ({ x, y, got: false, gt: 0 })); got = 0; state = 'play'; t = 0; trail = []; winT = 0; kbSel = 0; chew = 0;
 }
 /* si el caramelo se cae se repite el mismo nivel (con los puntos que tenías al empezarlo), no se vuelve al 1 */
-/* Dificultad: los niveles están verificados por simulador y no se tocan; difícil empieza en el 4. */
+/* Dificultad (normal = exactamente como siempre). La física NO se toca (los niveles están verificados
+   por simulador): solo cambian el nivel de partida, la tolerancia de la cesta y de las estrellas, y los
+   intentos extra de fácil. Cesta y estrellas se revalidaron con el simulador en los 8 niveles y sus espejos. */
 const LV0 = () => (k.dif === 2 ? 4 : 1);
-let s0 = 0; function reset() { if (!lv) { lv = LV0(); score = 0; } else if (k.st === 'over' && state === 'lost') score = s0; s0 = score; build(); }
-k.onDif = () => { if (k.st !== 'play') { lv = LV0(); score = 0; s0 = 0; build(); } };
+const BW = () => (k.dif === 0 ? 58 : k.dif === 2 ? 42 : 48);   /* media anchura útil de la cesta */
+const SR = () => (k.dif === 0 ? 38 : k.dif === 2 ? 27 : 31);   /* radio de recogida de estrella */
+let s0 = 0; function reset() { if (!lv) { lv = LV0(); score = 0; } else if (k.st === 'over' && state === 'lost') score = s0; s0 = score; build(); extra = k.D.life; }
+k.onDif = () => { if (k.st !== 'play') { lv = LV0(); score = 0; s0 = 0; build(); extra = k.D.life; } };
 reset(); k.show(CFG.title, 'Desliza el dedo a través de las cuerdas para cortarlas. Mete el caramelo en la cesta y recoge estrellas. Teclado: flechas eligen cuerda, A corta.');
 function segInt(a, b, p, q) { const d = (b.x - a.x) * (q.y - p.y) - (b.y - a.y) * (q.x - p.x); if (!d) return false; const u = ((p.x - a.x) * (q.y - p.y) - (p.y - a.y) * (q.x - p.x)) / d, v = ((p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x)) / d; return u >= 0 && u <= 1 && v >= 0 && v <= 1; }
 function cutRope(r, i) { r.cut = i; k.sfx('shoot'); navigator.vibrate && navigator.vibrate(15); const p = r.pts[i]; k.burst(p.x, p.y, '#e8c890', 10, 90); }
@@ -76,10 +80,10 @@ k.run((dt) => {
   candy.a += (candy.x - candy.ox) * 0.08;
   if (L.bumper) { const [bx, by] = L.bumper, d = Math.hypot(candy.x - bx, candy.y - by); if (d < 34) { const nx = (candy.x - bx) / d, ny = (candy.y - by) / d; candy.x = bx + nx * 34; candy.y = by + ny * 34; candy.ox = candy.x - nx * 9; candy.oy = candy.y - ny * 9; if (bumpT < 0.1) { k.sfx('jump'); bumpT = 0.3; } } }
   if (candy.x < 14 || candy.x > 346) { candy.x = k.clamp(candy.x, 14, 346); candy.ox = candy.x + (candy.x - candy.ox) * 0.5; }
-  for (const s of stars) if (!s.got && Math.hypot(s.x - candy.x, s.y - candy.y) < 31) { s.got = true; s.gt = t; got++; k.sfx('coin'); k.burst(s.x, s.y, '#ffd23d', 16); k.float('+100', s.x, s.y - 20, '#ffd23d'); }
-  if (candy.y > 560 && candy.y < 600 && Math.abs(candy.x - L.basket) < 48 && candy.y - candy.oy > 0) { state = 'won'; chew = 0.8; score += 100 + got * 100; k.best(CFG.id, score); k.sfx('pop'); k.burst(L.basket, 575, '#ff7aa8', 20, 150);
+  for (const s of stars) if (!s.got && Math.hypot(s.x - candy.x, s.y - candy.y) < SR()) { s.got = true; s.gt = t; got++; k.sfx('coin'); k.burst(s.x, s.y, '#ffd23d', 16); k.float('+100', s.x, s.y - 20, '#ffd23d'); }
+  if (candy.y > 560 && candy.y < 600 && Math.abs(candy.x - L.basket) < BW() && candy.y - candy.oy > 0) { state = 'won'; chew = 0.8; score += 100 + got * 100; k.best(CFG.id, score); k.sfx('pop'); k.burst(L.basket, 575, '#ff7aa8', 20, 150);
     later(() => { k.st = 'over'; k.show('¡Dentro!', `Nivel ${lv} · Estrellas ${got}/${stars.length} · ${score} puntos<br>Toca para el siguiente nivel`); lv++; }, 1300); }
-  if (candy.y > 680) { state = 'lost'; k.lose(CFG.id, score, 'Se cayó', `Nivel ${lv}`); }
+  if (candy.y > 680) { if (extra > 0) { extra--; k.sfx('hurt'); k.shake(4); build(); } else { state = 'lost'; k.lose(CFG.id, score, 'Se cayó', `Nivel ${lv}`); } }
 }, draw);
 
 /* ---------- Dibujo ---------- */
@@ -164,6 +168,7 @@ function draw() {
   // HUD
   label(`Nivel ${lv}`, 12, 10, 20, '#fff'); for (let i = 0; i < stars.length; i++) star(22 + i * 24, 48, 9, i < got ? '#ffd23d' : 'rgba(255,255,255,.18)');
   label(`${score}`, W - 12, 10, 20, '#ffd23d', 'right'); if (L.wind) label(L.wind > 0 ? 'Viento >>' : '<< Viento', W - 12, 36, 13, '#bfe6ff', 'right');
+  if (extra > 0) label(`Intentos ${extra + 1}`, 12, 36, 13, '#7cf7a0');
   if (state === 'won') { const p = Math.min(1, winT * 3), sc = 0.7 + p * 0.3 + Math.sin(p * 3.14) * 0.1; c.save(); c.globalAlpha = p; c.translate(W / 2, 250); c.scale(sc, sc); ART.rr(c, -120, -50, 240, 100, 20); ART.fillOut(c, 'rgba(34,28,66,.92)', 3); label('¡Dentro!', 0, -38, 30, '#7cf7a0', 'center');
     for (let i = 0; i < stars.length; i++) star((i - (stars.length - 1) / 2) * 40, 22, i < got ? 15 : 11, i < got && winT > 0.3 + i * 0.2 ? '#ffd23d' : 'rgba(255,255,255,.18)'); c.restore(); }
 }

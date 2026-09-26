@@ -39,7 +39,7 @@ function cel3(g, path, base, o) {
 function spec(g, x, y, rx, ry, rot, a) { g.fillStyle = `rgba(255,255,255,${a == null ? 0.5 : a})`; g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, 6.283); g.fill(); }
 /* sombra de contacto dura bajo el objeto */
 function contact(g, x, y, rx, ry, a) { g.fillStyle = `rgba(12,10,26,${a == null ? 0.3 : a})`; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.283); g.fill(); }
-let tiles, st, goal, level, moves, score, anim, fall, NX, NY, par, TW, TH, ZH, OX, OY, board, queue, t, lastMove;
+let tiles, st, goal, level, moves, score, anim, fall, NX, NY, par, TW, TH, ZH, OX, OY, board, queue, t, lastMove, retry = 0;
 /* estado: {x,y,o} o: 0 de pie, 1 tumbado en X (ocupa x,x+1), 2 tumbado en Y (ocupa y,y+1) */
 const cellsOf = (s) => s.o === 0 ? [[s.x, s.y]] : s.o === 1 ? [[s.x, s.y], [s.x + 1, s.y]] : [[s.x, s.y], [s.x, s.y + 1]];
 function roll(s, d) { const [dx, dy] = d; if (s.o === 0) { if (dx) return { x: dx > 0 ? s.x + 1 : s.x - 2, y: s.y, o: 1 }; return { x: s.x, y: dy > 0 ? s.y + 1 : s.y - 2, o: 2 }; }
@@ -47,10 +47,13 @@ function roll(s, d) { const [dx, dy] = d; if (s.o === 0) { if (dx) return { x: d
   if (dy) return { x: s.x, y: dy > 0 ? s.y + 2 : s.y - 1, o: 0 }; return { x: s.x + dx, y: s.y, o: 2 }; }
 const ok = (s) => cellsOf(s).every(([x, y]) => tiles.has(x + ',' + y));
 const DD = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
-/* dificultad: el nivel efectivo del generador baja uno en fácil y sube uno en difícil (normal igual que siempre) */
-const DLV = k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0;
+/* Dificultad (normal = exactamente como siempre):
+   - nivel efectivo del generador: −1 en fácil, +1 en difícil (el BFS sigue verificando cada nivel);
+   - intentos extra (k.D.life): en fácil, la primera caída repite el mismo tablero desde la salida;
+   - flechas de ayuda: 3 niveles en fácil, 1 en normal, ninguna en difícil. */
+const dlv = () => (k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0);
 function build() {
-  const lvd = Math.max(1, level + DLV);
+  const lvd = Math.max(1, level + dlv());
   NX = Math.min(14, 8 + Math.floor(lvd * 0.7)); NY = Math.min(9, 5 + Math.floor(lvd / 3)); // 1.23: más fácil (antes 8+nivel, 5+nivel/2)
   // Se repite hasta encontrar un nivel resoluble (BFS); tras 300 intentos se relaja la distancia mínima
   /* recorrido mínimo del nivel en una franja creciente: 5-8 (nivel 1), 6-9, 8-11 … hasta 14-17 desde el nivel 7 (antes ≥7 y la meta más lejana posible)
@@ -64,7 +67,7 @@ function build() {
     while (q.length) { const s = q.shift(), d = seen.get(K(s)); if (s.o === 0 && d > fd && d >= (tries < 2000 ? 4 : 2) && (tries >= 300 || d <= HI)) { far = s; fd = d; } for (const dd of Object.values(DD)) { const n = roll(s, dd); if (ok(n) && !seen.has(K(n))) { seen.set(K(n), d + 1); q.push(n); } } }
     if (far && fd >= (tries < 300 ? LO : tries < 2000 ? 4 : 2)) { /* tope: tras 2000 intentos acepta cualquier meta alcanzable */ st = start; goal = [far.x, far.y]; par = fd; break; }
   }
-  moves = 0; fall = 0; anim = null; queue = null; lastMove = 0; layout(); bake();
+  moves = 0; fall = 0; anim = null; queue = null; lastMove = 0; retry = k.D.life; layout(); bake();
 }
 function reset() { if (!level || (k.st === 'over' && fall > 0 && !st.won)) { level = 1; score = 0; } t = 0; build(); }
 /* ---------- Proyección isométrica (escala según tamaño del nivel) ---------- */
@@ -112,7 +115,9 @@ function bake() { const D = Math.max(8, TH * 0.4);
       }
       if (x === 1 && y === Math.floor(NY / 2)) { const a = P(x, y, 0); g.strokeStyle = 'rgba(124,247,160,.7)'; g.lineWidth = 2; g.beginPath(); g.ellipse(a[0], a[1], TW * 0.22, TH * 0.22, 0, 0, 6.283); g.stroke(); } }
   }); }
-reset(); k.show(CFG.title, 'Desliza (en diagonal) o usa las flechas para rodar el bloque. Mételo de pie en el agujero dorado. ¡Si se sale de las baldosas, cae!');
+reset();
+k.onDif = () => { if (k.st !== 'play') { level = 1; score = 0; build(); } };
+k.show(CFG.title, 'Desliza (en diagonal) o usa las flechas para rodar el bloque. Mételo de pie en el agujero dorado. ¡Si se sale de las baldosas, cae!');
 /* ---------- Bloque 3D ---------- */
 const FACES = [[[0, 2, 6, 4], [-1, 0, 0]], [[1, 5, 7, 3], [1, 0, 0]], [[0, 4, 5, 1], [0, -1, 0]], [[2, 3, 7, 6], [0, 1, 0]], [[0, 1, 3, 2], [0, 0, -1]], [[4, 6, 7, 5], [0, 0, 1]]];
 function boxOf(s) { const cs = cellsOf(s), x0 = Math.min(...cs.map((q) => q[0])), y0 = Math.min(...cs.map((q) => q[1])), x1 = Math.max(...cs.map((q) => q[0])) + 1, y1 = Math.max(...cs.map((q) => q[1])) + 1; return { x0, y0, x1, y1, h: s.o === 0 ? 2 : 1 }; }
@@ -155,7 +160,7 @@ function after() { // se evalúa al terminar la animación de rodar
   if (st.o === 0 && st.x === goal[0] && st.y === goal[1]) { st.won = true; score += level * (100 + Math.max(0, 200 - (moves - par) * 20)); fall = 0.01; k.sfx('coin'); } }
 k.run((dt) => {
   t += dt; if (!k.gate(reset)) return; lastMove += dt;
-  if (fall > 0) { fall += dt; if (fall > 0.9) { if (st.won) { level++; k.st = 'over'; k.sfx('win'); k.confetti(); k.show(moves <= par ? '¡Perfecto!' : '¡Dentro!', `${moves} movimientos (mínimo ${par}) · ${score} puntos<br>Toca para el nivel ${level}`); } else k.lose(CFG.id, score, 'El bloque cayó', `Nivel ${level}`); } return; }
+  if (fall > 0) { fall += dt; if (fall > 0.9) { if (st.won) { level++; k.st = 'over'; k.sfx('win'); k.confetti(); k.show(moves <= par ? '¡Perfecto!' : '¡Dentro!', `${moves} movimientos (mínimo ${par}) · ${score} puntos<br>Toca para el nivel ${level}`); } else if (retry > 0) { retry--; k.sfx('start'); st = { x: 1, y: Math.floor(NY / 2), o: 0 }; moves = 0; fall = 0; anim = null; queue = null; lastMove = 0; } else k.lose(CFG.id, score, 'El bloque cayó', `Nivel ${level}`); } return; }
   let d = ['up', 'down', 'left', 'right'].find((q) => k.hit.has(q));
   if (!d && k.ptr.up) { const dx = k.ptr.x - k.ptr.sx, dy = k.ptr.y - k.ptr.sy, m = Math.max(Math.abs(dx), Math.abs(dy));
     if (m * k.scale > 24) d = Math.min(Math.abs(dx), Math.abs(dy)) > 0.3 * m ? (dx > 0 ? (dy > 0 ? 'right' : 'up') : (dy > 0 ? 'down' : 'left')) : k.swipe; }
@@ -166,7 +171,7 @@ k.run((dt) => {
 }, () => {
   c.drawImage(board, 0, 0, 640, 480);
   // pistas de dirección al principio
-  if (level <= (k.dif === 0 ? 3 : 1) && moves < 3 && !anim && !fall && k.st === 'play') { const b = boxOf(st), cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2; c.globalAlpha = 0.55 + 0.3 * Math.sin(t * 5);
+  if (level <= (k.dif === 0 ? 3 : k.dif === 2 ? 0 : 1) && moves < 3 && !anim && !fall && k.st === 'play') { const b = boxOf(st), cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2; c.globalAlpha = 0.55 + 0.3 * Math.sin(t * 5);
     for (const [nm, [dx, dy]] of Object.entries(DD)) { const [a, bb] = Q(cx + dx * 1.3, cy + dy * 1.3, 0), [a0, b0] = Q(cx + dx * 0.8, cy + dy * 0.8, 0), an = Math.atan2(bb - b0, a - a0); c.save(); c.translate(a, bb); c.rotate(an); c.beginPath(); c.moveTo(8, 0); c.lineTo(-6, -7); c.lineTo(-6, 7); c.closePath(); ART.fillOut(c, '#7cf7a0', 2); c.restore(); } c.globalAlpha = 1; }
   const sink = fall > 0 ? fall * fall * (st.won ? 3.2 : 6) : 0;
   if (anim) drawBlock(anim.from, anim, 0, 1);
@@ -175,5 +180,6 @@ k.run((dt) => {
   else drawBlock(st, null, sink, fall > 0 ? Math.max(0, 1 - fall) : 1);
   label(`Nivel ${level}`, 14, 12, 24, '#f2d15c'); label(`${score}`, 626, 12, 24, '#fff', 'right');
   label(`Movimientos ${moves}`, 14, 44, 15, '#fff'); label(`Mínimo ${par}`, 626, 44, 15, '#b8b6e0', 'right');
+  if (retry > 0) label(`Intentos ${retry + 1}`, 320, 44, 15, '#7cf7a0', 'center');
 });
 function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }

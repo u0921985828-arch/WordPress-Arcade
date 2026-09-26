@@ -34,6 +34,8 @@ function build() {
   sol = Array.from({ length: N }, () => Array.from({ length: N }, () => seedR() < fill));
   for (const r of sol) for (let x = 0; x < N >> 1; x++) r[N - 1 - x] = r[x]; // simetría especular: el resultado parece un dibujo
   grid = Array.from({ length: N }, () => Array(N).fill(0)); rows = sol.map(clue); cols = sol[0].map((_, x) => clue(sol.map((r) => r[x]))); solved = false;
+  /* Fácil: unas pocas casillas ya resueltas como pista de arranque (no altera el dibujo ni su unicidad). */
+  if (k.dif === 0) for (const i of k.shuffle([...Array(N * N).keys()]).slice(0, Math.max(3, Math.round(N * N * 0.06)))) { const y = Math.floor(i / N), x = i % N; grid[y][x] = sol[y][x] ? 1 : 2; }
   tm = 0; revT = 0; paint = undefined; axis = null; cur = [0, 0]; rowOk = rows.map(() => false); colOk = cols.map(() => false); pulse = { r: rows.map(() => 0), c: cols.map(() => 0) };
 }
 const rowDone = (y) => clue(grid[y].map((v) => v === 1)).join() === rows[y].join();
@@ -80,6 +82,7 @@ function cellSprite(col) {
 }
 function cross(x, y, s, col, lw) { c.strokeStyle = col; c.lineWidth = lw; c.lineCap = 'round'; c.beginPath(); c.moveTo(x - s, y - s); c.lineTo(x + s, y + s); c.moveTo(x + s, y - s); c.lineTo(x - s, y + s); c.stroke(); }
 
+k.onDif = () => { if (k.st !== 'play') build(); };
 k.onDif = () => { if (k.st !== 'play') build(); };
 reset(); k.show(CFG.title, 'Rellena las casillas según las pistas: cada número es un bloque seguido de casillas pintadas. Elige Pintar o Marcar y toca o arrastra. Teclado: flechas, A pinta, B marca.');
 k.run((dt) => {

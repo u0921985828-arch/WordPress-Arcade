@@ -26,7 +26,7 @@ const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 const later = (fn, ms) => setTimeout(function f() { if (k.paused) setTimeout(f, 150); else fn(); }, ms); /* 1.23: la pantalla final espera si el juego está en pausa */
 const COL = { 2: '#f6eee2', 4: '#f3e1c2', 8: '#ffb066', 16: '#ff8c4a', 32: '#ff6b5b', 64: '#f0463c', 128: '#ffd84d', 256: '#ffc83a', 512: '#ffb61f', 1024: '#7ee07a', 2048: '#5ce1e6', 4096: '#b98cff', 8192: '#ff5fa2' };
 const tcol = (v) => COL[v] || '#6c8cff';
-let cells, tiles, score, anim, ghosts, bestV, overT, nudge, moves;
+let cells, tiles, score, anim, ghosts, bestV, overT, nudge, moves, rescues;
 const SQ_D = { right: [1, 0], left: [-1, 0], down: [0, 1], up: [0, -1] };
 const HX_D = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
 const CELL = 90, R = 50, SQ3 = Math.sqrt(3);
@@ -94,10 +94,18 @@ function slide(d) {
   for (const t of Object.values(tiles)) t.a = 0; moves++;
   k.sfx(merged.size ? 'pop' : 'click'); add();
   if (Object.values(tiles).some((q) => q.v >= 2048) && !anim) { anim = 1; later(() => { if (k.st === 'play') { k.show('¡2048!', 'Sigue jugando para más puntos'); later(() => { if (k.st === 'play') k.hide(); }, 1400); } }, 250); }
-  if (!canMove()) overT = 0.6;
+  if (!canMove()) { if (rescues > 0) rescue(); else overT = 0.6; }
+}
+/* Dificultad: k.D.life = 1 rescate en fácil (0 en normal y difícil, donde nada cambia).
+   Al quedarse sin movimientos se retiran las tres fichas más pequeñas y la partida sigue. */
+function rescue() {
+  rescues--;
+  const list = cells.map((cl) => [key(cl), tiles[key(cl)]]).filter((e) => e[1]).sort((a2, b2) => a2[1].v - b2[1].v).slice(0, 3);
+  for (const [kk, t2] of list) { const [x, y] = px(kk.split(',').map(Number)); k.burst(x, y, '#ffd84d', 10, 130); delete tiles[kk]; }
+  k.float('¡Rescate!', W / 2, H / 2 - 40, '#ffd84d'); k.sfx('win'); k.shake(3);
 }
 function canMove() { if (cells.some((cl) => !tiles[key(cl)])) return true; const dirs = HEX ? HX_D : Object.values(SQ_D); return cells.some((cl) => dirs.some(([dx, dy]) => { const o = tiles[key([cl[0] + dx, cl[1] + dy])]; return o && o.v === tiles[key(cl)].v; })); }
-function reset() { build(); tiles = {}; score = 0; anim = 0; ghosts = []; overT = 0; nudge = [0, 0]; moves = 0; bestV = k.best(CFG.id, 0); add(); add(); if (!bgCv) bgCv = makeBg(); }
+function reset() { build(); tiles = {}; score = 0; rescues = k.D.life; anim = 0; ghosts = []; overT = 0; nudge = [0, 0]; moves = 0; bestV = k.best(CFG.id, 0); add(); add(); if (!bgCv) bgCv = makeBg(); }
 k.onDif = () => { if (k.st !== 'play') reset(); };
 reset(); k.show(CFG.title, HEX ? 'Desliza en 6 direcciones (teclado: flechas + Q E Z C; mando: flechas, A arriba-derecha y B abajo-izquierda) para unir fichas iguales.' : 'Desliza o usa las flechas para unir fichas iguales. Llega a 2048.');
 const HEXKEY = { KeyQ: 2, KeyE: 1, KeyZ: 4, KeyC: 5 };

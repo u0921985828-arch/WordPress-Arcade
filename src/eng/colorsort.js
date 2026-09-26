@@ -24,11 +24,11 @@ function spec(g, x, y, rx, ry, rot, a) { g.fillStyle = 'rgba(255,255,255,' + (a 
 function contact(g, x, y, rx, ry, a) { g.fillStyle = 'rgba(14,8,30,' + (a == null ? 0.3 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.2832); g.fill(); }
 const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 const COL = ['#ff5f5f', '#4cc3ff', '#ffd23d', '#5fe08a', '#b77cff', '#ff9a3d', '#ff8ad0', '#5a78ff', '#b8e05a'];
-let tubes, sel, level, moves, done, hist, pour, fly, hidden, wob, liftA, init, winT, kc, kbd, fullT;
+let tubes, sel, level, moves, done, hist, pour, fly, hidden, wob, liftA, init, winT, kc, kbd, fullT, undoLeft = Infinity;
 const BR = 19, SL = 44, TW = 54, TH = CAP * SL + 18;
 function build() { const n = Math.min(9, 3 + Math.floor((level - 1) * 2 / 3)); /* 1.23: nivel 1-2: 3 colores, sube más despacio */ const all = []; for (let i = 0; i < n; i++) for (let j = 0; j < CAP; j++) all.push(i); k.shuffle(all); tubes = []; for (let i = 0; i < n; i++) tubes.push(all.slice(i * CAP, i * CAP + CAP)); tubes.push([], []); if (level <= EXTRA()) tubes.push([]); /* 1.23: tubo vacío extra al principio */ if (k.dif === 0) tubes.push([]); /* fácil: otro tubo libre siempre */ sel = null; moves = 0; done = false; hist = []; if (tubes.every((t) => !t.length || (t.length === CAP && t.every((v) => v === t[0])))) build();
   if (!csOk(tubes) && ++csTry < 40) return build(); csTry = 0;
-  init = JSON.stringify(tubes); fly = []; hidden = tubes.map(() => 0); wob = tubes.map(() => 0); fullT = tubes.map(() => 0); liftA = 0; winT = 0; kc = 0; }
+  init = JSON.stringify(tubes); fly = []; hidden = tubes.map(() => 0); wob = tubes.map(() => 0); fullT = tubes.map(() => 0); liftA = 0; winT = 0; kc = 0; undoLeft = k.dif === 2 ? 5 : Infinity; /* difícil: deshacer limitado por nivel */ }
 /* 1.23: el barajado aleatorio podía dar tableros sin solución → búsqueda en profundidad acotada antes de aceptarlo */
 let csTry = 0;
 function csOk(T) { const full = (x) => x.length === CAP && x.every((v) => v === x[0]), seen = new Set(); let n = 0;
@@ -103,7 +103,7 @@ function button(bn, dis) { const x = bn.x, y = 592, w = 128, h = 38; c.fillStyle
   c.strokeStyle = '#fff'; c.lineWidth = 3; c.lineCap = 'round'; c.globalAlpha = dis ? 0.4 : 1; const ix = x + 22, iy = y + 19;
   c.beginPath(); if (bn.id === 'undo') { c.arc(ix + 2, iy + 2, 7, -Math.PI * 0.9, Math.PI * 0.6); c.stroke(); c.fillStyle = '#fff'; c.beginPath(); c.moveTo(ix - 9, iy - 4); c.lineTo(ix - 1, iy - 6); c.lineTo(ix - 6, iy + 3); c.fill(); }
   else { c.arc(ix, iy, 7, -Math.PI * 0.35, Math.PI * 1.45); c.stroke(); c.fillStyle = '#fff'; c.beginPath(); c.moveTo(ix + 2, iy - 11); c.lineTo(ix + 8, iy - 6); c.lineTo(ix + 1, iy - 3); c.fill(); }
-  label(bn.t, x + 38, y + 11, 15, '#fff'); c.globalAlpha = 1; }
+  label(bn.id === 'undo' && undoLeft !== Infinity ? 'Deshacer ' + Math.max(0, undoLeft) : bn.t, x + 38, y + 11, 15, '#fff'); c.globalAlpha = 1; }
 
 reset(); k.show(CFG.title, 'Toca un tubo y luego otro para pasar las bolas de arriba. Solo se puede poner sobre el mismo color o en un tubo vacío.');
 function tapTube(i) {
@@ -124,7 +124,7 @@ k.run((dt) => { if (pour) { pour.t -= dt; if (pour.t <= 0) pour = null; }
   if (k.hit.has('left')) { kc = (kc + n - 1) % n; kbd = true; } if (k.hit.has('right')) { kc = (kc + 1) % n; kbd = true; }
   if (k.hit.has('up') && kc >= perRow) { kc -= perRow; kbd = true; } if (k.hit.has('down') && kc + perRow < n) { kc += perRow; kbd = true; }
   if (k.hit.has('a')) { kbd = true; tapTube(kc); }
-  const undo = () => { if (hist.length) { tubes = JSON.parse(hist.pop()); moves++; fly = []; hidden = tubes.map(() => 0); k.sfx('click'); } sel = null; };
+  const undo = () => { if (hist.length && undoLeft <= 0) { k.float('Sin deshacer', W / 2, 560, '#ffd23d'); k.sfx('hurt'); sel = null; return; } if (hist.length) { undoLeft--; tubes = JSON.parse(hist.pop()); moves++; fly = []; hidden = tubes.map(() => 0); k.sfx('click'); } sel = null; };
   if (k.hit.has('b')) undo();
   if (k.ptr.hit) { kbd = false;
     if (k.ptr.y > 586) { for (const bn of BTN) if (k.ptr.x > bn.x && k.ptr.x < bn.x + 128) { if (bn.id === 'undo') undo(); else { tubes = JSON.parse(init); hist = []; moves = 0; sel = null; fly = []; hidden = tubes.map(() => 0); k.sfx('click'); } } return; }
@@ -152,6 +152,6 @@ k.run((dt) => { if (pour) { pour.t -= dt; if (pour.t <= 0) pour = null; }
     const e = f.t < 0.5 ? 2 * f.t * f.t : 1 - 2 * (1 - f.t) * (1 - f.t), top = Math.min(f.from[1], f.to[1]) - 70 - Math.abs(f.to[0] - f.from[0]) * 0.15;
     const x = f.from[0] + (f.to[0] - f.from[0]) * e, y = (1 - e) * (1 - e) * f.from[1] + 2 * (1 - e) * e * top + e * e * f.to[1];
     c.drawImage(ballSprite(f.col), x - BR - 3, y - BR - 3, (BR + 3) * 2, (BR + 3) * 2); }
-  BTN.forEach((bn) => button(bn, bn.id === 'undo' ? !hist.length : !moves));
+  BTN.forEach((bn) => button(bn, bn.id === 'undo' ? (!hist.length || undoLeft <= 0) : !moves));
   if (!done && !fly.length && !tubes.some((_, i) => tubes.some((__, j) => canPour(i, j)))) label('Sin movimientos: deshaz o reinicia', W / 2, 560, 16, '#ffd23d', 'center');
 });

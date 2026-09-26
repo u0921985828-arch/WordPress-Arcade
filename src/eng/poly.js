@@ -26,14 +26,16 @@ function contact(g, x, y, rx, ry, a) { g.fillStyle = 'rgba(14,8,30,' + (a == nul
 const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 const later = (fn, ms) => setTimeout(function f() { if (k.paused) setTimeout(f, 150); else fn(); }, ms); /* 1.23: la pantalla final espera si el juego está en pausa */
 const COL = ['#ff6b6b', '#5ce1e6', '#ffd23d', '#7cf7a0', '#b98cff', '#ffa94d', '#ff9ad5', '#6c8cff'];
-let TS = 26, N, S, OX, OY = 84, pieces, level, drag, done, score, mask, bgCv, t = 0, doneT = 0, kbs = null, moves = 0;
+let TS = 26, N, S, OX, OY = 84, pieces, level, drag, done, score, mask, bgCv, t = 0, doneT = 0, kbs = null, moves = 0, own = null;
 function build() {
-  /* Dificultad: el cuadro de partida y una pieza menos o más. */
-  N = Math.min(7, (k.dif === 2 ? 5 : 4) + Math.floor(level / 3)); S = Math.floor(300 / N); OX = Math.floor((W - N * S) / 2); done = false; doneT = 0; kbs = null; moves = 0; bgCv = null;
-  const own = Array.from({ length: N }, () => Array(N).fill(-1)); const np = k.clamp(Math.min(8, 3 + Math.floor(N * N / 7), 3 + Math.floor((level - 1) * 0.6)) + (k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0), 2, 9); /* 1.23: niveles 1-2: 3 piezas, sube más despacio */ const seeds = k.shuffle([...Array(N * N).keys()]).slice(0, np);
+  /* Dificultad (normal = exactamente como siempre): el cuadro de partida, el ritmo al que crece,
+     una pieza menos o más, la ayuda de la partición y el encaje tolerante (solo en fácil). */
+  const grow = k.dif === 0 ? 4 : k.dif === 2 ? 2 : 3;
+  N = Math.min(7, (k.dif === 2 ? 5 : 4) + Math.floor(level / grow)); S = Math.floor(300 / N); OX = Math.floor((W - N * S) / 2); done = false; doneT = 0; kbs = null; moves = 0; bgCv = null;
+  own = Array.from({ length: N }, () => Array(N).fill(-1)); const np = k.clamp(Math.min(8, 3 + Math.floor(N * N / 7), 3 + Math.floor((level - 1) * 0.6)) + (k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0), 2, 9); /* 1.23: niveles 1-2: 3 piezas, sube más despacio */ const seeds = k.shuffle([...Array(N * N).keys()]).slice(0, np);
   seeds.forEach((s, i) => (own[Math.floor(s / N)][s % N] = i));
   let changed = true; while (changed) { changed = false; for (const [y, x] of k.shuffle([...Array(N * N).keys()].map((i) => [Math.floor(i / N), i % N]))) { if (own[y][x] >= 0) continue; const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => own[y + dy] && own[y + dy][x + dx]).filter((v) => v !== undefined && v >= 0); if (nb.length) { own[y][x] = k.pick(nb); changed = true; } } }
-  pieces = []; for (let i = 0; i < np; i++) { const cells = []; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (own[y][x] === i) cells.push([x, y]); if (!cells.length) continue; const mx = Math.min(...cells.map((q) => q[0])), my = Math.min(...cells.map((q) => q[1])); let sh = cells.map(([x, y]) => [x - mx, y - my]); for (let r = k.ri(0, 3); r > 0; r--) sh = rot(sh); pieces.push({ sh, col: COL[i % COL.length], bx: null, by: null, tx: 0, ty: 0, rx: null, ry: null, rs: TS, ang: 0, pop: 0 }); }
+  pieces = []; for (let i = 0; i < np; i++) { const cells = []; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (own[y][x] === i) cells.push([x, y]); if (!cells.length) continue; const mx = Math.min(...cells.map((q) => q[0])), my = Math.min(...cells.map((q) => q[1])); let sh = cells.map(([x, y]) => [x - mx, y - my]); for (let r = k.ri(0, 3); r > 0; r--) sh = rot(sh); pieces.push({ sh, oi: i, col: COL[i % COL.length], bx: null, by: null, tx: 0, ty: 0, rx: null, ry: null, rs: TS, ang: 0, pop: 0 }); }
   layoutTray(); for (const p of pieces) { p.rx = p.tx; p.ry = p.ty + 40; }
 }
 function rot(sh) { const r = sh.map(([x, y]) => [-y, x]); const mx = Math.min(...r.map((q) => q[0])), my = Math.min(...r.map((q) => q[1])); return r.map(([x, y]) => [x - mx, y - my]); }
@@ -52,6 +54,11 @@ function snap(p) { p.pop = 1; moves++; k.sfx('pop'); const cx = OX + (p.bx + pw(
 function checkDone() { if (pieces.every((q) => q.bx !== null) && !done) { done = true; doneT = 0; const gain = 150 * level; score += gain; k.best(CFG.id, score); k.float('+' + gain, W / 2, OY + N * S + 40, '#ffd23d');
   later(() => { k.st = 'over'; k.show('¡Encajado!', `Nivel ${level} · ${score} puntos<br>Toca para el siguiente`); level++; }, 900); } }
 function dropPos(p) { return [Math.round((k.ptr.x - OX) / S - 0.5 - (pw(p) - 1) / 2), Math.round((k.ptr.y - OY) / S - 0.5 - (ph(p) - 1) / 2)]; }
+/* Fácil: encaje tolerante — si la casilla exacta no vale, se prueban las vecinas (la más cercana primero). */
+function nearFit(p, gx, gy) { if (k.dif !== 0) return null;
+  const off = [[0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+  for (const [dx, dy] of off) if (fits(p, gx + dx, gy + dy)) return [gx + dx, gy + dy];
+  return null; }
 
 k.run((dt) => {
   if (!k.gate(reset)) return; t += dt;
@@ -71,7 +78,7 @@ k.run((dt) => {
   if (drag && k.ptr.up && !drag.moved && Math.hypot(k.ptr.x - k.ptr.sx, k.ptr.y - k.ptr.sy) > 8) { drag.moved = true; drag.p.bx = null; }
   if (drag && k.ptr.up) { const p = drag.p;
     if (!drag.moved) { p.sh = rot(p.sh); p.ang = -Math.PI / 2; k.sfx('click'); if (p.bx !== null) { const occ = occupied(p); if (p.sh.some(([x, y]) => p.bx + x >= N || p.by + y >= N || occ.has((p.bx + x) + ',' + (p.by + y)))) p.bx = null; } }
-    else { const [gx, gy] = dropPos(p);
+    else { let [gx, gy] = dropPos(p); const near = fits(p, gx, gy) ? null : nearFit(p, gx, gy); if (near) { gx = near[0]; gy = near[1]; }
       if (fits(p, gx, gy)) { p.bx = gx; p.by = gy; snap(p); } else { p.bx = null; k.sfx(k.ptr.y < OY + N * S + 10 ? 'hit' : 'click'); } }
     drag = null; layoutTray(); checkDone(); }
   // teclado: A coge una pieza de la bandeja o la suelta, flechas la mueven, B la gira
@@ -140,6 +147,11 @@ function draw() {
   if (!bgCv) bgCv = renderBg(); c.drawImage(bgCv, 0, 0, W, H);
   label(CFG.title, 14, 13, 17, '#ffd23d'); label(`Nivel ${level}`, 16, 40, 14, '#cfd6ff');
   label(`${score}`, W - 18, 12, 22, '#fff', 'right'); label(`Piezas ${pieces.filter((p) => p.bx !== null).length}/${pieces.length}`, W - 18, 40, 14, '#cfd6ff', 'right');
+  /* Fácil: pista — la partición de la solución se insinúa en las casillas aún libres. */
+  if (k.dif === 0 && own && !done) { const pend = new Map(); for (const p of pieces) if (p.bx === null) pend.set(p.oi, p.col);
+    c.globalAlpha = 0.3 + Math.sin(t * 2) * 0.06;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const col = pend.get(own[y][x]); if (!col) continue; c.fillStyle = col; c.fillRect(OX + x * S + 3, OY + y * S + 3, S - 6, S - 6); }
+    c.globalAlpha = 1; }
   const dp = drag && drag.moved ? drag.p : kbs ? kbs.p : null;
   if (dp) { const [gx, gy] = kbs ? [kbs.gx, kbs.gy] : dropPos(dp); if (kbs || (gx > -pw(dp) && gy > -ph(dp) && gx < N && gy < N)) piece(dp, OX + gx * S, OY + gy * S, S, { ghost: fits(dp, gx, gy) ? '#7cf7a0' : '#ff5f5f' }); }
   for (const p of pieces) if (p !== dp) piece(p, p.rx, p.ry, p.rs, {});

@@ -74,6 +74,8 @@ function solvedCheck() {
 }
 function validSudoku() { for (let i = 0; i < 9; i++) { const r = new Set(), cc = new Set(), b = new Set(); for (let j = 0; j < 9; j++) { r.add(g[i * 9 + j]); cc.add(g[j * 9 + i]); b.add(g[(Math.floor(i / 3) * 3 + Math.floor(j / 3)) * 9 + (i % 3) * 3 + j % 3]); } if (r.size < 9 || cc.size < 9 || b.size < 9) return false; } return true; }
 const unitsOf = (i) => { const r = Math.floor(i / 9), cc = i % 9, br = r - r % 3, bc = cc - cc % 3; return [[...Array(9).keys()].map((j) => r * 9 + j), [...Array(9).keys()].map((j) => j * 9 + cc), [...Array(9).keys()].map((j) => (br + Math.floor(j / 3)) * 9 + bc + j % 3)]; };
+/* Dificultad: en difícil no se marcan en rojo los números en conflicto (solo aviso visual; la lógica no cambia). */
+const SHOWC = () => k.dif !== 2;
 function calcConf() { conf = new Set(); for (let i = 0; i < 81; i++) if (g[i]) for (const u of unitsOf(i)) for (const j of u) if (j !== i && g[j] === g[i]) conf.add(i); }
 function setNum(n) {
   if (sel === null || given[sel] || done) return; if (g[sel] === n) return; g[sel] = n; anim[sel] = 1; k.sfx(n ? 'click' : 'pop'); calcConf();
@@ -96,7 +98,7 @@ function minesTap(cx, cy, flag) {
     let f = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(cx + dx, cy + dy) && g[(cy + dy) * N + cx + dx].flag) f++;
     if (f === cl.n) { k.sfx('click'); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(cx + dx, cy + dy) && !done) openCell(cx + dx, cy + dy, 1); } }
   else if (!cl.open && !cl.flag) {
-    if (first) { first = false; const safe = new Set(); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(cx + dx, cy + dy)) safe.add((cy + dy) * N + cx + dx); const cand = k.shuffle([...Array(81).keys()].filter((i) => !safe.has(i))); cand.slice(0, nMines()).forEach((i) => (g[i].mine = true)); g.forEach((q, i) => { const x = i % N, y = Math.floor(i / N); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(x + dx, y + dy) && g[(y + dy) * N + x + dx].mine) q.n++; }); }
+    if (first) { first = false; const safe = new Set(), sr = k.dif === 0 ? 2 : 1; for (let dy = -sr; dy <= sr; dy++) for (let dx = -sr; dx <= sr; dx++) if (inb(cx + dx, cy + dy)) safe.add((cy + dy) * N + cx + dx); /* fácil: 5×5 seguro → siempre se abre una zona grande */ const cand = k.shuffle([...Array(81).keys()].filter((i) => !safe.has(i))); cand.slice(0, nMines()).forEach((i) => (g[i].mine = true)); g.forEach((q, i) => { const x = i % N, y = Math.floor(i / N); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(x + dx, y + dy) && g[(y + dy) * N + x + dx].mine) q.n++; }); }
     k.sfx('click'); openCell(cx, cy, 0); }
   if (!done) solvedCheck();
 }
@@ -199,14 +201,14 @@ function drawSudoku() {
   const sr = sel !== null ? Math.floor(sel / 9) : -1, sc = sel !== null ? sel % 9 : -1, sb = sel !== null ? Math.floor(sr / 3) * 3 + Math.floor(sc / 3) : -1, sv = sel !== null ? g[sel] : 0;
   for (let i = 0; i < 81; i++) { const x = i % 9, y = Math.floor(i / 9), X = OX + x * S, Y = OY + y * S, b = Math.floor(y / 3) * 3 + Math.floor(x / 3);
     let col = (Math.floor(x / 3) + Math.floor(y / 3)) % 2 ? '#fbf6ea' : '#f4eedd';
-    if (sel !== null && (y === sr || x === sc || b === sb)) col = '#e3e8fb'; if (sv && g[i] === sv) col = '#c8d3fb'; if (conf.has(i) && !given[i]) col = '#ffd9d9'; if (i === sel) col = '#a9bbff';
+    if (sel !== null && (y === sr || x === sc || b === sb)) col = '#e3e8fb'; if (sv && g[i] === sv) col = '#c8d3fb'; if (SHOWC() && conf.has(i) && !given[i]) col = '#ffd9d9'; if (i === sel) col = '#a9bbff';
     c.fillStyle = col; c.fillRect(X, Y, S, S); }
   for (const f of fx) { c.fillStyle = f.col + Math.min(0.55, f.t) + ')'; for (const i of f.cells) c.fillRect(OX + (i % 9) * S, OY + Math.floor(i / 9) * S, S, S); }
   c.strokeStyle = '#cfc5ad'; c.lineWidth = 1; c.beginPath(); for (let i = 1; i < 9; i++) if (i % 3) { c.moveTo(OX + i * S, OY); c.lineTo(OX + i * S, OY + 9 * S); c.moveTo(OX, OY + i * S); c.lineTo(OX + 9 * S, OY + i * S); } c.stroke();
   c.strokeStyle = '#3a3f66'; c.lineWidth = 2.5; c.beginPath(); for (let i = 3; i < 9; i += 3) { c.moveTo(OX + i * S, OY); c.lineTo(OX + i * S, OY + 9 * S); c.moveTo(OX, OY + i * S); c.lineTo(OX + 9 * S, OY + i * S); } c.stroke();
   ART.rr(c, OX, OY, 9 * S, 9 * S, 6); c.strokeStyle = OUT; c.lineWidth = 3; c.stroke();
   for (let i = 0; i < 81; i++) { if (!g[i]) continue; const X = OX + (i % 9 + 0.5) * S, Y = OY + (Math.floor(i / 9) + 0.5) * S + 1, a = anim[i], sz = 27 * (1 + a * 0.45);
-    num(g[i], X, Y, sz, given[i] ? '#262a4a' : conf.has(i) ? '#e0344a' : '#4b5de0', given[i] ? 800 : 700); }
+    num(g[i], X, Y, sz, given[i] ? '#262a4a' : SHOWC() && conf.has(i) ? '#e0344a' : '#4b5de0', given[i] ? 800 : 700); }
   if (sel !== null) { const X = OX + sc * S, Y = OY + sr * S; c.strokeStyle = '#4b5de0'; c.lineWidth = 3; ART.rr(c, X + 1.5, Y + 1.5, S - 3, S - 3, 6); c.stroke(); }
   // teclado numérico
   const cnt = Array(10).fill(0); g.forEach((v) => v && cnt[v]++);

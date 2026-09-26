@@ -552,7 +552,7 @@ function jamGame() {
     }
     for (const b of BTN) button(b, b.pt > 0, won || (b.id === 'undo' && !hist.length) || (b.id === 'reset' && !moves));
   }
-  window.__rj = { get cars() { return cars; }, get pos() { return pos; }, get min() { return min; }, get moves() { return moves; }, get sel() { return sel; }, get cur() { return cur; }, get grab() { return !!grab; }, path: () => solvePath(cars, pos), get level() { return level; } };
+  window.__rj = { get cars() { return cars; }, get pos() { return pos; }, get min() { return min; }, get moves() { return moves; }, get sel() { return sel; }, get cur() { return cur; }, get grab() { return !!grab; }, path: () => solvePath(cars, pos), get level() { return level; }, get dlv() { return dlv(); } };
   reset();
   k.show(CFG.title || 'Atasco', 'Desliza coches y camiones por su carril para abrir paso al coche rojo hasta la salida. Iguala el mínimo de movimientos para ganar tres estrellas. Teclado: flechas eligen, A agarra y suelta, B deshace.<br>Toca para jugar');
   k.run((dt) => { if (!k.gate(reset)) { update(dt); return; } update(dt); }, draw);
