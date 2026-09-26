@@ -87,7 +87,7 @@ function miniDart(x, y, on) { c.save(); c.globalAlpha = on ? 0.9 : 0.25; c.trans
 function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
 
 /* ¿la puntuación supera el récord guardado? (se consulta antes de que k.best lo actualice; mismo aviso que k.end) */
-function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && b > 0) { k.confetti(); k.sfx('win'); return '<b style="color:#ffd166">¡Nuevo récord!</b><br>'; } return ''; }
+function NREC(s) { let b = 0; try { b = +localStorage.getItem(k.bkey(CFG.id)) || 0; } catch (e) {} if (s > b && b > 0) { k.confetti(); k.sfx('win'); return '<b style="color:#ffd166">¡Nuevo récord!</b><br>'; } return ''; }
 }
 /* ================= Dardos Cricket (CFG.mode 'cricket'): 1–4 jugadores, lienzo 800×450 =================
  * Reglas reales: solo cuentan 15–20 y la diana. Cada número se cierra con 3 marcas (sencillo 1, doble 2, triple 3;

@@ -1540,11 +1540,7 @@ function headGear(g, o) {
     g.lineTo(-dx * 3.6 + hx0, hy - hr - 12); g.quadraticCurveTo(hx0 - 1.3, hy - hr - 5.4, hx0 - 1.3, hy - hr + 1); g.closePath(); g.fill();
     g.restore();
     g.beginPath(); g.arc(-dx * 9 + hx0, hy - hr - 19 + wav, 2.2, 0, R2); Pfo(g, '#ffc928', 2);
-  } else if (cls === 'cleric') {                                   // banda dorada de la capucha
-    g.beginPath(); g.moveTo(hx0 - hr - 1.6, hy - 2.2); g.quadraticCurveTo(hx0, hy - hr - 3.4, hx0 + hr + 1.6, hy - 2.2);
-    g.lineTo(hx0 + hr + 1.6, hy - 4.8); g.quadraticCurveTo(hx0, hy - hr - 6, hx0 - hr - 1.6, hy - 4.8); g.closePath();
-    Pfo(g, '#ffc928', 2);
-    g.beginPath(); g.arc(hx0, hy - hr - 3.8, 1.9, 0, R2); Pfo(g, '#fff2b8', 1);
+  } else if (cls === 'cleric') {                                   // la banda dorada va encima de la visera (al final)
   } else if (cls === 'archer') {                                   // pluma en la capucha
     g.beginPath(); g.moveTo(-dx * 3.4 + hx0, hy - hr - 2.2);
     g.quadraticCurveTo(-dx * 10.5, hy - hr - 12.6 + wav, -dx * 16 - (1 - lat) * 2.6, hy - hr - 7.2 + wav);
@@ -1565,10 +1561,19 @@ function headGear(g, o) {
     else { g.strokeStyle = AL(OUT, 0.22); g.lineWidth = INW; g.beginPath(); g.moveTo(hx0, hy - hr - 2.6); g.quadraticCurveTo(hx0 + 1.2, hy - 1, hx0, hy + 2.6); g.stroke();
       g.fillStyle = AL(hoodL, 0.38); g.beginPath(); g.ellipse(hx0 - 3, hy - 1.8, 3.2, 3.8, 0.3, 0, R2); g.fill(); }
   }
+  if (cls === 'cleric') {                                          // banda dorada, por encima de la visera
+    g.beginPath(); g.moveTo(hx0 - hr - 1.4, hy - 3.4); g.quadraticCurveTo(hx0, hy - hr - 4.2, hx0 + hr + 1.4, hy - 3.4);
+    g.lineTo(hx0 + hr + 1.4, hy - 6); g.quadraticCurveTo(hx0, hy - hr - 6.8, hx0 - hr - 1.4, hy - 6); g.closePath();
+    Pfo(g, '#ffc928', 2);
+    g.beginPath(); g.arc(hx0, hy - hr - 4.6, 1.9, 0, R2); Pfo(g, '#fff2b8', 1);
+  }
 }
+/* caja ajustada a la silueta: con el caché a ×3 conviene no guardar aire (el encapuchado es el
+   que más variantes genera; las clases necesitan sitio para el sombrero y la cimera) */
+const HBOX = { hood: [54, 82, 12], knight: [70, 88, 16], archer: [72, 88, 16], mage: [72, 104, 16], cleric: [66, 88, 16] };
 function heroCv(col, cls, di, pose) {
-  const key = `h|${col}|${cls}|${di}|${pose}`;
-  return spr(key, 76, 92, 22, (g) => {
+  const key = `h|${col}|${cls}|${di}|${pose}`, B = HBOX[cls] || HBOX.hood;
+  return spr(key, B[0], B[1], B[2], (g) => {
     const a = di * DSTEP;
     heroArt(g, { col, cls, dx: Math.cos(a), dy: Math.sin(a), pose, ph: 0 });
   });

@@ -176,7 +176,7 @@ function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"
 function panel(x, y, w, h) { ART.rr(c, x, y, w, h, 10); c.fillStyle = 'rgba(26,21,48,.72)'; c.fill(); c.lineWidth = 2; c.strokeStyle = 'rgba(255,255,255,.14)'; c.stroke(); }
 
 /* ¿la puntuación supera el récord guardado? (se consulta antes de que k.best lo actualice; mismo aviso que k.end) */
-function NREC(s) { let b = 0; try { b = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) {} if (s > b && b > 0) { k.confetti(); k.sfx('win'); return '<b style="color:#ffd166">¡Nuevo récord!</b><br>'; } return ''; }
+function NREC(s) { let b = 0; try { b = +localStorage.getItem(k.bkey(CFG.id)) || 0; } catch (e) {} if (s > b && b > 0) { k.confetti(); k.sfx('win'); return '<b style="color:#ffd166">¡Nuevo récord!</b><br>'; } return ''; }
 
 /* ================= Minigolf Party (CFG.mode 'party') =================
  * 1–4 jugadores por turnos (rotación entre quienes no han embocado), 9 hoyos en horizontal que van de izquierda a derecha.
