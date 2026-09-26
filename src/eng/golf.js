@@ -26,6 +26,36 @@ const isG = (x, y) => y >= 0 && y < ROWS && x >= 0 && x < COLS && grid[y][x] > 0
 const solid = (x, y) => { const tx = Math.floor(x / T), ty = Math.floor(y / T); return tx < 0 || ty < 0 || tx >= COLS || ty >= ROWS || !grid[ty][tx]; };
 const isWall = (x, y) => !isG(x, y) && [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]].some(([dx, dy]) => isG(x + dx, y + dy));
 const hr = (a, b) => { const v = Math.sin(a * 127.1 + b * 311.7 + holeN * 17.3) * 43758.5; return v - Math.floor(v); };
+function uni(g, parts, ow) { g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = ow * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); } }
+const all = (parts) => (g) => { for (const p of parts) p(g); };
+function inw(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+const rp = (g, x, y, w, h, r) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+const cp = (g, x, y, r) => { g.moveTo(x + r, y); g.arc(x, y, r, 0, Math.PI * 2); g.closePath(); };
+const ep2 = (g, x, y, rx, ry, rot) => { g.moveTo(x + rx * Math.cos(rot || 0), y + rx * Math.sin(rot || 0)); g.ellipse(x, y, rx, ry, rot || 0, 0, Math.PI * 2); g.closePath(); };
+const ply = (pts) => (g) => { g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); };
+/* hueso de ancho variable: baja por un costado, redondea la punta y vuelve por el otro, así
+ * miembro y tronco se unen con tangente continua y sin escalón. */
+function bone(pts, ws) {
+  return (g) => {
+    const n = pts.length, L = [], R = [];
+    for (let i = 0; i < n; i++) {
+      const a = pts[i > 0 ? i - 1 : 0], b = pts[i < n - 1 ? i + 1 : n - 1];
+      let tx = b[0] - a[0], ty = b[1] - a[1]; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
+      L.push([pts[i][0] - ty * ws[i], pts[i][1] + tx * ws[i]]);
+      R.push([pts[i][0] + ty * ws[i], pts[i][1] - tx * ws[i]]);
+    }
+    g.moveTo(L[0][0], L[0][1]);
+    for (let i = 1; i < n - 1; i++) g.quadraticCurveTo(L[i][0], L[i][1], (L[i][0] + L[i + 1][0]) / 2, (L[i][1] + L[i + 1][1]) / 2);
+    g.lineTo(L[n - 1][0], L[n - 1][1]);
+    const e = pts[n - 1], w = ws[n - 1], a0 = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0]);
+    g.arc(e[0], e[1], w, a0, a0 - Math.PI, true);
+    for (let i = n - 2; i > 0; i--) g.quadraticCurveTo(R[i][0], R[i][1], (R[i][0] + R[i - 1][0]) / 2, (R[i][1] + R[i - 1][1]) / 2);
+    g.lineTo(R[0][0], R[0][1]);
+    g.closePath();
+  };
+}
 /* ---------- Recorrido cacheado a 2× (césped con franjas, paredes, agua, arena) ---------- */
 function buildCourse() {
   const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = ROWS * T * 2; const g = cv.getContext('2d'); g.scale(2, 2);
@@ -44,7 +74,10 @@ function buildCourse() {
     for (let i = 0; i < 420; i++) { g.fillStyle = i % 2 ? '#34583a' : '#243f2a'; g.fillRect(hr(i, 1) * W, hr(i, 2) * ROWS * T, 2, 3); }
     // arbustos y flores en las zonas libres
     cells((x, y) => { if (isG(x, y) || isWall(x, y)) return; const r = hr(x, y); const px = x * T + 15, py = y * T + 17;
-      if (r < 0.22) { g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(px, py + 9, 14, 5, 0, 0, R2); g.fill(); g.beginPath(); g.arc(px - 7, py, 8, 0, R2); g.arc(px + 7, py, 8, 0, R2); g.arc(px, py - 6, 9, 0, R2); ART.fillOut(g, '#3f8a45', 2); g.fillStyle = '#5bb05f'; g.beginPath(); g.arc(px - 3, py - 9, 3.5, 0, R2); g.fill(); }
+      if (r < 0.22) { g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(px, py + 9, 14, 5, 0, 0, R2); g.fill();
+        const L = (q) => cp(q, px - 7, py, 8), Rr = (q) => cp(q, px + 7, py, 8), Tp = (q) => cp(q, px, py - 6, 9), Tr = (q) => rp(q, px - 2.6, py + 2, 5.2, 9, 2);
+        uni(g, [[Tr, '#6b4a2a'], [L, '#3f8a45'], [Rr, '#3f8a45'], [Tp, '#3f8a45']], 1.6);
+        inw(g, all([Tr, L, Rr, Tp]), (q) => { q.fillStyle = '#5bb05f'; q.beginPath(); cp(q, px - 3, py - 9, 5.5); q.fill(); q.fillStyle = 'rgba(20,60,25,.20)'; q.beginPath(); rp(q, px - 16, py + 3, 32, 14, 6); q.fill(); }); }
       else if (r < 0.4) for (let i = 0; i < 3; i++) { const fx = x * T + 5 + hr(x + i, y + 3) * 20, fy = y * T + 5 + hr(x, y + i + 7) * 20; g.fillStyle = ['#ff8fb3', '#fff1a8', '#ffffff'][i]; g.beginPath(); for (let j = 0; j < 5; j++) g.arc(fx + Math.cos(j * 1.256) * 2.6, fy + Math.sin(j * 1.256) * 2.6, 1.8, 0, R2); g.fill(); g.fillStyle = '#f2b705'; g.fillRect(fx - 1, fy - 1, 2, 2); } });
   }
   // césped: franjas diagonales + moteado
@@ -146,13 +179,22 @@ k.run((dt) => {
   if (msgT > 0) { const e = Math.min(1, (1.6 - msgT) / 0.18), s = 0.6 + 0.4 * e + Math.sin(Math.min(1, e) * Math.PI) * 0.15; c.save(); c.translate(W / 2, 290); c.scale(s, s); c.globalAlpha = Math.min(1, msgT / 0.3); label(msg, 0, -20, 36, msg.startsWith('¡') ? '#f2d15c' : '#fff', 'center'); c.restore(); c.globalAlpha = 1; }
 }); }
 /* ---------- Piezas de dibujo compartidas (se llaman con el contexto ya desplazado OY) ---------- */
+/* ---------- Ley de la pieza única (REMASTER §8) ----------
+ * uni(): traza TODAS las partes y las rellena después, así los contornos interiores quedan
+ * tapados y solo sobrevive el borde exterior de la silueta. inw(): detalle interior recortado
+ * contra esa silueta. Las separaciones internas se leen por sombra propia o por cambio de
+ * color, nunca por stroke. Una pieza solo se separa cuando se mueve de verdad. */
 function drawCup() {
   const [hx, hy] = hole; c.fillStyle = 'rgba(255,255,255,.25)'; c.beginPath(); c.ellipse(hx, hy + 1, 14, 11, 0, 0, R2); c.fill();
   c.beginPath(); c.ellipse(hx, hy, 11, 9, 0, 0, R2); ART.fillOut(c, '#101018', 2.5); c.fillStyle = '#3a3a48'; c.beginPath(); c.ellipse(hx, hy - 3, 9, 5, 0, Math.PI, R2); c.fill();
 }
 function drawBumpers() {
   for (const o of bumpers) { const s = 1 + o.p * 0.25; c.fillStyle = 'rgba(0,0,0,.28)'; c.beginPath(); c.ellipse(o.x + 3, o.y + 6, o.r, o.r * 0.55, 0, 0, R2); c.fill();
-    c.beginPath(); c.arc(o.x, o.y, o.r * s, 0, R2); ART.fillOut(c, o.p > 0.3 ? '#ff9fb2' : '#ff5f7a', 2.5); c.beginPath(); c.arc(o.x, o.y, o.r * 0.55 * s, 0, R2); ART.fillOut(c, '#ffe0e7', 2); c.fillStyle = 'rgba(255,255,255,.7)'; c.beginPath(); c.arc(o.x - 5 * s, o.y - 6 * s, 3, 0, R2); c.fill(); }
+    const D = (q) => cp(q, o.x, o.y, o.r * s);
+    uni(c, [[D, o.p > 0.3 ? '#ff9fb2' : '#ff5f7a']], 1.25);
+    inw(c, D, (q) => { q.fillStyle = 'rgba(120,20,50,.22)'; q.beginPath(); cp(q, o.x, o.y + 1.6, o.r * 0.6 * s); q.fill();
+      q.fillStyle = '#ffe0e7'; q.beginPath(); cp(q, o.x, o.y, o.r * 0.55 * s); q.fill();
+      q.fillStyle = 'rgba(255,255,255,.7)'; q.beginPath(); cp(q, o.x - 5 * s, o.y - 6 * s, 3); q.fill(); }); }
 }
 function drawBall(ball, state, col) {
   if (ball.a > 0 && ball.s > 0.02) { const z = ball.air > 0 ? Math.sin(Math.PI * (1 - ball.air / ball.airT)) * 16 : 0, r = ball.r * ball.s * (1 + z / 50), bx = ball.x, by = ball.y - z;
@@ -162,7 +204,11 @@ function drawBall(ball, state, col) {
 }
 function drawFlag(near) {
   const [hx, hy] = hole; c.save(); c.translate(hx, hy); if (near) c.translate(0, -8); c.globalAlpha = near ? 0.55 : 1;
-  ART.rr(c, -1.8, -50, 3.6, 50, 1.5); ART.fillOut(c, '#f2f2f7', 1.5); c.beginPath(); c.moveTo(1.8, -50); const wv = Math.sin(t * 5) * 3; c.quadraticCurveTo(12, -47 + wv, 24, -44 + wv * 0.6); c.quadraticCurveTo(12, -39 - wv, 1.8, -34); c.closePath(); ART.fillOut(c, '#ff4d5e', 2);
+  const wv = Math.sin(t * 5) * 3;
+  const mast = (q) => rp(q, -1.8, -50, 3.6, 50, 1.5);
+  const pano = (q) => { q.moveTo(-0.6, -50); q.quadraticCurveTo(12, -47 + wv, 24, -44 + wv * 0.6); q.quadraticCurveTo(12, -39 - wv, -0.6, -34); q.closePath(); };
+  uni(c, [[pano, '#ff4d5e'], [mast, '#f2f2f7']], 1.15);
+  inw(c, all([mast, pano]), (q) => { q.fillStyle = 'rgba(120,10,40,.28)'; q.beginPath(); rp(q, -1, -50, 4.4, 50, 1.5); q.fill(); q.fillStyle = 'rgba(0,0,0,.16)'; q.beginPath(); rp(q, -1.8, -6, 3.6, 6, 1.5); q.fill(); });
   c.fillStyle = '#fff'; c.font = '800 9px ui-rounded,system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(holeN, 10, -42 + wv * 0.3); c.restore();
 }
 function drawGuide(b, aimA, aimP) {
@@ -170,7 +216,11 @@ function drawGuide(b, aimA, aimP) {
     c.fillStyle = '#fff'; for (let i = 0; i < 90; i++) { let r = null; for (let j = 0; j < 3; j++) { r = step(sim, 1 / 180, false) || r; } if (r === 'bounce') bounces++; if (r === 'water' || r === 'hole' || bounces > 1 || Math.hypot(sim.vx, sim.vy) < 5) break; if (i % 4 === 0) { c.globalAlpha = 0.95 * (1 - i / 110); c.beginPath(); c.arc(sim.x, sim.y, Math.max(1.5, 3.6 - i / 50), 0, R2); ART.fillOut(c, '#fff', 1.2); } }
     c.globalAlpha = 1; c.strokeStyle = OUT; c.lineWidth = 7; c.beginPath(); c.arc(ball.x, ball.y, 17, -Math.PI / 2, -Math.PI / 2 + aimP * R2); c.stroke(); c.strokeStyle = col; c.lineWidth = 4; c.stroke();
     // palo de golf detrás de la bola
-    c.save(); c.translate(ball.x, ball.y); c.rotate(aimA); const pull = 12 + aimP * 26; ART.rr(c, -pull - 8, -7, 7, 14, 2); ART.fillOut(c, '#c7ccd8', 2); c.strokeStyle = OUT; c.lineWidth = 4; c.beginPath(); c.moveTo(-pull - 8, 0); c.lineTo(-pull - 60, 18); c.stroke(); c.strokeStyle = '#9aa2b5'; c.lineWidth = 2; c.stroke(); c.restore(); }
+    c.save(); c.translate(ball.x, ball.y); c.rotate(aimA); const pull = 12 + aimP * 26;
+    const head = (q) => rp(q, -pull - 8, -7, 7, 14, 2), shaft = bone([[-pull - 5, -2], [-pull - 60, 18]], [2.2, 1.6]);
+    uni(c, [[shaft, '#9aa2b5'], [head, '#c7ccd8']], 1.15);
+    inw(c, all([head, shaft]), (q) => { q.fillStyle = 'rgba(30,30,60,.2)'; q.beginPath(); rp(q, -pull - 8, 2, 7, 5, 2); q.fill(); });
+    c.restore(); }
 }
 function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
 function panel(x, y, w, h) { ART.rr(c, x, y, w, h, 10); c.fillStyle = 'rgba(26,21,48,.72)'; c.fill(); c.lineWidth = 2; c.strokeStyle = 'rgba(255,255,255,.14)'; c.stroke(); }

@@ -1,6 +1,33 @@
 /* Brick Breaker DX: ladrillos con bisel (cacheados), diseños por nivel, ladrillos blindados que se agrietan,
  * cápsulas de mejora (pala ancha, multibola, bola lenta, vida extra), estela de bola y cascotes al romper. */
 const OUT = ART.OUT, R2 = 6.2832;
+/* --- Ley de la pieza única (R5, docs/REMASTER.md §8) -------------------------------
+   `unite(g, partes, ancho)` traza TODAS las partes y las rellena después: los contornos
+   interiores quedan tapados y solo sobrevive la silueta exterior. El detalle interior va
+   recortado (`within` en caché, `clipIn` en el lienzo de partida), nunca con stroke. */
+const OUTW = 1.1, INW = 0.65, INA = 0.62;
+const _hx = (h) => { if (h[0] !== '#') { const m = h.match(/[\d.]+/g) || [0, 0, 0]; return [+m[0], +m[1], +m[2]]; } h = h.slice(1); if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]; const n = parseInt(h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const _rgb = (a) => `rgb(${a[0] | 0},${a[1] | 0},${a[2] | 0})`;
+const LT = (col, f) => _rgb(_hx(col).map((v) => v + (255 - v) * f));
+const DK = (col, f) => _rgb(_hx(col).map((v) => v * (1 - f)));
+const MXC = (a, b, u) => { const x = _hx(a), y = _hx(b); return _rgb(x.map((v, i) => v + (y[i] - v) * u)); };
+const AL = (col, a) => { const q = _hx(col); return `rgba(${q[0]},${q[1]},${q[2]},${Math.max(0, a).toFixed(3)})`; };
+/* partes = [[trazado, relleno, sombraDeContacto?]], en orden de profundidad */
+function unite(g, parts, ow) {
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  g.strokeStyle = OUT; g.lineWidth = (ow || OUTW) * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) {
+    const P = parts[i];
+    if (P[2]) { g.save(); g.globalCompositeOperation = 'source-atop'; g.beginPath(); P[0](g); g.strokeStyle = AL(OUT, 0.15); g.lineWidth = P[2]; g.stroke(); g.lineWidth = P[2] * 0.45; g.stroke(); g.restore(); }
+    g.beginPath(); P[0](g); g.fillStyle = P[1]; g.fill();
+  }
+}
+/* detalle de una pieza, recortado contra su propio trazado (caché: source-atop es barato) */
+function within(g, path, fn) { g.save(); g.globalCompositeOperation = 'source-atop'; g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+/* igual, para el lienzo de partida: recorte a secas (source-atop costaría un compuesto de pantalla completa) */
+function clipIn(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+
 const k = Kit({ w: 480, h: 360, title: CFG.title, bg: '#16122b' }), c = k.ctx;
 const COLS = ['#ff6b6b', '#ffa94d', '#f2d15c', '#7cf7a0', '#5ce1e6', '#b98cff'], TOP = 30, WL = 8, WR = 472, BW = 42, BH = 16;
 const PW = { W: ['#5ce1e6', 'PALA ANCHA'], M: ['#ff5fa2', 'MULTIBOLA'], S: ['#7cf7a0', 'BOLA LENTA'], V: ['#ff6b6b', '+1 VIDA'] };

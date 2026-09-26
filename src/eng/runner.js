@@ -151,51 +151,130 @@ k.run((dt) => {
   holes = holes.filter((h) => h.b * T > cam - 40); decos = decos.filter((d) => d.x > cam - 80); bullets = bullets.filter((b) => !b.dead && b.x < cam + W + 20);
 }, draw);
 /* ---------- Dibujo ---------- */
+/* --- Ley de la pieza única (R5, docs/REMASTER.md §8) -------------------------------
+   `unite(g, partes, ancho)` traza TODAS las partes y las rellena después: los contornos
+   interiores quedan tapados y solo sobrevive la silueta exterior. El detalle interior va
+   recortado (`within` en caché, `clipIn` en el lienzo de partida), nunca con stroke. */
+const OUTW = 1.1, INW = 0.65, INA = 0.62;
+const _hx = (h) => { if (h[0] !== '#') { const m = h.match(/[\d.]+/g) || [0, 0, 0]; return [+m[0], +m[1], +m[2]]; } h = h.slice(1); if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]; const n = parseInt(h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const _rgb = (a) => `rgb(${a[0] | 0},${a[1] | 0},${a[2] | 0})`;
+const LT = (col, f) => _rgb(_hx(col).map((v) => v + (255 - v) * f));
+const DK = (col, f) => _rgb(_hx(col).map((v) => v * (1 - f)));
+const MXC = (a, b, u) => { const x = _hx(a), y = _hx(b); return _rgb(x.map((v, i) => v + (y[i] - v) * u)); };
+const AL = (col, a) => { const q = _hx(col); return `rgba(${q[0]},${q[1]},${q[2]},${Math.max(0, a).toFixed(3)})`; };
+/* partes = [[trazado, relleno, sombraDeContacto?]], en orden de profundidad */
+function unite(g, parts, ow) {
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  g.strokeStyle = OUT; g.lineWidth = (ow || OUTW) * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) {
+    const P = parts[i];
+    if (P[2]) { g.save(); g.globalCompositeOperation = 'source-atop'; g.beginPath(); P[0](g); g.strokeStyle = AL(OUT, 0.15); g.lineWidth = P[2]; g.stroke(); g.lineWidth = P[2] * 0.45; g.stroke(); g.restore(); }
+    g.beginPath(); P[0](g); g.fillStyle = P[1]; g.fill();
+  }
+}
+/* detalle de una pieza, recortado contra su propio trazado (caché: source-atop es barato) */
+function within(g, path, fn) { g.save(); g.globalCompositeOperation = 'source-atop'; g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+/* igual, para el lienzo de partida: recorte a secas (source-atop costaría un compuesto de pantalla completa) */
+function clipIn(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
 function label(s, x, y, size, col, align) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top';
   c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
 }
+/* Caja: un cuerpo. El bastidor y la diagonal ya no son contornos cerrados dentro de la silueta,
+   sino tablas separadas por su propia sombra. */
 function crate(x, y) {
-  ART.rr(c, x + 1, y + 1, T - 2, T - 2, 4); ART.fillOut(c, TH.plank, 2.5);
-  c.strokeStyle = 'rgba(0,0,0,.28)'; c.lineWidth = 2; c.strokeRect(x + 6, y + 6, T - 12, T - 12);
-  c.beginPath(); c.moveTo(x + 7, y + T - 7); c.lineTo(x + T - 7, y + 7); c.stroke();
-  c.fillStyle = 'rgba(255,255,255,.3)'; c.fillRect(x + 5, y + 4, T - 10, 2);
+  const box = (g) => ART.rr(g, x + 1, y + 1, T - 2, T - 2, 4);
+  const gr = c.createLinearGradient(x, y, x + T * 0.7, y + T); gr.addColorStop(0, LT(TH.plank, 0.2)); gr.addColorStop(0.55, TH.plank); gr.addColorStop(1, DK(TH.plank, 0.26));
+  unite(c, [[box, gr]], 1.1);
+  clipIn(c, box, (g) => {
+    g.fillStyle = AL(OUT, 0.3);
+    for (const yy of [y + 5.4, y + T - 7.4]) g.fillRect(x, yy, T, 2.2);
+    for (const xx of [x + 5.4, x + T - 7.4]) g.fillRect(xx, y, 2.2, T);
+    g.save(); g.translate(x + T / 2, y + T / 2); g.rotate(-0.785); g.fillRect(-T, -1.3, T * 2, 2.6); g.restore();
+    g.fillStyle = AL('#ffffff', 0.26);
+    for (const yy of [y + 7.6, y + T - 5.2]) g.fillRect(x, yy, T, 1.3);
+    g.fillStyle = AL('#ffffff', 0.3); g.fillRect(x + 4, y + 3, T - 8, 2);
+    g.fillStyle = AL(OUT, 0.16); g.fillRect(x + 1, y + T - 6, T - 2, 6);
+  });
 }
+/* Tronco: fuste, corte y hojas son el MISMO tronco. Se trazan juntos y se rellenan después; los
+   anillos del corte se leen por color, no por línea. */
 function log(x, y0, y1, capY) {
-  ART.rr(c, x + 6, y0, 52, y1 - y0, 6); ART.fillOut(c, '#a8703f', 3);
-  c.fillStyle = 'rgba(0,0,0,.16)'; for (let i = 0; i < 3; i++) for (let yy = y0 + 10 + i * 13; yy < y1 - 10; yy += 38) c.fillRect(x + 18 + i * 12, yy, 3, 20);
-  c.fillStyle = 'rgba(255,255,255,.2)'; c.fillRect(x + 11, y0 + 4, 5, Math.max(0, y1 - y0 - 8));
-  c.beginPath(); c.ellipse(x + 32, capY, 31, 9, 0, 0, 6.283); ART.fillOut(c, '#f0cf96', 3);
-  c.strokeStyle = '#c99a5a'; c.lineWidth = 2; c.beginPath(); c.ellipse(x + 32, capY, 19, 5.5, 0, 0, 6.283); c.stroke(); c.beginPath(); c.ellipse(x + 32, capY, 8, 2.5, 0, 0, 6.283); c.stroke();
-  const d = capY > y0 + 20 ? 1 : -1; // hojas junto al corte
-  for (const [lx, a] of [[x + 6, -0.6], [x + 58, 0.6]]) { c.save(); c.translate(lx, capY - d * 12); c.rotate(a * d); c.beginPath(); c.ellipse(0, 0, 10, 5, 0, 0, 6.283); ART.fillOut(c, TH.top, 2); c.restore(); }
+  const d = capY > y0 + 20 ? 1 : -1;
+  const trunk = (g) => ART.rr(g, x + 6, y0, 52, y1 - y0, 6);
+  const cap = (g) => g.ellipse(x + 32, capY, 31, 9, 0, 0, 6.283);
+  const leaf = (lx, a) => (g) => { const cx = lx, cy = capY - d * 12, co = Math.cos(a * d), si = Math.sin(a * d);
+    const P = (ux, uy) => [cx + ux * co - uy * si, cy + ux * si + uy * co];
+    const q = [P(-10, 0), P(-4, -5), P(6, -4.4), P(10, 0), P(4, 4.6), P(-5, 4.4)];
+    g.moveTo(q[0][0], q[0][1]); for (let i = 1; i < q.length; i++) g.quadraticCurveTo(q[i][0], q[i][1], (q[i][0] + q[(i + 1) % q.length][0]) / 2, (q[i][1] + q[(i + 1) % q.length][1]) / 2); g.closePath(); };
+  const gt = c.createLinearGradient(x + 6, 0, x + 58, 0); gt.addColorStop(0, '#7e5330'); gt.addColorStop(0.3, '#b87c47'); gt.addColorStop(0.68, '#a8703f'); gt.addColorStop(1, '#6f4726');
+  unite(c, [[leaf(x + 6, -0.6), TH.top], [leaf(x + 58, 0.6), TH.top], [trunk, gt], [cap, '#f0cf96']], 1.15);
+  clipIn(c, trunk, (g) => {
+    g.fillStyle = AL(OUT, 0.18); for (let i = 0; i < 3; i++) for (let yy = y0 + 10 + i * 13; yy < y1 - 10; yy += 38) g.fillRect(x + 18 + i * 12, yy, 3, 20);
+    g.fillStyle = AL('#ffffff', 0.18); g.fillRect(x + 11, y0 + 4, 5, Math.max(0, y1 - y0 - 8));
+  });
+  clipIn(c, cap, (g) => {
+    for (const [rx, ry, col] of [[24, 7, '#e2bb7e'], [19, 5.5, '#f0cf96'], [13, 3.8, '#dcb375'], [8, 2.5, '#f3d9a6']]) { g.fillStyle = col; g.beginPath(); g.ellipse(x + 32, capY, rx, ry, 0, 0, 6.283); g.fill(); }
+    g.fillStyle = AL(OUT, 0.2); g.beginPath(); g.ellipse(x + 34, capY + d * 2.4, 31, 9, 0, 0, 6.283); g.fill();
+    g.fillStyle = AL('#ffffff', 0.3); g.beginPath(); g.ellipse(x + 26, capY - d * 3, 12, 2.6, 0, 0, 6.283); g.fill();
+  });
 }
+/* Pájaro de una pieza: cola, cuerpo y pico comparten silueta (tangente seguida en la raíz de la
+   cola y en la comisura del pico); el ala, que sí bate, va recortada dentro con su propia sombra. */
 function bird(x, y, rot) {
   c.save(); c.translate(x, y); c.rotate(rot);
-  c.beginPath(); c.moveTo(-11, -3); c.lineTo(-21, -9); c.lineTo(-20, 5); c.closePath(); ART.fillOut(c, '#ff9a3d', 2);
-  c.beginPath(); c.ellipse(0, 0, 15, 13, 0, 0, 6.283); ART.fillOut(c, '#ffd23d', 2.5);
-  c.fillStyle = '#fff3c4'; c.beginPath(); c.ellipse(2, 5, 9, 6, 0, 0, 6.283); c.fill();
-  c.beginPath(); c.arc(6, -4, 5.2, 0, 6.283); ART.fillOut(c, '#fff', 2); c.fillStyle = OUT; c.beginPath(); c.arc(7.6, -4, 2.4, 0, 6.283); c.fill();
-  c.beginPath(); c.moveTo(12, -1); c.lineTo(22, 2.5); c.lineTo(12, 6.5); c.closePath(); ART.fillOut(c, '#ff7a2d', 2);
-  const wy = Math.sin(wing); c.beginPath(); c.ellipse(-4, 2 + wy * 2, 9, 5.5, -0.2 + wy * 0.45, 0, 6.283); ART.fillOut(c, '#ffb13d', 2);
+  const tail = (g) => { g.moveTo(-9.6, -5.4); g.quadraticCurveTo(-16, -8.4, -21, -9); g.quadraticCurveTo(-21.6, -2, -20, 5); g.quadraticCurveTo(-15, 2.6, -9.6, 4.2); g.closePath(); };
+  const body = (g) => g.ellipse(0, 0, 15, 13, 0, 0, 6.283);
+  const beak = (g) => { g.moveTo(11.4, -2.4); g.quadraticCurveTo(18, -0.6, 22, 2.5); g.quadraticCurveTo(17.4, 5.4, 11.4, 7); g.closePath(); };
+  const gb = c.createRadialGradient(-4, -6, 2, 1, 1, 19); gb.addColorStop(0, '#ffe98d'); gb.addColorStop(0.5, '#ffd23d'); gb.addColorStop(1, '#e09a17');
+  unite(c, [[tail, '#ff9a3d'], [beak, '#ff7a2d'], [body, gb]], 1.1);
+  clipIn(c, body, (g) => {
+    g.fillStyle = '#fff3c4'; g.beginPath(); g.ellipse(2, 5.6, 9, 6, 0, 0, 6.283); g.fill();
+    const wy = Math.sin(wing);
+    g.fillStyle = AL(OUT, 0.26); g.beginPath(); g.ellipse(-3.4, 3.6 + wy * 2, 9.4, 5.9, -0.2 + wy * 0.45, 0, 6.283); g.fill();
+    g.fillStyle = '#ffb13d'; g.beginPath(); g.ellipse(-4, 2 + wy * 2, 9, 5.5, -0.2 + wy * 0.45, 0, 6.283); g.fill();
+    g.fillStyle = AL('#ffffff', 0.22); g.beginPath(); g.ellipse(-5.4, 0.4 + wy * 2, 5.4, 2.2, -0.2 + wy * 0.45, 0, 6.283); g.fill();
+  });
+  c.fillStyle = '#fff'; c.beginPath(); c.arc(6, -4, 5.2, 0, 6.283); c.fill();
+  c.lineWidth = INW; c.strokeStyle = AL(OUT, INA); c.stroke();
+  c.fillStyle = OUT; c.beginPath(); c.arc(7.6, -4, 2.4, 0, 6.283); c.fill();
   c.restore();
 }
 function ship(x, y) {
   c.save(); c.translate(x, y); c.rotate(dead ? p.rot : k.clamp(p.vy / 900, -0.35, 0.35));
   if (p.thr && !dead) { c.fillStyle = '#ffb13d'; c.beginPath(); c.moveTo(-13, -4); c.lineTo(-22 - Math.random() * 9, 0); c.lineTo(-13, 4); c.fill(); c.fillStyle = '#fff6c2'; c.beginPath(); c.moveTo(-13, -2); c.lineTo(-18 - Math.random() * 4, 0); c.lineTo(-13, 2); c.fill(); }
-  for (const s of [-1, 1]) { c.beginPath(); c.moveTo(-4, s * 6); c.lineTo(-14, s * 15); c.lineTo(-12, s * 6); c.closePath(); ART.fillOut(c, PAL[1], 2); }
-  c.beginPath(); c.moveTo(19, 0); c.quadraticCurveTo(8, -11, -14, -8); c.lineTo(-14, 8); c.quadraticCurveTo(8, 11, 19, 0); ART.fillOut(c, PAL[0], 2.5);
-  c.beginPath(); c.ellipse(4, -2.5, 6, 4, 0, 0, 6.283); ART.fillOut(c, '#e9fbff', 2); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(-10, -5, 10, 2);
+  const fin = (sd) => (g) => { g.moveTo(-3.4, sd * 5); g.quadraticCurveTo(-9, sd * 10.4, -14, sd * 15); g.lineTo(-11.6, sd * 5.6); g.closePath(); };
+  const hull = (g) => { g.moveTo(19, 0); g.quadraticCurveTo(8, -11, -14, -8); g.quadraticCurveTo(-16.4, 0, -14, 8); g.quadraticCurveTo(8, 11, 19, 0); g.closePath(); };
+  const gh = c.createLinearGradient(0, -9, 0, 9); gh.addColorStop(0, LT(PAL[0], 0.34)); gh.addColorStop(0.55, PAL[0]); gh.addColorStop(1, DK(PAL[0], 0.3));
+  unite(c, [[fin(-1), PAL[1]], [fin(1), PAL[1]], [hull, gh]], 1.15);
+  clipIn(c, hull, (g) => {
+    g.fillStyle = AL(OUT, 0.26); g.fillRect(-14, 3.4, 34, 2); g.fillStyle = AL('#ffffff', 0.3); g.fillRect(-14, -5.4, 30, 1.8);
+    g.fillStyle = '#e9fbff'; g.beginPath(); g.ellipse(4, -2.5, 6, 4, 0, 0, 6.283); g.fill();
+    g.fillStyle = AL(OUT, 0.3); g.beginPath(); g.ellipse(5, -1, 6, 3, 0, 0, 6.283); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.55)'; g.beginPath(); g.ellipse(2.4, -4, 2.4, 1.3, -0.3, 0, 6.283); g.fill();
+  });
   c.restore();
 }
 function mine(o, x) {
   const r = 12, blink = Math.sin(t * 6 + o.ph) > 0.3;
   c.save(); c.translate(x, o.y + Math.sin(t * 2 + o.ph) * 3); c.rotate(t * 0.8 + o.ph);
-  for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; c.lineCap = 'round'; c.strokeStyle = OUT; c.lineWidth = 6; c.beginPath(); c.moveTo(Math.cos(a) * r * 0.7, Math.sin(a) * r * 0.7); c.lineTo(Math.cos(a) * r * 1.45, Math.sin(a) * r * 1.45); c.stroke(); c.strokeStyle = '#9aa0b8'; c.lineWidth = 2.5; c.stroke(); }
-  c.beginPath(); c.arc(0, 0, r, 0, 6.283); ART.fillOut(c, o.hit > 0 ? '#fff' : '#5a5470', 2.5); c.rotate(-(t * 0.8 + o.ph));
-  c.fillStyle = 'rgba(255,255,255,.25)'; c.beginPath(); c.arc(-4, -4, 4, 0, 6.283); c.fill();
-  c.beginPath(); c.arc(0, 0, 4, 0, 6.283); ART.fillOut(c, blink ? '#ff3b5c' : '#7a2233', 1.5);
-  if (o.hp < 2) { c.strokeStyle = OUT; c.lineWidth = 1.5; c.beginPath(); c.moveTo(3, -9); c.lineTo(6, -3); c.lineTo(9, -5); c.stroke(); }
+  const base = o.hit > 0 ? '#fff' : '#5a5470';
+  const spike = (a) => (g) => { const co = Math.cos(a), si = Math.sin(a);
+    g.moveTo(co * r * 0.6 - si * 3.4, si * r * 0.6 + co * 3.4);
+    g.quadraticCurveTo(co * r * 1.16 - si * 2, si * r * 1.16 + co * 2, co * r * 1.5, si * r * 1.5);
+    g.quadraticCurveTo(co * r * 1.16 + si * 2, si * r * 1.16 - co * 2, co * r * 0.6 + si * 3.4, si * r * 0.6 - co * 3.4); g.closePath(); };
+  const ball = (g) => g.arc(0, 0, r, 0, 6.283);
+  const gm = c.createRadialGradient(-r * 0.35, -r * 0.4, 1, 0, 0, r * 1.25); gm.addColorStop(0, LT(base, 0.34)); gm.addColorStop(0.6, base); gm.addColorStop(1, DK(base, 0.34));
+  const parts = []; for (let i = 0; i < 8; i++) parts.push([spike(i * Math.PI / 4), '#8a90a8']);
+  parts.push([ball, gm]);
+  unite(c, parts, 1.15);
+  clipIn(c, ball, (g) => {
+    g.fillStyle = 'rgba(255,255,255,.25)'; g.beginPath(); g.arc(-4, -4, 4, 0, 6.283); g.fill();
+    if (o.hp < 2) { g.fillStyle = AL(OUT, 0.5); g.beginPath(); g.moveTo(2, -10); g.lineTo(7.4, -2.4); g.lineTo(10, -6); g.lineTo(4.4, -2.4); g.closePath(); g.fill(); }
+  });
+  c.rotate(-(t * 0.8 + o.ph));
+  c.beginPath(); c.arc(0, 0, 4, 0, 6.283); c.fillStyle = blink ? '#ff3b5c' : '#7a2233'; c.fill(); c.lineWidth = INW; c.strokeStyle = AL(OUT, INA); c.stroke();
   c.restore();
 }
 function gem(x, y) { c.save(); c.translate(x, y + Math.sin(t * 3 + x) * 3); c.beginPath(); c.moveTo(0, -10); c.lineTo(8, -2); c.lineTo(0, 10); c.lineTo(-8, -2); c.closePath(); ART.fillOut(c, PAL[1], 2); c.fillStyle = 'rgba(255,255,255,.55)'; c.beginPath(); c.moveTo(0, -7); c.lineTo(3.5, -2); c.lineTo(0, -1); c.closePath(); c.fill(); c.restore(); }
@@ -207,7 +286,11 @@ function caveBg() {
   for (let i = 0; i < 5; i++) {
     const span = W + 260, x = ((i * 233 - cam * 0.22) % span + span) % span - 130, top = i % 2 === 0, h = 46 + (i * 37) % 40, y = top ? 40 : H - 40, d = top ? 1 : -1, col = PAL[i % 2];
     const hg = c.createRadialGradient(x, y + d * h * 0.5, 0, x, y + d * h * 0.5, h); hg.addColorStop(0, col + '38'); hg.addColorStop(1, col + '00'); c.fillStyle = hg; c.fillRect(x - h, y + d * h * 0.5 - h, h * 2, h * 2);
-    c.globalAlpha = 0.55; for (const [ox, sc] of [[-14, 0.6], [12, 0.75], [0, 1]]) { const hh = h * sc, ww = 9 + sc * 6; c.beginPath(); c.moveTo(x + ox - ww, y - d * 6); c.lineTo(x + ox - ww * 0.7, y + d * hh * 0.75); c.lineTo(x + ox, y + d * hh); c.lineTo(x + ox + ww * 0.7, y + d * hh * 0.75); c.lineTo(x + ox + ww, y - d * 6); c.closePath(); c.fillStyle = col; c.fill(); c.lineWidth = 2; c.strokeStyle = '#1a1530'; c.stroke(); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(x + ox - 2, y + d * hh * 0.15, 2.5, d * hh * 0.55); }
+    // las tres agujas son UN afloramiento: se trazan juntas y se rellenan después
+    c.globalAlpha = 0.55;
+    const spike3 = (ox, sc) => (g) => { const hh = h * sc, ww = 9 + sc * 6; g.moveTo(x + ox - ww, y - d * 6); g.lineTo(x + ox - ww * 0.7, y + d * hh * 0.75); g.lineTo(x + ox, y + d * hh); g.lineTo(x + ox + ww * 0.7, y + d * hh * 0.75); g.lineTo(x + ox + ww, y - d * 6); g.closePath(); };
+    unite(c, [[-14, 0.6], [12, 0.75], [0, 1]].map(([ox, sc]) => [spike3(ox, sc), col]), 1.1);
+    for (const [ox, sc] of [[-14, 0.6], [12, 0.75], [0, 1]]) clipIn(c, spike3(ox, sc), (g) => { const hh = h * sc; g.fillStyle = AL('#ffffff', 0.32); g.fillRect(x + ox - 2, y + d * hh * 0.15, 2.5, d * hh * 0.55); g.fillStyle = AL(OUT, 0.24); g.fillRect(x + ox + 3, y - d * 6, 20, d * hh * 1.2); });
     c.globalAlpha = 1;
   }
   layer(0.35, 18, 44, '#2f2150', 4);

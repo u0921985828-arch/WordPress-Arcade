@@ -336,6 +336,18 @@ else (function () {
   const W = PORT ? 600 : 960, H = PORT ? 920 : 600;
   const k = Kit({ w: W, h: H, title: CFG.title, bg: MODE === 'damas' ? '#1b1436' : '#20182f' }), c = k.ctx, OUT = ART.OUT, TAU = Math.PI * 2;
   const FONT = (wt, s) => `${wt} ${s}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
+  /* --- Ley de la pieza única (§8 REMASTER): un trazado, un relleno, un contorno ---
+     Se trazan todas las partes y se rellenan después: los contornos interiores quedan tapados
+     y solo sobrevive el borde exterior de la silueta. El detalle interior va recortado. */
+  function uni(g, parts, ow) {
+    g.save(); g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = (ow || 1.1) * 2;
+    for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+    for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); }
+    g.restore();
+  }
+  function inpath(g, parts, fn) {
+    g.save(); g.beginPath(); for (let i = 0; i < parts.length; i++) parts[i][0](g); g.clip(); fn(g); g.restore();
+  }
   const LK = 'cpu:' + (CFG.id || MODE);
   let lvl = 0; try { lvl = +localStorage.getItem(LK) || 0; } catch (e) { /* sin almacenamiento */ }
 
@@ -444,41 +456,88 @@ else (function () {
     for (let i = 0; i < 4; i++) out.push({ x: g.x0 + g.G * 4 + (i - 1.5) * g.G * 1.1, y, r: g.G * 0.52 });
     return out;
   }
-  /* ---- Dibujo del ajedrez ---- */
+  /* ---- Dibujo del ajedrez ----
+   * Ley de la pieza única: cada trebejo es UNA silueta continua (base, fuste y remate fundidos
+   * con tangente continua). Dentro no queda ningún contorno cerrado: el collarín, el pie y el
+   * volumen se leen por sombra propia y por cambio de color. */
+  /* torno: perfil [y, semiancho] de abajo arriba → costado derecho, remate y vuelta por el izquierdo */
+  function lathe(g, pts, cap) {
+    const n = pts.length;
+    g.moveTo(pts[0][1], pts[0][0]);
+    for (let i = 1; i < n; i++) { const a = pts[i - 1], b = pts[i], my = (a[0] + b[0]) / 2; g.bezierCurveTo(a[1], my, b[1], my, b[1], b[0]); }
+    const t = pts[n - 1], cy = t[0] - (cap == null ? t[1] * 0.55 : cap);
+    g.bezierCurveTo(t[1], cy, -t[1], cy, -t[1], t[0]);
+    for (let i = n - 1; i > 0; i--) { const a = pts[i], b = pts[i - 1], my = (a[0] + b[0]) / 2; g.bezierCurveTo(-a[1], my, -b[1], my, -b[1], b[0]); }
+    g.closePath();
+  }
+  const pEll = (cx, cy, rx, ry) => (g) => g.ellipse(cx, cy, rx, ry, 0, 0, TAU);
+  const pCir = (cx, cy, r) => (g) => g.arc(cx, cy, r, 0, TAU);
+  const pPoly = (P) => (g) => { g.moveTo(P[0][0], P[0][1]); for (let i = 1; i < P.length; i++) g.lineTo(P[i][0], P[i][1]); g.closePath(); };
+  /* pie común: zapata acampanada que arranca del tablero */
+  const foot = (s, top, tw) => [[s * 0.35, s * 0.295], [s * 0.305, s * 0.30], [s * 0.255, s * 0.20], [s * 0.19, s * 0.155], [s * top, s * tw]];
+  function chProfile(t, s) {
+    if (t === 'p') return { body: foot(s, 0.0, 0.10).concat([[-s * 0.09, s * 0.125]]), head: [[pCir(0, -s * 0.21, s * 0.15), 1]], collar: -s * 0.055, cw: 0.175 };
+    if (t === 'r') return { body: foot(s, 0.02, 0.145).concat([[-s * 0.13, s * 0.185]]),
+      head: [[pPoly([[-s * 0.25, -s * 0.13], [-s * 0.25, -s * 0.37], [-s * 0.145, -s * 0.37], [-s * 0.145, -s * 0.28], [-s * 0.05, -s * 0.28], [-s * 0.05, -s * 0.37], [s * 0.05, -s * 0.37], [s * 0.05, -s * 0.28], [s * 0.145, -s * 0.28], [s * 0.145, -s * 0.37], [s * 0.25, -s * 0.37], [s * 0.25, -s * 0.13]]), 1]], collar: -s * 0.12, cw: 0.255 };
+    if (t === 'b') return { body: foot(s, 0.03, 0.115).concat([[-s * 0.04, s * 0.145]]),
+      head: [[(g) => { g.moveTo(0, -s * 0.47); g.bezierCurveTo(s * 0.21, -s * 0.30, s * 0.19, -s * 0.10, s * 0.145, -s * 0.03); g.lineTo(-s * 0.145, -s * 0.03); g.bezierCurveTo(-s * 0.19, -s * 0.10, -s * 0.21, -s * 0.30, 0, -s * 0.47); g.closePath(); }, 1],
+        [pCir(0, -s * 0.50, s * 0.055), 1]], collar: -s * 0.045, cw: 0.195 };
+    if (t === 'q') return { body: foot(s, 0.02, 0.13).concat([[-s * 0.10, s * 0.165]]),
+      head: [[pPoly([[-s * 0.245, -s * 0.10], [-s * 0.30, -s * 0.36], [-s * 0.115, -s * 0.22], [0, -s * 0.44], [s * 0.115, -s * 0.22], [s * 0.30, -s * 0.36], [s * 0.245, -s * 0.10]]), 1],
+        [pCir(-s * 0.30, -s * 0.385, s * 0.052), 2], [pCir(0, -s * 0.475, s * 0.056), 2], [pCir(s * 0.30, -s * 0.385, s * 0.052), 2]], collar: -s * 0.095, cw: 0.235 };
+    return { body: foot(s, 0.02, 0.135).concat([[-s * 0.10, s * 0.17]]),
+      head: [[(g) => { g.moveTo(-s * 0.235, -s * 0.10); g.bezierCurveTo(-s * 0.21, -s * 0.33, s * 0.21, -s * 0.33, s * 0.235, -s * 0.10); g.closePath(); }, 1],
+        [pPoly([[-s * 0.048, -s * 0.28], [-s * 0.048, -s * 0.40], [-s * 0.135, -s * 0.40], [-s * 0.135, -s * 0.475], [-s * 0.048, -s * 0.475], [-s * 0.048, -s * 0.56], [s * 0.048, -s * 0.56], [s * 0.048, -s * 0.475], [s * 0.135, -s * 0.475], [s * 0.135, -s * 0.40], [s * 0.048, -s * 0.40], [s * 0.048, -s * 0.28]]), 2]], collar: -s * 0.09, cw: 0.24 };
+  }
   function piece(x, y, s, p) {
     const w = p === p.toUpperCase(), t = p.toLowerCase();
-    const body = w ? '#f5efe0' : '#4a4160', lite = w ? '#ffffff' : '#6b5f8c';
-    c.save(); c.translate(x, y); c.lineJoin = 'round'; c.lineWidth = Math.max(2, s * 0.07); c.strokeStyle = OUT;
+    const body = w ? '#f5efe0' : '#4a4160', lite = w ? '#ffffff' : '#6b5f8c', gold = w ? '#e8b64a' : '#c9962f';
+    c.save(); c.translate(x, y);
     ART.shadow(c, 0, s * 0.42, s * 0.34, 0.3);
-    const base = () => { c.beginPath(); c.ellipse(0, s * 0.36, s * 0.32, s * 0.11, 0, 0, TAU); ART.fillOut(c, ART.dark(body, 0.12), c.lineWidth); };
-    const gr = c.createLinearGradient(-s * 0.3, -s * 0.4, s * 0.3, s * 0.4); gr.addColorStop(0, lite); gr.addColorStop(1, ART.dark(body, 0.1));
-    base();
-    if (t === 'p') {
-      c.beginPath(); c.moveTo(-s * 0.2, s * 0.32); c.quadraticCurveTo(-s * 0.1, s * 0.02, -s * 0.09, -s * 0.06); c.lineTo(s * 0.09, -s * 0.06); c.quadraticCurveTo(s * 0.1, s * 0.02, s * 0.2, s * 0.32); c.closePath(); ART.fillOut(c, gr, c.lineWidth);
-      c.beginPath(); c.arc(0, -s * 0.18, s * 0.14, 0, TAU); ART.fillOut(c, gr, c.lineWidth);
-    } else if (t === 'r') {
-      c.beginPath(); c.moveTo(-s * 0.22, s * 0.32); c.lineTo(-s * 0.17, -s * 0.14); c.lineTo(s * 0.17, -s * 0.14); c.lineTo(s * 0.22, s * 0.32); c.closePath(); ART.fillOut(c, gr, c.lineWidth);
-      c.beginPath(); c.moveTo(-s * 0.26, -s * 0.14); c.lineTo(-s * 0.26, -s * 0.32); c.lineTo(-s * 0.13, -s * 0.32); c.lineTo(-s * 0.13, -s * 0.24); c.lineTo(-s * 0.05, -s * 0.24); c.lineTo(-s * 0.05, -s * 0.32); c.lineTo(s * 0.05, -s * 0.32); c.lineTo(s * 0.05, -s * 0.24); c.lineTo(s * 0.13, -s * 0.24); c.lineTo(s * 0.13, -s * 0.32); c.lineTo(s * 0.26, -s * 0.32); c.lineTo(s * 0.26, -s * 0.14); c.closePath(); ART.fillOut(c, gr, c.lineWidth);
-    } else if (t === 'n') {
-      c.beginPath(); c.moveTo(-s * 0.2, s * 0.32); c.lineTo(-s * 0.14, -s * 0.02); c.quadraticCurveTo(-s * 0.2, -s * 0.16, -s * 0.06, -s * 0.3);
-      c.quadraticCurveTo(s * 0.02, -s * 0.4, s * 0.16, -s * 0.3); c.quadraticCurveTo(s * 0.26, -s * 0.16, s * 0.2, s * 0.02); c.lineTo(s * 0.22, s * 0.32); c.closePath(); ART.fillOut(c, gr, c.lineWidth);
-      c.beginPath(); c.moveTo(s * 0.02, -s * 0.3); c.lineTo(s * 0.1, -s * 0.44); c.lineTo(s * 0.16, -s * 0.28); c.closePath(); ART.fillOut(c, gr, c.lineWidth);
-      c.beginPath(); c.arc(s * 0.04, -s * 0.2, s * 0.035, 0, TAU); c.fillStyle = OUT; c.fill();
-    } else if (t === 'b') {
-      c.beginPath(); c.moveTo(-s * 0.2, s * 0.32); c.quadraticCurveTo(-s * 0.12, s * 0.0, -s * 0.13, -s * 0.1); c.lineTo(s * 0.13, -s * 0.1); c.quadraticCurveTo(s * 0.12, s * 0, s * 0.2, s * 0.32); c.closePath(); ART.fillOut(c, gr, c.lineWidth);
-      c.beginPath(); c.moveTo(0, -s * 0.44); c.quadraticCurveTo(s * 0.2, -s * 0.22, 0, -s * 0.08); c.quadraticCurveTo(-s * 0.2, -s * 0.22, 0, -s * 0.44); c.closePath(); ART.fillOut(c, gr, c.lineWidth);
-    } else if (t === 'q' || t === 'k') {
-      c.beginPath(); c.moveTo(-s * 0.22, s * 0.32); c.quadraticCurveTo(-s * 0.14, s * 0.02, -s * 0.16, -s * 0.12); c.lineTo(s * 0.16, -s * 0.12); c.quadraticCurveTo(s * 0.14, s * 0.02, s * 0.22, s * 0.32); c.closePath(); ART.fillOut(c, gr, c.lineWidth);
-      if (t === 'q') {
-        c.beginPath(); c.moveTo(-s * 0.24, -s * 0.12); c.lineTo(-s * 0.3, -s * 0.36); c.lineTo(-s * 0.12, -s * 0.22); c.lineTo(0, -s * 0.44); c.lineTo(s * 0.12, -s * 0.22); c.lineTo(s * 0.3, -s * 0.36); c.lineTo(s * 0.24, -s * 0.12); c.closePath(); ART.fillOut(c, gr, c.lineWidth);
-        for (const dx of [-0.3, 0, 0.3]) { c.beginPath(); c.arc(dx * s, (dx ? -0.38 : -0.47) * s, s * 0.05, 0, TAU); ART.fillOut(c, '#ffd166', 1.6); }
-      } else {
-        c.beginPath(); c.moveTo(-s * 0.22, -s * 0.12); c.quadraticCurveTo(0, -s * 0.34, s * 0.22, -s * 0.12); c.closePath(); ART.fillOut(c, gr, c.lineWidth);
-        c.beginPath(); c.rect(-s * 0.05, -s * 0.5, s * 0.1, s * 0.22); ART.fillOut(c, '#ffd166', 1.8);
-        c.beginPath(); c.rect(-s * 0.14, -s * 0.42, s * 0.28, s * 0.09); ART.fillOut(c, '#ffd166', 1.8);
-      }
+    const gr = c.createLinearGradient(-s * 0.34, -s * 0.5, s * 0.3, s * 0.38);
+    gr.addColorStop(0, lite); gr.addColorStop(0.5, body); gr.addColorStop(1, ART.dark(body, 0.2));
+    const P = chProfile(t, s), parts = [];
+    if (t === 'n') {
+      parts.push([(g) => lathe(g, foot(s, 0.06, 0.125), s * 0.02), gr]);
+      parts.push([(g) => {                                   // cuello y cabeza de caballo, de una pieza
+        g.moveTo(-s * 0.175, s * 0.075);
+        g.bezierCurveTo(-s * 0.205, -s * 0.05, -s * 0.205, -s * 0.22, -s * 0.115, -s * 0.325);
+        g.bezierCurveTo(-s * 0.125, -s * 0.395, -s * 0.10, -s * 0.44, -s * 0.065, -s * 0.465);
+        g.bezierCurveTo(-s * 0.035, -s * 0.425, -s * 0.02, -s * 0.385, -s * 0.015, -s * 0.355);
+        g.bezierCurveTo(s * 0.005, -s * 0.40, s * 0.03, -s * 0.435, s * 0.06, -s * 0.45);
+        g.bezierCurveTo(s * 0.075, -s * 0.40, s * 0.075, -s * 0.36, s * 0.065, -s * 0.325);
+        g.bezierCurveTo(s * 0.145, -s * 0.30, s * 0.205, -s * 0.235, s * 0.235, -s * 0.155);
+        g.bezierCurveTo(s * 0.255, -s * 0.105, s * 0.25, -s * 0.06, s * 0.215, -s * 0.035);
+        g.bezierCurveTo(s * 0.15, -s * 0.015, s * 0.085, -s * 0.02, s * 0.03, -s * 0.005);
+        g.bezierCurveTo(s * 0.02, s * 0.02, s * 0.06, s * 0.05, s * 0.185, s * 0.075);
+        g.closePath(); }, gr]);
+    } else {
+      parts.push([(g) => lathe(g, P.body, s * 0.015), gr]);
+      parts.push([pEll(0, P.collar, s * P.cw, s * 0.048), gr]);
+      for (const [fn, kind] of P.head) parts.push([fn, kind === 2 ? gold : gr]);
     }
-    ART.glint(c, -s * 0.12, -s * 0.1, s * 0.07);
+    uni(c, parts, Math.max(1.05, s * 0.026));
+    /* volumen interior: sin un solo contorno, solo sombra propia y luz */
+    inpath(c, parts, (g) => {
+      let sh = g.createLinearGradient(0, s * 0.1, 0, s * 0.37); sh.addColorStop(0, ART.alpha(OUT, 0)); sh.addColorStop(1, ART.alpha(OUT, 0.34));
+      g.fillStyle = sh; g.fillRect(-s * 0.4, s * 0.1, s * 0.8, s * 0.3);            // asiento sobre la casilla
+      if (t !== 'n') { const cy = P.collar;                                          // collarín: se lee por sombra, no por línea
+        sh = g.createLinearGradient(0, cy - s * 0.05, 0, cy + s * 0.075); sh.addColorStop(0, ART.alpha(OUT, 0.26)); sh.addColorStop(0.42, ART.alpha(OUT, 0)); sh.addColorStop(1, ART.alpha(OUT, 0.22));
+        g.fillStyle = sh; g.fillRect(-s * 0.4, cy - s * 0.05, s * 0.8, s * 0.13);
+        g.fillStyle = ART.alpha('#ffffff', 0.22); g.fillRect(-s * 0.4, cy - s * 0.012, s * 0.8, s * 0.02); }
+      sh = g.createLinearGradient(s * 0.03, 0, s * 0.34, 0); sh.addColorStop(0, ART.alpha(OUT, 0)); sh.addColorStop(1, ART.alpha(OUT, 0.30));
+      g.fillStyle = sh; g.fillRect(0, -s * 0.6, s * 0.4, s * 1.0);                   // costado en sombra (luz arriba-izquierda)
+      sh = g.createLinearGradient(-s * 0.3, -s * 0.5, -s * 0.05, -s * 0.1); sh.addColorStop(0, ART.alpha('#ffffff', 0.3)); sh.addColorStop(1, ART.alpha('#ffffff', 0));
+      g.fillStyle = sh; g.fillRect(-s * 0.4, -s * 0.6, s * 0.4, s * 0.9);            // luz de borde
+      if (t === 'n') {
+        g.fillStyle = ART.alpha(OUT, 0.85); g.beginPath(); g.ellipse(s * 0.085, -s * 0.255, s * 0.027, s * 0.034, 0.3, 0, TAU); g.fill();
+        g.beginPath(); g.ellipse(s * 0.205, -s * 0.10, s * 0.022, s * 0.016, -0.4, 0, TAU); g.fill();
+        let mn = g.createLinearGradient(-s * 0.19, 0, -s * 0.03, 0); mn.addColorStop(0, ART.alpha(OUT, 0.34)); mn.addColorStop(1, ART.alpha(OUT, 0));
+        g.fillStyle = mn; g.beginPath(); g.moveTo(-s * 0.21, s * 0.07); g.bezierCurveTo(-s * 0.22, -s * 0.18, -s * 0.17, -s * 0.34, -s * 0.09, -s * 0.44);
+        g.lineTo(-s * 0.005, -s * 0.30); g.bezierCurveTo(-s * 0.075, -s * 0.18, -s * 0.09, -s * 0.04, -s * 0.085, s * 0.08); g.closePath(); g.fill();
+        mn = g.createLinearGradient(0, -s * 0.08, 0, s * 0.09); mn.addColorStop(0, ART.alpha(OUT, 0)); mn.addColorStop(1, ART.alpha(OUT, 0.26));
+        g.fillStyle = mn; g.fillRect(-s * 0.3, -s * 0.08, s * 0.6, s * 0.2); }
+    });
     c.restore();
   }
   function chDraw() {
@@ -655,13 +714,17 @@ else (function () {
       DCH.BRD.cells.forEach((cell, i) => {
         const [x, y] = hexXY(cell, g.s), px = g.cx + x, py = g.cy + y;
         const t = cell.t, p = S ? S.seats.indexOf(t) : -1, op = S && t >= 0 ? S.seats.indexOf(DCH.OPP(t)) : -1;
-        q.beginPath(); q.arc(px, py + 2, g.r * 0.92, 0, TAU); q.fillStyle = 'rgba(0,0,0,.35)'; q.fill();
-        q.beginPath(); q.arc(px, py, g.r * 0.9, 0, TAU);
+        /* agujero: un hueco, no un disco encima del tablero. Profundidad por sombra, sin anillos */
         let base = '#2a1f52';
         if (op >= 0) base = ART.mix ? ART.mix('#2a1f52', k.pcol(op), 0.55) : k.pcol(op); /* punta de destino de ese jugador */
-        q.fillStyle = base; q.fill(); q.lineWidth = 2.2; q.strokeStyle = op >= 0 ? ART.dark(k.pcol(op), 0.35) : ART.alpha(OUT, 0.7); q.stroke();
-        if (op >= 0) { q.beginPath(); q.arc(px, py, g.r * 0.46, 0, TAU); q.lineWidth = 2; q.strokeStyle = ART.alpha(ART.lite(k.pcol(op), 0.5), 0.9); q.stroke(); }
-        else { q.beginPath(); q.arc(px, py, g.r * 0.55, 0, TAU); q.fillStyle = 'rgba(0,0,0,.28)'; q.fill(); }
+        q.beginPath(); q.arc(px, py, g.r * 0.9, 0, TAU); q.fillStyle = base; q.fill();
+        q.save(); q.clip();
+        let hg = q.createRadialGradient(px + g.r * 0.3, py + g.r * 0.35, g.r * 0.1, px, py - g.r * 0.25, g.r * 1.5);
+        hg.addColorStop(0, ART.alpha(OUT, 0)); hg.addColorStop(1, ART.alpha(OUT, 0.75)); q.fillStyle = hg;
+        q.fillRect(px - g.r, py - g.r, g.r * 2, g.r * 2);
+        if (op >= 0) { q.fillStyle = ART.alpha(ART.lite(k.pcol(op), 0.6), 0.5); q.beginPath(); q.ellipse(px, py + g.r * 0.42, g.r * 0.62, g.r * 0.3, 0, 0, TAU); q.fill(); }
+        q.restore();
+        q.lineWidth = 2.2; q.strokeStyle = ART.alpha(OUT, 0.75); q.beginPath(); q.arc(px, py, g.r * 0.9 + 1.1, 0, TAU); q.stroke();
       });
       dBoardCv._res = res;
     }

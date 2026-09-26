@@ -81,17 +81,59 @@ const PT = (() => {
   };
 })();
 function drawPine(t) { c.save(); c.translate(t.x, t.y); c.scale(t.s * 0.8, t.s * 0.8); ART.deco(c, SNOW, 0, 0, 32, t.seed); c.restore(); }
+/* ---------- Ley de la pieza única (REMASTER §8) ----------
+ * uni(): traza TODAS las partes y las rellena después, así los contornos interiores quedan
+ * tapados y solo sobrevive el borde exterior de la silueta. inw(): detalle interior recortado
+ * contra esa silueta. Las separaciones internas se leen por sombra propia o por cambio de
+ * color, nunca por stroke. Una pieza solo se separa cuando se mueve de verdad. */
+function uni(g, parts, ow) { g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = ow * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); } }
+const all = (parts) => (g) => { for (const p of parts) p(g); };
+function inw(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+const rp = (g, x, y, w, h, r) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+const cp = (g, x, y, r) => { g.moveTo(x + r, y); g.arc(x, y, r, 0, Math.PI * 2); g.closePath(); };
+const ep2 = (g, x, y, rx, ry, rot) => { g.moveTo(x + rx * Math.cos(rot || 0), y + rx * Math.sin(rot || 0)); g.ellipse(x, y, rx, ry, rot || 0, 0, Math.PI * 2); g.closePath(); };
+const ply = (pts) => (g) => { g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); };
+/* hueso de ancho variable: baja por un costado, redondea la punta y vuelve por el otro, así
+ * miembro y tronco se unen con tangente continua y sin escalón. */
+function bone(pts, ws) {
+  return (g) => {
+    const n = pts.length, L = [], R = [];
+    for (let i = 0; i < n; i++) {
+      const a = pts[i > 0 ? i - 1 : 0], b = pts[i < n - 1 ? i + 1 : n - 1];
+      let tx = b[0] - a[0], ty = b[1] - a[1]; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
+      L.push([pts[i][0] - ty * ws[i], pts[i][1] + tx * ws[i]]);
+      R.push([pts[i][0] + ty * ws[i], pts[i][1] - tx * ws[i]]);
+    }
+    g.moveTo(L[0][0], L[0][1]);
+    for (let i = 1; i < n - 1; i++) g.quadraticCurveTo(L[i][0], L[i][1], (L[i][0] + L[i + 1][0]) / 2, (L[i][1] + L[i + 1][1]) / 2);
+    g.lineTo(L[n - 1][0], L[n - 1][1]);
+    const e = pts[n - 1], w = ws[n - 1], a0 = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0]);
+    g.arc(e[0], e[1], w, a0, a0 - Math.PI, true);
+    for (let i = n - 2; i > 0; i--) g.quadraticCurveTo(R[i][0], R[i][1], (R[i][0] + R[i - 1][0]) / 2, (R[i][1] + R[i - 1][1]) / 2);
+    g.lineTo(R[0][0], R[0][1]);
+    g.closePath();
+  };
+}
+/* Puerta de slalom: palo y banderola son una sola pieza (la tela nace del palo). */
 function drawGatePole(x, y, col, wob, right, tt) {
   const sw = Math.sin(tt * 18) * wob * 7; c.save(); c.translate(x, y); c.lineJoin = 'round';
   shadow(c, 3, 1, 6, 0.25);
   c.rotate(sw * 0.02);
-  rr(c, -2, -40, 4, 40, 1.5); c.fillStyle = col; c.fill(); c.lineWidth = 1.6; c.strokeStyle = OUT; c.stroke();
-  c.fillStyle = '#fff'; for (let i = 0; i < 3; i++) c.fillRect(-1.4, -34 + i * 11, 2.8, 4);
-  const d = right ? -1 : 1; c.beginPath(); c.moveTo(0, -38); c.lineTo(d * 22 + sw, -36); c.lineTo(d * 21 + sw, -20); c.lineTo(0, -22); c.closePath();
-  const g = c.createLinearGradient(0, -38, d * 22, -20); g.addColorStop(0, lite(col, 0.2)); g.addColorStop(1, dark(col, 0.15)); c.fillStyle = g; c.fill(); c.lineWidth = 1.8; c.strokeStyle = OUT; c.stroke();
-  c.fillStyle = alpha('#ffffff', 0.85); c.beginPath(); c.arc(d * 10 + sw * 0.5, -29, 3.2, 0, TAU); c.fill();
+  const d = right ? -1 : 1;
+  const pole = (q) => rp(q, -2, -40, 4, 40, 1.5);
+  const flag = ply([[0, -38], [d * 22 + sw, -36], [d * 21 + sw, -20], [0, -22]]);
+  const g = c.createLinearGradient(0, -38, d * 22, -20); g.addColorStop(0, lite(col, 0.2)); g.addColorStop(1, dark(col, 0.15));
+  uni(c, [[flag, g], [pole, col]], 1.1);
+  inw(c, all([pole, flag]), (q) => {
+    q.fillStyle = '#fff'; for (let i = 0; i < 3; i++) q.fillRect(-1.4, -34 + i * 11, 2.8, 4);
+    q.fillStyle = 'rgba(0,0,0,.22)'; q.fillRect(-2, -40, 1.4, 40);
+    q.fillStyle = alpha('#ffffff', 0.8); q.beginPath(); q.arc(d * 10 + sw * 0.5, -29, 3.2, 0, TAU); q.fill(); });
   c.restore();
 }
+/* Cada corredor es UN cuerpo (piernas, tronco, brazos y cabeza en el mismo trazado); la tabla,
+ * los esquís y el trineo van aparte porque giran con el rumbo. */
 function drawRacer(r, tt, ghost) {
   const x = r.x, z = r.z, y = r.y - z * 26, a = r.a; if (ghost) c.globalAlpha = 0.42;
   if (r.inv > 0 && !r.crash && Math.floor(tt * 14) % 2) c.globalAlpha *= 0.5;
@@ -99,49 +141,63 @@ function drawRacer(r, tt, ghost) {
   c.save(); c.translate(x, y); c.lineJoin = 'round'; c.lineCap = 'round';
   if (r.crash > 0) c.rotate(r.crash * 9 * r.spinDir);
   const sx = Math.sin(a), sy = Math.cos(a), col = r.col;
+  const body = (parts, detail) => { uni(c, parts, 1.15); inw(c, all(parts.map((q) => q[0])), detail); };
   if (SL) {
-    /* esquís (en el plano del suelo) */
-    for (const o of [-3.6, 3.6]) { const px = sy * o, py = -sx * o; c.beginPath(); c.moveTo(px - sx * 14, py - sy * 14); c.lineTo(px + sx * 15, py + sy * 15); c.lineWidth = 4.2; c.strokeStyle = OUT; c.stroke(); c.lineWidth = 2.2; c.strokeStyle = dark(col, 0.1); c.stroke(); }
-    const tuck = r.tuck && !r.crash, lean = clamp(r.steer, -1, 1) * 3;
-    /* bastones */
-    c.lineWidth = 1.6; c.strokeStyle = OUT; for (const sd of [-1, 1]) { c.beginPath(); c.moveTo(sd * 7 + lean, tuck ? -9 : -14); c.lineTo(sd * 9 - sx * 6, 2 - sy * 6); c.stroke(); }
-    /* piernas y cuerpo */
-    rr(c, -5 + lean * 0.4, tuck ? -9 : -13, 10, tuck ? 9 : 13, 3); fillOut(c, '#3a3558', 1.8);
-    rr(c, -7 + lean, tuck ? -18 : -25, 14, 12, 5); const g = c.createLinearGradient(-7, -25, 7, -13); g.addColorStop(0, lite(col, 0.25)); g.addColorStop(1, dark(col, 0.2)); c.fillStyle = g; c.fill(); c.lineWidth = 1.8; c.strokeStyle = OUT; c.stroke();
-    c.beginPath(); c.arc(lean * 1.2, tuck ? -21 : -29, 5.6, 0, TAU); c.fillStyle = col; c.fill(); c.lineWidth = 1.8; c.strokeStyle = OUT; c.stroke();
-    rr(c, lean * 1.2 - 4.5, (tuck ? -21 : -29) - 1, 9, 3.2, 1.5); c.fillStyle = '#ffd166'; c.fill(); c.lineWidth = 1.2; c.stroke(); glint(c, lean * 1.2 - 2, (tuck ? -21 : -29) - 3.5, 1.6);
+    const skis = (q) => { for (const o of [-3.6, 3.6]) { const px = sy * o, py = -sx * o;
+      q.moveTo(px - sx * 14 - sy * 1.5, py - sy * 14 + sx * 1.5);
+      q.lineTo(px + sx * 15 - sy * 1.5, py + sy * 15 + sx * 1.5);
+      q.lineTo(px + sx * 15 + sy * 1.5, py + sy * 15 - sx * 1.5);
+      q.lineTo(px - sx * 14 + sy * 1.5, py - sy * 14 - sx * 1.5); q.closePath(); } };
+    uni(c, [[skis, dark(col, 0.1)]], 1.1);
+    const tuck = r.tuck && !r.crash, lean = clamp(r.steer, -1, 1) * 3, hy = tuck ? -21 : -29;
+    c.lineWidth = 1.5; c.strokeStyle = OUT; for (const sd of [-1, 1]) { c.beginPath(); c.moveTo(sd * 7 + lean, tuck ? -9 : -14); c.lineTo(sd * 9 - sx * 6, 2 - sy * 6); c.stroke(); }
+    const legs = (q) => rp(q, -5 + lean * 0.4, tuck ? -9 : -13, 10, tuck ? 9 : 13, 3);
+    const torso = (q) => rp(q, -7 + lean, tuck ? -18 : -25, 14, 12, 5);
+    const head = (q) => cp(q, lean * 1.2, hy, 5.6);
+    const g = c.createLinearGradient(-7, -25, 7, -13); g.addColorStop(0, lite(col, 0.25)); g.addColorStop(1, dark(col, 0.2));
+    body([[legs, '#3a3558'], [torso, g], [head, col]], (q) => {
+      q.fillStyle = 'rgba(0,0,0,.26)'; q.fillRect(-9 + lean, (tuck ? -9 : -13) - 1.4, 18, 2.6); q.fillRect(-8 + lean, hy + 4, 16, 2.2);
+      q.fillStyle = '#ffd166'; q.beginPath(); rp(q, lean * 1.2 - 4.5, hy - 1, 9, 3.2, 1.5); q.fill(); glint(q, lean * 1.2 - 2, hy - 3.5, 1.6); });
   } else if (TB) {
-    /* tabla de snow: la plancha va bajo los pies, girada según el rumbo, y el rider se inclina al empujar */
     const lean = clamp(r.steer, -1, 1) * 3.4, tuck = r.tuck && !r.crash, pu = r.push > 0 ? Math.min(1, r.push / 0.25) : 0;
     c.save(); c.rotate(-a * 0.9); c.scale(1, 0.62);
-    rr(c, -7, -20, 14, 40, 7); const bg = c.createLinearGradient(-7, -20, 7, 20); bg.addColorStop(0, lite(col, 0.3)); bg.addColorStop(1, dark(col, 0.25)); c.fillStyle = bg; c.fill(); c.lineWidth = 2.4; c.strokeStyle = OUT; c.stroke();
-    c.fillStyle = alpha('#ffffff', 0.75); c.fillRect(-2, -14, 4, 28);
-    for (const o of [-7, 7]) { rr(c, -5, o - 2.5, 10, 5, 2); c.fillStyle = OUT; c.fill(); }
+    const board = (q) => rp(q, -7, -20, 14, 40, 7);
+    const bg = c.createLinearGradient(-7, -20, 7, 20); bg.addColorStop(0, lite(col, 0.3)); bg.addColorStop(1, dark(col, 0.25));
+    uni(c, [[board, bg]], 1.5);
+    inw(c, board, (q) => { q.fillStyle = alpha('#ffffff', 0.7); q.fillRect(-2, -14, 4, 28);
+      q.fillStyle = OUT; for (const o of [-7, 7]) { q.beginPath(); rp(q, -5, o - 2.5, 10, 5, 2); q.fill(); } });
     c.restore();
-    /* piernas flexionadas y torso */
-    c.lineWidth = 4.4; c.strokeStyle = OUT; c.lineCap = 'round';
-    for (const sd of [-1, 1]) { c.beginPath(); c.moveTo(sd * 3 + lean * 0.4, tuck ? -7 : -10); c.lineTo(sd * 6, 3); c.stroke(); }
-    rr(c, -7 + lean, tuck ? -17 : -23, 14, tuck ? 12 : 15, 6); const g = c.createLinearGradient(-7, -23, 7, -8); g.addColorStop(0, lite(col, 0.25)); g.addColorStop(1, dark(col, 0.2)); c.fillStyle = g; c.fill(); c.lineWidth = 1.8; c.strokeStyle = OUT; c.stroke();
-    /* brazos: abiertos para el equilibrio, uno estirado al empujar */
-    c.lineWidth = 3.4; c.strokeStyle = OUT; c.lineCap = 'round';
-    for (const sd of [-1, 1]) { const ex = sd * (10 + pu * 12), ey = (tuck ? -12 : -16) + sd * lean * 0.6 - pu * 4;
-      c.beginPath(); c.moveTo(sd * 5 + lean, tuck ? -14 : -19); c.lineTo(ex, ey); c.stroke(); c.lineWidth = 2; c.strokeStyle = lite(col, 0.35); c.stroke(); c.lineWidth = 3.4; c.strokeStyle = OUT; }
-    const hy = tuck ? -20 : -27; c.beginPath(); c.arc(lean * 1.2, hy, 5.8, 0, TAU); c.fillStyle = '#ffd9b8'; c.fill(); c.lineWidth = 1.8; c.strokeStyle = OUT; c.stroke();
-    c.beginPath(); c.arc(lean * 1.2, hy - 1, 6.2, Math.PI, 0); c.fillStyle = col; c.fill(); c.lineWidth = 1.8; c.stroke();
-    rr(c, lean * 1.2 - 4.6, hy - 1.6, 9.2, 3.4, 1.6); c.fillStyle = '#2c2a44'; c.fill(); c.lineWidth = 1.2; c.stroke(); glint(c, lean * 1.2 - 2, hy - 3.6, 1.6);
+    const hy = tuck ? -20 : -27;
+    const legs = [-1, 1].map((sd) => bone([[sd * 3 + lean * 0.4, tuck ? -7 : -10], [sd * 6, 3]], [2.6, 2]));
+    const arms = [-1, 1].map((sd) => bone([[sd * 5 + lean, tuck ? -14 : -19], [sd * (10 + pu * 12), (tuck ? -12 : -16) + sd * lean * 0.6 - pu * 4]], [2.2, 1.7]));
+    const torso = (q) => rp(q, -7 + lean, tuck ? -17 : -23, 14, tuck ? 12 : 15, 6);
+    const head = (q) => { cp(q, lean * 1.2, hy, 5.8); q.moveTo(lean * 1.2 + 6.2, hy - 1); q.arc(lean * 1.2, hy - 1, 6.2, 0, Math.PI, true); q.closePath(); };
+    const g = c.createLinearGradient(-7, -23, 7, -8); g.addColorStop(0, lite(col, 0.25)); g.addColorStop(1, dark(col, 0.2));
+    body([[legs[0], '#3a3558'], [legs[1], '#3a3558'], [arms[0], lite(col, 0.35)], [arms[1], lite(col, 0.35)], [torso, g], [head, '#ffd9b8']], (q) => {
+      q.fillStyle = 'rgba(0,0,0,.26)'; q.fillRect(-10 + lean, (tuck ? -7 : -10) - 1.2, 20, 2.4); q.fillRect(-9 + lean, hy + 4, 18, 2.2);
+      q.fillStyle = col; q.beginPath(); q.arc(lean * 1.2, hy - 1, 6.2, Math.PI, 0); q.fill();
+      q.fillStyle = '#2c2a44'; q.beginPath(); rp(q, lean * 1.2 - 4.6, hy - 1.6, 9.2, 3.4, 1.6); q.fill(); glint(q, lean * 1.2 - 2, hy - 3.6, 1.6); });
     if (r.shoved > 0) for (let i = 0; i < 2; i++) glint(c, Math.cos(tt * 12 + i * 3) * 16, hy - 8 + Math.sin(tt * 12 + i * 3) * 4, 3, '#ff8a8a');
   } else {
-    /* trineo de madera orientado según el rumbo */
     c.save(); c.rotate(-a); c.scale(1, 0.8);
-    for (const sd of [-1, 1]) { c.beginPath(); c.moveTo(sd * 8, -14); c.lineTo(sd * 8, 12); c.quadraticCurveTo(sd * 8, 19, sd * 4, 19); c.lineWidth = 3.4; c.strokeStyle = OUT; c.stroke(); c.lineWidth = 1.8; c.strokeStyle = '#c9d4e6'; c.stroke(); }
-    rr(c, -9, -13, 18, 26, 4); const wg = c.createLinearGradient(-9, 0, 9, 0); wg.addColorStop(0, '#d49a5c'); wg.addColorStop(1, '#9a6334'); c.fillStyle = wg; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
-    c.strokeStyle = alpha(OUT, 0.35); c.lineWidth = 1; for (let i = -1; i <= 1; i++) { c.beginPath(); c.moveTo(-8, i * 7); c.lineTo(8, i * 7); c.stroke(); }
+    const runners = (q) => { for (const sd of [-1, 1]) { q.moveTo(sd * 8 - 1.6, -14); q.lineTo(sd * 8 + 1.6, -14); q.lineTo(sd * 8 + 1.6, 12);
+      q.quadraticCurveTo(sd * 8 + 1.6, 20.6, sd * 4, 20.6); q.lineTo(sd * 4, 17.4); q.quadraticCurveTo(sd * 8 - 1.6, 17.4, sd * 8 - 1.6, 12); q.closePath(); } };
+    const seat = (q) => rp(q, -9, -13, 18, 26, 4);
+    const wg = c.createLinearGradient(-9, 0, 9, 0); wg.addColorStop(0, '#d49a5c'); wg.addColorStop(1, '#9a6334');
+    uni(c, [[runners, '#c9d4e6'], [seat, wg]], 1.3);
+    inw(c, all([runners, seat]), (q) => { q.fillStyle = alpha(OUT, 0.26); for (let i = -1; i <= 1; i++) q.fillRect(-9, i * 7 - 0.6, 18, 1.2);
+      q.fillStyle = 'rgba(0,0,0,.22)'; q.fillRect(-11, -13, 3, 26); q.fillRect(8, -13, 3, 26); });
     c.restore();
-    const lean = clamp(r.steer, -1, 1) * 3, tuck = r.tuck && !r.crash;
-    rr(c, -8 + lean, tuck ? -14 : -19, 16, tuck ? 12 : 15, 6); const g = c.createLinearGradient(-8, -19, 8, -4); g.addColorStop(0, lite(col, 0.25)); g.addColorStop(1, dark(col, 0.2)); c.fillStyle = g; c.fill(); c.lineWidth = 1.8; c.strokeStyle = OUT; c.stroke();
-    const hy = tuck ? -17 : -23; c.beginPath(); c.arc(lean * 1.3, hy, 6, 0, TAU); c.fillStyle = '#ffd9b8'; c.fill(); c.lineWidth = 1.8; c.strokeStyle = OUT; c.stroke();
-    c.beginPath(); c.arc(lean * 1.3, hy - 1, 6.2, Math.PI, 0); c.fillStyle = col; c.fill(); c.lineWidth = 1.8; c.stroke(); c.beginPath(); c.arc(lean * 1.3, hy - 8, 2.6, 0, TAU); c.fillStyle = '#fff'; c.fill(); c.lineWidth = 1.2; c.stroke();
-    const sc = Math.sin(tt * 10 + r.p) * 2; c.beginPath(); c.moveTo(lean * 1.3 - 5, hy + 5); c.quadraticCurveTo(lean - 12, hy + 6 + sc, lean - 16, hy + 2 + sc); c.lineWidth = 3.5; c.strokeStyle = OUT; c.stroke(); c.lineWidth = 2; c.strokeStyle = lite(col, 0.4); c.stroke();
+    const lean = clamp(r.steer, -1, 1) * 3, tuck = r.tuck && !r.crash, hy = tuck ? -17 : -23;
+    const sc = Math.sin(tt * 10 + r.p) * 2;
+    const scarf = bone([[lean * 1.3 - 5, hy + 5], [lean - 11, hy + 6 + sc], [lean - 16, hy + 2 + sc]], [2.2, 1.9, 1.4]);
+    const torso = (q) => rp(q, -8 + lean, tuck ? -14 : -19, 16, tuck ? 12 : 15, 6);
+    const head = (q) => { cp(q, lean * 1.3, hy, 6); q.moveTo(lean * 1.3 + 6.2, hy - 1); q.arc(lean * 1.3, hy - 1, 6.2, 0, Math.PI, true); q.closePath(); cp(q, lean * 1.3, hy - 8, 2.6); };
+    const g = c.createLinearGradient(-8, -19, 8, -4); g.addColorStop(0, lite(col, 0.25)); g.addColorStop(1, dark(col, 0.2));
+    body([[scarf, lite(col, 0.4)], [torso, g], [head, '#ffd9b8']], (q) => {
+      q.fillStyle = 'rgba(0,0,0,.24)'; q.fillRect(-10 + lean, hy + 4, 20, 2.2);
+      q.fillStyle = col; q.beginPath(); q.arc(lean * 1.3, hy - 1, 6.2, Math.PI, 0); q.fill();
+      q.fillStyle = '#fff'; q.beginPath(); q.arc(lean * 1.3, hy - 8, 2.4, 0, TAU); q.fill(); });
   }
   c.restore(); c.globalAlpha = 1;
   if (r.crash > 0) for (let i = 0; i < 3; i++) { const an = tt * 8 + i * 2.1; glint(c, x + Math.cos(an) * 14, y - 30 + Math.sin(an) * 4, 3, '#ffd166'); }

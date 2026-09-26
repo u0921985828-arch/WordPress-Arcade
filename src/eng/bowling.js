@@ -11,7 +11,7 @@ function setBall() { ball = { x: aimX || 0, y: 30, vx: 0, vy: 0, hook: 0, rollin
 function reset() { frames = []; frame = 0; roll = 0; aimX = 0; aimA = 0; cam = 0; kb = false; standing = 10; strikes = 0; spares = 0; rackPins(); setBall(); msg = ''; msgT = 0; if (TURN) resetT(); }
 function score() { const r = frames.flat(); let s = 0, i = 0; const out = []; for (let f = 0; f < 10; f++) { if (r[i] === undefined) break; if (r[i] === 10) { if (r[i + 2] === undefined) break; s += 10 + r[i + 1] + r[i + 2]; i++; } else { if (r[i + 1] === undefined) break; if (r[i] + r[i + 1] === 10) { if (r[i + 2] === undefined) break; s += 10 + r[i + 2]; } else s += r[i] + r[i + 1]; i += 2; } out.push(s); } return out; }
 /* ---------- Proyección en perspectiva con cámara ---------- */
-const P = (x, y, z) => { const s = F / (F + Math.max(-F * 0.6, y - cam)); return [PCX + x * s * SC, HY + (BASE - HY) * s - (z || 0) * s * SC, s]; };
+const P = (x, y, z) => { const cm = Number.isFinite(cam) ? cam : 0; const s = F / (F + Math.max(-F * 0.6, y - cm)); return [PCX + x * s * SC, HY + (BASE - HY) * s - (z || 0) * s * SC, s]; };
 /* ---------- Sprites cacheados a 2× ---------- */
 function sprite(w, h, fn) { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const g = cv.getContext('2d'); g.scale(2, 2); fn(g); return cv; }
 function buildSprites() {
@@ -104,7 +104,8 @@ function draw() {
   quad([P(-LANE_W, 1440), P(LANE_W, 1440), P(LANE_W, PIT), P(-LANE_W, PIT)], 'rgba(255,240,210,.18)');
   quad([P(-LANE_W - GUT, PIT), P(LANE_W + GUT, PIT), P(LANE_W + GUT, y1), P(-LANE_W - GUT, y1)], '#0c0818');
   // brillo del aceite
-  const gl = c.createLinearGradient(0, P(0, PIT)[1], 0, BASE); gl.addColorStop(0, 'rgba(255,255,255,0)'); gl.addColorStop(0.6, 'rgba(255,255,255,.10)'); gl.addColorStop(1, 'rgba(255,255,255,0)'); quad([P(-LANE_W * 0.5, y0), P(LANE_W * 0.1, y0), P(LANE_W * 0.1, PIT), P(-LANE_W * 0.5, PIT)], gl);
+  const oy = P(0, PIT)[1], gy = Number.isFinite(oy) ? oy : HY; /* blindaje: si cam/s se va a NaN el gradiente reventaba */
+  const gl = c.createLinearGradient(0, gy, 0, BASE); gl.addColorStop(0, 'rgba(255,255,255,0)'); gl.addColorStop(0.6, 'rgba(255,255,255,.10)'); gl.addColorStop(1, 'rgba(255,255,255,0)'); quad([P(-LANE_W * 0.5, y0), P(LANE_W * 0.1, y0), P(LANE_W * 0.1, PIT), P(-LANE_W * 0.5, PIT)], gl);
   // bordes de la pista
   c.strokeStyle = OUT; c.lineWidth = 2; for (const x of [-LANE_W, LANE_W]) { const a = P(x, y0), b = P(x, PIT); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
   // flechas, puntos y línea de falta

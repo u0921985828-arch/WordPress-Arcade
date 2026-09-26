@@ -231,37 +231,73 @@ else (function () {
     return out;
   }
 
-  /* ---------- Dibujo de fichas ---------- */
+  /* ---------- Dibujo de fichas ----------
+   * Ley de la pieza única (§8): la ficha es UNA pieza de hueso con grosor; la barra central y el
+   * canto se leen por sombra propia y por color, nunca por contorno. */
+  function uni(g, parts, ow) {
+    g.save(); g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = (ow || 1.1) * 2;
+    for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+    for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); }
+    g.restore();
+  }
+  function inpath(g, parts, fn) { g.save(); g.beginPath(); for (let i = 0; i < parts.length; i++) parts[i][0](g); g.clip(); fn(g); g.restore(); }
   const PIP = { 0: [], 1: [[0, 0]], 2: [[-1, -1], [1, 1]], 3: [[-1, -1], [0, 0], [1, 1]], 4: [[-1, -1], [1, -1], [-1, 1], [1, 1]], 5: [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]], 6: [[-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]] };
   const PCOL = ['#1a1530', '#e0344a', '#2f9e4f', '#2f5fd0', '#d4761c', '#7a3fc0', '#1a8f9e'];
+  /* punto: un hoyo taladrado en el hueso (sombra dentro, luz en el filo inferior), no un disco encima */
   function half(x, y, s, v) {
     const r = s * 0.115;
-    c.fillStyle = PCOL[v] || '#1a1530';
-    for (const [a, b] of PIP[v]) { c.beginPath(); c.arc(x + a * s * 0.26, y + b * s * 0.26, r, 0, TAU); c.fill(); c.beginPath(); c.arc(x + a * s * 0.26 - r * 0.3, y + b * s * 0.26 - r * 0.3, r * 0.34, 0, TAU); c.fillStyle = ART.alpha('#ffffff', 0.5); c.fill(); c.fillStyle = PCOL[v] || '#1a1530'; }
+    for (const [a, b] of PIP[v]) {
+      const px = x + a * s * 0.26, py = y + b * s * 0.26, col = PCOL[v] || '#1a1530';
+      c.beginPath(); c.arc(px, py, r * 1.12, 0, TAU); c.fillStyle = ART.alpha('#ffffff', 0.5); c.fill();
+      const g = c.createRadialGradient(px + r * 0.32, py + r * 0.36, r * 0.1, px, py - r * 0.12, r * 1.25);
+      g.addColorStop(0, ART.lite(col, 0.3)); g.addColorStop(0.55, col); g.addColorStop(1, ART.dark(col, 0.55));
+      c.beginPath(); c.arc(px, py, r, 0, TAU); c.fillStyle = g; c.fill();
+    }
   }
   function tileArt(x, y, w, h, a, b, opt) {
     opt = opt || {};
     c.save(); c.translate(x, y); if (opt.rot) c.rotate(opt.rot);
-    const hw = w / 2, hh = h / 2;
+    const hw = w / 2, hh = h / 2, TH = w * 0.085, rd = w * 0.18;
     ART.shadow(c, 0, hh * 0.92, w * 0.5, 0.3);
-    ART.rr(c, -hw, -hh + 3, w, h, w * 0.18); c.fillStyle = OUT; c.fill();
-    ART.rr(c, -hw, -hh, w, h, w * 0.18);
-    const g = c.createLinearGradient(-hw, -hh, hw, hh); g.addColorStop(0, opt.dim ? '#bdb6ad' : '#fff8ea'); g.addColorStop(1, opt.dim ? '#9a948c' : '#e7dcc6');
-    ART.fillOut(c, g, opt.lw || 2.4);
-    c.beginPath(); c.moveTo(-hw + w * 0.14, 0); c.lineTo(hw - w * 0.14, 0); c.lineWidth = 2; c.strokeStyle = ART.alpha(OUT, 0.55); c.stroke();
+    const body = (g) => ART.rr(g, -hw, -hh, w, h + TH, rd), face = (g) => ART.rr(g, -hw, -hh, w, h, rd);
+    const sg = c.createLinearGradient(-hw, hh - TH, hw, hh + TH); sg.addColorStop(0, opt.dim ? '#8a857d' : '#d7c9ad'); sg.addColorStop(1, opt.dim ? '#6e6a63' : '#a4967a');
+    const fg = c.createLinearGradient(-hw, -hh, hw, hh); fg.addColorStop(0, opt.dim ? '#bdb6ad' : '#fff8ea'); fg.addColorStop(1, opt.dim ? '#9a948c' : '#e7dcc6');
+    const parts = [[body, sg], [face, fg]];
+    uni(c, parts, opt.lw ? opt.lw / 2 : 1.2);
+    inpath(c, parts, (g) => {
+      /* canto: arista por sombra, no por línea */
+      let gr = g.createLinearGradient(0, hh - 2, 0, hh + TH); gr.addColorStop(0, 'rgba(0,0,0,.34)'); gr.addColorStop(0.35, 'rgba(0,0,0,.05)'); gr.addColorStop(1, 'rgba(0,0,0,.26)');
+      g.fillStyle = gr; g.fillRect(-hw, hh - 2, w, TH + 2);
+      /* barra central: ranura tallada (sombra + filo iluminado), nunca un trazo */
+      gr = g.createLinearGradient(0, -h * 0.035, 0, h * 0.035); gr.addColorStop(0, 'rgba(0,0,0,.30)'); gr.addColorStop(0.55, 'rgba(0,0,0,.10)'); gr.addColorStop(1, 'rgba(255,255,255,.55)');
+      g.fillStyle = gr; g.fillRect(-hw + w * 0.1, -h * 0.035, w - w * 0.2, h * 0.07);
+      /* grano del hueso, determinista por ficha */
+      let sd = (a * 7 + b) * 733 + 11; const rr = () => ((sd = (sd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+      for (let i = 0; i < 22; i++) { g.fillStyle = rr() < 0.5 ? 'rgba(150,130,95,.10)' : 'rgba(255,255,255,.3)'; g.fillRect(-hw + rr() * w, -hh + rr() * h, 2 + rr() * 6, 0.7); }
+      gr = g.createLinearGradient(0, -hh, 0, -hh + h * 0.22); gr.addColorStop(0, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gr; g.fillRect(-hw, -hh, w, h * 0.22);
+    });
     half(0, -h * 0.25, w, a); half(0, h * 0.25, w, b);
-    if (opt.ring) { ART.rr(c, -hw - 3, -hh - 3, w + 6, h + 6, w * 0.22); c.lineWidth = 3.5; c.strokeStyle = opt.ring; c.stroke(); }
-    ART.glint(c, -hw + w * 0.24, -hh + h * 0.09, w * 0.13);
+    if (opt.ring) { ART.rr(c, -hw - 3, -hh - 3, w + 6, h + TH + 6, rd + 4); c.lineWidth = 3.5; c.strokeStyle = opt.ring; c.stroke(); }
     c.restore();
   }
   function tileBack(x, y, w, h, rot) {
     c.save(); c.translate(x, y); if (rot) c.rotate(rot);
+    const hw = w / 2, hh = h / 2, TH = w * 0.085, rd = w * 0.18;
     ART.shadow(c, 0, h * 0.46, w * 0.5, 0.28);
-    ART.rr(c, -w / 2, -h / 2 + 3, w, h, w * 0.18); c.fillStyle = OUT; c.fill();
-    ART.rr(c, -w / 2, -h / 2, w, h, w * 0.18);
-    const g = c.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2); g.addColorStop(0, '#5a4f8f'); g.addColorStop(1, '#382f63');
-    ART.fillOut(c, g, 2.2);
-    c.beginPath(); c.arc(0, 0, w * 0.22, 0, TAU); c.lineWidth = 2; c.strokeStyle = ART.alpha('#a097ff', 0.7); c.stroke();
+    const body = (g) => ART.rr(g, -hw, -hh, w, h + TH, rd), face = (g) => ART.rr(g, -hw, -hh, w, h, rd);
+    const sg = c.createLinearGradient(-hw, hh - TH, hw, hh + TH); sg.addColorStop(0, '#3e3570'); sg.addColorStop(1, '#241d46');
+    const fg = c.createLinearGradient(-hw, -hh, hw, hh); fg.addColorStop(0, '#5a4f8f'); fg.addColorStop(1, '#382f63');
+    const parts = [[body, sg], [face, fg]];
+    uni(c, parts, 1.15);
+    inpath(c, parts, (g) => {
+      let gr = g.createLinearGradient(0, hh - 2, 0, hh + TH); gr.addColorStop(0, 'rgba(0,0,0,.4)'); gr.addColorStop(1, 'rgba(0,0,0,.2)');
+      g.fillStyle = gr; g.fillRect(-hw, hh - 2, w, TH + 2);
+      const rg = g.createRadialGradient(0, 0, w * 0.06, 0, 0, w * 0.26); rg.addColorStop(0, ART.alpha('#a097ff', 0.55)); rg.addColorStop(0.7, ART.alpha('#a097ff', 0.18)); rg.addColorStop(1, ART.alpha('#a097ff', 0));
+      g.fillStyle = rg; g.beginPath(); g.arc(0, 0, w * 0.26, 0, TAU); g.fill();
+      gr = g.createLinearGradient(0, -hh, 0, -hh + h * 0.25); gr.addColorStop(0, 'rgba(255,255,255,.2)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gr; g.fillRect(-hw, -hh, w, h * 0.25);
+    });
     c.restore();
   }
 

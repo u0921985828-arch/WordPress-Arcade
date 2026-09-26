@@ -4,6 +4,32 @@ const W = land ? 480 : 360, H = land ? 400 : 640;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#070814' }), c = k.ctx, OUT = '#0d0b1c';
 let p, shots, foes, eb, score, lives, wave, cool, inv, dirX, t, pt, calm, mush, bunkers, ufo, pups, power, shield, stars, banner, bannerT;
 /* ---------------------------------------------------------------- arte */
+/* --- Ley de la pieza única (R5, docs/REMASTER.md §8) -------------------------------
+   `unite(g, partes, ancho)` traza TODAS las partes y las rellena después: los contornos
+   interiores quedan tapados y solo sobrevive la silueta exterior. El detalle interior va
+   recortado (`within` en caché, `clipIn` en el lienzo de partida), nunca con stroke. */
+const OUTW = 1.1, INW = 0.65, INA = 0.62;
+const _hx = (h) => { if (h[0] !== '#') { const m = h.match(/[\d.]+/g) || [0, 0, 0]; return [+m[0], +m[1], +m[2]]; } h = h.slice(1); if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]; const n = parseInt(h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const _rgb = (a) => `rgb(${a[0] | 0},${a[1] | 0},${a[2] | 0})`;
+const LT = (col, f) => _rgb(_hx(col).map((v) => v + (255 - v) * f));
+const DK = (col, f) => _rgb(_hx(col).map((v) => v * (1 - f)));
+const MXC = (a, b, u) => { const x = _hx(a), y = _hx(b); return _rgb(x.map((v, i) => v + (y[i] - v) * u)); };
+const AL = (col, a) => { const q = _hx(col); return `rgba(${q[0]},${q[1]},${q[2]},${Math.max(0, a).toFixed(3)})`; };
+/* partes = [[trazado, relleno, sombraDeContacto?]], en orden de profundidad */
+function unite(g, parts, ow) {
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  g.strokeStyle = OUT; g.lineWidth = (ow || OUTW) * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) {
+    const P = parts[i];
+    if (P[2]) { g.save(); g.globalCompositeOperation = 'source-atop'; g.beginPath(); P[0](g); g.strokeStyle = AL(OUT, 0.15); g.lineWidth = P[2]; g.stroke(); g.lineWidth = P[2] * 0.45; g.stroke(); g.restore(); }
+    g.beginPath(); P[0](g); g.fillStyle = P[1]; g.fill();
+  }
+}
+/* detalle de una pieza, recortado contra su propio trazado (caché: source-atop es barato) */
+function within(g, path, fn) { g.save(); g.globalCompositeOperation = 'source-atop'; g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+/* igual, para el lienzo de partida: recorte a secas (source-atop costaría un compuesto de pantalla completa) */
+function clipIn(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
 function glow(col, blur) { c.shadowColor = col; c.shadowBlur = blur; }
 const GSP = {};
 function gspr(id) {
@@ -14,37 +40,136 @@ function gspr(id) {
   if (id === 'r' || id === 'R') { g.beginPath(); g.arc(0, 0, w / 2, 0, 6.283); g.fill(); } else g.fillRect(-w / 2, -h / 2, w, h);
   return (GSP[id] = { cv, w: cw, h: ch, o: -cw / 2, q: -ch / 2 });
 }
+/* Casco y alas son UN solo trazado continuo (tangente seguida en el encuentro ala-fuselaje);
+   el color de las alas y la carlinga van recortados dentro de esa silueta, sin contorno propio. */
+const HULL = (g) => {
+  g.moveTo(0, -18);
+  g.bezierCurveTo(3.4, -14.6, 6, -9.2, 7.2, -4.2);      // morro → hombro
+  g.bezierCurveTo(9.4, -0.4, 13.2, 4, 16, 8);           // hombro → punta de ala
+  g.lineTo(16, 13);
+  g.bezierCurveTo(11.4, 11.6, 8, 10.4, 5.4, 10);        // borde de fuga del ala → cola
+  g.quadraticCurveTo(0, 9.2, -5.4, 10);
+  g.bezierCurveTo(-8, 10.4, -11.4, 11.6, -16, 13);
+  g.lineTo(-16, 8);
+  g.bezierCurveTo(-13.2, 4, -9.4, -0.4, -7.2, -4.2);
+  g.bezierCurveTo(-6, -9.2, -3.4, -14.6, 0, -18);
+  g.closePath();
+};
 function ship(x, y, s, tilt, wing) {
   c.save(); c.translate(x, y); c.scale(s, s); c.rotate(tilt * 0.25);
   const fl = 6 + Math.random() * 6; glow('#ff9a3c', 12); c.fillStyle = '#ffb347'; c.beginPath(); c.moveTo(-5, 12); c.lineTo(0, 12 + fl); c.lineTo(5, 12); c.fill(); c.shadowBlur = 0;
-  c.beginPath(); c.moveTo(0, -18); c.lineTo(7, -4); c.lineTo(16, 8); c.lineTo(16, 13); c.lineTo(5, 10); c.lineTo(-5, 10); c.lineTo(-16, 13); c.lineTo(-16, 8); c.lineTo(-7, -4); c.closePath();
-  c.fillStyle = '#dfe6f5'; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
-  c.fillStyle = wing || '#6e62f5'; c.beginPath(); c.moveTo(-16, 8); c.lineTo(-7, 2); c.lineTo(-7, 10); c.lineTo(-16, 13); c.fill(); c.beginPath(); c.moveTo(16, 8); c.lineTo(7, 2); c.lineTo(7, 10); c.lineTo(16, 13); c.fill();
-  c.fillStyle = '#5ce1e6'; c.beginPath(); c.ellipse(0, -4, 3.5, 7, 0, 0, 6.283); c.fill(); c.fillStyle = 'rgba(255,255,255,.7)'; c.fillRect(-1.5, -9, 1.5, 4);
+  const gr = c.createLinearGradient(-8, -18, 10, 13); gr.addColorStop(0, '#f6f9ff'); gr.addColorStop(0.55, '#dfe6f5'); gr.addColorStop(1, '#a8b2cb');
+  unite(c, [[HULL, gr]], 1.1);
+  clipIn(c, HULL, (g) => {
+    const wc = wing || '#6e62f5';
+    g.fillStyle = wc; g.beginPath(); g.moveTo(-18, 6.4); g.lineTo(-6.4, 1.2); g.lineTo(-6.4, 11); g.lineTo(-18, 15); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(18, 6.4); g.lineTo(6.4, 1.2); g.lineTo(6.4, 11); g.lineTo(18, 15); g.closePath(); g.fill();
+    g.fillStyle = AL(OUT, 0.26); g.fillRect(-7.4, -6, 1.5, 20); g.fillRect(5.9, -6, 1.5, 20);   // juntura por sombra propia, no por línea
+    g.fillStyle = AL('#ffffff', 0.4); g.fillRect(-6.1, -6, 0.9, 20); g.fillRect(7.2, -6, 0.9, 20);
+    g.fillStyle = '#5ce1e6'; g.beginPath(); g.ellipse(0, -4, 3.5, 7, 0, 0, 6.283); g.fill();
+    g.fillStyle = AL(OUT, 0.3); g.beginPath(); g.ellipse(0, -1.2, 3.5, 3.4, 0, 0, 6.283); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.72)'; g.beginPath(); g.ellipse(-1.2, -6.4, 1.1, 2.2, 0.2, 0, 6.283); g.fill();
+    g.fillStyle = AL('#ffffff', 0.3); g.beginPath(); g.moveTo(0, -18); g.lineTo(-3.4, -5); g.lineTo(-1.2, -5); g.closePath(); g.fill();
+  });
   c.restore();
 }
 const EC = ['#f0647e', '#9b8afb', '#3cc7d0', '#e9b949'];
+/* patas y antenas salen del cuerpo como engrosamiento del mismo trazado: se trazan primero y se
+   rellenan después, así el borde interior desaparece y el bicho es una sola silueta. */
+const limb = (g, x0, y0, x1, y1, x2, y2, w) => { g.moveTo(x0, y0); g.lineTo(x1, y1); g.lineTo(x2, y2); g.lineTo(x2 + w, y2); g.lineTo(x1 + w * 0.7, y1); g.lineTo(x0 + w, y0); g.closePath(); };
 function alien(x, y, kind, fr, flash) {
-  c.save(); c.translate(x, y); const col = flash ? '#fff' : EC[kind % 4]; c.fillStyle = col; c.strokeStyle = OUT; c.lineWidth = 2;
-  if (kind % 3 === 0) { c.beginPath(); c.ellipse(0, 0, 12, 8, 0, 0, 6.283); c.fill(); c.stroke(); for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * 7, 5); c.lineTo(s * (10 + fr * 3), 12); c.stroke(); } }
-  else if (kind % 3 === 1) { c.beginPath(); c.moveTo(-12, 4); c.lineTo(-8, -8); c.lineTo(8, -8); c.lineTo(12, 4); c.lineTo(6, 8); c.lineTo(-6, 8); c.closePath(); c.fill(); c.stroke(); for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * 5, -8); c.lineTo(s * (7 + fr * 2), -13); c.stroke(); } }
-  else { c.beginPath(); c.arc(0, 0, 10, Math.PI, 0); c.lineTo(10, 6); for (let i = 0; i < 4; i++) c.lineTo(10 - (i + 0.5) * 5, fr ? 10 : 7); c.lineTo(-10, 6); c.closePath(); c.fill(); c.stroke(); }
-  c.fillStyle = '#fff'; c.beginPath(); c.arc(-4, -1, 3, 0, 6.283); c.arc(4, -1, 3, 0, 6.283); c.fill(); c.fillStyle = OUT; c.beginPath(); c.arc(-4, 0, 1.4, 0, 6.283); c.arc(4, 0, 1.4, 0, 6.283); c.fill();
+  c.save(); c.translate(x, y); const col = flash ? '#fff' : EC[kind % 4];
+  const kk = kind % 3;
+  const body = kk === 0 ? (g) => g.ellipse(0, 0, 12, 8, 0, 0, 6.283)
+    : kk === 1 ? (g) => { g.moveTo(-12, 4); g.quadraticCurveTo(-11.4, -5.4, -8, -8); g.lineTo(8, -8); g.quadraticCurveTo(11.4, -5.4, 12, 4); g.quadraticCurveTo(9.6, 7.2, 6, 8); g.lineTo(-6, 8); g.quadraticCurveTo(-9.6, 7.2, -12, 4); g.closePath(); }
+    : (g) => { g.arc(0, 0, 10, Math.PI, 0); g.lineTo(10, 6); for (let i = 0; i < 4; i++) g.lineTo(10 - (i + 0.5) * 5, fr ? 10 : 7); g.lineTo(-10, 6); g.closePath(); };
+  const parts = [];
+  if (kk === 0) for (const sd of [-1, 1]) parts.push([(g) => limb(g, sd * 5.4, 3.4, sd * 8, 8, sd * (10 + fr * 3), 12, sd * 2.4), col]);
+  if (kk === 1) for (const sd of [-1, 1]) parts.push([(g) => limb(g, sd * 3.6, -6.6, sd * 5.6, -10, sd * (7 + fr * 2), -13.4, sd * 2.1), col]);
+  parts.push([body, col]);
+  unite(c, parts, 1.05);
+  clipIn(c, body, (g) => {
+    const gr = g.createLinearGradient(-8, -9, 6, 9); gr.addColorStop(0, AL('#ffffff', 0.26)); gr.addColorStop(0.55, AL('#ffffff', 0)); gr.addColorStop(1, AL(OUT, 0.3));
+    g.fillStyle = gr; g.fillRect(-14, -14, 28, 28);
+  });
+  c.fillStyle = '#fff'; c.beginPath(); c.arc(-4, -1, 3, 0, 6.283); c.arc(4, -1, 3, 0, 6.283); c.fill();
+  c.fillStyle = OUT; c.beginPath(); c.arc(-4, 0, 1.4, 0, 6.283); c.arc(4, 0, 1.4, 0, 6.283); c.fill();
   c.restore();
 }
 function drone(x, y, r, big, flash) {
   c.save(); c.translate(x, y); c.rotate(t * (big ? 0.6 : 1.8)); c.strokeStyle = OUT; c.lineWidth = 2;
-  c.fillStyle = flash ? '#fff' : big ? '#b35a6b' : '#5a5f7a'; c.beginPath(); for (let i = 0; i < 6; i++) { const a = i * 1.047; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.closePath(); c.fill(); c.stroke();
+  const hex = (g) => { for (let i = 0; i < 6; i++) { const a = i * 1.047; g.lineTo(Math.cos(a) * r, Math.sin(a) * r); } g.closePath(); };
+  const base = flash ? '#fff' : big ? '#b35a6b' : '#5a5f7a';
+  const gr2 = c.createLinearGradient(-r, -r, r * 0.6, r); gr2.addColorStop(0, LT(base, 0.3)); gr2.addColorStop(0.6, base); gr2.addColorStop(1, DK(base, 0.3));
+  unite(c, [[hex, gr2]], 1.1);
+  clipIn(c, hex, (g) => { g.fillStyle = AL(OUT, 0.24); g.beginPath(); g.arc(0, 0, r * 0.62, 0, 6.283); g.fill(); });
   c.rotate(-t * (big ? 0.6 : 1.8)); glow('#f0647e', 10); c.fillStyle = '#f0647e'; c.beginPath(); c.arc(0, 0, r * 0.35, 0, 6.283); c.fill(); c.shadowBlur = 0; c.restore();
 }
-function segment(x, y, head, flash) { c.fillStyle = flash ? '#fff' : head ? '#e9b949' : '#4cc38a'; c.strokeStyle = OUT; c.lineWidth = 2; c.beginPath(); c.arc(x, y, 9, 0, 6.283); c.fill(); c.stroke(); if (head) { c.fillStyle = OUT; c.beginPath(); c.arc(x - 3, y + 2, 1.8, 0, 6.283); c.arc(x + 3, y + 2, 1.8, 0, 6.283); c.fill(); } }
-function mushroom(x, y, hp) { const s = 0.5 + hp / 6; c.fillStyle = '#e8dcc8'; c.fillRect(x - 3, y, 6, 7); c.fillStyle = ['#553', '#a0527a', '#c05a8a', '#e0649a'][hp]; c.strokeStyle = OUT; c.lineWidth = 1.5; c.beginPath(); c.arc(x, y + 1, 8 * s, Math.PI, 0); c.closePath(); c.fill(); c.stroke(); c.fillStyle = 'rgba(255,255,255,.6)'; c.beginPath(); c.arc(x - 3 * s, y - 3 * s, 1.6, 0, 6.283); c.fill(); }
+/* El ciempiés es UN cuerpo: los anillos se trazan con sus uniones y se rellenan de una vez; la
+   separación entre anillos se lee por sombra propia recortada, nunca por contorno. */
+function chain(segs) {
+  if (!segs.length) return;
+  const parts = [], link = [];
+  for (let i = 0; i < segs.length; i++) {
+    const a = segs[i], b = segs[i + 1];
+    if (b && Math.abs(a.x - b.x) < 26 && Math.abs(a.y - b.y) < 26) link.push([a, b]);
+  }
+  for (const [a, b] of link) parts.push([(g) => { const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1, nx = -dy / d * 7.4, ny = dx / d * 7.4; g.moveTo(a.x + nx, a.y + ny); g.lineTo(b.x + nx, b.y + ny); g.lineTo(b.x - nx, b.y - ny); g.lineTo(a.x - nx, a.y - ny); g.closePath(); }, '#4cc38a']);
+  for (const q of segs) parts.push([(g) => g.arc(q.x, q.y, 9, 0, 6.283), q.flash > 0 ? '#fff' : q.head ? '#e9b949' : '#4cc38a']);
+  unite(c, parts, 1.1);
+  for (const q of segs) clipIn(c, (g) => g.arc(q.x, q.y, 9, 0, 6.283), (g) => {
+    const gr = g.createRadialGradient(q.x - 3.2, q.y - 3.6, 1, q.x, q.y, 11);
+    gr.addColorStop(0, AL('#ffffff', 0.34)); gr.addColorStop(0.45, AL('#ffffff', 0)); gr.addColorStop(1, AL(OUT, 0.34));
+    g.fillStyle = gr; g.fillRect(q.x - 10, q.y - 10, 20, 20);
+    if (q.head) { g.fillStyle = OUT; g.beginPath(); g.arc(q.x - 3, q.y + 2, 1.8, 0, 6.283); g.arc(q.x + 3, q.y + 2, 1.8, 0, 6.283); g.fill(); }
+  });
+}
+/* Pie y sombrero, una sola seta: se traza el conjunto y se rellena después; el pie se distingue
+   por color y por la sombra que el sombrero proyecta sobre él. */
+function mushroom(x, y, hp) {
+  const s = 0.5 + hp / 6, R = 8 * s, cap = ['#553', '#a0527a', '#c05a8a', '#e0649a'][hp];
+  const stem = (g) => { g.moveTo(x - 3, y - 1); g.quadraticCurveTo(x - 3.4, y + 4, x - 2.6, y + 7); g.lineTo(x + 2.6, y + 7); g.quadraticCurveTo(x + 3.4, y + 4, x + 3, y - 1); g.closePath(); };
+  const hat = (g) => { g.moveTo(x - R, y + 1); g.quadraticCurveTo(x - R * 0.92, y + 1 - R * 1.24, x, y + 1 - R * 1.24); g.quadraticCurveTo(x + R * 0.92, y + 1 - R * 1.24, x + R, y + 1); g.quadraticCurveTo(x, y + 2.6, x - R, y + 1); g.closePath(); };
+  unite(c, [[stem, '#e8dcc8'], [hat, cap]], 1.05);
+  clipIn(c, stem, (g) => { g.fillStyle = AL(OUT, 0.3); g.fillRect(x - 4, y - 1, 8, 2.4); g.fillStyle = AL(OUT, 0.16); g.fillRect(x + 1, y - 1, 3, 10); });
+  clipIn(c, hat, (g) => { g.fillStyle = AL('#ffffff', 0.34); g.beginPath(); g.ellipse(x - R * 0.36, y - R * 0.5, R * 0.34, R * 0.24, -0.4, 0, 6.283); g.fill(); g.fillStyle = AL(OUT, 0.22); g.beginPath(); g.ellipse(x + R * 0.5, y - R * 0.1, R * 0.5, R * 0.46, 0, 0, 6.283); g.fill(); });
+}
 function boss(b, flash) {
   c.save(); c.translate(b.x, b.y); const r = b.r; c.strokeStyle = OUT; c.lineWidth = 3;
-  c.fillStyle = flash ? '#fff' : '#3d3566'; c.beginPath(); c.moveTo(-r * 1.6, 0); c.lineTo(-r, -r * 0.6); c.lineTo(r, -r * 0.6); c.lineTo(r * 1.6, 0); c.lineTo(r, r * 0.7); c.lineTo(-r, r * 0.7); c.closePath(); c.fill(); c.stroke();
-  c.fillStyle = '#5a4f99'; c.fillRect(-r * 0.9, -r * 0.2, r * 1.8, r * 0.4); glow('#f0647e', 20); c.fillStyle = b.phase > 1 ? '#ff3b5c' : '#f0647e'; c.beginPath(); c.arc(0, 0, r * 0.38 + Math.sin(t * 6) * 2, 0, 6.283); c.fill(); c.shadowBlur = 0;
-  for (const s of [-1, 1]) { c.fillStyle = '#2a2448'; c.fillRect(s * r * 1.1 - 5, r * 0.3, 10, r * 0.6); }
+  const base = flash ? '#fff' : '#3d3566';
+  const hull = (g) => { g.moveTo(-r * 1.6, 0); g.quadraticCurveTo(-r * 1.34, -r * 0.52, -r, -r * 0.6); g.lineTo(r, -r * 0.6); g.quadraticCurveTo(r * 1.34, -r * 0.52, r * 1.6, 0); g.quadraticCurveTo(r * 1.32, r * 0.56, r, r * 0.7); g.lineTo(-r, r * 0.7); g.quadraticCurveTo(-r * 1.32, r * 0.56, -r * 1.6, 0); g.closePath(); };
+  const pod = (sd) => (g) => { g.moveTo(sd * r * 1.1 - 5, r * 0.18); g.lineTo(sd * r * 1.1 + 5, r * 0.18); g.quadraticCurveTo(sd * r * 1.1 + 4, r * 0.82, sd * r * 1.1, r * 0.9); g.quadraticCurveTo(sd * r * 1.1 - 4, r * 0.82, sd * r * 1.1 - 5, r * 0.18); g.closePath(); };
+  const gb = c.createLinearGradient(0, -r * 0.6, 0, r * 0.9); gb.addColorStop(0, LT(base, 0.22)); gb.addColorStop(0.55, base); gb.addColorStop(1, DK(base, 0.3));
+  unite(c, [[pod(-1), '#2a2448'], [pod(1), '#2a2448'], [hull, gb]], 1.25);
+  clipIn(c, hull, (g) => {
+    g.fillStyle = '#5a4f99'; g.fillRect(-r * 0.9, -r * 0.2, r * 1.8, r * 0.4);
+    g.fillStyle = AL(OUT, 0.3); g.fillRect(-r * 0.9, -r * 0.2, r * 1.8, 2.2);
+    g.fillStyle = AL('#ffffff', 0.16); g.fillRect(-r * 1.5, -r * 0.6, r * 3, 2.4);
+  });
+  glow('#f0647e', 20); c.fillStyle = b.phase > 1 ? '#ff3b5c' : '#f0647e'; c.beginPath(); c.arc(0, 0, r * 0.38 + Math.sin(t * 6) * 2, 0, 6.283); c.fill(); c.shadowBlur = 0;
   c.restore();
+}
+/* Búnker: UNA losa por búnker. Las celdas vivas se trazan juntas y se rellenan de una vez, así solo
+   sobrevive el borde exterior (y el de los boquetes). Cacheado: solo se repinta al perder una celda. */
+let bkCv = null, bkN = -1, bkX = 0, bkY = 0, bkW = 0, bkH = 0;
+function drawBunkers() {
+  if (!bunkers || !bunkers.length) return;
+  const live = bunkers.filter((b) => !b.dead);
+  if (!live.length) return;
+  if (bkN !== live.length) {
+    bkN = live.length;
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (const b of live) { if (b.x < x0) x0 = b.x; if (b.y < y0) y0 = b.y; if (b.x > x1) x1 = b.x; if (b.y > y1) y1 = b.y; }
+    bkX = x0 - 4; bkY = y0 - 4; bkW = x1 - x0 + 14; bkH = y1 - y0 + 14;
+    if (!bkCv || bkCv.width < bkW * 2 || bkCv.height < bkH * 2) { bkCv = document.createElement('canvas'); bkCv.width = Math.ceil(bkW * 2); bkCv.height = Math.ceil(bkH * 2); }
+    const g = bkCv.getContext('2d'); g.setTransform(2, 0, 0, 2, -bkX * 2, -bkY * 2); g.clearRect(bkX, bkY, bkW, bkH);
+    const cell = (b) => (q) => q.rect(b.x - 0.5, b.y - 0.5, 6, 6);
+    unite(g, live.map((b) => [cell(b), '#4cc38a']), 1.05);
+    g.save(); g.globalCompositeOperation = 'source-atop';
+    for (const b of live) { g.fillStyle = AL('#ffffff', 0.3); g.fillRect(b.x - 0.5, b.y - 0.5, 6, 1.7); g.fillStyle = AL(OUT, 0.17); g.fillRect(b.x - 0.5, b.y + 3.6, 6, 1.9); }
+    g.restore();
+  }
+  c.drawImage(bkCv, 0, 0, bkW * 2, bkH * 2, bkX, bkY, bkW, bkH);
 }
 /* Fondo cacheado a 2×: nebulosas, polvo estelar y planeta (espacio) o huerto nocturno (ciempiés) */
 function mkCv(w, h) { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const g = cv.getContext('2d'); g.scale(2, 2); return [cv, g]; }
@@ -166,13 +291,23 @@ if (M !== 'coop') k.run((dt) => {
 }, () => {
   background();
   if (M === 'centipede') for (const m of mush) if (m.hp > 0) mushroom(m.x, m.y, m.hp);
-  if (bunkers) { c.fillStyle = OUT; for (const b of bunkers) c.fillRect(b.x - 1, b.y - 1, 7, 7); c.fillStyle = '#4cc38a'; for (const b of bunkers) c.fillRect(b.x, b.y, 5, 5); c.fillStyle = '#8ef0bd'; for (const b of bunkers) c.fillRect(b.x, b.y, 5, 1.5); }
-  if (ufo) { c.save(); c.translate(ufo.x, ufo.y); c.fillStyle = '#f0647e'; c.strokeStyle = OUT; c.lineWidth = 2; c.beginPath(); c.ellipse(0, 2, 20, 7, 0, 0, 6.283); c.fill(); c.stroke(); c.fillStyle = '#5ce1e6'; c.beginPath(); c.arc(0, -2, 8, Math.PI, 0); c.fill(); c.stroke(); for (let i = -2; i <= 2; i++) { c.fillStyle = Math.floor(t * 8 + i) % 2 ? '#fff' : '#e9b949'; c.fillRect(i * 7 - 1.5, 3, 3, 3); } c.restore(); }
+  if (bunkers) drawBunkers();
+  if (ufo) { c.save(); c.translate(ufo.x, ufo.y);
+    const disc = (g) => g.ellipse(0, 2, 20, 7, 0, 0, 6.283), dome = (g) => { g.moveTo(-8, -1.4); g.bezierCurveTo(-8, -9.6, 8, -9.6, 8, -1.4); g.quadraticCurveTo(0, 0.6, -8, -1.4); g.closePath(); };
+    const gd = c.createLinearGradient(0, -5, 0, 9); gd.addColorStop(0, '#ff93a8'); gd.addColorStop(0.5, '#f0647e'); gd.addColorStop(1, '#9c3550');
+    unite(c, [[dome, '#5ce1e6'], [disc, gd]], 1.15);
+    clipIn(c, dome, (g) => { g.fillStyle = AL('#ffffff', 0.45); g.beginPath(); g.ellipse(-3, -5, 2.6, 1.6, -0.4, 0, 6.283); g.fill(); });
+    clipIn(c, disc, (g) => { g.fillStyle = AL(OUT, 0.24); g.fillRect(-20, -1.2, 40, 2); for (let i = -2; i <= 2; i++) { g.fillStyle = Math.floor(t * 8 + i) % 2 ? '#fff' : '#e9b949'; g.beginPath(); g.arc(i * 7, 4, 1.8, 0, 6.283); g.fill(); } });
+    c.restore(); }
+  if (M === 'centipede') chain(foes.filter((f) => f.seg));
   for (const f of foes) { const fl = f.flash > 0;
     if (f.boss) { boss(f, fl); const bw = Math.min(220, W - 150), bx = W / 2 - bw / 2; ART.rr(c, bx - 2, 54, bw + 4, 10, 5); ART.fillOut(c, 'rgba(12,10,24,.7)', 2); c.fillStyle = f.phase > 2 ? '#ff3b5c' : '#f0647e'; ART.rr(c, bx, 56, bw * Math.max(0, f.hp) / f.max, 6, 3); c.fill(); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(bx + 2, 56.5, Math.max(0, bw * f.hp / f.max - 4), 1.5); continue; }
-    if (f.seg) segment(f.x, f.y, f.head, fl);
-    else if (f.spider) { c.save(); c.translate(f.x, f.y); c.lineCap = 'round'; for (const [lw, col] of [[4, OUT], [2, '#c98a2a']]) { c.strokeStyle = col; c.lineWidth = lw; for (let i = 0; i < 4; i++) for (const s of [-1, 1]) { const ly = -6 + i * 4 + Math.sin(t * 20 + i + s) * 2; c.beginPath(); c.moveTo(0, 0); c.lineTo(s * 9, ly - 5); c.lineTo(s * 15, ly + 2); c.stroke(); } }
-      c.fillStyle = fl ? '#fff' : '#e9b949'; c.strokeStyle = OUT; c.lineWidth = 2; c.beginPath(); c.ellipse(0, 1, 9, 8, 0, 0, 6.283); c.fill(); c.stroke(); c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.arc(-3, -3, 2.5, 0, 6.283); c.fill();
+    if (f.seg) continue;
+    else if (f.spider) { c.save(); c.translate(f.x, f.y); c.lineCap = 'round';
+      const legs = [];
+      for (let i = 0; i < 4; i++) for (const sd of [-1, 1]) { const ly = -6 + i * 4 + Math.sin(t * 20 + i + sd) * 2; legs.push([(g) => limb(g, sd * 1.6, -1.4, sd * 9, ly - 5, sd * 15, ly + 2, sd * 2.2), '#c98a2a']); }
+      unite(c, legs.concat([[(g) => g.ellipse(0, 1, 9, 8, 0, 0, 6.283), fl ? '#fff' : '#e9b949']]), 1.05);
+      clipIn(c, (g) => g.ellipse(0, 1, 9, 8, 0, 0, 6.283), (g) => { g.fillStyle = AL(OUT, 0.22); g.beginPath(); g.arc(3, 4, 8, 0, 6.283); g.fill(); g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(-3, -3, 2.5, 0, 6.283); g.fill(); });
       c.fillStyle = '#ff3b5c'; c.beginPath(); c.arc(-3, 2, 1.8, 0, 6.283); c.arc(3, 2, 1.8, 0, 6.283); c.fill(); c.restore(); }
     else if (M === 'invaders') alien(f.x, f.y, f.kind, f.fr, fl);
     else if (M === 'vertical') f.big ? drone(f.x, f.y, f.r, true, fl) : alien(f.x, f.y, f.kind, Math.floor(t * 4) % 2, fl); }
@@ -296,7 +431,7 @@ if (M === 'coop') {
     if (k.st === 'play' && !foes.length) { score += 200 * wave; k.float(`+${200 * wave}`, W / 2, H * 0.45, '#e9b949'); k.sfx('win'); k.confetti(); coopWave(); }
   }, () => {
     background();
-    if (bunkers) { c.fillStyle = OUT; for (const b of bunkers) c.fillRect(b.x - 1, b.y - 1, 7, 7); c.fillStyle = '#4cc38a'; for (const b of bunkers) c.fillRect(b.x, b.y, 5, 5); c.fillStyle = '#8ef0bd'; for (const b of bunkers) c.fillRect(b.x, b.y, 5, 1.5); }
+      if (bunkers) drawBunkers();
     for (const f of foes) alien(f.x, f.y, f.kind, f.fr, f.flash > 0);
     for (const f of foes) if (f.hp > 1) { c.strokeStyle = '#e9b949'; c.lineWidth = 2; c.beginPath(); c.arc(f.x, f.y, 15, 3.6, 5.8); c.stroke(); }
     const [a0, a1] = ships;
