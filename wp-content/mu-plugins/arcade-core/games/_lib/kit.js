@@ -20,6 +20,11 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-acti
 #ov p{margin:0;font:600 clamp(13px,3.4vmin,16px)/1.45 ui-rounded,"Trebuchet MS",system-ui,sans-serif;color:color-mix(in srgb,#fff 78%,var(--ac));max-width:36ch}#ov.hide{display:none}
 #ov .go{margin-top:8px;padding:13px 30px;border-radius:14px;background:var(--ac);color:#fff;font:800 clamp(15px,4vmin,18px)/1 ui-rounded,"Trebuchet MS",system-ui,sans-serif;border:3px solid #1a1530;box-shadow:inset 0 2px 0 rgba(255,255,255,.3),0 5px 0 #1a1530;text-shadow:0 2px 0 rgba(26,21,48,.5);animation:bob 1.6s ease-in-out infinite}
 #ov .rec{font:700 12.5px/1 ui-rounded,"Trebuchet MS",system-ui,sans-serif;color:#ffd166;padding:6px 11px;border:2px solid #1a1530;border-radius:10px;background:rgba(0,0,0,.25)}
+#ov .dif{display:flex;gap:6px;margin-top:4px;pointer-events:auto}
+#ov .dif button{font:800 12px/1 ui-rounded,"Trebuchet MS",system-ui,sans-serif;padding:9px 14px;border-radius:12px;border:3px solid #1a1530;background:color-mix(in srgb,var(--bg) 40%,#2a2350);color:#ddd6f0;cursor:pointer;box-shadow:inset 0 2px 0 rgba(255,255,255,.12),0 3px 0 #1a1530}
+#ov .dif button.on{background:var(--ac);color:#fff;text-shadow:0 1px 0 rgba(26,21,48,.5)}
+#ov .dif button:disabled{opacity:.55;cursor:default}
+body.party #ov .dif button{font-size:clamp(13px,3.2vmin,30px);padding:1.5vmin 3vmin;border-radius:2vmin}
 @keyframes pop{from{transform:scale(.9);opacity:0}}@keyframes bob{50%{transform:translateY(-2px)}}
 @media (prefers-reduced-motion:reduce){#ov .go{animation:none}}
 #hud{position:fixed;top:max(6px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:5}
@@ -69,9 +74,10 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
 in vec2 p;out vec2 v;void main(){v=p*.5+.5;gl_Position=vec4(p,0.,1.);}`;
       /* Desenfoque separable de 5 tomas (con muestreo lineal): también sirve de copia si uStep=0. */
       const FS_BLUR = `#version 300 es
-precision mediump float;in vec2 v;out vec4 o;uniform sampler2D uS;uniform vec2 uStep;
-void main(){vec4 c=texture(uS,v)*.2270270;vec2 a=uStep*1.3846154,b=uStep*3.2307692;
-c+=(texture(uS,v+a)+texture(uS,v-a))*.3162162;c+=(texture(uS,v+b)+texture(uS,v-b))*.0702703;o=c;}`;
+precision mediump float;in vec2 v;out vec4 o;uniform sampler2D uS;uniform vec2 uStep;uniform float uTh;
+vec4 T(vec2 q){vec4 c=texture(uS,q);return vec4(max(c.rgb-uTh,vec3(0.)),c.a);}
+void main(){vec4 c=T(v)*.2270270;vec2 a=uStep*1.3846154,b=uStep*3.2307692;
+c+=(T(v+a)+T(v-a))*.3162162;c+=(T(v+b)+T(v-b))*.0702703;o=c;}`;
       /* Luz (media resolución): normales por Sobel del relieve, direccional arriba-izquierda,
          especular controlado, oclusión de contacto y hasta 8 luces puntuales. El resultado es un
          multiplicador en [0,2] guardado a la mitad (RGBA8 no llega a 2). */
@@ -110,10 +116,11 @@ void main(){
       const FS_FINAL = `#version 300 es
 precision mediump float;in vec2 v;out vec4 o;
 uniform sampler2D uA,uL,uB,uLut;
-uniform vec2 uRes;uniform float uT,uLightOn,uBloomOn,uBloomK,uVig,uGrain,uCa,uMix,uExp,uWhite;
-float th(float t){float e=exp(-2.*t);return (1.-e)/(1.+e);}
-float sh(float x){return x<.82?x:.82+.18*th((x-.82)/.18);}
-vec3 tm(vec3 x){return vec3(sh(x.r),sh(x.g),sh(x.b));}
+uniform vec2 uRes;uniform float uT,uLightOn,uBloomOn,uBloomK,uVig,uGrain,uCa,uMix;
+/* Hombro que SOLO toca lo que ya se sale de rango (albedo x luz + bloom > 1). Por debajo de 1
+   es la identidad exacta: no levanta negros, no lava medios y no baja el contraste del 2D.
+   Conserva el tono (divide por el canal maximo) y blanquea de forma progresiva lo muy quemado. */
+vec3 tm(vec3 c){float m=max(max(c.r,c.g),c.b);if(m<=1.)return c;float t=1.-1./m;return mix(c/m,vec3(1.),t);}
 vec3 lut(vec3 c){
   c=clamp(c,0.,1.);
   float N=16.,sl=1./16.,px=1./256.,inr=px*15.;
@@ -129,7 +136,7 @@ void main(){
   else col=texture(uA,v).rgb;
   if(uLightOn>.5)col*=texture(uL,v).rgb*2.;
   if(uBloomOn>.5)col+=texture(uB,v).rgb*uBloomK;
-  col=clamp(tm(col*uExp)/uWhite,0.,1.);
+  col=clamp(tm(col),0.,1.);
   col=mix(col,lut(col),uMix);
   col*=1.-uVig*smoothstep(.16,.78,r2);
   col+=(hash(v*uRes+vec2(uT,uT*1.7))-.5)*uGrain;
@@ -172,39 +179,44 @@ void main(){
         return { t, f, w: tw, h: th };
       }
 
-      /* ---- LUT 3D (16³) generada por código: sin ficheros ni recursos de terceros ---- */
-      /* [templanza R, templanza B, saturación, contraste, elevación de negros, tinte de sombras] */
+      /* ---- LUT 3D (16³) generada por código: sin ficheros ni recursos de terceros ----
+         Regla de la gradación: puede AÑADIR color y contraste, nunca levantar el negro ni bajar
+         la saturación. Por eso el punto de negro se recorta (no se eleva) y el tinte de sombras
+         es multiplicativo: sobre un negro puro no hace nada. */
+      /* [templanza R, templanza B, saturación, contraste, punto de negro, tinte frío de sombras] */
       const GR = {
-        _: [1.015, 1.010, 1.06, 1.08, 0.012, 0.018],
-        meadow: [1.02, 0.995, 1.09, 1.08, 0.010, 0.014],
-        snow: [0.965, 1.075, 1.04, 1.14, 0.008, 0.040],
-        night: [0.955, 1.085, 1.02, 1.16, 0.014, 0.044],
-        castle: [1.055, 0.955, 1.07, 1.10, 0.014, 0.020],
-        factory: [1.02, 0.965, 1.05, 1.12, 0.012, 0.016],
-        dusk: [1.085, 0.945, 1.10, 1.09, 0.020, 0.024],
-        jungle: [0.985, 0.995, 1.10, 1.10, 0.010, 0.020],
-        sky: [0.985, 1.045, 1.06, 1.07, 0.008, 0.030],
-        canyon: [1.075, 0.945, 1.09, 1.10, 0.016, 0.018],
-        neon: [1.02, 1.055, 1.12, 1.16, 0.016, 0.040],
-        rally: [1.045, 0.975, 1.08, 1.09, 0.012, 0.018],
-        skate: [1.045, 0.995, 1.09, 1.10, 0.014, 0.022],
-        voxel: [0.985, 1.025, 1.07, 1.08, 0.010, 0.024]
+        _: [1.015, 1.010, 1.11, 1.10, 0.008, 0.030],
+        meadow: [1.020, 0.995, 1.14, 1.10, 0.008, 0.024],
+        snow: [0.965, 1.075, 1.09, 1.16, 0.006, 0.060],
+        night: [0.955, 1.085, 1.07, 1.18, 0.010, 0.066],
+        castle: [1.055, 0.955, 1.12, 1.12, 0.010, 0.032],
+        factory: [1.020, 0.965, 1.10, 1.14, 0.009, 0.026],
+        dusk: [1.085, 0.945, 1.15, 1.11, 0.012, 0.038],
+        jungle: [0.985, 0.995, 1.15, 1.12, 0.008, 0.032],
+        sky: [0.985, 1.045, 1.11, 1.09, 0.006, 0.046],
+        canyon: [1.075, 0.945, 1.14, 1.12, 0.011, 0.028],
+        neon: [1.020, 1.055, 1.17, 1.18, 0.011, 0.060],
+        rally: [1.045, 0.975, 1.13, 1.11, 0.009, 0.028],
+        skate: [1.045, 0.995, 1.14, 1.12, 0.010, 0.034],
+        voxel: [0.985, 1.025, 1.12, 1.10, 0.008, 0.036]
       };
       function lutTex(theme) {
         const g = GR[theme] || GR._, N = 16, d = new Uint8Array(N * N * N * 4);
+        const cl = (c) => c < 0 ? 0 : c > 1 ? 1 : c;
+        /* Curva en S con pivote en el gris medio: sube el contraste sin mover ni el 0 ni el 1. */
+        const S = (c) => { const t = cl(c); return t + (t * t * (3 - 2 * t) - t) * (g[3] - 1) * 2.2; };
         for (let b = 0; b < N; b++) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
           let r = x / (N - 1) * g[0], gg = y / (N - 1), bb = b / (N - 1) * g[1];
           const lum = 0.299 * r + 0.587 * gg + 0.114 * bb;
           r = lum + (r - lum) * g[2]; gg = lum + (gg - lum) * g[2]; bb = lum + (bb - lum) * g[2];
-          const S = (c) => { const t = Math.max(0, Math.min(1, c)); return t + (t * t * (3 - 2 * t) - t) * (g[3] - 1) * 1.8; };
           r = S(r); gg = S(gg); bb = S(bb);
-          const sh = Math.max(0, 1 - lum * 2.2);           // sólo las sombras se tiñen
-          r += g[4] * (1 - r); gg += g[4] * (1 - gg) + g[5] * sh * 0.3; bb += g[4] * (1 - bb) + g[5] * sh;
+          const sh = Math.max(0, 1 - lum * 2.2);        // sólo las sombras se tiñen…
+          const kb = 1 + g[5] * sh, kr = 1 - g[5] * sh * 0.55;
+          r *= kr; bb *= kb;                            // …y de forma multiplicativa: el negro sigue negro
+          const bp = g[4], iv = 1 / (1 - bp);           // punto de negro: se RECORTA, nunca se eleva
+          r = cl((r - bp) * iv); gg = cl((gg - bp) * iv); bb = cl((bb - bp) * iv);
           const i = ((y * N * N) + (b * N) + x) * 4;
-          d[i] = Math.max(0, Math.min(255, r * 255 + 0.5)) | 0;
-          d[i + 1] = Math.max(0, Math.min(255, gg * 255 + 0.5)) | 0;
-          d[i + 2] = Math.max(0, Math.min(255, bb * 255 + 0.5)) | 0;
-          d[i + 3] = 255;
+          d[i] = (r * 255 + 0.5) | 0; d[i + 1] = (gg * 255 + 0.5) | 0; d[i + 2] = (bb * 255 + 0.5) | 0; d[i + 3] = 255;
         }
         return tex(N * N, N, d);
       }
@@ -214,10 +226,6 @@ void main(){
       let LIT = null, B0 = null, B1 = null, H0 = null, H1 = null, VW = 0, VH = 0;
       let lost = false;
       glc.addEventListener('webglcontextlost', (e) => { e.preventDefault(); lost = true; }, false);
-
-      /* Tonemap con hombro suave: identidad hasta 0,82 y compresión por encima (los colores
-         saturados y el bloom no se queman). Se normaliza para que el blanco siga siendo blanco. */
-      const EXP = 1, WHITE = (function () { const t = (1 - 0.82) / 0.18, e = Math.exp(-2 * t); return 0.82 + 0.18 * ((1 - e) / (1 + e)); })();
 
       function resize(cssW, cssH, pw, ph, hw, hh) {
         glc.style.width = cssW + 'px'; glc.style.height = cssH + 'px';
@@ -238,6 +246,9 @@ void main(){
       }
       const bind = (unit, t) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t); };
 
+      /* Direccional normalizada: con el relieve plano (normal 0,0,1) el multiplicador vale
+         exactamente 1, así el compositor SUMA luz donde hay volumen y no toca el resto. */
+      const SUNK = 0.48, AMB = 1 - SUNK * 0.6242;
       const LP = new Float32Array(32), LC = new Float32Array(24);
 
       /* opt: {emissive:canvas|null, height:canvas|null, lights:[...], nl, grain, vig, ca, mix, bloom, str, ao, spec} */
@@ -255,7 +266,7 @@ void main(){
         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 
         if (useH) {                                   // --- relieve suavizado: bisel ancho, no de 1 píxel
-          gl.useProgram(P_BLUR); gl.uniform1i(U(P_BLUR, 'uS'), 2);
+          gl.useProgram(P_BLUR); gl.uniform1f(U(P_BLUR, 'uTh'), 0); gl.uniform1i(U(P_BLUR, 'uS'), 2);
           gl.uniform2f(U(P_BLUR, 'uStep'), 1.1 / H0.w, 0); pass(P_BLUR, H0);
           gl.uniform1i(U(P_BLUR, 'uS'), 7); bind(7, H0.t);
           gl.uniform2f(U(P_BLUR, 'uStep'), 0, 1.1 / H0.h); pass(P_BLUR, H1);
@@ -267,8 +278,8 @@ void main(){
           gl.uniform2f(U(P_LIGHT, 'uTex'), 1 / LIT.w, 1 / LIT.h);
           gl.uniform1f(U(P_LIGHT, 'uHOn'), useH ? 1 : 0);
           gl.uniform1f(U(P_LIGHT, 'uStr'), opt.str);
-          gl.uniform1f(U(P_LIGHT, 'uAmb'), useH ? 0.70 : 1);
-          gl.uniform1f(U(P_LIGHT, 'uSunK'), useH ? 0.40 : 0);
+          gl.uniform1f(U(P_LIGHT, 'uAmb'), useH ? AMB : 1);
+          gl.uniform1f(U(P_LIGHT, 'uSunK'), useH ? SUNK : 0);
           gl.uniform1f(U(P_LIGHT, 'uSpec'), opt.spec);
           gl.uniform1f(U(P_LIGHT, 'uAo'), opt.ao);
           gl.uniform1f(U(P_LIGHT, 'uAsp'), opt.asp);
@@ -276,10 +287,12 @@ void main(){
           if (nl) { gl.uniform4fv(U(P_LIGHT, 'uLP'), LP); gl.uniform3fv(U(P_LIGHT, 'uLC'), LC); }
           pass(P_LIGHT, LIT);
         }
-        if (useB) {                                   // --- bloom: reducción + desenfoque separable
+        if (useB) {                                   // --- bloom: reducción con umbral + desenfoque separable
           gl.useProgram(P_BLUR); gl.uniform1i(U(P_BLUR, 'uS'), 1);
+          gl.uniform1f(U(P_BLUR, 'uTh'), opt.bth);     // sin umbral, la cola suave del emisivo empaña toda la escena
           gl.uniform2f(U(P_BLUR, 'uStep'), 0.5 / B0.w, 0.5 / B0.h);
           pass(P_BLUR, B0);
+          gl.uniform1f(U(P_BLUR, 'uTh'), 0);
           gl.uniform1i(U(P_BLUR, 'uS'), 3);
           bind(3, B0.t); gl.uniform2f(U(P_BLUR, 'uStep'), 1.35 / B0.w, 0); pass(P_BLUR, B1);
           bind(3, B1.t); gl.uniform2f(U(P_BLUR, 'uStep'), 0, 1.35 / B0.h); pass(P_BLUR, B0);
@@ -297,8 +310,6 @@ void main(){
         gl.uniform1f(U(P_FINAL, 'uGrain'), opt.grain);
         gl.uniform1f(U(P_FINAL, 'uCa'), opt.ca);
         gl.uniform1f(U(P_FINAL, 'uMix'), opt.mix);
-        gl.uniform1f(U(P_FINAL, 'uExp'), EXP);
-        gl.uniform1f(U(P_FINAL, 'uWhite'), WHITE);
         pass(P_FINAL, null);
         return true;
       }
@@ -407,11 +418,45 @@ void main(){
 
     k.go = () => k.hit.has('a') || k.ptr.hit || (!!k.party && PADS.some((q) => q && q.hit.has('a')));
     const CFGID = (window.CFG && window.CFG.id) || o.id || o.title;
+    /* ---------- Dificultad seleccionable (fácil · normal · difícil) ----------
+       Normal es EXACTAMENTE la curva de siempre (todos los factores a 1): un motor que no mire
+       k.D se comporta hoy igual que ayer. Se recuerda por juego y separa los récords por nivel,
+       manteniendo la clave antigua para normal (no se pierde ninguna marca ya guardada). */
+    const DIFN = ['Fácil', 'Normal', 'Difícil'];
+    const DIFD = [
+      { spd: 0.8, rate: 0.75, dmg: 0.6, life: 1, cpu: -1, time: 1.25 },
+      { spd: 1, rate: 1, dmg: 1, life: 0, cpu: 0, time: 1 },
+      { spd: 1.18, rate: 1.3, dmg: 1.4, life: 0, cpu: 1, time: 0.85 }
+    ];
+    k.dif = 1; try { const v0 = localStorage.getItem('dif:' + CFGID); if (v0 === '0' || v0 === '2') k.dif = +v0; } catch (e) {}
+    k.D = DIFD[k.dif];
+    k.difName = () => DIFN[k.dif];
+    const bkey = (id) => 'best:' + id + (k.dif === 1 ? '' : k.dif === 0 ? '@f' : '@d');
+    k.bkey = bkey;   /* los motores que leen el récord a mano (pool, darts, paddle, golf, platform) deben usar esta clave */
+    let lastReady = null;
+    /* En el modo tele el nivel lo fija quien monta la partida desde la tele: aquí no se toca. */
+    const difHtml = () => k.party ? '' : `<div class="dif">${DIFN.map((n, i) =>
+      `<button type="button" data-d="${i}"${i === k.dif ? ' class="on" aria-current="true"' : ''}>${n}</button>`).join('')}</div>`;
+    k.setDif = (v, quiet) => {
+      v = v | 0; if (v < 0 || v > 2 || v === k.dif) return;
+      k.dif = v; k.D = DIFD[v];
+      try { localStorage.setItem('dif:' + CFGID, v); } catch (e) {}
+      if (!quiet) { k.sfx('click'); tell('arcade:dif', { v }); }
+      if (k.onDif) k.onDif(v);
+      if (k.paused) k._pauseCard(); else if (k.st === 'ready' && lastReady) k.show(lastReady[0], lastReady[1]);
+    };
+    ov.addEventListener('pointerdown', (e) => {
+      const b = e.target && e.target.closest && e.target.closest('[data-d]');
+      if (!b) return;
+      e.stopPropagation(); e.preventDefault(); k.setDif(+b.dataset.d);
+    });
     k.show = (t, s) => {
       let body = s || '', go = 'Toca para jugar';
       const m = body.match(/<br>\s*(Toca[^<]*)$/i); if (m) { go = m[1]; body = body.slice(0, m.index); }
-      const rec = k.st === 'ready' ? (() => { const b = k.best(CFGID, 0); return b ? `<div class="rec">Mejor puntuación: ${b}</div>` : ''; })() : '';
-      const html = `<div class="card"><h1>${t}</h1>${body ? `<p>${body}</p>` : ''}${rec}<div class="go">${k.party ? '<span class="ka">A</span>' : ''}${(g2 => g2.charAt(0).toUpperCase() + g2.slice(1))(go.replace(/^Toca para /i, ''))}</div></div>`;
+      const ready = k.st === 'ready';
+      if (ready) lastReady = [t, s];
+      const rec = ready ? (() => { const b = k.best(CFGID, 0); return b ? `<div class="rec">Mejor puntuación: ${b}${k.dif === 1 ? '' : ' · ' + DIFN[k.dif]}</div>` : ''; })() : '';
+      const html = `<div class="card"><h1>${t}</h1>${body ? `<p>${body}</p>` : ''}${rec}<div class="go">${k.party ? '<span class="ka">A</span>' : ''}${(g2 => g2.charAt(0).toUpperCase() + g2.slice(1))(go.replace(/^Toca para /i, ''))}</div>${ready ? difHtml() : ''}</div>`;
       if (k.paused) { ovSaved = { html, win: false }; return; } /* en pausa: se enseña al continuar */
       ov.innerHTML = html;
       ov.classList.remove('hide', 'win');
@@ -474,9 +519,10 @@ void main(){
     const setPause = (on) => {
       if (on && (k.st !== 'play' || k.paused)) return;
       k.paused = on; bp.innerHTML = on ? IC.r : IC.p;
-      if (on) { ovSaved = ov.classList.contains('hide') ? null : { html: ov.innerHTML, win: ov.classList.contains('win') }; k.sfx('click'); ov.innerHTML = `<div class="card"><h1>Pausa</h1><div class="go">${k.party ? '<span class="ka">A</span>' : ''}Continuar</div></div>`; ov.classList.remove('hide', 'win'); }
+      if (on) { ovSaved = ov.classList.contains('hide') ? null : { html: ov.innerHTML, win: ov.classList.contains('win') }; k.sfx('click'); k._pauseCard(); ov.classList.remove('hide', 'win'); }
       else { if (ovSaved) { ov.innerHTML = ovSaved.html; ov.classList.toggle('win', ovSaved.win); ov.classList.remove('hide'); } else ov.classList.add('hide'); ovSaved = null; k.held.clear(); }
     };
+    k._pauseCard = () => { ov.innerHTML = `<div class="card"><h1>Pausa</h1><div class="go">${k.party ? '<span class="ka">A</span>' : ''}Continuar</div>${difHtml()}</div>`; };
     bp.addEventListener('pointerdown', (e) => { e.stopPropagation(); setPause(!k.paused); });
     document.addEventListener('visibilitychange', () => { if (document.hidden) setPause(true); });
     /* Puente con el portal: avisa de inicio/fin de partida (pausas publicitarias) y obedece pausa/reanudar. */
@@ -486,17 +532,19 @@ void main(){
       else if (d.type === 'arcade:resume') { if (AC) AC.resume(); }
       else if (d.type === 'arcade:unpause') { if (k.paused) setPause(false); }
       else if (d.type === 'arcade:mute') setMute(d.on);
-      else if (d.type === 'arcade:hud') { hud.classList.add('ext'); k.extHud = true; } });
+      else if (d.type === 'arcade:hud') { hud.classList.add('ext'); k.extHud = true; }
+      else if (d.type === 'arcade:dif') k.setDif(d.v | 0, true); });
     /* Mando del portal: el juego describe qué controles necesita (se colocan fuera del lienzo). */
     /* Saludo al reproductor del portal: tamaño, colores y ayuda del juego. El portal coloca el menú
        (pausa, sonido, pantalla completa) y el mando fuera del lienzo y responde con 'arcade:hud'. */
-    { const C = window.CFG || {}, hi = { w, h, bg, ac: acc, hud: C.hud || '', muted, title: C.title || o.title || '', help: C.help || '' };
+    { const C = window.CFG || {}, hi = { w, h, bg, ac: acc, hud: C.hud || '', muted, dif: k.dif, difs: DIFN, title: C.title || o.title || '', help: C.help || '' };
       if ('pad' in C) hi.pad = C.pad;
       if (C.mp) hi.mp = C.mp;
       tell('arcade:hello', hi); }
     k.hide = () => { if (k.paused) ovSaved = null; else ov.classList.add('hide'); };
     k.best = (id, score) => {
-      let b = 0; try { b = +localStorage.getItem('best:' + id) || 0; if (score > b) { b = score; localStorage.setItem('best:' + id, b); } } catch (e) { b = Math.max(b, score); }
+      const key = bkey(id);
+      let b = 0; try { b = +localStorage.getItem(key) || 0; if (score > b) { b = score; localStorage.setItem(key, b); } } catch (e) { b = Math.max(b, score); }
       return b;
     };
     k.rnd = (a, b) => a + Math.random() * (b - a);
@@ -504,11 +552,11 @@ void main(){
     k.pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
     k.shuffle = (arr) => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
     k.end = (id, score, head, extra) => {
-      let prev = 0; try { prev = +localStorage.getItem('best:' + id) || 0; } catch (e) {}
+      let prev = 0; try { prev = +localStorage.getItem(bkey(id)) || 0; } catch (e) {}
       const best = k.best(id, score), rec = score > 0 && score > prev && prev > 0;
       tell('arcade:over', { score });
       if (rec) { k.confetti(); k.sfx('win'); }
-      return k.show(head || 'Fin', `${rec ? '<b style="color:#ffd166">¡Nuevo récord!</b><br>' : ''}${extra ? extra + ' · ' : ''}Puntos: ${score} · Récord ${best}<br>Toca para jugar otra vez`);
+      return k.show(head || 'Fin', `${rec ? '<b style="color:#ffd166">¡Nuevo récord!</b><br>' : ''}${extra ? extra + ' · ' : ''}Puntos: ${score} · Récord ${best}${k.dif === 1 ? '' : ' (' + DIFN[k.dif] + ')'}<br>Toca para jugar otra vez`);
     };
     k.rect = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); };
     k.circle = (x, y, r, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill(); };
@@ -577,10 +625,14 @@ void main(){
     } else { k.glow = () => {}; k.relief = () => {}; k.light = () => {}; }
     let rmo = false; try { rmo = matchMedia('(prefers-reduced-motion:reduce)').matches; } catch (e) {}
     const GOPT = { emissive: null, height: null, nl: 0, asp: w / h, t: 0,
-      grain: rmo ? 0.012 : 0.02, vig: 0.28, ca: rmo ? 0 : 0.0009, mix: 1, bloom: 0.85, str: 4.2, ao: 0.72, spec: 0.5 };
+      grain: rmo ? 0.010 : 0.017, vig: 0.24, ca: rmo ? 0 : 0.0008, mix: 1, bloom: 1.05, bth: 0.22, str: 4.2, ao: 0.72, spec: 0.5 };
     /* Repliegue: si el contexto se pierde, o si en este aparato el compositor no cabe en el
        presupuesto, se vuelve al lienzo 2D de siempre sin decir nada por consola. */
     const gxDrop = () => { gxOn = false; k.gfx = false; cv.style.visibility = ''; GX.el.style.display = 'none'; };
+    /* Interruptor para QA (comparativas antes/después sobre el MISMO frame). No lo usa ningún juego. */
+    k._gx = (on) => { if (!GX || GX.dead()) return false; if (on === false && gxOn) gxDrop();
+      else if (on === true && !gxOn) { gxOn = true; k.gfx = true; cv.style.visibility = 'hidden'; GX.el.style.display = ''; fit(); }
+      return gxOn; };
     let gxN = 0; const gxProbe = [];
     function composite(t) {
       GOPT.emissive = eUse ? eCv : null; GOPT.height = hUse ? hCv : null; GOPT.nl = nL;
