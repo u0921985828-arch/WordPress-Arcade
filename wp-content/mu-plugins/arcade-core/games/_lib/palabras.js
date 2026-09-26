@@ -489,7 +489,7 @@ const HG = (() => {
     if (phase === 'reveal') { rescueT += dt; if (pt > 2.8 || (pt > 1.2 && !k.party && (k.hit.has('a') || k.ptr.hit))) { if (wi >= NW - 1) finish(); else nextWord(); } return; }
     if (phase !== 'turn') return;
     const s = seats[turn]; turnT += dt;
-    const lim = k.party ? 15 : 25;
+    const lim = k.party ? 15 : 25 * k.D.time;
     if (s.cpu) { if (turnT >= s.cpuT) pickL(cpuChoice()); return; }
     if (turnT > lim) { say('Se acabó el tiempo'); k.sfx('hurt'); passTurn(); return; }
     if (lim - turnT < 3.5 && Math.ceil(lim - turnT) !== Math.ceil(lim - turnT + dt)) k.sfx('tick');
@@ -619,7 +619,7 @@ const HG = (() => {
     }
     if (cur && !cur.cpu && (cursorShown || k.party)) { const [x, y, w, h] = keyRect(cur.cur), col = k.pcol(cur.p); c.save(); ART.rr(c, x - 4, y - 4, w + 8, h + 8, 13); c.strokeStyle = ART.alpha(col, 0.32); c.lineWidth = 9; c.stroke(); c.strokeStyle = col; c.lineWidth = 4; c.stroke(); c.restore(); }
     /* tiempo del turno */
-    if (cur && !cur.cpu) { const lim = k.party ? 15 : 25, fr = Math.max(0, 1 - turnT / lim), [x, y, w] = L.ab; c.fillStyle = 'rgba(0,0,0,.3)'; ART.rr(c, x, y - 12, w, 6, 3); c.fill(); c.fillStyle = fr > 0.3 ? k.pcol(cur.p) : '#ff6b6b'; ART.rr(c, x, y - 12, w * fr, 6, 3); c.fill(); }
+    if (cur && !cur.cpu) { const lim = k.party ? 15 : 25 * k.D.time, fr = Math.max(0, 1 - turnT / lim), [x, y, w] = L.ab; c.fillStyle = 'rgba(0,0,0,.3)'; ART.rr(c, x, y - 12, w, 6, 3); c.fill(); c.fillStyle = fr > 0.3 ? k.pcol(cur.p) : '#ff6b6b'; ART.rr(c, x, y - 12, w * fr, 6, 3); c.fill(); }
     if (msgT > 0 && lastMsg) { c.save(); c.globalAlpha = Math.min(1, msgT * 3); const [ax, ay, aw] = L.art; c.font = FONT(18, 900); const mw = Math.min(aw - 20, c.measureText(lastMsg).width + 30); panel(ax + aw / 2 - mw / 2, ay + 12, mw, 36, 18, '#f4f0ff', { drop: 3 }); txt(lastMsg, ax + aw / 2, ay + 31, fitSize(lastMsg, mw - 16, 18, 12, 900), OUT, 'center', 900); c.restore(); }
     if (cur && wi === 0 && !cur.cpu && guessed.size < 3) { const tip = k.party ? 'Joystick: letra · A: elegir' : 'Toca una letra (o escríbela)'; txt(tip, L.art[0] + L.art[2] / 2, L.art[1] + L.art[3] - 40, 15, OUT, 'center', 800); }
   }
@@ -637,7 +637,7 @@ const SP = (() => {
   const NW = 8, HL = ['#ff6b6b', '#4fb3ff', '#ffc94a', '#6fd66f', '#b98cff', '#ff9f43', '#3fd6c6', '#ff7ab8'];
   const LETF = 'EEEEEAAAAAOOOOSSSSRRRNNNIIIDDLLLCCTTUUMMPPBGVYQHFZJÑX';
   const DIRS = [[0, 1], [1, 0], [1, 1], [0, -1], [-1, 0], [-1, 1], [1, -1], [-1, -1]];
-  let lvl = Math.min(3, +ST('sopa:lvl', 0) || 0);
+  let lvl = k.clamp((+ST('sopa:lvl', 0) || 0) + k.D.cpu, 0, 3);   // k.D.cpu: más o menos direcciones, sin tocar lo guardado
   let grid, words, cat, time, sinceFind, sel, kc, kSel, kShown, built = false, doneT = 0;
   function build() {
     const cats = Object.keys(CATS), dirs = DIRS.slice(0, [2, 3, 5, 8][lvl]), maxL = Math.max(G.cols, G.rows);
@@ -738,7 +738,7 @@ const SP = (() => {
     if (sel) capsule(sel, '#6e62f5', 0.45);
     if (kSel) capsule(snap(kSel, kc), '#6e62f5', 0.4);
     /* pista: primera letra de una palabra pendiente parpadea tras 25 s sin encontrar nada (1.23: antes 45 s) */
-    const hint = !doneT && sinceFind > 25 ? words.find((o) => !o.found) : null;
+    const hint = !doneT && sinceFind > 25 / k.D.time ? words.find((o) => !o.found) : null;
     for (let r = 0; r < G.rows; r++) for (let q = 0; q < G.cols; q++) {
       const [x, y] = cellC(r, q);
       if (hint && hint.r === r && hint.c === q) { c.fillStyle = ART.alpha('#ffd166', 0.45 + 0.35 * Math.sin(t * 6)); c.beginPath(); c.arc(x, y, G.cs * 0.42, 0, TAU); c.fill(); }
@@ -773,7 +773,7 @@ const SP = (() => {
 /* ============================= ABECEDARIO VELOZ (rosco) ============================== */
 /* ===================================================================================== */
 const AB = (() => {
-  const TOT = 150, TURN = 15;
+  const TOT = 150 * k.D.time, TURN = 15 * k.D.time;   // k.D.time: reloj del rosco
   const L = LAND
     ? { bar: [16, 8, 768, 34], ring: [190, 240, 150, 16], def: [372, 50, 412, 116], opt: (i) => [372 + (i % 2) * 210, 176 + (i >> 1) * 74, 202, 64], pass: [372, 326, 412, 46], chip: (i) => [372 + i * 104, 382, 98, 54] }
     : { bar: [12, 10, 426, 34], ring: [225, 272, 143, 18], def: [12, 448, 426, 112], opt: (i) => [12 + (i % 2) * 219, 570 + (i >> 1) * 72, 207, 64], pass: [12, 718, 426, 44], chip: (i) => [12 + i * 108, 50, 102, 44] };
@@ -944,7 +944,8 @@ const AB = (() => {
 /* =================================== ANAGRAMAS ======================================= */
 /* ===================================================================================== */
 const AN = (() => {
-  const RONDAS = 2, RT = 100, TURN = 22, PTS = { 3: 100, 4: 200, 5: 400, 6: 700, 7: 1200 };
+  const RONDAS = 2, RT = 100 * k.D.time, TURN = 22 * k.D.time,   // k.D.time: reloj de la ronda
+     PTS = { 3: 100, 4: 200, 5: 400, 6: 700, 7: 1200 };
   const L = LAND
     ? { bar: [16, 8, 768, 34], wy: 72, ws: 52, ry: 158, rs: 58, btn: (i) => [88 + i * 130, 244, 120, 52], cx: 278, list: [556, 50, 228, 288], chip: (i) => [16 + i * 134, 328, 128, 56], msg: 410 }
     : { bar: [12, 10, 426, 34], wy: 82, ws: 50, ry: 166, rs: 52, btn: (i) => [15 + i * 140, 250, 132, 54], cx: 225, list: [12, 320, 426, 244], chip: (i) => [12 + i * 108, 578, 102, 58], msg: 668 };

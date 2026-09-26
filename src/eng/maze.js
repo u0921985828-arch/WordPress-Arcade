@@ -283,7 +283,7 @@ function updIso(dt) {
     if (it) { it.got = true; score += 200; k.sfx('coin'); k.burst(sx, sy - 20, '#ffc928', 16, 150); k.float('+200', sx, sy - 44, '#ffc928');
       if (allKeys()) { msg = '¡Salida abierta!'; msgT = 1.6; k.sfx('start'); } }
     const dp = drops.find((q) => q.x === x && q.y === y);
-    if (dp) { drops.splice(drops.indexOf(dp), 1); if (dp.t === 'coin') { score += 50; k.sfx('coin'); k.float('+50', sx, sy - 44, '#ffe27a'); } else { lives = Math.min(6, lives + 1); k.sfx('pop'); k.float('+1', sx, sy - 44, '#ff7a8a'); } k.burst(sx, sy - 16, dp.t === 'coin' ? '#ffc928' : '#ff4d6d', 10); }
+    if (dp) { drops.splice(drops.indexOf(dp), 1); if (dp.t === 'coin') { score += 50; k.sfx('coin'); k.float('+50', sx, sy - 44, '#ffe27a'); } else { lives = Math.min(6 + k.D.life, lives + 1); k.sfx('pop'); k.float('+1', sx, sy - 44, '#ff7a8a'); } k.burst(sx, sy - 16, dp.t === 'coin' ? '#ffc928' : '#ff4d6d', 10); }
     if (x === exitC[0] && y === exitC[1] && allKeys()) { const bonus = Math.max(0, Math.round(90 - lvT)) * 5; score += 500 * level + bonus; clearT = 1.5; k.sfx('win'); k.confetti(); msg = bonus ? `¡Salida! +${bonus} por rapidez` : '¡Salida!'; msgT = 1.5; return; }
   }
   if (!DG) { // laberinto sin monstruos: límite de tiempo por nivel (si no, la partida no acababa ni guardaba récord)
@@ -319,7 +319,7 @@ k.run((dt) => {
   if (freeze > 0) { freeze -= dt; return; }
   if (dying > 0) { if ((dying -= dt) <= 0) afterDeath(); return; }
   if (clearT > 0) { clearT -= dt; if (clearT <= 0) { level++; build(); } return; }
-  if (ready > 0) { ready -= dt; if (ready <= 0) invT = Math.max(invT, 2); return; }
+  if (ready > 0) { ready -= dt; if (ready <= 0) invT = Math.max(invT, 2 / k.D.dmg); return; }
   if (M === 'muncher') updMuncher(dt); else if (M === 'digger') updDigger(dt); else updIso(dt);
 }, draw);
 function afterDeath() {

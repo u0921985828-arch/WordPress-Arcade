@@ -164,6 +164,7 @@ const CUT_T = 2.1, COOK_T = 5.6, BURN_T = 6.2, BAKE_T = 7.4, FIRE_T = 6.5, PANIC
 const KX = 10, KY = TOP + 4, KW = W - 20, KH = H - KY - (PORT ? 66 : 62), S = PORT ? 62 : 60;
 const COLS = Math.floor(KW / S), ROWS = Math.floor(KH / S);
 const GX = Math.round(KX + (KW - COLS * S) / 2), GY = Math.round(KY + (KH - ROWS * S) / 2);
+const REP0 = 3 + k.D.life;   /* una estrella más en fácil */
 let ST = [], chefs = [], orders = [], t, money, tips, rep, served, lostO, combo, nextO, oid, alertT, alertC, ended;
 
 function ring() { /* celdas del borde, en el sentido de las agujas del reloj desde arriba a la izquierda */
@@ -217,10 +218,10 @@ const newPlate = () => ({ plate: 1, on: [], baked: 0 });
 const nAct = () => Math.max(1, chefs.length);
 function recPool() { const p = REC.filter((r) => t >= r.after); return p.length ? p : [REC[0]]; }
 function maxOrders() { return 2 + nAct(); }
-function patience() { return lerp(42, 26, t / DAY) * (nAct() === 1 ? 1.15 : 1); }
+function patience() { return lerp(42, 26, t / DAY) * (nAct() === 1 ? 1.15 : 1) * k.D.time; }   /* k.D.time: paciencia del cliente */
 function interval() {
   const base = PIZZA ? 7.6 : 8.2, d = t / DAY;
-  return base * lerp(1.45, 0.95, d) / (0.6 + 0.4 * nAct());
+  return base * lerp(1.45, 0.95, d) / (0.6 + 0.4 * nAct()) / k.D.rate;   /* k.D.rate: ritmo de pedidos */
 }
 function addOrder() {
   if (orders.length >= maxOrders()) { nextO = 2.5; return; }
@@ -264,7 +265,7 @@ function makeChefs() {
 k.onParty = () => makeChefs(); /* se ajusta la plantilla aunque aún no haya empezado la partida */
 
 function reset() {
-  t = 0; money = 0; tips = 0; rep = 3; served = 0; lostO = 0; combo = 0; nextO = 6; oid = 0; orders = []; alertT = 0; alertC = ''; ended = 0;
+  t = 0; money = 0; tips = 0; rep = REP0; served = 0; lostO = 0; combo = 0; nextO = 6; oid = 0; orders = []; alertT = 0; alertC = ''; ended = 0;
   build(); chefs = []; makeChefs();
 }
 
@@ -583,7 +584,7 @@ function draw() {
   /* dinero, estrellas, reloj */
   const rx = W - 8;
   label(money + ' €', rx, 18, 22, '#ffc94d', 'right');
-  for (let i = 0; i < 3; i++) ART.heart(c, rx - 14 - i * 24, 46, 1.4, i < rep);
+  for (let i = 0; i < REP0; i++) ART.heart(c, rx - 14 - i * 24, 46, 1.4, i < rep);
   const left = Math.max(0, DAY - t);
   label(`${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, rx, 72, 15, left < 20 ? '#ff6fb5' : '#d8d4f5', 'right');
   bar(rx - 96, TOP - 12, 96, 6, 1 - left / DAY, '#6e62f5');

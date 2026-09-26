@@ -120,9 +120,11 @@ function mouth8(g, x, y, w, m, col) {
 const OUT = ART.OUT, R2 = 6.2832;
 const k = Kit({ w: 360, h: 640, title: CFG.title, bg: '#0b1238' }), c = k.ctx;
 const PY = 292, ZY = 552, WALL = 206, HX = 150, HY = 548, BAT = 92;
+/* Dificultad seleccionable: en normal OUTS = 10 y k.D.spd = 1 → derby idéntico al de siempre. */
+const OUTS = 10 + k.D.life;
 let ball, swing, outs, hrs, total, msg, msgT, msgD = 1, msgC, wait, hit, pitchN, trail, streak, fw, tm, outMarks;
 /* dificultad por lanzamiento: d 0→1 en 30 lanzamientos. Velocidad media 0,78→1,65 (antes 1,2→1,8 al 10.º), la variación y el efecto crecen con d */
-function pitch() { pitchN++; const d = Math.min(1, (pitchN - 1) / 45), /* 1.23: más fácil (rampa 30→45 lanzamientos, velocidad 0,78–1,65 → 0,62–1,40) */ e = d * d * (3 - 2 * d) * 0.6 + d * 0.4; const sp = (0.62 + 0.78 * e) * (1 + k.rnd(-1, 1) * (0.04 + 0.2 * e)); const curve = k.rnd(-40, 40) * Math.min(1, (pitchN - 1) / 18); ball = { t: 0, sp, curve, x: 180, y: PY, s: 0.3, live: true, spin: 0 }; swing = 0; hit = null; trail = []; k.sfx('click'); }
+function pitch() { pitchN++; const d = Math.min(1, (pitchN - 1) / 45), /* 1.23: más fácil (rampa 30→45 lanzamientos, velocidad 0,78–1,65 → 0,62–1,40) */ e = d * d * (3 - 2 * d) * 0.6 + d * 0.4; const sp = (0.62 + 0.78 * e) * (1 + k.rnd(-1, 1) * (0.04 + 0.2 * e)) * k.D.spd; const curve = k.rnd(-40, 40) * Math.min(1, (pitchN - 1) / 18); ball = { t: 0, sp, curve, x: 180, y: PY, s: 0.3, live: true, spin: 0 }; swing = 0; hit = null; trail = []; k.sfx('click'); }
 function reset() { outs = 0; hrs = 0; total = 0; msg = ''; msgT = 0; msgC = '#fff'; wait = 1.2; pitchN = 0; ball = null; hit = null; swing = 0; trail = []; streak = 0; fw = []; tm = 0; outMarks = []; }
 reset(); k.show(CFG.title, 'Toca (o pulsa A) para batear cuando la bola entre en la zona de strike. Buen momento = jonrón. 10 eliminaciones y se acaba.');
 function say(s, col, d) { msg = s; msgC = col; msgT = msgD = d || 1.2; }
@@ -266,7 +268,7 @@ k.run((dt) => {
   for (const f of fw) f.t -= dt; fw = fw.filter((f) => f.t > 0);
   if (!k.gate(reset)) return;
   if (swing > 0) swing -= dt;
-  if (outs >= 10 && !ball && msgT < 0.2) return k.lose(CFG.id, hrs, 'Fin del Derby', `${hrs} jonrones · ${total} m`);
+  if (outs >= OUTS && !ball && msgT < 0.2) return k.lose(CFG.id, hrs, 'Fin del Derby', `${hrs} jonrones · ${total} m`);
   if (!ball) { wait -= dt; if (wait <= 0) pitch(); return; }
   if (hit) { hit.t += dt; const [x, y] = hitPos(hit); trail.push([x, y]); if (trail.length > 14) trail.shift();
     if (hit.hr && hit.t > 1 && !hit.boom) { hit.boom = 1; for (let i = 0; i < 3; i++) fw.push({ x: k.rnd(60, 300), y: k.rnd(40, 120), t: 0.9 + i * 0.25, d: i * 0.25, col: k.pick(['#f2d15c', '#ff5fa2', '#5ce1e6', '#7cf7a0']) }); }
@@ -299,7 +301,7 @@ k.run((dt) => {
   batter();
   // HUD en las esquinas
   label(hrs, 14, 10, 34, '#fff27a'); label('JONRONES', 14, 48, 11, '#dfe6ff'); label(`${total} m`, 14, 64, 13, '#b8c6ff');
-  for (let i = 0; i < 10; i++) { const x = 250 + (i % 5) * 20, y = 22 + Math.floor(i / 5) * 22; if (i < outs) { const s = 0.6 + (outMarks[i] || 1) * 0.4; c.save(); c.translate(x, y); c.scale(s, s); c.beginPath(); c.arc(0, 0, 8, 0, R2); ART.fillOut(c, '#e24b5b', 2); c.strokeStyle = '#fff'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(-3.5, -3.5); c.lineTo(3.5, 3.5); c.moveTo(3.5, -3.5); c.lineTo(-3.5, 3.5); c.stroke(); c.restore(); } else baseball(x, y, 7.5, 0); }
+  for (let i = 0, cols = Math.ceil(OUTS / 2), sp2 = OUTS <= 10 ? 20 : 16; i < OUTS; i++) { const x = 250 + (i % cols) * sp2, y = 22 + Math.floor(i / cols) * 22; if (i < outs) { const s = 0.6 + (outMarks[i] || 1) * 0.4; c.save(); c.translate(x, y); c.scale(s, s); c.beginPath(); c.arc(0, 0, 8, 0, R2); ART.fillOut(c, '#e24b5b', 2); c.strokeStyle = '#fff'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(-3.5, -3.5); c.lineTo(3.5, 3.5); c.moveTo(3.5, -3.5); c.lineTo(-3.5, 3.5); c.stroke(); c.restore(); } else baseball(x, y, 7.5, 0); }
   label('OUTS', 346, 58, 11, '#dfe6ff', 'right');
   if (msgT > 0) { const p = (msgD - msgT) / 0.18, s = p < 1 ? 0.6 + p * 0.55 : Math.max(1, 1.15 - (p - 1) * 0.3); c.save(); c.translate(180, 400); c.scale(s, s); c.globalAlpha = Math.min(1, msgT / 0.25); label(msg, 0, 0, msg.startsWith('¡J') ? 34 : 24, msgC, 'center', 'middle'); c.restore(); c.globalAlpha = 1; }
 });

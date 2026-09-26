@@ -92,7 +92,8 @@ function blocksGame() {
   const anyFit = (pc, g) => { for (let y = 0; y <= N - pc.h; y++) for (let x = 0; x <= N - pc.w; x++) if (fits(pc, x, y, g)) return true; return false; };
   function mkPiece(fam, rot) { const cells = fam.rots[rot]; return { cells, col: fam.col, w: Math.max(...cells.map((p) => p[0])) + 1, h: Math.max(...cells.map((p) => p[1])) + 1, pop: 0, back: 0 }; }
   function draw1(r) {
-    const d = daily ? 0.55 : Math.min(1, placed / 90), wt = FAM.map((f) => (f.tier === 0 ? 1.7 - 0.9 * d : f.tier === 1 ? 1 + 0.25 * d : 0.18 + 0.95 * d));
+    /* Dificultad: cada cuánto entran las piezas grandes (el reto del día no se toca). */
+    const d = daily ? 0.55 : Math.min(1, placed / (k.dif === 0 ? 130 : k.dif === 2 ? 60 : 90)), wt = FAM.map((f) => (f.tier === 0 ? 1.7 - 0.9 * d : f.tier === 1 ? 1 + 0.25 * d : 0.18 + 0.95 * d));
     let x = r() * wt.reduce((a, b) => a + b, 0), i = 0; while (x > wt[i]) x -= wt[i++];
     const f = FAM[Math.min(i, FAM.length - 1)]; return mkPiece(f, Math.floor(r() * f.rots.length));
   }
@@ -119,7 +120,7 @@ function blocksGame() {
   function newTray() {
     let set;
     if (daily) set = [draw1(rng), draw1(rng), draw1(rng)];           // misma secuencia para todos en el reto del día
-    else for (let a = 0, tries = placed < 150 ? 30 : 8; a < tries; a++) { set = [draw1(Math.random), draw1(Math.random), draw1(Math.random)]; if (solvable(set)) break; }
+    else for (let a = 0, tries = placed < (k.dif === 0 ? 260 : k.dif === 2 ? 90 : 150) ? 30 : 8; a < tries; a++) { set = [draw1(Math.random), draw1(Math.random), draw1(Math.random)]; if (solvable(set)) break; }
     tray = set; trayN++; set.forEach((p, i) => (p.pop = -i * 0.08)); kb.sel = 0;
   }
   function reset() {
@@ -391,13 +392,16 @@ function jamGame() {
   /* ---------- estado ---------- */
   let level, cars, pos, start, min, moves, hist, drag, sel, cur, grab, kbMode, t = 0, winT, won, scored, hintUsed, hint, stars, shake = [], bump = 0, total;
   const tgt = (lv) => Math.min(24, 2 + Math.round((lv - 1) * 1.35)), ncars = (lv) => Math.min(13, 4 + Math.floor(lv * 0.7));
+  /* Dificultad: el nivel guardado no se toca; se juega como si fuera 2 más abajo (fácil) o 3 más arriba (difícil). */
+  const dlv = () => Math.max(1, level + (k.dif === 0 ? -2 : k.dif === 2 ? 3 : 0));
   function loadLevel() {
-    const g = (tgt(level) >= 3 && fromBank(tgt(level), level)) || generate(tgt(level), ncars(level));
+    const g = (tgt(dlv()) >= 3 && fromBank(tgt(dlv()), level)) || generate(tgt(dlv()), ncars(dlv()));
     let ci = 0; cars = g.cars.map((v, i) => ({ ...v, col: i === 0 ? RED : COLS[(ci++ + level * 3) % COLS.length], seed: Math.random() }));
     pos = g.pos.slice(); start = pos.slice(); min = g.min; moves = 0; hist = []; drag = null; sel = 0; cur = { x: pos[0], y: EXIT }; grab = false; winT = 0; won = false; scored = false; hintUsed = false; hint = null;
     cars.forEach((v, i) => { v.vis = pos[i]; v.pop = -i * 0.04; });
   }
   function reset() { level = +lsGet('jam:' + ID + ':lvl', 1) || 1; total = +lsGet('jam:' + ID + ':stars', 0) || 0; loadLevel(); }
+  k.onDif = () => { if (k.st !== 'play') reset(); };
   const range = (i) => { const v = cars[i], o = occOf(cars, pos); let lo = pos[i], hi = pos[i];
     const free = (p) => { const cell = v.h ? v.y * N + p : p * N + v.x; return o[cell] < 0 || o[cell] === i; };
     while (lo - 1 >= 0 && free(lo - 1)) lo--; while (hi + v.len < N && free(hi + v.len)) hi++; return [lo, hi]; };

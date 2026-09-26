@@ -413,7 +413,7 @@ else (function () {
     sub = isHum(side) ? (CHS.promo ? 'Elige pieza de coronación' : k.party ? (CHS.sel >= 0 ? 'Flechas: destino · A confirma · B cancela' : 'Flechas: mueve el cursor · A elige pieza') : (CHS.sel >= 0 ? 'Toca el destino · A confirma' : 'Toca tu pieza · flechas y A con mando')) : 'La CPU piensa…';
     if (!isHum(side)) {
       if (!think) think = 0.45 + Math.random() * 0.3;
-      if ((think -= dt) <= 0) { think = 0; const m = CH.think(S, Math.min(4, lvl), Math.random); if (m) chMove(m); }
+      if ((think -= dt) <= 0) { think = 0; const m = CH.think(S, k.clamp(lvl + k.D.cpu, 0, 4), Math.random); /* dificultad: k.D.cpu al nivel de la CPU */ if (m) chMove(m); }
       return;
     }
     think = 0;
@@ -616,7 +616,7 @@ else (function () {
       if (d > 0) { c.fillStyle = '#a8cf3f'; c.textAlign = 'right'; c.fillText('+' + Math.round(d / 100), PAN.x + PAN.w - 18, top + 20); }
       if (!PORT) { c.font = FONT(700, 13); c.fillStyle = '#bdb2e0'; c.textAlign = 'left'; c.fillText(`Jugada ${S.full} · 50 jugadas: ${Math.floor(S.half / 2)}`, PAN.x + 20, top + 70); }
     }
-    if (!PORT) { c.textAlign = 'left'; c.font = FONT(700, 14); c.fillStyle = '#bdb2e0'; c.fillText(`Nivel de la CPU: ${Math.round(lvl) + 1}/5`, PAN.x + 20, PAN.y + 210); }
+    if (!PORT) { c.textAlign = 'left'; c.font = FONT(700, 14); c.fillStyle = '#bdb2e0'; c.fillText(`Nivel de la CPU: ${Math.round(k.clamp(lvl + k.D.cpu, 0, 4)) + 1}/5`, PAN.x + 20, PAN.y + 210); }
   }
 
   /* ---------------------------------------------- Damas chinas ---------------------------------------------- */
@@ -659,7 +659,7 @@ else (function () {
     if (DS.anim) return;
     if (!isHum(p)) {
       if (!think) think = 0.4 + Math.random() * 0.3;
-      if ((think -= dt) <= 0) { think = 0; const m = DCH.aiPick(S, p, Math.min(3, lvl), Math.random); if (m) dPlay(m); }
+      if ((think -= dt) <= 0) { think = 0; const m = DCH.aiPick(S, p, k.clamp(lvl + k.D.cpu, 0, 3), Math.random); /* dificultad: k.D.cpu al nivel de la CPU */ if (m) dPlay(m); }
       return;
     }
     think = 0;

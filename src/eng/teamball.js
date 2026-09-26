@@ -11,12 +11,14 @@
  * Cenitales: en vertical el campo se gira (ataca hacia arriba) y en horizontal va apaisado; la física es la misma.
  * Plazas: equipo 0 = J1 y J3, equipo 1 = J2 y J4 (en 1v1: J1 contra J2). CPU mejora con victorias (localStorage cpu:<id>). */
 const MODE = CFG.mode || 'futbol', SIDE = MODE === 'voley' || MODE === 'cabezon', OUT = ART.OUT, TAU = 6.2832;
-const TS = MODE === 'prisionero' || MODE === 'sala' || MODE === 'balonmano' ? 3 : MODE === 'cabezon' ? 1 : 2, DUR = CFG.time || 120;
+const TS = MODE === 'prisionero' || MODE === 'sala' || MODE === 'balonmano' ? 3 : MODE === 'cabezon' ? 1 : 2, DUR0 = CFG.time || 120;
 const TIMED = MODE !== 'voley' && MODE !== 'canasta' && MODE !== 'futbolin'; // los demás van por puntos
 const VERT = !SIDE && innerHeight > innerWidth * 1.08;
 const FW = 600, FH = 340, HUD = 56;
 const W = SIDE ? 640 : VERT ? FH + 40 : FW + 40, H = SIDE ? 400 : VERT ? FW + HUD + 24 : FH + HUD + 20, OX = 20, OY = HUD + (VERT ? 4 : 0);
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#16122a' }), c = k.ctx;
+/* Dificultad seleccionable: en normal DUR = DUR0 y DC = 0 → partido y CPU idénticos a siempre. */
+const DUR = Math.round(DUR0 * k.D.time), DC = k.D.cpu;
 /* ---------- PZ · Ley de la pieza única + cartoon de estudio (docs/REMASTER.md §8) ----------
    Un objeto que el jugador lee como UNA cosa se traza entero, se contornea UNA vez y se rellena
    UNA vez: `PZ.unite()` contornea todas las partes primero y las rellena después, así cualquier
@@ -260,7 +262,7 @@ function keepIn(b) { // jugadores dentro del campo (y de su zona en balón prisi
 
 /* ---------------- Arranque de partido / saques ---------------- */
 function reset() {
-  skill = clamp(0.2 + lsGet(CPUK, 0) * 0.04, 0.2, 0.85); // 1.23: más fácil (subida 0.08→0.04 por victoria, tope 0.92→0.85)
+  skill = clamp(clamp(0.2 + lsGet(CPUK, 0) * 0.04, 0.2, 0.85) + DC * 0.09, 0.08, 0.95); // 1.23: más fácil (subida 0.08→0.04 por victoria, tope 0.92→0.85)
   mkBodies(); score = [0, 0]; clock = DUR; golden = false; msg = ''; msgT = 0; rounds = [0, 0]; roundNo = 1; lastTouch = null;
   serveTeam = 0; serveIdx = [0, 0]; touches = [0, 0];
   kickTeam = Math.random() < 0.5 ? 0 : 1; kickoff(); cdPend = true;
@@ -555,7 +557,7 @@ function stepDodge(dt) {
   for (let tm = 0; tm < 2; tm++) if (!B.some((b) => b.team === tm && inField(b))) { roundEnd(1 - tm); return; }
 }
 function roundEnd(tm) {
-  score[tm]++; phase = 'goal'; phT = 2; golden = false; clock = CFG.round || 60; roundNo++;
+  score[tm]++; phase = 'goal'; phT = 2; golden = false; clock = Math.round((CFG.round || 60) * k.D.time); roundNo++;
   msg = `¡Ronda para los ${TEAM[tm].name}!`; msgT = 2; k.sfx('win'); k.confetti(TEAM[tm].col, 90); k.flash('rgba(255,255,255,.3)');
 }
 
@@ -916,7 +918,7 @@ k.run((dt) => {
       else return finish();
     }
   }
-  if (golden && phase === 'play' && (goldT += dt) > 60) { if (MODE !== 'prisionero') return finish(); golden = false; clock = CFG.round || 60; msg = 'Ronda nula'; msgT = 2; kickoff(); return; } // la prórroga no es eterna: a los 60 s, empate
+  if (golden && phase === 'play' && (goldT += dt) > 60) { if (MODE !== 'prisionero') return finish(); golden = false; clock = Math.round((CFG.round || 60) * k.D.time); msg = 'Ronda nula'; msgT = 2; kickoff(); return; } // la prórroga no es eterna: a los 60 s, empate
   glow = glow.filter((g) => (g.t -= dt) > 0);
   if (MODE === 'futbol' || MODE === 'hockey' || MODE === 'sala' || MODE === 'balonmano') stepField(dt);
   else if (MODE === 'canasta') stepHoop(dt);

@@ -57,6 +57,8 @@ const fmtT = (s) => (s == null ? 'No acaba' : s.toFixed(2).replace('.', ',') + '
 
 /* ---------------- Jugadores y CPU ---------------- */
 const LSK = 'cpu:' + ID; let LV = 0; try { LV = clamp(+localStorage.getItem(LSK) || 0, 0, 10); } catch (e) { /* sin almacenamiento */ }
+/* Dificultad seleccionable: LVD() = LV en normal → la CPU corre exactamente igual que siempre (lo guardado no se toca). */
+const LVD = () => clamp(LV + k.D.cpu * 2, -2, 12);
 const CNAME = ['roja', 'azul', 'amarilla', 'verde'];
 let seats = [], PL = [], t = 0, msg = '', msgT = 0, msgC = '#fff';
 function nPl() { if (!k.party) return 2; return Math.max(2, ...k.party.map((q) => q.p + 1)); }
@@ -99,9 +101,9 @@ function runTick(r, dt) {
 function cpuRun(r, dt) {
   if (!r.cpu) r.cpu = { at: 1 + gauss() * cpuSig() };
   if (r.air) return;
-  if (r.ph >= r.cpu.at) { if (Math.random() < 0.035 - LV * 0.002) stride(r, r.foot === 'L' ? 'R' : 'L'); else stride(r, r.foot); r.cpu.at = clamp(1 + gauss() * cpuSig(), 0.5, 1.45); }
+  if (r.ph >= r.cpu.at) { if (Math.random() < 0.035 - LVD() * 0.002) stride(r, r.foot === 'L' ? 'R' : 'L'); else stride(r, r.foot); r.cpu.at = clamp(1 + gauss() * cpuSig(), 0.5, 1.45); }
 }
-const cpuSig = () => 0.26 - LV * 0.013; /* 1.23: CPU base floja */
+const cpuSig = () => 0.26 - LVD() * 0.013; /* 1.23: CPU base floja */
 
 /* ---------------- Pruebas ---------------- */
 const EV = [
@@ -118,7 +120,7 @@ function startEvent() { phase = 'card'; phT = 3.2; res = PL.map(() => null); tri
 function setupRace() { R = PL.map((q, i) => mkRunner(i)); hurd = PL.map(() => HX.map((x) => ({ x, down: 0 }))); raceT = 0; gunT = k.rnd(1.1, 2.1); camX = -6; }
 function raceUpdate(dt) {
   if (phase === 'marks') { phT -= dt; if (phT <= 0) { phase = 'set'; phT = gunT; k.sfx('tick'); } }
-  else if (phase === 'set') { phT -= dt; if (phT <= 0) { phase = 'run'; raceT = 0; k.sfx('shoot'); k.flash('rgba(255,255,255,.4)'); k.shake(3); R.forEach((r) => { if (isCpu(r.i)) r.cpu = { at: 1, react: k.rnd(0.14, 0.3) - LV * 0.006 }; }); } }
+  else if (phase === 'set') { phT -= dt; if (phT <= 0) { phase = 'run'; raceT = 0; k.sfx('shoot'); k.flash('rgba(255,255,255,.4)'); k.shake(3); R.forEach((r) => { if (isCpu(r.i)) r.cpu = { at: 1, react: k.rnd(0.14, 0.3) - LVD() * 0.006 }; }); } }
   const running = phase === 'run' || phase === 'end';
   if (running) raceT += dt;
   for (const r of R) {
@@ -126,7 +128,7 @@ function raceUpdate(dt) {
     if (!running) { if (phase === 'set' && I && (I.L || I.R) && !r.fs) { r.fs = 0.3; say(`Salida nula de ${nm(r.i)}: +0,3 s`, '#ff9a9a', 1.4); k.sfx('hurt'); } continue; }
     if (!r.go) { const can = raceT >= r.fs + (cpu ? (r.cpu && r.cpu.react) || 0.2 : 0); if (!can) continue; if (cpu || I.L || I.R) { r.go = true; r.v = 1.6; r.ph = 0.5; if (!cpu && I.R) r.foot = 'L'; } else continue; }
     if (r.fin == null || r.x < 106) {
-      if (cpu) { cpuRun(r, dt); if (EV[ev].hurdles && !r.air) { const nx = hurd[r.i].find((h) => h.x > r.x && !h.down); if (nx) { if (!r.cpu.jd) r.cpu.jd = 0.5 * r.v * airT(r.v) + gauss() * (0.9 - LV * 0.05); if (nx.x - r.x <= r.cpu.jd) { jump(r); r.cpu.jd = 0; } } } }
+      if (cpu) { cpuRun(r, dt); if (EV[ev].hurdles && !r.air) { const nx = hurd[r.i].find((h) => h.x > r.x && !h.down); if (nx) { if (!r.cpu.jd) r.cpu.jd = 0.5 * r.v * airT(r.v) + gauss() * (0.9 - LVD() * 0.05); if (nx.x - r.x <= r.cpu.jd) { jump(r); r.cpu.jd = 0; } } } }
       else { if (I.L) stride(r, 'L'); if (I.R) stride(r, 'R'); if (EV[ev].hurdles && I.U) jump(r); }
     }
     const x0 = r.x; runTick(r, dt); if (r.fin != null) r.v = Math.max(0, r.v - 6 * dt);
@@ -162,7 +164,7 @@ function fieldUpdate(dt) {
   if (phase === 'ready') { phT -= dt; camX += (ath.x - 8 - camX) * Math.min(1, dt * 5); if (phT <= 0) { phase = 'runup'; phT = 0; ath.go = false; } return; }
   if (phase === 'runup') {
     const cpu = isCpu(ath.i), I = cpu ? null : inp(ath.i);
-    if (cpu) { if (!ath.cpu) { const sk = LV / 10, th = clamp(E.ideal + gauss() * (7 - sk * 4), 5, E.amax), xr = E.XB - Math.abs(gauss()) * (0.7 - sk * 0.4) - 0.1 + (Math.random() < 0.1 - sk * 0.06 ? 0.4 : 0); ath.cpu = { at: 1, th, xr }; ath.go = true; ath.v = 1.5; }
+    if (cpu) { if (!ath.cpu) { const sk = LVD() / 10, th = clamp(E.ideal + gauss() * (7 - sk * 4), 5, E.amax), xr = E.XB - Math.abs(gauss()) * (0.7 - sk * 0.4) - 0.1 + (Math.random() < 0.1 - sk * 0.06 ? 0.4 : 0); ath.cpu = { at: 1, th, xr }; ath.go = true; ath.v = 1.5; }
       cpuRun(ath, dt); const RATE = 55; if (!ath.hold && ath.x >= ath.cpu.xr - ath.v * (ath.cpu.th / RATE)) ath.hold = true; if (ath.hold) { ath.ang += RATE * dt; if (ath.ang >= ath.cpu.th) takeoff(); } }
     else { if (!ath.go && (I.L || I.R)) { ath.go = true; ath.v = 1.5; ath.ph = 0.5; if (I.R) ath.foot = 'L'; }
       if (ath.go) { if (I.L) stride(ath, 'L'); if (I.R) stride(ath, 'R'); }

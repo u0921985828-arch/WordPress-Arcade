@@ -125,6 +125,8 @@ const W = PORT ? 480 : 820, H = PORT ? 760 : 480, TOP = PORT ? 96 : 88;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: FARM ? '#16321f' : '#1b1430' }), c = k.ctx;
 const clamp = k.clamp, hyp = Math.hypot, lerp = (a, b, t) => a + (b - a) * clamp(t, 0, 1);
 const DAYS = 5, DAYLEN = FARM ? 40 : 45;
+/* dificultad: objetivo del día ×0,8 / 1 / 1,2, estrellas +1 en fácil, paciencia ×k.D.time y ritmo /k.D.rate */
+const GF = k.dif === 0 ? 0.8 : k.dif === 2 ? 1.2 : 1, REP0 = 3 + k.D.life;
 const GOAL = FARM ? [22, 60, 110, 175, 250] : [28, 78, 145, 230, 340]; /* dinero acumulado al final de cada día */
 
 /* ---------------------------------------------------------------- distribución de la escena */
@@ -166,11 +168,11 @@ let mesas, fogones, cola, colaT, comandas, hands; /* restaurante */
 const has = (id) => up.indexOf(id) >= 0;
 
 function reset() {
-  day = 1; money = 0; rep = 3; up = []; phase = 'day'; dayT = DAYLEN; over = 0; sel = 0; hint = ''; hintT = 0; banner = ''; bt = 0;
+  day = 1; money = 0; rep = REP0; up = []; phase = 'day'; dayT = DAYLEN; over = 0; sel = 0; hint = ''; hintT = 0; banner = ''; bt = 0;
   startDay();
 }
 function startDay() {
-  dayT = DAYLEN; goal = GOAL[day - 1]; phase = 'day'; banner = 'Día ' + day; bt = 1.6;
+  dayT = DAYLEN; goal = Math.round(GOAL[day - 1] * GF); phase = 'day'; banner = 'Día ' + day; bt = 1.6;
   if (FARM) {
     aguaMax = 3 + (has('reg') ? 2 : 0); agua = aguaMax; almacen = 0; precio = 4; precT = 6; plagaT = 12;
     plots = LAY.P.map((p, i) => ({ i, st: 0, g: 0, w: 0, bug: 0 }));
@@ -303,17 +305,17 @@ function farm(dt) {
   if (precT <= 0) { precT = k.rnd(5, 9); precio = k.ri(3, 7); }
   plagaT -= dt;
   if (plagaT <= 0) {
-    plagaT = (has('esp') ? 22 : 11) * lerp(1.6, 0.85, (day - 1) / 4) * k.rnd(0.8, 1.3);
+    plagaT = (has('esp') ? 22 : 11) * lerp(1.6, 0.85, (day - 1) / 4) * k.rnd(0.8, 1.3) / k.D.rate;
     const cand = plots.filter((p) => p.st === 1 && !p.bug);
     if (cand.length && dayT < DAYLEN - 6) { k.pick(cand).bug = 0.01; k.sfx('hurt'); }
   }
 }
 function resto(dt) {
-  const pac = (has('pac') ? 1.3 : 1) * lerp(1.25, 0.8, (day - 1) / 4);
+  const pac = (has('pac') ? 1.3 : 1) * lerp(1.25, 0.8, (day - 1) / 4) * k.D.time;
   colaT -= dt;
   if (colaT <= 0 && cola.length < 2 && dayT < DAYLEN - 3) {
     cola.push({ dish: k.ri(0, DISH.length - 1), st: 'cola', t: 0, pat: 1, pmax: 18 * pac });
-    colaT = lerp(7.5, 4.2, (day - 1) / 4) * k.rnd(0.85, 1.2); k.sfx('pop');
+    colaT = lerp(7.5, 4.2, (day - 1) / 4) * k.rnd(0.85, 1.2) / k.D.rate; k.sfx('pop');
   } else if (colaT <= 0) colaT = 2;
   for (let i = cola.length - 1; i >= 0; i--) {
     const cl = cola[i]; cl.pat -= dt / cl.pmax;
@@ -500,7 +502,7 @@ function draw() {
   label(money + ' €', 12, 50, 24, money >= goal ? '#a8cf3f' : '#ffc94d', 'left');
   label('objetivo ' + goal + ' €', 12, 74, 12, '#b8b0ff', 'left');
   bar(PORT ? 150 : 200, 16, PORT ? 180 : 300, 10, money / goal, money >= goal ? '#a8cf3f' : '#6e62f5');
-  for (let i = 0; i < 3; i++) ART.heart(c, W - 22 - i * 24, 26, 1.4, i < rep);
+  for (let i = 0; i < REP0; i++) ART.heart(c, W - 22 - i * 24, 26, 1.4, i < rep);
   label(Math.ceil(dayT) + ' s', W - 12, 54, 18, dayT < 10 ? '#ff6fb5' : '#d8d4f5', 'right');
   bar(W - 108, 72, 96, 7, dayT / DAYLEN, dayT < 10 ? '#ff6fb5' : '#6e62f5');
   if (FARM) label('mercado ' + Math.round(precio * (has('pre') ? 1.25 : 1)) + ' €', PORT ? 150 : 200, 46, 13, '#d8d4f5', 'left');

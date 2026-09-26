@@ -128,7 +128,9 @@ const LAND = innerWidth >= innerHeight * 0.98;
 const W = LAND ? 800 : 450, H = LAND ? 450 : 800;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: TF ? '#14233a' : '#1b1640' }), c = k.ctx;
 const FONT = (s, wt) => `${wt || 800} ${s}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
-const NQ = 10, TQ = TF ? 15 : 22, /* 1.23: más tiempo (antes 10/15 s) */ SEATS = 4;
+/* dificultad: las preguntas del mazo bajan un escalón en fácil y suben uno en difícil (1–3) */
+const DSH = (d) => k.clamp(d + (k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0), 1, 3);
+const NQ = 10, TQ = (TF ? 15 : 22) * k.D.time, /* 1.23: más tiempo (antes 10/15 s) · k.D.time: ×1,25 fácil, ×0,85 difícil */ SEATS = 4;
 const OPC = ['#ff6b6b', '#4fb3ff', '#ffc94a', '#6fd66f'], LET = ['A', 'B', 'C', 'D'];
 let CPU = 0; try { CPU = Math.min(8, +localStorage.getItem('cpu:' + CFG.id) || 0); } catch (e) { /* sin almacenamiento */ }
 
@@ -149,7 +151,7 @@ function seenGet() { try { return JSON.parse(localStorage.getItem(SEENK) || '[]'
 function seenAdd(ids) { try { const s = seenGet().concat(ids).slice(-420); localStorage.setItem(SEENK, JSON.stringify(s)); } catch (e) { /* sin almacenamiento */ } }
 /* Mazo de 10: arranque suave (dificultad 1), centro de dificultad 2 y final con 3; en quiz sin repetir categoría seguida. */
 function deck() {
-  const all = TF ? DATA.s : DATA.q, seen = new Set(seenGet()), plan = TF ? [1, 1, 1, 2, 2, 2, 2, 2, 3, 3] : [1, 1, 1, 2, 2, 2, 2, 3, 2, 3];
+  const all = TF ? DATA.s : DATA.q, seen = new Set(seenGet()), plan = (TF ? [1, 1, 1, 2, 2, 2, 2, 2, 3, 3] : [1, 1, 1, 2, 2, 2, 2, 3, 2, 3]).map(DSH);
   const out = [], used = new Set();
   plan.forEach((d, n) => {
     const prevC = out.length ? out[out.length - 1].c : null;
@@ -188,7 +190,7 @@ function onAsk() {
 /* Respuesta y tiempo de la CPU (también si alguien se va a mitad de pregunta y la CPU ocupa su sitio) */
 function cpuPlan(s, q, base) {
   if (base == null) base = TF ? [0, 0.66, 0.6, 0.55][q.d] : [0, 0.52, 0.38, 0.26][q.d];
-  const pc = Math.min(0.85, base + CPU * 0.015 + k.rnd(-0.05, 0.05));
+  const pc = Math.min(0.85, Math.max(0.05, base + CPU * 0.015 + k.D.cpu * 0.08 + k.rnd(-0.05, 0.05)));
   s.cpuPick = Math.random() < pc ? q.right : k.pick([...Array(q.n).keys()].filter((i) => i !== q.right));
   s.cpuT = Math.max(pt + 1, k.rnd(TF ? 1.8 : 3, TQ * (0.55 + Math.random() * 0.3)));
 }
@@ -473,8 +475,8 @@ function draw() {
  * ========================================================================================= */
 function NEWGAME() {
   const MAS = NM === 'mas', MAP = NM === 'mapa', BAN = NM === 'banderas', CAL = NM === 'calculo';
-  const NQ2 = MAP ? 8 : BAN ? 10 : 12, TQ2 = MAP ? 15 : CAL ? 11 : 13;
-  const PLAN = { 8: [1, 1, 2, 2, 2, 3, 3, 3], 10: [1, 1, 1, 2, 2, 2, 2, 3, 3, 3], 12: [1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3] }[NQ2];
+  const NQ2 = MAP ? 8 : BAN ? 10 : 12, TQ2 = (MAP ? 15 : CAL ? 11 : 13) * k.D.time;
+  const PLAN = { 8: [1, 1, 2, 2, 2, 3, 3, 3], 10: [1, 1, 1, 2, 2, 2, 2, 3, 3, 3], 12: [1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3] }[NQ2].map(DSH);
   const KX = Math.cos(0.6981); /* cos(40°): grados de longitud → anchura real */
   /* Atril propio: en apaisado se aparta de la esquina inferior izquierda, donde va el HUD de kit. */
   const LEC = LAND ? (i) => [92 + i * 172, 370, 166, 76] : L.lec;
@@ -825,7 +827,7 @@ function NEWGAME() {
       s.cpuT = k.rnd(3, TQ2 * 0.78);
       return;
     }
-    const pc = Math.min(0.85, base + CPU * 0.015 + k.rnd(-0.05, 0.05));
+    const pc = Math.min(0.85, Math.max(0.05, base + CPU * 0.015 + k.D.cpu * 0.08 + k.rnd(-0.05, 0.05)));
     s.cpuPick = Math.random() < pc ? q.right : k.pick([...Array(q.n).keys()].filter((i) => i !== q.right));
     s.cpuT = Math.max(pt + 1, k.rnd(MAS ? 2 : 2.6, TQ2 * (0.5 + Math.random() * 0.32)));
   }

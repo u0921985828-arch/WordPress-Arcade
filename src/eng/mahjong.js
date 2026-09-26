@@ -25,9 +25,10 @@ function assign(pos, types) {
 }
 function build() {
   tiles = null; let pos = layout().map(([x, y, z]) => ({ x, y, z })); if (pos.length % 2) pos.pop();
-  const nT = Math.min(NT, 9 + (level - 1) * 4); /* nivel 1: 9 símbolos (más parejas a la vista) → 27 en el nivel 6 */
+  /* Dificultad: símbolos distintos en el tablero, pistas y barajados. */
+  const nT = k.clamp(Math.min(NT, 9 + (level - 1) * 4) + (k.dif === 0 ? -3 : k.dif === 2 ? 3 : 0), 6, NT); /* nivel 1: 9 símbolos (más parejas a la vista) → 27 en el nivel 6 */
   tiles = assign(pos, [...Array(pos.length / 2).keys()].map((i) => i % nT)); if (!tiles || !tiles.length) return build();
-  sel = null; done = false; hints = level <= 2 ? 6 : 4; shuf = level <= 2 ? 4 : 3; t = 0; hint = null; combo = 0; comboT = 0; fly = []; dirty = true;
+  sel = null; done = false; hints = Math.max(1, (level <= 2 ? 6 : 4) + (k.dif === 0 ? 3 : k.dif === 2 ? -2 : 0)); shuf = Math.max(1, (level <= 2 ? 4 : 3) + (k.dif === 0 ? 2 : k.dif === 2 ? -1 : 0)); t = 0; hint = null; combo = 0; comboT = 0; fly = []; dirty = true;
 }
 function moves() { const fr = tiles.filter((q) => free(q, tiles)); for (let i = 0; i < fr.length; i++) for (let j = i + 1; j < fr.length; j++) if (fr[i].t === fr[j].t) return [fr[i], fr[j]]; return null; }
 /* Barajado que conserva la garantía: se reasignan los tipos restantes con colocación inversa */
@@ -51,6 +52,7 @@ function useHint() { if (hints > 0 && !hint) { hint = moves(); if (hint) { hints
 function nav(dir) { const fr = tiles.filter((q) => free(q, tiles)); if (!fr.length) return; if (!kbd || !cur || !tiles.includes(cur)) { kbd = true; cur = sel && tiles.includes(sel) ? sel : fr[0]; return; }
   const cx = sx(cur), cy = sy(cur); let best = null, bd = 1e9; for (const q of fr) { if (q === cur) continue; const dx = sx(q) - cx, dy = sy(q) - cy, al = dir === 'left' ? -dx : dir === 'right' ? dx : dir === 'up' ? -dy : dy, pe = dir === 'left' || dir === 'right' ? Math.abs(dy) : Math.abs(dx); if (al < 5) continue; const s = al + pe * 2; if (s < bd) { bd = s; best = q; } }
   if (best) { cur = best; k.sfx('click'); } }
+k.onDif = () => { if (k.st !== 'play') { level = 1; score = 0; build(); } };
 reset(); k.show(CFG.title, 'Toca dos fichas iguales que estén libres (sin nada encima y con un lado libre). Encadena parejas rápido para hacer combos. B o el botón = pista.');
 k.run((dt) => {
   for (const f of fly) f.a += dt * 3.2; fly = fly.filter((f) => { if (f.a >= 1 && !f.b) { f.b = 1; k.burst(f.mx + TW / 2, f.my + TH / 2, SUITC(f.q.t), 10, 130); } return f.a < 1.25; });

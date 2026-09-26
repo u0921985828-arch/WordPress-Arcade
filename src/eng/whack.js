@@ -120,7 +120,7 @@ function mouth8(g, x, y, w, m, col) {
 const OUT = ART.OUT, R2 = 6.2832;
 const k = Kit({ w: 360, h: 640, title: CFG.title, bg: '#3f9b4c' }), c = k.ctx;
 let N, cells, time, score, combo, spawnT, lvl, mallet, sel, kbd, tm, lvlT, boardCv, el;
-function reset() { N = 3; cells = Array(16).fill(null); time = 60; score = 0; combo = 0; spawnT = 1.2; lvl = 1; el = 0; mallet = null; sel = 4; kbd = false; tm = 0; lvlT = 0; boardCv = board(3); }
+function reset() { N = 3; cells = Array(16).fill(null); time = 60 * k.D.time; score = 0; combo = 0; spawnT = 1.2; lvl = 1; el = 0; mallet = null; sel = 4; kbd = false; tm = 0; lvlT = 0; boardCv = board(3); }
 const cellR = (i) => { const S = 300 / N; return [30 + (i % N) * S, 196 + Math.floor(i / N) * S * 1.18, S, S * 1.18]; };
 const holeC = (i) => { const [x, y, S] = cellR(i); return [x + S / 2, y + S * 0.78, S]; };
 
@@ -246,7 +246,7 @@ k.run((dt) => {
   if (score > 1500 && N === 3) { N = 4; cells = Array(16).fill(null); lvl = 2; lvlT = 1.6; sel = 5; boardCv = board(4); k.sfx('win'); k.confetti(); }
   /* dificultad (1.23: más fácil): d 0→1 en 82 s de juego (el oro no la rebaja); ritmo e intervalo suaves al principio, bombas desde los 5 s */
   el += dt; const d = Math.min(1, el / 82), e = d * d * (3 - 2 * d);
-  spawnT -= dt; if (spawnT <= 0) { spawnT = 1.0 - 0.7 * e; const free = [...Array(N * N).keys()].filter((i) => !cells[i]); if (free.length) { const i = k.pick(free); const bomb = el > 5 && Math.random() < 0.05 + 0.1 * e, gold = !bomb && Math.random() < 0.1; const life = (2.0 - 1.3 * e) * (gold ? 0.6 : 1); cells[i] = { life, max: life, bomb, gold, age: 0, hit: 0 }; } }
+  spawnT -= dt; if (spawnT <= 0) { spawnT = (1.0 - 0.7 * e) / k.D.rate; const free = [...Array(N * N).keys()].filter((i) => !cells[i]); if (free.length) { const i = k.pick(free); const bomb = el > 5 && Math.random() < 0.05 + 0.1 * e, gold = !bomb && Math.random() < 0.1; const life = (2.0 - 1.3 * e) * (gold ? 0.6 : 1) / k.D.spd; /* los topos se esconden antes en difícil */ cells[i] = { life, max: life, bomb, gold, age: 0, hit: 0 }; } }
   for (let i = 0; i < N * N; i++) { const q = cells[i]; if (!q) continue; q.age += dt; q.life -= dt; if (q.life <= 0) { if (!q.bomb && !q.hit) combo = 0; cells[i] = null; } }
   // teclado: cursor por la cuadrícula
   const mv = (dx, dy) => { kbd = true; const x = k.clamp(sel % N + dx, 0, N - 1), y = k.clamp(Math.floor(sel / N) + dy, 0, N - 1); sel = y * N + x; };

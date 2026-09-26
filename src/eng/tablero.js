@@ -553,7 +553,7 @@ else (function () {
     }
     if (phase === 'rolling') { dice.t -= dt; dice.rot += dt * 18; if (Math.random() < 0.35) dice.spin = dice.spin.map(() => k.ri(1, 6)); if (dice.t <= 0) afterRoll(); return; }
     if (phase === 'pick') {
-      if (isCpu(p)) { timer -= dt; if (timer <= 0) play(TAB.aiPick(S, moves, lvl, Math.random)); return; }
+      if (isCpu(p)) { timer -= dt; if (timer <= 0) play(TAB.aiPick(S, moves, k.clamp(lvl + k.D.cpu, 0, 3), Math.random)); return; } /* dificultad: k.D.cpu al nivel de la CPU */
       const d = (k.phit(p, 'right') || k.phit(p, 'down') ? 1 : 0) - (k.phit(p, 'left') || k.phit(p, 'up') ? 1 : 0);
       if (d) { sel = (sel + d + moves.length) % moves.length; k.sfx('click'); }
       if (!k.party && p === 0 && k.ptr.hit) { touchPick(); return; }

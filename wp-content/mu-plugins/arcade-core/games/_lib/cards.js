@@ -9,7 +9,13 @@ const NC = M === 'spider' ? 10 : M === 'freecell' ? 8 : 7, GAP = (W - NC * CW) /
 const TOP = 58, TY = TOP + CH + 22, BOT = 632, BY = 640;
 const SPAWN = { klondike: [colX(0), TOP], spider: [colX(9), TOP], freecell: [W / 2 - CW / 2, H + 30], pyramid: [70, 468], tripeaks: [130, 400] }[M];
 function deck(n, suits) { const d = []; for (let i = 0; i < n; i++) for (const s of suits) for (let r = 1; r <= 13; r++) d.push({ r, s, up: false, id: uid++ }); return k.shuffle(d); }
+/* Dificultad: las REGLAS del solitario no se tocan (Spider 2 palos, Klondike robo 1, Pyramid 2 reciclados…);
+   cambian las ayudas: pista automática al quedarse parado y cuántos deshacer quedan. */
+const IDLEH = () => (k.dif === 0 ? 8 : k.dif === 2 ? 1e9 : 15);
+const HINTT = () => (k.dif === 0 ? 4 : 2.4);
+let undoLeft = Infinity;
 function build() {
+  undoLeft = k.dif === 2 ? 3 : Infinity;
   moves = 0; sel = null; done = false; hist = []; found = [[], [], [], []]; cells = [null, null, null, null]; waste = []; streak = 0; comp = []; disc = []; time = 0;
   auto = false; autoT = 0; drag = null; hintT = 0; hintR = null; casc = null; newAsk = 0; stuckT = 0; AP.clear(); spawnQ = 0.25;
   if (M === 'klondike') { const d = deck(1, [0, 1, 2, 3]); tab = []; for (let i = 0; i < 7; i++) { tab.push(d.splice(0, i + 1)); tab[i][i].up = true; } stock = d; recycles = 0; }
@@ -19,7 +25,7 @@ function build() {
   if (M === 'tripeaks') { const d = deck(1, [0, 1, 2, 3]); peaks = [d.splice(0, 3), d.splice(0, 6), d.splice(0, 9), d.splice(0, 10)]; peaks[3].forEach((cd) => (cd.up = true)); stock = d; waste = [stock.pop()]; waste[0].up = true; }
 }
 function snapshot() { hist.push(JSON.stringify({ tab, stock, waste, found, cells, pyr, peaks, removed, recycles, score, streak, comp, disc })); if (hist.length > 80) hist.shift(); hintR = null; }
-function undo() { if (!hist.length || auto) return; const s = JSON.parse(hist.pop()); ({ tab, stock, waste, found, cells, pyr, peaks, removed, recycles, score, streak, comp, disc } = s); moves++; sel = null; stuckT = 0; hintR = null; k.sfx('click'); }
+function undo() { if (!hist.length || auto || undoLeft <= 0) { if (hist.length && undoLeft <= 0) { k.float('Sin deshacer', W / 2, 600, '#ffe27a'); k.sfx('hurt'); } return; } undoLeft--; const s = JSON.parse(hist.pop()); ({ tab, stock, waste, found, cells, pyr, peaks, removed, recycles, score, streak, comp, disc } = s); moves++; sel = null; stuckT = 0; hintR = null; k.sfx('click'); }
 function flipTops() { if (tab) for (const col of tab) if (col.length && !col[col.length - 1].up) { col[col.length - 1].up = true; if (M === 'klondike') score += 5; } }
 const fits = (f, cd) => (!f.length && cd.r === 1) || (f.length > 0 && f[f.length - 1].s === cd.s && f[f.length - 1].r === cd.r - 1);
 function canFound(cd) { return found.findIndex((f) => fits(f, cd)); }
@@ -97,7 +103,7 @@ function findHint() {
   if ((M === 'klondike' && (stock.length || waste.length)) || (M === 'spider' && stock.length)) return [slotR(SL.stock)];
   return null;
 }
-function showHint() { const h = findHint(); if (!h || !h[0]) { k.float(M === 'freecell' && cells.includes(null) ? 'Prueba a pasar una carta a una celda' : 'Sin movimientos útiles', W / 2, 600, '#ffe27a'); k.sfx('hurt'); return; } hintR = h.filter(Boolean); hintT = 2.4; k.sfx('click'); }
+function showHint() { const h = findHint(); if (!h || !h[0]) { k.float(M === 'freecell' && cells.includes(null) ? 'Prueba a pasar una carta a una celda' : 'Sin movimientos útiles', W / 2, 600, '#ffe27a'); k.sfx('hurt'); return; } hintR = h.filter(Boolean); hintT = HINTT(); k.sfx('click'); }
 
 /* ---------- Acciones de toque ---------- */
 function act(h) {
@@ -576,7 +582,7 @@ function draw() {
   if (M === 'tripeaks') { label(`${stock.length}`, 130 + CW / 2, 400 + CH + 6, 13, '#cfe9d8', 'center'); label('Una arriba o abajo · K y A enlazan', W / 2, 598, 13, '#fff', 'center');
     if (streak > 1) { const s = 1 + 0.08 * Math.sin(now / 90); c.save(); c.translate(W / 2, 520); c.scale(s, s); label(`Racha x${streak}`, 0, -12, 24, streak > 4 ? '#ffb0e0' : '#ffe27a', 'center'); c.restore(); } }
   if (auto) label('Autocompletando…', W / 2, BY - 26, 14, '#ffe27a', 'center');
-  const H3 = hs.slice(-3); btn(16, 120, newAsk > 0 ? '¿Seguro?' : 'Nueva', 'new', true, H3[0]); btn(180, 120, 'Deshacer', 'undo', hist.length > 0, H3[1]); btn(344, 120, 'Pista', 'hint', true, H3[2]);
+  const H3 = hs.slice(-3); btn(16, 120, newAsk > 0 ? '¿Seguro?' : 'Nueva', 'new', true, H3[0]); btn(180, 120, 'Deshacer', 'undo', hist.length > 0 && undoLeft > 0, H3[1]); btn(344, 120, 'Pista', 'hint', true, H3[2]);
 }
 /* ---------- Cascada de celebración ---------- */
 function startCascade() {
@@ -593,6 +599,7 @@ function stepCascade(dt) {
   C.fl = C.fl.filter((f) => f.x > -CW - 10 && f.x < W + 10); if ((!C.q.length && !C.fl.length) || C.t > 7) C.end = true;
 }
 
+k.onDif = () => { if (k.st !== 'play') reset(); };
 reset(); k.show(CFG.title, CFG.help);
 k.run((dt) => {
   if (!k.gate(reset)) return;
@@ -601,7 +608,7 @@ k.run((dt) => {
   if (stuckT > 0 && (stuckT -= dt) <= 0) { k.lose(CFG.id, score, 'Sin movimientos', `${moves} movimiento${moves === 1 ? "" : "s"}`); return; }
   if (auto) { autoT -= dt; if (autoT <= 0) { autoT = 0.09; if (!autoStep()) auto = false; } return; }
   /* 1.23: más fácil — pista automática tras 15 s sin tocar */
-  if (k.ptr.down || k.held.size) idleH = 0; else if ((idleH += dt) > 15 && !hintR && !stuckT) { idleH = -30; const h = findHint(); if (h && h[0]) { hintR = h.filter(Boolean); hintT = 2.4; } }
+  if (k.ptr.down || k.held.size) idleH = 0; else if ((idleH += dt) > IDLEH() && !hintR && !stuckT) { idleH = -30; const h = findHint(); if (h && h[0]) { hintR = h.filter(Boolean); hintT = HINTT(); } }
   for (const d of ['left', 'right', 'up', 'down']) if (k.hit.has(d)) nav(d);
   if (k.hit.has('a')) { if (kbd) act(curH()); else nav('right'); }
   if (k.hit.has('b')) undo();

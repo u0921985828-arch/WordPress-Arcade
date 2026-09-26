@@ -183,9 +183,10 @@ function buildLevel() {
   // las verduras que falten se quedan a la vista, en el suelo entre torres (nivel 1 muy fácil)
   let g = 0;
   while (vegQueue > 0) { addVeg(clamp(360 + g * 78 + (g % 2 ? 26 : 0), 330, W - 40), GY - 16, VEG[(vegs.length + level) % VEG.length]); vegQueue--; g++; }
-  const need = 3 + Math.min(3, Math.floor(level / 3)) + (nv > 3 ? 1 : 0);
+  /* Dificultad: una fruta de más en fácil y una menos en difícil (el resolutor revalida el nivel con esa munición). */
+  const need = Math.max(2, 3 + Math.min(3, Math.floor(level / 3)) + (nv > 3 ? 1 : 0) + (k.dif === 0 ? 1 : k.dif === 2 ? -1 : 0));
   ammo = []; for (let i = 0; i < need; i++) ammo.push(FRUIT[level < 2 ? 1 : (i + level) % (level < 4 ? 2 : FRUIT.length)]);
-  aim = 0.62; hintT = level === 1 ? 4 : 0;
+  aim = 0.62; hintT = k.dif === 0 ? 4 : k.dif === 2 ? 0 : (level === 1 ? 4 : 0);
   return lv;
 }
 /* ---- simulación del generador: ¿se puede terminar el nivel? ---- */
@@ -285,7 +286,8 @@ function updFrutas(dt) {
 const DUCKY = [GY - 208, GY - 164, GY - 120], TIME = 60;
 let P = [], ducks = [], stars = [], time = 0, phase = 'play', overT2 = 0, rebuildT = 0, cd = 0, CPUW = 0;
 try { CPUW = Math.min(8, +localStorage.getItem('cpu:' + CFG.id) || 0); } catch (e) { /* sin almacenamiento */ }
-const skill = () => Math.min(0.78, 0.2 + CPUW * 0.055 + (TIME - time) / TIME * 0.12);
+/* Dificultad: k.D.cpu se suma al nivel guardado de la CPU, sin tocar lo almacenado. */
+const skill = () => Math.min(0.78, 0.2 + Math.max(0, CPUW + k.D.cpu) * 0.055 + (TIME - time) / TIME * 0.12);
 function nSeats() { return k.party ? Math.max(1, Math.max.apply(null, k.party.map((x) => x.p)) + 1) : Math.min(2, k.mpMax); }
 function mkPlayers() { P = k.players(nSeats()).map((q, i) => ({ i, p: q.p, col: q.color, name: q.name, cpu: q.cpu, sc: 0, ammo: 6, rl: 0, cool: 0, x: 180 + i * 140, y: GY - 150, tx: 0, ty: 0, think: 0, kick: 0 })); }
 function syncPlayers() { const pl = k.players(P.length); P.forEach((x, i) => { x.cpu = pl[i].cpu; x.name = pl[i].name; x.col = pl[i].color; }); }
@@ -372,6 +374,7 @@ function pickTarget(pl) {
 
 /* ================= Bucle ================= */
 function reset() { t = 0; PR = []; shakeQ = 0; if (M === 'caseta') resetCaseta(); else resetFrutas(); }
+k.onDif = () => { if (k.st !== 'play' && M !== 'caseta') reset(); };
 reset(); k.show(CFG.title, CFG.help);
 k.onParty = () => { if (M !== 'caseta') return; if (k.st !== 'play' || !P.length) reset(); else syncPlayers(); };
 k.run((dt) => {

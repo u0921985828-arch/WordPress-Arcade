@@ -44,6 +44,8 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
   const PAL = ['#ff6fb5', '#5b8cff', '#a8cf3f', '#ffc94d', '#a097ff', '#5ce1e6'];
   const MAXP = Math.max(2, Math.min(4, (Array.isArray(CFG.mp) && CFG.mp[1]) || 4));
   let LVL = 0; try { LVL = Math.min(3, Math.floor(+localStorage.getItem('cpu:' + CFG.id) || 0)); } catch (e) { /* sin almacenamiento */ }
+  /* Dificultad: k.D.cpu se suma al nivel guardado de la CPU al leerlo (lo almacenado no se toca). */
+  const AIL = () => k.clamp(LVL + k.D.cpu, 0, 3);
 
   /* ---------------- utilidades de dibujo ---------------- */
   function fo(fill, lw) { c.fillStyle = fill; c.fill(); c.lineWidth = lw || 2; c.strokeStyle = OUT; c.stroke(); }
@@ -193,18 +195,18 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       const est = (f) => mine.filter((v) => v === f).length + others / 6;
       if (b) {
         const e = est(b.f), margin = b.q - e;
-        const tol = [1.6, 1.25, 0.95, 0.75][Math.min(3, LVL)];
+        const tol = [1.6, 1.25, 0.95, 0.75][AIL()];
         if (margin > tol + Math.random() * 0.7) return { t: 'dudo' };
       }
       let best = null;
       for (let f = 1; f <= 6; f++) {
         const q = FAR.minQ(b, f); if (q > tot) continue;
         const e = est(f), risk = q - e;
-        const sc = -risk + (mine.filter((v) => v === f).length) * 0.35 + (Math.random() - 0.5) * (1.1 - LVL * 0.2);
+        const sc = -risk + (mine.filter((v) => v === f).length) * 0.35 + (Math.random() - 0.5) * (1.1 - AIL() * 0.2);
         if (!best || sc > best.sc) best = { q, f, sc };
       }
       if (!best) return { t: 'dudo' };
-      if (b && best.sc < -1.4 && Math.random() < 0.55 + LVL * 0.1) return { t: 'dudo' };
+      if (b && best.sc < -1.4 && Math.random() < 0.55 + AIL() * 0.1) return { t: 'dudo' };
       return { t: 'bid', q: best.q, f: best.f };
     },
     update(dt) {
@@ -347,7 +349,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
     /* IA: empieza confiada y va copiando lo que le hacen (toma y daca); en la última ronda roba más. */
     ai(p) {
       const rob = S.hist.filter((h) => h.some((v, q) => q !== p && v === 'robar')).length;
-      let pr = 0.16 + rob * 0.13 + (S.round >= S.rounds ? 0.3 : 0) + LVL * 0.05;
+      let pr = 0.16 + rob * 0.13 + (S.round >= S.rounds ? 0.3 : 0) + AIL() * 0.05;
       if (S.round === 1) pr = Math.min(pr, 0.12);
       return Math.random() < Math.min(0.82, pr) ? 'robar' : 'compartir';
     },
@@ -474,7 +476,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       const rows = S.rows[p], pool = [0, 1, 2, 3, 4, 5].slice(0, S.nc);
       const ok = (g) => rows.every((r) => FAR.same(FAR.clue(r.g, g), { ok: r.ok, col: r.col }));
       const rnd = () => Array.from({ length: 4 }, () => pool[k.ri(0, S.nc - 1)]);
-      if (Math.random() > 0.35 + LVL * 0.18 && rows.length) return rnd();
+      if (Math.random() > 0.35 + AIL() * 0.18 && rows.length) return rnd();
       for (let i = 0; i < 400; i++) { const g = rnd(); if (ok(g)) return g; }
       return rnd();
     },
@@ -490,7 +492,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       }
       for (let p = 0; p < S.n; p++) {
         if (hum(p) || S.done[p]) continue;
-        if ((S.think[p] -= dt) <= 0) { S.think[p] = 3.4 + Math.random() * 2.8 - LVL * 0.4; S.guess[p] = this.aiGuess(p); this.submit(p); }
+        if ((S.think[p] -= dt) <= 0) { S.think[p] = 3.4 + Math.random() * 2.8 - AIL() * 0.4; S.guess[p] = this.aiGuess(p); this.submit(p); }
       }
       for (let p = 0; p < S.n; p++) {
         if (!hum(p) || S.done[p] || S.phase !== 'play') continue;

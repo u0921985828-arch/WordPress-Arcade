@@ -465,7 +465,7 @@ else (function () {
     sub = S.chain.length ? `Puntas: ${S.ends[0]} y ${S.ends[1]}` : 'Mesa vacía: abre quien tiene el doble seis';
     if (!isHum(p)) {
       if (!think) think = 0.6 + Math.random() * 0.4;
-      if ((think -= dt) <= 0) { think = 0; const m = DOM.aiPick(S, p, lvl, Math.random); if (m) doPlay(p, m.id, m.side); else doPass(p); }
+      if ((think -= dt) <= 0) { think = 0; const m = DOM.aiPick(S, p, k.clamp(lvl + k.D.cpu, 0, 3), Math.random); /* dificultad: k.D.cpu al nivel de la CPU */ if (m) doPlay(p, m.id, m.side); else doPass(p); }
       return;
     }
     think = 0;

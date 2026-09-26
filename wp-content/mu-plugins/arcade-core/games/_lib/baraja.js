@@ -780,7 +780,8 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
   const CW = PORT ? 78 : 82, CH = Math.round(CW * 1.55), TW = PORT ? 66 : 66, SW = PORT ? 40 : 44, RW = PORT ? 50 : 54;
   const FONT = 'ui-rounded,"Trebuchet MS",system-ui,sans-serif';
   const LVKEY = 'cpu:' + CFG.id;
-  const lvlGet = () => { try { return Math.min(3, Math.floor(+localStorage.getItem(LVKEY) || 0)); } catch (e) { return 0; } };
+  /* Dificultad: k.D.cpu se suma al nivel guardado de la CPU al leerlo (lo almacenado no se toca). */
+  const lvlGet = () => { let v = 0; try { v = Math.min(3, Math.floor(+localStorage.getItem(LVKEY) || 0)); } catch (e) { v = 0; } return k.clamp(v + k.D.cpu, 0, 4); };
 
   /* ------------------------------------------------ Dibujo de cartas (espacio 100 × 155) */
   function fo(g, fill, lw) { g.fillStyle = fill; g.fill(); g.lineWidth = lw || 1.7; g.strokeStyle = OUT; g.stroke(); }

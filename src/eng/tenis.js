@@ -54,6 +54,7 @@ function bone(pts, ws) {
 }
 const lite = ART.lite, dark = ART.dark, clamp = k.clamp, hyp = Math.hypot;
 const CPUK = 'cpu:' + CFG.id;
+const DC = k.D.cpu; // dificultad seleccionable: 0 en normal → la CPU juega igual que siempre (el nivel guardado no se toca)
 const lsGet = (key, d) => { try { const v = localStorage.getItem(key); return v == null ? d : +v; } catch (e) { return d; } };
 const lsSet = (key, v) => { try { localStorage.setItem(key, v); } catch (e) { /* sin almacenamiento */ } };
 /* mundo (x lateral, y a lo largo; y>0 = campo del equipo 0) → pantalla */
@@ -91,7 +92,7 @@ function mkPlayers() {
 function refreshCtl() { for (const pl of P) pl.ctl = k.human(pl.slot) ? pl.slot : -1; }
 function reset() {
   DBL = PADEL || !!CFG.dbl || !!(k.party && k.party.length >= 3); HW = DBL ? HWD : HWS;
-  skill = clamp(0.25 + lsGet(CPUK, 0) * 0.05, 0.25, 0.8); played = 0; rally = 0; firstPt = true;
+  skill = clamp(clamp(0.25 + lsGet(CPUK, 0) * 0.05, 0.25, 0.8) + DC * 0.07, 0.12, 0.92); played = 0; rally = 0; firstPt = true;
   mkPlayers();
   sc = { pts: [0, 0], games: [0, 0], sets: [0, 0], hist: [], tb: false, tbT0: 0, srvTeam: k.party ? (Math.random() < 0.5 ? 0 : 1) : 0, srvIdx: [0, 0] };
   marks = []; flashes = []; msgT = 0; cdPend = !!k.party;
@@ -248,7 +249,7 @@ function onEvent(type, info) {
 function hittable(pl) {
   return phase === 'play' && ball.last !== pl.team && ball.y * sg(pl.team) > 0 && !(ball.serve && ball.bounces === 0) && ball.bounces <= 1 && ball.z < 2.7 && hyp(ball.x - pl.x, ball.y - pl.y) < REACH;
 }
-function lvl() { const lead = humanTeam() >= 0 ? sc.games[1 - humanTeam()] - sc.games[humanTeam()] : 0; return clamp(skill + Math.min(0.12, played * 0.02) - (lead >= 2 ? 0.12 : 0), 0.15, 0.92); }
+function lvl() { const lead = humanTeam() >= 0 ? sc.games[1 - humanTeam()] - sc.games[humanTeam()] : 0; return clamp(clamp(skill + Math.min(0.12, played * 0.02) - (lead >= 2 ? 0.12 : 0), 0.15, 0.92) + DC * 0.09, 0.08, 0.98); }
 function humanShot(pl, q, type) {
   const s = sg(pl.team), dq = q - 0.5, perf = Math.abs(dq) < 0.17, err = Math.max(0, Math.abs(dq) - 0.17) / 0.33, j = wdir(pl.ctl), fx = Math.sign(pl.x) || 1;
   let tx, ty = -s * L * (0.7 + k.rnd(-0.08, 0.08)), v, spin, lob = 0, word = null, wc = '#fff';

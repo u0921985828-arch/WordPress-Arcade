@@ -56,6 +56,8 @@ const hr = (a, b) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5; retu
 
 /* ---------------- Jugadores, turnos y CPU ---------------- */
 const LSK = 'cpu:' + ID; let LV = 0; try { LV = clamp(+localStorage.getItem(LSK) || 0, 0, 10); } catch (e) { /* sin almacenamiento */ }
+/* Dificultad seleccionable: en normal LVD() = LV y k.D.spd = 1 → todo queda igual que siempre. */
+const LVD = () => clamp(LV + k.D.cpu * 2, -2, 12);
 const CNAME = ['roja', 'azul', 'amarilla', 'verde'];
 let seats = [], PL = [], cur = 0, st = 'intro', stT = 0, t = 0, msg = '', msgT = 0, msgC = '#fff';
 function nPl() { if (!k.party) return 2; return Math.max(2, ...k.party.map((q) => q.p + 1)); }
@@ -177,7 +179,7 @@ function simStop(a, g, s) {
   return [x, y];
 }
 function cpuPlan() {
-  const j = jack(), d = bestD(), h = holder(), sk = LV / 10; let best = null;
+  const j = jack(), d = bestD(), h = holder(), sk = LVD() / 10; let best = null;
   // ¿tirar contra la bola rival que tiene el punto?
   if (h >= 0 && h !== cur && d[h] < 28 && Math.random() < 0.15 + sk * 0.4 && left[cur] > 0) {
     const tb = balls.filter((b) => b.p === h).sort((p, q) => Math.hypot(p.x - j.x, p.y - j.y) - Math.hypot(q.x - j.x, q.y - j.y))[0], D = Math.hypot(tb.x - CX, tb.y - CY);
@@ -266,13 +268,13 @@ let rnd = 0, arrowN = 0, sx = 0, sy = 0, drift = { x: 0, y: 0, vx: 0, vy: 0 }, d
 const R = () => RAD[DIST[rnd]];
 function arcReset() { seats = k.players(nPl()); PL = seats.map((q, i) => ({ i })); score = PL.map(() => 0); xs = PL.map(() => 0); ends = PL.map(() => [[], [], []]); rnd = 0; cur = 0; startTurn(); }
 function startTurn() { arrowN = 0; arrows = []; st = 'intro'; stT = 1.2; newArrow(); }
-function newArrow() { sx = k.rnd(-0.6, 0.6) * R(); sy = k.rnd(0.5, 0.9) * R(); drift = { x: 0, y: 0, vx: k.rnd(-1, 1), vy: k.rnd(-1, 1) }; draw = 0; drawT = 0; breathT = k.rnd(0, 4); lung = 1; holdB = false; tired = 0; wind = k.rnd(-1, 1) * WMAX[DIST[rnd]] * (0.35 + 0.65 * Math.random()); windT = 0; cpuA = null; ptrLast = null; }
+function newArrow() { sx = k.rnd(-0.6, 0.6) * R(); sy = k.rnd(0.5, 0.9) * R(); drift = { x: 0, y: 0, vx: k.rnd(-1, 1), vy: k.rnd(-1, 1) }; draw = 0; drawT = 0; breathT = k.rnd(0, 4); lung = 1; holdB = false; tired = 0; wind = k.rnd(-1, 1) * WMAX[DIST[rnd]] * (0.35 + 0.65 * Math.random()) * k.D.spd; windT = 0; cpuA = null; ptrLast = null; }
 const windNow = () => wind * (1 + 0.18 * Math.sin(windT * 1.7) + 0.08 * Math.sin(windT * 4.3));
 const driftOf = (w) => w * Math.pow(DIST[rnd] / 70, 1.5) * 0.19 * R();
 /* oscilación de la mira: respiración (4 s; calma tras espirar), aguantar con B (2,5 s), cansancio si tensas mucho rato */
 function sway() {
   const ph = (breathT % 4) / 4, br = holdB ? (lung > 0 ? 0.12 : 1.7) : 0.18 + 0.82 * Math.pow(Math.sin(ph * Math.PI), 2);
-  const amp = (4 + DIST[rnd] * 0.06) * (br + tired * 1.2) * (R() / 84);
+  const amp = (4 + DIST[rnd] * 0.06) * (br + tired * 1.2) * (R() / 84) * k.D.spd; // la respiración oscila menos en fácil
   return [Math.sin(t * 1.9) * amp + Math.sin(t * 4.7) * amp * 0.35 + drift.x, Math.cos(t * 1.6) * amp * 0.8 + Math.sin(t * 3.9) * amp * 0.3 + drift.y, br];
 }
 function ringOf(d) { const r = d / R(); if (r > 1) return 0; return Math.max(1, 10 - Math.floor(r * 10)); }
@@ -311,7 +313,7 @@ function arcUpdate(dt) {
   else if (draw > 0) { if (draw > 0.25) shoot(); else draw = 0; }
 }
 function cpuArc(dt, spd) {
-  const sk = LV / 10;
+  const sk = LVD() / 10;
   if (!cpuA) cpuA = { t: 0, ex: gauss() * R() * (0.2 - sk * 0.12), ey: gauss() * R() * (0.18 - sk * 0.1), wait: k.rnd(0.2, 0.8), readW: 0.55 + sk * 0.4 + gauss() * 0.12 };
   cpuA.t += dt; const [wx, wy, br] = sway(), tx = -driftOf(windNow()) * cpuA.readW + cpuA.ex - (wx - drift.x) * 0, ty = cpuA.ey;
   const ax = tx - drift.x, ay = ty - drift.y, dx = ax - sx, dy = ay - sy, L = Math.hypot(dx, dy); if (L > 1) { const m = Math.min(L, spd * 0.8 * dt); sx += dx / L * m; sy += dy / L * m; }

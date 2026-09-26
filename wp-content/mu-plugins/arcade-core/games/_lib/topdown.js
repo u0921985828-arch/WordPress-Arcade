@@ -58,10 +58,12 @@ function place(minD, edge) {
 }
 /* Curva de dificultad: 0 en la sala 1 → 1 hacia la sala 9 (suavizada). Velocidad, cadencia y balas enemigas escalan con ella. */
 const ramp = () => { const d = Math.min(1, (room - 1) / 12); return d * d * (3 - 2 * d); };
-const spK = () => 0.56 + 0.29 * ramp(), cdK = () => (1.6 - 0.6 * ramp()) / 0.75, bK = () => 0.64 + 0.16 * ramp(); // 1.23: más fácil (vel. ×0,8/×0,85, cadencia −25 %, balas −20 %)
+/* Nivel de dificultad (k.D): velocidad de enemigos y balas ×spd, cadencia /rate, nivel de enemigos y jefe +cpu. */
+const spK = () => (0.56 + 0.29 * ramp()) * k.D.spd, cdK = () => (1.6 - 0.6 * ramp()) / 0.75 / k.D.rate, bK = () => (0.64 + 0.16 * ramp()) * k.D.spd; // 1.23: más fácil (vel. ×0,8/×0,85, cadencia −25 %, balas −20 %)
+const flvl = () => Math.max(1, room + k.D.cpu); /* enemigos y jefe un nivel arriba/abajo según dificultad */
 function pickType() { const f = TH.foes; if (ZQ && Math.random() < room * 0.02) return 'brute'; return k.pick(f); }
 function addFoe(type, x, y, boss) {
-  const b = FOE[type], sc = 1 + (room - 1) * 0.12;
+  const b = FOE[type], sc = 1 + (flvl() - 1) * 0.12;
   const f = { type, x, y, r: b[0] * (boss ? 2.1 : 1), hp: Math.round(b[1] * sc * (boss ? 8 : 1) * hpMul), sp: b[2] * (boss ? 0.7 : 1) * spK(), pts: b[3] * (boss ? 10 : 1), cd: k.rnd(0.9, 2) * cdK(), cd2: 1.5, a: 0, body: 0, kx: 0, ky: 0, fl: 0, ph: Math.random() * 6, boss, dash: 0, warn: 0, face: 1 };
   f.max = f.hp; foes.push(f); if (boss) bossF = f; return f;
 }
@@ -79,14 +81,14 @@ function buildRoom() {
   }
   quota = 0;
   if (isBoss) { queue(TH.boss, true); if (ZQ) quota = 6; }
-  else if (ZQ) { quota = 5 + room * 3; spawnT = 2.5; }
-  else { const n = tankM ? Math.min(4, 1 + Math.ceil((room - 1) / 2)) : M === 'arena' ? Math.min(8, 2 + Math.round((room - 1) * 0.8)) : Math.min(11, 3 + Math.round((room - 1) * 1.1)); for (let i = 0; i < n; i++) queue(pickType()); }
+  else if (ZQ) { quota = Math.max(1, Math.round((5 + room * 3) * k.D.rate)); spawnT = 2.5; }
+  else { const n0 = tankM ? Math.min(4, 1 + Math.ceil((room - 1) / 2)) : M === 'arena' ? Math.min(8, 2 + Math.round((room - 1) * 0.8)) : Math.min(11, 3 + Math.round((room - 1) * 1.1)), n = Math.max(1, Math.round(n0 * k.D.rate)); for (let i = 0; i < n; i++) queue(pickType()); }
   msg = `${TH.label} ${room}${isBoss ? ' · Jefe' : ''}`; msgT = 1.8;
 }
 function reset() {
   if (COOP) return coopReset();
   VS = BOUNCE ? k.players(4).map((q) => ({ pl: q.p, col: q.color, name: q.name, r: 11, wins: 0, kills: 0 })) : tankM && k.party && k.party.length >= 2 ? k.party.slice(0, 4).map((q) => ({ pl: q.p, col: k.pcol(q.p), name: 'J' + (q.p + 1), r: 11, wins: 0 })) : null;
-  p = { x: TH.door ? X0 + 40 : W / 2, y: H / 2, r: 11, hp: 6, max: 6, a: 0, aim: 0, inv: 0, kx: 0, ky: 0, mv: false, face: 1, body: 0, recoil: 0 };
+  p = { x: TH.door ? X0 + 40 : W / 2, y: H / 2, r: 11, hp: 6 + k.D.life, max: 6 + k.D.life, a: 0, aim: 0, inv: 0, kx: 0, ky: 0, mv: false, face: 1, body: 0, recoil: 0 };
   room = 0; score = 0; t = 0; cool = 0; swing = 0; kills = 0; choice = null; upg = { rate: 1, dmg: 1, speed: 1, multi: 1, pierce: 0, reach: 1 }; if (VS) vsRound(true); else buildRoom();
 }
 /* ---------- Modo tele (fiesta): 2–4 tanques humanos, todos contra todos; gana quien gane 3 rondas.
@@ -369,7 +371,7 @@ function lobbyUpdate(dt) {
 const nearFoe = (x, y) => { let n = null, nd = 1e9; for (const f of foes) { const d = Math.hypot(f.x - x, f.y - y); if (d < nd) { nd = d; n = f; } } return [n, nd]; };
 function heroHurt(h, n, sx, sy) {
   if (h.inv > 0 || h.down || h.roll > 0) return;
-  h.hp -= n; h.inv = 1.5; k.shake(5); k.sfx('hurt'); k.burst(h.x, h.y, h.col, 10, 150);
+  h.hp -= n; h.inv = 1.5 / k.D.dmg; k.shake(5); k.sfx('hurt'); k.burst(h.x, h.y, h.col, 10, 150);
   if (sx !== undefined) { const a = Math.atan2(h.y - sy, h.x - sx); h.kx = Math.cos(a) * 280; h.ky = Math.sin(a) * 280; }
   if (h.hp <= 0) { h.hp = 0; h.down = true; h.rev = 0; k.flash('rgba(255,60,80,.25)'); k.float(`¡${h.name} ha caído!`, h.x, Math.max(Y0 + 44, h.y - 30), h.col); }
 }
@@ -428,7 +430,7 @@ function coopUpdate(dt) {
   for (const w of walls) w.fl -= dt;
   for (const q of pend) { q.t -= dt; if (q.t <= 0) { q.done = 1; addFoe(q.type, q.x, q.y, q.boss); k.burst(q.x, q.y, '#b98cff', 10, 120); } }
   pend = pend.filter((q) => !q.done);
-  if (quota > 0) { spawnT -= dt; if (spawnT <= 0 && foes.length + pend.length < (8 + room * 2) * HE.length) { spawnT = Math.max(0.5, 2.1 - room * 0.12) / Math.max(1, HE.length * 0.6); quota--; queue(pickType(), false, true); } }
+  if (quota > 0) { spawnT -= dt; if (spawnT <= 0 && foes.length + pend.length < (8 + room * 2) * HE.length) { spawnT = Math.max(0.5, 2.1 - room * 0.12) / Math.max(1, HE.length * 0.6) / k.D.rate; quota--; queue(pickType(), false, true); } }
   /* héroes */
   for (const h of HE) {
     h.inv -= dt; h.cool -= dt; h.sk -= dt; h.swing -= dt; h.rollCd -= dt;
@@ -643,7 +645,7 @@ function coopDraw() {
 reset(); k.show(CFG.title, CFG.help);
 function hurt(n, sx, sy) {
   if (p.inv > 0 || k.st !== 'play') return;
-  p.hp -= n; p.inv = 1.5; k.shake(6); k.flash('rgba(255,60,80,.3)'); k.sfx('hurt');
+  p.hp -= n; p.inv = 1.5 / k.D.dmg; k.shake(6); k.flash('rgba(255,60,80,.3)'); k.sfx('hurt');
   if (sx !== undefined) { const a = Math.atan2(p.y - sy, p.x - sx); p.kx = Math.cos(a) * 280; p.ky = Math.sin(a) * 280; }
   if (p.hp <= 0) { k.burst(p.x, p.y, '#5ce1e6', 30, 240); k.lose(CFG.id, score, 'Derrotado', `${TH.label} ${room} · ${kills} bajas`); }
 }
@@ -694,7 +696,7 @@ k.run((dt) => {
   // apariciones anunciadas
   for (const q of pend) { q.t -= dt; if (q.t <= 0) { q.done = 1; addFoe(q.type, q.x, q.y, q.boss); k.burst(q.x, q.y, '#b98cff', 10, 120); } }
   pend = pend.filter((q) => !q.done);
-  if (quota > 0) { spawnT -= dt; if (spawnT <= 0 && foes.length + pend.length < 10 + room * 2) { spawnT = Math.max(0.5, 2.1 - room * 0.12); quota--; queue(pickType(), false, true); } }
+  if (quota > 0) { spawnT -= dt; if (spawnT <= 0 && foes.length + pend.length < 10 + room * 2) { spawnT = Math.max(0.5, 2.1 - room * 0.12) / k.D.rate; quota--; queue(pickType(), false, true); } }
   // objetivo más cercano
   let near = null, nd = 1e9; for (const f of foes) { const d = Math.hypot(f.x - p.x, f.y - p.y); if (d < nd) { nd = d; near = f; } }
   p.aim = near && (melee || nd < 380) ? Math.atan2(near.y - p.y, near.x - p.x) : tankM ? p.body : p.a;
