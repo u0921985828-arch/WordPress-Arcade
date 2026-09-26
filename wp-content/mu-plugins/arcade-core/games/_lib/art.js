@@ -583,7 +583,7 @@ const ART = (() => {
     c.save(); c.translate(x, y);
     if (o.gy == null && !air) shadow(c, 0, 0.5, (run ? 7.6 : 8.8) * s * (1 + sq), 0.24);
     c.scale(f * s * (1 + sq), s * (1 - sq)); c.lineJoin = 'round'; c.lineCap = 'round';
-    const colD = dark(col, 0.26), colL = lite(col, 0.34), colS = dark(col, 0.18);
+    const colD = dark(col, 0.26), colL = lite(col, 0.34);
     // --- pose: cadera, inclinación del torso y de la cabeza
     const bob = run ? -1.7 * Math.abs(Math.sin(ph)) + 0.7 : idle ? br * 0.5 : jump ? -0.8 : fall ? 0.6 : 0;
     const hipY = HIPY + bob + (wall ? 0.6 : 0);
@@ -697,11 +697,11 @@ const ART = (() => {
       g.restore();
       g.beginPath(); g.ellipse(0, 0, R, R * 1.06, 0, 0, TAU); g.lineWidth = OLS; g.strokeStyle = OUT; g.stroke();
       // casquete que deja la frente libre, con flequillo en dos puntas suaves
-      g.beginPath(); g.moveTo(-R + 0.9, -4.3); g.arc(0, -1, R + 0.25, Math.PI * 1.2, Math.PI * 1.86);
-      g.quadraticCurveTo(4.9, -3.6, 3.4, -4.6);
-      g.quadraticCurveTo(2.3, -3.4, 0.7, -5.1);
-      g.quadraticCurveTo(-0.9, -3.8, -2.4, -5.3);
-      g.quadraticCurveTo(-3.3, -4.4, -4.1, -4.5); g.closePath();
+      g.beginPath(); g.moveTo(-R + 0.7, -3.4); g.arc(0, -0.5, R + 0.25, Math.PI * 1.17, Math.PI * 1.89);
+      g.quadraticCurveTo(4.8, -2.8, 3.3, -3.8);
+      g.quadraticCurveTo(2.2, -2.7, 0.6, -4.3);
+      g.quadraticCurveTo(-1, -3.1, -2.5, -4.5);
+      g.quadraticCurveTo(-3.4, -3.6, -4.2, -3.7); g.closePath();
       const hgr = g.createLinearGradient(-4.4, -R - 2, 4.4, 0); hgr.addColorStop(0, lite(HAIR, 0.3)); hgr.addColorStop(1, dark(HAIR, 0.18));
       g.fillStyle = hgr; g.fill(); g.lineWidth = OLS; g.strokeStyle = OUT; g.stroke();
       g.save(); g.clip();

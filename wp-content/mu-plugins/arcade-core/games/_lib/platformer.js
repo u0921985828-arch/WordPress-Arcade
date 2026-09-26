@@ -162,7 +162,7 @@ function gfx() {
     for (const co of coins) if (!co.got && co.x > cx - 20 && co.x < cx + W + 20) { g.beginPath(); g.arc(co.x, co.y, 9, 0, 6.283); g.fill(); }
     g.fillStyle = '#d2d2d2';
     for (const e of enemies) if (e.alive && e.x > cx - 40 && e.x < cx + W + 40) g.fillRect(e.x, e.fly ? e.y - 20 : e.y, e.w, e.h);
-    g.fillStyle = '#f0f0f0'; if (!dead) g.fillRect(p.x + 2, p.y + 2, 18, p.h - 2);
+    g.fillStyle = '#f0f0f0'; if (!dead) g.fillRect(p.x + 4, p.y + 2, 14, p.h - 2); // silueta fina: la caja de relieve se ajusta al nuevo ancho
     g.restore();
   });
   k.glow((g) => {
