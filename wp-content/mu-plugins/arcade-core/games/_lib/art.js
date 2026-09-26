@@ -598,11 +598,14 @@ const ART = (() => {
   /* relieve de toda la pieza: luz de borde arriba-izquierda y sombra de contacto abajo-derecha,
      ambas recortadas dentro de la silueta (van por trazo desplazado: sin contornos nuevos) */
   function silShade(c, P, key, box, a, b) {
-    const x0 = box[0], y0 = box[1], x1 = box[2], y1 = box[3];
-    c.save(); c.translate(-0.45, -0.6); c.lineWidth = 1.35;
-    c.strokeStyle = grd(c, 'sil.l' + key + a, [x0, y0, x1, y1], [0, alpha('#ffffff', a == null ? 0.34 : a), 0.5, alpha('#ffffff', 0)]); c.stroke(P); c.restore();
-    c.save(); c.translate(0.5, 0.64); c.lineWidth = 1.7;
-    c.strokeStyle = grd(c, 'sil.d' + key + b, [x0, y0, x1, y1], [0.42, alpha(OUT, 0), 1, alpha(OUT, b == null ? 0.26 : b)]); c.stroke(P); c.restore();
+    // sin save/restore a propósito: dentro de un clip, cada save() copia la pila de recorte y es
+    // lo más caro del dibujo (57 % del perfil). Se deshace la transformación a mano.
+    const x0 = box[0], y0 = box[1], x1 = box[2], y1 = box[3], lw = c.lineWidth, ss = c.strokeStyle;
+    c.translate(-0.45, -0.6); c.lineWidth = 1.35;
+    c.strokeStyle = grd(c, 'sil.l' + key + a, [x0, y0, x1, y1], [0, alpha('#ffffff', a == null ? 0.34 : a), 0.5, alpha('#ffffff', 0)]); c.stroke(P);
+    c.translate(0.95, 1.24); c.lineWidth = 1.7;
+    c.strokeStyle = grd(c, 'sil.d' + key + b, [x0, y0, x1, y1], [0.42, alpha(OUT, 0), 1, alpha(OUT, b == null ? 0.26 : b)]); c.stroke(P);
+    c.translate(-0.5, -0.64); c.lineWidth = lw; c.strokeStyle = ss;
   }
   /* articulación: banda suave de color base oscurecido (nunca stroke) */
   function joint(c, x, y, r, col, a, ang) {
@@ -717,7 +720,7 @@ const ART = (() => {
     // cuello y mandíbula: sombra propia bajo la cabeza (así la cabeza sale del tronco, no se apoya)
     c.fillStyle = alpha(dark(SKIN, 0.45), 0.4); c.beginPath(); c.ellipse(hp(0, R * 0.8)[0], hp(0, R * 0.8)[1] + 0.6, 2.6, 1.5, hA, 0, TAU); c.fill();
     // cabeza: volumen, mejilla y pelo (todo dentro del recorte, sin contornos)
-    c.save(); c.translate(hcx, hcy); c.rotate(hA);
+    c.translate(hcx, hcy); c.rotate(hA);
     c.fillStyle = grd(c, 'h.head3' + R, [-R * 0.4, -R * 0.55, 1, 0, 0, R * 1.5], [0, '#fff3e3', 0.55, SKIN, 1, SKIND]);
     c.beginPath(); c.ellipse(0, 0, R + 0.4, R * 1.08, 0, 0, TAU); c.fill();
     c.fillStyle = alpha('#c98f6e', 0.18); c.beginPath(); c.ellipse(R * 0.85, R * 0.55, R * 0.62, R * 0.8, 0, 0, TAU); c.fill();
@@ -728,11 +731,11 @@ const ART = (() => {
     c.fillStyle = grd(c, 'h.hair3', [-4.4, -R - 2, 4.4, 0], [0, lite(HAIR, 0.3), 1, dark(HAIR, 0.18)]); c.fill(hair);
     c.save(); c.clip(hair); c.strokeStyle = alpha('#ffffff', 0.2); c.lineWidth = 0.9; c.beginPath(); c.arc(-0.5, -2, R - 2.2, Math.PI * 1.2, Math.PI * 1.44); c.stroke(); c.restore();
     c.fillStyle = alpha(dark(SKIN, 0.5), 0.3); c.beginPath(); c.moveTo(-R + 0.7, -3); c.quadraticCurveTo(0, -1.4, 4.6, -2.6); c.quadraticCurveTo(0, -0.2, -R + 0.9, -1.8); c.fill(); // sombra del flequillo
-    c.restore();
+    c.rotate(-hA); c.translate(-hcx, -hcy);
     // pelo de atrás (mechón) con el mismo color
     c.fillStyle = dark(HAIR, 0.14); c.fill(lock);
     // brazo delantero: cruza por delante del torso → solo la sombra que lo separa
-    c.save(); c.translate(0.8, 1); c.fillStyle = alpha(OUT, 0.2); c.fill(A0.up); c.fill(A0.lo); c.restore();
+    c.translate(0.8, 1); c.fillStyle = alpha(OUT, 0.2); c.fill(A0.up); c.fill(A0.lo); c.translate(-0.8, -1);
     c.fillStyle = lite(col, 0.06); c.fill(A0.up);
     c.fillStyle = SKIN; c.fill(A0.lo); c.fill(handP(A0));
     c.fillStyle = alpha(dark(SKIN, 0.35), 0.5); c.beginPath(); c.ellipse(A0.w[0], A0.w[1], 1.5, 1.1, A0.a, 0, TAU); c.fill(); // pulgar por sombra

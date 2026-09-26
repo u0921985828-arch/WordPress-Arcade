@@ -598,11 +598,14 @@ const ART = (() => {
   /* relieve de toda la pieza: luz de borde arriba-izquierda y sombra de contacto abajo-derecha,
      ambas recortadas dentro de la silueta (van por trazo desplazado: sin contornos nuevos) */
   function silShade(c, P, key, box, a, b) {
-    const x0 = box[0], y0 = box[1], x1 = box[2], y1 = box[3];
-    c.save(); c.translate(-0.45, -0.6); c.lineWidth = 1.35;
-    c.strokeStyle = grd(c, 'sil.l' + key + a, [x0, y0, x1, y1], [0, alpha('#ffffff', a == null ? 0.34 : a), 0.5, alpha('#ffffff', 0)]); c.stroke(P); c.restore();
-    c.save(); c.translate(0.5, 0.64); c.lineWidth = 1.7;
-    c.strokeStyle = grd(c, 'sil.d' + key + b, [x0, y0, x1, y1], [0.42, alpha(OUT, 0), 1, alpha(OUT, b == null ? 0.26 : b)]); c.stroke(P); c.restore();
+    // sin save/restore a propósito: dentro de un clip, cada save() copia la pila de recorte y es
+    // lo más caro del dibujo (57 % del perfil). Se deshace la transformación a mano.
+    const x0 = box[0], y0 = box[1], x1 = box[2], y1 = box[3], lw = c.lineWidth, ss = c.strokeStyle;
+    c.translate(-0.45, -0.6); c.lineWidth = 1.35;
+    c.strokeStyle = grd(c, 'sil.l' + key + a, [x0, y0, x1, y1], [0, alpha('#ffffff', a == null ? 0.34 : a), 0.5, alpha('#ffffff', 0)]); c.stroke(P);
+    c.translate(0.95, 1.24); c.lineWidth = 1.7;
+    c.strokeStyle = grd(c, 'sil.d' + key + b, [x0, y0, x1, y1], [0.42, alpha(OUT, 0), 1, alpha(OUT, b == null ? 0.26 : b)]); c.stroke(P);
+    c.translate(-0.5, -0.64); c.lineWidth = lw; c.strokeStyle = ss;
   }
   /* articulación: banda suave de color base oscurecido (nunca stroke) */
   function joint(c, x, y, r, col, a, ang) {
@@ -616,16 +619,10 @@ const ART = (() => {
    * fundidos en el hombro. Se rellena y se contornea UNA vez; ropa, pelo, cara y sombras van
    * recortados dentro. El brazo y la pierna traseros forman su propia silueta detrás (se mueven
    * por su cuenta) y quedan tapados por el cuerpo donde se cruzan: no hay contorno de juntura. */
-  function hero(c, x, y, s, o) {
-    // o: {face, state:'idle'|'run'|'jump'|'fall'|'wall', t, col, squash, sword, gy}
-    const f = o.face || 1, t = o.t || 0, st = o.state || 'idle', col = o.col || '#ff5f7a';
+  const HX = -24, HY = -48, HW = 46, HH = 58; // caja local del cuerpo cacheado
+  function heroBody(c, st, t, col) {
     const run = st === 'run', jump = st === 'jump', fall = st === 'fall', air = jump || fall, wall = st === 'wall', idle = !run && !air && !wall;
-    const sq = o.squash || 0, ph = t * 12.5, br = idle ? Math.sin(t * 3) : 0;
-    if (o.gy != null) { const d = Math.max(0, o.gy - y), k2 = Math.max(0.32, 1 - d / 160);
-      c.save(); c.translate(x + d * 0.06, o.gy); shadow(c, 0, 0.5, 9 * s * k2 * (1 + sq), 0.3 * k2 * k2); c.restore(); }
-    c.save(); c.translate(x, y);
-    if (o.gy == null && !air) shadow(c, 0, 0.5, (run ? 7.6 : 8.8) * s * (1 + sq), 0.24);
-    c.scale(f * s * (1 + sq), s * (1 - sq)); c.lineJoin = 'round'; c.lineCap = 'round';
+    const sq = 0, ph = t * 12.5, br = idle ? Math.sin(t * 3) : 0;
     const colD = dark(col, 0.26), colL = lite(col, 0.34);
     // --- pose
     const bob = run ? -1.7 * Math.abs(Math.sin(ph)) + 0.7 : idle ? br * 0.5 : jump ? -0.8 : fall ? 0.6 : 0;
@@ -717,7 +714,7 @@ const ART = (() => {
     // cuello y mandíbula: sombra propia bajo la cabeza (así la cabeza sale del tronco, no se apoya)
     c.fillStyle = alpha(dark(SKIN, 0.45), 0.4); c.beginPath(); c.ellipse(hp(0, R * 0.8)[0], hp(0, R * 0.8)[1] + 0.6, 2.6, 1.5, hA, 0, TAU); c.fill();
     // cabeza: volumen, mejilla y pelo (todo dentro del recorte, sin contornos)
-    c.save(); c.translate(hcx, hcy); c.rotate(hA);
+    c.translate(hcx, hcy); c.rotate(hA);
     c.fillStyle = grd(c, 'h.head3' + R, [-R * 0.4, -R * 0.55, 1, 0, 0, R * 1.5], [0, '#fff3e3', 0.55, SKIN, 1, SKIND]);
     c.beginPath(); c.ellipse(0, 0, R + 0.4, R * 1.08, 0, 0, TAU); c.fill();
     c.fillStyle = alpha('#c98f6e', 0.18); c.beginPath(); c.ellipse(R * 0.85, R * 0.55, R * 0.62, R * 0.8, 0, 0, TAU); c.fill();
@@ -728,11 +725,11 @@ const ART = (() => {
     c.fillStyle = grd(c, 'h.hair3', [-4.4, -R - 2, 4.4, 0], [0, lite(HAIR, 0.3), 1, dark(HAIR, 0.18)]); c.fill(hair);
     c.save(); c.clip(hair); c.strokeStyle = alpha('#ffffff', 0.2); c.lineWidth = 0.9; c.beginPath(); c.arc(-0.5, -2, R - 2.2, Math.PI * 1.2, Math.PI * 1.44); c.stroke(); c.restore();
     c.fillStyle = alpha(dark(SKIN, 0.5), 0.3); c.beginPath(); c.moveTo(-R + 0.7, -3); c.quadraticCurveTo(0, -1.4, 4.6, -2.6); c.quadraticCurveTo(0, -0.2, -R + 0.9, -1.8); c.fill(); // sombra del flequillo
-    c.restore();
+    c.rotate(-hA); c.translate(-hcx, -hcy);
     // pelo de atrás (mechón) con el mismo color
     c.fillStyle = dark(HAIR, 0.14); c.fill(lock);
     // brazo delantero: cruza por delante del torso → solo la sombra que lo separa
-    c.save(); c.translate(0.8, 1); c.fillStyle = alpha(OUT, 0.2); c.fill(A0.up); c.fill(A0.lo); c.restore();
+    c.translate(0.8, 1); c.fillStyle = alpha(OUT, 0.2); c.fill(A0.up); c.fill(A0.lo); c.translate(-0.8, -1);
     c.fillStyle = lite(col, 0.06); c.fill(A0.up);
     c.fillStyle = SKIN; c.fill(A0.lo); c.fill(handP(A0));
     c.fillStyle = alpha(dark(SKIN, 0.35), 0.5); c.beginPath(); c.ellipse(A0.w[0], A0.w[1], 1.5, 1.1, A0.a, 0, TAU); c.fill(); // pulgar por sombra
@@ -750,6 +747,10 @@ const ART = (() => {
     joint(c, A0.e[0], A0.e[1], 1.55, col, 0.1, A0.a); joint(c, L0.K[0], L0.K[1], 1.85, PANTS, 0.11);
     silShade(c, SILH, 'hero', [-7, SHOFF - 9, 7, 14], 0.34, 0.22);
     c.restore();
+  }
+  function heroFace(c, st, t, P) {
+    const run = st === 'run', jump = st === 'jump', fall = st === 'fall', wall = st === 'wall';
+    const hcx = P.hcx, hcy = P.hcy, hA = P.hA;
     // ---------- cara (dentro de la cabeza, en su espacio local)
     c.save(); c.translate(hcx, hcy); c.rotate(hA);
     const bc = t % 3.6, blink = (bc < 0.11 || (bc > 0.28 && bc < 0.36)) && !fall;
@@ -776,16 +777,57 @@ const ART = (() => {
     else if (wall) { c.beginPath(); c.moveTo(0.9, 3.8); c.lineTo(4, 3.2); c.stroke(); }
     else { c.beginPath(); c.arc(2.3, 2.3, 1.7, 0.36, Math.PI - 0.5); c.stroke(); }
     c.restore();
+  }
+  /* Pose cacheada: el cuerpo entero se pinta una vez por fotograma de animación en un lienzo
+   * aparte (12 pasos de carrera, 10 de reposo/pared/caída, 1 de salto) y luego solo es un
+   * drawImage. La cara va viva encima (así el parpadeo no multiplica la caché) y la espada
+   * también (su ángulo es continuo). */
+  const HSPR = {};
+  function heroQ(st, t) { // instante representativo del fotograma de animación
+    if (st === 'jump' || st === 'wall') return st === 'wall' ? qz(t, 3, 8) : 0;
+    if (st === 'run') return qz(t, 12.5, 12);
+    if (st === 'fall') return qz(t, 16, 10);
+    return qz(t, 3, 10);
+  }
+  function qz(t, w, n) { const p = ((t * w) % TAU + TAU) % TAU; return Math.floor(p / TAU * n) / n * TAU / w; }
+  /* solo lo que la cara y la espada necesitan de la pose (mismas fórmulas que heroBody) */
+  function heroHead(st, t) {
+    const run = st === 'run', jump = st === 'jump', fall = st === 'fall', wall = st === 'wall', idle = !run && !jump && !fall && !wall;
+    const br = idle ? Math.sin(t * 3) : 0, ph = t * 12.5;
+    const bob = run ? -1.7 * Math.abs(Math.sin(ph)) + 0.7 : idle ? br * 0.5 : jump ? -0.8 : fall ? 0.6 : 0;
+    const hipY = HIPY + bob + (wall ? 0.6 : 0);
+    const lean = run ? 0.17 : jump ? 0.07 : fall ? -0.09 : wall ? -0.1 : br * 0.012;
+    const headA = run ? -0.09 : jump ? -0.14 : fall ? 0.16 : wall ? 0.1 : br * 0.02;
+    const SHOFF = SHY - HIPY, hA = headA - lean * 0.45, chA = Math.cos(hA), shA = Math.sin(hA);
+    const hy0 = (HEADY - SHY) - 1.5 + (idle ? br * 0.3 : 0);
+    return { hipY, lean, hA, SHOFF, hcx: 0.4 * chA - hy0 * shA, hcy: 0.4 * shA + hy0 * chA + SHOFF };
+  }
+  function hero(c, x, y, s, o) {
+    // o: {face, state:'idle'|'run'|'jump'|'fall'|'wall', t, col, squash, sword, gy}
+    const f = o.face || 1, t = o.t || 0, st = o.state || 'idle', col = o.col || '#ff5f7a';
+    const run = st === 'run', air = st === 'jump' || st === 'fall', sq = o.squash || 0;
+    if (o.gy != null) { const d = Math.max(0, o.gy - y), k2 = Math.max(0.32, 1 - d / 160);
+      c.save(); c.translate(x + d * 0.06, o.gy); shadow(c, 0, 0.5, 9 * s * k2 * (1 + sq), 0.3 * k2 * k2); c.restore(); }
+    c.save(); c.translate(x, y);
+    if (o.gy == null && !air) shadow(c, 0, 0.5, (run ? 7.6 : 8.8) * s * (1 + sq), 0.24);
+    c.scale(f * s * (1 + sq), s * (1 - sq)); c.lineJoin = 'round'; c.lineCap = 'round';
+    const tq = heroQ(st, t), res = resOf(c, 2, 3), key = 'h' + st + col + tq.toFixed(4) + '#' + res;
+    let e = HSPR[key];
+    if (!e) { const cv = mk(HW * res, HH * res), g = cv.getContext('2d');
+      g.scale(res, res); g.translate(-HX, -HY); g.lineJoin = 'round'; g.lineCap = 'round';
+      heroBody(g, st, tq, col); e = HSPR[key] = cv; }
+    c.drawImage(e, HX, HY, HW, HH);
+    const P = heroHead(st, tq); c.translate(0, P.hipY); c.rotate(P.lean);
+    heroFace(c, st, t, P);
     // ---------- espada (objeto suelto: lleva su propia silueta)
-    if (o.sword) { c.save(); c.translate(6, SHOFF + 3); c.rotate(o.sword - lean);
+    if (o.sword) { c.save(); c.translate(6, P.SHOFF + 3); c.rotate(o.sword - P.lean);
       const SW = polyP([[-1.1, -3], [-1.1, -20], [0.9, -24.4], [2.9, -20], [2.9, -3]], true);
       const GR = join(polyP([[-3.6, -3.5], [6.2, -3.5], [6.2, -0.4], [-3.6, -0.4]]), polyP([[-0.2, -0.2], [2.4, -0.2], [2.4, 4.2], [-0.2, 4.2]]));
       addEll(GR, 1.1, 5.2, 1.3, 1.3, 0);
       sil(c, GR, '#f2d15c', OLS); c.save(); c.clip(GR); c.fillStyle = '#7a4a2a'; c.fillRect(-0.4, 0, 3, 4.4); silShade(c, GR, 'grip', [-4, -4, 7, 7], 0.3, 0.22); c.restore();
       sil(c, SW, grd(c, 'h.sword3', [-1.1, 0, 2.9, 0], [0, '#ffffff', 0.5, '#dfe7f4', 0.51, '#aebbd0', 1, '#c9d3e4']), OLS);
       c.save(); c.clip(SW); c.strokeStyle = alpha('#ffffff', 0.85); c.lineWidth = 0.55; c.beginPath(); c.moveTo(-0.2, -5); c.lineTo(-0.2, -18.4); c.stroke(); c.restore();
-      c.restore(); }
-    c.restore();
+      c.restore(); }    c.restore();
   }
   /* ------------------------------------------------ Enemigos
    * Cada uno con su lenguaje corporal: el slime se agacha antes de saltar, el fantasma se abalanza con
