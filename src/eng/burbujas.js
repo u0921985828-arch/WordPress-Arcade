@@ -251,7 +251,7 @@ function arcoiris() {
     for (let i = 0; i < 7; i++) { c.beginPath(); c.arc(W - 14 - i * 12, 34, 4, 0, TAU); ART.fillOut(c, i < shots ? '#a8cf3f' : 'rgba(255,255,255,.18)', 1.5); }
     if (msgT > 0) { c.globalAlpha = Math.min(1, msgT * 2); label(msg, W / 2, LINE - 44, 22, '#ffd166', 'center'); c.globalAlpha = 1; }
   }
-  window.__bu = { get G() { return G; }, get score() { return score; }, get shot() { return shot; }, fire, get over() { return over; } };
+  window.__bu = { get G() { return G; }, get score() { return score; }, get shot() { return shot; }, fire, get over() { return over; }, get shots() { return shots; }, get colores() { return colorsNow(); } };
   k.onDif = () => { if (k.st !== 'play') reset(); };
   reset();
   k.show(CFG.title || 'Burbujas Arcoíris', 'Apunta con el dedo o el ratón y suelta para lanzar. Tres burbujas iguales estallan y las que se quedan sueltas caen. Cada pocos disparos baja el techo: no dejes que llegue a la línea rosa.<br>Toca para jugar');
@@ -477,7 +477,7 @@ function fusion() {
   }
   /* pruebas: simulación sin dibujar (window.__fu.sim(n) devuelve cuántos cuerpos se salieron) */
   window.__fu = {
-    get B() { return B; }, get score() { return score; }, T, BOX, CEN, SOLAR, drop,
+    get B() { return B; }, get score() { return score; }, T, BOX, CEN, SOLAR, drop, get ms() { return MS(); },
     sim(n, every) {
       let bad = 0;
       for (let i = 0; i < n; i++) {

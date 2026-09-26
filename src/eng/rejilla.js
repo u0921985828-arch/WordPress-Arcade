@@ -93,7 +93,7 @@ function blocksGame() {
   function mkPiece(fam, rot) { const cells = fam.rots[rot]; return { cells, col: fam.col, w: Math.max(...cells.map((p) => p[0])) + 1, h: Math.max(...cells.map((p) => p[1])) + 1, pop: 0, back: 0 }; }
   function draw1(r) {
     /* Dificultad: cada cuánto entran las piezas grandes (el reto del día no se toca). */
-    const d = daily ? 0.55 : Math.min(1, placed / (k.dif === 0 ? 130 : k.dif === 2 ? 60 : 90)), wt = FAM.map((f) => (f.tier === 0 ? 1.7 - 0.9 * d : f.tier === 1 ? 1 + 0.25 * d : 0.18 + 0.95 * d));
+    const d = daily ? 0.55 : Math.min(1, placed / DC()), wt = FAM.map((f) => (f.tier === 0 ? 1.7 - 0.9 * d : f.tier === 1 ? 1 + 0.25 * d : 0.18 + 0.95 * d));
     let x = r() * wt.reduce((a, b) => a + b, 0), i = 0; while (x > wt[i]) x -= wt[i++];
     const f = FAM[Math.min(i, FAM.length - 1)]; return mkPiece(f, Math.floor(r() * f.rots.length));
   }
@@ -289,7 +289,8 @@ function blocksGame() {
     b.addEventListener('pointerdown', () => { startDaily = true; });
     card.append(b);
   }
-  window.__rj = { get grid() { return grid; }, get tray() { return tray; }, get score() { return score; }, fits: (i, x, y) => !!tray[i] && fits(tray[i], x, y), get kb() { return kb; }, get daily() { return daily; } };
+  const DC = () => (k.dif === 0 ? 130 : k.dif === 2 ? 60 : 90); /* dificultad: cada cuántas piezas colocadas se llega a las formas grandes */
+  window.__rj = { get grid() { return grid; }, get tray() { return tray; }, get score() { return score; }, get dc() { return DC(); }, fits: (i, x, y) => !!tray[i] && fits(tray[i], x, y), get kb() { return kb; }, get daily() { return daily; } };
   reset();
   // tablero de muestra detrás de la pantalla de inicio (se vacía al empezar: reset() en la transición ready→play)
   for (let y = 3; y < N; y++) for (let x = 0; x < N; x++) if ((x * 7 + y * 3) % 5 && !(y < 6 && x > 4) && x !== 7) grid[y][x] = PAL[(((x / 3) | 0) + ((y / 2) | 0) * 3) % PAL.length];
