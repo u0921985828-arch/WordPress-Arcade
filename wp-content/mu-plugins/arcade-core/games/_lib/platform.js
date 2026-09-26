@@ -76,7 +76,7 @@ function build() { if (TEJ) return buildTej();
   t = 0; rope = null; dashT = 0; dashCd = 0; swordT = 0; jumpBuf = 0; coyote = 0; cam = 0; dead = 0; sq = 0; steer = 0; diffT = 0; if (M === 'barrels') genBarrels(); else genVert(); }
 let rec = 0;
 function reset() { if (TEJ) return resetTej();
-  try { rec = +localStorage.getItem('best:' + CFG.id) || 0; } catch (e) { /* sin almacenamiento */ } level = 1; lives = 4; score = 0; got = 0; build(); }
+  try { rec = +localStorage.getItem(k.bkey(CFG.id)) || 0; } catch (e) { /* sin almacenamiento */ } level = 1; lives = 4; score = 0; got = 0; build(); }
 if (!TEJ) reset(); k.show(CFG.title, CFG.help);
 
 /* ================= Muerte ================= */
