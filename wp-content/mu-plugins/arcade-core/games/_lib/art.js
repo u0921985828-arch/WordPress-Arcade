@@ -619,16 +619,10 @@ const ART = (() => {
    * fundidos en el hombro. Se rellena y se contornea UNA vez; ropa, pelo, cara y sombras van
    * recortados dentro. El brazo y la pierna traseros forman su propia silueta detrás (se mueven
    * por su cuenta) y quedan tapados por el cuerpo donde se cruzan: no hay contorno de juntura. */
-  function hero(c, x, y, s, o) {
-    // o: {face, state:'idle'|'run'|'jump'|'fall'|'wall', t, col, squash, sword, gy}
-    const f = o.face || 1, t = o.t || 0, st = o.state || 'idle', col = o.col || '#ff5f7a';
+  const HX = -24, HY = -48, HW = 46, HH = 58; // caja local del cuerpo cacheado
+  function heroBody(c, st, t, col) {
     const run = st === 'run', jump = st === 'jump', fall = st === 'fall', air = jump || fall, wall = st === 'wall', idle = !run && !air && !wall;
-    const sq = o.squash || 0, ph = t * 12.5, br = idle ? Math.sin(t * 3) : 0;
-    if (o.gy != null) { const d = Math.max(0, o.gy - y), k2 = Math.max(0.32, 1 - d / 160);
-      c.save(); c.translate(x + d * 0.06, o.gy); shadow(c, 0, 0.5, 9 * s * k2 * (1 + sq), 0.3 * k2 * k2); c.restore(); }
-    c.save(); c.translate(x, y);
-    if (o.gy == null && !air) shadow(c, 0, 0.5, (run ? 7.6 : 8.8) * s * (1 + sq), 0.24);
-    c.scale(f * s * (1 + sq), s * (1 - sq)); c.lineJoin = 'round'; c.lineCap = 'round';
+    const ph = t * 12.5, br = idle ? Math.sin(t * 3) : 0;
     const colD = dark(col, 0.26), colL = lite(col, 0.34);
     // --- pose
     const bob = run ? -1.7 * Math.abs(Math.sin(ph)) + 0.7 : idle ? br * 0.5 : jump ? -0.8 : fall ? 0.6 : 0;
@@ -725,10 +719,10 @@ const ART = (() => {
     c.beginPath(); c.ellipse(0, 0, R + 0.4, R * 1.08, 0, 0, TAU); c.fill();
     c.fillStyle = alpha('#c98f6e', 0.18); c.beginPath(); c.ellipse(R * 0.85, R * 0.55, R * 0.62, R * 0.8, 0, 0, TAU); c.fill();
     c.fillStyle = alpha('#c07f63', 0.45); c.beginPath(); c.ellipse(-R + 0.4, 1.3, 0.75, 1.05, -0.2, 0, TAU); c.fill();
-    const hair = nP(); hair.moveTo(-R + 0.7, -3.4); hair.arc(0, -0.5, R + 0.45, Math.PI * 1.17, Math.PI * 1.89);
-    hair.quadraticCurveTo(4.8, -2.8, 3.3, -3.8); hair.quadraticCurveTo(2.2, -2.7, 0.6, -4.3);
-    hair.quadraticCurveTo(-1, -3.1, -2.5, -4.5); hair.quadraticCurveTo(-3.4, -3.6, -4.2, -3.7); hair.closePath();
-    c.fillStyle = grd(c, 'h.hair3', [-4.4, -R - 2, 4.4, 0], [0, lite(HAIR, 0.3), 1, dark(HAIR, 0.18)]); c.fill(hair);
+    const hair = nP(); hair.moveTo(-R + 0.5, -2.2); hair.arc(0, -0.5, R + 0.45, Math.PI * 1.12, Math.PI * 1.94);
+    hair.quadraticCurveTo(5.1, -1.5, 3.4, -2.7); hair.quadraticCurveTo(2.3, -1.4, 0.6, -3.2);
+    hair.quadraticCurveTo(-1, -1.8, -2.6, -3.4); hair.quadraticCurveTo(-3.6, -2.2, -4.4, -2.5); hair.closePath();
+    c.fillStyle = grd(c, 'h.hair4', [-4.4, -R - 2, 4.4, 0], [0, lite(HAIR, 0.18), 1, dark(HAIR, 0.3)]); c.fill(hair);
     c.save(); c.clip(hair); c.strokeStyle = alpha('#ffffff', 0.2); c.lineWidth = 0.9; c.beginPath(); c.arc(-0.5, -2, R - 2.2, Math.PI * 1.2, Math.PI * 1.44); c.stroke(); c.restore();
     c.fillStyle = alpha(dark(SKIN, 0.5), 0.3); c.beginPath(); c.moveTo(-R + 0.7, -3); c.quadraticCurveTo(0, -1.4, 4.6, -2.6); c.quadraticCurveTo(0, -0.2, -R + 0.9, -1.8); c.fill(); // sombra del flequillo
     c.rotate(-hA); c.translate(-hcx, -hcy);
@@ -753,6 +747,10 @@ const ART = (() => {
     joint(c, A0.e[0], A0.e[1], 1.55, col, 0.1, A0.a); joint(c, L0.K[0], L0.K[1], 1.85, PANTS, 0.11);
     silShade(c, SILH, 'hero', [-7, SHOFF - 9, 7, 14], 0.34, 0.22);
     c.restore();
+  }
+  function heroFace(c, st, t, P) {
+    const run = st === 'run', jump = st === 'jump', fall = st === 'fall', wall = st === 'wall';
+    const hcx = P.hcx, hcy = P.hcy, hA = P.hA;
     // ---------- cara (dentro de la cabeza, en su espacio local)
     c.save(); c.translate(hcx, hcy); c.rotate(hA);
     const bc = t % 3.6, blink = (bc < 0.11 || (bc > 0.28 && bc < 0.36)) && !fall;
@@ -779,16 +777,58 @@ const ART = (() => {
     else if (wall) { c.beginPath(); c.moveTo(0.9, 3.8); c.lineTo(4, 3.2); c.stroke(); }
     else { c.beginPath(); c.arc(2.3, 2.3, 1.7, 0.36, Math.PI - 0.5); c.stroke(); }
     c.restore();
+  }
+  /* Pose cacheada: el cuerpo entero se pinta una vez por fotograma de animación en un lienzo
+   * aparte (12 pasos de carrera, 10 de reposo/pared/caída, 1 de salto) y luego solo es un
+   * drawImage. La cara va viva encima (así el parpadeo no multiplica la caché) y la espada
+   * también (su ángulo es continuo). */
+  const HSPR = {}; let HN = 0;
+  function heroQ(st, t) { // instante representativo del fotograma de animación
+    if (st === 'jump' || st === 'wall') return st === 'wall' ? qz(t, 3, 8) : 0;
+    if (st === 'run') return qz(t, 12.5, 12);
+    if (st === 'fall') return qz(t, 16, 10);
+    return qz(t, 3, 10);
+  }
+  function qz(t, w, n) { const p = ((t * w) % TAU + TAU) % TAU; return Math.floor(p / TAU * n) / n * TAU / w; }
+  /* solo lo que la cara y la espada necesitan de la pose (mismas fórmulas que heroBody) */
+  function heroHead(st, t) {
+    const run = st === 'run', jump = st === 'jump', fall = st === 'fall', wall = st === 'wall', idle = !run && !jump && !fall && !wall;
+    const br = idle ? Math.sin(t * 3) : 0, ph = t * 12.5;
+    const bob = run ? -1.7 * Math.abs(Math.sin(ph)) + 0.7 : idle ? br * 0.5 : jump ? -0.8 : fall ? 0.6 : 0;
+    const hipY = HIPY + bob + (wall ? 0.6 : 0);
+    const lean = run ? 0.17 : jump ? 0.07 : fall ? -0.09 : wall ? -0.1 : br * 0.012;
+    const headA = run ? -0.09 : jump ? -0.14 : fall ? 0.16 : wall ? 0.1 : br * 0.02;
+    const SHOFF = SHY - HIPY, hA = headA - lean * 0.45, chA = Math.cos(hA), shA = Math.sin(hA);
+    const hy0 = (HEADY - SHY) - 1.5 + (idle ? br * 0.3 : 0);
+    return { hipY, lean, hA, SHOFF, hcx: 0.4 * chA - hy0 * shA, hcy: 0.4 * shA + hy0 * chA + SHOFF };
+  }
+  function hero(c, x, y, s, o) {
+    // o: {face, state:'idle'|'run'|'jump'|'fall'|'wall', t, col, squash, sword, gy}
+    const f = o.face || 1, t = o.t || 0, st = o.state || 'idle', col = o.col || '#ff5f7a';
+    const run = st === 'run', air = st === 'jump' || st === 'fall', sq = o.squash || 0;
+    if (o.gy != null) { const d = Math.max(0, o.gy - y), k2 = Math.max(0.32, 1 - d / 160);
+      c.save(); c.translate(x + d * 0.06, o.gy); shadow(c, 0, 0.5, 9 * s * k2 * (1 + sq), 0.3 * k2 * k2); c.restore(); }
+    c.save(); c.translate(x, y);
+    if (o.gy == null && !air) shadow(c, 0, 0.5, (run ? 7.6 : 8.8) * s * (1 + sq), 0.24);
+    c.scale(f * s * (1 + sq), s * (1 - sq)); c.lineJoin = 'round'; c.lineCap = 'round';
+    const tq = heroQ(st, t), res = resOf(c, 2, 4), key = 'h' + st + col + tq.toFixed(4) + '#' + res;
+    let e = HSPR[key];
+    if (!e) { if (HN > 120) { for (const q in HSPR) delete HSPR[q]; HN = 0; } HN++;
+      const cv = mk(HW * res, HH * res), g = cv.getContext('2d');
+      g.scale(res, res); g.translate(-HX, -HY); g.lineJoin = 'round'; g.lineCap = 'round';
+      heroBody(g, st, tq, col); e = HSPR[key] = cv; }
+    c.drawImage(e, HX, HY, HW, HH);
+    const P = heroHead(st, tq); c.translate(0, P.hipY); c.rotate(P.lean);
+    heroFace(c, st, t, P);
     // ---------- espada (objeto suelto: lleva su propia silueta)
-    if (o.sword) { c.save(); c.translate(6, SHOFF + 3); c.rotate(o.sword - lean);
+    if (o.sword) { c.save(); c.translate(6, P.SHOFF + 3); c.rotate(o.sword - P.lean);
       const SW = polyP([[-1.1, -3], [-1.1, -20], [0.9, -24.4], [2.9, -20], [2.9, -3]], true);
       const GR = join(polyP([[-3.6, -3.5], [6.2, -3.5], [6.2, -0.4], [-3.6, -0.4]]), polyP([[-0.2, -0.2], [2.4, -0.2], [2.4, 4.2], [-0.2, 4.2]]));
       addEll(GR, 1.1, 5.2, 1.3, 1.3, 0);
       sil(c, GR, '#f2d15c', OLS); c.save(); c.clip(GR); c.fillStyle = '#7a4a2a'; c.fillRect(-0.4, 0, 3, 4.4); silShade(c, GR, 'grip', [-4, -4, 7, 7], 0.3, 0.22); c.restore();
       sil(c, SW, grd(c, 'h.sword3', [-1.1, 0, 2.9, 0], [0, '#ffffff', 0.5, '#dfe7f4', 0.51, '#aebbd0', 1, '#c9d3e4']), OLS);
       c.save(); c.clip(SW); c.strokeStyle = alpha('#ffffff', 0.85); c.lineWidth = 0.55; c.beginPath(); c.moveTo(-0.2, -5); c.lineTo(-0.2, -18.4); c.stroke(); c.restore();
-      c.restore(); }
-    c.restore();
+      c.restore(); }    c.restore();
   }
   /* ------------------------------------------------ Enemigos
    * Cada uno con su lenguaje corporal: el slime se agacha antes de saltar, el fantasma se abalanza con
@@ -902,7 +942,8 @@ const ART = (() => {
         const LG = join(tubeP([[0, -h * 0.3], [0.2, -h * 0.04]], [2.5, 1.95]), polyP([[-2.4, -1.9], [-2.7, 0.1], [0, 0.5], [3.4, 0.25], [3.7, -0.8], [1.2, -2]]));
         sil(c, LG, i ? M1 : M2, 1.0);
         c.save(); c.clip(LG); c.fillStyle = i ? '#3a3258' : '#2a2342'; c.fillRect(-5, -1.9, 12, 3);
-        silShade(c, LG, 'kleg', [-4, -h * 0.28, 4, 1], 0.3, 0.2); c.restore(); c.restore(); });
+        c.fillStyle = alpha(OUT, 0.2); c.fillRect(1.1, -h * 0.34, 5, h * 0.36);
+        c.fillStyle = alpha('#ffffff', 0.22); c.fillRect(-2.5, -h * 0.32, 1.3, h * 0.3); c.restore(); c.restore(); });
       const bob = -Math.abs(step) * 0.8; c.translate(0, bob);
       const hy = -h * 0.62, HW = W2 * 0.76;
       const sw = Math.sin(t * 4.5) * 1.8, ty = hy - h * 0.32;
@@ -953,13 +994,17 @@ const ART = (() => {
       shadow(c, 0, 0, w * 0.42, 0.26); c.scale(f, 1);
       const W2 = w / 2, bob = Math.sin(t * 9) * 0.6, push = Math.max(0, Math.sin(t * 1.8));
       const WR = w * 0.22, WY = -w * 0.22;
-      const WH = nP(); addEll(WH, 0, WY, WR, WR, 0);
-      sil(c, WH, '#4a4657', OLS);
-      c.save(); c.clip(WH);
-      c.fillStyle = grd(c, 'e.rwheel2' + w, [-w * 0.07, WY - w * 0.07, 0.5, 0, WY, WR * 1.1], [0, '#7a7a8a', 1, '#312d3c']); c.fill(WH);
+      // rueda: el disco es siempre igual (se cachea); solo los radios giran
+      sprite(c, 'rwheel3' + WR + WY, -WR - 3, WY - WR - 3, WR * 2 + 6, WR * 2 + 6, (g, ox, oy) => {
+        g.translate(-ox, -oy); g.lineJoin = 'round'; g.lineCap = 'round';
+        const WH = nP(); addEll(WH, 0, WY, WR, WR, 0);
+        sil(g, WH, '#4a4657', OLS);
+        g.save(); g.clip(WH);
+        g.fillStyle = grd(g, 'e.rwheel2' + w, [-w * 0.07, WY - w * 0.07, 0.5, 0, WY, WR * 1.1], [0, '#7a7a8a', 1, '#312d3c']); g.fill(WH);
+        silShade(g, WH, 'rw', [-WR, WY - WR, WR, WY + WR], 0.3, 0.26); g.restore();
+      });
       c.save(); c.translate(0, WY); c.rotate(t * 7); c.strokeStyle = alpha('#c7d0da', 0.85); c.lineWidth = 0.8;
       c.beginPath(); c.moveTo(-WR * 0.6, 0); c.lineTo(WR * 0.6, 0); c.moveTo(0, -WR * 0.6); c.lineTo(0, WR * 0.6); c.stroke(); c.restore();
-      silShade(c, WH, 'rw', [-WR, WY - WR, WR, WY + WR], 0.3, 0.26); c.restore();
       c.translate(0, bob);
       const CX = W2 * 0.75 + push * 2.6, CY = -h * 0.5, ca = -0.2 + push * 0.25;
       const body = polyP([[-W2, -h + h * 0.12], [-W2, -h * 0.55], [-W2, -h * 0.33], [-W2 + 0.8, -h * 0.2], [0, -h * 0.16], [W2 - 0.8, -h * 0.2], [W2, -h * 0.33], [W2, -h * 0.55], [W2, -h + h * 0.12], [W2 * 0.5, -h - h * 0.01], [-W2 * 0.5, -h - h * 0.01]]);
@@ -1068,6 +1113,7 @@ const ART = (() => {
   }
   function flag(c, x, y, t, col, h) {
     h = h || 96; col = col || '#7cf7a0'; c.save(); c.lineJoin = 'round'; c.lineCap = 'round';
+    c.translate(x, y); x = 0; y = 0; // coordenadas locales: los degradados memoizados no dependen de la posición
     shadow(c, x, y, 9, 0.2);
     // base, mastil y pomo: un solo trazado continuo
     const P = join(boxP(x - 7, y - 6.5, 14, 7, 2.4), boxP(x - 2.6, y - h - 2, 5.2, h - 2, 2.2));
@@ -1096,7 +1142,8 @@ const ART = (() => {
   }
   function anchor(c, x, y, t) {
     let gl = cache.anchorGlow; if (!gl) { gl = cache.anchorGlow = mk(64, 64); const g = gl.getContext('2d'), rg = g.createRadialGradient(32, 32, 4, 32, 32, 32); rg.addColorStop(0, 'rgba(255,214,80,.8)'); rg.addColorStop(1, 'rgba(255,214,80,0)'); g.fillStyle = rg; g.fillRect(0, 0, 64, 64); }
-    c.save(); c.globalAlpha = 0.45 + Math.sin(t * 4) * 0.2; const R = 18 + Math.sin(t * 4) * 2; c.drawImage(gl, x - R, y - R, R * 2, R * 2); c.globalAlpha = 1;
+    c.save(); c.translate(x, y); x = 0; y = 0; // ídem: en local, para memoizar el degradado del aro
+    c.globalAlpha = 0.45 + Math.sin(t * 4) * 0.2; const R = 18 + Math.sin(t * 4) * 2; c.drawImage(gl, x - R, y - R, R * 2, R * 2); c.globalAlpha = 1;
     const P = nP(); addEll(P, x, y, 10.5, 10.5); addEll(P, x, y, 7.5, 7.5, 0, true);
     sil(c, P, '#c9d0de', 1.25);
     c.save(); c.clip(P);
