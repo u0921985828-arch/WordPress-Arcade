@@ -3,7 +3,7 @@
  * CFG.mode 'race': carrera a 4 (1 humano + CPU o hasta 4 en la tele) por rondas con cámara que sigue al líder. */
 const A = CFG.abil || {}, RACE = CFG.mode === 'race';
 let TH = ART.THEMES[CFG.theme || 'meadow'];
-const W = 640, H = 360, T = 32, MH = 16;
+const W = 640, H = 360, T = 32, MH = 16, HS = 1.24; /* HS: escala de dibujo del héroe (la caja de colisión no cambia) */
 const k = Kit({ w: W, h: H, title: CFG.title, bg: TH.sky[0] }), c = k.ctx;
 /* Física ajustada a la escala de 32 px */
 const G = 2300, JUMP = 830, CUT = 350, RUN = A.swing ? 250 : 285, FALL = 1100, COYOTE = 0.13, BUFFER = 0.15;
@@ -51,6 +51,8 @@ function gen() {
   for (; x < MW; x++) col(x, h); flag = { x: (MW - 5) * T, y: (MH - h) * T };
   spawn = { x: 3 * T, y: (MH - 3) * T - 40 };
 }
+/* Suelo bajo el personaje: la sombra proyectada se dibuja ahí y se encoge al saltar */
+function groundY(o) { const tx = Math.floor((o.x + o.w / 2) / T); for (let ty = Math.max(0, Math.floor((o.y + o.h - 1) / T)); ty < MH; ty++) { const v = map[ty] && map[ty][tx]; if (v === 1 || v === 2 || v === 3) return ty * T; } return null; }
 function mkP(s) { return { x: s.x, y: s.y, vx: 0, vy: 0, w: 22, h: 30, face: 1, ground: false, state: 'idle', wall: 0 }; }
 function build() { check = null; checks = []; inv = 0; go = 0; gen(); p = mkP(spawn); t = 0; rope = null; dashT = 0; dashCd = 0; swordT = 0; jumpBuf = 0; coyote = 0; dead = 0; intro = 1.6; landSq = 0; cx = 0; cy = (MH * T - H); }
 function reset() { if (RACE) return raceNew(); level = 1; lives = 4; score = 0; coinsGot = 0; build(); }
@@ -127,12 +129,13 @@ function drw() {
   for (const co of coins) if (!co.got && co.x > cx - 20 && co.x < cx + W + 20) ART.coin(c, co.x, co.y, t);
   for (const e of enemies) if (e.alive && e.x > cx - 40 && e.x < cx + W + 40) ART.enemy(c, TH.enemy, e.x, e.fly ? e.y - 20 + Math.sin(t * 2 + e.min) * 16 : e.y, e.w, e.h, { t, face: e.vx > 0 ? 1 : -1 });
   if (rope) { c.strokeStyle = ART.OUT; c.lineWidth = 4; c.beginPath(); c.moveTo(rope.a.x, rope.a.y); c.lineTo(p.x + 11, p.y + 12); c.stroke(); c.strokeStyle = '#e6d3a3'; c.lineWidth = 2; c.stroke(); }
-  if (dashT > 0) { c.globalAlpha = 0.35; ART.hero(c, p.x + 11 - p.face * 18, p.y + p.h, 1, { face: p.face, state: 'run', t, col: TH.hero }); c.globalAlpha = 1; }
+  if (dashT > 0) { c.globalAlpha = 0.35; ART.hero(c, p.x + 11 - p.face * 18, p.y + p.h, HS, { face: p.face, state: 'run', t, col: TH.hero }); c.globalAlpha = 1; }
   const sq = landSq > 0 ? landSq : landSq < 0 ? landSq : 0;
   if (inv > 0 && !dead && Math.floor(t * 12) % 2) c.globalAlpha = 0.45;
-  ART.hero(c, p.x + 11, p.y + p.h, 1, { face: p.face, state: dead ? 'fall' : p.state, t, col: TH.hero, squash: sq, sword: A.sword ? (swordT > 0 ? -1.6 + (0.22 - swordT) * 14 : 0.5) : 0 }); c.globalAlpha = 1;
+  ART.hero(c, p.x + 11, p.y + p.h, HS, { face: p.face, state: dead ? 'fall' : p.state, t, col: TH.hero, squash: sq, gy: dead ? null : groundY(p), sword: A.sword ? (swordT > 0 ? -1.6 + (0.22 - swordT) * 14 : 0.5) : 0 }); c.globalAlpha = 1;
   if (swordT > 0) { c.strokeStyle = 'rgba(255,255,255,.8)'; c.lineWidth = 4; c.beginPath(); c.arc(p.x + 11, p.y + 12, 30, p.face > 0 ? -1.3 : 1.8, p.face > 0 ? 1.1 : 4.2); c.stroke(); }
   c.restore();
+  ART.vignette(c, W, H);
   // HUD
   for (let i = 0; i < 4; i++) ART.heart(c, 22 + i * 24, 22, 1.25, i < lives);
   ART.coin(c, 128, 22, 0, 8); label(`× ${coinsGot}`, 140, 13, 17, '#fff');
@@ -242,11 +245,12 @@ function raceDraw() {
   for (const co of coins) if (!co.got && co.x > cx - 20 && co.x < cx + W + 20) ART.coin(c, co.x, co.y, t);
   for (const e of enemies) if (e.alive && e.x > cx - 40 && e.x < cx + W + 40) ART.enemy(c, TH.enemy, e.x, e.fly ? e.y - 20 + Math.sin(t * 2 + e.min) * 16 : e.y, e.w, e.h, { t, face: e.vx > 0 ? 1 : -1 });
   for (const r of R.rs) { if (r.out) continue;
-    if (r.dashT > 0) { c.globalAlpha = 0.35; ART.hero(c, r.x + 11 - r.face * 18, r.y + r.h, 1, { face: r.face, state: 'run', t, col: r.col }); c.globalAlpha = 1; }
-    ART.hero(c, r.x + 11, r.y + r.h, 1, { face: r.face, state: r.dead ? 'fall' : r.state, t: t + r.pl * 0.3, col: r.col, squash: r.sq > 0 ? r.sq : 0 });
+    if (r.dashT > 0) { c.globalAlpha = 0.35; ART.hero(c, r.x + 11 - r.face * 18, r.y + r.h, HS, { face: r.face, state: 'run', t, col: r.col }); c.globalAlpha = 1; }
+    ART.hero(c, r.x + 11, r.y + r.h, HS, { face: r.face, state: r.dead ? 'fall' : r.state, t: t + r.pl * 0.3, col: r.col, squash: r.sq > 0 ? r.sq : 0, gy: r.dead ? null : groundY(r) });
     if (r.stun > 0) for (let i = 0; i < 3; i++) { const a = t * 6 + i * 2.1; c.fillStyle = '#ffd23d'; c.beginPath(); c.arc(r.x + 11 + Math.cos(a) * 12, r.y - 6 + Math.sin(a) * 4, 3, 0, 6.283); c.fill(); }
     label(r.cpu ? 'CPU' : r.name, r.x + 11, r.y - 26, 14, r.cpu ? '#e8e4f4' : r.col, 'center'); }
   c.restore();
+  ART.vignette(c, W, H);
   /* borde que elimina */
   const gr = c.createLinearGradient(0, 0, 28, 0); gr.addColorStop(0, `rgba(255,60,90,${0.3 + Math.sin(t * 6) * 0.08})`); gr.addColorStop(1, 'rgba(255,60,90,0)'); c.fillStyle = gr; c.fillRect(0, 0, 28, H);
   /* marcador: rondas ganadas y barra de progreso con la posición de cada uno */
