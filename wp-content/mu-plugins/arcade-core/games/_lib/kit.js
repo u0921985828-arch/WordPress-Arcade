@@ -48,6 +48,264 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
     if (hp) { hud.style.transform = 'none'; hud.style.left = hp.includes('l') ? '8px' : 'auto'; hud.style.right = hp.includes('r') ? '8px' : 'auto'; if (hp.includes('b')) { hud.style.top = 'auto'; hud.style.bottom = 'max(8px,env(safe-area-inset-bottom))'; } }
     // alpha:false = lienzo opaco: el navegador lo compone sin mezclar con la página (menos trabajo por frame, menos latencia).
     const ctx = cv.getContext('2d', { alpha: false });
+    /* ---------- Compositor WebGL2 (remaster R1) ----------------------------------------------
+       El juego sigue pintando en canvas 2D (cv, k.ctx): no cambia ni una línea de los motores.
+       Lo que cambia es el último paso: si el navegador tiene WebGL2, ese lienzo se sube como
+       textura «albedo» y se compone con luz, oclusión de contacto, bloom, gradación por LUT,
+       viñeta, grano y tonemap. Capas opcionales que el motor puede escribir:
+         k.glow(fn)   → capa emisiva (lo que brilla): fn(g) pinta en coordenadas del juego.
+         k.relief(fn) → relieve (gris: 0 fondo, 255 cerca); de él salen las normales por Sobel.
+         k.light(x,y,r,col,i) → hasta 8 luces puntuales de ese frame, en coordenadas del juego.
+       Sin WebGL2 (o si falla la creación del contexto) se enseña el lienzo 2D tal cual, sin
+       errores: los tres métodos existen siempre y no hacen nada. Con ?gfx=0 se desactiva. */
+    const GXOFF = /[?&](gfx|nogl)=0/.test(location.search) || (window.CFG && window.CFG.gfx === false);
+    const GX = GXOFF ? null : (function () {
+      const glc = document.createElement('canvas');
+      let gl = null;
+      try { gl = glc.getContext('webgl2', { alpha: false, depth: false, stencil: false, antialias: false, premultipliedAlpha: false, powerPreference: 'high-performance' }); } catch (e) { gl = null; }
+      if (!gl) return null;
+
+      const VS = `#version 300 es
+in vec2 p;out vec2 v;void main(){v=p*.5+.5;gl_Position=vec4(p,0.,1.);}`;
+      /* Desenfoque separable de 5 tomas (con muestreo lineal): también sirve de copia si uStep=0. */
+      const FS_BLUR = `#version 300 es
+precision mediump float;in vec2 v;out vec4 o;uniform sampler2D uS;uniform vec2 uStep;
+void main(){vec4 c=texture(uS,v)*.2270270;vec2 a=uStep*1.3846154,b=uStep*3.2307692;
+c+=(texture(uS,v+a)+texture(uS,v-a))*.3162162;c+=(texture(uS,v+b)+texture(uS,v-b))*.0702703;o=c;}`;
+      /* Luz (media resolución): normales por Sobel del relieve, direccional arriba-izquierda,
+         especular controlado, oclusión de contacto y hasta 8 luces puntuales. El resultado es un
+         multiplicador en [0,2] guardado a la mitad (RGBA8 no llega a 2). */
+      const FS_LIGHT = `#version 300 es
+precision mediump float;in vec2 v;out vec4 o;
+uniform sampler2D uH;uniform vec2 uTex;uniform float uHOn,uStr,uAmb,uSunK,uSpec,uAo,uAsp;
+uniform int uNL;uniform vec4 uLP[8];uniform vec3 uLC[8];
+const vec3 SUN=vec3(-0.5184,0.5844,0.6242);
+void main(){
+  vec3 n=vec3(0.,0.,1.);float ao=1.;
+  if(uHOn>.5){
+    float tl=texture(uH,v+vec2(-uTex.x,uTex.y)).r,tc=texture(uH,v+vec2(0.,uTex.y)).r,tr=texture(uH,v+uTex).r;
+    float ml=texture(uH,v+vec2(-uTex.x,0.)).r,mc=texture(uH,v).r,mr=texture(uH,v+vec2(uTex.x,0.)).r;
+    float bl=texture(uH,v-uTex).r,bc=texture(uH,v+vec2(0.,-uTex.y)).r,br=texture(uH,v+vec2(uTex.x,-uTex.y)).r;
+    float gx=(tl+2.*ml+bl)-(tr+2.*mr+br),gy=(bl+2.*bc+br)-(tl+2.*tc+tr);
+    n=normalize(vec3(gx*uStr,gy*uStr,1.));
+    float avg=(tl+tc+tr+ml+mr+bl+bc+br)*.125;
+    ao=1.-clamp((avg-mc)*2.2,0.,1.)*uAo;
+  }
+  float nl=max(0.,dot(n,SUN));
+  vec3 lit=vec3(uAmb+uSunK*nl);
+  if(uHOn>.5){vec3 hv=normalize(SUN+vec3(0.,0.,1.));lit+=vec3(pow(max(0.,dot(n,hv)),26.)*uSpec);}
+  for(int i=0;i<8;i++){
+    if(i>=uNL)break;
+    vec2 d=vec2((v.x-uLP[i].x)*uAsp,v.y-uLP[i].y);
+    float dl=length(d)/max(1e-4,uLP[i].z);
+    if(dl>=1.)continue;
+    float att=1.-dl;att*=att;
+    float wrap=.62+.38*max(0.,dot(n,normalize(vec3(-d.x,-d.y,.55))));
+    lit+=uLC[i]*(att*uLP[i].w*wrap);
+  }
+  o=vec4(lit*ao*.5,1.);
+}`;
+      /* Pase final (resolución completa): albedo × luz + bloom, tonemap fílmico, LUT de
+         gradación, viñeta, grano fino y aberración cromática sólo en los bordes. */
+      const FS_FINAL = `#version 300 es
+precision mediump float;in vec2 v;out vec4 o;
+uniform sampler2D uA,uL,uB,uLut;
+uniform vec2 uRes;uniform float uT,uLightOn,uBloomOn,uBloomK,uVig,uGrain,uCa,uMix,uExp,uWhite;
+float th(float t){float e=exp(-2.*t);return (1.-e)/(1.+e);}
+float sh(float x){return x<.82?x:.82+.18*th((x-.82)/.18);}
+vec3 tm(vec3 x){return vec3(sh(x.r),sh(x.g),sh(x.b));}
+vec3 lut(vec3 c){
+  c=clamp(c,0.,1.);
+  float N=16.,sl=1./16.,px=1./256.,inr=px*15.;
+  float zs=c.b*15.,z0=floor(zs),fz=zs-z0;
+  float xo=px*.5+c.r*inr,y=(.5+c.g*15.)/16.;
+  return mix(texture(uLut,vec2(z0*sl+xo,y)).rgb,texture(uLut,vec2(min(z0+1.,15.)*sl+xo,y)).rgb,fz);
+}
+float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
+void main(){
+  vec2 d=v-.5;float r2=dot(d,d);
+  vec3 col;
+  if(uCa>0.){vec2 of=d*r2*uCa;col=vec3(texture(uA,v+of).r,texture(uA,v).g,texture(uA,v-of).b);}
+  else col=texture(uA,v).rgb;
+  if(uLightOn>.5)col*=texture(uL,v).rgb*2.;
+  if(uBloomOn>.5)col+=texture(uB,v).rgb*uBloomK;
+  col=clamp(tm(col*uExp)/uWhite,0.,1.);
+  col=mix(col,lut(col),uMix);
+  col*=1.-uVig*smoothstep(.16,.78,r2);
+  col+=(hash(v*uRes+vec2(uT,uT*1.7))-.5)*uGrain;
+  o=vec4(col,1.);
+}`;
+
+      let bad = '';
+      const mk = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { bad = gl.getShaderInfoLog(s) || 'shader'; gl.deleteShader(s); return null; } return s; };
+      function prog(fs) {
+        const a = mk(gl.VERTEX_SHADER, VS), b = mk(gl.FRAGMENT_SHADER, fs);
+        if (!a || !b) return null;
+        const p = gl.createProgram(); gl.attachShader(p, a); gl.attachShader(p, b); gl.bindAttribLocation(p, 0, 'p'); gl.linkProgram(p);
+        gl.deleteShader(a); gl.deleteShader(b);
+        if (!gl.getProgramParameter(p, gl.LINK_STATUS)) { bad = gl.getProgramInfoLog(p) || 'link'; return null; }
+        p._u = {};
+        return p;
+      }
+      const P_BLUR = prog(FS_BLUR), P_LIGHT = prog(FS_LIGHT), P_FINAL = prog(FS_FINAL);
+      if (!P_BLUR || !P_LIGHT || !P_FINAL) return null;
+      const U = (p, n) => (n in p._u) ? p._u[n] : (p._u[n] = gl.getUniformLocation(p, n));
+
+      const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+      const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+      function tex(tw, th, data) {
+        const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, tw, th, 0, gl.RGBA, gl.UNSIGNED_BYTE, data || null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        return t;
+      }
+      function target(tw, th) {
+        const t = tex(tw, th), f = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        return { t, f, w: tw, h: th };
+      }
+
+      /* ---- LUT 3D (16³) generada por código: sin ficheros ni recursos de terceros ---- */
+      /* [templanza R, templanza B, saturación, contraste, elevación de negros, tinte de sombras] */
+      const GR = {
+        _: [1.015, 1.010, 1.06, 1.08, 0.012, 0.018],
+        meadow: [1.02, 0.995, 1.09, 1.08, 0.010, 0.014],
+        snow: [0.965, 1.075, 1.04, 1.14, 0.008, 0.040],
+        night: [0.955, 1.085, 1.02, 1.16, 0.014, 0.044],
+        castle: [1.055, 0.955, 1.07, 1.10, 0.014, 0.020],
+        factory: [1.02, 0.965, 1.05, 1.12, 0.012, 0.016],
+        dusk: [1.085, 0.945, 1.10, 1.09, 0.020, 0.024],
+        jungle: [0.985, 0.995, 1.10, 1.10, 0.010, 0.020],
+        sky: [0.985, 1.045, 1.06, 1.07, 0.008, 0.030],
+        canyon: [1.075, 0.945, 1.09, 1.10, 0.016, 0.018],
+        neon: [1.02, 1.055, 1.12, 1.16, 0.016, 0.040],
+        rally: [1.045, 0.975, 1.08, 1.09, 0.012, 0.018],
+        skate: [1.045, 0.995, 1.09, 1.10, 0.014, 0.022],
+        voxel: [0.985, 1.025, 1.07, 1.08, 0.010, 0.024]
+      };
+      function lutTex(theme) {
+        const g = GR[theme] || GR._, N = 16, d = new Uint8Array(N * N * N * 4);
+        for (let b = 0; b < N; b++) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          let r = x / (N - 1) * g[0], gg = y / (N - 1), bb = b / (N - 1) * g[1];
+          const lum = 0.299 * r + 0.587 * gg + 0.114 * bb;
+          r = lum + (r - lum) * g[2]; gg = lum + (gg - lum) * g[2]; bb = lum + (bb - lum) * g[2];
+          const S = (c) => { const t = Math.max(0, Math.min(1, c)); return t + (t * t * (3 - 2 * t) - t) * (g[3] - 1) * 1.8; };
+          r = S(r); gg = S(gg); bb = S(bb);
+          const sh = Math.max(0, 1 - lum * 2.2);           // sólo las sombras se tiñen
+          r += g[4] * (1 - r); gg += g[4] * (1 - gg) + g[5] * sh * 0.3; bb += g[4] * (1 - bb) + g[5] * sh;
+          const i = ((y * N * N) + (b * N) + x) * 4;
+          d[i] = Math.max(0, Math.min(255, r * 255 + 0.5)) | 0;
+          d[i + 1] = Math.max(0, Math.min(255, gg * 255 + 0.5)) | 0;
+          d[i + 2] = Math.max(0, Math.min(255, bb * 255 + 0.5)) | 0;
+          d[i + 3] = 255;
+        }
+        return tex(N * N, N, d);
+      }
+      const TLUT = lutTex((window.CFG && window.CFG.theme) || '_');
+
+      const TA = tex(2, 2), TE = tex(2, 2), TH = tex(2, 2);      // albedo / emisivo / relieve
+      let LIT = null, B0 = null, B1 = null, H0 = null, H1 = null, VW = 0, VH = 0;
+      let lost = false;
+      glc.addEventListener('webglcontextlost', (e) => { e.preventDefault(); lost = true; }, false);
+
+      /* Tonemap con hombro suave: identidad hasta 0,82 y compresión por encima (los colores
+         saturados y el bloom no se queman). Se normaliza para que el blanco siga siendo blanco. */
+      const EXP = 1, WHITE = (function () { const t = (1 - 0.82) / 0.18, e = Math.exp(-2 * t); return 0.82 + 0.18 * ((1 - e) / (1 + e)); })();
+
+      function resize(cssW, cssH, pw, ph, hw, hh) {
+        glc.style.width = cssW + 'px'; glc.style.height = cssH + 'px';
+        glc.width = pw; glc.height = ph;
+        VW = pw; VH = ph;
+        if (!LIT || LIT.w !== hw || LIT.h !== hh) {
+          for (const o2 of [LIT, B0, B1, H0, H1]) if (o2) { gl.deleteTexture(o2.t); gl.deleteFramebuffer(o2.f); }
+          LIT = target(hw, hh); H0 = target(hw, hh); H1 = target(hw, hh);
+          const qw = Math.max(2, hw >> 1), qh = Math.max(2, hh >> 1);
+          B0 = target(qw, qh); B1 = target(qw, qh);
+        }
+      }
+
+      function pass(p, dst) {
+        if (dst) { gl.bindFramebuffer(gl.FRAMEBUFFER, dst.f); gl.viewport(0, 0, dst.w, dst.h); }
+        else { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, VW, VH); }
+        gl.useProgram(p); gl.drawArrays(gl.TRIANGLES, 0, 3);
+      }
+      const bind = (unit, t) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t); };
+
+      const LP = new Float32Array(32), LC = new Float32Array(24);
+
+      /* opt: {emissive:canvas|null, height:canvas|null, lights:[...], nl, grain, vig, ca, mix, bloom, str, ao, spec} */
+      function frame(src, opt) {
+        if (lost) return false;
+        gl.bindVertexArray(vao);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        bind(0, TA); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
+
+        const useH = !!opt.height, nl = opt.nl | 0, useL = useH || nl > 0, useB = !!opt.emissive;
+        if (useH) { bind(2, TH); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, opt.height); }
+        if (useB) { bind(1, TE); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, opt.emissive); }
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+
+        if (useH) {                                   // --- relieve suavizado: bisel ancho, no de 1 píxel
+          gl.useProgram(P_BLUR); gl.uniform1i(U(P_BLUR, 'uS'), 2);
+          gl.uniform2f(U(P_BLUR, 'uStep'), 1.1 / H0.w, 0); pass(P_BLUR, H0);
+          gl.uniform1i(U(P_BLUR, 'uS'), 7); bind(7, H0.t);
+          gl.uniform2f(U(P_BLUR, 'uStep'), 0, 1.1 / H0.h); pass(P_BLUR, H1);
+          bind(7, H1.t);
+        }
+        if (useL) {                                   // --- luz + oclusión, a media resolución
+          gl.useProgram(P_LIGHT);
+          gl.uniform1i(U(P_LIGHT, 'uH'), 7);
+          gl.uniform2f(U(P_LIGHT, 'uTex'), 1 / LIT.w, 1 / LIT.h);
+          gl.uniform1f(U(P_LIGHT, 'uHOn'), useH ? 1 : 0);
+          gl.uniform1f(U(P_LIGHT, 'uStr'), opt.str);
+          gl.uniform1f(U(P_LIGHT, 'uAmb'), useH ? 0.70 : 1);
+          gl.uniform1f(U(P_LIGHT, 'uSunK'), useH ? 0.40 : 0);
+          gl.uniform1f(U(P_LIGHT, 'uSpec'), opt.spec);
+          gl.uniform1f(U(P_LIGHT, 'uAo'), opt.ao);
+          gl.uniform1f(U(P_LIGHT, 'uAsp'), opt.asp);
+          gl.uniform1i(U(P_LIGHT, 'uNL'), nl);
+          if (nl) { gl.uniform4fv(U(P_LIGHT, 'uLP'), LP); gl.uniform3fv(U(P_LIGHT, 'uLC'), LC); }
+          pass(P_LIGHT, LIT);
+        }
+        if (useB) {                                   // --- bloom: reducción + desenfoque separable
+          gl.useProgram(P_BLUR); gl.uniform1i(U(P_BLUR, 'uS'), 1);
+          gl.uniform2f(U(P_BLUR, 'uStep'), 0.5 / B0.w, 0.5 / B0.h);
+          pass(P_BLUR, B0);
+          gl.uniform1i(U(P_BLUR, 'uS'), 3);
+          bind(3, B0.t); gl.uniform2f(U(P_BLUR, 'uStep'), 1.35 / B0.w, 0); pass(P_BLUR, B1);
+          bind(3, B1.t); gl.uniform2f(U(P_BLUR, 'uStep'), 0, 1.35 / B0.h); pass(P_BLUR, B0);
+        }
+        gl.useProgram(P_FINAL);                       // --- compuesto final a pantalla
+        bind(4, LIT ? LIT.t : TA); bind(5, B0 ? B0.t : TA); bind(6, TLUT);
+        gl.uniform1i(U(P_FINAL, 'uA'), 0); gl.uniform1i(U(P_FINAL, 'uL'), 4);
+        gl.uniform1i(U(P_FINAL, 'uB'), 5); gl.uniform1i(U(P_FINAL, 'uLut'), 6);
+        gl.uniform2f(U(P_FINAL, 'uRes'), VW, VH);
+        gl.uniform1f(U(P_FINAL, 'uT'), opt.t);
+        gl.uniform1f(U(P_FINAL, 'uLightOn'), useL ? 1 : 0);
+        gl.uniform1f(U(P_FINAL, 'uBloomOn'), useB ? 1 : 0);
+        gl.uniform1f(U(P_FINAL, 'uBloomK'), opt.bloom);
+        gl.uniform1f(U(P_FINAL, 'uVig'), opt.vig);
+        gl.uniform1f(U(P_FINAL, 'uGrain'), opt.grain);
+        gl.uniform1f(U(P_FINAL, 'uCa'), opt.ca);
+        gl.uniform1f(U(P_FINAL, 'uMix'), opt.mix);
+        gl.uniform1f(U(P_FINAL, 'uExp'), EXP);
+        gl.uniform1f(U(P_FINAL, 'uWhite'), WHITE);
+        pass(P_FINAL, null);
+        return true;
+      }
+      return { el: glc, resize, frame, lights: { LP, LC }, sync: () => gl.finish(), dead: () => lost };
+    })();
+    let gxOn = !!GX;
+    if (gxOn) { document.body.insertBefore(GX.el, ov); cv.style.visibility = 'hidden'; }
     const k = { w, h, ctx, cv, held: new Set(), hit: new Set(), ptr: { x: w / 2, y: h / 2, down: false, hit: false, up: false }, swipe: null, tap: false, scale: 1 };
 
     function fit() {
@@ -56,6 +314,7 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
       cv.style.width = w * s + 'px'; cv.style.height = h * s + 'px';
       cv.width = Math.round(w * s * dpr); cv.height = Math.round(h * s * dpr);
       ctx.setTransform(s * dpr, 0, 0, s * dpr, 0, 0);
+      if (gxOn) GX.resize(w * s, h * s, cv.width, cv.height, Math.max(2, cv.width >> 1), Math.max(2, cv.height >> 1));
     }
     addEventListener('resize', () => { fit(); pDrawn = 0; }); fit();
 
@@ -293,6 +552,39 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
     /* Al terminar la partida, 0,45 s sin aceptar «otra vez»: un toque que ya iba de camino no se salta la pantalla final. */
     let stSeen = k.st;
     const stWatch = () => { if (k.st !== stSeen) { if (k.st === 'over') lockT = Math.max(lockT, performance.now() + 450); stSeen = k.st; } };
+    /* ---------- Capas del compositor: emisivo, relieve y luces (API nueva y mínima) ----------
+       Un motor que no llame a nada se ve igual que siempre, sólo con el acabado (gradación,
+       viñeta, grano) encima. Sin WebGL2 los tres métodos existen y no hacen nada. */
+    let eCv = null, eCx = null, hCv = null, hCx = null, eUse = false, hUse = false, nL = 0, gxMs = 0;
+    k.gfx = gxOn;
+    if (gxOn) {
+      const EW = Math.max(2, Math.ceil(w / 2)), EH = Math.max(2, Math.ceil(h / 2));
+      const layer = () => { const c2 = document.createElement('canvas'); c2.width = EW; c2.height = EH; const x2 = c2.getContext('2d'); x2.setTransform(EW / w, 0, 0, EH / h, 0, 0); return [c2, x2]; };
+      const wipe = (x2) => { x2.save(); x2.setTransform(1, 0, 0, 1, 0, 0); x2.clearRect(0, 0, EW, EH); x2.restore(); };
+      k.glow = (fn) => { if (!eCx) { const r = layer(); eCv = r[0]; eCx = r[1]; } if (!eUse) { wipe(eCx); eUse = true; } fn(eCx); };
+      k.relief = (fn) => { if (!hCx) { const r = layer(); hCv = r[0]; hCx = r[1]; } if (!hUse) { wipe(hCx); hUse = true; } fn(hCx); };
+      const CCOL = {}, LP = GX.lights.LP, LC = GX.lights.LC;
+      const rgb = (c) => { let v2 = CCOL[c]; if (v2) return v2; let r = 1, g = 1, b = 1;
+        if (typeof c === 'string' && c.charAt(0) === '#') { let t = c.slice(1); if (t.length === 3) t = t[0] + t[0] + t[1] + t[1] + t[2] + t[2]; const n = parseInt(t.slice(0, 6), 16); if (!isNaN(n)) { r = (n >> 16 & 255) / 255; g = (n >> 8 & 255) / 255; b = (n & 255) / 255; } }
+        else if (Array.isArray(c)) { r = c[0]; g = c[1]; b = c[2]; }
+        v2 = [r, g, b]; CCOL[c] = v2; return v2; };
+      /* Luz puntual de este frame, en coordenadas del juego. Se olvida al componer. */
+      k.light = (x, y, r, col, i) => {
+        if (nL >= 8) return; const c = rgb(col || '#ffd9a0'), o2 = nL * 4, o3 = nL * 3;
+        LP[o2] = x / w; LP[o2 + 1] = 1 - y / h; LP[o2 + 2] = Math.max(1, r) / h; LP[o2 + 3] = i == null ? 1 : i;
+        LC[o3] = c[0]; LC[o3 + 1] = c[1]; LC[o3 + 2] = c[2]; nL++;
+      };
+    } else { k.glow = () => {}; k.relief = () => {}; k.light = () => {}; }
+    let rmo = false; try { rmo = matchMedia('(prefers-reduced-motion:reduce)').matches; } catch (e) {}
+    const GOPT = { emissive: null, height: null, nl: 0, asp: w / h, t: 0,
+      grain: rmo ? 0.012 : 0.02, vig: 0.28, ca: rmo ? 0 : 0.0009, mix: 1, bloom: 0.85, str: 4.2, ao: 0.72, spec: 0.5 };
+    function composite(t) {
+      GOPT.emissive = eUse ? eCv : null; GOPT.height = hUse ? hCv : null; GOPT.nl = nL;
+      GOPT.t = rmo ? 0.5 : (t * 0.0017) % 977;
+      const t0 = performance.now();
+      if (!GX.frame(cv, GOPT)) { gxOn = false; k.gfx = false; cv.style.visibility = ''; GX.el.style.display = 'none'; return; }
+      gxMs += (performance.now() - t0 - gxMs) * 0.08; k.gfxMs = gxMs;
+    }
     k.run = (update, draw) => {
       let last = performance.now();
       function frame(t) {
@@ -303,7 +595,9 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
         if (k.paused) { if (k.ptr.hit || k.hit.has('a') || k.hit.has('pause') || PADS.some((q) => q && q.hit.has('a'))) { setPause(false); if (k.ptr.down) k._skipUp = true; } }
         else { if (k.hit.has('pause') && k.st === 'play') setPause(true); else { stWatch(); update(dt); stWatch(); } }
         const sx = shakeA ? (Math.random() - 0.5) * shakeA * 2 : 0, sy = shakeA ? (Math.random() - 0.5) * shakeA * 2 : 0; shakeA = Math.max(0, shakeA - dt * 30);
+        if (gxOn) { eUse = false; hUse = false; nL = 0; }
         ctx.save(); ctx.translate(sx, sy); draw(); ctx.restore(); if (!k.paused) cdTick(dt); cdDraw(); fx(k.paused ? 0 : dt);
+        if (gxOn) composite(t);
         k.hit.clear(); for (const q of PADS) if (q) q.hit.clear(); k.ptr.hit = false; k.ptr.up = false; k.swipe = null; k.tap = false;
         requestAnimationFrame(frame);
       }

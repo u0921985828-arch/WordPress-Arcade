@@ -1057,5 +1057,33 @@ const ART = (() => {
     const v = seed != null ? Math.floor(Math.abs(seed) * 3) % 3 : Math.floor(rnd(Math.round(x) * 0.37) * 3);
     c.drawImage(decoSprite(c, th, k, v), x - 50, y - 84, 100, 90);
   }
-  return { THEMES, background, tile, hero, enemy, coin, flag, anchor, heart, deco, vignette, rr, fillOut, OUT, mix, lite, dark, alpha, shadow, glint, eyes };
+  /* ---------- Remaster R1: apoyo para el compositor WebGL2 de kit.js ----------
+     glow(g,...) pinta un halo suave en la capa emisiva (k.glow) con un sprite cacheado: nada de
+     crear degradados dentro del bucle. keyLight() dice dónde está el foco principal del tema para
+     declararlo como luz (k.light) y que coincida con el sol/luna que pinta background(). */
+  const GCACHE = {};
+  function glowSprite(col) {
+    let q = GCACHE[col]; if (q) return q;
+    let hx = (col.charAt(0) === '#' ? col.slice(1) : col);
+    if (hx.length === 3) hx = hx.charAt(0) + hx.charAt(0) + hx.charAt(1) + hx.charAt(1) + hx.charAt(2) + hx.charAt(2);
+    const n = parseInt(hx.slice(0, 6), 16) || 0xffffff, R = n >> 16 & 255, G = n >> 8 & 255, B = n & 255;
+    q = document.createElement('canvas'); q.width = q.height = 64;
+    const g = q.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, `rgba(${R},${G},${B},1)`); gr.addColorStop(0.3, `rgba(${R},${G},${B},.62)`);
+    gr.addColorStop(0.62, `rgba(${R},${G},${B},.2)`); gr.addColorStop(1, `rgba(${R},${G},${B},0)`);
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64); GCACHE[col] = q; return q;
+  }
+  function glow(g, x, y, r, col, a) {
+    const q = glowSprite(col || '#ffffff');
+    if (a != null) g.globalAlpha = a;
+    g.drawImage(q, x - r, y - r, r * 2, r * 2);
+    if (a != null) g.globalAlpha = 1;
+  }
+  function keyLight(th, W, H, camY) {
+    if (!th) return { x: W * 0.2, y: H * 0.18, r: H * 1.4, col: '#ffe9a8', i: 0.4 };
+    if (th.id === 'dusk') return { x: W * 0.27, y: H * 0.5 - (camY || 0) * 0.03, r: H * 1.3, col: '#ffb070', i: 0.52 };
+    const cold = !!(th.moon || th.brick);
+    return { x: W * 0.2, y: H * 0.18, r: H * 1.45, col: cold ? '#a8bcff' : '#ffeaa6', i: cold ? 0.3 : 0.42 };
+  }
+  return { THEMES, background, tile, hero, enemy, coin, flag, anchor, heart, deco, vignette, rr, fillOut, OUT, mix, lite, dark, alpha, shadow, glint, eyes, glow, glowSprite, keyLight };
 })();

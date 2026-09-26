@@ -1979,6 +1979,39 @@ function wrap(s, x, y, maxW, size, col) {
   c.font = `600 ${size}px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif`; c.textAlign = 'center'; c.textBaseline = 'top'; c.fillStyle = col;
   let line = '', yy = y; for (const w of s.split(' ')) { const tl = line ? line + ' ' + w : w; if (c.measureText(tl).width > maxW && line) { c.fillText(line, x, yy); line = w; yy += size + 4; } else line = tl; } c.fillText(line, x, yy);
 }
+/* ---------- Remaster R1: capas para el compositor WebGL2 de kit.js ----------
+   La sala es un interior: la luz la ponen las antorchas (LPOS/LCOL), los proyectiles y el botín.
+   relief() da volumen a los muros y a los bloques (normales por Sobel y oclusión de contacto),
+   glow() pinta las llamas y los disparos en la capa emisiva y light() declara los focos del
+   frame. Sin WebGL2 los tres métodos no hacen nada y la sala se ve como siempre. */
+function gfx() {
+  if (!k.gfx) return;
+  const fl = (x) => 0.86 + Math.sin(t * 13 + x) * 0.08 + Math.sin(t * 7.3 + x * 2) * 0.07;
+  k.relief((g) => {
+    g.fillStyle = '#5a5a5a'; g.fillRect(X0, Y0, X1 - X0, Y1 - Y0);      // suelo: plano medio
+    g.fillStyle = '#d8d8d8';                                            // muros: lo más alto
+    g.fillRect(0, 0, W, Y0); g.fillRect(0, Y0, X0, H - Y0); g.fillRect(X1, Y0, W - X1, H - Y0); g.fillRect(0, Y1, W, H - Y1);
+    g.fillStyle = '#b4b4b4';
+    for (const w of walls) if (!w.open) g.fillRect(w.x, w.y, w.w, w.h);
+    g.fillStyle = '#9c9c9c';
+    for (const f of foes) if (!f.dead) { g.beginPath(); g.arc(f.x, f.y, f.r, 0, R2); g.fill(); }
+    for (const d of drops) { g.beginPath(); g.arc(d.x, d.y, 7, 0, R2); g.fill(); }
+    g.fillStyle = '#c8c8c8'; g.beginPath(); g.arc(p.x, p.y, p.r, 0, R2); g.fill();
+  });
+  k.glow((g) => {
+    if (TH.light) for (const x of LPOS) ART.glow(g, x, 10, 15 * fl(x), LCOL, 0.95);
+    for (const s2 of shots) ART.glow(g, s2.x, s2.y, 13, tankM ? '#ffb45a' : TH.shot, 0.85);
+    for (const s2 of eshots) ART.glow(g, s2.x, s2.y, 12, '#ff5f7a', 0.7);
+    for (const d of drops) ART.glow(g, d.x, d.y, 11, d.k === 'coin' ? '#ffc928' : '#ff5f7a', 0.45);
+    if (swing > 0) ART.glow(g, p.x + Math.cos(p.swingA) * 34, p.y - 4 + Math.sin(p.swingA) * 34, 26, '#ffffff', swing / 0.18 * 0.7);
+    for (const q of pend) ART.glow(g, q.x, q.y, q.boss ? 26 : 16, q.boss ? '#ff3b5c' : '#b98cff', 0.35);
+  });
+  if (TH.light) for (const x of LPOS) k.light(x, Y0 - 2, 185, LCOL, 0.36 * fl(x));
+  let n = LPOS.length;
+  for (const s2 of shots) { if (n >= 7) break; n++; k.light(s2.x, s2.y, 64, tankM ? '#ffb45a' : TH.shot, 0.42); }
+  for (const s2 of eshots) { if (n >= 8) break; n++; k.light(s2.x, s2.y, 56, '#ff5f7a', 0.34); }
+  if (n < 8) k.light(p.x, p.y, 96, '#9fe8ff', 0.18);
+}
 function draw() {
   if (VS) return vsDraw();
   if (COOP) return coopDraw();
@@ -1997,7 +2030,7 @@ function draw() {
   for (const s of eshots) { c.beginPath(); c.arc(s.x, s.y, s.r, 0, R2); ART.fillOut(c, tankM ? '#3a3a46' : '#ff5f7a', 2); if (!tankM) { c.fillStyle = '#ffe0e6'; c.beginPath(); c.arc(s.x - 1, s.y - 1, s.r * 0.4, 0, R2); c.fill(); } }
   if (swing > 0 && M === 'crypt') { const a = p.swingA, rr = 38 * upg.reach; c.globalAlpha = swing / 0.18; c.strokeStyle = '#fff'; c.lineWidth = 7; c.lineCap = 'round'; c.beginPath(); c.arc(p.x, p.y - 4, rr, a - 1.1, a + 1.1); c.stroke(); c.strokeStyle = '#7df0ff'; c.lineWidth = 3; c.stroke(); c.globalAlpha = 1; }
   if (swing > 0 && M === 'brawl') { const a = p.swingA; c.globalAlpha = swing / 0.18; c.strokeStyle = '#ffd23d'; c.lineWidth = 4; c.lineCap = 'round'; for (const da of [-0.5, 0, 0.5]) { c.beginPath(); c.moveTo(p.x + Math.cos(a + da) * 22, p.y - 6 + Math.sin(a + da) * 22); c.lineTo(p.x + Math.cos(a + da) * 34 * upg.reach, p.y - 6 + Math.sin(a + da) * 34 * upg.reach); c.stroke(); } c.globalAlpha = 1; }
-  c.drawImage(vigCv, 0, 0, W, H);
+  c.drawImage(vigCv, 0, 0, W, H); gfx();
   if (k.ptr.down && !choice) { c.strokeStyle = 'rgba(255,255,255,.3)'; c.lineWidth = 2; c.beginPath(); c.arc(k.ptr.sx, k.ptr.sy, 40, 0, R2); c.stroke(); k.circle(k.ptr.sx + k.clamp(k.ptr.x - k.ptr.sx, -40, 40), k.ptr.sy + k.clamp(k.ptr.y - k.ptr.sy, -40, 40), 14, 'rgba(255,255,255,.35)'); }
   // HUD
   if (p.max <= 7) for (let i = 0; i < p.max; i++) ART.heart(c, 18 + i * 21, 19, 1.1, i < p.hp); // con muchas vidas, icono + número para no invadir el centro

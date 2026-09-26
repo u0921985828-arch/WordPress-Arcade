@@ -141,6 +141,46 @@ function drw() {
   ART.coin(c, 128, 22, 0, 8); label(`× ${coinsGot}`, 140, 13, 17, '#fff');
   label(`${score}`, W - 12, 8, 22, '#fff', 'right'); label(`Nivel ${level}`, W - 12, 34, 13, '#ffc928', 'right');
   if (intro > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, intro); ART.rr(c, W / 2 - 110, H / 2 - 38, 220, 64, 18); c.fillStyle = 'rgba(26,21,48,.8)'; c.fill(); label(`Nivel ${level}`, W / 2, H / 2 - 30, 30, '#fff', 'center'); label(CFG.title, W / 2, H / 2 + 4, 14, '#ffc928', 'center'); c.globalAlpha = 1; }
+  gfx();
+}
+/* ---------- Remaster R1: capas para el compositor WebGL2 de kit.js ----------
+   relief() = relieve del escenario y las figuras (de ahí salen las normales y la oclusión de
+   contacto); glow() = lo que brilla (sol, monedas, banderas, estela del esprint, espada);
+   light() = el sol del tema, el aura del héroe y las monedas cercanas. Sin WebGL2 no hace nada. */
+function gfx() {
+  if (!k.gfx) return;
+  const ox = -Math.round(cx), oy = -Math.round(cy), KL = ART.keyLight(TH, W, H, cy);
+  k.relief((g) => {
+    g.save(); g.translate(ox, oy);
+    const x0 = Math.max(0, Math.floor(cx / T) - 1), x1 = Math.min(MW, x0 + Math.ceil(W / T) + 3);
+    for (let y = 0; y < MH; y++) for (let x = x0; x < x1; x++) { const v = map[y][x]; if (!v) continue;
+      g.fillStyle = v === 1 ? '#8c8c8c' : v === 2 ? '#b4b4b4' : '#a0a0a0';
+      g.fillRect(x * T, y * T, T, v === 1 ? T : T * 0.45); }
+    g.fillStyle = '#c4c4c4';
+    for (const a of anchors) { g.beginPath(); g.arc(a.x, a.y, 9, 0, 6.283); g.fill(); }
+    for (const co of coins) if (!co.got && co.x > cx - 20 && co.x < cx + W + 20) { g.beginPath(); g.arc(co.x, co.y, 9, 0, 6.283); g.fill(); }
+    g.fillStyle = '#d2d2d2';
+    for (const e of enemies) if (e.alive && e.x > cx - 40 && e.x < cx + W + 40) g.fillRect(e.x, e.fly ? e.y - 20 : e.y, e.w, e.h);
+    g.fillStyle = '#f0f0f0'; if (!dead) g.fillRect(p.x + 2, p.y + 2, 18, p.h - 2);
+    g.restore();
+  });
+  k.glow((g) => {
+    ART.glow(g, KL.x, KL.y, 62, KL.col, 0.5);
+    g.save(); g.translate(ox, oy);
+    for (const co of coins) if (!co.got && co.x > cx - 20 && co.x < cx + W + 20) ART.glow(g, co.x, co.y, 15, '#ffd23d', 0.9);
+    ART.glow(g, flag.x + 8, flag.y - 78, 24, '#ff7f96', 0.55);
+    for (const q of checks) if (q.on) ART.glow(g, q.x + 8, q.y - 44, 20, '#7cf7a0', 0.6);
+    if (dashT > 0) ART.glow(g, p.x + 11 - p.face * 14, p.y + 14, 34, '#a8e4ff', 0.8);
+    if (swordT > 0) ART.glow(g, p.x + 11 + p.face * 26, p.y + 12, 28, '#ffffff', 0.85);
+    if (inv > 0 && !dead) ART.glow(g, p.x + 11, p.y + 14, 26, '#ffd9e6', 0.35 + 0.25 * Math.sin(t * 22));
+    g.restore();
+  });
+  k.light(KL.x, KL.y, KL.r * 0.5, KL.col, KL.i * 0.32);
+  const hx = p.x + 11 - cx, hy = p.y + 14 - cy;
+  k.light(hx, hy, 80, TH.hero, dashT > 0 ? 0.45 : 0.14);
+  let n = 0;
+  for (const co of coins) { if (n >= 4) break; if (co.got) continue; const sx = co.x - cx; if (sx < -14 || sx > W + 14 || Math.abs(co.x - p.x) > 240) continue; n++; k.light(sx, co.y - cy, 54, '#ffc928', 0.34); }
+  if (swordT > 0) k.light(hx + p.face * 26, hy - 2, 70, '#ffffff', 0.7);
 }
 /* ---------- Carrera de Plataformas (CFG.mode 'race'): 4 corredores en el mismo nivel, la cámara sigue al que va primero.
    Quien se queda fuera por la izquierda, cae a un foso o toca pinchos/enemigos pierde la ronda. Gana la ronda quien toca
