@@ -180,9 +180,13 @@ const CSS = `
 .arcade-mcard p{margin:0 0 6px;font:600 13.5px/1.45 var(--g-font);color:color-mix(in srgb,#fff 78%,var(--g-ac))}
 .arcade-mcard button{padding:12px 16px;border-radius:14px;border:3px solid var(--g-ink);background:var(--g-face);color:#fff;font:800 1rem var(--g-font);cursor:pointer;box-shadow:inset 0 2px 0 rgba(255,255,255,.2),0 4px 0 var(--g-ink);text-shadow:0 2px 0 rgba(26,21,48,.5)}
 .arcade-mcard button.pri{background:var(--g-ac);font-size:1.1rem}
+.arcade-mdif{display:flex;gap:6px;justify-content:center}
+.arcade-mdif span{align-self:center;font:800 12px var(--g-font);opacity:.7;margin-right:2px}
+.arcade-mcard .arcade-mdif button{flex:1;padding:8px 6px;font-size:.82rem;border-width:2px;border-radius:11px;background:color-mix(in srgb,var(--g-bg) 70%,#fff 8%);opacity:.72}
+.arcade-mcard .arcade-mdif button.on{background:var(--g-ac);opacity:1}
 .arcade-mcard button:active{transform:translateY(3px);box-shadow:inset 0 2px 0 rgba(255,255,255,.2),0 1px 0 var(--g-ink)}
 .arcade-mcard button:focus-visible{outline:3px solid #ffd400;outline-offset:2px}
-@media (max-height:460px){.arcade-mcard p{display:none}.arcade-mcard{gap:8px;padding:16px 18px 18px}.arcade-mcard button{padding:9px 14px}}
+@media (max-height:460px){.arcade-mcard p{display:none}.arcade-mcard{gap:8px;padding:16px 18px 18px}.arcade-mcard button{padding:9px 14px}.arcade-mcard .arcade-mdif button{padding:7px 5px}}
 @keyframes arcade-pop{from{transform:scale(.92);opacity:0}}
 @media (prefers-reduced-motion:reduce){.arcade-mcard{animation:none}}
 @media (prefers-reduced-motion:reduce){.arcade-rotate i{animation:none;transform:rotate(-90deg)}}
@@ -286,6 +290,7 @@ export class ArcadePlayer {
       if (!this.iframe || e.source !== this.iframe.contentWindow || !e.data) return;
       if (e.data.type === 'arcade:restart' || e.data.type === 'arcade:adbreak') this._adBreak('next');
       else if (e.data.type === 'arcade:hello') this._hello(e.data);
+      else if (e.data.type === 'arcade:dif') this._echoDif(e.data.v | 0);
       else if (e.data.type === 'arcade:pad') { this.padSpec = e.data.pad || false; this.gameAR = e.data.w / e.data.h || 0; this._dropPad(); this._syncPad(); }
     }, sig);
     // Franja del mando: abajo si el reproductor es vertical, a los lados si es horizontal.
@@ -355,7 +360,9 @@ export class ArcadePlayer {
   _hello(d) {
     const w = +d.w, h = +d.h;
     if (!(w > 0 && h > 0)) return;
-    this.game = { w, h, hud: String(d.hud || ''), muted: !!d.muted, title: String(d.title || this.cfg.title), help: String(d.help || '') };
+    const difs = Array.isArray(d.difs) && d.difs.length === 3 ? d.difs.map((x) => String(x).slice(0, 12)) : null;
+    this.game = { w, h, hud: String(d.hud || ''), muted: !!d.muted, title: String(d.title || this.cfg.title), help: String(d.help || ''),
+      dif: Math.min(2, Math.max(0, d.dif | 0)), difs };
     const col = (c, def) => (/^#[0-9a-f]{3,8}$/i.test(c || '') ? c : def);
     this.root.style.setProperty('--g-bg', col(d.bg, '#12151c'));
     this.root.style.setProperty('--g-ac', col(d.ac, '#6e62f5'));
@@ -391,8 +398,13 @@ export class ArcadePlayer {
     const esc = (t) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
     m.innerHTML = `<div class="arcade-mcard"><h2>${esc(this.game.title)}</h2>${this.game.help ? `<p>${esc(this.game.help)}</p>` : ''}` +
       '<button type="button" class="pri" data-m="go">Continuar</button><button type="button" data-m="snd"></button>' +
-      '<button type="button" data-m="fs"></button><button type="button" data-m="exit">Salir del juego</button></div>';
+      '<button type="button" data-m="fs"></button>' +
+      (this.game.difs ? `<div class="arcade-mdif" role="group" aria-label="Dificultad"><span>Nivel</span>${this.game.difs.map((n, i) =>
+        `<button type="button" data-d="${i}"${i === this.game.dif ? ' class="on" aria-current="true"' : ''}>${esc(n)}</button>`).join('')}</div>` : '') +
+      '<button type="button" data-m="exit">Salir del juego</button></div>';
     m.addEventListener('click', (e) => {
+      const db = e.target.closest?.('[data-d]');
+      if (db) { this._setDif(+db.dataset.d); return; }
       const act = e.target.closest('[data-m]')?.dataset.m;
       if (!act) { if (e.target === m) this._closeMenu(); return; }
       if (act === 'go') this._closeMenu();
@@ -403,6 +415,32 @@ export class ArcadePlayer {
     m.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); this._closeMenu(); } }, sig);
     this.root.append(m);
     if (wasOpen) { this._menuLabels(); m.classList.add('open'); }
+  }
+
+  /* El jugador cambió el nivel dentro del juego: el menú del portal lo refleja, sin reenviarlo. */
+  _echoDif(v) {
+    v = Math.min(2, Math.max(0, v | 0));
+    if (!this.game?.difs) return;
+    this.game.dif = v;
+    if (!this.menu) return;
+    for (const b of this.menu.querySelectorAll('[data-d]')) {
+      const on = +b.dataset.d === v;
+      b.classList.toggle('on', on);
+      if (on) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
+    }
+  }
+
+  /* El nivel lo guarda el propio juego (kit.js, por juego en localStorage): aquí solo se pide. */
+  _setDif(v) {
+    v = Math.min(2, Math.max(0, v | 0));
+    if (!this.game?.difs || v === this.game.dif) return;
+    this.game.dif = v;
+    this._say('arcade:dif', { v });
+    for (const b of this.menu.querySelectorAll('[data-d]')) {
+      const on = +b.dataset.d === v;
+      b.classList.toggle('on', on);
+      if (on) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
+    }
   }
 
   _menuLabels() {

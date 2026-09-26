@@ -382,6 +382,20 @@
 
   function post(msg) { try { if (S.frame) S.frame.contentWindow.postMessage(msg, '*'); } catch (e) { /* nada */ } }
 
+  /* Dificultad: en la tele la fija quien monta la partida y vale para todos los juegos de la sesión.
+     Se recuerda en el aparato y se envía al juego en cuanto saluda (kit.js la aplica sin ruido). */
+  var DIFN = ['Fácil', 'Normal', 'Difícil'];
+  S.dif = 1;
+  try { var d0 = localStorage.getItem('arcade:tv:dif'); if (d0 === '0' || d0 === '2') S.dif = +d0; } catch (e) { /* nada */ }
+  function cycleDif() {
+    S.dif = (S.dif + 1) % 3;
+    try { localStorage.setItem('arcade:tv:dif', S.dif); } catch (e) { /* nada */ }
+    if (S.game) post({ type: 'arcade:dif', v: S.dif });
+    var i = S.menuSel;
+    openMenu();
+    menuSel(i);
+  }
+
   function playersMsg() {
     var list = [];
     Object.keys(S.peers).forEach(function (p) { if (active(p)) list.push({ p: +p, color: COLORS[p], name: S.peers[p].name || 'J' + (+p + 1) }); });
@@ -403,7 +417,7 @@
   window.addEventListener('message', function (e) {
     var d = e.data;
     if (!d || !S.frame || e.source !== S.frame.contentWindow) return;
-    if (d.type === 'arcade:hello') { S.ready = true; post(playersMsg()); }
+    if (d.type === 'arcade:hello') { S.ready = true; post({ type: 'arcade:dif', v: S.dif }); post(playersMsg()); }
     // Mensaje privado a un solo móvil (mano de cartas, rol secreto…): nunca se pinta en la tele.
     else if (d.type === 'arcade:adbreak') adBreakGame();
     else if (d.type === 'arcade:priv' && d.p >= 0 && d.p < 4) { S.priv[d.p] = d.data ? 1 : 0; send(d.p | 0, { t: 'priv', d: d.data || null }); }
@@ -463,9 +477,9 @@
     if (S.game) {
       releaseAll(null, true);
       post({ type: 'arcade:pause' });
-      S.menu = [['Seguir jugando', closeMenu], ['Elegir otro juego', toLobby], ['Reiniciar', function () { start(S.game); }]];
+      S.menu = [['Seguir jugando', closeMenu], ['Nivel: ' + DIFN[S.dif], cycleDif], ['Elegir otro juego', toLobby], ['Reiniciar', function () { start(S.game); }]];
     } else {
-      S.menu = [['Seguir en la tele', closeMenu], ['Salir del modo tele', function () { leave(); }]];
+      S.menu = [['Seguir en la tele', closeMenu], ['Nivel: ' + DIFN[S.dif], cycleDif], ['Salir del modo tele', function () { leave(); }]];
     }
     S.menuSel = 0;
     ui.menu.innerHTML = '<div class="pt-card pt-mcard"><span class="pt-kick">' + (S.game ? 'Pausa' : 'Modo tele') + '</span><h2>' + esc(S.game ? S.game.title : 'Menú') + '</h2>' +
