@@ -649,27 +649,32 @@ const ART = (() => {
     c.beginPath(); c.moveTo(-2.2, 0.6); c.lineTo(2.2, 0.6); c.lineTo(1.9, -2.4); c.lineTo(-1.9, -2.4); c.closePath(); fillOut(c, SKIND, 1.4);
     c.translate(0.5, HEADY - SHY + 2 + (idle ? br * 0.3 : 0));
     const R = HEADR;
-    // oreja (lado de atrás)
-    c.beginPath(); c.ellipse(-R + 0.6, 1.4, 2.1, 2.5, -0.2, 0, TAU); fillOut(c, SKIND, 1.3);
-    c.fillStyle = alpha('#c07f63', 0.6); c.beginPath(); c.ellipse(-R + 0.5, 1.5, 0.9, 1.2, -0.2, 0, TAU); c.fill();
-    // cráneo
-    c.beginPath(); c.ellipse(0, 0, R, R * 1.03, 0, 0, TAU);
-    c.fillStyle = grd(c, 'h.head' + R, [-R * 0.4, -R * 0.55, 1, 0, 0, R * 1.5], [0, '#fff1de', 0.55, SKIN, 1, SKIND]); c.fill();
-    c.save(); c.clip();
-    c.fillStyle = alpha('#8a6ad0', 0.16); c.beginPath(); c.ellipse(R * 0.55, R * 0.6, R * 0.95, R * 0.9, 0, 0, TAU); c.fill();
-    c.strokeStyle = alpha('#fff6ea', 0.8); c.lineWidth = 2; c.beginPath(); c.arc(0, 0, R - 0.9, Math.PI * 1.03, Math.PI * 1.44); c.stroke();
-    c.strokeStyle = alpha('#7fa0ff', 0.3); c.lineWidth = 2.2; c.beginPath(); c.arc(0, 0, R - 0.8, 0.25, 1.15); c.stroke();
-    c.restore();
-    c.beginPath(); c.ellipse(0, 0, R, R * 1.03, 0, 0, TAU); c.lineWidth = 1.7; c.strokeStyle = OUT; c.stroke();
-    // pelo: casquete que deja la frente libre, flequillo en pico y mechón trasero con retardo
+    // mechón trasero: lo único del pelo que se mueve, va detrás del cráneo
     const tuft = air ? (jump ? 1.1 : -1) : run ? Math.sin(t * 13) * 0.7 - 0.3 : Math.sin(t * 3) * 0.25;
-    c.beginPath(); c.moveTo(-R + 1.4, -5.3); c.arc(0, -1.2, R + 0.35, Math.PI * 1.21, Math.PI * 1.85);
-    c.lineTo(5.6, -4.3); c.lineTo(4.2, -6); c.lineTo(3, -4.6); c.lineTo(1, -6.4); c.lineTo(-0.8, -5);
-    c.lineTo(-2.8, -6.6); c.lineTo(-4.6, -5.4); c.closePath();
-    c.fillStyle = grd(c, 'h.hair' + R, [-5, -R - 2, 5, 0], [0, lite(HAIR, 0.28), 1, dark(HAIR, 0.16)]); c.fill(); c.lineWidth = 1.6; c.strokeStyle = OUT; c.stroke();
     c.beginPath(); c.moveTo(-3.4, -R + 0.9); c.quadraticCurveTo(-7 + tuft, -R - 1.4, -9.4 + tuft * 1.4, -R + 1.6); c.quadraticCurveTo(-6.6, -R + 1.9, -5.6, -R + 3.4); fillOut(c, HAIR, 1.5);
-    c.strokeStyle = alpha('#ffffff', 0.4); c.lineWidth = 1.4; c.beginPath(); c.arc(-0.6, -2.4, R - 2.6, Math.PI * 1.2, Math.PI * 1.46); c.stroke();
-    c.strokeStyle = alpha('#d8c8f5', 0.45); c.lineWidth = 0.8; c.beginPath(); c.moveTo(-5, -6.4); c.quadraticCurveTo(-2.6, -7.4, 0.6, -7.2); c.moveTo(2.2, -7.1); c.quadraticCurveTo(4.4, -6.6, 5.6, -5.4); c.stroke();
+    // oreja, cráneo y casquete de pelo: geometría fija → una sola pasada cacheada
+    sprite(c, 'head' + R, -12, -14, 24, 26, (g, ox, oy) => {
+      g.translate(-ox, -oy); g.lineJoin = 'round'; g.lineCap = 'round';
+      g.beginPath(); g.ellipse(-R + 0.6, 1.4, 2.1, 2.5, -0.2, 0, TAU); fillOut(g, SKIND, 1.3);
+      g.fillStyle = alpha('#c07f63', 0.6); g.beginPath(); g.ellipse(-R + 0.5, 1.5, 0.9, 1.2, -0.2, 0, TAU); g.fill();
+      g.beginPath(); g.ellipse(0, 0, R, R * 1.03, 0, 0, TAU);
+      const hg = g.createRadialGradient(-R * 0.4, -R * 0.55, 1, 0, 0, R * 1.5);
+      hg.addColorStop(0, '#fff1de'); hg.addColorStop(0.55, SKIN); hg.addColorStop(1, SKIND); g.fillStyle = hg; g.fill();
+      g.save(); g.clip();
+      g.fillStyle = alpha('#8a6ad0', 0.16); g.beginPath(); g.ellipse(R * 0.55, R * 0.6, R * 0.95, R * 0.9, 0, 0, TAU); g.fill();
+      g.strokeStyle = alpha('#fff6ea', 0.8); g.lineWidth = 2; g.beginPath(); g.arc(0, 0, R - 0.9, Math.PI * 1.03, Math.PI * 1.44); g.stroke();
+      g.strokeStyle = alpha('#7fa0ff', 0.3); g.lineWidth = 2.2; g.beginPath(); g.arc(0, 0, R - 0.8, 0.25, 1.15); g.stroke();
+      g.restore();
+      g.beginPath(); g.ellipse(0, 0, R, R * 1.03, 0, 0, TAU); g.lineWidth = 1.7; g.strokeStyle = OUT; g.stroke();
+      // casquete que deja la frente libre, con flequillo en pico
+      g.beginPath(); g.moveTo(-R + 1.4, -5.3); g.arc(0, -1.2, R + 0.35, Math.PI * 1.21, Math.PI * 1.85);
+      g.lineTo(5.6, -4.3); g.lineTo(4.2, -6); g.lineTo(3, -4.6); g.lineTo(1, -6.4); g.lineTo(-0.8, -5);
+      g.lineTo(-2.8, -6.6); g.lineTo(-4.6, -5.4); g.closePath();
+      const hgr = g.createLinearGradient(-5, -R - 2, 5, 0); hgr.addColorStop(0, lite(HAIR, 0.28)); hgr.addColorStop(1, dark(HAIR, 0.16));
+      g.fillStyle = hgr; g.fill(); g.lineWidth = 1.6; g.strokeStyle = OUT; g.stroke();
+      g.strokeStyle = alpha('#ffffff', 0.4); g.lineWidth = 1.4; g.beginPath(); g.arc(-0.6, -2.4, R - 2.6, Math.PI * 1.2, Math.PI * 1.46); g.stroke();
+      g.strokeStyle = alpha('#d8c8f5', 0.45); g.lineWidth = 0.8; g.beginPath(); g.moveTo(-5, -6.4); g.quadraticCurveTo(-2.6, -7.4, 0.6, -7.2); g.moveTo(2.2, -7.1); g.quadraticCurveTo(4.4, -6.6, 5.6, -5.4); g.stroke();
+    });
     // cara: ojos grandes con iris, pupila y brillo
     const bc = t % 3.6, blink = (bc < 0.11 || (bc > 0.28 && bc < 0.36)) && !fall;
     const big = fall ? 1.24 : jump ? 1.1 : 1, ey = 0.2;
@@ -716,7 +721,7 @@ const ART = (() => {
    * (ox,oy,sw,sh) es el rectángulo en coordenadas locales; draw(g, ox, oy) lo pinta. */
   const SPR = {};
   function sprite(c, key, ox, oy, sw, sh, draw) {
-    const res = resOf(c, 1, 2), k = key + '#' + res;
+    const res = resOf(c, 1, 3), k = key + '#' + res;
     let e = SPR[k];
     if (!e) {
       const cv = mk(sw * res, sh * res), g = cv.getContext('2d');
@@ -812,33 +817,36 @@ const ART = (() => {
       h *= 1.42;
       const plume = o.col || (th.enemy === 'knight' && th.foe) || '#ff5f5f', step = Math.sin(t * 7), M0 = '#eef3fb', M1 = '#a8b2c6', M2 = '#5d6680';
       shadow(c, 0, 0, w * 0.52, 0.26); c.scale(f, 1);
-      const W2 = w / 2, metal = (y0, y1) => grd(c, 'e.metal' + W2 + y0 + '_' + y1, [-W2, y0, W2 * 0.8, y1], [0, M0, 0.42, M1, 1, M2]);
+      const W2 = w / 2;
       // piernas que marchan (bota con suela)
       [[-W2 * 0.42, step], [W2 * 0.3, -step]].forEach(([fx, sp], i) => { const up = Math.max(0, sp) * h * 0.1;
         c.save(); c.translate(fx + sp * 1.6, -up);
         rr(c, -2.6, -h * 0.26, 5.2, h * 0.2, 1.6); fillOut(c, i ? M1 : M2, 1.6);
         c.beginPath(); c.moveTo(-3, -1.2); c.lineTo(3.6, -1.2); c.quadraticCurveTo(4.6, -1, 4.6, 0.4); c.lineTo(-3.4, 0.4); c.closePath(); fillOut(c, i ? '#3a3258' : '#2a2342', 1.5); c.restore(); });
       const bob = -Math.abs(step) * 0.8; c.translate(0, bob);
-      // coraza con hombrera
-      c.beginPath(); c.moveTo(-W2 + 1.4, -h * 0.22); c.quadraticCurveTo(-W2 - 0.4, -h * 0.5, -W2 + 1.8, -h * 0.62);
-      c.lineTo(W2 - 1.8, -h * 0.62); c.quadraticCurveTo(W2 + 0.4, -h * 0.5, W2 - 1.4, -h * 0.22); c.closePath();
-      c.fillStyle = metal(-h * 0.64, -h * 0.2); c.fill(); c.lineWidth = 2.1; c.strokeStyle = OUT; c.stroke();
-      c.fillStyle = alpha('#ffffff', 0.5); c.beginPath(); c.moveTo(-W2 + 2.4, -h * 0.26); c.lineTo(-W2 + 3.6, -h * 0.58); c.lineTo(-W2 + 5.2, -h * 0.58); c.lineTo(-W2 + 4, -h * 0.26); c.fill();
-      c.fillStyle = alpha(OUT, 0.42); c.fillRect(-W2 + 2, -h * 0.34, w - 4, 1.6);
-      c.beginPath(); c.moveTo(-3.4, -h * 0.6); c.lineTo(3.4, -h * 0.6); c.lineTo(0, -h * 0.4); c.closePath(); fillOut(c, '#f2d15c', 1.3);
-      c.beginPath(); c.ellipse(-W2 + 1.2, -h * 0.62, 3.6, 2.6, -0.4, 0, TAU); fillOut(c, M1, 1.8); // hombrera trasera
-      // casco con visera y ojos encendidos
+      // coraza, gorjal y casco: chapa fija, se pinta una vez (solo la mirada cambia)
       const hy = -h * 0.62, HW = W2 * 0.76;
-      rr(c, -W2 + 1.6, hy - h * 0.045, w - 3.2, h * 0.06, 1.4); fillOut(c, M2, 1.6); // gorjal
-      c.beginPath(); c.moveTo(-HW, hy - h * 0.02); c.lineTo(-HW, hy - h * 0.17); c.quadraticCurveTo(-HW, hy - h * 0.32, 0, hy - h * 0.32);
-      c.quadraticCurveTo(HW, hy - h * 0.32, HW, hy - h * 0.17); c.lineTo(HW, hy - h * 0.02); c.quadraticCurveTo(0, hy + h * 0.03, -HW, hy - h * 0.02); c.closePath();
-      c.fillStyle = metal(hy - h * 0.32, hy); c.fill(); c.lineWidth = 2.1; c.strokeStyle = OUT; c.stroke();
-      c.fillStyle = alpha('#ffffff', 0.6); c.beginPath(); c.ellipse(-HW * 0.5, hy - h * 0.24, 2.2, 1.3, -0.45, 0, TAU); c.fill();
-      rr(c, -HW + 1.2, hy - h * 0.21, HW * 2 - 2.4, h * 0.08, 1.4); c.fillStyle = OUT; c.fill();
+      sprite(c, 'knight' + W2 + h, -W2 - 3, hy - h * 0.36, w + 6, h * 0.78, (g, ox, oy) => {
+        g.translate(-ox, -oy); g.lineJoin = 'round'; g.lineCap = 'round';
+        const mt = (y0, y1) => { const q = g.createLinearGradient(-W2, y0, W2 * 0.8, y1); q.addColorStop(0, M0); q.addColorStop(0.42, M1); q.addColorStop(1, M2); return q; };
+        g.beginPath(); g.moveTo(-W2 + 1.4, -h * 0.22); g.quadraticCurveTo(-W2 - 0.4, -h * 0.5, -W2 + 1.8, -h * 0.62);
+        g.lineTo(W2 - 1.8, -h * 0.62); g.quadraticCurveTo(W2 + 0.4, -h * 0.5, W2 - 1.4, -h * 0.22); g.closePath();
+        g.fillStyle = mt(-h * 0.64, -h * 0.2); g.fill(); g.lineWidth = 2.1; g.strokeStyle = OUT; g.stroke();
+        g.fillStyle = alpha('#ffffff', 0.5); g.beginPath(); g.moveTo(-W2 + 2.4, -h * 0.26); g.lineTo(-W2 + 3.6, -h * 0.58); g.lineTo(-W2 + 5.2, -h * 0.58); g.lineTo(-W2 + 4, -h * 0.26); g.fill();
+        g.fillStyle = alpha(OUT, 0.42); g.fillRect(-W2 + 2, -h * 0.34, w - 4, 1.6);
+        g.beginPath(); g.moveTo(-3.4, -h * 0.6); g.lineTo(3.4, -h * 0.6); g.lineTo(0, -h * 0.4); g.closePath(); fillOut(g, '#f2d15c', 1.3);
+        g.beginPath(); g.ellipse(-W2 + 1.2, -h * 0.62, 3.6, 2.6, -0.4, 0, TAU); fillOut(g, M1, 1.8); // hombrera trasera
+        rr(g, -W2 + 1.6, hy - h * 0.045, w - 3.2, h * 0.06, 1.4); fillOut(g, M2, 1.6); // gorjal
+        g.beginPath(); g.moveTo(-HW, hy - h * 0.02); g.lineTo(-HW, hy - h * 0.17); g.quadraticCurveTo(-HW, hy - h * 0.32, 0, hy - h * 0.32);
+        g.quadraticCurveTo(HW, hy - h * 0.32, HW, hy - h * 0.17); g.lineTo(HW, hy - h * 0.02); g.quadraticCurveTo(0, hy + h * 0.03, -HW, hy - h * 0.02); g.closePath();
+        g.fillStyle = mt(hy - h * 0.32, hy); g.fill(); g.lineWidth = 2.1; g.strokeStyle = OUT; g.stroke();
+        g.fillStyle = alpha('#ffffff', 0.6); g.beginPath(); g.ellipse(-HW * 0.5, hy - h * 0.24, 2.2, 1.3, -0.45, 0, TAU); g.fill();
+        rr(g, -HW + 1.2, hy - h * 0.21, HW * 2 - 2.4, h * 0.08, 1.4); g.fillStyle = OUT; g.fill();
+        g.strokeStyle = alpha(OUT, 0.45); g.lineWidth = 0.9; g.beginPath(); g.moveTo(0, hy - h * 0.31); g.lineTo(0, hy - h * 0.22); g.stroke();
+      });
       const gx = HW * 0.22; c.fillStyle = shut ? '#7a6a20' : '#ffe14a';
       c.fillRect(gx - 3.4, hy - h * 0.195, 2.1, h * 0.05); c.fillRect(gx + 0.5, hy - h * 0.195, 2.1, h * 0.05);
       c.fillStyle = alpha('#ffe14a', 0.28); c.fillRect(gx - 4.4, hy - h * 0.205, 8, h * 0.07);
-      c.strokeStyle = alpha(OUT, 0.45); c.lineWidth = 0.9; c.beginPath(); c.moveTo(0, hy - h * 0.31); c.lineTo(0, hy - h * 0.22); c.stroke();
       // penacho
       const sw = Math.sin(t * 4.5) * 1.8, ty = hy - h * 0.32;
       c.beginPath(); c.moveTo(-1.6, ty + 0.6); c.quadraticCurveTo(-3 + sw * 0.3, ty - h * 0.3, -w * 0.5 + sw, ty - h * 0.16);
@@ -848,11 +856,15 @@ const ART = (() => {
       c.strokeStyle = alpha('#ffffff', 0.4); c.lineWidth = 1; c.beginPath(); c.moveTo(-2, ty - h * 0.06); c.quadraticCurveTo(-5, ty - h * 0.2, -w * 0.36 + sw, ty - h * 0.14); c.stroke();
       // escudo por delante (el lenguaje corporal: avanza protegido)
       c.save(); c.translate(W2 * 0.86, -h * 0.4 + step * 0.8);
-      c.beginPath(); c.moveTo(-4.4, -h * 0.26); c.quadraticCurveTo(0, -h * 0.3, 4.4, -h * 0.26); c.lineTo(4.4, h * 0.08);
-      c.quadraticCurveTo(0, h * 0.26, -4.4, h * 0.08); c.closePath();
-      c.fillStyle = grd(c, 'e.kcape' + h, [-4.4, -h * 0.26, 4.4, h * 0.26], [0, '#e9727f', 1, '#8e2a3e']); c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
-      c.fillStyle = '#ffd24a'; c.fillRect(-1.1, -h * 0.22, 2.2, h * 0.36); c.fillRect(-3.3, -h * 0.11, 6.6, 2);
-      c.fillStyle = alpha('#ffffff', 0.32); c.beginPath(); c.moveTo(-3.8, -h * 0.23); c.lineTo(-2, -h * 0.23); c.lineTo(-3, h * 0.06); c.lineTo(-4, 0); c.fill(); c.restore();
+      sprite(c, 'kshield' + h, -7, -h * 0.32, 14, h * 0.62, (g, ox, oy) => {
+        g.translate(-ox, -oy); g.lineJoin = 'round';
+        g.beginPath(); g.moveTo(-4.4, -h * 0.26); g.quadraticCurveTo(0, -h * 0.3, 4.4, -h * 0.26); g.lineTo(4.4, h * 0.08);
+        g.quadraticCurveTo(0, h * 0.26, -4.4, h * 0.08); g.closePath();
+        const sg2 = g.createLinearGradient(-4.4, -h * 0.26, 4.4, h * 0.26); sg2.addColorStop(0, '#e9727f'); sg2.addColorStop(1, '#8e2a3e');
+        g.fillStyle = sg2; g.fill(); g.lineWidth = 2; g.strokeStyle = OUT; g.stroke();
+        g.fillStyle = '#ffd24a'; g.fillRect(-1.1, -h * 0.22, 2.2, h * 0.36); g.fillRect(-3.3, -h * 0.11, 6.6, 2);
+        g.fillStyle = alpha('#ffffff', 0.32); g.beginPath(); g.moveTo(-3.8, -h * 0.23); g.lineTo(-2, -h * 0.23); g.lineTo(-3, h * 0.06); g.lineTo(-4, 0); g.fill(); });
+      c.restore();
     } else if (kind === 'robot') {
       /* patrullero de fábrica sobre una rueda: el ojo barre y la pinza se adelanta al embestir */
       h *= 1.34;

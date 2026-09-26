@@ -156,13 +156,13 @@ def main():
         if slug in PAD: cfg['pad'] = PAD[slug]
         if slug in MP: cfg['mp'] = list(MP[slug])
         d = GAMES_DIR / slug; d.mkdir(parents=True, exist_ok=True)
-        (d / 'index.html').write_text(TPL.format(title=titles[slug], cfg=json.dumps(cfg, ensure_ascii=False), eng=eng, ev=hashlib.md5((ENG_DIR / f'{eng}.js').read_bytes()).hexdigest()[:8], deps=''.join(f'<script src="../_lib/{d}.js?v=10"></script>' for d in deps_of(eng))), encoding='utf-8')
+        (d / 'index.html').write_text(TPL.format(title=titles[slug], cfg=json.dumps(cfg, ensure_ascii=False), eng=eng, ev=hashlib.md5((ENG_DIR / f'{eng}.js').read_bytes()).hexdigest()[:8], deps=''.join(f'<script src="../_lib/{d}.js?v=11"></script>' for d in deps_of(eng))), encoding='utf-8')
     # Lista de scripts de cada juego: el portal la usa para precargarlos (prefetch) en la ficha y que
     # al pulsar «Jugar» no haya espera de red. Los independientes se leen de su index.html.
     dep = {}
     for slug, (eng, cfg) in G.items():
         ev = hashlib.md5((ENG_DIR / f'{eng}.js').read_bytes()).hexdigest()[:8]
-        dep[slug] = ['_lib/kit.js?v=18'] + [f'_lib/{d}.js?v=10' for d in deps_of(eng)] + [f'_lib/{eng}.js?v={ev}']
+        dep[slug] = ['_lib/kit.js?v=18'] + [f'_lib/{d}.js?v=11' for d in deps_of(eng)] + [f'_lib/{eng}.js?v={ev}']
     for slug in STANDALONE:
         f = GAMES_DIR / slug / 'index.html'
         if f.exists(): dep[slug] = [m.replace('../', '') for m in re.findall(r'<script src="([^"]+)"', f.read_text(encoding='utf-8'))]
