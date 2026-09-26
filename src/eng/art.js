@@ -784,12 +784,11 @@ const ART = (() => {
     c.restore();
   }
   /* --------------- cara: la mitad de la cabeza, expresión exagerada y distinta por estado ------ */
-  function heroFace(c, st, t, P) {
+  function heroFace(c, st, blink, P) {
     const run = st === 'run', jump = st === 'jump', fall = st === 'fall', wall = st === 'wall';
     const hurt = st === 'hurt', win = st === 'win';
     c.save(); c.translate(P.hcx, P.hcy); c.rotate(P.hA);
     const R = HEADR;
-    const bc = t % 3.6, blink = (bc < 0.1 || (bc > 0.27 && bc < 0.34)) && !fall && !hurt;
     // lid: cuánto baja el párpado superior (lo que da expresión y quita el «ojo de plato»)
     const lid = blink ? 1 : fall ? 0.02 : jump ? 0.06 : hurt ? 0.9 : win ? 0.86 : run ? 0.34 : wall ? 0.44 : 0.22;
     const look = fall ? -0.34 : run ? 0.1 : wall ? 0.16 : 0;
@@ -878,15 +877,18 @@ const ART = (() => {
     c.save(); c.translate(x, y);
     if (o.gy == null && !air) shadow(c, 0, 0.5, (run ? 9 : 10.2) * s * (1 + sq), 0.28);
     c.scale(f * s * (1 + sq), s * (1 - sq)); c.lineJoin = 'round'; c.lineCap = 'round';
-    const tq = heroQ(st, t), res = resOf(c, 2, 4), key = 'h' + st + col + tq.toFixed(4) + '#' + res;
+    // la cara solo depende del estado y de si parpadea: entra en el mismo sprite que el cuerpo
+    const bc = t % 3.6, blink = (bc < 0.1 || (bc > 0.27 && bc < 0.34)) && st !== 'fall' && st !== 'hurt';
+    const tq = heroQ(st, t), res = resOf(c, 2, 4), key = 'h' + st + col + tq.toFixed(4) + (blink ? 'b' : '') + '#' + res;
     let e = HSPR[key];
-    if (!e) { if (HN > 120) { for (const q in HSPR) delete HSPR[q]; HN = 0; } HN++;
+    if (!e) { if (HN > 160) { for (const q in HSPR) delete HSPR[q]; HN = 0; } HN++;
       const cv = mk(HW * res, HH * res), g = cv.getContext('2d');
       g.scale(res, res); g.translate(-HX, -HY); g.lineJoin = 'round'; g.lineCap = 'round';
-      heroBody(g, st, tq, col); e = HSPR[key] = cv; }
+      heroBody(g, st, tq, col);
+      heroFace(g, st, blink, heroHead(st, tq));   // heroBody deja el contexto ya en el espacio de la cadera
+      e = HSPR[key] = cv; }
     c.drawImage(e, HX, HY, HW, HH);
     const P = heroHead(st, tq); c.translate(0, P.hipY); c.rotate(P.lean);
-    heroFace(c, st, t, P);
     // ---------- espada (objeto suelto: lleva su propia silueta)
     if (o.sword) { c.save(); c.translate(7.5, P.SHOFF + 4); c.rotate(o.sword - P.lean);
       const SW = polyP([[-1.5, -3.6], [-1.5, -23], [1.1, -28], [3.7, -23], [3.7, -3.6]], true);
@@ -979,6 +981,10 @@ const ART = (() => {
       shadow(c, 0, 0, w * 0.36, 0.12 - bob * 0.008);
       c.translate(0, bob - 2); c.scale(f, 1);
       const W2 = w * 0.5, hem = -h * 0.3;
+      const tq = Math.round(t * 5 / (Math.PI * 2) * 12) % 12, lq = Math.round(lunge * 6);
+      sprite(c, 'ghostE' + W2 + h + col + tq + lq, -W2 * 2.1, -h * 1.35, W2 * 4.2, h * 1.5, (g, ox, oy) => {
+      g.translate(-ox, -oy); g.lineJoin = 'round'; g.lineCap = 'round';
+      const t = tq / 12 * (Math.PI * 2) / 5, lunge = lq / 6, c = g;   // instante cuantizado dentro del sprite
       const B = nP();
       B.moveTo(-W2, hem);
       for (let i = 0; i < 3; i++) { const x0 = -W2 + i * (W2 * 2 / 3), x1 = x0 + W2 / 3, x2 = x0 + W2 * 2 / 3;
@@ -998,6 +1004,7 @@ const ART = (() => {
       c.fillStyle = alpha(dark(col, 0.34), 0.55); c.fill(AR[1]);   // el brazo de delante cruza: solo su sombra
       c.restore();
       c.fillStyle = alpha('#ffffff', 0.7); c.beginPath(); c.ellipse(-W2 * 0.42, -h * 0.82, W2 * 0.28, h * 0.09, -0.45, 0, TAU); c.fill();
+      });
       const r = m * 0.2, ey = -h * 0.62;
       eye2(c, -W2 * 0.3, ey, r, lx, ly, shut, 0.3); eye2(c, W2 * 0.34, ey, r * 0.95, lx, ly, shut, 0.3);
       c.strokeStyle = OUT; c.lineWidth = 1.5; c.lineCap = 'round';                   // cejas pícaras (dentro de la cúpula)
@@ -1065,6 +1072,10 @@ const ART = (() => {
       c.beginPath(); c.moveTo(-WR * 0.55, 0); c.lineTo(WR * 0.55, 0); c.moveTo(0, -WR * 0.55); c.lineTo(0, WR * 0.55); c.stroke(); c.restore();
       c.translate(0, bob);
       const on = Math.sin(t * 5) > 0;
+      const eq = Math.round(Math.sin(t * 2) * 4);
+      sprite(c, 'robotE' + W2 + h + eyeC + on + shut + eq, -W2 - 5, -h - h * 0.34, W2 * 2 + 10, h * 1.3, (g, ox, oy) => {
+      g.translate(-ox, -oy); g.lineJoin = 'round'; g.lineCap = 'round';
+      const c = g;
       const body = capP(-W2, -h - h * 0.06, W2 * 2, h * 0.94, W2 * 0.82);            // cápsula de verdad
       const ant = tubeP([[-W2 * 0.28, -h + h * 0.04], [-W2 * 0.44, -h - h * 0.2]], [1.3, 1.1]);
       const bulb = nP(); addEll(bulb, -W2 * 0.46, -h - h * 0.25, 2.8, 2.8, 0);
@@ -1074,7 +1085,7 @@ const ART = (() => {
       cel(c, body, M1, M2, W2 * 0.5, h * 0.22);
       c.fillStyle = on ? '#ff3b3b' : '#9a4a5a'; c.fill(bulb);
       c.fillStyle = OUT; rr(c, -W2 * 0.82, -h + h * 0.12, W2 * 1.64, h * 0.32, h * 0.15); c.fill();   // visor único
-      const ex = Math.sin(t * 2) * (W2 * 0.3);
+      const ex = eq / 4 * (W2 * 0.3);
       c.fillStyle = alpha(eyeC, 0.24); rr(c, -W2 * 0.76, -h + h * 0.15, W2 * 1.52, h * 0.26, h * 0.12); c.fill();
       c.fillStyle = shut ? alpha(eyeC, 0.45) : eyeC;
       if (shut) { rr(c, ex - W2 * 0.34, -h + h * 0.27, W2 * 0.68, 1.6, 0.8); c.fill(); }
@@ -1083,6 +1094,7 @@ const ART = (() => {
       c.restore();
       c.fillStyle = alpha('#ffffff', 0.5); c.beginPath(); c.ellipse(-W2 * 0.44, -h + h * 0.58, W2 * 0.19, h * 0.17, -0.25, 0, TAU); c.fill();
       if (on) { c.fillStyle = alpha('#ff3b3b', 0.24); c.beginPath(); c.arc(-W2 * 0.46, -h - h * 0.25, 6, 0, TAU); c.fill(); }
+      });
     } else if (kind === 'bird') {
       /* bola con pico grande y dos alas de tres plumas: nada más */
       const col = o.col || (th.enemy === 'bird' && th.foe) || '#ff9a3d', base = lite(col, 0.18), fl = Math.sin(t * 11);

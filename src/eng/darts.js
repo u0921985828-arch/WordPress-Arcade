@@ -6,7 +6,7 @@
  * tapados y solo sobrevive el borde exterior de la silueta. inw(): detalle interior recortado
  * contra esa silueta. Las separaciones internas se leen por sombra propia o por cambio de
  * color, nunca por stroke. Una pieza solo se separa cuando se mueve de verdad. */
-function uni(g, parts, ow) { g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = ow * 2;
+function uni(g, parts, ow) { g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = ART.OUT; g.lineWidth = ow * 2;
   for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
   for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); } }
 const all = (parts) => (g) => { for (const p of parts) p(g); };

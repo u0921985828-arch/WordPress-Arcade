@@ -1815,14 +1815,14 @@ function humanArt(g, o) {
       q.moveTo(hx0 - hr - 1, hy - hr * 0.06);
       q.quadraticCurveTo(hx0 - hr - 1.4, hy - hr - 4.6, hx0 + dx * 1.6, hy - hr - 4.8);
       q.quadraticCurveTo(hx0 + hr + 1.4, hy - hr - 4.2, hx0 + hr + 1, hy - hr * 0.06);
-      q.quadraticCurveTo(hx0, hy - hr * 0.44, hx0 - hr - 1, hy - hr * 0.06); q.closePath();
+      q.quadraticCurveTo(hx0, hy - hr * 0.66, hx0 - hr - 1, hy - hr * 0.06); q.closePath();
     }, '#e0402f', 2.4, { f: 0.8 }]);
   } else if (big && !o.zq) {                                       // casco de matón grande: cúpula con reborde
     parts.push([(q) => {
-      q.moveTo(hx0 - hr - 1.2, hy - hr * 0.16);
+      q.moveTo(hx0 - hr - 1.2, hy - hr * 0.24);
       q.quadraticCurveTo(hx0 - hr - 1.6, hy - hr - 5, hx0 + dx * 1.2, hy - hr - 5.2);
-      q.quadraticCurveTo(hx0 + hr + 1.6, hy - hr - 4.6, hx0 + hr + 1.2, hy - hr * 0.16);
-      q.quadraticCurveTo(hx0, hy - hr * 0.52, hx0 - hr - 1.2, hy - hr * 0.16); q.closePath();
+      q.quadraticCurveTo(hx0 + hr + 1.6, hy - hr - 4.6, hx0 + hr + 1.2, hy - hr * 0.24);
+      q.quadraticCurveTo(hx0, hy - hr * 0.78, hx0 - hr - 1.2, hy - hr * 0.24); q.closePath();
     }, '#8f9ab8', 2.6, { f: 0.85 }]);
   }
   parts.push([L1.leg, pants, 3.6 * B, { f: 0.7 }], [L1.foot, boot, 0, { f: 0.8 }]);
