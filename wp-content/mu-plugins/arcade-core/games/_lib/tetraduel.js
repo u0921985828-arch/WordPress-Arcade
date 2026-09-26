@@ -354,7 +354,7 @@ function setupPlayers() {
 }
 k.onParty = () => setupPlayers();
 function startRound() { round++; seed = (Math.random() * 1e9) | 0; rt = 0; over = false; overT = 0; projs = []; P.forEach(roundReset); banner = 1.6; k.count(3); }
-function reset() { cpuLv = k.clamp(lsGet('cpu:' + ID) + k.D.cpu, 0, 10); /* k.D.cpu sin tocar lo guardado */ P = []; setupPlayers(); round = 0; startRound(); }
+function reset() { cpuLv = k.clamp(lsGet('cpu:' + ID) + k.D.cpu, -1.5, 10); /* k.D.cpu sin tocar lo guardado */ P = []; setupPlayers(); round = 0; startRound(); }
 function endRound() {
   const alive = P.filter((q) => q.alive), win = alive.length === 1 ? alive[0] : null;
   if (win) { win.wins++; k.confetti(win.col, 50); }

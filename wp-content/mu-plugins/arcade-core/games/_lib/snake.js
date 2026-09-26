@@ -406,7 +406,7 @@ function snakeMP() {
   }
   k.onParty = () => setup();
   function reset() {
-    cpuLv = k.clamp(lsGet('cpu:' + ID) + k.D.cpu, 0, 8); /* k.D.cpu sin tocar lo guardado */ S = []; setup(); clock = 0; over = false; overT = 0; goldT = 6; warned = 0; foods = []; t = 0;
+    cpuLv = k.clamp(lsGet('cpu:' + ID) + k.D.cpu, -1.5, 8); /* k.D.cpu sin tocar lo guardado */ S = []; setup(); clock = 0; over = false; overT = 0; goldT = 6; warned = 0; foods = []; t = 0;
     S.forEach((s, i) => { s.score = 0; s.alive = true; s.inv = 0; s.dying = 0; s.down = 0; place(s, START[i][0], START[i][1], START[i][2], 4); s.len0 = 4; });
     for (let i = 0; i < APPLES; i++) spawnApple('apple');
     step = 1 / 3.0; acc = 0; k.count(3);
@@ -603,7 +603,7 @@ function comilona() {
   }
   k.onParty = () => setup();
   function reset() {
-    cpuLv = k.clamp(lsGet('cpu:' + ID) + k.D.cpu, 0, 8); /* k.D.cpu sin tocar lo guardado */ E = []; setup(); buildMaze(); seed();
+    cpuLv = k.clamp(lsGet('cpu:' + ID) + k.D.cpu, -1.5, 8); /* k.D.cpu sin tocar lo guardado */ E = []; setup(); buildMaze(); seed();
     clock = 0; over = false; overT = 0; scared = 0; warned = 0; banner = ''; bannerT2 = 0; t = 0;
     E.forEach((e, i) => { e.score = 0; e.acc = 0; e.down = 0; e.inv = 0; e.cool = 0; e.eaten = 0; place(e, HOME[i][0], HOME[i][1]); });
     k.count(3);

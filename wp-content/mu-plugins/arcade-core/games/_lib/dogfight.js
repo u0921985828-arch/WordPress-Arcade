@@ -47,7 +47,7 @@ function spec(g, x, y, rx, ry, rot, a) { g.fillStyle = `rgba(255,255,255,${a == 
 function contact(g, x, y, rx, ry, a) { g.fillStyle = `rgba(12,10,26,${a == null ? 0.3 : a})`; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.283); g.fill(); }
 const lerp = (a, b, t) => a + (b - a) * Math.max(0, Math.min(1, t)), adiff = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 let CPU = 0; try { CPU = Math.min(8, +localStorage.getItem('cpu:' + CFG.id) || 0); } catch (e) { /* sin almacenamiento */ }
-const skill = () => Math.min(0.8, Math.max(0.05, 0.2 + Math.max(0, CPU + k.D.cpu) * 0.06 + (round - 1) * 0.03));   /* k.D.cpu: ±1 nivel de las CPU, sin tocar lo guardado */
+const skill = () => Math.min(0.8, Math.max(0.05, 0.2 + (CPU + k.D.cpu) * 0.06 + (round - 1) * 0.03));   /* k.D.cpu: ±1 nivel de las CPU, sin tocar lo guardado */
 const VSTALL = 82, VREC = 118, VMAX = 330, THR = 132, DRAG = 0.78, GRAV = 150;
 function label(s, x, y, size, col, align) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'center'; c.textBaseline = 'middle';

@@ -226,7 +226,7 @@ const PCOL = { hi: '#ff6fb5', lo: '#5b8cff', grab: '#a8cf3f' };
 
 /* ---------------- Jugadores y CPU ---------------- */
 let LV = 0; try { LV = clamp(+localStorage.getItem('cpu:' + ID) || 0, 0, 9); } catch (e) { /* sin almacenamiento */ }
-const SK = () => (0.175 + clamp(LV + k.D.cpu, 0, 9) * 0.075) * (demo ? 0.85 : 1);   /* k.D.cpu: nivel de la CPU, sin tocar lo guardado */
+const SK = () => (0.175 + clamp(LV + k.D.cpu, -1.5, 9) * 0.075) * (demo ? 0.85 : 1);   /* k.D.cpu: nivel de la CPU, sin tocar lo guardado */
 let demo = true, t = 0, live = false;
 const cpu = (p) => demo || !k.human(p);
 const col = (p) => k.pcol(p);

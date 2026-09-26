@@ -191,7 +191,7 @@ const PIL = MD.pil ? [[220, 92, 24], [220, 348, 24], [92, 220, 24], [348, 220, 2
 const lerp = (a, b, t) => a + (b - a) * Math.max(0, Math.min(1, t)), adiff = (a) => Math.atan2(Math.sin(a), Math.cos(a)), hyp = Math.hypot;
 let P = [], round = 0, rt = 0, T = 0, phase = 'play', btw = 0, banner = null, cdPend = false, elimOrder = [], S = {}, waves = [];
 let CPU = 0; try { CPU = Math.min(8, +localStorage.getItem('cpu:' + CFG.id) || 0); } catch (e) { /* sin almacenamiento */ }
-const skill = () => Math.min(0.8, Math.max(0.05, 0.21 + Math.max(0, CPU + k.D.cpu) * 0.05 + (round - 1) * 0.03));   /* k.D.cpu: nivel de las CPU */ /* 1.23: más fácil (antes 0,3 + 0,1/victoria, tope 0,95) */
+const skill = () => Math.min(0.8, Math.max(0.06, 0.21 + (CPU + k.D.cpu) * 0.05 + (round - 1) * 0.03));   /* k.D.cpu: nivel de las CPU */ /* 1.23: más fácil (antes 0,3 + 0,1/victoria, tope 0,95) */
 const spdK = () => lerp(0.8, 1, rt / 20); /* arranque suave: 80 % → 100 % en 20 s */
 function mk(w, h, fn) { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const q = cv.getContext('2d'); q.scale(2, 2); if (fn) fn(q); return cv; }
 function label(s, x, y, size, col, align, q) {
