@@ -74,14 +74,56 @@ k.run((dt) => {
   if (msgT > 0) { const e = Math.min(1, (0.9 - msgT) / 0.12), s = 0.6 + 0.4 * Math.min(1, e) + Math.sin(Math.min(1, e) * Math.PI) * 0.2; c.save(); c.translate(W / 2, 66); c.scale(s, s); c.globalAlpha = Math.min(1, msgT / 0.3); label(msg, 0, -14, 26, msgC, 'center'); c.restore(); c.globalAlpha = 1; }
 });
 /* Dardo clavado visto de frente-lado: punta en (x,y), barril metálico, varilla y plumas */
+/* ---------- Ley de la pieza única (REMASTER §8) ----------
+ * uni(): traza TODAS las partes y las rellena después, así los contornos interiores quedan
+ * tapados y solo sobrevive el borde exterior de la silueta. inw(): detalle interior recortado
+ * contra esa silueta. Las separaciones internas se leen por sombra propia o por cambio de
+ * color, nunca por stroke. Una pieza solo se separa cuando se mueve de verdad. */
+function uni(g, parts, ow) { g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = ow * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); } }
+const all = (parts) => (g) => { for (const p of parts) p(g); };
+function inw(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+const rp = (g, x, y, w, h, r) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+const cp = (g, x, y, r) => { g.moveTo(x + r, y); g.arc(x, y, r, 0, Math.PI * 2); g.closePath(); };
+const ep2 = (g, x, y, rx, ry, rot) => { g.moveTo(x + rx * Math.cos(rot || 0), y + rx * Math.sin(rot || 0)); g.ellipse(x, y, rx, ry, rot || 0, 0, Math.PI * 2); g.closePath(); };
+const ply = (pts) => (g) => { g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); };
+/* hueso de ancho variable: baja por un costado, redondea la punta y vuelve por el otro, así
+ * miembro y tronco se unen con tangente continua y sin escalón. */
+function bone(pts, ws) {
+  return (g) => {
+    const n = pts.length, L = [], R = [];
+    for (let i = 0; i < n; i++) {
+      const a = pts[i > 0 ? i - 1 : 0], b = pts[i < n - 1 ? i + 1 : n - 1];
+      let tx = b[0] - a[0], ty = b[1] - a[1]; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
+      L.push([pts[i][0] - ty * ws[i], pts[i][1] + tx * ws[i]]);
+      R.push([pts[i][0] + ty * ws[i], pts[i][1] - tx * ws[i]]);
+    }
+    g.moveTo(L[0][0], L[0][1]);
+    for (let i = 1; i < n - 1; i++) g.quadraticCurveTo(L[i][0], L[i][1], (L[i][0] + L[i + 1][0]) / 2, (L[i][1] + L[i + 1][1]) / 2);
+    g.lineTo(L[n - 1][0], L[n - 1][1]);
+    const e = pts[n - 1], w = ws[n - 1], a0 = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0]);
+    g.arc(e[0], e[1], w, a0, a0 - Math.PI, true);
+    for (let i = n - 2; i > 0; i--) g.quadraticCurveTo(R[i][0], R[i][1], (R[i][0] + R[i - 1][0]) / 2, (R[i][1] + R[i - 1][1]) / 2);
+    g.lineTo(R[0][0], R[0][1]);
+    g.closePath();
+  };
+}
 function drawDart(x, y, s, a) {
   if (a <= 0) return; c.save(); c.globalAlpha = a; c.translate(x, y); c.scale(s, s);
   c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(0, 0); c.lineTo(-8, 16); c.stroke();
-  c.strokeStyle = '#c7ccd8'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(0, 0); c.lineTo(3, 5); c.stroke();
-  c.strokeStyle = OUT; c.lineWidth = 7; c.beginPath(); c.moveTo(3, 5); c.lineTo(8, 14); c.stroke(); c.strokeStyle = '#9aa2b5'; c.lineWidth = 4.5; c.stroke(); c.strokeStyle = '#eef0f6'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(3.5, 5.5); c.lineTo(7, 12); c.stroke();
-  c.strokeStyle = OUT; c.lineWidth = 3.5; c.beginPath(); c.moveTo(8, 14); c.lineTo(12, 22); c.stroke(); c.strokeStyle = '#5ce1e6'; c.lineWidth = 1.8; c.stroke();
-  for (const [dx, dy] of [[-6, 3], [6, -1]]) { c.beginPath(); c.moveTo(11, 19); c.lineTo(12 + dx, 22 + dy); c.lineTo(15, 30); c.closePath(); ART.fillOut(c, '#ff4d6d', 1.5); }
-  c.beginPath(); c.moveTo(11, 19); c.lineTo(13, 31); c.lineTo(16, 29); c.closePath(); ART.fillOut(c, '#ff8fa6', 1.2); c.restore(); c.globalAlpha = 1;
+  const punta = ply([[0, 0], [1.6, 3.4], [4.4, 6.2], [2.6, 7]]);
+  const barril = bone([[3, 5], [8, 14]], [3.1, 2.4]);
+  const varilla = bone([[8, 14], [12.2, 22.4]], [1.5, 1.3]);
+  const plumas = ply([[5, 22], [11, 19], [16, 29], [13, 31.5], [9.6, 28], [6.4, 30.4]]);
+  const PA = [[plumas, '#ff4d6d'], [varilla, '#5ce1e6'], [barril, '#9aa2b5'], [punta, '#c7ccd8']];
+  uni(c, PA, 1.05);
+  inw(c, all(PA.map((q) => q[0])), (q) => {
+    q.fillStyle = 'rgba(255,255,255,.55)'; q.beginPath(); q.moveTo(3.6, 5.6); q.lineTo(5.2, 5.1); q.lineTo(9.2, 12.6); q.lineTo(7.6, 13.2); q.closePath(); q.fill();
+    q.fillStyle = 'rgba(26,21,48,.22)'; q.beginPath(); q.moveTo(6.4, 7.4); q.lineTo(8, 6.9); q.lineTo(11.4, 13.6); q.lineTo(9.8, 14.2); q.closePath(); q.fill();
+    q.fillStyle = '#ff8fa6'; q.beginPath(); q.moveTo(11, 19); q.lineTo(13, 31); q.lineTo(16, 29); q.closePath(); q.fill();
+    q.fillStyle = 'rgba(26,21,48,.18)'; q.beginPath(); q.moveTo(11, 19); q.lineTo(9.6, 28); q.lineTo(6.4, 30.4); q.lineTo(5, 22); q.closePath(); q.fill(); });
+  c.restore(); c.globalAlpha = 1;
 }
 function miniDart(x, y, on) { c.save(); c.globalAlpha = on ? 0.9 : 0.25; c.translate(x - 14, y); c.rotate(-0.1); c.strokeStyle = '#c7ccd8'; c.lineWidth = 2; c.beginPath(); c.moveTo(0, 0); c.lineTo(8, 0); c.stroke(); c.strokeStyle = '#9aa2b5'; c.lineWidth = 5; c.beginPath(); c.moveTo(8, 0); c.lineTo(18, 0); c.stroke(); c.fillStyle = '#ff4d6d'; c.beginPath(); c.moveTo(20, 0); c.lineTo(30, -6); c.lineTo(28, 0); c.lineTo(30, 6); c.closePath(); c.fill(); c.restore(); c.globalAlpha = 1; }
 function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
@@ -234,8 +276,11 @@ function cricketGame() {
     c.strokeStyle = OUT; c.lineWidth = 7; c.beginPath(); c.moveTo(3, 5); c.lineTo(8, 14); c.stroke(); c.strokeStyle = '#9aa2b5'; c.lineWidth = 4.5; c.stroke();
     c.strokeStyle = OUT; c.lineWidth = 3.5; c.beginPath(); c.moveTo(8, 14); c.lineTo(12, 22); c.stroke(); c.strokeStyle = '#eef0f6'; c.lineWidth = 1.8; c.stroke();
     const fc = d.col || '#ff4d6d';
-    for (const [dx, dy] of [[-6, 3], [6, -1]]) { c.beginPath(); c.moveTo(11, 19); c.lineTo(12 + dx, 22 + dy); c.lineTo(15, 30); c.closePath(); ART.fillOut(c, fc, 1.5); }
-    c.beginPath(); c.moveTo(11, 19); c.lineTo(13, 31); c.lineTo(16, 29); c.closePath(); ART.fillOut(c, ART.lite(fc, 0.35), 1.2); c.restore(); c.globalAlpha = 1;
+    { const plumas = ply([[5, 22], [11, 19], [16, 29], [13, 31.5], [9.6, 28], [6.4, 30.4]]);
+      uni(c, [[plumas, fc]], 1.05);
+      inw(c, plumas, (q) => { q.fillStyle = ART.lite(fc, 0.35); q.beginPath(); q.moveTo(11, 19); q.lineTo(13, 31); q.lineTo(16, 29); q.closePath(); q.fill();
+        q.fillStyle = 'rgba(26,21,48,.18)'; q.beginPath(); q.moveTo(11, 19); q.lineTo(9.6, 28); q.lineTo(6.4, 30.4); q.lineTo(5, 22); q.closePath(); q.fill(); }); }
+    c.restore(); c.globalAlpha = 1;
   }
   const d = { col: '#ff4d6d' };
   function draw() {

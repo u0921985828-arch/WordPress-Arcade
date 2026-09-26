@@ -64,23 +64,34 @@ const BG = off(480, 360, (g) => {
 const BRK = {};
 function brickSpr(col, metal, cracked) { const key = col + metal + cracked; if (BRK[key]) return BRK[key];
   return (BRK[key] = off(BW + 4, BH + 4, (g) => { g.translate(2, 2); const base = metal ? '#b8c2d8' : col;
-    ART.rr(g, 0, 0, BW, BH, 3); g.fillStyle = base; g.fill();
-    g.fillStyle = shade(metal ? '#b8c2d8' : col, 0.45); g.beginPath(); g.moveTo(0, 0); g.lineTo(BW, 0); g.lineTo(BW - 4, 4); g.lineTo(4, 4); g.lineTo(4, BH - 4); g.lineTo(0, BH); g.fill();
-    g.fillStyle = shade(base, -0.35); g.beginPath(); g.moveTo(BW, 0); g.lineTo(BW, BH); g.lineTo(0, BH); g.lineTo(4, BH - 4); g.lineTo(BW - 4, BH - 4); g.lineTo(BW - 4, 4); g.fill();
-    g.fillStyle = 'rgba(255,255,255,.45)'; g.fillRect(7, 5.5, BW * 0.4, 2);
-    if (metal) { g.fillStyle = '#5a6488'; for (const [x, y] of [[7, 8], [BW - 7, 8]]) { g.beginPath(); g.arc(x, y, 1.8, 0, R2); g.fill(); } }
-    if (cracked) { g.strokeStyle = OUT; g.lineWidth = 1.4; g.beginPath(); g.moveTo(BW * 0.45, 0); g.lineTo(BW * 0.52, 6); g.lineTo(BW * 0.42, 10); g.lineTo(BW * 0.5, BH); g.moveTo(BW * 0.52, 6); g.lineTo(BW * 0.66, 9); g.stroke(); }
-    ART.rr(g, 0, 0, BW, BH, 3); g.lineWidth = 2; g.strokeStyle = OUT; g.stroke(); })); }
+    const body = (q) => ART.rr(q, 0, 0, BW, BH, 3);
+    /* ladrillo = una sola pieza: silueta trazada y rellenada una vez; el bisel va recortado dentro */
+    unite(g, [[body, base]], 1.1);
+    within(g, body, (q) => {
+      q.fillStyle = shade(metal ? '#b8c2d8' : col, 0.45); q.beginPath(); q.moveTo(0, 0); q.lineTo(BW, 0); q.lineTo(BW - 4, 4); q.lineTo(4, 4); q.lineTo(4, BH - 4); q.lineTo(0, BH); q.fill();
+      q.fillStyle = shade(base, -0.35); q.beginPath(); q.moveTo(BW, 0); q.lineTo(BW, BH); q.lineTo(0, BH); q.lineTo(4, BH - 4); q.lineTo(BW - 4, BH - 4); q.lineTo(BW - 4, 4); q.fill();
+      q.fillStyle = 'rgba(255,255,255,.45)'; q.fillRect(7, 5.5, BW * 0.4, 2);
+      if (metal) { q.fillStyle = '#5a6488'; for (const [x, y] of [[7, 8], [BW - 7, 8]]) { q.beginPath(); q.arc(x, y, 1.8, 0, R2); q.fill(); } }
+      /* grieta: hendidura por sombra propia y luz, nunca un trazo negro dentro de la silueta */
+      if (cracked) { const crack = (w) => { q.lineWidth = w; q.lineJoin = 'round'; q.lineCap = 'round'; q.beginPath(); q.moveTo(BW * 0.45, -1); q.lineTo(BW * 0.52, 6); q.lineTo(BW * 0.42, 10); q.lineTo(BW * 0.5, BH + 1); q.moveTo(BW * 0.52, 6); q.lineTo(BW * 0.66, 9); q.stroke(); };
+        q.strokeStyle = AL('#ffffff', 0.35); q.save(); q.translate(0.9, 0.6); crack(1.5); q.restore();
+        q.strokeStyle = AL(OUT, 0.5); crack(1.3); }
+    }); })); }
 function label(s, x, y, size, col, align, base) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = base || 'top';
   c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
 }
 function paddle(x, y, w) {
   c.fillStyle = 'rgba(0,0,0,.3)'; ART.rr(c, x - w / 2 + 3, y + 4, w, 11, 5.5); c.fill();
-  ART.rr(c, x - w / 2, y, w, 11, 5.5); const g = c.createLinearGradient(0, y, 0, y + 11); g.addColorStop(0, '#ffffff'); g.addColorStop(0.5, '#c9d2ea'); g.addColorStop(1, '#8a94b8'); c.fillStyle = g; c.fill();
-  for (const sx of [-1, 1]) { ART.rr(c, sx < 0 ? x - w / 2 : x + w / 2 - 14, y, 14, 11, 5.5); c.fillStyle = '#ff5f7a'; c.fill(); c.fillStyle = 'rgba(255,255,255,.5)'; c.fillRect(sx < 0 ? x - w / 2 + 4 : x + w / 2 - 10, y + 2, 6, 2); }
-  c.fillStyle = 'rgba(92,225,230,.9)'; c.fillRect(x - 6, y + 4, 12, 3);
-  ART.rr(c, x - w / 2, y, w, 11, 5.5); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
+  const body = (g) => ART.rr(g, x - w / 2, y, w, 11, 5.5);
+  const g = c.createLinearGradient(0, y, 0, y + 11); g.addColorStop(0, '#ffffff'); g.addColorStop(0.5, '#c9d2ea'); g.addColorStop(1, '#8a94b8');
+  unite(c, [[body, g]], 1.25);
+  clipIn(c, body, (q) => {
+    /* topes: cambio de color dentro de la silueta, sin contorno propio */
+    for (const sx of [-1, 1]) { q.fillStyle = '#ff5f7a'; q.fillRect(sx < 0 ? x - w / 2 : x + w / 2 - 14, y - 1, 14, 13); q.fillStyle = AL(OUT, 0.2); q.fillRect(sx < 0 ? x - w / 2 + 13 : x + w / 2 - 14, y - 1, 1.6, 13); q.fillStyle = 'rgba(255,255,255,.5)'; q.fillRect(sx < 0 ? x - w / 2 + 4 : x + w / 2 - 10, y + 2, 6, 2); }
+    q.fillStyle = 'rgba(92,225,230,.9)'; q.fillRect(x - 6, y + 4, 12, 3);
+    q.fillStyle = AL('#ffffff', 0.45); q.fillRect(x - w / 2 + 16, y + 1.4, w - 32, 1.8);
+  });
 }
 function breakBrick(br) {
   br.dead = true; score += 10 * level; k.burst(br.x + 21, br.y + 8, br.col, 10, 140);

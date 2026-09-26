@@ -85,20 +85,61 @@ function label(s, x, y, size, col, align, base) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = base || 'top';
   c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
 }
+/* ---------- Ley de la pieza única (REMASTER §8) ----------
+ * uni(): traza TODAS las partes y las rellena después, así los contornos interiores quedan
+ * tapados y solo sobrevive el borde exterior de la silueta. inw(): detalle interior recortado
+ * contra esa silueta. Las separaciones internas se leen por sombra propia o por cambio de
+ * color, nunca por stroke. Una pieza solo se separa cuando se mueve de verdad. */
+function uni(g, parts, ow) { g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = ow * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); } }
+const all = (parts) => (g) => { for (const p of parts) p(g); };
+function inw(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+const rp = (g, x, y, w, h, r) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+const cp = (g, x, y, r) => { g.moveTo(x + r, y); g.arc(x, y, r, 0, Math.PI * 2); g.closePath(); };
+const ep2 = (g, x, y, rx, ry, rot) => { g.moveTo(x + rx * Math.cos(rot || 0), y + rx * Math.sin(rot || 0)); g.ellipse(x, y, rx, ry, rot || 0, 0, Math.PI * 2); g.closePath(); };
+const ply = (pts) => (g) => { g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); };
+/* hueso de ancho variable: baja por un costado, redondea la punta y vuelve por el otro, así
+ * miembro y tronco se unen con tangente continua y sin escalón. */
+function bone(pts, ws) {
+  return (g) => {
+    const n = pts.length, L = [], R = [];
+    for (let i = 0; i < n; i++) {
+      const a = pts[i > 0 ? i - 1 : 0], b = pts[i < n - 1 ? i + 1 : n - 1];
+      let tx = b[0] - a[0], ty = b[1] - a[1]; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
+      L.push([pts[i][0] - ty * ws[i], pts[i][1] + tx * ws[i]]);
+      R.push([pts[i][0] + ty * ws[i], pts[i][1] - tx * ws[i]]);
+    }
+    g.moveTo(L[0][0], L[0][1]);
+    for (let i = 1; i < n - 1; i++) g.quadraticCurveTo(L[i][0], L[i][1], (L[i][0] + L[i + 1][0]) / 2, (L[i][1] + L[i + 1][1]) / 2);
+    g.lineTo(L[n - 1][0], L[n - 1][1]);
+    const e = pts[n - 1], w = ws[n - 1], a0 = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0]);
+    g.arc(e[0], e[1], w, a0, a0 - Math.PI, true);
+    for (let i = n - 2; i > 0; i--) g.quadraticCurveTo(R[i][0], R[i][1], (R[i][0] + R[i - 1][0]) / 2, (R[i][1] + R[i - 1][1]) / 2);
+    g.lineTo(R[0][0], R[0][1]);
+    g.closePath();
+  };
+}
 function mallet(m, col, dark) {
   c.fillStyle = 'rgba(20,30,60,.25)'; c.beginPath(); c.ellipse(m.x + 4, m.y + 6, m.r, m.r * 0.9, 0, 0, R2); c.fill();
-  c.beginPath(); c.arc(m.x, m.y + 3, m.r, 0, R2); ART.fillOut(c, dark, 3);
-  c.beginPath(); c.arc(m.x, m.y, m.r - 1, 0, R2); c.fillStyle = col; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
-  c.beginPath(); c.arc(m.x, m.y, m.r * 0.72, 0, R2); c.lineWidth = 3; c.strokeStyle = dark; c.stroke();
-  c.beginPath(); c.arc(m.x, m.y - 2, m.r * 0.42, 0, R2); ART.fillOut(c, col, 2.5); c.fillStyle = 'rgba(255,255,255,.55)'; c.beginPath(); c.ellipse(m.x - m.r * 0.14, m.y - m.r * 0.22, m.r * 0.16, m.r * 0.1, -0.5, 0, R2); c.fill();
+  const disc = (q) => cp(q, m.x, m.y, m.r), base = (q) => cp(q, m.x, m.y + 3, m.r);
+  uni(c, [[base, dark], [disc, col]], 1.3);
+  inw(c, all([base, disc]), (q) => {
+    q.fillStyle = dark; q.beginPath(); cp(q, m.x, m.y + 3.2, m.r * 0.78); q.fill();
+    q.fillStyle = col; q.beginPath(); cp(q, m.x, m.y - 2, m.r * 0.42); q.fill();
+    q.fillStyle = 'rgba(255,255,255,.55)'; q.beginPath(); ep2(q, m.x - m.r * 0.14, m.y - m.r * 0.22, m.r * 0.16, m.r * 0.1, -0.5); q.fill(); });
   c.strokeStyle = 'rgba(255,255,255,.45)'; c.lineWidth = 3; c.beginPath(); c.arc(m.x, m.y, m.r * 0.86, 3.6, 4.6); c.stroke();
 }
 function racket(p, y, dir, col) {
   const tilt = k.clamp((p.x - p.px) * 0.02, -0.4, 0.4), bw = p.w / 2 - 5, bh = 21;
   c.fillStyle = 'rgba(0,0,0,.28)'; c.beginPath(); c.ellipse(p.x + 6, y + 8, bw, bh, tilt, 0, R2); c.fill();
   c.save(); c.translate(p.x, y); c.rotate(tilt);
-  ART.rr(c, -6, dir > 0 ? 14 : -40, 12, 26, 4); ART.fillOut(c, '#c98a4b', 2.5); c.fillStyle = 'rgba(0,0,0,.2)'; c.fillRect(-6, dir > 0 ? 26 : -28, 12, 3);
-  c.beginPath(); c.ellipse(0, 0, bw, bh, 0, 0, R2); ART.fillOut(c, '#e8c89a', 3); c.beginPath(); c.ellipse(0, 0, bw - 3, bh - 3, 0, 0, R2); c.fillStyle = col; c.fill();
+  const gy = dir > 0 ? 14 : -40, grip = (q) => rp(q, -6, gy, 12, 26, 4), blade = (q) => ep2(q, 0, 0, bw, bh, 0);
+  uni(c, [[grip, '#c98a4b'], [blade, '#e8c89a']], 1.4);
+  inw(c, all([grip, blade]), (q) => {
+    q.fillStyle = 'rgba(0,0,0,.2)'; q.beginPath(); rp(q, -6, dir > 0 ? 26 : -28, 12, 3, 1); q.fill();
+    q.fillStyle = 'rgba(26,21,48,.18)'; q.beginPath(); rp(q, -7, dir > 0 ? bh - 4 : -bh + 1, 14, 4, 2); q.fill();
+    q.fillStyle = col; q.beginPath(); ep2(q, 0, 0, bw - 3, bh - 3, 0); q.fill(); });
   c.fillStyle = 'rgba(255,255,255,.3)'; c.beginPath(); c.ellipse(-bw * 0.3, -bh * 0.45, bw * 0.35, 3.5, -0.2, 0, R2); c.fill(); c.restore();
 }
 function ballH() { if (!puck || puck.from === undefined) return 0; const tot = Math.abs(PYME - PYAI), p = k.clamp(Math.abs(puck.y - puck.from) / tot, 0, 1.2); return p < 0.72 ? Math.sin(Math.PI * p / 0.72) * 34 : Math.sin(Math.PI * Math.min(1, (p - 0.72) / 0.56)) * 20; }
@@ -169,7 +210,8 @@ k.run((dt) => {
     if (!below) drawBall();
     // red con malla y postes
     c.fillStyle = 'rgba(255,255,255,.18)'; c.fillRect(TX0 - 10, NETY - 12, TX1 - TX0 + 20, 14); c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 1; c.beginPath(); for (let x = TX0 - 8; x < TX1 + 10; x += 6) { c.moveTo(x, NETY - 12); c.lineTo(x, NETY + 2); } c.stroke();
-    ART.rr(c, TX0 - 12, NETY - 15, TX1 - TX0 + 24, 5, 2); ART.fillOut(c, '#fff', 2); for (const x of [TX0 - 14, TX1 + 6]) { ART.rr(c, x, NETY - 18, 8, 22, 3); ART.fillOut(c, '#3a3f5c', 2); }
+    { const tape = (q) => rp(q, TX0 - 12, NETY - 15, TX1 - TX0 + 24, 5, 2), pA = (q) => rp(q, TX0 - 14, NETY - 18, 8, 22, 3), pB = (q) => rp(q, TX1 + 6, NETY - 18, 8, 22, 3);
+      uni(c, [[pA, '#3a3f5c'], [pB, '#3a3f5c'], [tape, '#fff']], 1.1); }
     if (below) drawBall();
     racket(ai, PYAI, -1, PC(false) || '#2a2f44'); racket(me, PYME, 1, PC(true) || '#e24b5b');
     if (!LAND) { label('Saque: ' + (server ? (k.party ? NM(true) : 'tú') : NM(false)), 12, 614, 13, '#cfe3ff');
@@ -511,7 +553,9 @@ function paddleX() {
       c.fillStyle = '#f4f4f8'; for (const q of [-1, 1]) { c.beginPath(); c.ellipse(q * sw - 2, q * 6, 5, 3.4, 0, 0, R2); c.fill(); c.lineWidth = 1.5; c.strokeStyle = OUT; c.stroke(); }
       const ph = P.sw > 0 ? 2.2 - 3.2 * (1 - P.sw / 0.25) : 0.7, hx = Math.cos(ph) * 12, hy = 7 + Math.sin(ph) * 8;
       c.strokeStyle = OUT; c.lineWidth = 5; c.beginPath(); c.moveTo(0, 8); c.lineTo(hx * 0.8, hy); c.stroke(); c.strokeStyle = '#ffd9b5'; c.lineWidth = 3; c.stroke();
-      c.save(); c.translate(hx * 0.8, hy); c.rotate(ph); ART.rr(c, 0, -2.5, 9, 5, 2); ART.fillOut(c, '#6b4a2b', 1.6); ART.rr(c, 8, -6, 16, 12, 5); ART.fillOut(c, '#c98a4b', 2); c.fillStyle = 'rgba(255,255,255,.3)'; c.fillRect(11, -4, 10, 2); c.restore();
+      c.save(); c.translate(hx * 0.8, hy); c.rotate(ph); const hg = (q) => rp(q, 0, -2.5, 9, 5, 2), hp = (q) => rp(q, 8, -6, 16, 12, 5);
+      uni(c, [[hg, '#6b4a2b'], [hp, '#c98a4b']], 1.05);
+      inw(c, all([hg, hp]), (q) => { q.fillStyle = 'rgba(26,21,48,.2)'; q.beginPath(); rp(q, 7, -6, 3, 12, 1.5); q.fill(); q.fillStyle = 'rgba(255,255,255,.3)'; q.beginPath(); rp(q, 11, -4, 10, 2, 1); q.fill(); }); c.restore();
       c.beginPath(); c.ellipse(0, 0, 9, 12, 0, 0, R2); c.fillStyle = col; c.fill(); c.lineWidth = 2.2; c.strokeStyle = OUT; c.stroke();
       c.fillStyle = '#fff'; c.fillRect(-2, -11, 4, 22);
       c.beginPath(); c.arc(1, 0, 7.5, 0, R2); c.fillStyle = P.p ? '#8a4b2a' : '#3a2a4a'; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();

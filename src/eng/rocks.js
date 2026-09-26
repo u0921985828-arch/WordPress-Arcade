@@ -254,24 +254,42 @@ function drawShip(x, y, a, s, thr, tilt, wing) {
   });
   c.restore();
 }
+const UF_BODY = (g) => { g.moveTo(-20, 0); g.quadraticCurveTo(-19.6, -3.3, -11.5, -4.6); g.quadraticCurveTo(-9.6, -12.9, 0, -13); g.quadraticCurveTo(9.6, -12.9, 11.5, -4.6); g.quadraticCurveTo(19.6, -3.3, 20, 0); g.quadraticCurveTo(19, 6.5, 0, 6.5); g.quadraticCurveTo(-19, 6.5, -20, 0); g.closePath(); };
 function drawUfo(u) {
   c.save(); c.translate(u.x, u.y); const s = u.r / 16; c.scale(s, s);
-  c.beginPath(); c.ellipse(0, -5, 9, 8, 0, Math.PI, 0); ART.fillOut(c, 'rgba(140,240,255,.85)', 2);
-  c.fillStyle = '#7cf7a0'; c.beginPath(); c.arc(0, -6, 3.5, 0, R2); c.fill(); c.fillStyle = OUT; c.fillRect(-1.8, -7, 1.2, 1.5); c.fillRect(0.8, -7, 1.2, 1.5);
-  c.beginPath(); c.ellipse(0, 0, 20, 6.5, 0, 0, R2); ART.fillOut(c, u.small ? '#ff5f7a' : '#9aa3bd', 2.4);
-  c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.ellipse(-3, -2.5, 12, 1.8, 0, 0, R2); c.fill();
-  for (let i = 0; i < 5; i++) { const on = Math.floor(t * 8 + i) % 5 === 0; c.fillStyle = on ? '#ffe45c' : '#5a4f7a'; c.beginPath(); c.arc(-14 + i * 7, 1.5, 1.8, 0, R2); c.fill(); }
+  unite(c, [[UF_BODY, u.small ? '#ff5f7a' : '#9aa3bd']], 1.2);
+  clipIn(c, UF_BODY, (g) => {
+    /* cúpula: cambio de color, no contorno */
+    g.fillStyle = AL(OUT, 0.2); g.beginPath(); g.ellipse(0, -4, 9.4, 8.4, 0, 0, R2); g.fill();
+    g.fillStyle = 'rgba(150,242,255,.95)'; g.beginPath(); g.ellipse(0, -5, 9, 8, 0, 0, R2); g.fill();
+    g.fillStyle = '#7cf7a0'; g.beginPath(); g.arc(0, -6, 3.5, 0, R2); g.fill();
+    g.fillStyle = OUT; g.fillRect(-1.8, -7, 1.2, 1.5); g.fillRect(0.8, -7, 1.2, 1.5);
+    g.fillStyle = AL('#ffffff', 0.5); g.beginPath(); g.ellipse(-3.4, -8.4, 3, 1.8, -0.5, 0, R2); g.fill();
+    /* platillo: luz arriba y sombra propia abajo */
+    g.fillStyle = AL('#ffffff', 0.35); g.beginPath(); g.ellipse(-3, -2.6, 12, 1.8, 0, 0, R2); g.fill();
+    g.fillStyle = AL(OUT, 0.22); g.beginPath(); g.ellipse(0, 7.6, 19, 4.2, 0, 0, R2); g.fill();
+    for (let i = 0; i < 5; i++) { const on = Math.floor(t * 8 + i) % 5 === 0; g.fillStyle = on ? '#ffe45c' : '#5a4f7a'; g.beginPath(); g.arc(-14 + i * 7, 1.5, 1.8, 0, R2); g.fill(); }
+  });
   c.restore();
 }
 function pupIcon(kind, x, y, s) {
   c.save(); c.translate(x, y); c.scale(s, s);
   c.globalAlpha = 0.3; c.fillStyle = PCOL[kind]; c.beginPath(); c.arc(0, 0, 17, 0, R2); c.fill(); c.globalAlpha = 1;
-  c.beginPath(); c.arc(0, 0, 12, 0, R2); ART.fillOut(c, PCOL[kind], 2.2); c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.arc(-3, -4, 4.5, 0, R2); c.fill();
-  c.fillStyle = '#fff'; c.strokeStyle = OUT; c.lineWidth = 1.5;
-  if (kind === 'triple') for (const a of [-0.5, 0, 0.5]) { c.save(); c.rotate(a); ART.rr(c, -1.5, -8, 3, 7, 1.5); c.fill(); c.stroke(); c.restore(); }
-  else if (kind === 'rapid') { c.beginPath(); c.moveTo(1, -8); c.lineTo(-4, 1); c.lineTo(0, 1); c.lineTo(-1, 8); c.lineTo(4, -1); c.lineTo(0, -1); c.closePath(); c.fill(); c.stroke(); }
-  else if (kind === 'shield') { c.beginPath(); c.moveTo(0, -7); c.lineTo(6, -4); c.lineTo(5, 2); c.quadraticCurveTo(3, 6, 0, 8); c.quadraticCurveTo(-3, 6, -5, 2); c.lineTo(-6, -4); c.closePath(); c.fill(); c.stroke(); }
-  else { c.restore(); ART.heart(c, x, y + 1, 0.9, true); return; }
+  if (kind === 'life') { c.restore(); ART.heart(c, x, y + 1, 0.9, true); return; }
+  const disc = (g) => { g.arc(0, 0, 12, 0, R2); };
+  unite(c, [[disc, PCOL[kind]]], 1.15);
+  clipIn(c, disc, (g) => {
+    g.fillStyle = AL('#ffffff', 0.3); g.beginPath(); g.arc(-3, -4, 6.5, 0, R2); g.fill();
+    g.fillStyle = AL(OUT, 0.2); g.beginPath(); g.arc(3, 5, 9, 0, R2); g.fill();
+    /* símbolo: relieve por sombra propia, sin trazo */
+    const sym = (q) => {
+      if (kind === 'triple') for (const a of [-0.5, 0, 0.5]) { q.save(); q.rotate(a); ART.rr(q, -1.5, -8, 3, 7, 1.5); q.fill(); q.restore(); }
+      else if (kind === 'rapid') { q.beginPath(); q.moveTo(1, -8); q.lineTo(-4, 1); q.lineTo(0, 1); q.lineTo(-1, 8); q.lineTo(4, -1); q.lineTo(0, -1); q.closePath(); q.fill(); }
+      else { q.beginPath(); q.moveTo(0, -7); q.lineTo(6, -4); q.lineTo(5, 2); q.quadraticCurveTo(3, 6, 0, 8); q.quadraticCurveTo(-3, 6, -5, 2); q.lineTo(-6, -4); q.closePath(); q.fill(); }
+    };
+    g.save(); g.translate(0, 1.1); g.fillStyle = AL(OUT, 0.35); sym(g); g.restore();
+    g.fillStyle = '#fff'; sym(g);
+  });
   c.restore();
 }
 function each(o, r, fn) { fn(o.x, o.y); if (o.x < r) fn(o.x + W, o.y); if (o.x > W - r) fn(o.x - W, o.y); if (o.y < r) fn(o.x, o.y + H); if (o.y > H - r) fn(o.x, o.y - H); }

@@ -71,6 +71,41 @@ function scored() {
 /* ---------- Red: nodos con muelle hacia su posición de reposo ---------- */
 function netRest(n) { const u = n.i / (NC - 1) * 2 - 1, taper = 1 - 0.45 * n.j / (NR - 1); return [hoop.x + u * RIM * taper, hoop.y + 2 + n.j * 11]; }
 function stepNet(dt) { for (const n of net) { if (n.j === 0) { n.dx = n.dy = 0; continue; } n.vx += (-n.dx * 90 - n.vx * 6) * dt; n.vy += (-n.dy * 90 - n.vy * 6) * dt; n.dx += n.vx * dt; n.dy += n.vy * dt; } }
+/* ---------- Ley de la pieza única (REMASTER §8) ----------
+ * uni(): traza TODAS las partes y las rellena después, así los contornos interiores quedan
+ * tapados y solo sobrevive el borde exterior de la silueta. inw(): detalle interior recortado
+ * contra esa silueta. Las separaciones internas se leen por sombra propia o por cambio de
+ * color, nunca por stroke. Una pieza solo se separa cuando se mueve de verdad. */
+function uni(g, parts, ow) { g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = ow * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); } }
+const all = (parts) => (g) => { for (const p of parts) p(g); };
+function inw(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+const rp = (g, x, y, w, h, r) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+const cp = (g, x, y, r) => { g.moveTo(x + r, y); g.arc(x, y, r, 0, Math.PI * 2); g.closePath(); };
+const ep2 = (g, x, y, rx, ry, rot) => { g.moveTo(x + rx * Math.cos(rot || 0), y + rx * Math.sin(rot || 0)); g.ellipse(x, y, rx, ry, rot || 0, 0, Math.PI * 2); g.closePath(); };
+const ply = (pts) => (g) => { g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); };
+/* hueso de ancho variable: baja por un costado, redondea la punta y vuelve por el otro, así
+ * miembro y tronco se unen con tangente continua y sin escalón. */
+function bone(pts, ws) {
+  return (g) => {
+    const n = pts.length, L = [], R = [];
+    for (let i = 0; i < n; i++) {
+      const a = pts[i > 0 ? i - 1 : 0], b = pts[i < n - 1 ? i + 1 : n - 1];
+      let tx = b[0] - a[0], ty = b[1] - a[1]; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
+      L.push([pts[i][0] - ty * ws[i], pts[i][1] + tx * ws[i]]);
+      R.push([pts[i][0] + ty * ws[i], pts[i][1] - tx * ws[i]]);
+    }
+    g.moveTo(L[0][0], L[0][1]);
+    for (let i = 1; i < n - 1; i++) g.quadraticCurveTo(L[i][0], L[i][1], (L[i][0] + L[i + 1][0]) / 2, (L[i][1] + L[i + 1][1]) / 2);
+    g.lineTo(L[n - 1][0], L[n - 1][1]);
+    const e = pts[n - 1], w = ws[n - 1], a0 = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0]);
+    g.arc(e[0], e[1], w, a0, a0 - Math.PI, true);
+    for (let i = n - 2; i > 0; i--) g.quadraticCurveTo(R[i][0], R[i][1], (R[i][0] + R[i - 1][0]) / 2, (R[i][1] + R[i - 1][1]) / 2);
+    g.lineTo(R[0][0], R[0][1]);
+    g.closePath();
+  };
+}
 function drawNet() {
   const P = (i, j) => { const n = net[j * NC + i], [x, y] = netRest(n); return [x + n.dx, y + n.dy]; };
   c.lineCap = 'round'; for (const [lw, col] of [[3.2, 'rgba(26,21,48,.55)'], [1.6, '#f4f2ff']]) { c.lineWidth = lw; c.strokeStyle = col; c.beginPath();
@@ -90,10 +125,15 @@ function draw() {
   const hgt = Math.max(0, FLOOR - ball.y), sh = Math.max(0.25, 1 - hgt / 500); c.fillStyle = `rgba(0,0,0,${0.35 * sh})`; c.beginPath(); c.ellipse(ball.x, FLOOR + 6, 16 * sh, 4 * sh, 0, 0, R2); c.fill();
   // poste, brazo y tablero
   const bb = BB(), px = bb.x1 + 26; c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(px, FLOOR + 6, 22, 5, 0, 0, R2); c.fill();
-  ART.rr(c, px - 5, bb.y0 + 30, 10, FLOOR - bb.y0 - 28, 3); ART.fillOut(c, '#5d6480', 2.5); c.fillStyle = 'rgba(255,255,255,.2)'; c.fillRect(px - 3, bb.y0 + 34, 3, FLOOR - bb.y0 - 40);
-  ART.rr(c, px - 22, FLOOR - 70, 44, 70, 6); ART.fillOut(c, '#2e3350', 2.5); c.fillStyle = '#ff5fa2'; c.fillRect(px - 18, FLOOR - 60, 36, 4);
-  c.beginPath(); c.moveTo(bb.x1, hoop.y - 44); c.lineTo(px, bb.y0 + 34); c.lineTo(px, bb.y0 + 48); c.lineTo(bb.x1, hoop.y - 30); c.closePath(); ART.fillOut(c, '#5d6480', 2);
-  c.beginPath(); c.moveTo(bb.x0, bb.y0 + 6); c.lineTo(bb.x1, bb.y0); c.lineTo(bb.x1, bb.y1 - 6); c.lineTo(bb.x0, bb.y1); c.closePath(); ART.fillOut(c, 'rgba(235,245,255,.92)', 2.5);
+  { const post = (q) => rp(q, px - 5, bb.y0 + 30, 10, FLOOR - bb.y0 - 28, 3),
+      base = (q) => rp(q, px - 22, FLOOR - 70, 44, 70, 6),
+      brazo = ply([[bb.x1, hoop.y - 44], [px, bb.y0 + 34], [px, bb.y0 + 48], [bb.x1, hoop.y - 30]]),
+      tab = ply([[bb.x0, bb.y0 + 6], [bb.x1, bb.y0], [bb.x1, bb.y1 - 6], [bb.x0, bb.y1]]);
+    uni(c, [[base, '#2e3350'], [post, '#5d6480'], [brazo, '#5d6480'], [tab, 'rgba(235,245,255,.92)']], 1.3);
+    inw(c, all([base, post, brazo, tab]), (q) => {
+      q.fillStyle = 'rgba(26,21,48,.22)'; q.beginPath(); rp(q, px - 24, FLOOR - 72, 48, 5, 2); q.fill();
+      q.fillStyle = 'rgba(255,255,255,.2)'; q.beginPath(); rp(q, px - 3, bb.y0 + 34, 3, FLOOR - bb.y0 - 40, 1.5); q.fill();
+      q.fillStyle = '#ff5fa2'; q.beginPath(); rp(q, px - 18, FLOOR - 60, 36, 4, 2); q.fill(); }); }
   c.strokeStyle = '#e0303f'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(bb.x0 + 3, hoop.y - 34); c.lineTo(bb.x1 - 3, hoop.y - 36); c.lineTo(bb.x1 - 3, hoop.y - 6); c.lineTo(bb.x0 + 3, hoop.y - 4); c.closePath(); c.stroke();
   c.fillStyle = 'rgba(255,255,255,.7)'; c.fillRect(bb.x0 + 2, bb.y0 + 10, 2, 40);
   // aro: mitad trasera, balón, red, mitad delantera
@@ -250,10 +290,13 @@ function duelGame() {
     const hgt = Math.max(0, FLOOR - b.y), sh = Math.max(0.25, 1 - hgt / 400); c.fillStyle = `rgba(0,0,0,${0.35 * sh})`; c.beginPath(); c.ellipse(b.u, FLOOR + 6, 15 * sh, 4 * sh, 0, 0, R2); c.fill();
     // poste, brazo y tablero (color del jugador)
     c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(px, FLOOR + 6, 18, 4, 0, 0, R2); c.fill();
-    ART.rr(c, px - 5, bb.y0 + 30, 10, FLOOR - bb.y0 - 28, 3); ART.fillOut(c, '#5d6480', 2.5);
-    ART.rr(c, px - 16, FLOOR - 56, 32, 56, 6); ART.fillOut(c, '#2e3350', 2.5); c.fillStyle = col; c.fillRect(px - 12, FLOOR - 48, 24, 4);
-    c.beginPath(); c.moveTo(bb.x1, hoop.y - 40); c.lineTo(px, bb.y0 + 34); c.lineTo(px, bb.y0 + 46); c.lineTo(bb.x1, hoop.y - 28); c.closePath(); ART.fillOut(c, '#5d6480', 2);
-    c.beginPath(); c.moveTo(bb.x0, bb.y0 + 6); c.lineTo(bb.x1, bb.y0); c.lineTo(bb.x1, bb.y1 - 6); c.lineTo(bb.x0, bb.y1); c.closePath(); ART.fillOut(c, 'rgba(235,245,255,.92)', 2.5);
+    { const post = (q) => rp(q, px - 5, bb.y0 + 30, 10, FLOOR - bb.y0 - 28, 3),
+        base = (q) => rp(q, px - 16, FLOOR - 56, 32, 56, 6),
+        brazo = ply([[bb.x1, hoop.y - 40], [px, bb.y0 + 34], [px, bb.y0 + 46], [bb.x1, hoop.y - 28]]),
+        tab = ply([[bb.x0, bb.y0 + 6], [bb.x1, bb.y0], [bb.x1, bb.y1 - 6], [bb.x0, bb.y1]]);
+      uni(c, [[base, '#2e3350'], [post, '#5d6480'], [brazo, '#5d6480'], [tab, 'rgba(235,245,255,.92)']], 1.3);
+      inw(c, all([base, post, brazo, tab]), (q) => { q.fillStyle = 'rgba(26,21,48,.22)'; q.beginPath(); rp(q, px - 18, FLOOR - 58, 36, 5, 2); q.fill();
+        q.fillStyle = col; q.beginPath(); rp(q, px - 12, FLOOR - 48, 24, 4, 2); q.fill(); }); }
     c.strokeStyle = col; c.lineWidth = 2.5; c.beginPath(); c.moveTo(bb.x0 + 3, hoop.y - 32); c.lineTo(bb.x1 - 3, hoop.y - 34); c.lineTo(bb.x1 - 3, hoop.y - 6); c.lineTo(bb.x0 + 3, hoop.y - 4); c.closePath(); c.stroke();
     const hot = s.streak >= 3, rc = hot ? '#ffb13d' : '#ff5f2d';
     c.lineWidth = 7; c.strokeStyle = OUT; c.beginPath(); c.ellipse(hoop.u, hoop.y, RIM, 6, 0, Math.PI, R2); c.stroke(); c.lineWidth = 4; c.strokeStyle = rc; c.stroke();

@@ -191,14 +191,20 @@ k.run((dt) => {
 }, draw);
 
 /* ---------- Dibujo ---------- */
+const BK_BODY = (g) => { ART.rr(g, -11, -4.5, 17, 9, 4); };
+const BK_NOSE = (g) => { g.moveTo(10.2, 0); g.arc(7, 0, 3.2, 0, R2); };
+const EXHAUST = (g) => { ART.rr(g, -13, -1.8, 4, 3.6, 1.4); };
 function bike(b, fr) {
   const x = (b.px + (b.x - b.px) * fr) * S + S / 2, y = TOP + (b.py + (b.y - b.py) * fr) * S + S / 2, a = ANG[b.d] || 0;
   c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.8; c.drawImage(glowOf(b), x - 20, y - 20, 40, 40); c.restore();
   c.save(); c.translate(x, y); c.rotate(a); c.scale(1.25, 1.25); c.lineJoin = 'round';
-  ART.rr(c, -11, -4.5, 17, 9, 4); ART.fillOut(c, b.col, 2); // carenado
-  c.beginPath(); c.moveTo(-3, -3); c.lineTo(5, -2); c.quadraticCurveTo(9, 0, 5, 2); c.lineTo(-3, 3); c.closePath(); ART.fillOut(c, '#1b2040', 1.5);
-  c.fillStyle = 'rgba(255,255,255,.55)'; c.fillRect(-9, -3, 6, 1.5);
-  c.beginPath(); c.arc(7, 0, 3.2, 0, R2); ART.fillOut(c, '#fff', 1.5); c.fillStyle = OUT; c.fillRect(-12, -1.5, 3, 3);
+  /* moto de una pieza: carenado + morro + escape se trazan juntos y se rellenan después */
+  unite(c, [[EXHAUST, '#2a2d4a'], [BK_BODY, b.col], [BK_NOSE, '#fff']], 1.05 / 1.25);
+  clipIn(c, BK_BODY, (g) => {
+    g.fillStyle = '#1b2040'; g.beginPath(); g.moveTo(-3, -3); g.lineTo(5, -2); g.quadraticCurveTo(9, 0, 5, 2); g.lineTo(-3, 3); g.closePath(); g.fill();
+    g.fillStyle = AL('#ffffff', 0.55); g.fillRect(-9, -3.2, 6, 1.6);
+    g.fillStyle = AL(OUT, 0.2); g.fillRect(-11, 2.6, 17, 2.4);
+  });
   c.restore();
   if (MP) label(b.name, k.clamp(x, 22, W - 22), y < TOP + 40 ? y + 34 : y - 34, 17, b.pl !== undefined ? b.col : '#c9cbe0', 'center');
 }
