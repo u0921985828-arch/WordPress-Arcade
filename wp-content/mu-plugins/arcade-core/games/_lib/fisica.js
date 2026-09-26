@@ -39,14 +39,16 @@ const PZ = (() => {
         for (let i = 0; i < n; i++) {
           const a = pts[i > 0 ? i - 1 : 0], b = pts[i < n - 1 ? i + 1 : n - 1];
           let tx = b[0] - a[0], ty = b[1] - a[1]; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
-          L.push([pts[i][0] - ty * ws[i], pts[i][1] + tx * ws[i]]);
-          R.push([pts[i][0] + ty * ws[i], pts[i][1] - tx * ws[i]]);
+          /* L = costado superior: el hueso se traza en el mismo sentido de giro que blob/box, así
+             dos piezas del mismo color se pueden fundir en un relleno sin abrir agujeros. */
+          L.push([pts[i][0] + ty * ws[i], pts[i][1] - tx * ws[i]]);
+          R.push([pts[i][0] - ty * ws[i], pts[i][1] + tx * ws[i]]);
         }
         g.moveTo(L[0][0], L[0][1]);
         for (let i = 1; i < n - 1; i++) g.quadraticCurveTo(L[i][0], L[i][1], (L[i][0] + L[i + 1][0]) / 2, (L[i][1] + L[i + 1][1]) / 2);
         g.lineTo(L[n - 1][0], L[n - 1][1]);
         const e = pts[n - 1], w = ws[n - 1], a0 = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0]);
-        g.arc(e[0], e[1], w, a0, a0 - Math.PI, true);
+        g.arc(e[0], e[1], w, a0, a0 + Math.PI, false);
         for (let i = n - 2; i > 0; i--) g.quadraticCurveTo(R[i][0], R[i][1], (R[i][0] + R[i - 1][0]) / 2, (R[i][1] + R[i - 1][1]) / 2);
         g.lineTo(R[0][0], R[0][1]); g.closePath();
       };
@@ -73,8 +75,13 @@ const PZ = (() => {
           g.strokeStyle = AL(O, 0.15); g.lineWidth = p[2]; g.stroke(ds[i]);
           g.lineWidth = p[2] * 0.45; g.stroke(ds[i]); g.restore();
         }
-        /* cada pieza se rellena por separado: fundir dos trazados en un Path2D los sumaría con la
-           regla «nonzero» y dos sentidos de giro contrarios abrirían un hueco (bota con agujero). */
+        /* Piezas contiguas del mismo color y sin detalle propio se funden en UN relleno: todos los
+           trazados giran en el mismo sentido, así la regla «nonzero» las suma sin abrir huecos. */
+        if (!p[2] && !p[3] && !p[4]) {
+          let j = i, m = ds[i];
+          while (j + 1 < parts.length && parts[j + 1][1] === p[1] && !parts[j + 1][2] && !parts[j + 1][3] && !parts[j + 1][4]) { j++; if (m === ds[i]) { m = new Path2D(); m.addPath(ds[i]); } m.addPath(ds[j]); }
+          g.fillStyle = p[1]; g.fill(m); i = j; continue;
+        }
         g.fillStyle = p[1]; g.fill(ds[i]);
         if (p[3]) P.cel(g, p[0], p[1], p[3] === true ? null : p[3]);
         if (p[4]) P.in(g, p[0], p[4]);
@@ -150,7 +157,7 @@ const PZ = (() => {
     /* sprite de personaje/objeto: ×3 lógico para que la línea fina no se rompa. (0,0) = ancla */
     spr(key, w, h, ax, ay, fn) {
       let q = CH[key]; if (q) return q;
-      if (++NCH > 400) { for (const kk in CH) delete CH[kk]; NCH = 1; }   /* tope de memoria del caché */
+      if (++NCH > 600) { for (const kk in CH) delete CH[kk]; NCH = 1; }   /* tope de memoria del caché */
       q = P.cv(w, h, 3, (g) => { g.translate(ax, ay); fn(g); });
       q.ax = ax; q.ay = ay; CH[key] = q; return q;
     },
@@ -197,6 +204,21 @@ function label(s, x, y, size, col, align, q) {
 function fit(s, w, base) { let f = base; do { c.font = `800 ${f}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; } while (c.measureText(s).width > w && --f > 9); return f; }
 
 /* ---------------------------------------------------------------- Muñecos articulados */
+/* Ley de la pieza única: cuerpo, cuello y patas son un solo caballo, contorneado de una pasada;
+   las patas traseras se leen por su tono más oscuro, no por un borde interior. La crin y la cola
+   se mueven aparte, así que van con su propio borde. */
+function horseSpr(ph16) {
+  return PZ.spr('horse|' + ph16, 108, 92, 50, 58, (g) => {
+    const hoof = ph16 / 16, bob = Math.sin(hoof * TAU) * 3, hp = [];
+    for (const [ox, ph] of [[-20, 0], [-8, 0.5], [10, 0.25], [22, 0.75]]) { const a = Math.sin((hoof + ph) * TAU) * 0.7;
+      hp.push([PZ.bone([[ox, 4 + bob], [ox + Math.sin(a) * 8, 16 + bob], [ox + Math.sin(a) * 15, 26]], [2.5, 2.5, 2.5]), ph > 0.4 ? '#6b4a2c' : '#7a5433']); }
+    hp.push([PZ.box(-30, -22 + bob, 60, 30, 14), '#8a6240', 0, { dx: 3, dy: 3.2 }]);
+    hp.push([(q) => { q.moveTo(24, -18 + bob); q.quadraticCurveTo(42, -30 + bob, 40, -44 + bob); q.quadraticCurveTo(38, -52 + bob, 30, -50 + bob); q.quadraticCurveTo(22, -44 + bob, 20, -20 + bob); q.closePath(); }, '#9a7048']);
+    PZ.unite(g, hp, 2.6);
+    g.beginPath(); g.arc(36, -46 + bob, 2, 0, TAU); g.fillStyle = OUT; g.fill();
+    g.beginPath(); g.moveTo(-28, -18 + bob); g.quadraticCurveTo(-44, -14 + bob, -40, 6 + bob); g.lineWidth = 6; g.strokeStyle = '#6b4a2c'; g.lineCap = 'round'; g.stroke();
+  });
+}
 function seg(pts, w, col, back) {
   c.beginPath(); c.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]);
   c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = OUT; c.lineWidth = w + 2.6; c.stroke(); c.strokeStyle = back ? dark(col, 0.28) : col; c.lineWidth = w; c.stroke();
@@ -238,16 +260,16 @@ function joint(x0, y0, x1, y1, bend) { const l = Math.max(hyp(x1 - x0, y1 - y0) 
    dibuja una sola vez por pose en vez de 60 veces por segundo y jugador. */
 function puppet(x, y, s, col, o) {
   o = o || {};
-  const q2 = (v) => Math.round(v / 2) * 2;
+  const q2 = (v) => Math.round(v / 3) * 3;
   const hands = (o.hands || [[-15, -1], [15, -1]]).map((h) => [q2(h[0]), q2(h[1])]);
   const feet = (o.feet || [[-7.5, 22], [7.5, 22]]).map((h) => [q2(h[0]), q2(h[1])]);
   const hr = o.hr == null ? 11 : o.hr + 2, hy = o.hy == null ? -22 : o.hy;
   const f = o.face === -1 ? -1 : 1, fr = o.front == null ? 1 : o.front;
   const skin = o.skin || '#ffd9b5';
   const key = `P${col}|${skin}|${hr}|${hy}|${f}|${fr}|${o.helm ? 1 : 0}|${o.belt ? 1 : 0}|${o.hair === false ? 0 : 1}|${o.shadow === false ? 0 : 1}|${o.mouth || ''}|${o.shut ? 1 : 0}|${hands}|${feet}`;
-  const q = PZ.spr(key, 78, 88, 39, 58, (g) => bodyDraw(g, col, skin, hands, feet, hr, hy, f, fr, o));
+  const q = PZ.spr(key, 64, 78, 32, 50, (g) => bodyDraw(g, col, skin, hands, feet, hr, hy, f, fr, o));
   c.save(); c.translate(x, y); c.scale(s, s); if (o.rot) c.rotate(o.rot);
-  c.drawImage(q, -39, -58, 78, 88);
+  c.drawImage(q, -32, -50, 64, 78);
   if (o.after) o.after();
   c.restore();
 }
@@ -516,12 +538,8 @@ const MODES = {
       const x = pl.x, s = pl.sd, y = 210, bob = Math.sin(pl.hoof * TAU) * 3;
       /* caballo dibujado por código */
       c.save(); c.translate(x, y); c.scale(s, 1); shadow(c, 0, 24, 30, 0.22);
-      rr(c, -30, -22 + bob, 60, 30, 14); fillOut(c, '#8a6240', 2.6);
-      c.beginPath(); c.moveTo(24, -18 + bob); c.quadraticCurveTo(42, -30 + bob, 40, -44 + bob); c.quadraticCurveTo(38, -52 + bob, 30, -50 + bob); c.quadraticCurveTo(22, -44 + bob, 20, -20 + bob); c.closePath(); fillOut(c, '#9a7048', 2.4);
-      c.beginPath(); c.arc(36, -46 + bob, 2, 0, TAU); c.fillStyle = OUT; c.fill();
-      c.beginPath(); c.moveTo(-28, -18 + bob); c.quadraticCurveTo(-44, -14 + bob, -40, 6 + bob); c.lineWidth = 6; c.strokeStyle = '#6b4a2c'; c.stroke();
-      for (const [ox, ph] of [[-20, 0], [-8, 0.5], [10, 0.25], [22, 0.75]]) { const a = Math.sin((pl.hoof + ph) * TAU) * 0.7;
-        seg([[ox, 4 + bob], [ox + Math.sin(a) * 8, 16 + bob], [ox + Math.sin(a) * 15, 26]], 5, '#7a5433'); }
+      /* el trote solo depende de la fase del casco: 16 fotogramas cacheados */
+      PZ.put(c, horseSpr(Math.round((pl.hoof % 1 + 1) % 1 * 16) % 16), 0, 0);
       c.restore();
       /* caballero */
       const hy2 = y - 34 + bob, lanceY = pl.aim ? -24 : -4;

@@ -15,6 +15,167 @@
 const W = 800, H = 450, OUT = ART.OUT, TAU = 6.2832, NP = 4, TH = ART.THEMES;
 const ID = CFG.id || 'brawl', MODE = ['toys', 'scrap'].includes(CFG.mode) ? CFG.mode : 'pillow', TOYS = MODE === 'toys', SCRAP = MODE === 'scrap';
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#1d1840' }), c = k.ctx;
+/* ---------- PZ · Ley de la pieza única + cartoon de estudio (docs/REMASTER.md §8) ----------
+   Un objeto que el jugador lee como UNA cosa se traza entero, se contornea UNA vez y se rellena
+   UNA vez: `PZ.unite()` contornea todas las partes primero y las rellena después, así cualquier
+   borde interior queda tapado y sólo sobrevive la silueta. El detalle interior va recortado
+   (`PZ.in`, y `PZ.cut` sobre el lienzo de partida, donde `source-atop` costaría un compuesto de
+   pantalla completa). Sólo se separa lo que se mueve de verdad (rueda, torreta, arma, paño).
+   Cartoon de estudio: 3 tonos por pieza con borde duro (`cel`), párpado superior recto, cejas
+   gruesas, manoplas con pulgar, un óvalo especular y sombra de contacto dura. */
+const PZ = (() => {
+  const O = ART.OUT, AL = ART.alpha, DK = ART.dark, LT = ART.lite, R2 = Math.PI * 2;
+  const DPR = Math.min(2, (typeof devicePixelRatio === 'number' && devicePixelRatio) || 1);
+  const OW = 1.5, IW = 0.7, IA = 0.62, CH = {}; let NCH = 0;
+  const P = {
+    O, R2, DPR,
+    /* --- trazados reutilizables (sólo trazan; no rellenan ni contornean) --- */
+    blob: (x, y, rx, ry, rot) => (g) => { g.moveTo(x + rx, y); g.ellipse(x, y, rx, Math.abs(ry), rot || 0, 0, R2); },
+    /* rr compatible con Path2D (ART.rr llama a beginPath y no vale aquí) */
+    box: (x, y, w, h, r) => (g) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); },
+    /* hueso de ancho variable: baja por un costado, redondea la punta y vuelve por el otro; la raíz
+       queda abierta y enterrada en el tronco → tangente continua en hombro y cadera. */
+    bone(pts, ws) {
+      return (g) => {
+        const n = pts.length, L = [], R = [];
+        for (let i = 0; i < n; i++) {
+          const a = pts[i > 0 ? i - 1 : 0], b = pts[i < n - 1 ? i + 1 : n - 1];
+          let tx = b[0] - a[0], ty = b[1] - a[1]; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
+          /* L = costado superior: el hueso se traza en el mismo sentido de giro que blob/box, así
+             dos piezas del mismo color se pueden fundir en un relleno sin abrir agujeros. */
+          L.push([pts[i][0] + ty * ws[i], pts[i][1] - tx * ws[i]]);
+          R.push([pts[i][0] - ty * ws[i], pts[i][1] + tx * ws[i]]);
+        }
+        g.moveTo(L[0][0], L[0][1]);
+        for (let i = 1; i < n - 1; i++) g.quadraticCurveTo(L[i][0], L[i][1], (L[i][0] + L[i + 1][0]) / 2, (L[i][1] + L[i + 1][1]) / 2);
+        g.lineTo(L[n - 1][0], L[n - 1][1]);
+        const e = pts[n - 1], w = ws[n - 1], a0 = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0]);
+        g.arc(e[0], e[1], w, a0, a0 + Math.PI, false);
+        for (let i = n - 2; i > 0; i--) g.quadraticCurveTo(R[i][0], R[i][1], (R[i][0] + R[i - 1][0]) / 2, (R[i][1] + R[i - 1][1]) / 2);
+        g.lineTo(R[0][0], R[0][1]); g.closePath();
+      };
+    },
+    /* manopla: bola grande con el pulgar marcado (media cabeza de ancho) */
+    mitt(x, y, a, r, s) {
+      const tx = x + Math.cos(a - s * 1.2) * r * 0.85, ty = y + Math.sin(a - s * 1.2) * r * 0.85;
+      return (g) => { g.moveTo(x + r, y); g.arc(x, y, r, 0, R2); g.moveTo(tx + r * 0.47, ty); g.arc(tx, ty, r * 0.47, 0, R2); };
+    },
+    /* --- el mecanismo: contornear todo, rellenar todo ---
+       Todas las partes se acumulan en UN Path2D y se contornean de una sola pasada (una llamada a
+       stroke en vez de N: es lo que hace que la pieza única salga más barata que el collage). Luego
+       se rellenan en orden; las partes contiguas del mismo color se funden en un solo relleno.
+       Devuelve el Path2D de la silueta para recortar el detalle contra él sin volver a trazarlo. */
+    unite(g, parts, ow) {
+      g.lineJoin = 'round'; g.lineCap = 'round';
+      const all = new Path2D(), ds = [];
+      for (let i = 0; i < parts.length; i++) { const d = new Path2D(); parts[i][0](d); ds.push(d); all.addPath(d); }
+      g.strokeStyle = O; g.lineWidth = (ow || OW) * 2; g.stroke(all);
+      for (let i = 0; i < parts.length; i++) {
+        const p = parts[i];
+        if (p[2]) { /* sombra propia: la separación interna se lee por valor, nunca por stroke */
+          g.save(); g.globalCompositeOperation = 'source-atop';
+          g.strokeStyle = AL(O, 0.15); g.lineWidth = p[2]; g.stroke(ds[i]);
+          g.lineWidth = p[2] * 0.45; g.stroke(ds[i]); g.restore();
+        }
+        /* Piezas contiguas del mismo color y sin detalle propio se funden en UN relleno: todos los
+           trazados giran en el mismo sentido, así la regla «nonzero» las suma sin abrir huecos. */
+        if (!p[2] && !p[3] && !p[4]) {
+          let j = i, m = ds[i];
+          while (j + 1 < parts.length && parts[j + 1][1] === p[1] && !parts[j + 1][2] && !parts[j + 1][3] && !parts[j + 1][4]) { j++; if (m === ds[i]) { m = new Path2D(); m.addPath(ds[i]); } m.addPath(ds[j]); }
+          g.fillStyle = p[1]; g.fill(m); i = j; continue;
+        }
+        g.fillStyle = p[1]; g.fill(ds[i]);
+        if (p[3]) P.cel(g, p[0], p[1], p[3] === true ? null : p[3]);
+        if (p[4]) P.in(g, p[0], p[4]);
+      }
+      return all;
+    },
+    /* 3 tonos con borde duro: la pieza en sombra, encima la misma pieza desplazada hacia la luz */
+    cel(g, path, base, o) {
+      o = o || {}; const dx = o.dx == null ? 2.2 : o.dx, dy = o.dy == null ? 2 : o.dy, f = o.f == null ? 1 : o.f, E = g.__ext || 260;
+      g.save(); g.beginPath(); path(g); g.clip();
+      g.fillStyle = DK(base, 0.26 * f); g.fillRect(-E, -E, E * 2, E * 2);
+      g.translate(-dx, -dy); g.beginPath(); path(g); g.fillStyle = base; g.fill();
+      if (o.hi !== false && f > 0.35) { g.translate(-dx * 1.15, -dy * 1.15); g.beginPath(); path(g); g.fillStyle = LT(base, 0.2 * f); g.fill(); }
+      g.restore();
+    },
+    /* detalle de una pieza, recortado contra ella y contra lo ya pintado (sólo fuera de pantalla) */
+    in(g, path, fn) { g.save(); g.globalCompositeOperation = 'source-atop'; if (path instanceof Path2D) g.clip(path); else { g.beginPath(); path(g); g.clip(); } fn(g); g.restore(); },
+    /* igual, para el lienzo de partida: recorte a secas */
+    cut(g, path, fn) { g.save(); if (path instanceof Path2D) g.clip(path); else { g.beginPath(); path(g); g.clip(); } fn(g); g.restore(); },
+    /* óvalo especular y sombra de contacto duras */
+    shine(g, x, y, rx, ry, rot, a) { g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, R2); g.fillStyle = 'rgba(255,255,255,' + (a == null ? 0.42 : a) + ')'; g.fill(); },
+    drop(g, x, y, rx, ry, a) { g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, R2); g.fillStyle = AL(O, a == null ? 0.3 : a); g.fill(); },
+    /* --- la cara manda: ojo grande con PÁRPADO SUPERIOR recto --- */
+    eyes(g, cx, cy, sep, r, lx, ly, o) {
+      o = o || {}; const ry = r * (o.sq || 1), lid = o.lid == null ? 0.24 : o.lid, tilt = o.tilt || 0;
+      for (const s of [-1, 1]) {
+        g.save(); g.translate(cx + s * sep, cy);
+        if (o.shut) {
+          g.beginPath(); g.moveTo(-r, -ry * 0.1); g.quadraticCurveTo(0, ry * 0.75, r, -ry * 0.1);
+          g.lineWidth = Math.max(0.9, r * 0.3); g.strokeStyle = AL(O, 0.9); g.lineCap = 'round'; g.stroke(); g.restore(); continue;
+        }
+        g.beginPath(); g.ellipse(0, 0, r, ry, 0, 0, R2); g.fillStyle = o.white || '#fff'; g.fill();
+        const ix = (lx || 0) * r * 0.36, iy = (ly || 0) * ry * 0.32 + ry * 0.08;
+        g.beginPath(); g.arc(ix, iy, r * 0.62, 0, R2); g.fillStyle = o.iris || '#3a5bb8'; g.fill();
+        g.beginPath(); g.arc(ix, iy, r * 0.32, 0, R2); g.fillStyle = O; g.fill();
+        g.beginPath(); g.arc(ix - r * 0.32, iy - r * 0.36, r * 0.23, 0, R2); g.fillStyle = '#fff'; g.fill();
+        g.rotate(s * tilt);
+        g.beginPath(); g.ellipse(0, 0, r * 1.06, ry * 1.06, 0, 0, R2); g.clip();
+        const y0 = -ry + ry * 2 * lid;
+        g.fillStyle = o.lidCol || '#ffd3ad'; g.fillRect(-r * 1.3, -ry * 1.5, r * 2.6, y0 + ry * 1.5);
+        g.fillStyle = AL(O, 0.92); g.fillRect(-r * 1.3, y0 - r * 0.2, r * 2.6, Math.max(0.7, r * 0.2));
+        g.restore();
+      }
+    },
+    /* cejas gruesas y móviles; tilt>0 = enfado */
+    brows(g, cx, cy, sep, len, tilt, col, th) {
+      th = th || 1.5; g.fillStyle = col || O;
+      for (const s of [-1, 1]) { g.beginPath(); P.bone([[cx + s * (sep - len * 0.45), cy + tilt], [cx + s * (sep + len * 0.55), cy - tilt * 0.85]], [th, th * 0.5])(g); g.fill(); }
+    },
+    /* boca grande: 0 sonrisa · 1 abierta · 2 mueca · 3 recta · 4 «o» · 5 triste */
+    mouth(g, x, y, w, kind, col) {
+      if (kind === 1 || kind === 4) {
+        g.beginPath(); g.ellipse(x, y + w * 0.16, w * (kind === 4 ? 0.5 : 0.7), w * (kind === 4 ? 0.62 : 0.76), 0, 0, R2);
+        g.fillStyle = col || '#5e2436'; g.fill();
+        if (kind === 1) { g.beginPath(); g.ellipse(x, y + w * 0.6, w * 0.4, w * 0.28, 0, 0, R2); g.fillStyle = '#e0607e'; g.fill(); }
+        return;
+      }
+      g.lineWidth = Math.max(0.9, w * 0.26); g.strokeStyle = col || AL(O, 0.92); g.lineCap = 'round'; g.beginPath();
+      if (kind === 2) { g.moveTo(x - w * 0.7, y); g.lineTo(x - w * 0.24, y + w * 0.34); g.lineTo(x + w * 0.24, y); g.lineTo(x + w * 0.7, y + w * 0.34); }
+      else if (kind === 3) { g.moveTo(x - w * 0.6, y + w * 0.1); g.lineTo(x + w * 0.6, y + w * 0.1); }
+      else if (kind === 5) { g.moveTo(x - w * 0.62, y + w * 0.36); g.quadraticCurveTo(x, y - w * 0.22, x + w * 0.62, y + w * 0.36); }
+      else { g.moveTo(x - w * 0.62, y - w * 0.04); g.quadraticCurveTo(x, y + w * 0.62, x + w * 0.62, y - w * 0.04); }
+      g.stroke();
+    },
+    /* --- cachés --- */
+    /* lienzo cacheado genérico, a Math.min(2, dpr) */
+    cv(w, h, s, fn) {
+      const q = document.createElement('canvas'); s = s || DPR;
+      q.width = Math.max(1, Math.round(w * s)); q.height = Math.max(1, Math.round(h * s));
+      const g = q.getContext('2d'); g.scale(s, s); g.lineJoin = 'round'; g.lineCap = 'round';
+      g.__ext = Math.max(w, h) * 1.5; if (fn) fn(g); q.iw = w; q.ih = h; return q;
+    },
+    /* sprite de personaje/objeto: ×3 lógico para que la línea fina no se rompa. (0,0) = ancla */
+    spr(key, w, h, ax, ay, fn) {
+      let q = CH[key]; if (q) return q;
+      if (++NCH > 600) { for (const kk in CH) delete CH[kk]; NCH = 1; }   /* tope de memoria del caché */
+      q = P.cv(w, h, 3, (g) => { g.translate(ax, ay); fn(g); });
+      q.ax = ax; q.ay = ay; CH[key] = q; return q;
+    },
+    /* pinta un sprite con su ancla en (x,y) */
+    put(g, q, x, y, s, rot, a) {
+      s = s == null ? 1 : s;
+      if (rot) { g.save(); g.translate(x, y); g.rotate(rot); x = 0; y = 0; }
+      if (a != null) g.globalAlpha = a;
+      g.drawImage(q, x - q.ax * s, y - q.ay * s, q.iw * s, q.ih * s);
+      if (a != null) g.globalAlpha = 1;
+      if (rot) g.restore();
+    },
+    has: (key) => !!CH[key],
+  };
+  return P;
+})();
 const lerp = (a, b, q) => a + (b - a) * q, ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x)), clamp = k.clamp;
 const FONT = (s, wt) => `${wt || 800} ${s}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
 function label(s, x, y, size, col, align, lw) {
@@ -467,10 +628,10 @@ function drawPlank(P, th) {
 function pillow(x, y, ang, s, cl, glow) {
   c.save(); c.translate(x, y); c.rotate(ang); c.scale(s, s);
   if (glow) { c.fillStyle = `rgba(255,209,102,${0.25 + glow * 0.35})`; c.beginPath(); c.ellipse(18, 0, 26 + glow * 6, 18 + glow * 5, 0, 0, TAU); c.fill(); }
-  c.beginPath(); c.moveTo(3, -10); c.quadraticCurveTo(18, -7, 33, -10); c.quadraticCurveTo(30, 0, 33, 10); c.quadraticCurveTo(18, 7, 3, 10); c.quadraticCurveTo(6, 0, 3, -10); c.closePath();
-  const gr = c.createLinearGradient(0, -10, 0, 10); gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#d9d3ee'); c.fillStyle = gr; c.fill(); c.lineWidth = 2.2; c.strokeStyle = OUT; c.stroke();
-  c.fillStyle = cl; c.fillRect(15, -8, 5, 16); c.strokeStyle = 'rgba(26,21,48,.35)'; c.lineWidth = 1; c.strokeRect(15, -8, 5, 16);
-  c.fillStyle = 'rgba(255,255,255,.8)'; c.beginPath(); c.ellipse(9, -4, 3, 1.6, 0, 0, TAU); c.fill();
+  const bag = (g) => { g.moveTo(3, -10); g.quadraticCurveTo(18, -7, 33, -10); g.quadraticCurveTo(30, 0, 33, 10); g.quadraticCurveTo(18, 7, 3, 10); g.quadraticCurveTo(6, 0, 3, -10); g.closePath(); };
+  PZ.unite(c, [[bag, '#efeafd']], 1.5);
+  c.fillStyle = ART.dark('#efeafd', 0.14); c.beginPath(); c.moveTo(3, 10); c.quadraticCurveTo(18, 7, 33, 10); c.quadraticCurveTo(26, 2, 20, 1); c.closePath(); c.fill();
+  c.fillStyle = cl; c.fillRect(15, -8, 5, 16); PZ.shine(c, 9, -4, 3.4, 1.7, 0, 0.8);
   c.restore();
 }
 function gift(x, y, type, sw, falling) {
@@ -629,35 +790,51 @@ function giftAlt(x, y, type, sw, falling) { // cajas de juguetes / de repuestos
 function robot(f, pa, chg) {
   const cl = col(f.p), has = (q) => f.parts.includes(q), air = !f.on && f.cloud <= 0, run = f.on && Math.abs(f.vx) > 30 && f.stun <= 0, ph = t * 14 + f.p;
   c.save(); c.translate(f.x, f.y); c.scale(f.face * (1 + f.sq) * 0.84, (1 - f.sq) * 0.84); c.lineJoin = 'round'; c.lineCap = 'round';
-  // piernas
-  for (const i of [1, 0]) { const dx = i ? -7 : 7, sw = run ? Math.sin(ph + i * Math.PI) * 6 : air ? (i ? -4 : 4) : 0, lift = run ? Math.max(0, Math.cos(ph + i * Math.PI)) * 5 : air ? 6 : 0;
-    ART.rr(c, dx - 3.5 + sw * 0.5, -20, 7, 16 - lift * 0.6, 3); ART.fillOut(c, i ? '#5d6b77' : '#7b8791', 2); ART.rr(c, dx - 6 + sw, -6 - lift, 13, 6, 2.5); ART.fillOut(c, i ? '#2a3138' : '#3a4650', 2); }
-  // brazo trasero
-  const arm = (front, a, ext) => { c.save(); c.translate(front ? 5 : -7, -40); c.rotate(a); const L = 14 + ext;
-    ART.rr(c, -3.5, -3.5, L, 7, 3.5); ART.fillOut(c, front ? '#b8c2cc' : '#8a96a3', 2); c.beginPath(); c.arc(L, 0, front ? 7 : 6, 0, TAU); ART.fillOut(c, front ? (f.elec > 0 ? '#9fe8ff' : '#dfe7f4') : '#a8b2bc', 2.2);
-    if (front && f.elec > 0) { c.strokeStyle = '#ffffff'; c.lineWidth = 1.5; c.beginPath(); for (let i = 0; i < 4; i++) c.lineTo(L + Math.cos(i * 2 + t * 30) * 11, Math.sin(i * 2.3 + t * 25) * 11); c.stroke(); }
-    c.restore(); };
+  // pose de los brazos
   let fa = 0.9, fe = 0, ba = 1.2 + (run ? Math.sin(ph) * 0.5 : 0);
   if (f.atk && ATK[f.atk.kind]) { const A = ATK[f.atk.kind], q = clamp(f.atk.t / A.a1, 0, 1);
     if (f.atk.kind === 'jab' || f.atk.kind === 'smash') { fa = lerp(0.3, -0.05, q); fe = Math.sin(Math.PI * clamp(f.atk.t / A.dur, 0, 1)) * (f.atk.kind === 'smash' ? 26 : 16); }
     else if (f.atk.kind === 'rise') { fa = -1.5; fe = 8; } else if (f.atk.kind === 'spin') { fa = f.atk.t * 22; fe = 8; ba = fa + Math.PI; } }
   else if (f.chg >= 0) { fa = 0.2; fe = -8 - chg * 4; } else if (f.atk && f.atk.kind === 'throw') { fa = -0.6; fe = 10; } else if (air) { fa = -0.6; ba = -1; } else if (f.stun > 0) { fa = -2.2; ba = -2.6; }
-  if (has('arm')) arm(false, ba, 0); else { c.strokeStyle = '#ff6a6a'; c.lineWidth = 2; c.beginPath(); c.moveTo(-7, -40); c.quadraticCurveTo(-13, -36, -11, -30); c.moveTo(-7, -39); c.quadraticCurveTo(-12, -44, -15, -40); c.stroke(); }
-  // cuerpo
-  ART.rr(c, -14, -50, 28, 32, 6); const gr = c.createLinearGradient(-14, -50, 14, -18); gr.addColorStop(0, ART.lite(cl, 0.25)); gr.addColorStop(1, ART.dark(cl, 0.25)); c.fillStyle = gr; c.fill(); c.lineWidth = 2.6; c.strokeStyle = OUT; c.stroke();
-  if (has('core')) { ART.rr(c, -10, -46, 20, 22, 4); ART.fillOut(c, '#b8c2cc', 2); c.fillStyle = OUT; for (const [x, y] of [[-7, -43], [7, -43], [-7, -27], [7, -27]]) { c.beginPath(); c.arc(x, y, 1.3, 0, TAU); c.fill(); } ART.rr(c, -5, -39, 10, 8, 2); ART.fillOut(c, f.elec > 0 ? '#9fe8ff' : '#7cf7a0', 1.4); }
-  else { c.fillStyle = '#2a3138'; ART.rr(c, -9, -45, 18, 20, 3); c.fill(); c.strokeStyle = '#ffd166'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(-6, -42); c.quadraticCurveTo(0, -30, 6, -42); c.stroke(); c.strokeStyle = '#5ce1e6'; c.beginPath(); c.moveTo(-6, -30); c.quadraticCurveTo(0, -40, 6, -28); c.stroke(); }
-  // cabeza
-  c.save(); c.translate(0, -58 + (run ? Math.abs(Math.sin(ph)) * -1.5 : 0));
-  ART.rr(c, -11, -8, 22, 17, 5); ART.fillOut(c, '#8a96a3', 2.4); ART.rr(c, -3, -3, 13, 7, 3); ART.fillOut(c, '#1a1530', 1.5);
-  const hurt = f.stun > 0; c.fillStyle = hurt ? '#ff6a6a' : f.elec > 0 ? '#9fe8ff' : '#7cf7a0';
-  if (hurt) { c.font = FONT(8, 900); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('x x', 3.5, 0.5); } else { c.fillRect(1, -1.5, 3, 3); c.fillRect(6, -1.5, 3, 3); }
-  if (has('helm')) { c.beginPath(); c.arc(0, -7, 13, Math.PI * 1.02, Math.PI * 1.98); c.lineTo(13, -5); c.lineTo(-13, -5); c.closePath(); ART.fillOut(c, '#f2b705', 2.4); c.fillStyle = 'rgba(255,255,255,.4)'; c.fillRect(-7, -16, 7, 3); }
-  if (has('ant')) { c.strokeStyle = OUT; c.lineWidth = 2; c.beginPath(); c.moveTo(-4, has('helm') ? -19 : -8); c.lineTo(-7, -28); c.stroke(); c.beginPath(); c.arc(-7, -29, 3.5, 0, TAU); ART.fillOut(c, Math.floor(t * 3 + f.p) % 2 ? '#ff5a5f' : '#ffd166', 1.6); }
-  c.restore();
-  // cohete (↑+A)
+  const hd = -58 + (run ? Math.abs(Math.sin(ph)) * -1.5 : 0);
+  // cohete (↑+A), detrás del chasis
   if (f.atk && f.atk.kind === 'rise') { for (let i = 0; i < 2; i++) { c.beginPath(); c.moveTo(-8 + i * 16 - 4, -2); c.lineTo(-8 + i * 16, 14 + Math.random() * 12); c.lineTo(-8 + i * 16 + 4, -2); c.closePath(); ART.fillOut(c, i ? '#ffd166' : '#ff9a3d', 1.6); } }
-  arm(true, fa, fe);
+  /* Ley de la pieza única: patas, chasis, cabeza y brazos se trazan juntos y se contornean de una
+     sola pasada; las separaciones internas se leen por color y sombra propia. */
+  const armPts = (front, a, ext) => { const ox = front ? 5 : -7, oy = -40, L = 14 + ext, ca = Math.cos(a), sa = Math.sin(a);
+    return [[ox, oy], [ox + ca * L * 0.55, oy + sa * L * 0.55], [ox + ca * L, oy + sa * L]]; };
+  const parts = [];
+  for (const i of [1, 0]) { const dx = i ? -7 : 7, sw = run ? Math.sin(ph + i * Math.PI) * 6 : air ? (i ? -4 : 4) : 0, lift = run ? Math.max(0, Math.cos(ph + i * Math.PI)) * 5 : air ? 6 : 0;
+    parts.push([PZ.box(dx - 3.5 + sw * 0.5, -20, 7, 16 - lift * 0.6, 3), i ? '#5d6b77' : '#7b8791']);
+    parts.push([PZ.box(dx - 6 + sw, -6 - lift, 13, 6, 2.5), i ? '#2a3138' : '#3a4650']); }
+  if (has('arm')) { const p = armPts(false, ba, 0); parts.push([PZ.bone(p, [3.6, 3.3, 3]), '#8a96a3']); parts.push([PZ.blob(p[2][0], p[2][1], 6, 6), '#a8b2bc']); }
+  parts.push([PZ.box(-14, -50, 28, 32, 6), cl]);
+  parts.push([PZ.box(-11, hd - 8, 22, 17, 5), '#8a96a3']);
+  if (has('helm')) parts.push([(g) => { g.moveTo(-13, hd - 5); g.arc(0, hd - 7, 13, Math.PI * 1.02, Math.PI * 1.98); g.lineTo(13, hd - 5); g.closePath(); }, '#f2b705']);
+  if (has('ant')) { parts.push([PZ.bone([[-4, hd + (has('helm') ? -19 : -8)], [-7, hd - 28]], [1.3, 1.1]), '#8a96a3']); parts.push([PZ.blob(-7, hd - 29, 3.5, 3.5), Math.floor(t * 3 + f.p) % 2 ? '#ff5a5f' : '#ffd166']); }
+  const fp = armPts(true, fa, fe);
+  parts.push([PZ.bone(fp, [4, 3.7, 3.4]), '#b8c2cc']);
+  parts.push([PZ.blob(fp[2][0], fp[2][1], 7, 7), f.elec > 0 ? '#9fe8ff' : '#dfe7f4']);
+  PZ.unite(c, parts, 1.5);
+  {
+    const g = c;
+    g.fillStyle = ART.dark(cl, 0.2); g.beginPath(); g.moveTo(14, -44); g.lineTo(14, -18); g.lineTo(4, -18); g.quadraticCurveTo(12, -32, 9, -49); g.closePath(); g.fill();
+    // pecho: reactor o hueco chamuscado
+    if (has('core')) { g.fillStyle = '#b8c2cc'; g.beginPath(); PZ.box(-10, -46, 20, 22, 4)(g); g.fill();
+      g.fillStyle = 'rgba(26,21,48,.75)'; for (const [x, y] of [[-7, -43], [7, -43], [-7, -27], [7, -27]]) { g.beginPath(); g.arc(x, y, 1.3, 0, TAU); g.fill(); }
+      g.fillStyle = f.elec > 0 ? '#9fe8ff' : '#7cf7a0'; g.beginPath(); PZ.box(-5, -39, 10, 8, 2)(g); g.fill(); }
+    else { g.fillStyle = '#2a3138'; g.beginPath(); PZ.box(-9, -45, 18, 20, 3)(g); g.fill();
+      g.strokeStyle = '#ffd166'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(-6, -42); g.quadraticCurveTo(0, -30, 6, -42); g.stroke();
+      g.strokeStyle = '#5ce1e6'; g.beginPath(); g.moveTo(-6, -30); g.quadraticCurveTo(0, -40, 6, -28); g.stroke(); }
+    // visor y ojos
+    g.fillStyle = '#1a1530'; g.beginPath(); PZ.box(-3, hd - 3, 13, 7, 3)(g); g.fill();
+    const hurt = f.stun > 0; g.fillStyle = hurt ? '#ff6a6a' : f.elec > 0 ? '#9fe8ff' : '#7cf7a0';
+    if (hurt) { g.font = FONT(8, 900); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('x x', 3.5, hd + 0.5); } else { g.fillRect(1, hd - 1.5, 3, 3); g.fillRect(6, hd - 1.5, 3, 3); }
+    if (has('helm')) { g.fillStyle = 'rgba(255,255,255,.4)'; g.fillRect(-7, hd - 16, 7, 3); }
+    PZ.shine(g, -8, -46, 4.5, 2.4, -0.5, 0.3);
+  }
+  if (!has('arm')) { c.strokeStyle = '#ff6a6a'; c.lineWidth = 2; c.beginPath(); c.moveTo(-7, -40); c.quadraticCurveTo(-13, -36, -11, -30); c.moveTo(-7, -39); c.quadraticCurveTo(-12, -44, -15, -40); c.stroke(); }
+  if (f.elec > 0) { c.strokeStyle = '#ffffff'; c.lineWidth = 1.5; c.beginPath(); for (let i = 0; i < 4; i++) c.lineTo(fp[2][0] + Math.cos(i * 2 + t * 30) * 11, fp[2][1] + Math.sin(i * 2.3 + t * 25) * 11); c.stroke(); }
   if (chg > 0) { c.fillStyle = `rgba(255,209,102,${0.3 + chg * 0.4})`; c.beginPath(); c.arc(-4, -40, 9 + chg * 5, 0, TAU); c.fill(); }
   c.restore();
 }
@@ -698,8 +875,13 @@ function drawFighter(f) {
     if (back) drawW();
     ART.hero(c, f.x + sh, f.y, SCL, { face: f.face, state: f.stun > 0 ? 'fall' : st, t: t + f.p * 0.7, col: cl, squash: f.sq });
     // casco de gladiador con penacho del color del jugador
-    c.save(); c.translate(f.x + sh + f.face * 0.6, f.y - 39); c.scale(f.face, 1); c.beginPath(); c.arc(0, 0, 15.5, Math.PI * 1.05, Math.PI * 1.95); c.closePath(); ART.fillOut(c, '#c9d3e4', 2.4);
-    c.beginPath(); c.moveTo(-10, -12); c.quadraticCurveTo(-4, -30, 12, -22); c.quadraticCurveTo(2, -20, -2, -12); c.closePath(); ART.fillOut(c, cl, 2.2); c.restore();
+    c.save(); c.translate(f.x + sh + f.face * 0.6, f.y - 46); c.scale(f.face, 1);
+    /* casco + penacho: una sola silueta (el penacho nace del yelmo, no se le pega encima) */
+    PZ.unite(c, [
+      [(g) => { g.moveTo(-10, -12); g.quadraticCurveTo(-4, -30, 12, -22); g.quadraticCurveTo(2, -20, -2, -12); g.closePath(); }, cl],
+      [(g) => { g.moveTo(-15.5, 0); g.arc(0, 0, 15.5, Math.PI * 1.05, Math.PI * 1.95); g.closePath(); }, '#c9d3e4'],
+    ], 1.5);
+    c.restore();
     if (!back) drawW();
     if (f.glide) umbrellaOpen(f.x + f.face * 4, f.y - 74, cl);
   } else {

@@ -17,6 +17,167 @@ const VERT = !SIDE && innerHeight > innerWidth * 1.08;
 const FW = 600, FH = 340, HUD = 56;
 const W = SIDE ? 640 : VERT ? FH + 40 : FW + 40, H = SIDE ? 400 : VERT ? FW + HUD + 24 : FH + HUD + 20, OX = 20, OY = HUD + (VERT ? 4 : 0);
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#16122a' }), c = k.ctx;
+/* ---------- PZ · Ley de la pieza única + cartoon de estudio (docs/REMASTER.md §8) ----------
+   Un objeto que el jugador lee como UNA cosa se traza entero, se contornea UNA vez y se rellena
+   UNA vez: `PZ.unite()` contornea todas las partes primero y las rellena después, así cualquier
+   borde interior queda tapado y sólo sobrevive la silueta. El detalle interior va recortado
+   (`PZ.in`, y `PZ.cut` sobre el lienzo de partida, donde `source-atop` costaría un compuesto de
+   pantalla completa). Sólo se separa lo que se mueve de verdad (rueda, torreta, arma, paño).
+   Cartoon de estudio: 3 tonos por pieza con borde duro (`cel`), párpado superior recto, cejas
+   gruesas, manoplas con pulgar, un óvalo especular y sombra de contacto dura. */
+const PZ = (() => {
+  const O = ART.OUT, AL = ART.alpha, DK = ART.dark, LT = ART.lite, R2 = Math.PI * 2;
+  const DPR = Math.min(2, (typeof devicePixelRatio === 'number' && devicePixelRatio) || 1);
+  const OW = 1.5, IW = 0.7, IA = 0.62, CH = {}; let NCH = 0;
+  const P = {
+    O, R2, DPR,
+    /* --- trazados reutilizables (sólo trazan; no rellenan ni contornean) --- */
+    blob: (x, y, rx, ry, rot) => (g) => { g.moveTo(x + rx, y); g.ellipse(x, y, rx, Math.abs(ry), rot || 0, 0, R2); },
+    /* rr compatible con Path2D (ART.rr llama a beginPath y no vale aquí) */
+    box: (x, y, w, h, r) => (g) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); },
+    /* hueso de ancho variable: baja por un costado, redondea la punta y vuelve por el otro; la raíz
+       queda abierta y enterrada en el tronco → tangente continua en hombro y cadera. */
+    bone(pts, ws) {
+      return (g) => {
+        const n = pts.length, L = [], R = [];
+        for (let i = 0; i < n; i++) {
+          const a = pts[i > 0 ? i - 1 : 0], b = pts[i < n - 1 ? i + 1 : n - 1];
+          let tx = b[0] - a[0], ty = b[1] - a[1]; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
+          /* L = costado superior: el hueso se traza en el mismo sentido de giro que blob/box, así
+             dos piezas del mismo color se pueden fundir en un relleno sin abrir agujeros. */
+          L.push([pts[i][0] + ty * ws[i], pts[i][1] - tx * ws[i]]);
+          R.push([pts[i][0] - ty * ws[i], pts[i][1] + tx * ws[i]]);
+        }
+        g.moveTo(L[0][0], L[0][1]);
+        for (let i = 1; i < n - 1; i++) g.quadraticCurveTo(L[i][0], L[i][1], (L[i][0] + L[i + 1][0]) / 2, (L[i][1] + L[i + 1][1]) / 2);
+        g.lineTo(L[n - 1][0], L[n - 1][1]);
+        const e = pts[n - 1], w = ws[n - 1], a0 = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0]);
+        g.arc(e[0], e[1], w, a0, a0 + Math.PI, false);
+        for (let i = n - 2; i > 0; i--) g.quadraticCurveTo(R[i][0], R[i][1], (R[i][0] + R[i - 1][0]) / 2, (R[i][1] + R[i - 1][1]) / 2);
+        g.lineTo(R[0][0], R[0][1]); g.closePath();
+      };
+    },
+    /* manopla: bola grande con el pulgar marcado (media cabeza de ancho) */
+    mitt(x, y, a, r, s) {
+      const tx = x + Math.cos(a - s * 1.2) * r * 0.85, ty = y + Math.sin(a - s * 1.2) * r * 0.85;
+      return (g) => { g.moveTo(x + r, y); g.arc(x, y, r, 0, R2); g.moveTo(tx + r * 0.47, ty); g.arc(tx, ty, r * 0.47, 0, R2); };
+    },
+    /* --- el mecanismo: contornear todo, rellenar todo ---
+       Todas las partes se acumulan en UN Path2D y se contornean de una sola pasada (una llamada a
+       stroke en vez de N: es lo que hace que la pieza única salga más barata que el collage). Luego
+       se rellenan en orden; las partes contiguas del mismo color se funden en un solo relleno.
+       Devuelve el Path2D de la silueta para recortar el detalle contra él sin volver a trazarlo. */
+    unite(g, parts, ow) {
+      g.lineJoin = 'round'; g.lineCap = 'round';
+      const all = new Path2D(), ds = [];
+      for (let i = 0; i < parts.length; i++) { const d = new Path2D(); parts[i][0](d); ds.push(d); all.addPath(d); }
+      g.strokeStyle = O; g.lineWidth = (ow || OW) * 2; g.stroke(all);
+      for (let i = 0; i < parts.length; i++) {
+        const p = parts[i];
+        if (p[2]) { /* sombra propia: la separación interna se lee por valor, nunca por stroke */
+          g.save(); g.globalCompositeOperation = 'source-atop';
+          g.strokeStyle = AL(O, 0.15); g.lineWidth = p[2]; g.stroke(ds[i]);
+          g.lineWidth = p[2] * 0.45; g.stroke(ds[i]); g.restore();
+        }
+        /* Piezas contiguas del mismo color y sin detalle propio se funden en UN relleno: todos los
+           trazados giran en el mismo sentido, así la regla «nonzero» las suma sin abrir huecos. */
+        if (!p[2] && !p[3] && !p[4]) {
+          let j = i, m = ds[i];
+          while (j + 1 < parts.length && parts[j + 1][1] === p[1] && !parts[j + 1][2] && !parts[j + 1][3] && !parts[j + 1][4]) { j++; if (m === ds[i]) { m = new Path2D(); m.addPath(ds[i]); } m.addPath(ds[j]); }
+          g.fillStyle = p[1]; g.fill(m); i = j; continue;
+        }
+        g.fillStyle = p[1]; g.fill(ds[i]);
+        if (p[3]) P.cel(g, p[0], p[1], p[3] === true ? null : p[3]);
+        if (p[4]) P.in(g, p[0], p[4]);
+      }
+      return all;
+    },
+    /* 3 tonos con borde duro: la pieza en sombra, encima la misma pieza desplazada hacia la luz */
+    cel(g, path, base, o) {
+      o = o || {}; const dx = o.dx == null ? 2.2 : o.dx, dy = o.dy == null ? 2 : o.dy, f = o.f == null ? 1 : o.f, E = g.__ext || 260;
+      g.save(); g.beginPath(); path(g); g.clip();
+      g.fillStyle = DK(base, 0.26 * f); g.fillRect(-E, -E, E * 2, E * 2);
+      g.translate(-dx, -dy); g.beginPath(); path(g); g.fillStyle = base; g.fill();
+      if (o.hi !== false && f > 0.35) { g.translate(-dx * 1.15, -dy * 1.15); g.beginPath(); path(g); g.fillStyle = LT(base, 0.2 * f); g.fill(); }
+      g.restore();
+    },
+    /* detalle de una pieza, recortado contra ella y contra lo ya pintado (sólo fuera de pantalla) */
+    in(g, path, fn) { g.save(); g.globalCompositeOperation = 'source-atop'; if (path instanceof Path2D) g.clip(path); else { g.beginPath(); path(g); g.clip(); } fn(g); g.restore(); },
+    /* igual, para el lienzo de partida: recorte a secas */
+    cut(g, path, fn) { g.save(); if (path instanceof Path2D) g.clip(path); else { g.beginPath(); path(g); g.clip(); } fn(g); g.restore(); },
+    /* óvalo especular y sombra de contacto duras */
+    shine(g, x, y, rx, ry, rot, a) { g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, R2); g.fillStyle = 'rgba(255,255,255,' + (a == null ? 0.42 : a) + ')'; g.fill(); },
+    drop(g, x, y, rx, ry, a) { g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, R2); g.fillStyle = AL(O, a == null ? 0.3 : a); g.fill(); },
+    /* --- la cara manda: ojo grande con PÁRPADO SUPERIOR recto --- */
+    eyes(g, cx, cy, sep, r, lx, ly, o) {
+      o = o || {}; const ry = r * (o.sq || 1), lid = o.lid == null ? 0.24 : o.lid, tilt = o.tilt || 0;
+      for (const s of [-1, 1]) {
+        g.save(); g.translate(cx + s * sep, cy);
+        if (o.shut) {
+          g.beginPath(); g.moveTo(-r, -ry * 0.1); g.quadraticCurveTo(0, ry * 0.75, r, -ry * 0.1);
+          g.lineWidth = Math.max(0.9, r * 0.3); g.strokeStyle = AL(O, 0.9); g.lineCap = 'round'; g.stroke(); g.restore(); continue;
+        }
+        g.beginPath(); g.ellipse(0, 0, r, ry, 0, 0, R2); g.fillStyle = o.white || '#fff'; g.fill();
+        const ix = (lx || 0) * r * 0.36, iy = (ly || 0) * ry * 0.32 + ry * 0.08;
+        g.beginPath(); g.arc(ix, iy, r * 0.62, 0, R2); g.fillStyle = o.iris || '#3a5bb8'; g.fill();
+        g.beginPath(); g.arc(ix, iy, r * 0.32, 0, R2); g.fillStyle = O; g.fill();
+        g.beginPath(); g.arc(ix - r * 0.32, iy - r * 0.36, r * 0.23, 0, R2); g.fillStyle = '#fff'; g.fill();
+        g.rotate(s * tilt);
+        g.beginPath(); g.ellipse(0, 0, r * 1.06, ry * 1.06, 0, 0, R2); g.clip();
+        const y0 = -ry + ry * 2 * lid;
+        g.fillStyle = o.lidCol || '#ffd3ad'; g.fillRect(-r * 1.3, -ry * 1.5, r * 2.6, y0 + ry * 1.5);
+        g.fillStyle = AL(O, 0.92); g.fillRect(-r * 1.3, y0 - r * 0.2, r * 2.6, Math.max(0.7, r * 0.2));
+        g.restore();
+      }
+    },
+    /* cejas gruesas y móviles; tilt>0 = enfado */
+    brows(g, cx, cy, sep, len, tilt, col, th) {
+      th = th || 1.5; g.fillStyle = col || O;
+      for (const s of [-1, 1]) { g.beginPath(); P.bone([[cx + s * (sep - len * 0.45), cy + tilt], [cx + s * (sep + len * 0.55), cy - tilt * 0.85]], [th, th * 0.5])(g); g.fill(); }
+    },
+    /* boca grande: 0 sonrisa · 1 abierta · 2 mueca · 3 recta · 4 «o» · 5 triste */
+    mouth(g, x, y, w, kind, col) {
+      if (kind === 1 || kind === 4) {
+        g.beginPath(); g.ellipse(x, y + w * 0.16, w * (kind === 4 ? 0.5 : 0.7), w * (kind === 4 ? 0.62 : 0.76), 0, 0, R2);
+        g.fillStyle = col || '#5e2436'; g.fill();
+        if (kind === 1) { g.beginPath(); g.ellipse(x, y + w * 0.6, w * 0.4, w * 0.28, 0, 0, R2); g.fillStyle = '#e0607e'; g.fill(); }
+        return;
+      }
+      g.lineWidth = Math.max(0.9, w * 0.26); g.strokeStyle = col || AL(O, 0.92); g.lineCap = 'round'; g.beginPath();
+      if (kind === 2) { g.moveTo(x - w * 0.7, y); g.lineTo(x - w * 0.24, y + w * 0.34); g.lineTo(x + w * 0.24, y); g.lineTo(x + w * 0.7, y + w * 0.34); }
+      else if (kind === 3) { g.moveTo(x - w * 0.6, y + w * 0.1); g.lineTo(x + w * 0.6, y + w * 0.1); }
+      else if (kind === 5) { g.moveTo(x - w * 0.62, y + w * 0.36); g.quadraticCurveTo(x, y - w * 0.22, x + w * 0.62, y + w * 0.36); }
+      else { g.moveTo(x - w * 0.62, y - w * 0.04); g.quadraticCurveTo(x, y + w * 0.62, x + w * 0.62, y - w * 0.04); }
+      g.stroke();
+    },
+    /* --- cachés --- */
+    /* lienzo cacheado genérico, a Math.min(2, dpr) */
+    cv(w, h, s, fn) {
+      const q = document.createElement('canvas'); s = s || DPR;
+      q.width = Math.max(1, Math.round(w * s)); q.height = Math.max(1, Math.round(h * s));
+      const g = q.getContext('2d'); g.scale(s, s); g.lineJoin = 'round'; g.lineCap = 'round';
+      g.__ext = Math.max(w, h) * 1.5; if (fn) fn(g); q.iw = w; q.ih = h; return q;
+    },
+    /* sprite de personaje/objeto: ×3 lógico para que la línea fina no se rompa. (0,0) = ancla */
+    spr(key, w, h, ax, ay, fn) {
+      let q = CH[key]; if (q) return q;
+      if (++NCH > 600) { for (const kk in CH) delete CH[kk]; NCH = 1; }   /* tope de memoria del caché */
+      q = P.cv(w, h, 3, (g) => { g.translate(ax, ay); fn(g); });
+      q.ax = ax; q.ay = ay; CH[key] = q; return q;
+    },
+    /* pinta un sprite con su ancla en (x,y) */
+    put(g, q, x, y, s, rot, a) {
+      s = s == null ? 1 : s;
+      if (rot) { g.save(); g.translate(x, y); g.rotate(rot); x = 0; y = 0; }
+      if (a != null) g.globalAlpha = a;
+      g.drawImage(q, x - q.ax * s, y - q.ay * s, q.iw * s, q.ih * s);
+      if (a != null) g.globalAlpha = 1;
+      if (rot) g.restore();
+    },
+    has: (key) => !!CH[key],
+  };
+  return P;
+})();
 const lite = ART.lite, dark = ART.dark;
 const TEAM = [{ col: '#ff6b4a', name: CFG.t0 || 'Rojos' }, { col: '#3f8cff', name: CFG.t1 || 'Azules' }];
 const CPUK = 'cpu:' + CFG.id;
@@ -912,25 +1073,55 @@ function drawBall(x, y, r, spin, kind, z) {
   c.restore();
 }
 function ringCol(b) { return b.ctl >= 0 ? k.pcol(b.ctl) : null; }
+/* cenital en una sola pieza: pies, manos, tronco y cabeza se trazan juntos y se contornean de una
+   pasada; el pelo y la piel se leen por color, no por contorno. Se cachea por color/pelo/paso. */
+function walkerSpr(jc, hair, sw, team) {
+  return PZ.spr(`W${jc}|${hair}|${sw}|${MODE}|${team}`, 56, 56, 28, 28, (g) => {
+    const parts = [], skin = '#ffd9b5';
+    for (const s of [-1, 1]) parts.push([PZ.blob(s * sw * 0.8 + 2, s * 6, 5, 3.4), dark(jc, 0.62)]);
+    for (const s of [-1, 1]) parts.push([PZ.blob(-s * sw * 0.5 + 1, s * 11, 4, 4), skin]);
+    parts.push([PZ.blob(0, 0, 9, 12), jc, 0, { dx: 2.2, dy: 2 }]);
+    parts.push([PZ.blob(1, 0, 7.5, 7.5), MODE === 'hockey' ? lite(jc, 0.2) : hair]);
+    if (MODE === 'hockey') parts.push([PZ.bone([[2, 8], [20, 10]], [2.6, 2.2]), '#c98a4b']);
+    const sil = PZ.unite(g, parts, 1.5);
+    PZ.in(g, sil, (q) => {
+      q.beginPath(); q.arc(2.6, 0, 5.6, -1.45, 1.45); q.lineTo(0.4, 0); q.closePath(); q.fillStyle = skin; q.fill();
+      q.fillStyle = dark(skin, 0.45); q.beginPath(); q.arc(6.2, -2.2, 1.1, 0, TAU); q.arc(6.2, 2.2, 1.1, 0, TAU); q.fill();
+      if (MODE === 'hockey') { q.strokeStyle = 'rgba(255,255,255,.8)'; q.lineWidth = 1.2; q.beginPath(); q.moveTo(-5, 0); q.lineTo(5, 0); q.stroke(); }
+      PZ.shine(q, -3.4, -6.4, 3.4, 1.9, -0.5, 0.3);
+    });
+  });
+}
 function drawWalker(b) { // cenital: cuerpo con camiseta del equipo, cabeza con pelo, brazos y pies que se mueven
   const [x, y] = V(b.x, b.y), a = SA(b.a), jc = TEAM[b.team].col, rc = ringCol(b), sw = Math.sin(b.anim * 3) * 5, jail = b.jail;
   c.save(); if (jail) c.globalAlpha = 0.75; if (b.inv > 0 && Math.floor(b.inv * 10) % 2) c.globalAlpha = 0.45;
   ART.shadow(c, x + 2, y + 8, 13, 0.28);
   if (rc) { c.beginPath(); c.ellipse(x, y + 3, 16, 11, 0, 0, TAU); c.lineWidth = 3.5; c.strokeStyle = rc; c.stroke(); }
   if (b.catchT > 0) { c.beginPath(); c.arc(x, y, 19, 0, TAU); c.lineWidth = 3; c.strokeStyle = '#7cf7a0'; c.stroke(); }
-  c.translate(x, y); c.rotate(a);
-  c.fillStyle = '#3a3258'; for (const s of [-1, 1]) { c.beginPath(); c.ellipse(s * sw * 0.8 + 2, s * 6, 5, 3.4, 0, 0, TAU); c.fill(); c.lineWidth = 1.5; c.strokeStyle = OUT; c.stroke(); }
-  if (MODE === 'hockey') { c.strokeStyle = OUT; c.lineWidth = 4.5; c.beginPath(); c.moveTo(2, 8); c.lineTo(20, 10); c.stroke(); c.strokeStyle = '#c98a4b'; c.lineWidth = 2.5; c.stroke(); c.fillStyle = '#1a1530'; ART.rr(c, 17, 8, 8, 6, 2); c.fill(); }
-  for (const s of [-1, 1]) { c.beginPath(); c.arc(-s * sw * 0.5 + 1, s * 11, 4, 0, TAU); c.fillStyle = '#ffd9b5'; c.fill(); c.lineWidth = 1.6; c.strokeStyle = OUT; c.stroke(); }
-  c.beginPath(); c.ellipse(0, 0, 9, 12, 0, 0, TAU); const gr = c.createLinearGradient(-9, -12, 9, 12); gr.addColorStop(0, lite(jc, 0.3)); gr.addColorStop(1, dark(jc, 0.2)); c.fillStyle = gr; c.fill(); c.lineWidth = 2.2; c.strokeStyle = OUT; c.stroke();
-  c.beginPath(); c.arc(1, 0, 7.5, 0, TAU); c.fillStyle = MODE === 'hockey' ? jc : b.hair; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
-  c.beginPath(); c.arc(4, 0, 4.2, -1.3, 1.3); c.fillStyle = '#ffd9b5'; c.fill();
-  if (MODE === 'hockey') { c.strokeStyle = '#fff'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(-5, 0); c.lineTo(5, 0); c.stroke(); }
+  PZ.put(c, walkerSpr(jc, b.hair, Math.round(sw), b.team), x, y, 1, a);
   c.restore();
   if (b.chg >= 0 && MODE === 'canasta') { const q = clamp(b.chg / 1.3, 0, 1), z0 = (0.82 - 0.14) * 0.8 / 1.3, z1 = (0.82 + 0.14) * 0.8 / 1.3; c.fillStyle = 'rgba(26,21,48,.85)'; ART.rr(c, x - 21, y + 15, 42, 8, 4); c.fill();
     c.fillStyle = 'rgba(124,247,160,.55)'; c.fillRect(x - 20 + 40 * z0, y + 16, 40 * (z1 - z0), 6); c.fillStyle = q >= z0 && q <= z1 ? '#7cf7a0' : q > z1 ? '#ff5f7a' : '#ffd166'; ART.rr(c, x - 20, y + 17, 40 * q, 4, 2); c.fill(); }
   else if (b.chg >= 0) { const q = clamp(b.chg / 0.8, 0, 1); c.fillStyle = 'rgba(26,21,48,.8)'; ART.rr(c, x - 16, y + 16, 32, 6, 3); c.fill(); c.fillStyle = q > 0.9 ? '#ff5f7a' : '#ffd166'; ART.rr(c, x - 15, y + 17, 30 * q, 4, 2); c.fill(); }
   label(nameOf(b), x, y - 22 - (k.party ? 3 : 0), k.party ? 18 : 12, rc || '#d8d0f0');
+}
+/* coche en una sola pieza: ruedas, carrocería y cabina trazadas juntas; la cabina se lee por color
+   y sombra propia, no por contorno. Un sprite por color de equipo. */
+function carSpr(jc) {
+  return PZ.spr(`C${jc}`, 56, 34, 28, 17, (g) => {
+    const parts = [];
+    for (const [wx, wy] of [[-10, -11], [10, -11], [-10, 11], [10, 11]]) parts.push([PZ.box(wx - 5, wy - 3, 10, 6, 2.4), '#1a1530']);
+    parts.push([PZ.box(-19, -10, 38, 20, 7), jc, 0, { dx: 2.4, dy: 2.2 }]);
+    const sil = PZ.unite(g, parts, 1.5);
+    PZ.in(g, sil, (q) => {
+      q.fillStyle = dark('#9ad8ff', 0.3); q.beginPath(); PZ.box(-6, -7, 14, 14, 4)(q); q.fill();
+      q.fillStyle = '#9ad8ff'; q.beginPath(); PZ.box(-7.6, -8.6, 14, 14, 4)(q); q.fill();
+      q.fillStyle = 'rgba(255,255,255,.6)'; q.fillRect(-3, -5, 3, 10);
+      q.fillStyle = '#fff'; q.fillRect(-18, -2, 10, 4);
+      q.fillStyle = '#fff6c8'; q.fillRect(15, -8, 3, 4); q.fillRect(15, 4, 3, 4);
+      PZ.shine(q, -2, -8, 8, 2.2, -0.08, 0.35);
+    });
+  });
 }
 function drawCar(b) {
   const [x, y] = V(b.x, b.y), a = SA(b.a), jc = TEAM[b.team].col, rc = ringCol(b), z = b.z;
@@ -938,35 +1129,52 @@ function drawCar(b) {
   if (rc) { c.beginPath(); c.ellipse(x, y + 4, 24, 15, 0, 0, TAU); c.lineWidth = 3.5; c.strokeStyle = rc; c.stroke(); }
   c.save(); c.translate(x, y - z); c.rotate(a); const sc = 1 + z / 200; c.scale(sc, sc);
   if (b.fire > 0) { for (let i = 0; i < 3; i++) { c.fillStyle = ['#ffd166', '#ff9f5a', '#ff5f7a'][i]; c.beginPath(); c.ellipse(-22 - i * 5 - Math.random() * 4, 0, 8 - i * 2, 4 - i, 0, 0, TAU); c.fill(); } }
-  c.fillStyle = '#1a1530'; for (const [wx, wy] of [[-10, -11], [10, -11], [-10, 11], [10, 11]]) { ART.rr(c, wx - 5, wy - 3, 10, 6, 2); c.fill(); }
-  ART.rr(c, -19, -10, 38, 20, 7); const gr = c.createLinearGradient(0, -10, 0, 10); gr.addColorStop(0, lite(jc, 0.3)); gr.addColorStop(1, dark(jc, 0.25)); c.fillStyle = gr; c.fill(); c.lineWidth = 2.4; c.strokeStyle = OUT; c.stroke();
-  ART.rr(c, -6, -7, 14, 14, 4); c.fillStyle = '#9ad8ff'; c.fill(); c.lineWidth = 1.8; c.stroke(); c.fillStyle = 'rgba(255,255,255,.6)'; c.fillRect(-3, -5, 3, 10);
-  c.fillStyle = '#fff'; c.fillRect(-18, -2, 10, 4); c.fillStyle = '#fff6c8'; c.fillRect(15, -8, 3, 4); c.fillRect(15, 4, 3, 4);
+  PZ.put(c, carSpr(jc), 0, 0);
   c.restore();
   // turbo
   c.fillStyle = 'rgba(26,21,48,.8)'; ART.rr(c, x - 14, y + 16, 28, 5, 2.5); c.fill(); c.fillStyle = '#ffd166'; ART.rr(c, x - 13, y + 17, 26 * b.boost, 3, 1.5); c.fill();
   label(nameOf(b), x, y - 26 - z - (k.party ? 3 : 0), k.party ? 18 : 12, rc || '#d8d0f0');
 }
+/* jugador lateral en una sola pieza: piernas, tronco, brazos y cabeza-pelo trazados juntos y
+   contorneados de una pasada. Se cachea por pose cuantizada (paso, chute, salto, brazos arriba). */
+function sideSpr(big, jc, hair, s, sw, kick, air, up) {
+  const by = big ? -30 : -44, bh = big ? 18 : 24, hr = big ? 26 : 12, hy = big ? -52 : -58, skin = '#ffd9b5';
+  return PZ.spr(`S${big ? 1 : 0}|${jc}|${hair}|${s}|${sw}|${kick}|${air ? 1 : 0}|${up ? 1 : 0}`, 110, 130, 55, 108, (g) => {
+    const parts = [];
+    for (const i of [0, 1]) {
+      const back = i === 1, hipx = back ? -4 * s : 4 * s, hipy = big ? -14 : -24;
+      const lx = (back ? -5 : 5) * s + (air ? 0 : sw * 5 * (back ? -6 : 6) / 5), ang = !back && kick ? kick * 1.3 : 0;
+      const len = big ? 12 : 22, ca = Math.cos(-ang * s), sa = Math.sin(-ang * s);
+      const ex = lx - (back ? -4 : 4) * s, kx = hipx + (ex * ca - len * sa) * 0.55, ky = hipy + (ex * sa + len * ca) * 0.55;
+      const fx = hipx + ex * ca - len * sa, fy = hipy + ex * sa + len * ca;
+      const cl = back ? dark(skin, 0.24) : skin;
+      parts.push([PZ.bone([[hipx, hipy], [kx, ky], [fx, fy]], [3.4, 2.9, 2.5]), cl]);
+      parts.push([PZ.box(fx - 5 + s * 2, fy - 3, 11, 6, 3), big ? '#1a1530' : cl]);
+    }
+    if (!big) for (const sd of [-1, 1]) {
+      const ax = sd * 8, ay = -40, bx = ax + (up ? sd * 4 : sd * 6), byy = up ? -64 : -22;
+      parts.push([PZ.bone([[ax, ay], [(ax + bx) / 2, (ay + byy) / 2], [bx, byy]], [3.2, 2.7, 2.3]), sd === -s ? dark(skin, 0.24) : skin]);
+    }
+    parts.push([PZ.box(-11, by, 22, bh, 7), jc, 0, { dx: 2.4, dy: 2.2 }]);
+    parts.push([PZ.blob(0, hy, hr, hr), skin, 0, { dx: hr * 0.2, dy: hr * 0.2, f: 0.65 }]);
+    parts.push([(q) => { q.moveTo(-hr * 0.98, hy - hr * 0.1); q.arc(0, hy, hr * 0.99, Math.PI * 1.04, Math.PI * 1.96); q.lineTo(hr * 0.7 * -s, hy - hr * 0.2); q.closePath(); }, hair]);
+    if (big) parts.push([PZ.box(-hr, hy - hr * 0.62, hr * 2, hr * 0.3, 3), lite(jc, 0.15)]);
+    const sil = PZ.unite(g, parts, 1.5);
+    PZ.in(g, sil, (q) => PZ.shine(q, -hr * 0.42, hy - hr * 0.42, hr * 0.3, hr * 0.17, -0.6, 0.32));
+    const ex = s * hr * 0.35, ey = hy - (big ? 2 : 0);
+    PZ.eyes(g, ex, ey, hr * 0.28, hr * 0.19, s, 0.1, { lidCol: skin, lid: 0.2, tilt: 0.1 });
+    PZ.brows(g, ex, ey - hr * 0.34, hr * 0.28, hr * 0.26, hr * 0.03, dark(skin, 0.55), hr * 0.075);
+    PZ.mouth(g, ex, hy + hr * 0.42, hr * 0.34, up || kick ? 1 : 0);
+  });
+}
 function drawSidePlayer(b) { // lateral: cabezón (cabeza grande) o jugador de playa
   const big = MODE === 'cabezon', jc = TEAM[b.team].col, rc = ringCol(b), s = MODE === 'cabezon' ? atk(b.team) : b.team ? -1 : 1, x = b.x, y = b.y, sw = Math.sin(b.anim * 3), air = y < GROUND - 2;
   ART.shadow(c, x, GROUND + 4, 18 - Math.min(10, (GROUND - y) / 12), 0.3);
   if (rc) { c.beginPath(); c.ellipse(x, GROUND + 4, 24, 6, 0, 0, TAU); c.lineWidth = 3; c.strokeStyle = rc; c.stroke(); }
-  c.save(); c.translate(x, y); if (b.st > 0) c.rotate(Math.sin(t * 30) * 0.2);
-  // piernas
   const kick = big && b.kick > 0 ? Math.sin((1 - b.kick / 0.24) * Math.PI) : 0;
-  for (const i of [0, 1]) { const back = i === 1, lx = (back ? -5 : 5) * s + (air ? 0 : sw * (back ? -6 : 6)), ang = !back && kick ? kick * 1.3 : 0;
-    c.save(); c.translate(back ? -4 * s : 4 * s, big ? -14 : -24); c.rotate(-ang * s); c.strokeStyle = OUT; c.lineWidth = 8; c.beginPath(); c.moveTo(0, 0); c.lineTo(lx - (back ? -4 : 4) * s, big ? 12 : 22); c.stroke(); c.strokeStyle = back ? dark('#ffd9b5', 0.2) : '#ffd9b5'; c.lineWidth = 5; c.stroke();
-      c.fillStyle = big ? '#1a1530' : '#ffd9b5'; ART.rr(c, lx - (back ? -4 : 4) * s - 5 + s * 2, (big ? 12 : 22) - 3, 11, 6, 3); c.fill(); c.restore(); }
-  // cuerpo
-  const by = big ? -30 : -44, bh = big ? 18 : 24; ART.rr(c, -11, by, 22, bh, 7); const gr = c.createLinearGradient(-11, by, 11, by + bh); gr.addColorStop(0, lite(jc, 0.3)); gr.addColorStop(1, dark(jc, 0.2)); c.fillStyle = gr; c.fill(); c.lineWidth = 2.4; c.strokeStyle = OUT; c.stroke();
-  if (!big) { c.strokeStyle = OUT; c.lineWidth = 7; const up = air || Math.abs(ball.x - x) < 50 && ball.y < y - 40; for (const sd of [-1, 1]) { c.beginPath(); c.moveTo(sd * 8, -40); c.lineTo(sd * 8 + (up ? sd * 4 : sd * 6), up ? -64 : -22); c.stroke(); } c.strokeStyle = '#ffd9b5'; c.lineWidth = 4; for (const sd of [-1, 1]) { c.beginPath(); c.moveTo(sd * 8, -40); c.lineTo(sd * 8 + (up ? sd * 4 : sd * 6), up ? -64 : -22); c.stroke(); } }
-  // cabeza
-  const hr = big ? 26 : 12, hy = big ? -52 : -58;
-  c.beginPath(); c.arc(0, hy, hr, 0, TAU); const gh = c.createRadialGradient(-hr * 0.4, hy - hr * 0.4, 2, 0, hy, hr); gh.addColorStop(0, '#ffe7cc'); gh.addColorStop(1, '#eab08c'); c.fillStyle = gh; c.fill(); c.lineWidth = 2.6; c.strokeStyle = OUT; c.stroke();
-  c.beginPath(); c.arc(0, hy, hr, Math.PI * 1.05, Math.PI * 1.95); c.lineTo(hr * 0.7 * -s, hy - hr * 0.2); c.closePath(); c.fillStyle = b.hair; c.fill(); c.lineWidth = 2; c.stroke();
-  if (big) { c.fillStyle = jc; ART.rr(c, -hr, hy - hr * 0.55, hr * 2, hr * 0.28, 4); c.fill(); c.lineWidth = 1.6; c.stroke(); }
-  const ex = s * hr * 0.35, ey = hy - (big ? 2 : 0); for (const d of [-1, 1]) { c.beginPath(); c.ellipse(ex + d * hr * 0.28, ey, hr * 0.15, hr * 0.2, 0, 0, TAU); c.fillStyle = '#fff'; c.fill(); c.lineWidth = 1.5; c.strokeStyle = OUT; c.stroke(); c.beginPath(); c.arc(ex + d * hr * 0.28 + s * hr * 0.05, ey + 1, hr * 0.08, 0, TAU); c.fillStyle = OUT; c.fill(); }
-  c.beginPath(); c.arc(ex, hy + hr * 0.42, hr * 0.18, 0.1, Math.PI - 0.1); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
+  const up = !big && (air || Math.abs(ball.x - x) < 50 && ball.y < y - 40);
+  c.save(); c.translate(x, y); if (b.st > 0) c.rotate(Math.sin(t * 30) * 0.2);
+  PZ.put(c, sideSpr(big, jc, b.hair, s, Math.round(sw * 4) / 4, Math.round(kick * 4) / 4, air, up), 0, 0);
   c.restore();
   label(nameOf(b), x, y + (big ? -92 : -84), k.party ? 18 : 13, rc || '#d8d0f0');
   if (big) { const q = b.sup || 0; c.fillStyle = 'rgba(26,21,48,.8)'; ART.rr(c, x - 22, y - 108, 44, 6, 3); c.fill(); c.fillStyle = q >= 1 ? (Math.floor(t * 8) % 2 ? '#ff5f7a' : '#ffd166') : '#ff9f5a'; ART.rr(c, x - 21, y - 107, 42 * q, 4, 2); c.fill(); }
