@@ -81,6 +81,34 @@ final class Arcade_Portal {
 			$img = plugins_url( 'assets/img/', __FILE__ );
 			printf( '<link rel="icon" href="%1$sicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="%1$sicon-192.png">' . "\n", esc_url( $img ) );
 		}
+		self::preload_game();
+	}
+
+	/**
+	 * Latencia: en la ficha de un juego propio se precargan (prefetch, prioridad baja) la página del juego y
+	 * sus scripts, así al pulsar «Jugar» ya están en la caché del navegador y arranca sin espera de red.
+	 * La lista sale de games/deps.json (la genera build_games.py con las mismas versiones ?v= del index.html).
+	 */
+	private static function preload_game() {
+		if ( ! is_singular( 'game' ) ) {
+			return;
+		}
+		$post = get_queried_object();
+		$slug = $post->post_name;
+		$tail = $slug . '/index.html';
+		$url  = Arcade_Core::resolve_embed( $post->ID );
+		if ( ! $url || substr( $url, -strlen( $tail ) ) !== $tail ) {
+			return; // Juego importado (otro dominio): no se precarga nada.
+		}
+		$base = substr( $url, 0, -strlen( $tail ) );
+		$out  = '<link rel="prefetch" href="' . esc_url( $url ) . '">';
+		$deps = json_decode( (string) @file_get_contents( __DIR__ . '/games/deps.json' ), true ); // phpcs:ignore
+		if ( isset( $deps[ $slug ] ) && is_array( $deps[ $slug ] ) ) {
+			foreach ( array_slice( $deps[ $slug ], 0, 6 ) as $d ) {
+				$out .= '<link rel="prefetch" as="script" href="' . esc_url( $base . $d ) . '">';
+			}
+		}
+		echo $out . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput
 	}
 
 	public static function is_portal() {

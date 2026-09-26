@@ -248,7 +248,24 @@
       if (rest.length) S.sections.push({ title: 'Multijugador', sub: 'Hasta 4 en la misma pantalla', games: rest, mp: true });
       S.sections.push({ title: mp.length ? 'Para un jugador' : 'Juegos', sub: 'Juega con el mando del móvil (J1)', games: solo });
       renderGrid();
+      // kit.js y art.js los usan todos los juegos: se piden ya, en el lobby.
+      if (C.games) { prefetch(C.games + '_lib/kit.js?v=18'); prefetch(C.games + '_lib/art.js?v=9'); }
     }).catch(function () { ui.grid.innerHTML = '<p class="pt-empty">No se pudo cargar la lista de juegos.</p>'; });
+  }
+
+  /* Latencia: se adelanta la descarga del juego señalado (y del runtime común al abrir el lobby), así al
+     pulsar OK arranca sin esperar a la red. Con prefetch: prioridad baja, no estorba a lo demás. */
+  var pref = {};
+  function prefetch(url) {
+    if (pref[url]) return;
+    pref[url] = 1;
+    try { var l = document.createElement('link'); l.rel = 'prefetch'; l.href = url; document.head.appendChild(l); } catch (e) { /* nada */ }
+  }
+  var prefT = 0;
+  function prefetchGame(g) {
+    if (!g || !C.games || Object.keys(pref).length > 14) return; // tope: navegar mucho por el lobby no descarga medio catálogo
+    clearTimeout(prefT);
+    prefT = setTimeout(function () { prefetch(C.games + g.slug + '/index.html?party=1'); }, 250);
   }
 
   function renderGrid() {
@@ -290,6 +307,7 @@
     var old = cells[S.cur]; if (old) old.classList.remove('on');
     S.cur = i;
     var c = cells[i]; c.classList.add('on');
+    prefetchGame(S.cells[i]);
     if (!noScroll) {
       var r = c.getBoundingClientRect(), sr = ui.scroll.getBoundingClientRect(), m = sr.height * 0.18;
       if (r.top < sr.top + m) ui.scroll.scrollTop += r.top - sr.top - m;
@@ -784,7 +802,8 @@
         });
       });
       var more = S.rmore || relayPeers().some(function (p) { return S.peers[p].dc.q.length; });
-      relaySoon(more ? 0 : document.hidden ? 1000 : 120);
+      // En partida se pregunta más a menudo (menos retardo del mando); en el lobby no hace falta.
+      relaySoon(more ? 0 : document.hidden ? 1000 : S.game ? 80 : 250);
     }).catch(function () { S.rbusy = false; back(); relaySoon(1000); });
   }
 

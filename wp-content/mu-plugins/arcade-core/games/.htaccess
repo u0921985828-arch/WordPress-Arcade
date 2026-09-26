@@ -1,0 +1,13 @@
+# Latencia: los recursos de los juegos casi nunca cambian y, cuando cambian, cambia su URL (?v=…) o se
+# regeneran con el plugin. Con esto el navegador no vuelve a pedirlos en cada partida.
+# Si el servidor no tiene mod_headers/mod_expires, estas reglas se ignoran sin dar error.
+<IfModule mod_headers.c>
+  # Miniaturas y datos: un día (no llevan versión en la URL).
+  <FilesMatch "\.(webp|png|jpg|svg|json|txt)$">
+    Header set Cache-Control "public, max-age=86400"
+  </FilesMatch>
+  # Página del juego: 10 minutos (así el prefetch de la ficha sirve de verdad y una actualización del plugin se ve enseguida).
+  <FilesMatch "\.html$">
+    Header set Cache-Control "public, max-age=600"
+  </FilesMatch>
+</IfModule>

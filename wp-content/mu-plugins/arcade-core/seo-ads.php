@@ -195,6 +195,8 @@ final class Arcade_SEO {
 			return;
 		}
 		if ( self::opt( 'pub' ) ) {
+			// Latencia: se abre la conexión con Google en paralelo, antes de que haga falta el script.
+			echo '<link rel="preconnect" href="https://pagead2.googlesyndication.com" crossorigin><link rel="dns-prefetch" href="https://googleads.g.doubleclick.net">' . "\n";
 			$h5 = self::opt( 'h5' ) && class_exists( 'Arcade_Portal' ) && Arcade_Portal::is_portal();
 			$ex = $h5 ? sprintf( ' data-ad-frequency-hint="%ds"', (int) self::opt( 'freq' ) ) : '';
 			if ( self::opt( 'adtest' ) ) {

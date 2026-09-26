@@ -46,7 +46,8 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
     document.body.append(hud);
     const hp = (window.CFG && window.CFG.hud) || '';
     if (hp) { hud.style.transform = 'none'; hud.style.left = hp.includes('l') ? '8px' : 'auto'; hud.style.right = hp.includes('r') ? '8px' : 'auto'; if (hp.includes('b')) { hud.style.top = 'auto'; hud.style.bottom = 'max(8px,env(safe-area-inset-bottom))'; } }
-    const ctx = cv.getContext('2d');
+    // alpha:false = lienzo opaco: el navegador lo compone sin mezclar con la página (menos trabajo por frame, menos latencia).
+    const ctx = cv.getContext('2d', { alpha: false });
     const k = { w, h, ctx, cv, held: new Set(), hit: new Set(), ptr: { x: w / 2, y: h / 2, down: false, hit: false, up: false }, swipe: null, tap: false, scale: 1 };
 
     function fit() {
