@@ -11,6 +11,41 @@
  * CPU: nivel 0..10 en localStorage 'cpu:<id>' (sube media vez cuando le gana el único humano; baja si gana la CPU). */
 const W = 800, H = 450, OUT = ART.OUT, TAU = 6.2832, MODE = CFG.mode === 'petanca' ? 'petanca' : 'arco', ID = CFG.id || MODE;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: MODE === 'petanca' ? '#5c8f45' : '#6ec0f0' }), c = k.ctx;
+/* ---------- Ley de la pieza única (REMASTER §8) ----------
+ * uni(): traza TODAS las partes y las rellena después, así los contornos interiores quedan
+ * tapados y solo sobrevive el borde exterior de la silueta. inw(): detalle interior recortado
+ * contra esa silueta. Las separaciones internas se leen por sombra propia o por cambio de
+ * color, nunca por stroke. Una pieza solo se separa cuando se mueve de verdad. */
+function uni(g, parts, ow) { g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = ow * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); } }
+const all = (parts) => (g) => { for (const p of parts) p(g); };
+function inw(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+const rp = (g, x, y, w, h, r) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+const cp = (g, x, y, r) => { g.moveTo(x + r, y); g.arc(x, y, r, 0, Math.PI * 2); g.closePath(); };
+const ep2 = (g, x, y, rx, ry, rot) => { g.moveTo(x + rx * Math.cos(rot || 0), y + rx * Math.sin(rot || 0)); g.ellipse(x, y, rx, ry, rot || 0, 0, Math.PI * 2); g.closePath(); };
+const ply = (pts) => (g) => { g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); };
+/* hueso de ancho variable: baja por un costado, redondea la punta y vuelve por el otro, así
+ * miembro y tronco se unen con tangente continua y sin escalón. */
+function bone(pts, ws) {
+  return (g) => {
+    const n = pts.length, L = [], R = [];
+    for (let i = 0; i < n; i++) {
+      const a = pts[i > 0 ? i - 1 : 0], b = pts[i < n - 1 ? i + 1 : n - 1];
+      let tx = b[0] - a[0], ty = b[1] - a[1]; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
+      L.push([pts[i][0] - ty * ws[i], pts[i][1] + tx * ws[i]]);
+      R.push([pts[i][0] + ty * ws[i], pts[i][1] - tx * ws[i]]);
+    }
+    g.moveTo(L[0][0], L[0][1]);
+    for (let i = 1; i < n - 1; i++) g.quadraticCurveTo(L[i][0], L[i][1], (L[i][0] + L[i + 1][0]) / 2, (L[i][1] + L[i + 1][1]) / 2);
+    g.lineTo(L[n - 1][0], L[n - 1][1]);
+    const e = pts[n - 1], w = ws[n - 1], a0 = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0]);
+    g.arc(e[0], e[1], w, a0, a0 - Math.PI, true);
+    for (let i = n - 2; i > 0; i--) g.quadraticCurveTo(R[i][0], R[i][1], (R[i][0] + R[i - 1][0]) / 2, (R[i][1] + R[i - 1][1]) / 2);
+    g.lineTo(R[0][0], R[0][1]);
+    g.closePath();
+  };
+}
 const lerp = (a, b, q) => a + (b - a) * q, clamp = k.clamp, ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 const gauss = () => { let u = 0; while (!u) u = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * Math.random()); };
 const FONT = (s) => `800 ${s}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
@@ -321,41 +356,6 @@ function drawWind() {
     const x0 = fx + dir * len * u0 * (0.35 + 0.65 * L), x1 = fx + dir * len * u1 * (0.35 + 0.65 * L), y0 = fy + sag * u0 * u0 + fl, y1 = fy + sag * u1 * u1 + fl, h0 = 13 - u0 * 5, h1 = 13 - u1 * 5;
     c.beginPath(); c.moveTo(x0, y0 - h0); c.lineTo(x1, y1 - h1); c.lineTo(x1, y1 + h1); c.lineTo(x0, y0 + h0); c.closePath(); ART.fillOut(c, i % 2 ? '#fff' : '#ff5a3d', 2); }
   panel(fx - 62, 262, 124, 44, 10, 'rgba(26,21,48,.82)'); label(`${w > 0.05 ? '→' : w < -0.05 ? '←' : '·'} ${Math.abs(w).toFixed(1)} m/s`, fx, 277, 16, Math.abs(w) > 3 ? '#ff9a9a' : '#fff'); label('viento', fx, 295, 11, '#cfc8ff');
-}
-/* ---------- Ley de la pieza única (REMASTER §8) ----------
- * uni(): traza TODAS las partes y las rellena después, así los contornos interiores quedan
- * tapados y solo sobrevive el borde exterior de la silueta. inw(): detalle interior recortado
- * contra esa silueta. Las separaciones internas se leen por sombra propia o por cambio de
- * color, nunca por stroke. Una pieza solo se separa cuando se mueve de verdad. */
-function uni(g, parts, ow) { g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = ow * 2;
-  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
-  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); } }
-const all = (parts) => (g) => { for (const p of parts) p(g); };
-function inw(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
-const rp = (g, x, y, w, h, r) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
-const cp = (g, x, y, r) => { g.moveTo(x + r, y); g.arc(x, y, r, 0, Math.PI * 2); g.closePath(); };
-const ep2 = (g, x, y, rx, ry, rot) => { g.moveTo(x + rx * Math.cos(rot || 0), y + rx * Math.sin(rot || 0)); g.ellipse(x, y, rx, ry, rot || 0, 0, Math.PI * 2); g.closePath(); };
-const ply = (pts) => (g) => { g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); };
-/* hueso de ancho variable: baja por un costado, redondea la punta y vuelve por el otro, así
- * miembro y tronco se unen con tangente continua y sin escalón. */
-function bone(pts, ws) {
-  return (g) => {
-    const n = pts.length, L = [], R = [];
-    for (let i = 0; i < n; i++) {
-      const a = pts[i > 0 ? i - 1 : 0], b = pts[i < n - 1 ? i + 1 : n - 1];
-      let tx = b[0] - a[0], ty = b[1] - a[1]; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
-      L.push([pts[i][0] - ty * ws[i], pts[i][1] + tx * ws[i]]);
-      R.push([pts[i][0] + ty * ws[i], pts[i][1] - tx * ws[i]]);
-    }
-    g.moveTo(L[0][0], L[0][1]);
-    for (let i = 1; i < n - 1; i++) g.quadraticCurveTo(L[i][0], L[i][1], (L[i][0] + L[i + 1][0]) / 2, (L[i][1] + L[i + 1][1]) / 2);
-    g.lineTo(L[n - 1][0], L[n - 1][1]);
-    const e = pts[n - 1], w = ws[n - 1], a0 = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0]);
-    g.arc(e[0], e[1], w, a0, a0 - Math.PI, true);
-    for (let i = n - 2; i > 0; i--) g.quadraticCurveTo(R[i][0], R[i][1], (R[i][0] + R[i - 1][0]) / 2, (R[i][1] + R[i - 1][1]) / 2);
-    g.lineTo(R[0][0], R[0][1]);
-    g.closePath();
-  };
 }
 function drawBow() {
   // arco en primer plano (abajo a la derecha): se tensa con draw

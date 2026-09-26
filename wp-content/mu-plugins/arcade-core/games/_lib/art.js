@@ -948,16 +948,17 @@ const ART = (() => {
       const sqz = p < 0.28 ? Math.sin(p / 0.28 * Math.PI) * 0.2 : (p > 0.86 ? Math.sin((p - 0.86) / 0.14 * Math.PI) * 0.17 : -Math.sin((p - 0.28) / 0.58 * Math.PI) * 0.12);
       shadow(c, 0, 0, w * 0.56 * (1 - lift / h * 0.5), 0.26 * (1 - lift / h * 0.6));
       c.translate(0, -lift); c.scale(f * (1 + sqz), 1 - sqz);
-      const W2 = w * 0.6, HH = h * 1.02;
+      const W2 = w * 0.53, HH = h * 1.1;
       sprite(c, 'slimeD' + W2 + HH + col + air, -W2 - 4, -HH - 5, W2 * 2 + 8, HH + 9, (g, ox, oy) => {
         g.translate(-ox, -oy); g.lineJoin = 'round'; g.lineCap = 'round';
         const B = nP();
         B.moveTo(-W2, -HH * 0.04);
         B.quadraticCurveTo(-W2 * 0.66, HH * 0.04, -W2 * 0.28, -HH * 0.01);          // goterón izquierdo
         B.quadraticCurveTo(W2 * 0.22, HH * 0.05, W2, -HH * 0.04);                   // goterón derecho
-        B.bezierCurveTo(W2 * 1.14, -HH * 0.42, W2 * 0.96, -HH * 0.82, W2 * 0.4, -HH * 0.98);
-        B.bezierCurveTo(W2 * 0.12, -HH * 1.06, -W2 * 0.06, -HH * 1.06, -W2 * 0.22, -HH * 0.94); // puntita
-        B.bezierCurveTo(-W2 * 0.86, -HH * 0.76, -W2 * 1.14, -HH * 0.4, -W2, -HH * 0.04);
+        B.bezierCurveTo(W2 * 1.18, -HH * 0.4, W2 * 0.9, -HH * 0.76, W2 * 0.26, -HH * 0.9);
+        B.bezierCurveTo(W2 * 0.02, -HH * 0.96, -W2 * 0.1, -HH * 1.1, -W2 * 0.3, -HH * 1.04);   // puntita ladeada
+        B.bezierCurveTo(-W2 * 0.3, -HH * 0.92, -W2 * 0.34, -HH * 0.86, -W2 * 0.46, -HH * 0.82);
+        B.bezierCurveTo(-W2 * 0.92, -HH * 0.66, -W2 * 1.18, -HH * 0.36, -W2, -HH * 0.04);
         B.closePath();
         sil(g, B, base, OLS);
         g.save(); g.clip(B);
@@ -1111,7 +1112,7 @@ const ART = (() => {
         g.fillStyle = alpha('#ffffff', 0.65); g.beginPath(); g.ellipse(-R * 0.3, cy2 - R * 0.56, R * 0.28, R * 0.14, -0.5, 0, TAU); g.fill();
       });
       eye2(c, R * 0.36, cy2 - R * 0.3, m * 0.17, 0.8, 0.2, shut, 0.1);
-      c.save(); c.translate(-R * 0.1, cy2 + R * 0.24); c.rotate(-2.9 - fl * 0.45); c.scale(1, -1); wing('bwingFE', 0); c.restore();
+      c.save(); c.translate(-R * 0.06, cy2 + R * 0.16); c.rotate(-2.55 - fl * 0.45); c.scale(1, -1); wing('bwingFE', 0); c.restore();
     }
     c.restore();
   }

@@ -179,11 +179,6 @@ k.run((dt) => {
   if (msgT > 0) { const e = Math.min(1, (1.6 - msgT) / 0.18), s = 0.6 + 0.4 * e + Math.sin(Math.min(1, e) * Math.PI) * 0.15; c.save(); c.translate(W / 2, 290); c.scale(s, s); c.globalAlpha = Math.min(1, msgT / 0.3); label(msg, 0, -20, 36, msg.startsWith('¡') ? '#f2d15c' : '#fff', 'center'); c.restore(); c.globalAlpha = 1; }
 }); }
 /* ---------- Piezas de dibujo compartidas (se llaman con el contexto ya desplazado OY) ---------- */
-/* ---------- Ley de la pieza única (REMASTER §8) ----------
- * uni(): traza TODAS las partes y las rellena después, así los contornos interiores quedan
- * tapados y solo sobrevive el borde exterior de la silueta. inw(): detalle interior recortado
- * contra esa silueta. Las separaciones internas se leen por sombra propia o por cambio de
- * color, nunca por stroke. Una pieza solo se separa cuando se mueve de verdad. */
 function drawCup() {
   const [hx, hy] = hole; c.fillStyle = 'rgba(255,255,255,.25)'; c.beginPath(); c.ellipse(hx, hy + 1, 14, 11, 0, 0, R2); c.fill();
   c.beginPath(); c.ellipse(hx, hy, 11, 9, 0, 0, R2); ART.fillOut(c, '#101018', 2.5); c.fillStyle = '#3a3a48'; c.beginPath(); c.ellipse(hx, hy - 3, 9, 5, 0, Math.PI, R2); c.fill();

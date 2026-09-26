@@ -727,8 +727,8 @@ const ART = (() => {
     const q = (ax, ay, bx, by) => { const A = hp(ax, ay), B = hp(bx, by); cap.quadraticCurveTo(A[0], A[1], B[0], B[1]); };
     const m0 = hp(-R * 1.02, R * 0.64); cap.moveTo(m0[0], m0[1]);
     q(-R * 0.64, R * 0.44, -R * 0.6, -R * 0.06);          // borde interior: sien de atrás
-    q(-R * 0.42, -R * 0.3, -R * 0.06, -R * 0.62);         // línea del pelo sobre las cejas
-    q(R * 0.24, -R * 0.26, R * 0.5, -R * 0.56);           // diente del flequillo
+    q(-R * 0.4, -R * 0.14, -R * 0.04, -R * 0.5);          // línea del pelo sobre las cejas
+    q(R * 0.26, -R * 0.1, R * 0.54, -R * 0.44);           // diente del flequillo
     q(R * 0.82, -R * 0.3, R * 1.06, R * 0.04);            // punta del flequillo
     const p1 = hp(R * 1.0, -R * 0.26); cap.lineTo(p1[0], p1[1]);
     q(R * 0.86, -R * 0.78, R * 0.36, -R * 1.02);          // cúpula
@@ -754,7 +754,7 @@ const ART = (() => {
     spec(c, -3, SHOFF + 2.4, 2.4, 3.4, -0.3, 0.2);
     // --- brazo delantero (cruza por delante del torso: solo la sombra que lo separa)
     const ARM = join(A0.up, A0.lo, handP(A0));
-    c.translate(1.2, 1.5); c.fillStyle = alpha(OUT, 0.26); c.fill(ARM); c.translate(-1.2, -1.5);
+    c.translate(1.2, 1.5); c.fillStyle = alpha(OUT, 0.34); c.fill(ARM); c.translate(-1.2, -1.5);
     cel(c, A0.up, col, colD, 1.6, 2);
     const hand = join(A0.lo, handP(A0));
     cel(c, hand, SKIN, SKIND, 1.5, 1.9);
@@ -813,15 +813,15 @@ const ART = (() => {
     };
     eye(4.6, 2.5 * big, 2.9 * big); eye(-0.7, 2.2 * big, 2.65 * big);
     // cejas gruesas y muy móviles
-    c.strokeStyle = HAIRD; c.lineWidth = 1.7; c.lineCap = 'round';
+    c.strokeStyle = HAIRD; c.lineWidth = 1.5; c.lineCap = 'round';
     const brow = (bx, dx, y0, y1) => { c.beginPath(); c.moveTo(bx - dx, y0); c.quadraticCurveTo(bx, (y0 + y1) / 2 - 0.7, bx + dx, y1); c.stroke(); };
-    if (fall) { brow(4.6, 2.4, -2.7, -4.1); brow(-0.7, 2.1, -3.7, -2.5); }
-    else if (jump) { brow(4.6, 2.4, -3.8, -4.4); brow(-0.7, 2.1, -4.2, -3.6); }
-    else if (hurt) { brow(4.6, 2.4, -3.9, -1.7); brow(-0.7, 2.1, -1.5, -3.7); }
-    else if (win) { brow(4.6, 2.4, -4.0, -4.6); brow(-0.7, 2.1, -4.4, -3.8); }
-    else if (run) { brow(4.6, 2.4, -4.0, -2.1); brow(-0.7, 2.1, -1.9, -3.4); }
-    else if (wall) { brow(4.6, 2.4, -4.3, -2.3); brow(-0.7, 2.1, -1.7, -3.0); }
-    else { brow(4.6, 2.4, -3.2, -3.0); brow(-0.7, 2.1, -3.1, -3.3); }
+    if (fall) { brow(4.6, 2.4, -3.6, -5.0); brow(-0.7, 2.1, -4.6, -3.4); }
+    else if (jump) { brow(4.6, 2.4, -4.6, -5.2); brow(-0.7, 2.1, -5.0, -4.4); }
+    else if (hurt) { brow(4.6, 2.4, -4.7, -2.7); brow(-0.7, 2.1, -2.5, -4.5); }
+    else if (win) { brow(4.6, 2.4, -4.8, -5.4); brow(-0.7, 2.1, -5.2, -4.6); }
+    else if (run) { brow(4.6, 2.4, -4.9, -3.1); brow(-0.7, 2.1, -2.9, -4.3); }
+    else if (wall) { brow(4.6, 2.4, -5.1, -3.3); brow(-0.7, 2.1, -2.7, -4.0); }
+    else { brow(4.6, 2.4, -4.2, -4.0); brow(-0.7, 2.1, -4.1, -4.3); }
     // nariz (bolita) y mofletes
     c.fillStyle = SKIND; c.beginPath(); c.ellipse(6.6, 3.7, 1.25, 1, 0.3, 0, TAU); c.fill();
     c.fillStyle = alpha('#ff6fb5', hurt ? 0.1 : 0.26); c.beginPath(); c.ellipse(6.0, 5.7, 1.7, 1, 0, 0, TAU); c.fill();

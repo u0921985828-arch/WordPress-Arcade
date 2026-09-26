@@ -3,6 +3,16 @@
 const M = CFG.mode, TH = CFG.theme || 'rally', port = M === 'lanes', OUT = ART.OUT, RR = ART.rr, FO = ART.fillOut;
 const W = port ? 360 : 640, H = port ? 640 : 360;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#000' }), c = k.ctx;
+/* ---------- Ley de la pieza única (REMASTER §8) ----------
+ * uni(): traza TODAS las partes y las rellena después, así los contornos interiores quedan
+ * tapados y solo sobrevive el borde exterior. inw(): detalle interior recortado contra esa
+ * misma silueta. Las separaciones internas se leen por sombra propia o cambio de color. */
+function uni(g, parts, ow) { g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = ow * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); } }
+const all = (parts) => (g) => { for (const p of parts) p(g); };
+function inw(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+const rp = (g, x, y, w, h, r) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
 const PAL = {
   rally: { sky: ['#3f9bff', '#c4e8ff'], grass: ['#5cb24b', '#53a443'], rumble: ['#f4f4f4', '#d63a3a'], road: ['#6c6c78', '#666672'], lane: '#ffffff', fog: '#c4e8ff', deco: ['tree', 'pine', 'bush'], car: '#e53935' },
   neon: { sky: ['#07021c', '#4a0d6b'], grass: ['#120830', '#170b3a'], rumble: ['#ff2bd6', '#2bf0ff'], road: ['#1d1640', '#231b4c'], lane: '#2bf0ff', fog: '#3a0d5c', deco: ['lamp', 'palm', 'lamp'], car: '#ff2bd6' },
@@ -58,16 +68,6 @@ function placeRows() { const ahead = Math.floor((dist + PLZ) / SEG) + DRAW - 4; 
 const mk = (w, h, f) => { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const g = cv.getContext('2d'); g.scale(2, 2); g.lineJoin = 'round'; g.lineCap = 'round'; f(g, w, h); return cv; };
 const sh = (g, x, y, rx, ry) => { g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.283); g.fill(); };
 const dk = (col, t) => mix(col, '#000000', t), lt = (col, t) => mix(col, '#ffffff', t);
-/* ---------- Ley de la pieza única (REMASTER §8) ----------
- * uni(): traza TODAS las partes y las rellena después, así los contornos interiores quedan
- * tapados y solo sobrevive el borde exterior. inw(): detalle interior recortado contra esa
- * misma silueta. Las separaciones internas se leen por sombra propia o cambio de color. */
-function uni(g, parts, ow) { g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = OUT; g.lineWidth = ow * 2;
-  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
-  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); } }
-const all = (parts) => (g) => { for (const p of parts) p(g); };
-function inw(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
-const rp = (g, x, y, w, h, r) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
 const ep = (g, x, y, rx, ry, rot) => { g.moveTo(x + rx * Math.cos(rot || 0), y + rx * Math.sin(rot || 0)); g.ellipse(x, y, rx, ry, rot || 0, 0, 6.283); g.closePath(); };
 const ply = (pts) => (g) => { g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); };
 const vgrad = (g, y0, y1, a, b) => { const q = g.createLinearGradient(0, y0, 0, y1); q.addColorStop(0, a); q.addColorStop(1, b); return q; };
