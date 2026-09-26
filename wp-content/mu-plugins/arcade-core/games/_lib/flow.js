@@ -2,6 +2,27 @@
  * Generador: camino hamiltoniano aleatorio (backbite) partido en tramos ≥ 3 → solución garantizada.
  * Tuberías con contorno y brillo, extremos que laten al conectar, cursor de teclado y ola final al completar. */
 const W = 480, H = 580, OUT = ART.OUT, k = Kit({ w: W, h: H, title: CFG.title, bg: '#141a33' }), c = k.ctx;
+/* ---------- R5 §8 «pieza única» + cartoon de estudio (helpers locales) ----------
+   uni(): contornea TODAS las partes y luego las rellena → solo sobrevive la silueta exterior.
+   celp(): 3 tonos de borde duro (cel shading) recortados a la silueta, sin degradados.
+   spec(): único óvalo especular.  contact(): sombra de contacto dura. */
+function uni(g, parts, ow) {
+  g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = ART.OUT; g.lineWidth = (ow || 1.5) * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); }
+}
+function inpath(g, parts, fn) { g.save(); g.beginPath(); for (let i = 0; i < parts.length; i++) parts[i][0](g); g.clip(); fn(g); g.restore(); }
+function celp(g, parts, base, dx, dy) {
+  inpath(g, parts, (h) => {
+    const P = () => { h.beginPath(); for (let i = 0; i < parts.length; i++) parts[i][0](h); h.fill(); };
+    h.fillStyle = ART.dark(base, 0.24); P();
+    h.translate(-dx, -dy); h.fillStyle = base; P();
+    h.translate(-dx * 1.15, -dy * 1.15); h.fillStyle = ART.lite(base, 0.2); P();
+  });
+}
+function spec(g, x, y, rx, ry, rot, a) { g.fillStyle = 'rgba(255,255,255,' + (a == null ? 0.7 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, 6.2832); g.fill(); }
+function contact(g, x, y, rx, ry, a) { g.fillStyle = 'rgba(14,8,30,' + (a == null ? 0.3 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.2832); g.fill(); }
+const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 const COL = ['#ff5f5f', '#4cc3ff', '#ffd23d', '#5fe08a', '#b77cff', '#ff9a3d', '#ff8ad0', '#5a78ff', '#b8e05a', '#f2f2f2'];
 let sol, N, S, OX, OY = 104, ends, paths, drag, level, score, done, cur, kbd, winT, conn, boardCv, bestL;
 function build() {
@@ -57,6 +78,22 @@ function makeBoard() {
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { ART.rr(g, OX + x * S + 1.5, OY + y * S + 1.5, S - 3, S - 3, 6); g.fillStyle = (x + y) % 2 ? '#1e2548' : '#1b2143'; g.fill(); }
   return cv;
 }
+/* Extremo de tubería: pieza única cacheada por color y estado (R5 §8) */
+const endCv = {};
+function endSprite(i, ok, r) {
+  const key = i + '|' + (ok ? 1 : 0) + '|' + Math.round(r);
+  let q = endCv[key]; if (q) return q;
+  const R = r * 1.5, d = Math.ceil(R * 2 * CDPR);
+  q = document.createElement('canvas'); q.width = q.height = d;
+  const g = q.getContext('2d'); g.scale(d / (R * 2), d / (R * 2)); g.translate(R, R);
+  const body = (h) => { h.moveTo(r, 0); h.arc(0, 0, r, 0, 6.283); }, parts = [[body, COL[i]]];
+  contact(g, 0, r * 0.88, r * 0.78, r * 0.24, 0.32);
+  uni(g, parts, 1.5);
+  celp(g, parts, COL[i], r * 0.42, r * 0.42);
+  spec(g, -r * 0.32, -r * 0.4, r * 0.3, r * 0.17, -0.6, 0.72);
+  if (ok) { g.strokeStyle = ART.OUT; g.lineWidth = 2.5; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); g.moveTo(-r * 0.3, 0); g.lineTo(-r * 0.05, r * 0.25); g.lineTo(r * 0.35, -r * 0.25); g.stroke(); }
+  endCv[key] = q; return q;
+}
 function label(s, x, y, size, col, align, base) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = base || 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
 
 reset(); k.show(CFG.title, 'Arrastra desde un punto hasta el otro del mismo color. Las líneas no pueden cruzarse. Llena todo el tablero. Teclado: flechas y A.');
@@ -88,11 +125,7 @@ k.run((dt) => {
   // extremos
   ends.forEach((e, i) => { const ok = connected(i); e.forEach((p) => { const [x, y] = ctr(p), r = S * 0.34;
     if (ok || conn[i] > 0) { c.globalAlpha = 0.25 + 0.15 * Math.sin(t * 4 + i) + conn[i]; c.fillStyle = COL[i]; c.beginPath(); c.arc(x, y, r * 1.45 + conn[i] * 14, 0, 6.283); c.fill(); c.globalAlpha = 1; }
-    c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(x, y + r * 0.85, r * 0.8, r * 0.28, 0, 0, 6.283); c.fill();
-    c.beginPath(); c.arc(x, y, r, 0, 6.283); ART.fillOut(c, COL[i], 3);
-    c.fillStyle = 'rgba(26,21,48,.2)'; c.beginPath(); c.arc(x, y + r * 0.25, r * 0.72, 0, Math.PI); c.fill();
-    c.fillStyle = 'rgba(255,255,255,.6)'; c.beginPath(); c.ellipse(x - r * 0.3, y - r * 0.38, r * 0.3, r * 0.17, -0.6, 0, 6.283); c.fill();
-    if (ok) { c.strokeStyle = OUT; c.lineWidth = 2.5; c.beginPath(); c.moveTo(x - r * 0.3, y); c.lineTo(x - r * 0.05, y + r * 0.25); c.lineTo(x + r * 0.35, y - r * 0.25); c.stroke(); } }); });
+    const q = endSprite(i, ok, r); c.drawImage(q, x - r * 1.5, y - r * 1.5, r * 3, r * 3); }); });
   // dedo / cursor
   if (drag != null && !kbd && k.ptr.down) { c.globalAlpha = 0.3; c.fillStyle = COL[drag]; c.beginPath(); c.arc(k.ptr.x, k.ptr.y, S * 0.6, 0, 6.283); c.fill(); c.globalAlpha = 1; }
   if (kbd && !done) { const [x, y] = ctr(cur); c.strokeStyle = drag != null ? COL[drag] : '#fff'; c.lineWidth = 3; c.setLineDash([5, 4]); ART.rr(c, x - S / 2 + 2, y - S / 2 + 2, S - 4, S - 4, 8); c.stroke(); c.setLineDash([]); }

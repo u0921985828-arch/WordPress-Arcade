@@ -2,6 +2,27 @@
  * Arte propio: almacén de losetas con muros de ladrillo y cajas de madera / pista de hielo con rocas nevadas. Movimiento interpolado. */
 const M = CFG.mode, ICE = M === 'ice', W = 480, H = 540, OUT = ART.OUT, R2 = 6.2832;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: ICE ? '#16304d' : '#1b1a2e' }), c = k.ctx;
+/* ---------- R5 §8 «pieza única» + cartoon de estudio (helpers locales) ----------
+   uni(): contornea TODAS las partes y luego las rellena → solo sobrevive la silueta exterior.
+   celp(): 3 tonos de borde duro (cel shading) recortados a la silueta, sin degradados.
+   spec(): único óvalo especular.  contact(): sombra de contacto dura. */
+function uni(g, parts, ow) {
+  g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = ART.OUT; g.lineWidth = (ow || 1.5) * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); }
+}
+function inpath(g, parts, fn) { g.save(); g.beginPath(); for (let i = 0; i < parts.length; i++) parts[i][0](g); g.clip(); fn(g); g.restore(); }
+function celp(g, parts, base, dx, dy) {
+  inpath(g, parts, (h) => {
+    const P = () => { h.beginPath(); for (let i = 0; i < parts.length; i++) parts[i][0](h); h.fill(); };
+    h.fillStyle = ART.dark(base, 0.24); P();
+    h.translate(-dx, -dy); h.fillStyle = base; P();
+    h.translate(-dx * 1.15, -dy * 1.15); h.fillStyle = ART.lite(base, 0.2); P();
+  });
+}
+function spec(g, x, y, rx, ry, rot, a) { g.fillStyle = 'rgba(255,255,255,' + (a == null ? 0.7 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, 6.2832); g.fill(); }
+function contact(g, x, y, rx, ry, a) { g.fillStyle = 'rgba(14,8,30,' + (a == null ? 0.3 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.2832); g.fill(); }
+const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 const D = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 let N, wall, goals, boxes, pl, level, moves, hist, exitC, total, par, init;
 let S, OX, OY, boardCv, bgCv, pr, boxR, face = 1, walkT = 0, t = 0, queued = null, holdT = 0, bump = null, trail = [], winT = 0, winStars = 0, pushT = 0;
@@ -137,18 +158,33 @@ function renderBoard() {
   g.stroke();
   return cv;
 }
+/* Caja: pieza única cacheada (R5 §8). El squash escala la imagen, no la redibuja. */
+const crateCv = {};
+function crateSprite(s, on) {
+  const key = Math.round(s) + '|' + (on ? 1 : 0); let q = crateCv[key]; if (q) return q;
+  const w = s * 0.84, pad = 6, d = Math.ceil((w + pad * 2) * CDPR);
+  q = document.createElement('canvas'); q.width = q.height = d;
+  const g = q.getContext('2d'); g.scale(d / (w + pad * 2), d / (w + pad * 2)); g.translate(pad, pad);
+  const base = on ? '#e8b04a' : '#d0934e', b = s * 0.13;
+  const body = (h) => ART.rr(h, 0, 0, w, w, s * 0.1), parts = [[body, base]];
+  uni(g, parts, 1.5);
+  celp(g, parts, base, s * 0.12, s * 0.12);
+  inpath(g, parts, (h) => {
+    h.fillStyle = ART.dark(base, 0.3); h.fillRect(b, b, w - 2 * b, w - 2 * b);
+    h.fillStyle = base; for (let i = 0; i < 3; i++) h.fillRect(b + 1, b + i * (w - 2 * b) / 3 + 1, w - 2 * b - 2, (w - 2 * b) / 3 - 2);
+    h.strokeStyle = ART.dark(base, 0.3); h.lineWidth = b * 0.9; h.beginPath(); h.moveTo(b, w - b); h.lineTo(w - b, b); h.stroke();
+    h.strokeStyle = ART.lite(base, 0.12); h.lineWidth = b * 0.5; h.stroke();
+    h.fillStyle = ART.dark(base, 0.55); for (const [ax, ay] of [[b / 2, b / 2], [w - b / 2, b / 2], [b / 2, w - b / 2], [w - b / 2, w - b / 2]]) { h.beginPath(); h.arc(ax, ay, 1.7, 0, R2); h.fill(); }
+  });
+  spec(g, w * 0.27, w * 0.16, w * 0.16, w * 0.055, -0.35, 0.5);
+  if (on) { g.beginPath(); g.arc(w - s * 0.06, s * 0.06, s * 0.15, 0, R2); ART.fillOut(g, '#5fd37a', 2); g.strokeStyle = '#fff'; g.lineWidth = 2.2; g.lineCap = 'round'; g.beginPath(); g.moveTo(w - s * 0.13, s * 0.06); g.lineTo(w - s * 0.08, s * 0.11); g.lineTo(w + s * 0.01, 0); g.stroke(); }
+  crateCv[key] = q; return q;
+}
 function crate(x, y, s, on, sq) {
   const w = s * (0.84 + sq), h = s * (0.84 - sq * 0.6), X = x - w / 2, Y = y + s * 0.42 - h;
   c.fillStyle = 'rgba(0,0,0,.28)'; c.beginPath(); c.ellipse(x, y + s * 0.4, w * 0.5, s * 0.1, 0, 0, R2); c.fill();
-  const base = on ? '#e8b04a' : '#d0934e', dark = on ? '#b27a1e' : '#9a6232';
-  ART.rr(c, X, Y, w, h, s * 0.1); ART.fillOut(c, base, 2.5);
-  c.fillStyle = dark; const b = s * 0.13; c.fillRect(X + b, Y + b, w - 2 * b, h - 2 * b);
-  c.fillStyle = base; for (let i = 0; i < 3; i++) c.fillRect(X + b + 1, Y + b + i * (h - 2 * b) / 3 + 1, w - 2 * b - 2, (h - 2 * b) / 3 - 2);
-  c.save(); c.beginPath(); c.rect(X + b, Y + b, w - 2 * b, h - 2 * b); c.clip(); c.strokeStyle = dark; c.lineWidth = b * 0.9; c.beginPath(); c.moveTo(X + b, Y + h - b); c.lineTo(X + w - b, Y + b); c.stroke(); c.strokeStyle = base; c.lineWidth = b * 0.55; c.stroke(); c.restore();
-  c.strokeStyle = OUT; c.lineWidth = 1.5; c.strokeRect(X + b, Y + b, w - 2 * b, h - 2 * b);
-  c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(X + 3, Y + 3, w - 6, 2.5);
-  c.fillStyle = '#4a3a2a'; for (const [ax, ay] of [[X + b / 2, Y + b / 2], [X + w - b / 2, Y + b / 2], [X + b / 2, Y + h - b / 2], [X + w - b / 2, Y + h - b / 2]]) { c.beginPath(); c.arc(ax, ay, 1.6, 0, R2); c.fill(); }
-  if (on) { c.beginPath(); c.arc(X + w - s * 0.06, Y + s * 0.06, s * 0.15, 0, R2); ART.fillOut(c, '#5fd37a', 2); c.strokeStyle = '#fff'; c.lineWidth = 2.2; c.lineCap = 'round'; c.beginPath(); c.moveTo(X + w - s * 0.13, Y + s * 0.06); c.lineTo(X + w - s * 0.08, Y + s * 0.11); c.lineTo(X + w + s * 0.01, Y); c.stroke(); }
+  const q = crateSprite(s, on), pad = 6, base = s * 0.84, f = (base + pad * 2) / base;
+  c.drawImage(q, X - w * (f - 1) / 2, Y - h * (f - 1) / 2, w * f, h * f);
 }
 function btn(kind, x, w) {
   const pressed = k.ptr.down && btnAt(k.ptr.x, k.ptr.y) === kind, y = BY + (pressed ? 2 : 0);

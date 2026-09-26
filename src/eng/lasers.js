@@ -2,6 +2,27 @@
  * Generador: se traza primero el camino con espejos (solución garantizada) y luego se desordenan.
  * Emisor con carcasa, espejos enmarcados que giran animados, bloques de piedra, rayo con brillo y receptor que se ilumina. */
 const W = 480, H = 560, OUT = ART.OUT, k = Kit({ w: W, h: H, title: CFG.title, bg: '#0e1226' }), c = k.ctx;
+/* ---------- R5 §8 «pieza única» + cartoon de estudio (helpers locales) ----------
+   uni(): contornea TODAS las partes y luego las rellena → solo sobrevive la silueta exterior.
+   celp(): 3 tonos de borde duro (cel shading) recortados a la silueta, sin degradados.
+   spec(): único óvalo especular.  contact(): sombra de contacto dura. */
+function uni(g, parts, ow) {
+  g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = ART.OUT; g.lineWidth = (ow || 1.5) * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); }
+}
+function inpath(g, parts, fn) { g.save(); g.beginPath(); for (let i = 0; i < parts.length; i++) parts[i][0](g); g.clip(); fn(g); g.restore(); }
+function celp(g, parts, base, dx, dy) {
+  inpath(g, parts, (h) => {
+    const P = () => { h.beginPath(); for (let i = 0; i < parts.length; i++) parts[i][0](h); h.fill(); };
+    h.fillStyle = ART.dark(base, 0.24); P();
+    h.translate(-dx, -dy); h.fillStyle = base; P();
+    h.translate(-dx * 1.15, -dy * 1.15); h.fillStyle = ART.lite(base, 0.2); P();
+  });
+}
+function spec(g, x, y, rx, ry, rot, a) { g.fillStyle = 'rgba(255,255,255,' + (a == null ? 0.7 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, 6.2832); g.fill(); }
+function contact(g, x, y, rx, ry, a) { g.fillStyle = 'rgba(14,8,30,' + (a == null ? 0.3 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.2832); g.fill(); }
+const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 const later = (fn, ms) => setTimeout(function f() { if (k.paused) setTimeout(f, 150); else fn(); }, ms); /* 1.23: la pantalla final espera si el juego está en pausa */
 let N, S, OX, OY = 112, grid, emit, target, level, done, beam, score, taps, cur, kbd, hitT, boardCv, sparkT;
 const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
@@ -78,6 +99,35 @@ function beamPx() { const pts = beam.pts.map(P); pts[0] = [OX - 4, pts[0][1]]; c
   if (!beam.hit) { if (beam.stop === 'block') pts[L] = [pts[L][0] - d[0] * S * 0.38, pts[L][1] - d[1] * S * 0.38]; else pts[L] = [OX + (lx - d[0] * 0.5) * S + S / 2, OY + (ly - d[1] * 0.5) * S + S / 2]; }
   return pts; }
 function beamEnd() { const p = beamPx(); return p[p.length - 1]; }
+/* Receptor y espejo: piezas únicas cacheadas (R5 §8) */
+const recvCv = {}, mirCv = {};
+function recvSprite(lit, r) {
+  const key = (lit ? 1 : 0) + '|' + Math.round(r); let q = recvCv[key]; if (q) return q;
+  const R = r * 1.35, d = Math.ceil(R * 2 * CDPR);
+  q = document.createElement('canvas'); q.width = q.height = d;
+  const g = q.getContext('2d'); g.scale(d / (R * 2), d / (R * 2)); g.translate(R, R);
+  const col = lit ? '#2f9e62' : '#2a5a48';
+  const body = (h) => { h.moveTo(r, 0); h.arc(0, 0, r, 0, 6.283); }, parts = [[body, col]];
+  contact(g, 0, r * 0.92, r * 0.86, r * 0.26, 0.34);
+  uni(g, parts, 1.5);
+  celp(g, parts, col, r * 0.4, r * 0.4);
+  const gem = lit ? '#b6ffd0' : '#4f8a70';
+  g.fillStyle = gem; g.beginPath(); g.moveTo(0, -r * 0.62); g.lineTo(r * 0.5, 0); g.lineTo(0, r * 0.62); g.lineTo(-r * 0.5, 0); g.closePath(); g.fill();
+  g.fillStyle = ART.dark(gem, 0.26); g.beginPath(); g.moveTo(0, r * 0.62); g.lineTo(r * 0.5, 0); g.lineTo(0, 0); g.closePath(); g.fill();
+  spec(g, -r * 0.16, -r * 0.3, r * 0.14, r * 0.09, -0.7, 0.8);
+  recvCv[key] = q; return q;
+}
+function mirSprite(L) {
+  const key = Math.round(L); let q = mirCv[key]; if (q) return q;
+  const w = L + 8, h = 12, d = Math.ceil(w * 2 * CDPR), dh = Math.ceil(h * 2 * CDPR);
+  q = document.createElement('canvas'); q.width = d; q.height = dh;
+  const g = q.getContext('2d'); g.scale(d / (w * 2), dh / (h * 2)); g.translate(w, h);
+  const body = (t) => ART.rr(t, -L, -5, L * 2, 10, 4), parts = [[body, '#8a90b0']];
+  uni(g, parts, 1.4);
+  celp(g, parts, '#8a90b0', 0, 3.4);
+  inpath(g, parts, (t) => { t.fillStyle = '#bfe6ff'; t.fillRect(-L + 4, -2.6, L * 2 - 8, 3.6); t.fillStyle = '#ffffff'; t.fillRect(-L + 4, -2.6, L * 2 - 8, 1.6); });
+  mirCv[key] = q; return q;
+}
 function draw() {
   if (!bgCv) bgCv = makeBg(); if (!boardCv) boardCv = makeBoard(); c.drawImage(bgCv, 0, 0, W, H); c.drawImage(boardCv, 0, 0, W, H);
   const t = performance.now() / 1000;
@@ -87,20 +137,16 @@ function draw() {
   // receptor
   const [tx, ty] = P(target), r = S * 0.36, lit = beam.hit;
   if (lit) { c.globalAlpha = 0.35 + 0.2 * Math.sin(t * 10); c.fillStyle = '#7cf7a0'; c.beginPath(); c.arc(tx, ty, r * 1.7 + Math.min(1, hitT * 3) * 8, 0, 6.283); c.fill(); c.globalAlpha = 1; }
-  c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(tx, ty + r * 0.9, r, r * 0.3, 0, 0, 6.283); c.fill();
-  c.beginPath(); c.arc(tx, ty, r, 0, 6.283); ART.fillOut(c, lit ? '#2f9e62' : '#2a5a48', 3);
-  c.beginPath(); c.moveTo(tx, ty - r * 0.62); c.lineTo(tx + r * 0.5, ty); c.lineTo(tx, ty + r * 0.62); c.lineTo(tx - r * 0.5, ty); c.closePath(); ART.fillOut(c, lit ? '#b6ffd0' : '#4f8a70', 2.5);
-  c.fillStyle = 'rgba(255,255,255,.55)'; c.beginPath(); c.moveTo(tx, ty - r * 0.5); c.lineTo(tx + r * 0.2, ty - r * 0.1); c.lineTo(tx, ty); c.closePath(); c.fill();
+  { const q = recvSprite(lit, r); c.drawImage(q, tx - r * 1.35, ty - r * 1.35, r * 2.7, r * 2.7); }
   // rayo: halo, color y núcleo (con pulso)
   const pts = beamPx(); c.lineCap = c.lineJoin = 'round';
   const line = (w, col) => { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); pts.forEach((p) => c.lineTo(p[0], p[1])); c.stroke(); };
   line(16 + Math.sin(t * 12) * 2, 'rgba(255,60,110,.18)'); line(7, lit ? '#ff5f8a' : '#ff3b6b'); c.setLineDash([10, 8]); c.lineDashOffset = -t * 60; line(2.5, '#fff'); c.setLineDash([]); line(1.2, 'rgba(255,255,255,.8)');
   const e = pts[pts.length - 1]; if (!lit) { c.fillStyle = '#fff'; c.beginPath(); c.arc(e[0], e[1], 4 + Math.sin(t * 30) * 1.5, 0, 6.283); c.fill(); }
   // espejos (encima del rayo): placa con marco que gira
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const cl = grid[y][x]; if (!cl.m) continue; const [X, Y] = P([x, y]), L = S * 0.42 * (1 + cl.p * 0.12);
-    c.save(); c.translate(X, Y); c.rotate(cl.a); ART.rr(c, -L, -5, L * 2, 10, 4); ART.fillOut(c, '#8a90b0', 2.5);
-    const gr = c.createLinearGradient(0, -3, 0, 3); gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.5, '#bfe6ff'); gr.addColorStop(1, '#7aa8d8'); c.fillStyle = gr; c.fillRect(-L + 4, -2.5, L * 2 - 8, 3.5);
-    c.restore(); c.beginPath(); c.arc(X, Y, 4, 0, 6.283); ART.fillOut(c, '#ffd23d', 2); }
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const cl = grid[y][x]; if (!cl.m) continue; const [X, Y] = P([x, y]), L = S * 0.42, f = 1 + cl.p * 0.12;
+    const q = mirSprite(L); c.save(); c.translate(X, Y); c.rotate(cl.a); c.drawImage(q, -(L + 8) * f, -12 * f, (L + 8) * 2 * f, 24 * f); c.restore();
+    c.beginPath(); c.arc(X, Y, 4, 0, 6.283); ART.fillOut(c, '#ffd23d', 2); }
   if (kbd && !done) { const X = OX + cur[0] * S, Y = OY + cur[1] * S; c.strokeStyle = '#fff'; c.lineWidth = 3; c.setLineDash([5, 4]); ART.rr(c, X + 2, Y + 2, S - 4, S - 4, 8); c.stroke(); c.setLineDash([]); }
   if (hitT) { c.globalAlpha = Math.min(1, hitT * 3); label('¡Conectado!', W / 2, OY + N * S + 24, 28, '#7cf7a0', 'center', 'middle'); c.globalAlpha = 1; }
 }

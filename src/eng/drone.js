@@ -1,5 +1,43 @@
 /* Drone Flight: atraviesa los anillos en 3D. Proyección en perspectiva (F / profundidad); el dron vuela en el plano z. */
 const k = Kit({ w: 640, h: 360, title: CFG.title, bg: '#0a1030' }), c = k.ctx, F = 300, OUT = ART.OUT;
+/* --- Ley de la pieza única (R5, docs/REMASTER.md §8) + cartoon de estudio -----------------
+   `unite(g, partes, ancho)` traza TODAS las partes y las rellena después: los contornos
+   interiores quedan tapados y solo sobrevive la silueta. El detalle interior va recortado
+   (`clipIn`), nunca con stroke; las separaciones internas se leen por sombra propia. */
+const PZO = '#1a1530', OUTW = 1.5, INW = 0.7, INA = 0.6;
+const _hx = (h) => { if (h[0] !== '#') { const m = h.match(/[\d.]+/g) || [0, 0, 0]; return [+m[0], +m[1], +m[2]]; } h = h.slice(1); if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]; const n = parseInt(h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const _rgb = (a) => `rgb(${a[0] | 0},${a[1] | 0},${a[2] | 0})`;
+const PLT = (col, f) => _rgb(_hx(col).map((v) => v + (255 - v) * f));
+const PDK = (col, f) => _rgb(_hx(col).map((v) => v * (1 - f)));
+const PAL = (col, a) => { const q = _hx(col); return `rgba(${q[0]},${q[1]},${q[2]},${Math.max(0, a).toFixed(3)})`; };
+/* partes = [[trazado, relleno, sombraDeContacto?]], en orden de profundidad */
+function unite(g, parts, ow) {
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  g.strokeStyle = PZO; g.lineWidth = (ow || OUTW) * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) {
+    const P = parts[i];
+    if (P[2]) { g.save(); g.globalCompositeOperation = 'source-atop'; g.beginPath(); P[0](g); g.strokeStyle = PAL(PZO, 0.15); g.lineWidth = P[2]; g.stroke(); g.lineWidth = P[2] * 0.45; g.stroke(); g.restore(); }
+    g.beginPath(); P[0](g); g.fillStyle = P[1]; g.fill();
+  }
+}
+/* detalle recortado contra un trazado (en el lienzo vivo: recorte a secas, nunca source-atop) */
+function clipIn(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+/* detalle de una pieza dentro de una caché (source-atop es barato en un lienzo pequeño) */
+function within(g, path, fn) { g.save(); g.globalCompositeOperation = 'source-atop'; g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+/* 3 planos de color con borde duro: sombra, base desplazada hacia la luz y plano de luz */
+function cel3(g, path, base, o) {
+  o = o || {}; const dx = o.dx == null ? 2.4 : o.dx, dy = o.dy == null ? 2.2 : o.dy, R = o.r || 200;
+  g.save(); g.beginPath(); path(g); g.clip();
+  g.fillStyle = PDK(base, o.sh == null ? 0.26 : o.sh); g.fillRect(-R, -R, R * 2, R * 2);
+  g.save(); g.translate(-dx, -dy); g.beginPath(); path(g); g.fillStyle = base; g.fill(); g.restore();
+  if (o.hi !== false) { g.save(); g.translate(-dx * 2.15, -dy * 2.15); g.beginPath(); path(g); g.fillStyle = PLT(base, o.lt == null ? 0.2 : o.lt); g.fill(); g.restore(); }
+  g.restore();
+}
+/* óvalo especular (un único toque de luz por pieza) */
+function spec(g, x, y, rx, ry, rot, a) { g.fillStyle = `rgba(255,255,255,${a == null ? 0.5 : a})`; g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, 6.283); g.fill(); }
+/* sombra de contacto dura bajo el objeto */
+function contact(g, x, y, rx, ry, a) { g.fillStyle = `rgba(12,10,26,${a == null ? 0.3 : a})`; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.283); g.fill(); }
 /* Dificultad: de 600 a 1400 u/s en ~3,5 min (suavizado); anillos más juntos, pequeños y desplazados con el progreso.
  * Antes: 900 u/s + 8/s sin tope, separación 900→600 y radio 140→90 a los 80-100 s. */
 const V0 = 480, V1 = 1190, DIF = () => { const d = Math.min(1, t / 315); // 1.23: más fácil (antes 600→1400 en 210 s)

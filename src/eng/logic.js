@@ -4,6 +4,27 @@
 const M = CFG.mode, W = 480, H = 600, OUT = ART.OUT, R2 = 6.2832;
 const BG = { sudoku: ['#2d3a5c', '#161f35'], mines: ['#2f4a3a', '#15241c'], lights: ['#2a2350', '#110d24'], pipes: ['#23374f', '#0f1b2b'], slide: ['#4a3426', '#20150e'] }[M];
 const k = Kit({ w: W, h: H, title: CFG.title, bg: BG[1] }), c = k.ctx;
+/* ---------- R5 §8 «pieza única» + cartoon de estudio (helpers locales) ----------
+   uni(): contornea TODAS las partes y luego las rellena → solo sobrevive la silueta exterior.
+   celp(): 3 tonos de borde duro (cel shading) recortados a la silueta, sin degradados.
+   spec(): único óvalo especular.  contact(): sombra de contacto dura. */
+function uni(g, parts, ow) {
+  g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = ART.OUT; g.lineWidth = (ow || 1.5) * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); }
+}
+function inpath(g, parts, fn) { g.save(); g.beginPath(); for (let i = 0; i < parts.length; i++) parts[i][0](g); g.clip(); fn(g); g.restore(); }
+function celp(g, parts, base, dx, dy) {
+  inpath(g, parts, (h) => {
+    const P = () => { h.beginPath(); for (let i = 0; i < parts.length; i++) parts[i][0](h); h.fill(); };
+    h.fillStyle = ART.dark(base, 0.24); P();
+    h.translate(-dx, -dy); h.fillStyle = base; P();
+    h.translate(-dx * 1.15, -dy * 1.15); h.fillStyle = ART.lite(base, 0.2); P();
+  });
+}
+function spec(g, x, y, rx, ry, rot, a) { g.fillStyle = 'rgba(255,255,255,' + (a == null ? 0.7 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, 6.2832); g.fill(); }
+function contact(g, x, y, rx, ry, a) { g.fillStyle = 'rgba(14,8,30,' + (a == null ? 0.3 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.2832); g.fill(); }
+const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 const later = (fn, ms) => setTimeout(function f() { if (k.paused) setTimeout(f, 150); else fn(); }, ms); /* 1.23: la pantalla final espera si el juego está en pausa */
 let lost = false, g, N, S, OX = 24, OY = 90, sel, score, level, t, done, flagMode, first, sol, given, src;
 let clk = 0, litN = 0, padHit = 0, downIn = false, skipSw = false, cur = [0, 0], kb = false, anim, fx = [], moves = 0, bgCv, boardCv, keyNum = null, pressT = 0, longDone = false, boom = null, doneT = 0, conf = new Set(), rp, glow;

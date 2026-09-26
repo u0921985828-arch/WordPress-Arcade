@@ -1,5 +1,120 @@
 /* Tower Defense con arte propio (ART). CFG.mode: 'path' (camino fijo) | 'maze' (prado libre: las torres desvían la ruta) | 'hex' (mapa hexagonal)
  * 4 torres con torreta que apunta, 3 niveles y venta; oleadas anunciadas con jefe cada 5; construcción en dos toques con vista previa. */
+/* ===== §8 «Ley de la pieza única» — utilería local (REMASTER.md §8) =====
+ * unite8(): traza y contornea TODAS las partes y después las rellena en orden de profundidad, así
+ * dentro de la silueta no sobrevive ningún contorno cerrado: solo el borde exterior. Las separaciones
+ * internas se leen por sombra propia (seam8) o por cambio de color, nunca por stroke.
+ * Todo lo repetido se hornea en sprites cacheados a Math.min(2, devicePixelRatio) para que el coste
+ * por frame no suba (regla innegociable del brief). */
+const P8OUT = ART.OUT, P8W = 1.5, P8IW = 0.7, P8IA = 0.62, P8T = 6.2832;
+const _p8h = (s) => { s = String(s).replace('#', ''); if (s.length === 3) s = s[0] + s[0] + s[1] + s[1] + s[2] + s[2]; const n = parseInt(s, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const _p8c = (a) => `rgb(${Math.max(0, Math.min(255, a[0] | 0))},${Math.max(0, Math.min(255, a[1] | 0))},${Math.max(0, Math.min(255, a[2] | 0))})`;
+const LT8 = (col, f) => (String(col)[0] === '#' ? _p8c(_p8h(col).map((v) => v + (255 - v) * f)) : col);
+const DK8 = (col, f) => (String(col)[0] === '#' ? _p8c(_p8h(col).map((v) => v * (1 - f))) : col);
+const AL8 = (col, a) => { const q = _p8h(col); return `rgba(${q[0]},${q[1]},${q[2]},${Math.max(0, a).toFixed(3)})`; };
+const CV8 = (w, h) => { const q = document.createElement('canvas'); q.width = Math.max(1, Math.ceil(w)); q.height = Math.max(1, Math.ceil(h)); return q; };
+const DPR8 = Math.min(2, (typeof devicePixelRatio === 'number' ? devicePixelRatio : 1) || 1);
+/* recorte contra la propia forma. Nunca `source-atop` en el lienzo vivo: obliga a un compuesto de
+ * pantalla completa (medido 11–18 ms/frame). Aquí basta el clip. */
+function clip8(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+/* cel de 3 planos con borde DURO: sombra, base desplazada hacia la luz (arriba-izquierda) y luz */
+function cel8(g, path, base, o) {
+  o = o || {}; const dx = o.dx == null ? 2.2 : o.dx, dy = o.dy == null ? 2 : o.dy, f = o.f == null ? 1 : o.f, B = o.b || 260;
+  g.save(); g.beginPath(); path(g); g.clip();
+  g.fillStyle = DK8(base, 0.22 * f); g.fillRect(-B, -B, B * 2, B * 2);
+  g.save(); g.translate(-dx, -dy); g.beginPath(); path(g); g.fillStyle = base; g.fill(); g.restore();
+  if (o.hi !== false) { g.save(); g.translate(-dx * 2.1, -dy * 2.1); g.beginPath(); path(g); g.fillStyle = LT8(base, 0.2 * f); g.fill(); g.restore(); }
+  g.restore();
+}
+/* EL MECANISMO: parts = [[trazado, color, celOpts|0, detalle(g)|0]] en orden de profundidad */
+function unite8(g, parts, ow) {
+  g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = P8OUT; g.lineWidth = (ow || P8W) * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) {
+    const P = parts[i];
+    g.beginPath(); P[0](g); g.fillStyle = P[1]; g.fill();
+    if (P[2]) cel8(g, P[0], P[1], P[2] === true ? null : P[2]);
+    if (P[3]) clip8(g, P[0], P[3]);
+  }
+}
+/* separación interna por sombra propia (~16 % más oscuro), nunca por contorno */
+function seam8(g, path, base, fn, f) { clip8(g, path, (q) => { q.fillStyle = DK8(base, f == null ? 0.16 : f); fn(q); }); }
+/* línea interior fina: detalle, jamás un contorno cerrado */
+function ink8(g, w, a) { g.lineWidth = w == null ? P8IW : w; g.strokeStyle = AL8(P8OUT, a == null ? P8IA : a); }
+/* óvalo especular (un toque por pieza) */
+function shine8(g, x, y, rx, ry, rot, a) { g.fillStyle = `rgba(255,255,255,${a == null ? 0.34 : a})`; g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, P8T); g.fill(); }
+/* sombra de contacto dura bajo la pieza */
+function drop8(g, x, y, rx, ry, a) { g.fillStyle = `rgba(26,21,48,${a == null ? 0.26 : a})`; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, P8T); g.fill(); }
+/* caché de sprites; el origen del dibujo es (ox,oy) dentro del lienzo de w×h */
+const SPR8 = {};
+function spr8(key, w, h, ox, oy, fn, sc) {
+  let q = SPR8[key]; if (q) return q;
+  const s = (sc || 1) * DPR8; q = SPR8[key] = CV8(w * s, h * s); const g = q.getContext('2d');
+  g.scale(s, s); g.translate(ox, oy); g.lineJoin = 'round'; g.lineCap = 'round'; fn(g);
+  q.iw = w; q.ih = h; q.ox = ox; q.oy = oy; return q;
+}
+function blit8(ctx, q, x, y, sc, al) {
+  sc = sc || 1; if (al != null) ctx.globalAlpha = al;
+  ctx.drawImage(q, x - q.ox * sc, y - q.oy * sc, q.iw * sc, q.ih * sc);
+  if (al != null) ctx.globalAlpha = 1;
+}
+/* manopla grande con pulgar marcado, en una sola forma */
+function mitt8(x, y, a, r, s) {
+  const tx = x + Math.cos(a - s * 1.25) * r * 0.85, ty = y + Math.sin(a - s * 1.25) * r * 0.85;
+  return (g) => { g.moveTo(x + r, y); g.arc(x, y, r, 0, P8T); g.moveTo(tx + r * 0.46, ty); g.arc(tx, ty, r * 0.46, 0, P8T); };
+}
+/* hueso de ancho variable: la raíz queda abierta y enterrada en el tronco → tangente continua */
+function bone8(pts, ws) {
+  return (g) => {
+    const n = pts.length, L = [], R = [];
+    for (let i = 0; i < n; i++) {
+      const a = pts[i > 0 ? i - 1 : 0], b = pts[i < n - 1 ? i + 1 : n - 1];
+      let tx = b[0] - a[0], ty = b[1] - a[1]; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
+      L.push([pts[i][0] - ty * ws[i], pts[i][1] + tx * ws[i]]);
+      R.push([pts[i][0] + ty * ws[i], pts[i][1] - tx * ws[i]]);
+    }
+    g.moveTo(L[0][0], L[0][1]);
+    for (let i = 1; i < n - 1; i++) g.quadraticCurveTo(L[i][0], L[i][1], (L[i][0] + L[i + 1][0]) / 2, (L[i][1] + L[i + 1][1]) / 2);
+    g.lineTo(L[n - 1][0], L[n - 1][1]);
+    const e = pts[n - 1], w = ws[n - 1], a0 = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0]);
+    g.arc(e[0], e[1], w, a0, a0 - Math.PI, true);
+    for (let i = n - 2; i > 0; i--) g.quadraticCurveTo(R[i][0], R[i][1], (R[i][0] + R[i - 1][0]) / 2, (R[i][1] + R[i - 1][1]) / 2);
+    g.lineTo(R[0][0], R[0][1]); g.closePath();
+  };
+}
+/* La cara manda: ojos grandes con PÁRPADO SUPERIOR RECTO (lo que da expresión) y cejas gruesas */
+function eyes8(g, cx, cy, sep, r, o) {
+  o = o || {}; const ry = r * (o.sq || 1), lid = o.lid == null ? 0.24 : o.lid, lx = o.lx || 0, ly = o.ly || 0;
+  for (const s of [-1, 1]) {
+    g.save(); g.translate(cx + s * sep, cy);
+    if (o.shut) { g.beginPath(); g.moveTo(-r, -ry * 0.1); g.quadraticCurveTo(0, ry * 0.7, r, -ry * 0.1); g.lineWidth = Math.max(0.9, r * 0.3); g.strokeStyle = AL8(P8OUT, 0.9); g.stroke(); g.restore(); continue; }
+    g.beginPath(); g.ellipse(0, 0, r, ry, 0, 0, P8T); g.fillStyle = o.white || '#fff'; g.fill();
+    const ix = lx * r * 0.34, iy = ly * ry * 0.3 + ry * 0.06;
+    g.beginPath(); g.arc(ix, iy, r * 0.6, 0, P8T); g.fillStyle = o.iris || '#3a5bb8'; g.fill();
+    g.beginPath(); g.arc(ix, iy, r * 0.31, 0, P8T); g.fillStyle = P8OUT; g.fill();
+    g.beginPath(); g.arc(ix - r * 0.3, iy - r * 0.34, r * 0.22, 0, P8T); g.fillStyle = '#fff'; g.fill();
+    g.rotate(s * (o.tilt || 0));
+    g.beginPath(); g.ellipse(0, 0, r * 1.05, ry * 1.05, 0, 0, P8T); g.clip();
+    const y0 = -ry + ry * 2 * lid;
+    g.fillStyle = o.lidCol || '#ffd3ad'; g.fillRect(-r * 1.3, -ry * 1.6, r * 2.6, y0 + ry * 1.6);
+    g.fillStyle = AL8(P8OUT, 0.92); g.fillRect(-r * 1.3, y0 - r * 0.18, r * 2.6, r * 0.2);
+    g.restore();
+  }
+}
+/* cejas gruesas (trazo con cuerpo). tilt>0 = enfadado */
+function brow8(g, cx, cy, sep, len, tilt, col, th) {
+  th = th || 1.5; g.fillStyle = col || P8OUT;
+  for (const s of [-1, 1]) { g.beginPath(); bone8([[cx + s * (sep - len * 0.45), cy + tilt], [cx + s * (sep + len * 0.55), cy - tilt * 0.85]], [th, th * 0.5])(g); g.fill(); }
+}
+/* boca grande y simple. m: 0 sonrisa · 1 abierta · 2 mueca · 3 recta · 4 «o» */
+function mouth8(g, x, y, w, m, col) {
+  if (m === 1 || m === 4) { g.beginPath(); g.ellipse(x, y + w * 0.14, w * (m === 4 ? 0.5 : 0.7), w * (m === 4 ? 0.6 : 0.76), 0, 0, P8T); g.fillStyle = col || '#5e2436'; g.fill(); return; }
+  g.beginPath(); g.lineCap = 'round'; g.lineWidth = Math.max(1, w * 0.26); g.strokeStyle = col || AL8(P8OUT, 0.9);
+  if (m === 3) { g.moveTo(x - w * 0.5, y); g.lineTo(x + w * 0.5, y); }
+  else if (m === 2) { g.moveTo(x - w * 0.5, y + w * 0.2); g.quadraticCurveTo(x, y - w * 0.3, x + w * 0.5, y + w * 0.2); }
+  else { g.moveTo(x - w * 0.55, y - w * 0.1); g.quadraticCurveTo(x, y + w * 0.55, x + w * 0.55, y - w * 0.1); }
+  g.stroke();
+}
 const M = CFG.mode, HEX = M === 'hex', OUT = ART.OUT, R2 = 6.2832;
 /* disposición: vertical (móvil de pie) = tablero arriba y panel abajo; horizontal = panel a la derecha */
 const PORT = innerHeight > innerWidth;

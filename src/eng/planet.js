@@ -1,5 +1,43 @@
 /* Planet Hopper: salta de planeta en planeta con gravedad. Planetas cacheados como sprites que giran; fondo con 3 capas de paralaje. */
 const k = Kit({ w: 640, h: 360, title: CFG.title, bg: '#070818' }), c = k.ctx, OUT = ART.OUT;
+/* --- Ley de la pieza única (R5, docs/REMASTER.md §8) + cartoon de estudio -----------------
+   `unite(g, partes, ancho)` traza TODAS las partes y las rellena después: los contornos
+   interiores quedan tapados y solo sobrevive la silueta. El detalle interior va recortado
+   (`clipIn`), nunca con stroke; las separaciones internas se leen por sombra propia. */
+const PZO = '#1a1530', OUTW = 1.5, INW = 0.7, INA = 0.6;
+const _hx = (h) => { if (h[0] !== '#') { const m = h.match(/[\d.]+/g) || [0, 0, 0]; return [+m[0], +m[1], +m[2]]; } h = h.slice(1); if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]; const n = parseInt(h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const _rgb = (a) => `rgb(${a[0] | 0},${a[1] | 0},${a[2] | 0})`;
+const PLT = (col, f) => _rgb(_hx(col).map((v) => v + (255 - v) * f));
+const PDK = (col, f) => _rgb(_hx(col).map((v) => v * (1 - f)));
+const PAL = (col, a) => { const q = _hx(col); return `rgba(${q[0]},${q[1]},${q[2]},${Math.max(0, a).toFixed(3)})`; };
+/* partes = [[trazado, relleno, sombraDeContacto?]], en orden de profundidad */
+function unite(g, parts, ow) {
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  g.strokeStyle = PZO; g.lineWidth = (ow || OUTW) * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) {
+    const P = parts[i];
+    if (P[2]) { g.save(); g.globalCompositeOperation = 'source-atop'; g.beginPath(); P[0](g); g.strokeStyle = PAL(PZO, 0.15); g.lineWidth = P[2]; g.stroke(); g.lineWidth = P[2] * 0.45; g.stroke(); g.restore(); }
+    g.beginPath(); P[0](g); g.fillStyle = P[1]; g.fill();
+  }
+}
+/* detalle recortado contra un trazado (en el lienzo vivo: recorte a secas, nunca source-atop) */
+function clipIn(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+/* detalle de una pieza dentro de una caché (source-atop es barato en un lienzo pequeño) */
+function within(g, path, fn) { g.save(); g.globalCompositeOperation = 'source-atop'; g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+/* 3 planos de color con borde duro: sombra, base desplazada hacia la luz y plano de luz */
+function cel3(g, path, base, o) {
+  o = o || {}; const dx = o.dx == null ? 2.4 : o.dx, dy = o.dy == null ? 2.2 : o.dy, R = o.r || 200;
+  g.save(); g.beginPath(); path(g); g.clip();
+  g.fillStyle = PDK(base, o.sh == null ? 0.26 : o.sh); g.fillRect(-R, -R, R * 2, R * 2);
+  g.save(); g.translate(-dx, -dy); g.beginPath(); path(g); g.fillStyle = base; g.fill(); g.restore();
+  if (o.hi !== false) { g.save(); g.translate(-dx * 2.15, -dy * 2.15); g.beginPath(); path(g); g.fillStyle = PLT(base, o.lt == null ? 0.2 : o.lt); g.fill(); g.restore(); }
+  g.restore();
+}
+/* óvalo especular (un único toque de luz por pieza) */
+function spec(g, x, y, rx, ry, rot, a) { g.fillStyle = `rgba(255,255,255,${a == null ? 0.5 : a})`; g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, 6.283); g.fill(); }
+/* sombra de contacto dura bajo el objeto */
+function contact(g, x, y, rx, ry, a) { g.fillStyle = `rgba(12,10,26,${a == null ? 0.3 : a})`; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.283); g.fill(); }
 let planets, p, cam, score, stars, gems, t, best, jet, walkT, land;
 const mk = (w, h, f) => { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const g = cv.getContext('2d'); g.scale(2, 2); g.lineJoin = 'round'; f(g); return cv; };
 const rs = (s) => { const x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -64,13 +102,53 @@ k.run((dt) => {
   label(`${score}`, 14, 10, 26); label(`Planetas ${best}`, 626, 12, 17, '#b8b6e0', 'right');
   if (k.st === 'play' && t < 3) { c.globalAlpha = Math.min(1, 3 - t); label('Toca para saltar', 320, 300, 20, '#fff', 'center'); c.globalAlpha = 1; }
 });
-function astronaut() { const ang = p.on ? p.a + Math.PI / 2 : Math.atan2(p.vy, p.vx) + Math.PI / 2, air = !p.on, ph = walkT * 12;
-  c.save(); c.translate(p.x, p.y); c.rotate(ang); c.lineJoin = 'round'; if (land > 0) c.scale(1 + land, 1 - land);
-  const la = air ? -3 : Math.sin(ph) * 3, lb = air ? 3 : -Math.sin(ph) * 3;
-  ART.rr(c, -6 + la * 0.6, 2, 5, 8, 2); ART.fillOut(c, '#e8ecf6', 1.8); ART.rr(c, 1 + lb * 0.6, 2, 5, 8, 2); ART.fillOut(c, '#e8ecf6', 1.8);
-  ART.rr(c, -10, -9, 5, 12, 2); ART.fillOut(c, '#9aa3b5', 1.8);
-  ART.rr(c, -7, -8, 14, 13, 5); ART.fillOut(c, '#f5f7ff', 2); c.fillStyle = '#ff5f7a'; c.fillRect(-2, -4, 4, 3);
-  c.beginPath(); c.arc(0, -13, 8, 0, 6.283); ART.fillOut(c, '#f5f7ff', 2); ART.rr(c, -1, -17, 8, 7, 3.5); ART.fillOut(c, '#5ce1e6', 1.8); c.fillStyle = 'rgba(255,255,255,.8)'; c.fillRect(1, -16, 2, 2);
-  const arm = air ? -0.9 : Math.sin(ph + Math.PI) * 0.5; c.save(); c.translate(3, -5); c.rotate(arm); ART.rr(c, -2, 0, 4, 8, 2); ART.fillOut(c, '#e8ecf6', 1.6); c.restore();
+/* Ley de la pieza única: el astronauta era casco + torso + mochila + 2 piernas + brazo, cada uno
+   con su contorno cerrado (7 chapas). Ahora es UNA silueta (unite traza todo y rellena después) y
+   las piernas/el brazo, que sí se mueven, se separan por sombra propia, no por línea.
+   Cartoon de estudio: casco grande (media figura), botas y manopla gruesas, 3 tonos por pieza con
+   borde duro, un óvalo especular en el casco y sombra de contacto dura bajo las botas. */
+const ASPR = {}, ASC = Math.min(2, window.devicePixelRatio || 1) * 2.2, AW = 40, AH = 46, AOX = 20, AOY = 28;
+const rrp = (x, y, w, h, r) => (g) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+function astroSpr(ph, air) {
+  const key = air ? 'a' : 'w' + ph;
+  if (ASPR[key]) return ASPR[key];
+  const cv = document.createElement('canvas'); cv.width = AW * ASC; cv.height = AH * ASC;
+  const g = cv.getContext('2d'); g.scale(ASC, ASC); g.translate(AOX, AOY); g.lineJoin = 'round'; g.lineCap = 'round';
+  const la = air ? -3.2 : Math.sin(ph / 8 * 6.283) * 3.4, lb = -la;
+  const arm = air ? -0.95 : Math.sin(ph / 8 * 6.283 + Math.PI) * 0.55;
+  const SUIT = '#eef1fb', DKS = PDK(SUIT, 0.2), PACK = '#8d96ab';
+  const legB = rrp(-7.4 + lb * 0.7, 1, 6.4, 10.5, 3), legF = rrp(0.6 + la * 0.7, 1, 6.4, 10.5, 3);
+  const pack = rrp(-11, -9.5, 6, 13, 2.6);
+  const torso = rrp(-7.4, -8.5, 14.8, 14, 5.6);
+  const helm = (q) => { q.moveTo(8.4, -13); q.arc(0, -13, 8.4, 0, 6.283); };
+  const ax = 3.4, ay = -5.4, ex = ax + Math.sin(arm + 1.1) * 8.2, ey = ay + Math.cos(arm + 1.1) * 8.2;
+  const armP = (q) => { q.moveTo(ax, ay - 2.6); q.lineTo(ex, ey - 2.4); q.lineTo(ex, ey + 2.4); q.lineTo(ax, ay + 2.6); q.closePath(); q.moveTo(ex + 3, ey); q.arc(ex, ey, 3, 0, 6.283); };
+  unite(g, [[legB, DKS], [pack, PDK(PACK, 0.18)], [torso, SUIT], [helm, SUIT], [legF, SUIT], [armP, SUIT]], 1.5);
+  // separaciones internas: solo por sombra propia (nunca con stroke)
+  within(g, legB, (q) => { q.fillStyle = PAL(PZO, 0.3); q.fillRect(-16, -2, 32, 16); });
+  within(g, pack, (q) => { q.fillStyle = PAL(PZO, 0.22); q.fillRect(-16, -14, 32, 22); q.fillStyle = '#ffc94d'; q.fillRect(-10.4, -6.5, 4.4, 2.2); });
+  within(g, torso, (q) => {
+    cel3(q, torso, SUIT, { dx: 2, dy: 1.8, r: 40, sh: 0.2, lt: 0.14 });
+    q.fillStyle = '#6e62f5'; q.fillRect(-7.6, -2.6, 15.2, 2.8);                    // franja de color, sin contorno
+    q.fillStyle = '#ff5f7a'; q.fillRect(-2.2, -6.4, 4.4, 3);
+    q.fillStyle = PAL(PZO, 0.2); q.fillRect(-7.6, 3.4, 15.2, 3);                   // sombra propia bajo el pecho
+  });
+  within(g, helm, (q) => {
+    cel3(q, helm, SUIT, { dx: 2.4, dy: 2.2, r: 40, sh: 0.22, lt: 0.16 });
+    q.fillStyle = '#2f9fb8'; q.beginPath(); q.ellipse(0.8, -13.4, 6.2, 5.2, 0, 0, 6.283); q.fill();
+    q.fillStyle = '#5ce1e6'; q.beginPath(); q.ellipse(0.4, -14.2, 5.6, 4.4, 0, 0, 6.283); q.fill();
+    spec(q, -2.2, -16.4, 2.4, 1.5, -0.6, 0.85);                                    // un solo toque especular
+    q.fillStyle = PAL(PZO, 0.18); q.beginPath(); q.ellipse(0, -8.6, 8.4, 3, 0, 0, 6.283); q.fill();
+  });
+  within(g, legF, (q) => { q.fillStyle = PAL(PZO, 0.16); q.fillRect(-16, 7, 32, 8); });
+  within(g, armP, (q) => { q.fillStyle = PAL(PZO, 0.14); q.beginPath(); q.arc(ex, ey + 1.6, 3, 0, 6.283); q.fill(); });
+  cv.k = key; return (ASPR[key] = cv);
+}
+function astronaut() { const ang = p.on ? p.a + Math.PI / 2 : Math.atan2(p.vy, p.vx) + Math.PI / 2, air = !p.on;
+  const ph = ((Math.round(walkT * 12 / 6.283 * 8) % 8) + 8) % 8;
+  c.save(); c.translate(p.x, p.y); c.rotate(ang); if (land > 0) c.scale(1 + land, 1 - land);
+  if (!air) contact(c, 0, 12, 8.5, 2.6, 0.32);                                     // sombra de contacto dura
   if (air) { c.fillStyle = '#ffb347'; c.beginPath(); c.ellipse(-8, 6 + Math.random() * 2, 2.5, 5 + Math.random() * 3, 0, 0, 6.283); c.fill(); }
+  const q = astroSpr(ph, air ? 1 : 0);
+  c.drawImage(q, -AOX, -AOY, AW, AH);
   c.restore(); }

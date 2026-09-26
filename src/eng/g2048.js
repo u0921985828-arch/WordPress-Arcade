@@ -1,6 +1,27 @@
 /* 2048 (CFG.hex = false|true). Fichas con relieve cacheadas, deslizamiento interpolado, fusión con "pop",
  * fantasmas de las fichas absorbidas, aparición elástica y récord en vivo. */
 const HEX = !!CFG.hex, W = 480, H = 560, OUT = ART.OUT, k = Kit({ w: W, h: H, title: CFG.title, bg: '#241a3d' }), c = k.ctx;
+/* ---------- R5 §8 «pieza única» + cartoon de estudio (helpers locales) ----------
+   uni(): contornea TODAS las partes y luego las rellena → solo sobrevive la silueta exterior.
+   celp(): 3 tonos de borde duro (cel shading) recortados a la silueta, sin degradados.
+   spec(): único óvalo especular.  contact(): sombra de contacto dura. */
+function uni(g, parts, ow) {
+  g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = ART.OUT; g.lineWidth = (ow || 1.5) * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); }
+}
+function inpath(g, parts, fn) { g.save(); g.beginPath(); for (let i = 0; i < parts.length; i++) parts[i][0](g); g.clip(); fn(g); g.restore(); }
+function celp(g, parts, base, dx, dy) {
+  inpath(g, parts, (h) => {
+    const P = () => { h.beginPath(); for (let i = 0; i < parts.length; i++) parts[i][0](h); h.fill(); };
+    h.fillStyle = ART.dark(base, 0.24); P();
+    h.translate(-dx, -dy); h.fillStyle = base; P();
+    h.translate(-dx * 1.15, -dy * 1.15); h.fillStyle = ART.lite(base, 0.2); P();
+  });
+}
+function spec(g, x, y, rx, ry, rot, a) { g.fillStyle = 'rgba(255,255,255,' + (a == null ? 0.7 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, 6.2832); g.fill(); }
+function contact(g, x, y, rx, ry, a) { g.fillStyle = 'rgba(14,8,30,' + (a == null ? 0.3 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.2832); g.fill(); }
+const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 const later = (fn, ms) => setTimeout(function f() { if (k.paused) setTimeout(f, 150); else fn(); }, ms); /* 1.23: la pantalla final espera si el juego está en pausa */
 const COL = { 2: '#f6eee2', 4: '#f3e1c2', 8: '#ffb066', 16: '#ff8c4a', 32: '#ff6b5b', 64: '#f0463c', 128: '#ffd84d', 256: '#ffc83a', 512: '#ffb61f', 1024: '#7ee07a', 2048: '#5ce1e6', 4096: '#b98cff', 8192: '#ff5fa2' };
 const tcol = (v) => COL[v] || '#6c8cff';
@@ -23,11 +44,12 @@ function tileSprite(v) {
   const cv = document.createElement('canvas'); cv.width = cv.height = SP * 4; const g = cv.getContext('2d'); g.scale(2, 2); g.translate(SP, SP);
   const col = tcol(v), dark = shade(col, -0.3);
   if (v >= 128) { const gl = g.createRadialGradient(0, 0, 20, 0, 0, SP); gl.addColorStop(0, shade(col, 0.2)); gl.addColorStop(1, 'rgba(255,255,255,0)'); g.globalAlpha = 0.55; g.fillStyle = gl; g.fillRect(-SP, -SP, SP * 2, SP * 2); g.globalAlpha = 1; }
-  const body = (dy, inset) => HEX ? hexPath(g, 0, dy, 45 - inset) : ART.rr(g, -45 + inset, -45 + inset + dy, 90 - inset * 2, 90 - inset * 2, 14 - inset / 2);
-  body(0, 0); ART.fillOut(g, dark, 3);
-  g.save(); body(-5, 3); g.clip(); const gr = g.createLinearGradient(0, -45, 0, 40); gr.addColorStop(0, shade(col, 0.22)); gr.addColorStop(1, col); g.fillStyle = gr; g.fillRect(-50, -55, 100, 100);
-  g.fillStyle = 'rgba(255,255,255,.32)'; if (HEX) { g.beginPath(); g.ellipse(0, -26, 26, 9, 0, 0, 6.283); g.fill(); } else { ART.rr(g, -36, -40, 72, 13, 6.5); g.fill(); }
-  g.fillStyle = 'rgba(255,255,255,.5)'; g.beginPath(); g.arc(HEX ? -20 : -30, HEX ? -18 : -26, 3.5, 0, 6.283); g.fill(); g.restore();
+  const body = (h) => { if (HEX) { h.moveTo(Math.cos(Math.PI / 6) * 45, Math.sin(Math.PI / 6) * 45); for (let i = 1; i < 6; i++) { const an = Math.PI / 6 + i * Math.PI / 3; h.lineTo(Math.cos(an) * 45, Math.sin(an) * 45); } h.closePath(); } else ART.rr(h, -45, -45, 90, 90, 14); };
+  const parts = [[body, col]];
+  contact(g, 0, HEX ? 44 : 47, 36, 8, 0.3);
+  uni(g, parts, 1.6);
+  celp(g, parts, col, 9, 9);
+  spec(g, HEX ? -16 : -22, -25, HEX ? 12 : 15, 5.4, -0.5, 0.5);
   const s = String(v), fs = s.length <= 2 ? (HEX ? 36 : 42) : s.length === 3 ? (HEX ? 30 : 35) : s.length === 4 ? (HEX ? 23 : 27) : 20;
   g.font = `900 ${fs}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
   if (v <= 4) { g.fillStyle = 'rgba(255,255,255,.7)'; g.fillText(s, 0, -2); g.fillStyle = '#6b5647'; g.fillText(s, 0, -4); }

@@ -1,5 +1,43 @@
 /* Stack Tower 3D (isométrico): toca para soltar el bloque y apilarlo. Lo que sobresale se corta y cae. */
 const k = Kit({ w: 360, h: 640, title: CFG.title, bg: '#1b1f3b' }), c = k.ctx, OUT = ART.OUT;
+/* --- Ley de la pieza única (R5, docs/REMASTER.md §8) + cartoon de estudio -----------------
+   `unite(g, partes, ancho)` traza TODAS las partes y las rellena después: los contornos
+   interiores quedan tapados y solo sobrevive la silueta. El detalle interior va recortado
+   (`clipIn`), nunca con stroke; las separaciones internas se leen por sombra propia. */
+const PZO = '#1a1530', OUTW = 1.5, INW = 0.7, INA = 0.6;
+const _hx = (h) => { if (h[0] !== '#') { const m = h.match(/[\d.]+/g) || [0, 0, 0]; return [+m[0], +m[1], +m[2]]; } h = h.slice(1); if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]; const n = parseInt(h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const _rgb = (a) => `rgb(${a[0] | 0},${a[1] | 0},${a[2] | 0})`;
+const PLT = (col, f) => _rgb(_hx(col).map((v) => v + (255 - v) * f));
+const PDK = (col, f) => _rgb(_hx(col).map((v) => v * (1 - f)));
+const PAL = (col, a) => { const q = _hx(col); return `rgba(${q[0]},${q[1]},${q[2]},${Math.max(0, a).toFixed(3)})`; };
+/* partes = [[trazado, relleno, sombraDeContacto?]], en orden de profundidad */
+function unite(g, parts, ow) {
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  g.strokeStyle = PZO; g.lineWidth = (ow || OUTW) * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) {
+    const P = parts[i];
+    if (P[2]) { g.save(); g.globalCompositeOperation = 'source-atop'; g.beginPath(); P[0](g); g.strokeStyle = PAL(PZO, 0.15); g.lineWidth = P[2]; g.stroke(); g.lineWidth = P[2] * 0.45; g.stroke(); g.restore(); }
+    g.beginPath(); P[0](g); g.fillStyle = P[1]; g.fill();
+  }
+}
+/* detalle recortado contra un trazado (en el lienzo vivo: recorte a secas, nunca source-atop) */
+function clipIn(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+/* detalle de una pieza dentro de una caché (source-atop es barato en un lienzo pequeño) */
+function within(g, path, fn) { g.save(); g.globalCompositeOperation = 'source-atop'; g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
+/* 3 planos de color con borde duro: sombra, base desplazada hacia la luz y plano de luz */
+function cel3(g, path, base, o) {
+  o = o || {}; const dx = o.dx == null ? 2.4 : o.dx, dy = o.dy == null ? 2.2 : o.dy, R = o.r || 200;
+  g.save(); g.beginPath(); path(g); g.clip();
+  g.fillStyle = PDK(base, o.sh == null ? 0.26 : o.sh); g.fillRect(-R, -R, R * 2, R * 2);
+  g.save(); g.translate(-dx, -dy); g.beginPath(); path(g); g.fillStyle = base; g.fill(); g.restore();
+  if (o.hi !== false) { g.save(); g.translate(-dx * 2.15, -dy * 2.15); g.beginPath(); path(g); g.fillStyle = PLT(base, o.lt == null ? 0.2 : o.lt); g.fill(); g.restore(); }
+  g.restore();
+}
+/* óvalo especular (un único toque de luz por pieza) */
+function spec(g, x, y, rx, ry, rot, a) { g.fillStyle = `rgba(255,255,255,${a == null ? 0.5 : a})`; g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, 6.283); g.fill(); }
+/* sombra de contacto dura bajo el objeto */
+function contact(g, x, y, rx, ry, a) { g.fillStyle = `rgba(12,10,26,${a == null ? 0.3 : a})`; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.283); g.fill(); }
 /* velocidad del bloque: 125 → 340 u/s de forma suave hasta el piso 40 (antes 150 + 6 por piso hasta 360) */
 const SPD = (n) => { const d = Math.min(1, n / 60); return 100 + 190 * d * d * (3 - 2 * d); }; // 1.23: más fácil (antes 125→340 hasta el piso 40)
 let liveT = 0, blocks, cur, score, axis, dir, speed, perfect, falling, camY, hue, rings, t, flashB, best;
@@ -10,16 +48,27 @@ const ISO = (x, y, z) => [180 + (x - z) * 0.87, 470 - (x + z) * 0.5 - y * 24 + c
 /* Fondo: estrellas y nubes deterministas (se desplazan con la cámara) */
 const rs = (s) => { const x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
+/* Ley de la pieza única: el bloque es UN prisma, no tres caras apiladas. Se traza la silueta
+   hexagonal una vez (un relleno, un contorno) y las tres caras se separan dentro por color,
+   nunca por línea. Un óvalo especular y la luz de borde rematan el cartoon de estudio. */
 function box(b, alpha, glow) { const { x, z, w, d } = b, y = b.y, hh = b.hh || 1, p = (xx, zz, yy) => ISO(xx, yy, zz);
-  const Y = y + hh, top = [p(x, z, Y), p(x + w, z, Y), p(x + w, z + d, Y), p(x, z + d, Y)], L = [p(x, z + d, Y), p(x + w, z + d, Y), p(x + w, z + d, y), p(x, z + d, y)], R = [p(x + w, z, Y), p(x + w, z + d, Y), p(x + w, z + d, y), p(x + w, z, y)];
-  if (top[2][1] - 30 > 640 || L[2][1] < -60) return;
-  c.globalAlpha = alpha == null ? 1 : alpha; c.lineJoin = 'round'; c.lineWidth = 1.6; c.strokeStyle = OUT;
-  const poly = (pts, col) => { c.fillStyle = col; c.beginPath(); pts.forEach(([a, bb]) => c.lineTo(a, bb)); c.closePath(); c.fill(); c.stroke(); };
-  if (b.dark) { poly(L, '#3b3566'); poly(R, '#2b2650'); poly(top, '#57508a'); } else { poly(L, `hsl(${b.hue} 62% 50%)`); poly(R, `hsl(${b.hue} 58% 38%)`); poly(top, `hsl(${b.hue} 75% 66%)`); }
-  // brillo: franja clara en la arista frontal de la cara superior
-  c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 2; c.beginPath(); c.moveTo(top[3][0] + 3, top[3][1] - 1); c.lineTo(top[2][0], top[2][1] - 3); c.lineTo(top[1][0] - 3, top[1][1] - 1); c.stroke();
-  c.fillStyle = 'rgba(255,255,255,.12)'; c.beginPath(); c.moveTo(L[3][0] + 2, L[3][1] - 3); c.lineTo(L[0][0] + 2, L[0][1] + 3); c.lineTo(L[0][0] + 7, L[0][1] + 5); c.lineTo(L[3][0] + 7, L[3][1] - 1); c.fill();
-  if (glow) { c.globalAlpha = glow; c.fillStyle = '#fff'; c.beginPath(); top.forEach(([a, bb]) => c.lineTo(a, bb)); c.fill(); }
+  const Y = y + hh, T = [p(x, z, Y), p(x + w, z, Y), p(x + w, z + d, Y), p(x, z + d, Y)];
+  const bl = p(x, z + d, y), bm = p(x + w, z + d, y), br = p(x + w, z, y);
+  if (T[2][1] - 30 > 640 || bm[1] < -60) return;
+  c.globalAlpha = alpha == null ? 1 : alpha;
+  const hu = b.hue, top = b.dark ? '#57508a' : `hsl(${hu} 78% 68%)`, lft = b.dark ? '#3b3566' : `hsl(${hu} 64% 50%)`, rgt = b.dark ? '#282348' : `hsl(${hu} 56% 34%)`;
+  const sil = (g) => { g.moveTo(T[0][0], T[0][1]); g.lineTo(T[1][0], T[1][1]); g.lineTo(br[0], br[1]); g.lineTo(bm[0], bm[1]); g.lineTo(bl[0], bl[1]); g.lineTo(T[3][0], T[3][1]); g.closePath(); };
+  unite(c, [[sil, lft]], 1.5);
+  clipIn(c, sil, (g) => {
+    const poly = (pts, col) => { g.fillStyle = col; g.beginPath(); pts.forEach(([a2, b2]) => g.lineTo(a2, b2)); g.closePath(); g.fill(); };
+    poly([T[1], br, bm, T[2]], rgt);                       // cara derecha, en sombra
+    poly(T, top);                                          // cara superior, a la luz
+    g.fillStyle = 'rgba(12,10,26,.16)'; g.beginPath(); g.moveTo(bl[0], bl[1]); g.lineTo(bm[0], bm[1]); g.lineTo(bm[0], bm[1] - 7); g.lineTo(bl[0], bl[1] - 7); g.closePath(); g.fill();   // sombra propia en la base
+    g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 2; g.lineCap = 'round'; g.beginPath(); g.moveTo(T[3][0] + 3, T[3][1] - 1); g.lineTo(T[2][0], T[2][1] - 3); g.lineTo(T[1][0] - 3, T[1][1] - 1); g.stroke();   // luz de borde
+    const sx = (T[0][0] + T[3][0]) / 2, sy = (T[0][1] + T[3][1]) / 2;
+    if (w > 40) spec(g, sx + w * 0.13, sy + 2, Math.min(15, w * 0.15), Math.min(6, w * 0.07), -0.5, 0.34);   // un solo toque especular
+  });
+  if (glow) { c.globalAlpha = glow; c.fillStyle = '#fff'; c.beginPath(); T.forEach(([a2, b2]) => c.lineTo(a2, b2)); c.fill(); }
   c.globalAlpha = 1; }
 k.run((dt) => {
   t += dt;

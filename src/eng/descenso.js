@@ -489,7 +489,7 @@ function drawWorld(v, tt) {
   /* etiquetas */
   for (const r of racers) { if (r.hold > 0 || r.y < y0 - 40 || r.y > y1 + 40) continue; let tag = null;
     if (k.party || humans().length > 1) tag = r.cpu ? 'CPU' : 'J' + (r.p + 1); else if (!r.cpu && raceT < 4) tag = 'TÚ';
-    if (tag && !(SL && v.r !== r && r.cpu && humans().length > 1)) { const yy = r.y - r.z * 26 - 44; c.font = '900 11px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const tw = c.measureText(tag).width + 10; c.globalAlpha = SL && v.r !== r ? 0.55 : 1;
+    if (tag && !(SL && v.r !== r && r.cpu && humans().length > 1)) { const yy = tag === 'TÚ' ? r.y + 30 : r.y - r.z * 26 - 44; c.font = '900 11px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const tw = c.measureText(tag).width + 10; c.globalAlpha = SL && v.r !== r ? 0.55 : 1;
       rr(c, r.x - tw / 2, yy - 8, tw, 15, 6); c.fillStyle = r.col; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke(); c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(tag, r.x, yy); c.globalAlpha = 1; } }
   for (const f of flo) { if (SL && f.r !== v.r) continue; const a = Math.min(1, f.t * 2); c.globalAlpha = a; c.save(); c.translate(f.r.x, f.r.y - 56 - (1.1 - f.t) * 30); c.scale(1 / v.s, 1 / v.s); label(f.txt, 0, 0, 16, f.col, 'center', 'middle'); c.restore(); c.globalAlpha = 1; }
   c.restore();

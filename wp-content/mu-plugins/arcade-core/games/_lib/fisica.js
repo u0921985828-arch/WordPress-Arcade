@@ -13,6 +13,159 @@ const { lite, dark, alpha, rr, fillOut, shadow, glint } = ART;
 const PORT = innerHeight > innerWidth * 1.05;
 const W = PORT ? 480 : 760, H = PORT ? 720 : 480;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#120e26' }), c = k.ctx;
+/* ---------- PZ · Ley de la pieza única + cartoon de estudio (docs/REMASTER.md §8) ----------
+   Un objeto que el jugador lee como UNA cosa se traza entero, se contornea UNA vez y se rellena
+   UNA vez: `PZ.unite()` contornea todas las partes primero y las rellena después, así cualquier
+   borde interior queda tapado y sólo sobrevive la silueta. El detalle interior va recortado
+   (`PZ.in`, y `PZ.cut` sobre el lienzo de partida, donde `source-atop` costaría un compuesto de
+   pantalla completa). Sólo se separa lo que se mueve de verdad (rueda, torreta, arma, paño).
+   Cartoon de estudio: 3 tonos por pieza con borde duro (`cel`), párpado superior recto, cejas
+   gruesas, manoplas con pulgar, un óvalo especular y sombra de contacto dura. */
+const PZ = (() => {
+  const O = ART.OUT, AL = ART.alpha, DK = ART.dark, LT = ART.lite, R2 = Math.PI * 2;
+  const DPR = Math.min(2, (typeof devicePixelRatio === 'number' && devicePixelRatio) || 1);
+  const OW = 1.5, IW = 0.7, IA = 0.62, CH = {};
+  const P = {
+    O, R2, DPR,
+    /* --- trazados reutilizables (sólo trazan; no rellenan ni contornean) --- */
+    blob: (x, y, rx, ry, rot) => (g) => { g.moveTo(x + rx, y); g.ellipse(x, y, rx, Math.abs(ry), rot || 0, 0, R2); },
+    /* rr compatible con Path2D (ART.rr llama a beginPath y no vale aquí) */
+    box: (x, y, w, h, r) => (g) => { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); },
+    /* hueso de ancho variable: baja por un costado, redondea la punta y vuelve por el otro; la raíz
+       queda abierta y enterrada en el tronco → tangente continua en hombro y cadera. */
+    bone(pts, ws) {
+      return (g) => {
+        const n = pts.length, L = [], R = [];
+        for (let i = 0; i < n; i++) {
+          const a = pts[i > 0 ? i - 1 : 0], b = pts[i < n - 1 ? i + 1 : n - 1];
+          let tx = b[0] - a[0], ty = b[1] - a[1]; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
+          L.push([pts[i][0] - ty * ws[i], pts[i][1] + tx * ws[i]]);
+          R.push([pts[i][0] + ty * ws[i], pts[i][1] - tx * ws[i]]);
+        }
+        g.moveTo(L[0][0], L[0][1]);
+        for (let i = 1; i < n - 1; i++) g.quadraticCurveTo(L[i][0], L[i][1], (L[i][0] + L[i + 1][0]) / 2, (L[i][1] + L[i + 1][1]) / 2);
+        g.lineTo(L[n - 1][0], L[n - 1][1]);
+        const e = pts[n - 1], w = ws[n - 1], a0 = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0]);
+        g.arc(e[0], e[1], w, a0, a0 - Math.PI, true);
+        for (let i = n - 2; i > 0; i--) g.quadraticCurveTo(R[i][0], R[i][1], (R[i][0] + R[i - 1][0]) / 2, (R[i][1] + R[i - 1][1]) / 2);
+        g.lineTo(R[0][0], R[0][1]); g.closePath();
+      };
+    },
+    /* manopla: bola grande con el pulgar marcado (media cabeza de ancho) */
+    mitt(x, y, a, r, s) {
+      const tx = x + Math.cos(a - s * 1.2) * r * 0.85, ty = y + Math.sin(a - s * 1.2) * r * 0.85;
+      return (g) => { g.moveTo(x + r, y); g.arc(x, y, r, 0, R2); g.moveTo(tx + r * 0.47, ty); g.arc(tx, ty, r * 0.47, 0, R2); };
+    },
+    /* --- el mecanismo: contornear todo, rellenar todo ---
+       Todas las partes se acumulan en UN Path2D y se contornean de una sola pasada (una llamada a
+       stroke en vez de N: es lo que hace que la pieza única salga más barata que el collage). Luego
+       se rellenan en orden; las partes contiguas del mismo color se funden en un solo relleno.
+       Devuelve el Path2D de la silueta para recortar el detalle contra él sin volver a trazarlo. */
+    unite(g, parts, ow) {
+      g.lineJoin = 'round'; g.lineCap = 'round';
+      const all = new Path2D(), ds = [];
+      for (let i = 0; i < parts.length; i++) { const d = new Path2D(); parts[i][0](d); ds.push(d); all.addPath(d); }
+      g.strokeStyle = O; g.lineWidth = (ow || OW) * 2; g.stroke(all);
+      for (let i = 0; i < parts.length; i++) {
+        const p = parts[i];
+        if (p[2]) { /* sombra propia: la separación interna se lee por valor, nunca por stroke */
+          g.save(); g.globalCompositeOperation = 'source-atop';
+          g.strokeStyle = AL(O, 0.15); g.lineWidth = p[2]; g.stroke(ds[i]);
+          g.lineWidth = p[2] * 0.45; g.stroke(ds[i]); g.restore();
+        }
+        /* cada pieza se rellena por separado: fundir dos trazados en un Path2D los sumaría con la
+           regla «nonzero» y dos sentidos de giro contrarios abrirían un hueco (bota con agujero). */
+        g.fillStyle = p[1]; g.fill(ds[i]);
+        if (p[3]) P.cel(g, p[0], p[1], p[3] === true ? null : p[3]);
+        if (p[4]) P.in(g, p[0], p[4]);
+      }
+      return all;
+    },
+    /* 3 tonos con borde duro: la pieza en sombra, encima la misma pieza desplazada hacia la luz */
+    cel(g, path, base, o) {
+      o = o || {}; const dx = o.dx == null ? 2.2 : o.dx, dy = o.dy == null ? 2 : o.dy, f = o.f == null ? 1 : o.f, E = g.__ext || 260;
+      g.save(); g.beginPath(); path(g); g.clip();
+      g.fillStyle = DK(base, 0.26 * f); g.fillRect(-E, -E, E * 2, E * 2);
+      g.translate(-dx, -dy); g.beginPath(); path(g); g.fillStyle = base; g.fill();
+      if (o.hi !== false && f > 0.35) { g.translate(-dx * 1.15, -dy * 1.15); g.beginPath(); path(g); g.fillStyle = LT(base, 0.2 * f); g.fill(); }
+      g.restore();
+    },
+    /* detalle de una pieza, recortado contra ella y contra lo ya pintado (sólo fuera de pantalla) */
+    in(g, path, fn) { g.save(); g.globalCompositeOperation = 'source-atop'; if (path instanceof Path2D) g.clip(path); else { g.beginPath(); path(g); g.clip(); } fn(g); g.restore(); },
+    /* igual, para el lienzo de partida: recorte a secas */
+    cut(g, path, fn) { g.save(); if (path instanceof Path2D) g.clip(path); else { g.beginPath(); path(g); g.clip(); } fn(g); g.restore(); },
+    /* óvalo especular y sombra de contacto duras */
+    shine(g, x, y, rx, ry, rot, a) { g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, R2); g.fillStyle = 'rgba(255,255,255,' + (a == null ? 0.42 : a) + ')'; g.fill(); },
+    drop(g, x, y, rx, ry, a) { g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, R2); g.fillStyle = AL(O, a == null ? 0.3 : a); g.fill(); },
+    /* --- la cara manda: ojo grande con PÁRPADO SUPERIOR recto --- */
+    eyes(g, cx, cy, sep, r, lx, ly, o) {
+      o = o || {}; const ry = r * (o.sq || 1), lid = o.lid == null ? 0.24 : o.lid, tilt = o.tilt || 0;
+      for (const s of [-1, 1]) {
+        g.save(); g.translate(cx + s * sep, cy);
+        if (o.shut) {
+          g.beginPath(); g.moveTo(-r, -ry * 0.1); g.quadraticCurveTo(0, ry * 0.75, r, -ry * 0.1);
+          g.lineWidth = Math.max(0.9, r * 0.3); g.strokeStyle = AL(O, 0.9); g.lineCap = 'round'; g.stroke(); g.restore(); continue;
+        }
+        g.beginPath(); g.ellipse(0, 0, r, ry, 0, 0, R2); g.fillStyle = o.white || '#fff'; g.fill();
+        const ix = (lx || 0) * r * 0.36, iy = (ly || 0) * ry * 0.32 + ry * 0.08;
+        g.beginPath(); g.arc(ix, iy, r * 0.62, 0, R2); g.fillStyle = o.iris || '#3a5bb8'; g.fill();
+        g.beginPath(); g.arc(ix, iy, r * 0.32, 0, R2); g.fillStyle = O; g.fill();
+        g.beginPath(); g.arc(ix - r * 0.32, iy - r * 0.36, r * 0.23, 0, R2); g.fillStyle = '#fff'; g.fill();
+        g.rotate(s * tilt);
+        g.beginPath(); g.ellipse(0, 0, r * 1.06, ry * 1.06, 0, 0, R2); g.clip();
+        const y0 = -ry + ry * 2 * lid;
+        g.fillStyle = o.lidCol || '#ffd3ad'; g.fillRect(-r * 1.3, -ry * 1.5, r * 2.6, y0 + ry * 1.5);
+        g.fillStyle = AL(O, 0.92); g.fillRect(-r * 1.3, y0 - r * 0.2, r * 2.6, Math.max(0.7, r * 0.2));
+        g.restore();
+      }
+    },
+    /* cejas gruesas y móviles; tilt>0 = enfado */
+    brows(g, cx, cy, sep, len, tilt, col, th) {
+      th = th || 1.5; g.fillStyle = col || O;
+      for (const s of [-1, 1]) { g.beginPath(); P.bone([[cx + s * (sep - len * 0.45), cy + tilt], [cx + s * (sep + len * 0.55), cy - tilt * 0.85]], [th, th * 0.5])(g); g.fill(); }
+    },
+    /* boca grande: 0 sonrisa · 1 abierta · 2 mueca · 3 recta · 4 «o» · 5 triste */
+    mouth(g, x, y, w, kind, col) {
+      if (kind === 1 || kind === 4) {
+        g.beginPath(); g.ellipse(x, y + w * 0.16, w * (kind === 4 ? 0.5 : 0.7), w * (kind === 4 ? 0.62 : 0.76), 0, 0, R2);
+        g.fillStyle = col || '#5e2436'; g.fill();
+        if (kind === 1) { g.beginPath(); g.ellipse(x, y + w * 0.6, w * 0.4, w * 0.28, 0, 0, R2); g.fillStyle = '#e0607e'; g.fill(); }
+        return;
+      }
+      g.lineWidth = Math.max(0.9, w * 0.26); g.strokeStyle = col || AL(O, 0.92); g.lineCap = 'round'; g.beginPath();
+      if (kind === 2) { g.moveTo(x - w * 0.7, y); g.lineTo(x - w * 0.24, y + w * 0.34); g.lineTo(x + w * 0.24, y); g.lineTo(x + w * 0.7, y + w * 0.34); }
+      else if (kind === 3) { g.moveTo(x - w * 0.6, y + w * 0.1); g.lineTo(x + w * 0.6, y + w * 0.1); }
+      else if (kind === 5) { g.moveTo(x - w * 0.62, y + w * 0.36); g.quadraticCurveTo(x, y - w * 0.22, x + w * 0.62, y + w * 0.36); }
+      else { g.moveTo(x - w * 0.62, y - w * 0.04); g.quadraticCurveTo(x, y + w * 0.62, x + w * 0.62, y - w * 0.04); }
+      g.stroke();
+    },
+    /* --- cachés --- */
+    /* lienzo cacheado genérico, a Math.min(2, dpr) */
+    cv(w, h, s, fn) {
+      const q = document.createElement('canvas'); s = s || DPR;
+      q.width = Math.max(1, Math.round(w * s)); q.height = Math.max(1, Math.round(h * s));
+      const g = q.getContext('2d'); g.scale(s, s); g.lineJoin = 'round'; g.lineCap = 'round';
+      g.__ext = Math.max(w, h) * 1.5; if (fn) fn(g); q.iw = w; q.ih = h; return q;
+    },
+    /* sprite de personaje/objeto: ×3 lógico para que la línea fina no se rompa. (0,0) = ancla */
+    spr(key, w, h, ax, ay, fn) {
+      let q = CH[key]; if (q) return q;
+      q = P.cv(w, h, 3, (g) => { g.translate(ax, ay); fn(g); });
+      q.ax = ax; q.ay = ay; CH[key] = q; return q;
+    },
+    /* pinta un sprite con su ancla en (x,y) */
+    put(g, q, x, y, s, rot, a) {
+      s = s == null ? 1 : s;
+      if (rot) { g.save(); g.translate(x, y); g.rotate(rot); x = 0; y = 0; }
+      if (a != null) g.globalAlpha = a;
+      g.drawImage(q, x - q.ax * s, y - q.ay * s, q.iw * s, q.ih * s);
+      if (a != null) g.globalAlpha = 1;
+      if (rot) g.restore();
+    },
+    has: (key) => !!CH[key],
+  };
+  return P;
+})();
 const MD = {
   pulso: { np: 2, rounds: 3, len: 45, ww: 440, wh: 310 },
   justa: { np: 2, rounds: 5, len: 26, ww: 740, wh: 300 },
@@ -53,28 +206,77 @@ function ik(x0, y0, x1, y1, l1, l2, bend) {
   const a = Math.atan2(dy, dx), co = clamp((d * d + l1 * l1 - l2 * l2) / (2 * d * l1), -1, 1), an = Math.acos(co) * (bend || 1);
   return [x0 + Math.cos(a + an) * l1, y0 + Math.sin(a + an) * l1];
 }
-function faceAt(x, y, r, col, o) {
-  o = o || {}; c.beginPath(); c.arc(x, y, r, 0, TAU); const g = c.createRadialGradient(x - r * 0.4, y - r * 0.45, 1, x, y, r * 1.15);
-  g.addColorStop(0, lite(col, 0.35)); g.addColorStop(1, col); fillOut(c, g, 2.4);
-  const f = o.face == null ? 1 : o.face, ex = r * 0.34 * f;
-  c.fillStyle = OUT; for (const s of [-1, 1]) { c.beginPath(); c.ellipse(x + ex + s * r * 0.3, y - r * 0.08, r * 0.13, r * (o.shut ? 0.05 : 0.2), 0, 0, TAU); c.fill(); }
-  c.strokeStyle = OUT; c.lineWidth = 2; c.lineCap = 'round'; c.beginPath();
-  if (o.mouth === 'o') { c.arc(x + ex * 0.6, y + r * 0.42, r * 0.2, 0, TAU); c.stroke(); }
-  else { c.moveTo(x + ex * 0.6 - r * 0.22, y + r * 0.4); c.quadraticCurveTo(x + ex * 0.6, y + r * 0.4 + (o.mouth === 'sad' ? -r * 0.3 : r * 0.3), x + ex * 0.6 + r * 0.22, y + r * 0.4); c.stroke(); }
+/* --- Muñeco de una sola pieza (§8) con diseño cartoon de estudio ---------------------------
+   Antes era un collage: cada brazo, cada pierna, el torso y la cabeza se contorneaban por
+   separado y se veían las junturas. Ahora el cuerpo se declara como una lista de piezas
+   (huesos de ancho variable, tronco, cabeza, tocado, manoplas) y `PZ.unite` las contornea TODAS
+   antes de rellenarlas: los bordes interiores quedan tapados y sobrevive una sola silueta.
+   Proporción de apelación ~1:2,3 (cabeza r 11 sobre 52 de alto), extremidades cortas y gruesas,
+   manoplas con pulgar y botas redondas. Volumen por cel shading de borde duro, no por degradado.
+   Sólo se separa del cuerpo lo que se mueve de verdad (la lanza, el escudo: van en `o.after`). */
+/* La cara manda, y no cambia con la pose: se cachea a ×3 y se pega sobre la cabeza. No lleva
+   contorno propio (son rasgos, no piezas), así que la silueta sigue siendo una sola. */
+function faceSpr(hr, f, col, skin, mouth, shut) {
+  return PZ.spr(`f${hr}|${f}|${col}|${skin}|${mouth}|${shut ? 1 : 0}`, hr * 2.4, hr * 2.4, hr * 1.2, hr * 1.2, (g) => {
+    PZ.shine(g, -hr * 0.42, -hr * 0.48, hr * 0.32, hr * 0.18, -0.6, 0.4);
+    const ex = hr * 0.24 * f, er = hr * 0.27, grr = mouth === 'grr';
+    PZ.eyes(g, ex, -hr * 0.06, hr * 0.32, er, f, 0.1, { shut, lidCol: skin, lid: shut ? 0 : 0.22, tilt: grr ? 0.4 : 0.12 });
+    PZ.brows(g, ex, -hr * 0.46, hr * 0.32, hr * 0.34, grr ? hr * 0.14 : mouth === 'sad' ? -hr * 0.1 : hr * 0.04, dark(col, 0.5), hr * 0.13);
+    PZ.mouth(g, ex * 1.3, hr * 0.42, hr * 0.34, FACE_EXPR[mouth] == null ? 0 : FACE_EXPR[mouth]);
+  });
 }
-/* muñeco genérico: torso ovalado, dos brazos y dos piernas con IK hacia manos/pies dados en coordenadas locales */
+const FACE_EXPR = { o: 4, sad: 5, grr: 2, '': 0 };
+/* codo/rodilla con segmentos proporcionales: la articulación se insinúa y el hueso nunca se dobla
+   sobre sí mismo (un bucle abriría un hueco en el relleno y rompería la pieza única). */
+function joint(x0, y0, x1, y1, bend) { const l = Math.max(hyp(x1 - x0, y1 - y0) * 0.53 + 1.6, 5); return ik(x0, y0, x1, y1, l, l, bend * 0.38); }
 function puppet(x, y, s, col, o) {
-  o = o || {}; const hands = o.hands || [[-9, 2], [9, 2]], feet = o.feet || [[-6, 22], [6, 22]], hy = o.hy == null ? -20 : o.hy;
+  o = o || {};
+  const hands = o.hands || [[-13, 1], [13, 1]], feet = o.feet || [[-6, 22], [6, 22]];
+  const hr = o.hr == null ? 11 : o.hr + 2, hy = o.hy == null ? -22 : o.hy;
+  const f = o.face === -1 ? -1 : 1, fr = o.front == null ? 1 : o.front;
+  const skin = o.skin || '#ffd9b5', leg = dark(col, 0.34), parts = [];
   c.save(); c.translate(x, y); c.scale(s, s); if (o.rot) c.rotate(o.rot);
-  if (o.shadow !== false) shadow(c, 0, 24, 13, 0.24);
-  for (let i = 0; i < 2; i++) { const [fx, fy] = feet[i], kn = ik(i ? 5 : -5, 10, fx, fy, 10, 11, i ? 1 : -1); seg([[i ? 5 : -5, 10], kn, [fx, fy]], 5.5, dark(col, 0.35), i === (o.face === -1 ? 1 : 0)); }
-  for (let i = 0; i < 2; i++) if (i !== (o.front == null ? 1 : o.front)) { const [hx2, hy2] = hands[i], el = ik(i ? 7 : -7, -12, hx2, hy2, 10, 10, i ? 1 : -1); seg([[i ? 7 : -7, -12], el, [hx2, hy2]], 4.8, col, true); }
-  rr(c, -9, -17, 18, 28, 8); const g = c.createLinearGradient(-9, -17, 9, 11); g.addColorStop(0, lite(col, 0.28)); g.addColorStop(1, dark(col, 0.18)); fillOut(c, g, 2.4);
-  if (o.belt) { c.fillStyle = alpha('#ffd166', 0.9); c.fillRect(-9, 2, 18, 4); }
-  faceAt(0, hy, o.hr || 9, o.skin || '#ffd9b5', o);
-  if (o.hair !== false) { c.beginPath(); c.arc(0, hy - 1.5, (o.hr || 9) + 0.6, Math.PI, 0); fillOut(c, col, 2); }
-  if (o.helm) { c.beginPath(); c.arc(0, hy - 1, (o.hr || 9) + 2, Math.PI * 1.02, -0.02); fillOut(c, '#c8ccd8', 2.2); c.fillStyle = OUT; c.fillRect(-(o.hr || 9), hy - 2.5, (o.hr || 9) * 2, 3); c.fillStyle = col; c.fillRect(-2.5, hy - (o.hr || 9) - 9, 5, 8); }
-  for (let i = 0; i < 2; i++) if (i === (o.front == null ? 1 : o.front)) { const [hx2, hy2] = hands[i], el = ik(i ? 7 : -7, -12, hx2, hy2, 10, 10, i ? 1 : -1); seg([[i ? 7 : -7, -12], el, [hx2, hy2]], 5, col); }
+  if (o.shadow !== false) { c.beginPath(); c.ellipse(0, 25, 13, 4.4, 0, 0, TAU); c.fillStyle = alpha(OUT, 0.26); c.fill(); }
+  /* piernas: hueso grueso que nace DENTRO del tronco (tangente continua en la cadera) y bota redonda.
+     La rodilla/codo se resuelve con segmentos proporcionales a la distancia: así la articulación se
+     insinúa sin que el hueso se doble sobre sí mismo (y sin bucles que abrirían un hueco). */
+  for (let i = 0; i < 2; i++) {
+    const [fx2, fy2] = feet[i], hx0 = i ? 4.5 : -4.5, kn = joint(hx0, 4, fx2, fy2 - 3, i ? 1 : -1);
+    parts.push([PZ.bone([[hx0, -2], kn, [fx2, fy2 - 2.5]], [6, 4.8, 3.8]), leg]);
+    parts.push([PZ.blob(fx2 + f * 1.8, fy2 - 0.6, 6, 4.4), leg]);
+  }
+  /* brazo de atrás (más oscuro: la separación se lee por valor, nunca por contorno) */
+  for (let i = 0; i < 2; i++) if (i !== fr) {
+    const [hx2, hy2] = hands[i], sx = i ? 7.4 : -7.4, el = joint(sx, -13, hx2, hy2, i ? 1 : -1);
+    parts.push([PZ.bone([[sx, -15], el, [hx2, hy2]], [5.2, 4.2, 3.2]), dark(col, 0.32)]);
+    parts.push([PZ.mitt(hx2, hy2, Math.atan2(hy2 - el[1], hx2 - el[0]), 4.3, i ? 1 : -1), dark(skin, 0.3)]);
+  }
+  parts.push([PZ.box(-8.6, -18, 17.2, 27, 8.4), col]);                   /* tronco compacto */
+  if (o.belt) parts.push([PZ.box(-8.6, 1, 17.2, 5.2, 2.4), '#ffc94d']);
+  parts.push([PZ.blob(0, hy, hr, hr * 1.02), skin]);                      /* cabeza grande */
+  if (o.helm) {                                                           /* yelmo: se hunde en la cabeza */
+    parts.push([(g) => { g.moveTo(-hr - 1.4, hy + 1.5); g.quadraticCurveTo(-hr - 1.4, hy - hr - 3, 0, hy - hr - 3); g.quadraticCurveTo(hr + 1.4, hy - hr - 3, hr + 1.4, hy + 1.5); g.closePath(); }, '#c8ccd8']);
+    parts.push([PZ.box(-2.6, hy - hr - 11, 5.2, 9, 2), col]);
+  } else if (o.hair !== false) {                                          /* pelo: 3 mechones con punta */
+    parts.push([(g) => {
+      g.moveTo(-hr * 0.98, hy + 1);
+      g.quadraticCurveTo(-hr * 1.06, hy - hr * 0.95, -hr * 0.2, hy - hr * 1.02);
+      g.lineTo(-hr * 0.5, hy - hr * 1.5); g.lineTo(hr * 0.1, hy - hr * 1.05);
+      g.lineTo(hr * 0.16, hy - hr * 1.52); g.lineTo(hr * 0.66, hy - hr * 0.92);
+      g.lineTo(hr * 1.02, hy - hr * 1.18); g.quadraticCurveTo(hr * 1.06, hy - hr * 0.4, hr * 0.94, hy - hr * 0.1);
+      g.quadraticCurveTo(0, hy - hr * 0.62, -hr * 0.98, hy + 1); g.closePath();
+    }, dark(col, 0.45)]);
+  }
+  /* brazo de delante: cruza por encima, así que sí es pieza propia (se mueve de verdad) */
+  for (let i = 0; i < 2; i++) if (i === fr) {
+    const [hx2, hy2] = hands[i], sx = i ? 7.4 : -7.4, el = joint(sx, -13, hx2, hy2, i ? 1 : -1);
+    parts.push([PZ.bone([[sx, -15], el, [hx2, hy2]], [5.4, 4.4, 3.4]), col]);
+    parts.push([PZ.mitt(hx2, hy2, Math.atan2(hy2 - el[1], hx2 - el[0]), 4.6, i ? 1 : -1), skin]);
+  }
+  const sil = PZ.unite(c, parts, 1.5);
+  /* volumen en 2 planos de borde duro: un solo recorte contra la silueta ya trazada */
+  PZ.cut(c, sil, (g) => { g.translate(2, 1); g.rotate(-0.5); g.fillStyle = alpha(OUT, 0.17); g.fillRect(-70, 2, 140, 140); });
+  PZ.put(c, faceSpr(hr, f, col, skin, o.mouth || '', !!o.shut), 0, hy);
   if (o.after) o.after();
   c.restore();
 }

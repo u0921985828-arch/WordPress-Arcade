@@ -2,6 +2,27 @@
  * Gemas facetadas con forma y color distintos (accesible), intercambio animado, retirada con destello,
  * caída con rebote, cascadas en combo con texto y partículas, pista tras unos segundos quieto y control con teclado. */
 const W = 480, H = 640, OUT = ART.OUT, k = Kit({ w: W, h: H, title: CFG.title, bg: '#1d1538' }), c = k.ctx, N = 8, S = 56, OX = 16, OY = 146;
+/* ---------- R5 §8 «pieza única» + cartoon de estudio (helpers locales) ----------
+   uni(): contornea TODAS las partes y luego las rellena → solo sobrevive la silueta exterior.
+   celp(): 3 tonos de borde duro (cel shading) recortados a la silueta, sin degradados.
+   spec(): único óvalo especular.  contact(): sombra de contacto dura. */
+function uni(g, parts, ow) {
+  g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = ART.OUT; g.lineWidth = (ow || 1.5) * 2;
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.stroke(); }
+  for (let i = 0; i < parts.length; i++) { g.beginPath(); parts[i][0](g); g.fillStyle = parts[i][1]; g.fill(); }
+}
+function inpath(g, parts, fn) { g.save(); g.beginPath(); for (let i = 0; i < parts.length; i++) parts[i][0](g); g.clip(); fn(g); g.restore(); }
+function celp(g, parts, base, dx, dy) {
+  inpath(g, parts, (h) => {
+    const P = () => { h.beginPath(); for (let i = 0; i < parts.length; i++) parts[i][0](h); h.fill(); };
+    h.fillStyle = ART.dark(base, 0.24); P();
+    h.translate(-dx, -dy); h.fillStyle = base; P();
+    h.translate(-dx * 1.15, -dy * 1.15); h.fillStyle = ART.lite(base, 0.2); P();
+  });
+}
+function spec(g, x, y, rx, ry, rot, a) { g.fillStyle = 'rgba(255,255,255,' + (a == null ? 0.7 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, 6.2832); g.fill(); }
+function contact(g, x, y, rx, ry, a) { g.fillStyle = 'rgba(14,8,30,' + (a == null ? 0.3 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.2832); g.fill(); }
+const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 const GEM = ['#ff4d6d', '#ffd23d', '#4fe08a', '#4cc3ff', '#b77cff', '#ff9a3d'];
 const TIMED = CFG.mode === 'time';
 let queued = null, b, off, vel, sel, score, moves, target, level, time, busy, combo, clearing, swapA, check, cur, kbd, idle, hint, prevT, comboT, comboTxt, lvlT;
@@ -49,15 +70,13 @@ const gemCv = [];
 function gemSprite(v) {
   if (gemCv[v]) return gemCv[v];
   const cv = document.createElement('canvas'); cv.width = cv.height = S * 2; const g = cv.getContext('2d'); g.scale(2, 2); g.translate(S / 2, S / 2);
-  const V = shape(v), col = GEM[v], I = V.map(([x, y]) => [x * 0.5, y * 0.5 - 2]);
-  const poly = (pts) => { g.beginPath(); pts.forEach(([x, y]) => g.lineTo(x, y)); g.closePath(); };
-  g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(0, 22, 18, 5, 0, 0, 6.283); g.fill();
-  poly(V); g.fillStyle = col; g.fill();
-  for (let i = 0; i < V.length; i++) { const j = (i + 1) % V.length, mx = (V[i][0] + V[j][0]) / 2, my = (V[i][1] + V[j][1]) / 2, l = Math.cos(Math.atan2(my, mx) + 2.2);
-    poly([V[i], V[j], I[j], I[i]]); g.fillStyle = l > 0 ? `rgba(255,255,255,${0.35 * l})` : `rgba(20,10,40,${-0.35 * l})`; g.fill(); }
-  poly(I); const gr = g.createLinearGradient(0, -12, 0, 10); gr.addColorStop(0, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,.1)'); g.fillStyle = gr; g.fill();
-  poly(V); g.lineJoin = 'round'; g.lineWidth = 2.6; g.strokeStyle = OUT; g.stroke();
-  g.fillStyle = '#fff'; g.beginPath(); const hx = -8, hy = -11; g.moveTo(hx, hy - 5); g.quadraticCurveTo(hx, hy, hx + 5, hy); g.quadraticCurveTo(hx, hy, hx, hy + 5); g.quadraticCurveTo(hx, hy, hx - 5, hy); g.quadraticCurveTo(hx, hy, hx, hy - 5); g.fill();
+  const V = shape(v), col = GEM[v];
+  const body = (h) => { h.moveTo(V[0][0], V[0][1]); for (let i = 1; i < V.length; i++) h.lineTo(V[i][0], V[i][1]); h.closePath(); };
+  const parts = [[body, col]];
+  contact(g, 0, 22, 17, 4.6, 0.32);
+  uni(g, parts, 1.5);
+  celp(g, parts, col, 5.5, 5.5);
+  spec(g, -7.5, -10.5, 5.2, 3.2, -0.6, 0.78);
   return (gemCv[v] = cv);
 }
 let bgCv;
