@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **250 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2 y 50 de la oleada 3 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.30.1** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.31.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -104,6 +104,13 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
   - `cards.js`: fieltro con moteado y grano, ribete de cuero con costura, cartas con sombra horneada y grano por carta, palos con volumen, figuras J/Q/K dibujadas (manto con pliegues, corona, cara, objeto en la mano), ases con marco ornamental, reverso con celosía. Los índices se dibujan los últimos (si no, el panel de la figura decapitaba la «Q»).
   - `penalty.js`: césped procedural con franjas y desgaste, portería con sombra y red de 22×11, portero con volumen y mirada que sigue el balón, grada en perspectiva con público cacheado por filas, focos y niebla baja.
   - Coste medido: cartas y mazmorra igual o mejor que antes; plataformas +0,4 ms por frame de los 16,7 disponibles.
+- **Rediseño gráfico completo (1.31.0)**: dos leyes de proyecto en `docs/REMASTER.md`.
+  - **§8 Ley de la pieza única**: todo objeto que el jugador lee como una cosa se dibuja como **un solo trazo continuo**, rellenado una vez y contorneado una vez; ningún contorno cerrado dentro. Solo se separa lo que se mueve de verdad (rueda, torreta, hélice, vela, paño de bandera, arma). Separaciones internas por sombra propia (~16 % más oscuro) o cambio de color, nunca por `stroke`. Prueba de aceptación: **la mancha negra** (el objeto en negro puro sobre blanco debe leerse como ese objeto). Aplicada a los **80 motores**.
+  - **Cartoon de estudio**: proporción ~1:2,2–2,4 (cabeza grande), manos manopla con pulgar, **párpado superior recto**, cejas gruesas móviles, pelo en mechones, máximo **3 tonos por pieza con borde duro** (cel shading, no degradados difusos), un óvalo especular y sombra de contacto dura, contorno `#1a1530` ~1,4–1,6 px silueta / 0,7 interior. Pruebas: mancha negra, miniatura a 32 px, hoja de expresiones y escala de grises.
+  - Cachés obligatorias: sprite por objeto/pose a `Math.min(2, devicePixelRatio)`; nada de `shadowBlur`, `filter` ni gradientes creados dentro del bucle; **nunca `source-atop` sobre el lienzo vivo** (fuerza composición a pantalla completa, 11–18 ms/frame); evitar `ctx.save()` con un clip activo (copia la pila de clips).
+  - Resultado medido: personajes de `art.js` 5,39 → 2,29 ms (2,4× más rápido), `topdown` 4,86 → 4,25, `caseta-de-tiro` −80 %, `drone-flight` 8,9 → 6,0. Ningún motor empeora de forma apreciable.
+  - Caché: `kit.js?v=20`, `art.js?v=14`.
+- **Dificultad seleccionable (1.31.0)**: `k.dif` (0 fácil / 1 normal / 2 difícil) y `k.D {spd,rate,dmg,life,cpu,time}`; selector en la pantalla de inicio y en el menú de pausa; se recuerda en `localStorage` (`dif:<id>`), récords por nivel (`best:<id>`, `@f`, `@d`, clave con `k.bkey(id)`); en el modo tele por `arcade:dif {v}`.
 - **Universo Kuboplay (plan, `docs/PLAN-UNIVERSO.md`)**: mundo común (Kubo, el Prisma roto, 8 regiones = los 8 temas de `art.js`), elenco recurrente (Kubo, Pila, Ñam, Doña Grulla, el Vacío) y cuatro líneas de estructura pedidas por el usuario: niveles con jefe, misiones + medallas + fragmentos, escenarios diseñados a mano y torneo en el modo tele. Fases U1–U5 pendientes.
 - Todos los motores cargan `art.js` (`deps_of` en build_games.py).
 
