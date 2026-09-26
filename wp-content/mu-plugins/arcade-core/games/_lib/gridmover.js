@@ -83,7 +83,9 @@ function paintOwn() {
 /* Dificultad 0→1 por ronda (máximo en la 9): paso de las motos, visión de la IA, número y velocidad de chispas. */
 const DF = () => Math.min(1, (round - 1) / 12), // 1.23: más fácil (antes máximo en la ronda 9; paso 0,11→0,05, IA 60→300, chispas 5→11)
   lerp = (a, b, q) => a + (b - a) * q;
-const STEP = () => TRAILS ? lerp(0.1375, 0.059, DF()) : 0.065;
+const STEP = () => (TRAILS ? lerp(0.1375, 0.059, DF()) : 0.065) / k.D.spd; /* paso más corto = más rápido */
+/* dificultad de la IA y de las chispas: la rampa se desplaza con k.D.cpu (fácil −0,2 · difícil +0,2) */
+const DFA = () => k.clamp(DF() + k.D.cpu * 0.2, 0, 1);
 function newRound() {
   g = Array.from({ length: N }, () => Array(N).fill(0)); acc = 0; count = MP ? 0 : 2.4; cdPend = !!MP; rT = 0; between = 0; dying = 0; booms = []; freshT = 0; respawn = 0; tc.clearRect(0, 0, 480, 480); hc.clearRect(0, 0, 480, 480);
   if (TRAILS) {
@@ -95,10 +97,10 @@ function newRound() {
   } else {
     for (let y = 21; y < 27; y++) for (let x = 21; x < 27; x++) g[y][x] = 1;
     bikes = [{ x: 23, y: 26, px: 23, py: 26, d: null, ld: null, me: true, alive: true, trail: [] }];
-    sparks = Array.from({ length: Math.min(5, 1 + Math.floor(round / 3)) }, () => newSpark()); pct = 36 / (N * N) * 100; paintOwn(); fc.clearRect(0, 0, 480, 480);
+    sparks = Array.from({ length: Math.max(1, Math.round(Math.min(5, 1 + Math.floor(round / 3)) * k.D.rate)) }, () => newSpark()); pct = 36 / (N * N) * 100; paintOwn(); fc.clearRect(0, 0, 480, 480);
   }
 }
-function newSpark() { const me = bikes && bikes[0]; for (let i = 0; i < 60; i++) { const x = k.rnd(2, N - 2), y = k.rnd(2, N - 2); if (g[Math.floor(y)][Math.floor(x)]) continue; if (me && Math.hypot(x - me.x, y - me.y) < 14) continue; const v = lerp(4, 9.3, DF()); return { x, y, vx: k.pick([-1, 1]) * k.rnd(0.7, 1.2) * v, vy: k.pick([-1, 1]) * k.rnd(0.7, 1.2) * v, tail: [] }; } return { x: 2, y: 2, vx: 6, vy: 6, tail: [] }; }
+function newSpark() { const me = bikes && bikes[0]; for (let i = 0; i < 60; i++) { const x = k.rnd(2, N - 2), y = k.rnd(2, N - 2); if (g[Math.floor(y)][Math.floor(x)]) continue; if (me && Math.hypot(x - me.x, y - me.y) < 14) continue; const v = lerp(4, 9.3, DF()) * k.D.spd; return { x, y, vx: k.pick([-1, 1]) * k.rnd(0.7, 1.2) * v, vy: k.pick([-1, 1]) * k.rnd(0.7, 1.2) * v, tail: [] }; } return { x: 2, y: 2, vx: 6, vy: 6, tail: [] }; }
 function reset() { MP = TRAILS && k.party && k.party.length >= 2 ? k.party.slice(0, 4) : null;
   /* con 2 jugadores, en esquinas opuestas del molinete */
   SLOTS = MP ? (MP.length === 2 ? [MP[0].p, null, MP[1].p, null] : [0, 1, 2, 3].map((i) => (MP[i] ? MP[i].p : null))) : null;
@@ -144,7 +146,7 @@ k.run((dt) => {
   if (k.counting()) { acc = 0; return; }
   if (count > 0) { const c0 = Math.ceil(count / 0.8); count -= dt; const c1 = Math.ceil(count / 0.8); if (c1 !== c0) k.sfx(c1 > 0 ? 'click' : 'start'); if (count > 0) return; acc = 0; goT = 0.6; }
   if (MP) rT += dt;
-  const step = MP ? Math.max(0.06, 0.09 - rT * 0.001) : STEP(), /* fiesta: la ronda acelera poco a poco (0,09 → 0,06 s por casilla en 30 s) */ look = Math.round(lerp(40, 240, DF())), noise = lerp(13, 5, DF());
+  const step = MP ? Math.max(0.06, 0.09 - rT * 0.001) : STEP(), /* fiesta: la ronda acelera poco a poco (0,09 → 0,06 s por casilla en 30 s) */ look = Math.round(lerp(40, 240, DFA())), noise = lerp(13, 5, DFA());
   if (!TRAILS) {
     for (const s of sparks) {
       s.tail.unshift([s.x, s.y]); if (s.tail.length > 7) s.tail.pop();

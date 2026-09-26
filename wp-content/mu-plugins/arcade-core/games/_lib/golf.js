@@ -1,8 +1,10 @@
 /* Minigolf con arte propio. CFG.mode: 'walls' (Mini Golf 3D: recorridos con paredes de madera) | 'island' (Putt Island: isla rodeada de agua)
  * | 'party' (Minigolf Party: 1–4 por turnos en horizontal, molinos, cintas y rampas sobre estanques; ver partyMain al final)
  * 9 hoyos, par 3, máximo 8 golpes por hoyo. Arrastra hacia atrás (desde cualquier punto) o flechas + A. Vista previa del primer tramo del tiro. */
-const M = CFG.mode, PARTY = M === 'party', OUT = ART.OUT, R2 = 6.2832, W = PARTY ? 640 : 360, H = PARTY ? 360 : 640, T = PARTY ? 29 : 30, COLS = PARTY ? 22 : 12, ROWS = PARTY ? 11 : 20, OY = PARTY ? 40 : 22, MAXS = PARTY ? 6 : 8, PAR = 3;
+const M = CFG.mode, PARTY = M === 'party', OUT = ART.OUT, R2 = 6.2832, W = PARTY ? 640 : 360, H = PARTY ? 360 : 640, T = PARTY ? 29 : 30, COLS = PARTY ? 22 : 12, ROWS = PARTY ? 11 : 20, OY = PARTY ? 40 : 22, MAXS0 = PARTY ? 6 : 8, PAR = 3;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: M === 'island' ? '#1d6fb3' : '#23402b' }), c = k.ctx;
+/* Dificultad seleccionable: en normal life=0, rate=1 y cpu=0 → todo queda igual que siempre. */
+const MAXS = MAXS0 + k.D.life, DC = k.D.cpu;
 const TOPR = 2; // primera fila jugable: la franja superior queda libre para el marcador (la bandera no se tapa)
 let grid, ball, hole, tee, holeN, strokes, total, pars, aiming, sunkT, lastPos, bumpers, sand, card, state, stT, course, kAng, kPow, kb, t = 0, msg, msgT, lastBump = 0;
 function genHole() {
@@ -15,7 +17,7 @@ function genHole() {
     if (Math.hypot(tee[0] - hole[0], tee[1] - hole[1]) < 200) continue;
     for (let i = 0; i < 1 + Math.floor(holeN / 3); i++) { const r = k.pick(rooms.slice(1, -1).length ? rooms.slice(1, -1) : rooms); const bx = (r[0] + k.rnd(1, r[2] - 1)) * T, by = (r[1] + k.rnd(1, r[3] - 1)) * T; if (Math.hypot(bx - hole[0], by - hole[1]) > 60 && Math.hypot(bx - tee[0], by - tee[1]) > 60) bumpers.push({ x: bx, y: by, r: 14, p: 0 }); }
     // búnkeres de arena: siempre en la isla, desde el hoyo 4 en paredes (nunca bajo el tee ni el hoyo)
-    const ns = M === 'island' ? Math.min(5, 1 + Math.floor(holeN * 0.67)) : holeN >= 5 ? 3 : 0;
+    const ns = Math.round((M === 'island' ? Math.min(5, 1 + Math.floor(holeN * 0.67)) : holeN >= 5 ? 3 : 0) * k.D.rate);
     for (let i = 0; i < ns; i++) { const x = k.ri(0, COLS - 1), y = k.ri(0, ROWS - 1); if (grid[y][x] && Math.hypot((x + 0.5) * T - tee[0], (y + 0.5) * T - tee[1]) > 40 && Math.hypot((x + 0.5) * T - hole[0], (y + 0.5) * T - hole[1]) > 40) sand.add(x + ',' + y); }
     return;
   }
@@ -338,8 +340,8 @@ function partyMain() {
       for (let a = 0; a < 36; a++) for (const p of POW) ai.c.push([base + (a + 0.5) * R2 / 36, p]); }
     if (ai.i < ai.c.length) { const t0 = performance.now();
       while (ai.i < ai.c.length && performance.now() - t0 < 6) { const [a, p] = ai.c[ai.i++], sc = simShot(B, a, p, ai.at - t); ai.top.push([a, p, sc]); }
-      if (ai.i >= ai.c.length) { ai.top.sort((x, y) => x[2] - y[2]); const pool = ai.top.filter((x) => x[2] < ai.top[0][2] + 50).slice(0, lvl < 2 ? 3 : 1), ch = k.pick(pool);
-        const eA = 0.12 - lvl * 0.013, eP = 0.16 - lvl * 0.017; /* 1.23: CPU más fallona */ ai.ta = ch[0] + k.rnd(-1, 1) * eA; ai.tp = k.clamp(ch[1] * (1 + k.rnd(-1, 1) * eP), 0.08, 1); ai.ready = true; }
+      if (ai.i >= ai.c.length) { ai.top.sort((x, y) => x[2] - y[2]); const lv = k.clamp(lvl + DC, -1.5, 6.5), pool = ai.top.filter((x) => x[2] < ai.top[0][2] + 50).slice(0, lv < 2 ? 3 : 1), ch = k.pick(pool);
+        const eA = 0.12 - lv * 0.013, eP = 0.16 - lv * 0.017; /* 1.23: CPU más fallona */ ai.ta = ch[0] + k.rnd(-1, 1) * eA; ai.tp = k.clamp(ch[1] * (1 + k.rnd(-1, 1) * eP), 0.08, 1); ai.ready = true; }
       return; }
     let d = Math.atan2(Math.sin(ai.ta - aimA), Math.cos(ai.ta - aimA)); aimA += Math.sign(d) * Math.min(Math.abs(d), dt * 4);
     chg = true; pw = ai.tp * k.clamp(1 - (ai.at - t) / 0.8, 0, 1);

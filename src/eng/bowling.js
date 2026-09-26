@@ -3,6 +3,8 @@
  * Teclado: ← → colocar, ↑ ↓ ángulo, A lanzar. 10 frames con puntuación oficial (strike, spare y décimo frame con bolas extra). */
 const TURN = CFG.mode === 'turnos', OUT = ART.OUT, R2 = 6.2832, W = TURN ? 640 : 360, H = TURN ? 360 : 640, PCX = W / 2;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#1a1230' }), c = k.ctx;
+/* Dificultad seleccionable: NOISE = 1 en normal → la pista se comporta exactamente igual que siempre. */
+const NOISE = 1 + k.D.cpu * 0.35;
 const LANE_W = 62, GUT = 13, LANE_L = 1800, PIT = 1660, BR = 11, PR = 6, PH = 38, F = 520, HY = TURN ? 66 : 96, BASE = TURN ? 352 : 610, SC = TURN ? 1.7 : 2.45, PS = 2.6;
 let pins, ball, frames, frame, roll, state, standing, msg, msgT, msgC, aimX, aimA, cam, t = 0, kb, path, downT, strikes, spares, sweepT, pinSpr, ballSpr;
 let PL = [], seats = [], cur = 0, pw = 0, pwOn = false, pwT = 0, hookS = 0, introT = 0, aimT = 0, plan = null, lvlB = 0; // modo por turnos

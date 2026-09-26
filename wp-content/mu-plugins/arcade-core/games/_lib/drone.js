@@ -40,10 +40,11 @@ function spec(g, x, y, rx, ry, rot, a) { g.fillStyle = `rgba(255,255,255,${a == 
 function contact(g, x, y, rx, ry, a) { g.fillStyle = `rgba(12,10,26,${a == null ? 0.3 : a})`; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.283); g.fill(); }
 /* Dificultad: de 600 a 1400 u/s en ~3,5 min (suavizado); anillos más juntos, pequeños y desplazados con el progreso.
  * Antes: 900 u/s + 8/s sin tope, separación 900→600 y radio 140→90 a los 80-100 s. */
-const V0 = 480, V1 = 1190, DIF = () => { const d = Math.min(1, t / 315); // 1.23: más fácil (antes 600→1400 en 210 s)
+const V0 = 480 * k.D.spd, V1 = 1190 * k.D.spd, DIF = () => { const d = Math.min(1, t / 315); // 1.23: más fácil (antes 600→1400 en 210 s)
   return d * d * (3 - 2 * d); };
+const LIVES0 = 4 + k.D.life;   // batería: una más en fácil
 let d, rings, z, speed, score, lives, t, combo, parts, camX, camY, streaks, passed;
-function reset() { d = { x: 0, y: 0, vx: 0, vy: 0 }; rings = []; z = 0; speed = V0; score = 0; lives = 4; t = 0; combo = 0; parts = []; camX = 0; camY = -50; streaks = []; passed = 0;
+function reset() { d = { x: 0, y: 0, vx: 0, vy: 0 }; rings = []; z = 0; speed = V0; score = 0; lives = LIVES0; t = 0; combo = 0; parts = []; camX = 0; camY = -50; streaks = []; passed = 0;
   // arranque justo: el primer anillo está frente al dron y los siguientes se separan poco a poco
   let rz = 2300, rx = 0, ry = 0; for (let i = 0; i < 12; i++) { const sc = Math.min(1, i / 5); rx = k.clamp(rx + k.rnd(-260, 260) * sc, -500, 500); ry = k.clamp(ry + k.rnd(-160, 160) * sc, -260, 260); rings.push({ x: rx, y: ry, z: rz, r: i < 3 ? 170 : 140 }); rz += i < 3 ? 1100 : 900; } }
 reset(); k.show(CFG.title, 'Guía el dron a través de los anillos. Arrastra o usa las flechas. Pasar cerca del centro da más puntos y encadena combos.');
@@ -109,7 +110,7 @@ k.run((dt) => {
   // flecha hacia el próximo anillo si queda fuera de la vista
   if (next && k.st === 'play') { const [nx, ny] = P(next.x, next.y, next.z); if (nx < 20 || nx > 620 || ny < 20 || ny > 340) { const a = Math.atan2(ny - 180, nx - 320), ex = k.clamp(nx, 30, 610), ey = k.clamp(ny, 50, 330); c.save(); c.translate(ex, ey); c.rotate(a); c.beginPath(); c.moveTo(14, 0); c.lineTo(-8, -10); c.lineTo(-8, 10); c.closePath(); ART.fillOut(c, '#f2d15c', 2.5); c.restore(); } }
   // HUD
-  label(`${score}`, 14, 10, 26); for (let i = 0; i < 4; i++) battery(626 - 34 - i * 40, 14, i < lives);
+  label(`${score}`, 14, 10, 26); for (let i = 0; i < LIVES0; i++) battery(626 - 34 - i * 40, 14, i < lives);
   if (combo > 1) label(`Combo x${combo}`, 320, 56, 18, '#f2d15c', 'center');
 });
 /* la pila es un cuerpo con su borne, no dos rectángulos encajados */

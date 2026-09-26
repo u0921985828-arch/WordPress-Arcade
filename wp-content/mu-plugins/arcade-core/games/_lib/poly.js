@@ -28,8 +28,9 @@ const later = (fn, ms) => setTimeout(function f() { if (k.paused) setTimeout(f, 
 const COL = ['#ff6b6b', '#5ce1e6', '#ffd23d', '#7cf7a0', '#b98cff', '#ffa94d', '#ff9ad5', '#6c8cff'];
 let TS = 26, N, S, OX, OY = 84, pieces, level, drag, done, score, mask, bgCv, t = 0, doneT = 0, kbs = null, moves = 0;
 function build() {
-  N = Math.min(7, 4 + Math.floor(level / 3)); S = Math.floor(300 / N); OX = Math.floor((W - N * S) / 2); done = false; doneT = 0; kbs = null; moves = 0; bgCv = null;
-  const own = Array.from({ length: N }, () => Array(N).fill(-1)); const np = Math.min(8, 3 + Math.floor(N * N / 7), 3 + Math.floor((level - 1) * 0.6)); /* 1.23: niveles 1-2: 3 piezas, sube más despacio */ const seeds = k.shuffle([...Array(N * N).keys()]).slice(0, np);
+  /* Dificultad: el cuadro de partida y una pieza menos o más. */
+  N = Math.min(7, (k.dif === 2 ? 5 : 4) + Math.floor(level / 3)); S = Math.floor(300 / N); OX = Math.floor((W - N * S) / 2); done = false; doneT = 0; kbs = null; moves = 0; bgCv = null;
+  const own = Array.from({ length: N }, () => Array(N).fill(-1)); const np = k.clamp(Math.min(8, 3 + Math.floor(N * N / 7), 3 + Math.floor((level - 1) * 0.6)) + (k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0), 2, 9); /* 1.23: niveles 1-2: 3 piezas, sube más despacio */ const seeds = k.shuffle([...Array(N * N).keys()]).slice(0, np);
   seeds.forEach((s, i) => (own[Math.floor(s / N)][s % N] = i));
   let changed = true; while (changed) { changed = false; for (const [y, x] of k.shuffle([...Array(N * N).keys()].map((i) => [Math.floor(i / N), i % N]))) { if (own[y][x] >= 0) continue; const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => own[y + dy] && own[y + dy][x + dx]).filter((v) => v !== undefined && v >= 0); if (nb.length) { own[y][x] = k.pick(nb); changed = true; } } }
   pieces = []; for (let i = 0; i < np; i++) { const cells = []; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (own[y][x] === i) cells.push([x, y]); if (!cells.length) continue; const mx = Math.min(...cells.map((q) => q[0])), my = Math.min(...cells.map((q) => q[1])); let sh = cells.map(([x, y]) => [x - mx, y - my]); for (let r = k.ri(0, 3); r > 0; r--) sh = rot(sh); pieces.push({ sh, col: COL[i % COL.length], bx: null, by: null, tx: 0, ty: 0, rx: null, ry: null, rs: TS, ang: 0, pop: 0 }); }
@@ -45,6 +46,7 @@ function layoutTray() { const top = OY + N * S + 34, list = pieces.filter((p) =>
 function occupied(except) { const s = new Set(); for (const p of pieces) if (p !== except && p.bx !== null) for (const [x, y] of p.sh) s.add((p.bx + x) + ',' + (p.by + y)); return s; }
 const fits = (p, gx, gy) => { const occ = occupied(p); return p.sh.every(([x, y]) => gx + x >= 0 && gy + y >= 0 && gx + x < N && gy + y < N && !occ.has((gx + x) + ',' + (gy + y))); };
 function reset() { if (!level) { level = 1; score = 0; } build(); }
+k.onDif = () => { if (k.st !== 'play') { level = 1; score = 0; build(); } };
 reset(); k.show(CFG.title, 'Arrastra las piezas al cuadrado hasta llenarlo. Toca una pieza para girarla. Teclado: A coge / suelta, flechas mueven, B gira.');
 function snap(p) { p.pop = 1; moves++; k.sfx('pop'); const cx = OX + (p.bx + pw(p) / 2) * S, cy = OY + (p.by + ph(p) / 2) * S; k.burst(cx, cy, p.col, 10, 110); checkDone(); }
 function checkDone() { if (pieces.every((q) => q.bx !== null) && !done) { done = true; doneT = 0; const gain = 150 * level; score += gain; k.best(CFG.id, score); k.float('+' + gain, W / 2, OY + N * S + 40, '#ffd23d');

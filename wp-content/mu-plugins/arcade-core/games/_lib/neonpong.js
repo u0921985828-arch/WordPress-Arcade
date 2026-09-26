@@ -82,7 +82,7 @@ function renderArena() {
 function newPad(side) { return { y: FH / 2, vy: 0, h: 70, th: 70, longT: 0, shield: false, hitT: 0, side }; }
 function serve() { balls = []; serveT = 0.9; }
 function launch() {
-  const a = k.rnd(-0.45, 0.45), v = 200 + Math.min(rival - 1, 12) * 11; // 1.23: más fácil (250→200)
+  const a = k.rnd(-0.45, 0.45), v = (200 + Math.min(rival - 1, 12) * 11) * k.D.spd; // 1.23: más fácil (250→200) · k.D.spd: bola más lenta en fácil
   balls.push({ x: FW / 2, y: FH / 2 + k.rnd(-40, 40), vx: Math.cos(a) * v * serveDir, vy: Math.sin(a) * v, spin: 0, last: null, trail: [], rot: 0, smash: 0 });
   k.sfx('jump');
 }
@@ -104,7 +104,7 @@ function grant(side, kind) {
 }
 
 /* ---------- IA ---------- */
-const LV = () => Math.min(9, 1 + (rival - 1) * 0.67); // 1.23: la IA sube de nivel más despacio
+const LV = () => k.clamp(1 + (rival - 1) * 0.67 + k.D.cpu, 0, 9); // 1.23: la IA sube de nivel más despacio · k.D.cpu: ±1 nivel de rival
 function aiTarget() {
   let best = null, bt = 1e9;
   for (const b of balls) if (b.vx > 0) { const tt = (AX - PWID / 2 - BR - b.x) / b.vx; if (tt < bt) { bt = tt; best = b; } }
@@ -123,7 +123,7 @@ function hitPad(b, p, px, dir) {
   if (!(dir > 0 ? b.vx < 0 && b.x <= plane && prevX >= plane - 30 : b.vx > 0 && b.x >= plane && prevX <= plane + 30)) return;
   if (Math.abs(b.y - p.y) > p.h / 2 + BR) return;
   const o = k.clamp((b.y - p.y) / (p.h / 2), -1, 1), spd = Math.hypot(b.vx, b.vy), smash = Math.abs(p.vy) > 650;
-  const nv = Math.min(510 + Math.min(rival - 1, 12) * 22, spd * 1.045 + (smash ? 90 : 0)), a = o * 1.0;
+  const nv = Math.min((510 + Math.min(rival - 1, 12) * 22) * k.D.spd, spd * 1.045 + (smash ? 90 : 0)), a = o * 1.0;
   b.vx = Math.cos(a) * nv * dir; b.vy = Math.sin(a) * nv; b.x = plane; b.last = p.side;
   b.spin = k.clamp(p.vy / 1500, -0.7, 0.7); b.smash = smash ? 1 : 0; p.hitT = 0.18;
   const [sx, sy] = S(b.x, b.y); k.burst(sx, sy, COL[p.side], smash ? 16 : 8, smash ? 220 : 120);

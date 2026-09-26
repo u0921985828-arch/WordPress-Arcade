@@ -57,7 +57,9 @@ function label(s, x, y, size, col, align, base) {
 const fmtT = (t) => { t = Math.max(0, t); const m = Math.floor(t / 60), s = t - m * 60; return `${m}:${s < 10 ? '0' : ''}${s.toFixed(1)}`; };
 const ORD = (n) => n + '.º', CN = ['roja', 'azul', 'amarilla', 'verde'];
 let CUP = 0; try { CUP = clamp(+localStorage.getItem('cup:' + CFG.id) || 0, 0, 5); } catch (e) { /* sin almacenamiento */ }
-const skill = () => clamp(0.3 + CUP * 0.06, 0.3, 0.6);
+/* Dificultad seleccionable: DC = 0 en normal → la CPU baja exactamente igual que siempre. */
+const DC = k.D.cpu, BTK = 'bt:' + CFG.id + k.bkey('').replace('best:', ''); // récord de tiempo separado por nivel
+const skill = () => clamp(clamp(0.3 + CUP * 0.06, 0.3, 0.6) + DC * 0.07, 0.18, 0.72);
 
 /* ---------- Pistas ---------- */
 const CW = 360, NETL = 16, NETR = CW - 16; /* slalom: pista recta de 360 de ancho con redes a los lados */
@@ -300,7 +302,7 @@ function surfaceOf(r) {
 }
 function vFactor(r) {
   let f = 1;
-  if (r.cpu) { f = (0.84 + CUP * 0.014) * r.spd; const hs = humans(); if (hs.length) { const h = hs.reduce((a, b) => (b.y > a.y ? b : a)); f *= 1 + clamp((h.y - r.y) / 3000, -0.08, 0.05); } }
+  if (r.cpu) { f = (0.84 + CUP * 0.014 + DC * 0.05) * r.spd; const hs = humans(); if (hs.length) { const h = hs.reduce((a, b) => (b.y > a.y ? b : a)); f *= 1 + clamp((h.y - r.y) / 3000, -0.08, 0.05); } }
   return f * lerp(0.9, 1, clamp(run / (RUNS - 1), 0, 1));
 }
 function step(r, dt) {
@@ -440,7 +442,7 @@ function finish() {
   if (!k.party || hw) { CUP = clamp(CUP + (hw ? 1 : k.party ? 0 : -1), 0, 5); try { localStorage.setItem('cup:' + CFG.id, CUP); } catch (e) { /* sin almacenamiento */ } }
   let head = null;
   if (!k.party) { const me = racers[0];
-    if (SL) { let b = 0; try { b = +localStorage.getItem('bt:' + CFG.id) || 0; if (!b || total(me) < b) localStorage.setItem('bt:' + CFG.id, total(me).toFixed(1)); } catch (e) { /* sin almacenamiento */ } if (b && total(me) < b) head = '¡Récord personal!'; }
+    if (SL) { let b = 0; try { b = +localStorage.getItem(BTK) || 0; if (!b || total(me) < b) localStorage.setItem(BTK, total(me).toFixed(1)); } catch (e) { /* sin almacenamiento */ } if (b && total(me) < b) head = '¡Récord personal!'; }
     else k.best(CFG.id, me.pts); }
   if (!head) head = hw && !k.party ? (SL ? '¡Oro en el slalom!' : '¡La copa es tuya!') : champ.cpu ? `¡Gana la ${champ.name}!` : null;
   k.podium(rows, Object.assign(SL ? { asc: true, fmt: (n) => fmtT(n / 10) } : { fmt: (n) => `${n} punto${n === 1 ? '' : 's'}` }, head ? { head } : {}));

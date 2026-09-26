@@ -122,7 +122,7 @@ function build() {
   k.shuffle(dead); k.shuffle(free); const pick = dead.concat(free.filter((q) => !dead.includes(q)));
   crystals = []; for (const [x, y] of pick) { if (crystals.length === 3) break; if (crystals.every((q) => Math.abs(q.x - x - 0.5) + Math.abs(q.y - y - 0.5) > 4)) crystals.push({ x: x + 0.5, y: y + 0.5, col: GEM[crystals.length], got: false }); }
   for (const [x, y] of pick) { if (crystals.length === 3) break; if (!crystals.some((q) => q.x === x + 0.5 && q.y === y + 0.5)) crystals.push({ x: x + 0.5, y: y + 0.5, col: GEM[crystals.length], got: false }); }
-  oilMax = oil = Math.round(68 + N * N * 0.6); /* 1.23: +50 % de aceite */ seen = Array.from({ length: N }, () => Array(N).fill(false)); mapDirty = true; walk = 0; bannerT = 2.2; fade = 1;
+  oilMax = oil = Math.round((68 + N * N * 0.6) * k.D.time); /* 1.23: +50 % de aceite · k.D.time: más farol en fácil, menos en difícil */ seen = Array.from({ length: N }, () => Array(N).fill(false)); mapDirty = true; walk = 0; bannerT = 2.2; fade = 1;
 }
 function reset() { level = 1; score = 0; build(); }
 reset(); k.show(CFG.title, 'Encuentra los 3 cristales para abrir el portal y sal antes de que se apague el farol. Cada cristal da más aceite. Flechas o WASD: andar y girar. Táctil: arrastra como un joystick.');
@@ -143,7 +143,7 @@ k.run((dt) => {
   if (mv) walk += dt * 9 * Math.abs(mv);
   for (let y = Math.floor(py) - 2; y <= Math.floor(py) + 2; y++) for (let x = Math.floor(px) - 2; x <= Math.floor(px) + 2; x++) if (g[y] && g[y][x] !== undefined && !seen[y][x] && Math.hypot(x + 0.5 - px, y + 0.5 - py) < 2.6) { seen[y][x] = true; mapDirty = true; }
   for (const cr of crystals) if (!cr.got && Math.hypot(cr.x - px, cr.y - py) < 0.54) {
-    cr.got = true; got++; oil = Math.min(oilMax + 30, oil + 15); score += 100 * level; k.sfx('coin'); navigator.vibrate && navigator.vibrate(25); k.flash(cr.col + '55'); k.burst(W / 2, H / 2, cr.col, 24, 220); k.float(`+${100 * level}`, W / 2, H / 2 - 30, cr.col);
+    cr.got = true; got++; oil = Math.min(oilMax + 30, oil + 15 * k.D.time); score += 100 * level; k.sfx('coin'); navigator.vibrate && navigator.vibrate(25); k.flash(cr.col + '55'); k.burst(W / 2, H / 2, cr.col, 24, 220); k.float(`+${100 * level}`, W / 2, H / 2 - 30, cr.col);
     if (got === 3) { k.sfx('win'); setTimeout(() => k.float('¡Portal abierto!', W / 2, H / 2 + 10, '#7cf7a0'), 350); mapDirty = true; }
   }
   if (got === 3 && Math.hypot(N - 1.5 - px, N - 1.5 - py) < 0.55) {

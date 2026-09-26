@@ -30,7 +30,7 @@ function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Ma
 const clue = (line) => { const r = []; let n = 0; for (const v of line) { if (v) n++; else if (n) { r.push(n); n = 0; } } if (n) r.push(n); return r.length ? r : [0]; };
 function build() {
   const d = new Date(); seedR = CFG.daily ? mulberry(d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate() + puzzle * 7919) : Math.random;
-  const fill = Math.max(0.6, 0.74 - puzzle * 0.025); /* 1.23: más lleno al principio */ /* primeros puzzles más llenos (bloques largos, más fáciles de deducir) */
+  const fill = Math.max(k.dif === 0 ? 0.66 : k.dif === 2 ? 0.55 : 0.6, (k.dif === 0 ? 0.8 : k.dif === 2 ? 0.68 : 0.74) - puzzle * 0.025); /* 1.23: más lleno al principio */ /* primeros puzzles más llenos (bloques largos, más fáciles de deducir) */
   sol = Array.from({ length: N }, () => Array.from({ length: N }, () => seedR() < fill));
   for (const r of sol) for (let x = 0; x < N >> 1; x++) r[N - 1 - x] = r[x]; // simetría especular: el resultado parece un dibujo
   grid = Array.from({ length: N }, () => Array(N).fill(0)); rows = sol.map(clue); cols = sol[0].map((_, x) => clue(sol.map((r) => r[x]))); solved = false;
@@ -80,6 +80,7 @@ function cellSprite(col) {
 }
 function cross(x, y, s, col, lw) { c.strokeStyle = col; c.lineWidth = lw; c.lineCap = 'round'; c.beginPath(); c.moveTo(x - s, y - s); c.lineTo(x + s, y + s); c.moveTo(x + s, y - s); c.lineTo(x - s, y + s); c.stroke(); }
 
+k.onDif = () => { if (k.st !== 'play') build(); };
 reset(); k.show(CFG.title, 'Rellena las casillas según las pistas: cada número es un bloque seguido de casillas pintadas. Elige Pintar o Marcar y toca o arrastra. Teclado: flechas, A pinta, B marca.');
 k.run((dt) => {
   pulse.r = pulse.r.map((v) => Math.max(0, v - dt * 2)); pulse.c = pulse.c.map((v) => Math.max(0, v - dt * 2));

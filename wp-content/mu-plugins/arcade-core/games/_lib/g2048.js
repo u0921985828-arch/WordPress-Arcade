@@ -33,7 +33,9 @@ const CELL = 90, R = 50, SQ3 = Math.sqrt(3);
 function px(cl) { if (!HEX) return [91 + cl[0] * 100, 183 + cl[1] * 100]; return [240 + R * SQ3 * (cl[0] + cl[1] / 2), 335 + R * 1.5 * cl[1]]; }
 function build() { cells = []; if (HEX) { for (let q = -2; q <= 2; q++) for (let r = -2; r <= 2; r++) if (Math.abs(q + r) <= 2) cells.push([q, r]); } else for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) cells.push([x, y]); }
 const key = (a) => a[0] + ',' + a[1];
-function add() { const empty = cells.filter((cl) => !tiles[key(cl)]); if (!empty.length) return; const cl = k.pick(empty), v = Math.random() < 0.9 ? 2 : 4; tiles[key(cl)] = { v, dv: v, from: px(cl), a: 1, pop: 0, grow: -0.1 }; }
+/* Dificultad: la probabilidad de que salga un 4 (fácil 5 %, normal 10 %, difícil 20 %). */
+const P2 = () => (k.dif === 0 ? 0.95 : k.dif === 2 ? 0.8 : 0.9);
+function add() { const empty = cells.filter((cl) => !tiles[key(cl)]); if (!empty.length) return; const cl = k.pick(empty), v = Math.random() < P2() ? 2 : 4; tiles[key(cl)] = { v, dv: v, from: px(cl), a: 1, pop: 0, grow: -0.1 }; }
 
 /* ---------- Gráficos cacheados ---------- */
 function shade(hex, f) { const n = parseInt(hex.slice(1), 16); let r = n >> 16, g = (n >> 8) & 255, b = n & 255; const t = f < 0 ? 0 : 255, p = Math.abs(f); r = Math.round((t - r) * p + r); g = Math.round((t - g) * p + g); b = Math.round((t - b) * p + b); return `rgb(${r},${g},${b})`; }
@@ -96,6 +98,7 @@ function slide(d) {
 }
 function canMove() { if (cells.some((cl) => !tiles[key(cl)])) return true; const dirs = HEX ? HX_D : Object.values(SQ_D); return cells.some((cl) => dirs.some(([dx, dy]) => { const o = tiles[key([cl[0] + dx, cl[1] + dy])]; return o && o.v === tiles[key(cl)].v; })); }
 function reset() { build(); tiles = {}; score = 0; anim = 0; ghosts = []; overT = 0; nudge = [0, 0]; moves = 0; bestV = k.best(CFG.id, 0); add(); add(); if (!bgCv) bgCv = makeBg(); }
+k.onDif = () => { if (k.st !== 'play') reset(); };
 reset(); k.show(CFG.title, HEX ? 'Desliza en 6 direcciones (teclado: flechas + Q E Z C; mando: flechas, A arriba-derecha y B abajo-izquierda) para unir fichas iguales.' : 'Desliza o usa las flechas para unir fichas iguales. Llega a 2048.');
 const HEXKEY = { KeyQ: 2, KeyE: 1, KeyZ: 4, KeyC: 5 };
 addEventListener('keydown', (e) => { if (HEX && k.st === 'play' && !k.paused && HEXKEY[e.code] !== undefined) slide(HX_D[HEXKEY[e.code]]); });

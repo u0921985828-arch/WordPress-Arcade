@@ -26,7 +26,7 @@ const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 const COL = ['#ff5f5f', '#4cc3ff', '#ffd23d', '#5fe08a', '#b77cff', '#ff9a3d', '#ff8ad0', '#5a78ff', '#b8e05a'];
 let tubes, sel, level, moves, done, hist, pour, fly, hidden, wob, liftA, init, winT, kc, kbd, fullT;
 const BR = 19, SL = 44, TW = 54, TH = CAP * SL + 18;
-function build() { const n = Math.min(9, 3 + Math.floor((level - 1) * 2 / 3)); /* 1.23: nivel 1-2: 3 colores, sube más despacio */ const all = []; for (let i = 0; i < n; i++) for (let j = 0; j < CAP; j++) all.push(i); k.shuffle(all); tubes = []; for (let i = 0; i < n; i++) tubes.push(all.slice(i * CAP, i * CAP + CAP)); tubes.push([], []); if (level <= 3) tubes.push([]); /* 1.23: tubo vacío extra al principio */ sel = null; moves = 0; done = false; hist = []; if (tubes.every((t) => !t.length || (t.length === CAP && t.every((v) => v === t[0])))) build();
+function build() { const n = Math.min(9, 3 + Math.floor((level - 1) * 2 / 3)); /* 1.23: nivel 1-2: 3 colores, sube más despacio */ const all = []; for (let i = 0; i < n; i++) for (let j = 0; j < CAP; j++) all.push(i); k.shuffle(all); tubes = []; for (let i = 0; i < n; i++) tubes.push(all.slice(i * CAP, i * CAP + CAP)); tubes.push([], []); if (level <= EXTRA()) tubes.push([]); /* 1.23: tubo vacío extra al principio */ if (k.dif === 0) tubes.push([]); /* fácil: otro tubo libre siempre */ sel = null; moves = 0; done = false; hist = []; if (tubes.every((t) => !t.length || (t.length === CAP && t.every((v) => v === t[0])))) build();
   if (!csOk(tubes) && ++csTry < 40) return build(); csTry = 0;
   init = JSON.stringify(tubes); fly = []; hidden = tubes.map(() => 0); wob = tubes.map(() => 0); fullT = tubes.map(() => 0); liftA = 0; winT = 0; kc = 0; }
 /* 1.23: el barajado aleatorio podía dar tableros sin solución → búsqueda en profundidad acotada antes de aceptarlo */
@@ -48,7 +48,11 @@ function doPour(a, b) { hist.push(JSON.stringify(tubes)); const A = tubes[a], B 
   while (A.length && A[A.length - 1] === col && B.length < CAP) { const from = n === 0 ? liftPos(a) : slot(a, A.length - 1); A.pop(); B.push(col); fly.push({ col, from, to: slot(b, B.length - 1), t: -n * 0.08, b }); n++; }
   hidden[b] += n; moves++; pour = { b, t: 0.25 }; k.sfx('jump');
   if (tubes.every((t) => !t.length || solvedT(t))) { done = true; k.best(CFG.id, level); } }
-function reset() { if (!level) level = 1; build(); }
+/* Dificultad: fácil siempre con un tubo libre de más; difícil arranca en el nivel 3 (4 colores) y sin tubo extra. */
+const EXTRA = () => (k.dif === 2 ? 0 : 3);
+const LV0 = () => (k.dif === 2 ? 3 : 1);
+function reset() { if (!level) level = LV0(); build(); }
+k.onDif = () => { if (k.st !== 'play') { level = LV0(); build(); } };
 
 /* ---------- Gráficos cacheados ---------- */
 const ballCv = [];
