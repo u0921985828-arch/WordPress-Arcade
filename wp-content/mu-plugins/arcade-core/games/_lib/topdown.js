@@ -873,7 +873,7 @@ function bakeLight(g) {
   g.save(); g.beginPath(); g.rect(X0, Y0, X1 - X0, Y1 - Y0); g.clip();
   if (LPOS.length) {
     g.globalCompositeOperation = 'lighter';
-    for (const x of LPOS) { const gr = g.createRadialGradient(x, Y0 + 2, 4, x, Y0 + 2, 165); gr.addColorStop(0, AL(LCOL, 0.17)); gr.addColorStop(0.4, AL(LCOL, 0.065)); gr.addColorStop(1, AL(LCOL, 0)); g.fillStyle = gr; g.fillRect(x - 165, Y0 - 20, 330, 340); }
+    for (const x of LPOS) { const gr = g.createRadialGradient(x, Y0 + 2, 4, x, Y0 + 2, 165); gr.addColorStop(0, AL(LCOL, 0.2)); gr.addColorStop(0.4, AL(LCOL, 0.08)); gr.addColorStop(1, AL(LCOL, 0)); g.fillStyle = gr; g.fillRect(x - 165, Y0 - 20, 330, 340); }
     g.globalCompositeOperation = 'source-over';
   }
   const dark = DAMP ? '6,4,16' : '10,8,20';
@@ -974,7 +974,7 @@ function glowSprite() {
 function lights() {
   if (!TH.light) return;
   if (!glowCv) glowCv = glowSprite();
-  for (const x of LPOS) { const fl = 0.86 + Math.sin(t * 13 + x) * 0.08 + Math.sin(t * 7.3 + x * 2) * 0.07, rr0 = 78 * fl; c.globalAlpha = 0.5 * fl; c.drawImage(glowCv, x - rr0, Y0 + 2 - rr0, rr0 * 2, rr0 * 2); }
+  for (const x of LPOS) { const fl = 0.86 + Math.sin(t * 13 + x) * 0.08 + Math.sin(t * 7.3 + x * 2) * 0.07, rr0 = 54 * fl; c.globalAlpha = 0.62 * fl; c.drawImage(glowCv, x - rr0, Y0 + 2 - rr0, rr0 * 2, rr0 * 2); }
   c.globalAlpha = 1;
   for (const x of LPOS) {
     const fl = 0.86 + Math.sin(t * 13 + x) * 0.08 + Math.sin(t * 7.3 + x * 2) * 0.07;
