@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Arcade Core
  * Description: CPT "game", taxonomías, meta de juego y reproductor lazy para el portal arcade.
- * Version: 1.30.0
+ * Version: 1.30.1
  * Author:      Arcade Team
  *
  * Instalar: copiar este archivo + la carpeta /arcade-core/ en wp-content/mu-plugins/.
@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
 
 final class Arcade_Core {
 
-	const VERSION      = '1.30.0';
+	const VERSION      = '1.30.1';
 	const ORIENTATIONS = array( 'portrait', 'landscape', 'auto' );
 	const RATIOS       = array( '16:9', '4:3', '1:1', 'fill' );
 	const ENGINES      = array( 'canvas', 'phaser', 'threejs', 'godot_web', 'construct' );
@@ -204,10 +204,34 @@ final class Arcade_Core {
 		self::ensure_home_page();
 		self::adaptive_games();
 		self::sync_catalog();
+		self::publish_pending();
 		delete_transient( 'arcade_index' );
 		flush_rewrite_rules( false );
 		update_option( 'arcade_core_version', self::VERSION, false );
 		$wpdb->delete( $wpdb->options, array( 'option_name' => 'arcade_core_upgrading' ) );
+	}
+
+	/**
+	 * Juegos que quedaron programados por la publicación escalonada de versiones anteriores: se publican ya.
+	 * Solo toca entradas del CPT game en estado 'future'; no altera borradores ni nada editado a mano.
+	 */
+	public static function publish_pending() {
+		$ids = get_posts( array(
+			'post_type'        => 'game',
+			'post_status'      => 'future',
+			'numberposts'      => -1,
+			'fields'           => 'ids',
+			'suppress_filters' => true,
+		) );
+		foreach ( $ids as $id ) {
+			$now = current_time( 'mysql' );
+			wp_update_post( array(
+				'ID'            => $id,
+				'post_status'   => 'publish',
+				'post_date'     => $now,
+				'post_date_gmt' => get_gmt_from_date( $now ),
+			) );
+		}
 	}
 
 	/**
@@ -224,7 +248,9 @@ final class Arcade_Core {
 		if ( empty( $data['games'] ) ) {
 			return;
 		}
-		$pace  = apply_filters( 'arcade_publish_pace', array( 'now' => 15, 'every_days' => 2, 'per' => 5 ) );
+		// Por defecto se publican todos al momento: el catálogo es propio y el usuario quiere verlo entero.
+		// Quien prefiera escalonarlo para el SEO puede volver a array( 'now' => 15, 'every_days' => 2, 'per' => 5 ).
+		$pace  = apply_filters( 'arcade_publish_pace', array( 'now' => PHP_INT_MAX, 'every_days' => 2, 'per' => 5 ) );
 		$count = 0;
 		$base  = time();
 		foreach ( $data['games'] as $g ) {
