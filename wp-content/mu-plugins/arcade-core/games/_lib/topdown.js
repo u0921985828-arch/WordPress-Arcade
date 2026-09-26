@@ -873,7 +873,7 @@ function bakeLight(g) {
   g.save(); g.beginPath(); g.rect(X0, Y0, X1 - X0, Y1 - Y0); g.clip();
   if (LPOS.length) {
     g.globalCompositeOperation = 'lighter';
-    for (const x of LPOS) { const gr = g.createRadialGradient(x, Y0 + 2, 4, x, Y0 + 2, 165); gr.addColorStop(0, AL(LCOL, 0.2)); gr.addColorStop(0.4, AL(LCOL, 0.08)); gr.addColorStop(1, AL(LCOL, 0)); g.fillStyle = gr; g.fillRect(x - 165, Y0 - 20, 330, 340); }
+    for (const x of LPOS) { const gr = g.createRadialGradient(x, Y0 + 2, 4, x, Y0 + 2, 165); gr.addColorStop(0, AL(LCOL, 0.24)); gr.addColorStop(0.4, AL(LCOL, 0.1)); gr.addColorStop(1, AL(LCOL, 0)); g.fillStyle = gr; g.fillRect(x - 165, Y0 - 20, 330, 340); }
     g.globalCompositeOperation = 'source-over';
   }
   const dark = DAMP ? '6,4,16' : '10,8,20';
@@ -967,46 +967,47 @@ function renderVig() {
 /* halo cacheado de las luces: en el bucle solo drawImage con alfa */
 let glowCv = null, softCv = null;
 function glowSprite() {
-  const S = 192, q = CV(S, S), g = q.getContext('2d'), gr = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  const S = 72, q = CV(S, S), g = q.getContext('2d'), gr = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
   gr.addColorStop(0, AL(LCOL, 0.5)); gr.addColorStop(0.3, AL(LCOL, 0.2)); gr.addColorStop(0.62, AL(LCOL, 0.055)); gr.addColorStop(1, AL(LCOL, 0));
   g.fillStyle = gr; g.fillRect(0, 0, S, S); return q;
 }
+let fixCv = null;
+function fixSprite() { // parte fija de la luminaria (lo único que se anima es la llama)
+  const FW = 36, FH2 = 42, q = CV(FW * 2, FH2 * 2), g = q.getContext('2d'); g.scale(2, 2); g.translate(FW / 2, 0);
+  if (TH.light === 'torch') {
+    g.fillStyle = 'rgba(0,0,0,.3)'; ART.rr(g, -4, 17, 9, 15, 3); g.fill();
+    ART.rr(g, -3.4, 13, 6.8, 17, 2.4); ART.fillOut(g, '#6b4329', 2);
+    g.fillStyle = AL('#ffffff', 0.22); g.fillRect(-2.6, 14, 2, 14);
+    ART.rr(g, -6, 11, 12, 5, 2); ART.fillOut(g, '#4a4a58', 2); g.fillStyle = AL('#ffffff', 0.3); g.fillRect(-4.5, 11.8, 9, 1.4);
+  } else if (TH.light === 'candle') {
+    for (const o of [-6, 5]) { const yy = 20 + (o > 0 ? 3 : 0); g.fillStyle = 'rgba(0,0,0,.3)'; ART.rr(g, o - 2, yy + 1, 6, 12, 2); g.fill(); ART.rr(g, o - 2.5, yy, 5, 12, 1.5); ART.fillOut(g, '#efe6d0', 1.5); g.fillStyle = AL('#000000', 0.16); g.fillRect(o + 0.8, yy, 1.7, 12); }
+  } else if (TH.light === 'lantern') {
+    g.strokeStyle = OUT; g.lineWidth = 1.8; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, 12); g.stroke();
+    ART.rr(g, -8, 12, 16, 20, 7); ART.fillOut(g, '#e0463c', 2);
+    g.fillStyle = AL('#ffffff', 0.25); ART.rr(g, -6, 14, 3.4, 15, 2); g.fill();
+    g.fillStyle = AL('#000000', 0.22); ART.rr(g, 3, 14, 3.4, 15, 2); g.fill();
+  } else if (TH.light === 'lamp') {
+    ART.rr(g, -7.5, 11, 15, 13, 3.5); ART.fillOut(g, '#3a3a46', 2);
+    g.fillStyle = AL('#ffffff', 0.25); g.fillRect(-6, 12, 12, 1.8);
+  }
+  return q;
+}
 function lights() {
   if (!TH.light) return;
-  if (!glowCv) glowCv = glowSprite();
-  for (const x of LPOS) { const fl = 0.86 + Math.sin(t * 13 + x) * 0.08 + Math.sin(t * 7.3 + x * 2) * 0.07, rr0 = 54 * fl; c.globalAlpha = 0.62 * fl; c.drawImage(glowCv, x - rr0, Y0 + 2 - rr0, rr0 * 2, rr0 * 2); }
+  if (!glowCv) { glowCv = glowSprite(); fixCv = fixSprite(); }
+  for (const x of LPOS) { const fl = 0.86 + Math.sin(t * 13 + x) * 0.08 + Math.sin(t * 7.3 + x * 2) * 0.07; c.globalAlpha = 0.7 * fl * fl; c.drawImage(glowCv, x - 36, Y0 - 34); }
   c.globalAlpha = 1;
   for (const x of LPOS) {
     const fl = 0.86 + Math.sin(t * 13 + x) * 0.08 + Math.sin(t * 7.3 + x * 2) * 0.07;
+    c.drawImage(fixCv, x - 18, 0, 36, 42);
     if (TH.light === 'torch') {
-      c.fillStyle = 'rgba(0,0,0,.3)'; ART.rr(c, x - 4, 17, 9, 15, 3); c.fill(); // sombra del soporte en el muro
-      ART.rr(c, x - 3.4, 13, 6.8, 17, 2.4); ART.fillOut(c, '#6b4329', 2);
-      c.fillStyle = AL('#ffffff', 0.22); c.fillRect(x - 2.6, 14, 2, 14);
-      ART.rr(c, x - 6, 11, 12, 5, 2); ART.fillOut(c, '#4a4a58', 2); c.fillStyle = AL('#ffffff', 0.3); c.fillRect(x - 4.5, 11.8, 9, 1.4);
       c.fillStyle = AL('#ff5a1e', 0.8); c.beginPath(); c.ellipse(x, 9, 6 * fl, 10 * fl, 0, 0, R2); c.fill();
       c.fillStyle = '#ff9a2d'; c.beginPath(); c.ellipse(x + Math.sin(t * 9) * 0.8, 10, 4 * fl, 7.4 * fl, 0, 0, R2); c.fill();
       c.fillStyle = '#ffe07a'; c.beginPath(); c.ellipse(x + Math.sin(t * 11) * 0.6, 11.4, 2.2, 4.4 * fl, 0, 0, R2); c.fill();
-      c.fillStyle = AL('#fff6c0', 0.9); c.beginPath(); c.ellipse(x, 12.6, 1.2, 2.2, 0, 0, R2); c.fill();
     } else if (TH.light === 'candle') {
-      for (const o of [-6, 5]) {
-        const yy = 20 + (o > 0 ? 3 : 0); c.fillStyle = 'rgba(0,0,0,.3)'; ART.rr(c, x + o - 2, yy + 1, 6, 12, 2); c.fill();
-        ART.rr(c, x + o - 2.5, yy, 5, 12, 1.5); ART.fillOut(c, '#efe6d0', 1.5); c.fillStyle = AL('#000000', 0.16); c.fillRect(x + o + 0.8, yy, 1.7, 12);
-        c.fillStyle = AL('#c9a8ff', 0.85); c.beginPath(); c.ellipse(x + o, yy - 4, 3, 5.4 * fl, 0, 0, R2); c.fill();
-        c.fillStyle = '#efe0ff'; c.beginPath(); c.ellipse(x + o, yy - 3, 1.4, 3 * fl, 0, 0, R2); c.fill();
-      }
-    } else if (TH.light === 'lantern') {
-      c.strokeStyle = OUT; c.lineWidth = 1.8; c.beginPath(); c.moveTo(x, 0); c.lineTo(x, 12); c.stroke();
-      ART.rr(c, x - 8, 12, 16, 20, 7); ART.fillOut(c, '#e0463c', 2);
-      c.fillStyle = AL('#ffffff', 0.25); ART.rr(c, x - 6, 14, 3.4, 15, 2); c.fill();
-      c.fillStyle = AL('#000000', 0.22); ART.rr(c, x + 3, 14, 3.4, 15, 2); c.fill();
-      c.fillStyle = AL('#ffdc78', 0.35 + 0.35 * fl); c.fillRect(x - 3, 15, 6, 14);
-      c.fillStyle = AL('#fff3c0', 0.8); c.fillRect(x - 1.4, 17, 2.8, 8);
-    } else if (TH.light === 'lamp') {
-      ART.rr(c, x - 7.5, 11, 15, 13, 3.5); ART.fillOut(c, '#3a3a46', 2);
-      c.fillStyle = AL('#ffffff', 0.25); c.fillRect(x - 6, 12, 12, 1.8);
-      c.fillStyle = AL('#ffd66e', 0.45 + 0.4 * fl); ART.rr(c, x - 4.5, 15, 9, 7, 2); c.fill();
-      c.fillStyle = AL('#fff4cc', 0.85); ART.rr(c, x - 2.6, 16, 5.2, 4, 1.5); c.fill();
-    }
+      for (const o of [-6, 5]) { const yy = 20 + (o > 0 ? 3 : 0); c.fillStyle = AL('#c9a8ff', 0.85); c.beginPath(); c.ellipse(x + o, yy - 4, 3, 5.4 * fl, 0, 0, R2); c.fill(); c.fillStyle = '#efe0ff'; c.beginPath(); c.ellipse(x + o, yy - 3, 1.4, 3 * fl, 0, 0, R2); c.fill(); }
+    } else if (TH.light === 'lantern') { c.fillStyle = AL('#ffdc78', 0.35 + 0.35 * fl); c.fillRect(x - 3, 15, 6, 14); c.fillStyle = AL('#fff3c0', 0.8); c.fillRect(x - 1.4, 17, 2.8, 8); }
+    else if (TH.light === 'lamp') { c.fillStyle = AL('#ffd66e', 0.45 + 0.4 * fl); ART.rr(c, x - 4.5, 15, 9, 7, 2); c.fill(); c.fillStyle = AL('#fff4cc', 0.85); ART.rr(c, x - 2.6, 16, 5.2, 4, 1.5); c.fill(); }
   }
 }
 function drawDoor() {

@@ -374,10 +374,20 @@ const ART = (() => {
       g.fillStyle = alpha(OUT, 0.3); for (let i = 0; i < 3; i++) { const a = R(i + 11), b = R(i + 15); g.beginPath(); g.ellipse((a < 0.5 ? 1 : T - 1) + (a - 0.5) * 4, b * T, 2 + R(i + 19) * 2, 1.6 + R(i + 21) * 1.6, R(i) * 3, 0, TAU); g.fill(); }
       g.fillStyle = alpha('#ffffff', 0.12); for (let i = 0; i < 4; i++) g.fillRect(R(i + 30) * T, R(i + 34) * T, 1.4, 1.4);
       if (R(7) < 0.7) { g.fillStyle = alpha('#7fae6a', 0.42); const mx = R(8) * T; g.beginPath(); g.ellipse(mx, T * 0.97, 4 + R(9) * 3, 2 + R(10) * 1.5, 0, 0, TAU); g.fill(); g.fillStyle = alpha('#9fcf7a', 0.3); g.beginPath(); g.ellipse(mx - 1.5, T * 0.94, 2.4, 1.1, 0, 0, TAU); g.fill(); }
-    } else if (th.metal) { // placa con bisel y remaches
+    } else if (th.metal) { // placa de acero: bisel, remaches, reflejo alargado, arañazos y óxido (todo por variante)
       g.fillStyle = alpha('#ffffff', 0.16); g.fillRect(1, 1, T - 2, 2); g.fillRect(1, 1, 2, T - 2); g.fillStyle = alpha(OUT, 0.3); g.fillRect(1, T - 3, T - 2, 2); g.fillRect(T - 3, 1, 2, T - 2);
-      g.strokeStyle = alpha('#ffffff', 0.06); g.lineWidth = 1; for (let i = -T; i < T; i += 5) { g.beginPath(); g.moveTo(i, T); g.lineTo(i + T, 0); g.stroke(); }
-      [[5, 6], [T - 6, 6], [5, T - 7], [T - 6, T - 7]].forEach(([a, b]) => { g.fillStyle = D; g.beginPath(); g.arc(a, b, 2.3, 0, TAU); g.fill(); g.fillStyle = alpha('#ffffff', 0.5); g.beginPath(); g.arc(a - 0.6, b - 0.6, 0.9, 0, TAU); g.fill(); });
+      // reflejo alargado del metal: una banda diagonal clara que cruza la placa
+      g.save(); g.beginPath(); g.rect(1, 1, T - 2, T - 2); g.clip();
+      const sh = (v % 4) * T * 0.22 - T * 0.15;
+      g.fillStyle = alpha('#ffffff', 0.09); g.beginPath(); g.moveTo(sh, T); g.lineTo(sh + T * 0.7, 0); g.lineTo(sh + T * 0.95, 0); g.lineTo(sh + T * 0.25, T); g.fill();
+      g.fillStyle = alpha('#ffffff', 0.05); g.beginPath(); g.moveTo(sh + T * 0.32, T); g.lineTo(sh + T * 1.02, 0); g.lineTo(sh + T * 1.12, 0); g.lineTo(sh + T * 0.42, T); g.fill();
+      // arañazos finos: la dirección y el número cambian con la variante
+      g.lineWidth = 1; for (let i = 0; i < 3 + (v & 1); i++) { const ax = R(i + 40) * T, ay = R(i + 44) * T, ln = 3 + R(i + 48) * 9, an = (R(i + 52) - 0.5) * 1.1 + (v & 2 ? 2.4 : 0.7); g.strokeStyle = alpha(OUT, 0.22); g.beginPath(); g.moveTo(ax, ay); g.lineTo(ax + Math.cos(an) * ln, ay + Math.sin(an) * ln); g.stroke(); g.strokeStyle = alpha('#ffffff', 0.16); g.beginPath(); g.moveTo(ax, ay - 1); g.lineTo(ax + Math.cos(an) * ln, ay + Math.sin(an) * ln - 1); g.stroke(); }
+      // manchas de óxido / grasa en dos tonos, pegadas a una esquina distinta según la variante
+      if (R(60) < 0.75) { const cx = (v & 1 ? 2 : T - 2), cy = (v & 2 ? 2 : T - 2); g.fillStyle = alpha('#8a5a32', 0.2); g.beginPath(); g.ellipse(cx, cy, 5 + R(61) * 5, 4 + R(62) * 4, R(63) * 3, 0, TAU); g.fill(); g.fillStyle = alpha('#b57a3e', 0.14); g.beginPath(); g.ellipse(cx + (v & 1 ? 2 : -2), cy + (v & 2 ? 2 : -2), 3 + R(64) * 3, 2 + R(65) * 2.5, 0, 0, TAU); g.fill(); }
+      g.fillStyle = alpha(OUT, 0.16); for (let i = 0; i < 3; i++) { g.beginPath(); g.ellipse(R(i + 70) * T, R(i + 74) * T, 1.3 + R(i + 78) * 1.4, 1 + R(i + 82) * 1.1, 0, 0, TAU); g.fill(); }
+      g.restore();
+      [[5, 6], [T - 6, 6], [5, T - 7], [T - 6, T - 7]].forEach(([a, b], i) => { g.fillStyle = alpha(OUT, 0.28); g.beginPath(); g.arc(a + 0.8, b + 1, 2.4, 0, TAU); g.fill(); g.fillStyle = D; g.beginPath(); g.arc(a, b, 2.3, 0, TAU); g.fill(); g.fillStyle = alpha('#ffffff', 0.5 - R(i + 90) * 0.22); g.beginPath(); g.arc(a - 0.6, b - 0.6, 0.9, 0, TAU); g.fill(); });
       g.fillStyle = D; g.fillRect(T * 0.3, T * 0.45, T * 0.4, 3); g.fillStyle = alpha('#ffffff', 0.15); g.fillRect(T * 0.3, T * 0.45 + 3, T * 0.4, 1);
     } else { // TIERRA: estratos ondulados, piedras incrustadas con volumen, raíces, vetas y desgaste
       // 1) estratos: bandas suaves de sedimento (la onda y la altura cambian con la variante)
