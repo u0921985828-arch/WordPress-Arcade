@@ -7,7 +7,9 @@ const PORT = innerHeight > innerWidth;
 const W = PORT ? 480 : 820, H = PORT ? 760 : 470;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#12203a' }), c = k.ctx;
 const TCOL = ['#e0524f', '#4f8fe0', '#e08a2f', '#2f3550'];
-const NAMES = ['Tú', 'CPU 1', 'CPU 2', 'CPU 3'];
+let NAMES = ['Tú', 'CPU 1', 'CPU 2', 'CPU 3'];
+let pl = null; /* k.players(4) en el modo tele: humanos reales + CPU de relleno */
+const human = (p) => (k.party ? !pl[p].cpu : p === 0);
 const PCOL = ['#ffc94d', '#8fd6ff', '#a8cf3f', '#ff9ac4'];
 const LS = 'cpu:' + CFG.id; let lvl = 0; try { lvl = +localStorage.getItem(LS) || 0; } catch (e) {}
 
@@ -21,17 +23,27 @@ const STW = PORT ? 30 : 30, STH = Math.round(STW * 1.34), SGAP = 3, SPAD = 7, RO
 let deck, hands, table, turn, melded, pool, msg = '', msgT = 0, phase = 'play', tScroll = 0;
 let sel = null, carried = null, snap = null, fromHand = [], movedTable = false, cpuT = 0, tN = 0, started = false;
 let lay = [], ranking = null;
+let spots = [], spot = 0, noPlay = 0;
 
 const rndi = (n) => Math.floor(Math.random() * n);
 function reset() {
+  if (k.party) { pl = k.players(4); NAMES = pl.map((q) => q.name); }
   deck = FR.deck(rndi); hands = [0, 1, 2, 3].map(() => deck.splice(0, 14));
   table = []; turn = 0; melded = [0, 0, 0, 0]; pool = deck.length; phase = 'play';
   sel = null; carried = null; fromHand = []; movedTable = false; tScroll = 0; ranking = null;
-  hands[0].sort(handOrder); takeSnap();
-  say('Tu turno: baja 30 puntos o más para empezar');
+  spots = []; spot = 0; noPlay = 0;
+  for (let p = 0; p < 4; p++) if (human(p)) hands[p].sort(handOrder);
+  beginTurn();
+  say(`${NAMES[turn]}: baja 30 puntos o más para empezar`);
+}
+/* Arranque de turno: foto para deshacer y mano en el móvil del jugador (modo tele). */
+function beginTurn() {
+  cpuT = 0; sel = null; carried = null; spots = []; spot = 0;
+  if (human(turn)) takeSnap();
+  askPriv();
 }
 const handOrder = (a, b) => (a.j ? 1 : b.j ? -1 : a.c - b.c || a.n - b.n);
-const takeSnap = () => { snap = { hand: hands[0].slice(), table: table.map((s) => s.slice()) }; fromHand = []; movedTable = false; };
+const takeSnap = () => { snap = { p: turn, hand: hands[turn].slice(), table: table.map((s) => s.slice()) }; fromHand = []; movedTable = false; };
 const say = (t) => { msg = t; msgT = 3.2; };
 
 /* ---- arte: ficha de una sola pieza, cacheada ---- */
@@ -85,47 +97,93 @@ function layout() {
 }
 const layH = () => layout();
 
+/* ---- modo tele: la mano va en el móvil de cada jugador ---- */
+const IMGC = {};
+function tileImg(t) {
+  const key = t.j ? 'J' : t.c + ':' + t.n;
+  return IMGC[key] || (IMGC[key] = tile(t, 46, 62, false).toDataURL('image/png'));
+}
+/* Huecos donde la ficha elegida encaja (y siempre el hueco «+» para una combinación nueva). */
+function calcSpots() {
+  spots = []; spot = 0;
+  if (sel == null || sel >= hands[turn].length) return;
+  const tl = hands[turn][sel];
+  for (let i = 0; i < table.length; i++) { const st = table[i];
+    for (let q = 0; q <= st.length; q++) { const nw = st.slice(); nw.splice(q, 0, tl); if (FR.valid(nw)) { spots.push(i); break; } } }
+  spots.push(-1);
+}
+/* Cada jugador ve SU mano en su móvil, siempre: en su turno puede tocarla, fuera de turno apagada. */
+function askPriv() {
+  if (!k.party || !k.privOK) return;
+  for (let p = 0; p < 4; p++) {
+    if (!human(p)) continue;
+    const mine = p === turn && phase === 'play';
+    const items = hands[p].map((t, i) => ({ v: i, img: tileImg(t), off: !mine }));
+    if (mine) { items.push({ v: 'draw', label: 'Robar', col: '#2c4a86' });
+      if (fromHand.length) items.push({ v: 'undo', label: 'Deshacer', col: '#3a3556' });
+      items.push({ v: 'done', label: 'Listo', col: '#4d6b1f' }); }
+    k.priv(p, { title: `Tus fichas (${hands[p].length})`, sm: true,
+      text: mine ? (melded[p] ? 'Elige una ficha' : 'Primera bajada: 30 puntos o más') : `Turno de ${NAMES[turn]}`, items });
+  }
+}
+/* Mientras coloca, el panel se reduce a un aviso: así el joystick queda libre. */
+function privPlacing() {
+  if (!k.party || !k.privOK || !human(turn)) return;
+  k.priv(turn, { title: 'Coloca la ficha', text: 'Mueve con el joystick y pulsa A (B para cambiar de ficha)', bar: true, items: [] });
+}
+k.onPick = (p, v) => {
+  if (p !== turn || !human(turn) || phase !== 'play') return;
+  if (v === 'draw') return draw1();
+  if (v === 'undo') return undo();
+  if (v === 'done') return ready();
+  pickFromHand(v | 0);
+};
+
 /* ---- turno humano ---- */
-function pickFromHand(i) { carried = null; sel = sel === i ? null : i; k.sfx('click'); }
+function pickFromHand(i) { carried = null; sel = sel === i ? null : i; k.sfx('click'); if (k.party) { calcSpots(); privPlacing(); } }
 function insertAt(si, tl) {
   const s = table[si];
   for (let p = 0; p <= s.length; p++) { const nw = s.slice(); nw.splice(p, 0, tl); if (FR.valid(nw)) { table[si] = nw; return true; } }
   s.push(tl); return true;
 }
 function playSelected(si) {
-  if (sel != null) { const tl = hands[0][sel];
+  if (sel != null) { const tl = hands[turn][sel];
     if (si < 0) table.push([tl]); else insertAt(si, tl);
-    hands[0].splice(sel, 1); fromHand.push(tl); sel = null; k.sfx('pop'); return; }
+    hands[turn].splice(sel, 1); fromHand.push(tl); sel = null; k.sfx('pop');
+    if (k.party) { spots = []; askPriv(); }
+    return; }
   if (carried) { const { si: from, ti } = carried; const tl = table[from][ti];
-    if (!melded[0]) { say('En la primera bajada no puedes tocar la mesa'); carried = null; return; }
+    if (!melded[turn]) { say('En la primera bajada no puedes tocar la mesa'); carried = null; return; }
     table[from].splice(ti, 1); if (!table[from].length) { table.splice(from, 1); if (si > from) si--; if (si === from) si = -1; }
     if (si < 0) table.push([tl]); else insertAt(si, tl);
     if (fromHand.indexOf(tl) < 0) movedTable = true;
     carried = null; k.sfx('pop'); }
 }
-function undo() { hands[0] = snap.hand.slice(); table = snap.table.map((s) => s.slice()); hands[0].sort(handOrder); sel = null; carried = null; fromHand = []; movedTable = false; k.sfx('hit'); }
+function undo() { hands[snap.p] = snap.hand.slice(); table = snap.table.map((s) => s.slice()); hands[snap.p].sort(handOrder); sel = null; carried = null; spots = []; fromHand = []; movedTable = false; k.sfx('hit'); askPriv(); }
 function draw1() {
   if (fromHand.length) { say('Primero deshaz lo que has puesto'); return; }
   if (!deck.length) { say('No quedan fichas en el pozo'); endTurn(true); return; }
-  hands[0].push(deck.pop()); pool = deck.length; hands[0].sort(handOrder); k.sfx('coin'); endTurn(true);
+  hands[turn].push(deck.pop()); pool = deck.length; hands[turn].sort(handOrder); k.sfx('coin'); endTurn(true);
 }
 function ready() {
   if (!fromHand.length) { say('Tienes que poner al menos una ficha'); return; }
   for (const s of table) if (!FR.valid(s)) { say('Hay una combinación que no vale'); k.sfx('hit'); return; }
-  if (!melded[0]) {
+  if (!melded[turn]) {
     if (movedTable) { say('En la primera bajada no puedes mover la mesa'); return; }
     let sum = 0;
     for (const s of table) { const f = FR.info(s); if (!f) continue; s.forEach((t, i) => { if (fromHand.indexOf(t) >= 0) sum += f.vals[i]; }); }
     if (sum < 30) { say(`Te faltan ${30 - sum} puntos para la primera bajada`); k.sfx('hit'); return; }
-    melded[0] = 1; say('¡Primera bajada hecha!');
+    melded[turn] = 1; say('¡Primera bajada hecha!');
   }
   k.sfx('win'); endTurn(false);
 }
 function endTurn(drew) {
-  takeSnap();
-  if (!hands[0].length) return finish(0);
-  if (drew) say('Robas una ficha');
-  turn = 1; cpuT = 0;
+  const p = turn;
+  if (!hands[p].length) return finish(p);
+  noPlay = drew ? noPlay + 1 : 0;
+  if (drew) say(`${NAMES[p]} roba`);
+  if (noPlay >= 4 && !deck.length) return finish(-1);
+  turn = (p + 1) % 4; beginTurn();
 }
 
 /* ---- turnos de la CPU ---- */
@@ -138,36 +196,45 @@ function cpuPlay() {
     hands[p] = r.hand; table = r.table; melded[p] = 1;
     say(`${NAMES[p]} pone ${put0} ficha${put0 === 1 ? '' : 's'}`); k.sfx('pop');
     if (!hands[p].length) return finish(p);
-  } else if (deck.length) { hands[p].push(deck.pop()); pool = deck.length; say(`${NAMES[p]} roba`); k.sfx('click'); }
-  else { say(`${NAMES[p]} pasa`); }
-  turn = (p + 1) % 4; cpuT = 0;
-  if (turn === 0) {
-    if (!deck.length && !FR.cpuTurn(hands[0], table, melded[0]).played && !FR.rebuild(hands[0], table)) {
-      /* nadie puede seguir: gana la mano más baja */
-      if (!hands.some((h, i) => i && FR.cpuTurn(h, table, melded[i]).played)) return finish(-1);
-    }
-    say('Tu turno');
-  }
+    noPlay = 0;
+  } else if (deck.length) { hands[p].push(deck.pop()); pool = deck.length; say(`${NAMES[p]} roba`); k.sfx('click'); noPlay++; }
+  else { say(`${NAMES[p]} pasa`); noPlay++; }
+  if (noPlay >= 4 && !deck.length) return finish(-1);
+  turn = (p + 1) % 4; beginTurn();
+  if (human(turn)) say(`Turno de ${NAMES[turn]}`);
 }
 function finish(win) {
   phase = 'over';
   const rows = hands.map((h, i) => ({ p: i, name: NAMES[i], score: i === win ? 0 : FR.penalty(h) }));
-  if (win === 0) { lvl = Math.min(2, lvl + 0.5); } else if (win > 0) lvl = Math.max(0, lvl - 1);
-  try { localStorage.setItem(LS, lvl); } catch (e) { /* sin almacenamiento */ }
+  if (!k.party) { if (win === 0) lvl = Math.min(2, lvl + 0.5); else if (win > 0) lvl = Math.max(0, lvl - 1);
+    try { localStorage.setItem(LS, lvl); } catch (e) { /* sin almacenamiento */ } }
   ranking = rows;
-  k.podium(rows, { asc: true, head: win === 0 ? '¡Has ganado!' : win > 0 ? `Gana ${NAMES[win]}` : 'Sin fichas en el pozo', fmt: (v) => `${v} puntos`, go: 'Toca para otra partida' });
+  if (k.party && k.privOK) for (let p = 0; p < 4; p++) if (human(p)) k.priv(p, null);
+  k.podium(rows, { asc: true, head: win < 0 ? 'Sin fichas en el pozo' : (win === 0 && !k.party ? '¡Has ganado!' : `Gana ${NAMES[win]}`), fmt: (v) => `${v} puntos`, go: 'Toca para otra partida' });
 }
 
 /* ---- bucle ---- */
 reset();
 addEventListener('resize', () => { clearTimeout(window.__ot); window.__ot = setTimeout(() => { if ((innerHeight > innerWidth) !== PORT && k.st !== 'play') location.reload(); }, 400); });
+k.onParty = () => { if (k.st !== 'play') reset(); };
 k.show(CFG.title, CFG.help);
 k.run((dt) => {
   tN += dt; if (msgT > 0) msgT -= dt;
   if (!k.gate(reset)) return; started = true; void started;
   if (phase === 'over') return;
-  if (turn !== 0) { cpuT += dt; if (cpuT > 0.75) cpuPlay(); return; }
+  if (!human(turn)) { cpuT += dt; if (cpuT > 0.75) cpuPlay(); return; }
   const th = layH();
+  if (k.party) { /* en la tele se coloca con el mando: la mano es privada */
+    if (spots.length) {
+      const d = k.pdir(turn);
+      if (d.x > 0) { spot = (spot + 1) % spots.length; k.sfx('click'); }
+      else if (d.x < 0) { spot = (spot + spots.length - 1) % spots.length; k.sfx('click'); }
+      if (k.phit(turn, 'a')) { playSelected(spots[spot]); return; }
+      if (k.phit(turn, 'b')) { sel = null; spots = []; askPriv(); return; }
+    } else if (k.phit(turn, 'a')) return ready();
+    else if (k.phit(turn, 'b')) return draw1();
+    void th; return;
+  }
   if (k.ptr.down && k.ptr.y > TY && k.ptr.y < TY + TH && Math.abs(k.ptr.y - k.ptr.sy) > 6) {
     tScroll = k.clamp(tScroll + (k.ptr.y - k.ptr.sy) * 0.0, 0, 1e5); /* el arrastre se aplica abajo */
   }
@@ -182,7 +249,7 @@ k.run((dt) => {
   if (y >= HANDY && y < HANDY + HTH * 2 + 6) {
     const per = Math.max(1, Math.floor((W - 16) / (HTW + 4))), row = y < HANDY + HTH + 3 ? 0 : 1;
     const i = row * per + Math.floor((x - handX(per)) / (HTW + 4));
-    if (i >= 0 && i < hands[0].length && x >= handX(per)) pickFromHand(i);
+    if (i >= 0 && i < hands[turn].length && x >= handX(per)) pickFromHand(i);
     return; }
   /* mesa */
   if (y >= TY && y < TY + TH) {
@@ -193,7 +260,7 @@ k.run((dt) => {
       if (sel != null || carried) { playSelected(b.i); return; }
       const ti = k.clamp(Math.floor((x - b.x - SPAD) / (STW + SGAP)), 0, table[b.i].length - 1);
       const tl = table[b.i][ti];
-      if (!melded[0] && fromHand.indexOf(tl) < 0) { say('En la primera bajada no puedes tocar la mesa'); return; }
+      if (!melded[turn] && fromHand.indexOf(tl) < 0) { say('En la primera bajada no puedes tocar la mesa'); return; }
       carried = { si: b.i, ti }; sel = null; k.sfx('click'); return;
     }
     if (sel != null || carried) playSelected(-1);
@@ -224,21 +291,30 @@ k.run((dt) => {
     s.forEach((t, j) => { const hot = carried && carried.si === b.i && carried.ti === j;
       put(t, b.x + SPAD + j * (STW + SGAP), b.y + SPAD - (hot ? 4 : 0), STW, STH, hot); });
   }
+  if (k.party && spots.length) { const si = spots[spot];
+    for (const b of lay) { if (b.i !== si) continue;
+      ART.rr(c, b.x - 3, b.y - 3, b.w + 6, b.h + 6, 11); c.lineWidth = 3.4; c.strokeStyle = '#ffe27a'; c.stroke();
+      if (sel != null && hands[turn][sel]) put(hands[turn][sel], b.x + b.w - STW - SPAD + (si < 0 ? 0 : STW + SGAP), b.y + SPAD - 5, STW, STH, true); } }
   c.restore();
   if (th > TH) { const hbar = Math.max(24, TH * TH / th), by = TY + (TH - hbar) * (tScroll / Math.max(1, th - TH));
     ART.rr(c, W - 10, by, 4, hbar, 2); c.fillStyle = 'rgba(255,255,255,.35)'; c.fill(); }
-  /* mano */
-  const per = Math.max(1, Math.floor((W - 16) / (HTW + 4))), hx = handX(per);
-  hands[0].forEach((t, i) => { const r = i < per ? 0 : 1, cx = hx + (i % per) * (HTW + 4), cy = HANDY + r * (HTH + 6) - (sel === i ? 6 : 0);
-    put(t, cx, cy, HTW, HTH, sel === i); });
-  /* botones */
-  const bw = (W - 32) / 3, lbl = ['Robar', 'Deshacer', 'Listo'], colB = ['#5b8cff', '#8a86a5', '#a8cf3f'];
-  for (let i = 0; i < 3; i++) { const bx = 8 + i * (bw + 8);
-    ART.rr(c, bx, BTNY, bw, BTNH, 12); c.fillStyle = ART.alpha(colB[i], 0.28); c.fill(); c.lineWidth = 2.6; c.strokeStyle = colB[i]; c.stroke();
-    label(lbl[i], bx + bw / 2, BTNY + BTNH / 2, 17, '#fff', 'center', 'middle'); }
+  /* mano (en la tele es privada: va en el móvil) */
+  if (!k.party) {
+    const per = Math.max(1, Math.floor((W - 16) / (HTW + 4))), hx = handX(per);
+    hands[0].forEach((t, i) => { const r = i < per ? 0 : 1, cx = hx + (i % per) * (HTW + 4), cy = HANDY + r * (HTH + 6) - (sel === i ? 6 : 0);
+      put(t, cx, cy, HTW, HTH, sel === i); });
+    /* botones */
+    const bw = (W - 32) / 3, lbl = ['Robar', 'Deshacer', 'Listo'], colB = ['#5b8cff', '#8a86a5', '#a8cf3f'];
+    for (let i = 0; i < 3; i++) { const bx = 8 + i * (bw + 8);
+      ART.rr(c, bx, BTNY, bw, BTNH, 12); c.fillStyle = ART.alpha(colB[i], 0.28); c.fill(); c.lineWidth = 2.6; c.strokeStyle = colB[i]; c.stroke();
+      label(lbl[i], bx + bw / 2, BTNY + BTNH / 2, 17, '#fff', 'center', 'middle'); }
+  } else {
+    label(human(turn) ? (spots.length ? 'Mueve con el joystick y pulsa A' : 'Elige la ficha en tu móvil') : `Piensa ${NAMES[turn]}…`,
+      W / 2, HANDY + HTH, 17, '#cfe6ff', 'center', 'middle');
+  }
   /* aviso */
   if (msgT > 0) label(msg, W / 2, HANDY - 16, 15, '#ffe27a', 'center', 'middle');
-  else if (turn === 0 && !melded[0]) label('Primera bajada: 30 puntos o más', W / 2, HANDY - 16, 15, '#cfe6ff', 'center', 'middle');
+  else if (human(turn) && !melded[turn]) label('Primera bajada: 30 puntos o más', W / 2, HANDY - 16, 15, '#cfe6ff', 'center', 'middle');
   void ranking;
 });
-function handX(per) { const n = Math.min(per, hands[0].length); return Math.round((W - (n * (HTW + 4) - 4)) / 2); }
+function handX(per) { const n = Math.min(per, hands[turn].length); return Math.round((W - (n * (HTW + 4) - 4)) / 2); }

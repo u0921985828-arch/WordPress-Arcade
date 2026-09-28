@@ -206,6 +206,12 @@ body.pt-pad{position:fixed;top:0;right:0;bottom:0;left:0;overscroll-behavior:non
 .pd-it small{font:600 .75rem/1.2 system-ui,sans-serif;opacity:.8}
 .pd-it[disabled]{opacity:.35}
 .pd-it.hit{transform:translateY(3px);box-shadow:0 1px 0 #1a1530}
+/* manos largas (fichas, triominós, piezas): miniaturas pequeñas para que quepan sin desplazar */
+.pd-priv.sm .pd-items{gap:6px}
+.pd-priv.sm .pd-it{min-width:0;min-height:0;padding:2px}
+.pd-priv.sm .pd-it:not(.pic){min-width:66px;min-height:46px;padding:6px 10px;font-size:.95rem}
+.pd-priv.sm .pd-it img{width:auto;height:auto;max-width:min(30vw,120px);max-height:min(10vh,68px);box-shadow:0 3px 0 #1a1530}
+.pd-priv.sm .pd-it small{font-size:.66rem}
 
 /* ============================================================ 1.25 · Tele en móvil o tableta pequeña */
 .pt-lobby{height:100vh;height:100dvh}

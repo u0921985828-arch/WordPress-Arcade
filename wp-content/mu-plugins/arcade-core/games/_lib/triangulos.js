@@ -36,16 +36,53 @@ function reset() {
 }
 /* ---- turno ---- */
 const human = (p) => (k.party ? !pl[p].cpu : p === 0);
-function askPriv() {
-  if (!k.party || !k.privOK || !human(turn)) return;
-  k.priv(turn, { title: 'Tus fichas', text: 'Elige una ficha', items: hands[turn].map((t, i) => ({ v: i, label: `${t[0]}·${t[1]}·${t[2]}`, sub: `${TRI.val(t)} pts` })) });
+/* Miniatura de la ficha para el panel privado del mando (una por combinación, cacheada). */
+const IMGC = {};
+function tileImg(v) {
+  const key = v.join('');
+  if (IMGC[key]) return IMGC[key];
+  const w = 104, h = Math.round(w * 0.866);
+  const o = document.createElement('canvas'); o.width = w + 8; o.height = h + 8;
+  const g = o.getContext('2d'), x = 4, y = 4, cx = x + w / 2, cy = y + h * 0.62;
+  const cs = [[x + w / 2, y], [x + w, y + h], [x, y + h]];
+  g.lineJoin = 'round'; g.beginPath(); g.moveTo(cs[0][0], cs[0][1]); g.lineTo(cs[1][0], cs[1][1]); g.lineTo(cs[2][0], cs[2][1]); g.closePath();
+  g.fillStyle = '#f3ecd6'; g.fill(); g.lineWidth = 3.2; g.strokeStyle = OUT; g.stroke();
+  g.font = `800 ${Math.round(w * 0.27)}px system-ui,sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (let n = 0; n < 3; n++) {
+    const tx = cs[n][0] + (cx - cs[n][0]) * 0.36, ty = cs[n][1] + (cy - cs[n][1]) * 0.36;
+    g.lineWidth = 4.5; g.strokeStyle = OUT; g.strokeText(String(v[n]), tx, ty);
+    g.fillStyle = NCOL[v[n]]; g.fillText(String(v[n]), tx, ty);
+  }
+  return (IMGC[key] = o.toDataURL('image/png'));
 }
-k.onPick = (p, v) => { if (p === turn && human(turn)) pick(v | 0); };
+/* Cada jugador ve SU mano en su móvil, siempre: en su turno puede tocarla, fuera de turno se ve apagada. */
+function askPriv() {
+  if (!k.party || !k.privOK) return;
+  for (let p = 0; p < np; p++) {
+    if (!human(p)) continue;
+    const mine = p === turn && phase === 'play';
+    const items = hands[p].map((t, i) => ({ v: i, img: tileImg(t), sub: `${TRI.val(t)} pts`, off: !mine }));
+    if (mine) { items.push({ v: 'draw', label: `Robar (${3 - draws})`, col: '#2c4a86' }); items.push({ v: 'pass', label: 'Pasar', col: '#3a3556' }); }
+    k.priv(p, { title: `Tus fichas (${hands[p].length})`, sm: true,
+      text: mine ? 'Elige una ficha' : `Turno de ${pl[turn].name}`, items });
+  }
+}
+/* Mientras coloca, el panel se reduce a un aviso: así el joystick queda libre. */
+function privPlacing() {
+  if (!k.party || !k.privOK || !human(turn)) return;
+  k.priv(turn, { title: 'Coloca la ficha', text: 'Mueve con el joystick y pulsa Poner (B para cambiar de ficha)', bar: true, items: [] });
+}
+k.onPick = (p, v) => {
+  if (p !== turn || !human(turn) || phase !== 'play') return;
+  if (v === 'draw') return drawOne();
+  if (v === 'pass') return doPass();
+  pick(v | 0);
+};
 function pick(i) {
   if (i < 0 || i >= hands[turn].length) return;
   sel = i; legal = TRI.moves(board, [hands[turn][i]]); cur = 0;
   if (!legal.length) { sel = null; say('Esa ficha no encaja'); k.sfx('hurt'); return; }
-  k.sfx('click');
+  k.sfx('click'); privPlacing();
 }
 function place(m) {
   const s = TRI.rate(board, m);
@@ -65,6 +102,7 @@ function drawOne() {
 function doPass() { sc[turn] -= 10; say(`${pl[turn].name} pasa (−10)`); k.sfx('hurt'); if (++pass >= np) return over(-1); next(); }
 function over(win) {
   phase = 'over';
+  if (k.party && k.privOK) for (let p = 0; p < np; p++) if (human(p)) k.priv(p, null);
   if (win >= 0) { let rest = 0; for (let p = 0; p < np; p++) if (p !== win) { const v = hands[p].reduce((a, t) => a + TRI.val(t), 0); sc[p] -= v; rest += v; } sc[win] += 25 + rest; k.confetti(); }
   else { let lo = 0; for (let p = 1; p < np; p++) if (hands[p].reduce((a, t) => a + TRI.val(t), 0) < hands[lo].reduce((a, t) => a + TRI.val(t), 0)) lo = p; win = lo; }
   k.best(`${CFG.id}`, sc[0]);

@@ -104,12 +104,13 @@
   function releaseAll() { Object.keys(S.held).forEach(function (k) { if (S.held[k]) key(k, false); }); }
 
   /* Información privada de este jugador (mano de cartas, rol, dados…): solo en su móvil.
-     d = {title, text, items:[{v, label, sub, img, col, off}], bar} · bar: aviso pequeño sin tapar los controles. */
+     d = {title, text, items:[{v, label, sub, img, col, off}], bar, sm} · bar: aviso pequeño sin tapar los controles.
+     sm: fichas pequeñas (manos largas: rummikub, triominós, blokus), caben muchas sin desplazar. */
   function priv(d) {
     var p = ui.priv;
     if (!d) { p.innerHTML = ''; p.className = 'pd-priv'; return; }
-    var items = Array.isArray(d.items) ? d.items.slice(0, 24) : [];
-    p.className = 'pd-priv show' + (d.bar || !items.length ? ' bar' : '');
+    var items = Array.isArray(d.items) ? d.items.slice(0, 36) : [];
+    p.className = 'pd-priv show' + (d.bar || !items.length ? ' bar' : '') + (d.sm ? ' sm' : '');
     p.innerHTML = (d.title ? '<h2>' + esc(d.title) + '</h2>' : '') + (d.text ? '<p>' + esc(d.text) + '</p>' : '') +
       (items.length ? '<div class="pd-items">' + items.map(function (it, i) {
         var img = typeof it.img === 'string' && /^data:image\/(png|webp|jpeg);base64,/.test(it.img) ? '<img src="' + it.img + '" alt="">' : '';

@@ -29,11 +29,54 @@ function reset() {
   msg = 'Empieza en tu esquina'; msgT = 3; cpuT = 0;
   askPriv();
 }
-function askPriv() {
-  if (!k.party || !k.privOK || !human(turn)) return;
-  k.priv(turn, { title: 'Tus piezas', text: 'Elige una pieza', items: left[turn].map((i) => ({ v: i, label: NAMES[i], sub: '' })) });
+/* Miniatura de la pieza para el panel privado del mando (una por pieza y color, cacheada). */
+const IMGC = {};
+function pieceImg(pi, col) {
+  const key = pi + ':' + col;
+  if (IMGC[key]) return IMGC[key];
+  const cells = ESQ.PIECES[pi][0];
+  let mx = 0, my = 0;
+  for (const p2 of cells) { mx = Math.max(mx, p2[0]); my = Math.max(my, p2[1]); }
+  const u = 17, pad = 4;
+  const o = document.createElement('canvas');
+  o.width = (mx + 1) * u + pad * 2; o.height = (my + 1) * u + pad * 2;
+  const gx = o.getContext('2d'), has = (x, y) => cells.some((p2) => p2[0] === x && p2[1] === y);
+  gx.fillStyle = col;
+  for (const p2 of cells) gx.fillRect(pad + p2[0] * u, pad + p2[1] * u, u + 0.5, u + 0.5);
+  gx.beginPath();
+  for (const p2 of cells) { const x = pad + p2[0] * u, y = pad + p2[1] * u;
+    if (!has(p2[0], p2[1] - 1)) { gx.moveTo(x, y); gx.lineTo(x + u, y); }
+    if (!has(p2[0], p2[1] + 1)) { gx.moveTo(x, y + u); gx.lineTo(x + u, y + u); }
+    if (!has(p2[0] - 1, p2[1])) { gx.moveTo(x, y); gx.lineTo(x, y + u); }
+    if (!has(p2[0] + 1, p2[1])) { gx.moveTo(x + u, y); gx.lineTo(x + u, y + u); } }
+  gx.lineWidth = 3; gx.strokeStyle = OUT; gx.lineJoin = 'round'; gx.stroke();
+  return (IMGC[key] = o.toDataURL('image/png'));
 }
-k.onPick = (p, v) => { if (p === turn && human(turn)) { sel = v | 0; ori = 0; ghost = null; refresh(); k.sfx('click'); } };
+/* Cada jugador ve SUS piezas en su móvil, siempre: en su turno puede tocarlas, fuera de turno apagadas. */
+function askPriv() {
+  if (!k.party || !k.privOK) return;
+  for (let p = 0; p < np; p++) {
+    if (!human(p)) continue;
+    const mine = p === turn && phase === 'play' && !pass[p];
+    const items = left[p].map((i) => ({ v: i, img: pieceImg(i, k.pcol(p)), sub: `${ESQ.PIECES[i][0].length}`, off: !mine }));
+    if (mine) items.push({ v: 'pass', label: 'Paso', col: '#3a3556' });
+    k.priv(p, { title: `Tus piezas (${left[p].length})`, sm: true,
+      text: mine ? 'Elige una pieza' : (pass[p] ? 'Ya no puedes colocar más' : `Turno de ${pl[turn].name}`), items });
+  }
+}
+/* Mientras coloca, el panel se reduce a un aviso: así el joystick queda libre. */
+function privPlacing() {
+  if (!k.party || !k.privOK || !human(turn)) return;
+  k.priv(turn, { title: 'Coloca la pieza', text: 'Mueve con el joystick, B para girar y A para poner', bar: true, items: [] });
+}
+k.onPick = (p, v) => {
+  if (p !== turn || !human(turn) || phase !== 'play') return;
+  if (v === 'pass') return doPass();
+  sel = v | 0; ori = 0; ghost = null; refresh();
+  if (!ghost) snapTo(sel); /* el cursor salta a un sitio donde la pieza cabe: así siempre hay algo que colocar */
+  if (!ghost) { sel = null; say('Esa pieza ya no cabe en ningún sitio'); k.sfx('hurt'); return askPriv(); }
+  k.sfx('click'); privPlacing();
+};
 /* mejor colocación de la pieza elegida que cubra (cx,cy) */
 function ghostAt(cx, cy) {
   if (sel == null) return null;
@@ -45,6 +88,15 @@ function ghostAt(cx, cy) {
     if (ESQ.fits(g, turn, cells)) return { o: o, cells: cells };
   }
   return null;
+}
+/* Lleva el cursor al mejor hueco donde cabe la pieza pi (para el mando). */
+function snapTo(pi) {
+  const ms = ESQ.moves(g, turn, [pi], 60);
+  if (!ms.length) return false;
+  let best = ms[0], bv = -1e9;
+  for (const m of ms) { const v = ESQ.rate(g, m, left[turn]); if (v > bv) { bv = v; best = m; } }
+  ori = best.o; cur = [best.cells[0][0], best.cells[0][1]]; refresh();
+  return !!ghost;
 }
 const refresh = () => { const gh = ghostAt(cur[0], cur[1]); if (gh) { ori = gh.o; ghost = gh; } else ghost = null; };
 function put(cells) {
@@ -63,6 +115,7 @@ function next() {
 function doPass() { pass[turn] = 1; say(`${pl[turn].name} no puede seguir`); k.sfx('hurt'); if (pass.slice(0, np).every((v) => v)) return over(); next(); }
 function over() {
   phase = 'over';
+  if (k.party && k.privOK) for (let p = 0; p < np; p++) if (human(p)) k.priv(p, null);
   const sc = [];
   for (let p = 0; p < np; p++) sc.push(ESQ.score(left[p], lastP[p] === 0));
   let top = 0; for (let p = 1; p < np; p++) if (sc[p] > sc[top]) top = p;
@@ -89,7 +142,12 @@ k.run((dt) => {
   const d = k.party ? k.pdir(turn) : { x: (k.hit.has('right') ? 1 : 0) - (k.hit.has('left') ? 1 : 0), y: (k.hit.has('down') ? 1 : 0) - (k.hit.has('up') ? 1 : 0) };
   if (d.x || d.y) { cur = [k.clamp(cur[0] + d.x, 0, N - 1), k.clamp(cur[1] + d.y, 0, N - 1)]; refresh(); k.sfx('click'); }
   if (k.party ? k.phit(turn, 'b') : k.hit.has('b')) { rotate(); }
-  if ((k.party ? k.phit(turn, 'a') : k.hit.has('a')) && ghost) return put(ghost.cells);
+  if (k.party ? k.phit(turn, 'a') : k.hit.has('a')) {
+    if (!ghost && sel != null) snapTo(sel); /* si donde apuntas no cabe, el cursor salta al hueco más conveniente */
+    if (ghost) return put(ghost.cells);
+    say(sel == null ? 'Elige antes una pieza en tu móvil' : 'Esa pieza ya no cabe en ningún sitio'); k.sfx('hurt');
+    if (k.party) { sel = null; askPriv(); } /* se devuelve la mano al móvil para que elija otra */
+  }
   if (!k.ptr.hit) return;
   const x = k.ptr.x, y = k.ptr.y;
   if (y >= BTNY) { const bw = (W - 32) / 3;

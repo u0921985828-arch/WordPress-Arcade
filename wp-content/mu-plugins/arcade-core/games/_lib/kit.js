@@ -428,6 +428,9 @@ void main(){
         PADS.forEach((q, i) => { if (q && !(k.party && k.party.some((x) => x.p === i))) { if (i === 0) for (const n of q.held) press(n, false); q.held.clear(); q.hit.clear(); } }); /* quien se va suelta sus teclas */
         hud.classList.toggle('ext', !!k.party || !!k.extHud); /* en la tele la pausa va en el menú del mando */
         k.privOK = !!(k.party && d.priv);
+        /* 1.33: en la tele no hay menú de inicio (manda el mando). Si la sala llega con la tarjeta
+           ya pintada con botones, se repinta sin ellos: si no, la A del mando no arrancaría. */
+        if (k.st === 'ready' && lastReady) k.show(lastReady[0], lastReady[1]);
         if ((k.party ? k.party.map((x) => x.p).join() : '') !== was && k.onParty) k.onParty(k.party);
       } else if (d.type === 'arcade:ppick' && d.p >= 0 && d.p < 4) { if (k.onPick && !k.paused) k.onPick(d.p | 0, d.v);
       } else if (d.type === 'arcade:pkey' && PK[d.key] && d.p >= 0 && d.p < 4) {
