@@ -3,6 +3,11 @@ const M = CFG.mode, land = M === 'invaders' || M === 'coop';
 const W = land ? 480 : 360, H = land ? 400 : 640;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#070814' }), c = k.ctx, OUT = '#0d0b1c';
 let p, shots, foes, eb, score, lives, wave, cool, inv, dirX, t, pt, calm, mush, bunkers, ufo, pups, power, shield, stars, banner, bannerT;
+/* ---------- Oleadas a mano (shoolv.js, plan Friv) --------------------------------------
+   Si el juego tiene oleadas diseñadas, el azar no pinta nada: se juega lo escrito, con
+   progreso por dificultad (kit.js) y jefe final. Los demás modos no se enteran. */
+const HAND = M === 'invaders' && typeof SHOOLV !== 'undefined' ? (SHOOLV[CFG.id] || null) : null;
+let fox = 0, foy = 0, divT = 0, N0 = 45, LV = { sp: 1, fr: 1, dr: 10, dv: 0, uf: 1 };
 /* ---------------------------------------------------------------- arte */
 /* --- Ley de la pieza única (R5, docs/REMASTER.md §8) -------------------------------
    `unite(g, partes, ancho)` traza TODAS las partes y las rellena después: los contornos
@@ -241,21 +246,88 @@ function label(s, x, y, size, col, align) {
 /* ---------------------------------------------------------------- lógica */
 /* Dificultad 0→1: por tiempo jugado en starfall (máximo hacia los 3,5 min) y por oleada en el resto (máximo en la 9). */
 const lerp = (a, b, q) => a + (b - a) * q, ease = (q) => q * q * (3 - 2 * q);
-function diff() { return M === 'vertical' ? Math.min(1, pt / 315) : ease(Math.min(1, (wave - 1) / 12)); } // 1.23: más fácil (máx. 5,25 min / oleada 13)
+function diff() { return M === 'vertical' ? Math.min(1, pt / 315) : HAND ? ease(Math.min(1, (wave - 1) / 19)) : ease(Math.min(1, (wave - 1) / 12)); } // 1.23: más fácil (máx. 5,25 min / oleada 13); con niveles a mano, tope en el 20
 function msg(txt) { banner = txt; bannerT = 1.8; }
 function spawnWave() {
   wave++; foes = []; calm = wave === 1 ? 5 : 2;
-  if (M === 'invaders') { const rows = 5, cols = 9; for (let r = 0; r < rows; r++) for (let i = 0; i < cols; i++) foes.push({ x: 50 + i * 42, y: 60 + r * 30, r: 12, hp: 1, pts: [30, 20, 20, 10, 10][r], kind: r < 1 ? 1 : r < 3 ? 0 : 2, fr: 0 }); dirX = 1; if (wave === 1) makeBunkers(); msg(`Oleada ${wave}`); }
+  if (M === 'invaders') { const rows = 5, cols = 9; for (let r = 0; r < rows; r++) for (let i = 0; i < cols; i++) foes.push({ gx: 50 + i * 42, gy: 60 + r * 30, x: 50 + i * 42, y: 60 + r * 30, r: 12, hp: 1, pts: [30, 20, 20, 10, 10][r], kind: r < 1 ? 1 : r < 3 ? 0 : 2, fr: 0, dive: 0 }); dirX = 1; fox = 0; foy = 0; N0 = foes.length; LV = { sp: 1, fr: 1, dr: 10, dv: 0, uf: 1 }; if (wave === 1) makeBunkers(); msg(`Oleada ${wave}`); }
   if (M === 'centipede') { if (wave === 1) { mush = []; for (let i = 0; i < 34; i++) mush.push({ x: k.ri(1, 16) * 20 + 10, y: k.ri(3, 25) * 20 + 10, hp: 3 }); } for (let i = 0; i < Math.min(25, 9 + wave * 2); i++) foes.push({ x: 10 - i * 20, y: 30, r: 9, hp: 1, pts: i === 0 ? 100 : 20, dir: 1, seg: true, head: i === 0 }); msg(`Oleada ${wave}`); }
   if (M === 'bullethell' || (M === 'vertical' && wave % 3 === 0)) { const hp = M === 'bullethell' ? 112 + wave * 40 : 32 + wave * 10; foes.push({ x: W / 2, y: -60, ty: 110, r: 30, hp, max: hp, pts: 500 * wave, boss: true, a: 0, phase: 1 }); msg(M === 'bullethell' ? `Jefe ${wave}` : '¡Jefe!'); }
   else if (M === 'vertical') msg(`Oleada ${wave}`);
 }
-function makeBunkers() { bunkers = []; for (let b = 0; b < 4; b++) { const bx = 70 + b * 110, by = H - 100; for (let y = 0; y < 5; y++) for (let x = 0; x < 8; x++) { if ((y === 4 && x > 2 && x < 5) || (y === 0 && (x === 0 || x === 7))) continue; bunkers.push({ x: bx + x * 5, y: by + y * 5 }); } } }
-function reset() { p = { x: W / 2, y: H - 50, tilt: 0 }; shots = []; foes = []; eb = []; pups = []; score = 0; lives = 4 + k.D.life; wave = 0; cool = 0; inv = 3 / k.D.dmg; t = 0; pt = 0; calm = 0; power = 1; shield = 0; ufo = null; bunkers = []; stars = Array.from({ length: 70 }, () => ({ x: k.rnd(0, W), y: k.rnd(0, H), z: k.rnd(0.2, 1) })); spawnWave(); }
+/* spec = cuatro letras: F entero · h medio derruido · - sin búnker (la mordida de «h» es
+   determinista: la misma oleada trae siempre el mismo boquete). */
+function makeBunkers(spec) {
+  bunkers = []; const S = spec || 'FFFF';
+  for (let b = 0; b < 4; b++) {
+    const st = S[b] || 'F'; if (st === '-') continue;
+    const bx = 70 + b * 110, by = H - 100;
+    for (let y = 0; y < 5; y++) for (let x = 0; x < 8; x++) {
+      if ((y === 4 && x > 2 && x < 5) || (y === 0 && (x === 0 || x === 7))) continue;
+      if (st === 'h' && ((x * 2 + y * 3 + b) % 3 === 0 || (y === 0 && x > 2))) continue;
+      bunkers.push({ x: bx + x * 5, y: by + y * 5 });
+    }
+  }
+  bkN = -1;   /* la caché de búnkeres se indexa por número de celdas: fuérzala a repintarse */
+}
+/* ---------- Construcción de una oleada escrita a mano ---------- */
+const SCH = { a: { kind: 2, pts: 10, hp: 1 }, b: { kind: 0, pts: 20, hp: 1 }, c: { kind: 1, pts: 30, hp: 1 }, d: { kind: 3, pts: 40, hp: 2 }, z: { kind: 4, pts: 50, hp: 1, zig: 1 } };
+function handLevel(n) {
+  const L = HAND[k.clamp(n, 1, HAND.length) - 1];
+  wave = n;
+  LV = { sp: L.sp || 1, fr: L.fr == null ? 1 : L.fr, dr: L.dr || 10, dv: L.dv || 0, uf: L.uf == null ? 1 : L.uf };
+  foes = []; eb = []; shots = []; pups = []; ufo = null; fox = 0; foy = 0; dirX = 1; divT = LV.dv * 1.5;
+  calm = n === 1 ? 5 : 2.4;
+  const rows = L.f, cols = rows.reduce((a, r) => Math.max(a, r.length), 0), CS = cols >= 10 ? 38 : 42;
+  const x0 = W / 2 - (cols - 1) * CS / 2, y0 = L.y0 || 58;
+  for (let r = 0; r < rows.length; r++) for (let i = 0; i < rows[r].length; i++) {
+    const TY = SCH[rows[r][i]]; if (!TY) continue;
+    const gx = x0 + i * CS, gy = y0 + r * 30;
+    foes.push({ gx, gy, x: gx, y: gy, r: 12, hp: TY.hp, pts: TY.pts, kind: TY.kind, zig: !!TY.zig, fr: 0, dive: 0 });
+  }
+  N0 = foes.length;
+  if (L.bs) { const hp = L.bs.hp; foes.push({ x: W / 2, y: -70, ty: 110, r: 30, hp, max: hp, pts: 2000, boss: true, inv: 1, a: 0, cd: 2.4, phase: 1 }); }
+  makeBunkers(L.bk);
+  msg(L.m || `Nivel ${n}`);
+}
+/* Jefe de la oleada 20 (solo invasores): tres fases con patrón propio, siempre esquivable
+   moviéndose de lado. El jefe genérico de starfall/bullet-rain no se toca. */
+function bossEscort(b) {
+  const x = k.clamp(b.x + k.rnd(-70, 70), 30, W - 30);
+  foes.push({ gx: x - fox, gy: 148 - foy, x, y: b.y + 14, r: 12, hp: 1, pts: 50, kind: 4, zig: true, fr: 0, dive: 1, dt: 0, dx: x, shots: 0 });
+  k.sfx('pop');
+}
+function bossInv(b, dt, D) {
+  b.a += dt;
+  b.y += (b.ty - b.y) * Math.min(1, dt * 1.5);
+  b.phase = b.hp < b.max * 0.34 ? 3 : b.hp < b.max * 0.67 ? 2 : 1;
+  b.x = W / 2 + Math.sin(b.a * (0.42 + b.phase * 0.13) * k.D.spd) * (W / 2 - 74);
+  if (b.y < b.ty - 25) return;
+  b.cd -= dt; if (b.cd > 0) return;
+  const vd = lerp(118, 148, D) * k.D.spd;
+  if (b.phase === 1) {                                   /* dos plomos dirigidos, con calma */
+    b.cd = 1.2 / k.D.rate;
+    for (const sd of [-1, 1]) { const a = Math.atan2(p.y - b.y, p.x + sd * 30 - b.x); eb.push({ x: b.x + sd * 22, y: b.y + 18, vx: Math.cos(a) * vd, vy: Math.sin(a) * vd, zig: 1 }); }
+  } else if (b.phase === 2) {                            /* abanico hacia abajo + escolta */
+    b.cd = 1.05 / k.D.rate;
+    for (let i = -2; i <= 2; i++) eb.push({ x: b.x, y: b.y + 18, vx: i * 44, vy: vd });
+    if (Math.random() < 0.3) bossEscort(b);
+  } else {                                               /* barrido en peine + salva dirigida */
+    b.cd = 0.8 / k.D.rate;
+    b.sw = ((b.sw || 0) + 1) % 4;
+    for (let i = 0; i < 5; i++) eb.push({ x: b.x - 62 + i * 31 + b.sw * 7, y: b.y + 18, vx: 0, vy: vd * 1.12 });
+    const a = Math.atan2(p.y - b.y, p.x - b.x);
+    for (let j = -1; j <= 1; j++) eb.push({ x: b.x, y: b.y + 18, vx: Math.cos(a + j * 0.24) * vd * 1.1, vy: Math.sin(a + j * 0.24) * vd * 1.1 });
+  }
+  k.sfx('shoot');
+}
+function reset() { p = { x: W / 2, y: H - 50, tilt: 0 }; shots = []; foes = []; eb = []; pups = []; score = 0; lives = 4 + k.D.life; wave = 0; cool = 0; inv = 3 / k.D.dmg; t = 0; pt = 0; calm = 0; power = 1; shield = 0; ufo = null; bunkers = []; fox = 0; foy = 0; divT = 0; N0 = 45; LV = { sp: 1, fr: 1, dr: 10, dv: 0, uf: 1 }; stars = Array.from({ length: 70 }, () => ({ x: k.rnd(0, W), y: k.rnd(0, H), z: k.rnd(0.2, 1) })); if (HAND) handLevel(k.lv); else spawnWave(); }
+/* Niveles diseñados a mano (plan Friv): el progreso lo guarda kit.js por dificultad. */
+if (HAND) k.levels(HAND.length, { start: () => reset() });
 if (M !== 'coop') { reset(); k.show(CFG.title, CFG.help);
 /* si el jugador cambia de nivel en la pantalla de inicio, la partida se prepara de nuevo con los valores de k.D */
 k.onDif = () => { if (k.st !== 'play') reset(); }; }
-function hitPlayer() { if (inv > 0) return; if (shield > 0) { shield = 0; inv = 1 / k.D.dmg; k.sfx('hit'); k.burst(p.x, p.y, '#5ce1e6', 16); return; } lives--; inv = 2 / k.D.dmg; eb = []; power = Math.max(1, power - 1); k.burst(p.x, p.y, '#ffb347', 30, 220); k.sfx('explode'); k.shake(8); k.flash('rgba(255,80,90,.35)'); if (lives <= 0) k.lose(CFG.id, Math.floor(score), 'Nave destruida', `Oleada ${wave}`); }
+function hitPlayer() { if (inv > 0) return; if (shield > 0) { shield = 0; inv = 1 / k.D.dmg; k.sfx('hit'); k.burst(p.x, p.y, '#5ce1e6', 16); return; } lives--; inv = 2 / k.D.dmg; eb = []; power = Math.max(1, power - 1); k.burst(p.x, p.y, '#ffb347', 30, 220); k.sfx('explode'); k.shake(8); k.flash('rgba(255,80,90,.35)'); if (lives <= 0) k.lose(CFG.id, Math.floor(score), 'Nave destruida', HAND ? `Nivel ${wave} de ${HAND.length}` : `Oleada ${wave}`); }
 function killFoe(f) { f.dead = true; score += f.pts; k.burst(f.x, f.y, f.boss ? '#f0647e' : EC[(f.kind || 0) % 4], f.boss ? 70 : 14, f.boss ? 260 : 160); k.sfx(f.boss ? 'explode' : 'hit'); if (f.boss) { k.shake(12); k.float(`+${f.pts}`, f.x, f.y, '#e9b949'); pups.push({ x: f.x, y: f.y, t: 'P' }); }
   if (M === 'centipede' && f.seg) mush.push({ x: Math.round((f.x - 10) / 20) * 20 + 10, y: f.y, hp: 3 });
   if (M === 'vertical' && !f.boss && Math.random() < 0.08) pups.push({ x: f.x, y: f.y, t: Math.random() < 0.6 ? 'P' : 'S' }); }
@@ -276,16 +348,38 @@ if (M !== 'coop') k.run((dt) => {
   for (const s of shots) { s.y -= 560 * dt; s.x += (s.vx || 0) * dt; }
   /* enemigos */
   if (M === 'invaders') {
-    const alive = foes.length, sp2 = (lerp(16, 34, D) + (45 - alive) * 2.7) * k.D.spd; let edge = false; const fr = Math.floor(t * (1 + (45 - alive) / 12)) % 2;
-    for (const f of foes) { f.fr = fr; f.x += dirX * sp2 * dt; if (f.x < 16 || f.x > W - 16) edge = true; }
-    if (edge) { dirX *= -1; for (const f of foes) { f.y += 10; f.x += dirX * 4; if (f.y > H - 72) return k.lose(CFG.id, Math.floor(score), 'Invadido', `Oleada ${wave}`); } }
-    if (foes.length && calm <= 0 && Math.random() < dt * lerp(0.45, 2.25, D) * k.D.rate) { const cols = {}; for (const f of foes) { const key = Math.round(f.x / 10); if (!cols[key] || cols[key].y < f.y) cols[key] = f; } const f = k.pick(Object.values(cols)); eb.push({ x: f.x, y: f.y + 10, vx: 0, vy: lerp(128, 208, D) * k.D.spd, zig: 1 }); }
-    if (!ufo && Math.random() < dt * 0.06) ufo = { x: -30, y: 34, vx: 90, pts: k.pick([50, 100, 150, 300]) };
+    /* La flota se mueve como un bloque: cada bicho guarda su hueco (gx, gy) y el bloque lleva
+       su propio desplazamiento (fox, foy). Así un saltarín puede descolgarse y volver a su sitio. */
+    const form = foes.filter((f) => !f.boss && !f.dive), gone = Math.max(0, N0 - form.length);
+    const sp2 = (lerp(16, 34, D) + gone * 2.7) * k.D.spd * LV.sp;
+    fox += dirX * sp2 * dt;
+    let lo = 1e9, hi = -1e9, low = -1e9;
+    for (const f of form) { const fx = f.gx + fox, fy = f.gy + foy; if (fx < lo) lo = fx; if (fx > hi) hi = fx; if (fy > low) low = fy; }
+    if (form.length && (lo < 16 || hi > W - 16)) { dirX *= -1; fox += dirX * 4; foy += LV.dr; if (low + LV.dr > H - 72) return k.lose(CFG.id, Math.floor(score), 'Invadido', HAND ? `Nivel ${wave} de ${HAND.length}` : `Oleada ${wave}`); }
+    const fr = Math.floor(t * (1 + gone / 12)) % 2;
+    for (const f of foes) { if (f.boss) continue; f.fr = fr; if (!f.dive) { f.x = f.gx + fox; f.y = f.gy + foy; } }
+    /* saltarines: se descuelgan, bajan en zigzag persiguiendo la nave y, si salen por abajo,
+       reaparecen arriba y vuelven a su hueco de la formación. */
+    if (LV.dv > 0 && calm <= 0) {
+      divT -= dt;
+      if (divT <= 0) { const cand = form.filter((f) => f.zig); if (cand.length) { const f = k.pick(cand); f.dive = 1; f.dt = 0; f.dx = f.x; f.shots = 1; k.sfx('pop'); } divT = LV.dv * k.rnd(0.85, 1.2) / k.D.rate; }
+    }
+    for (const f of foes) if (f.dive) {
+      f.dt += dt;
+      if (f.dive === 1) {
+        f.dx += Math.sign(p.x - f.dx) * 48 * dt; f.dx = k.clamp(f.dx, 26, W - 26);
+        f.x = f.dx + Math.sin(f.dt * 4.6) * 52; f.y += lerp(100, 148, D) * k.D.spd * dt;
+        if (f.shots > 0 && f.y > 90 && f.y < H - 120 && Math.random() < dt * 1.2 * k.D.rate) { f.shots--; eb.push({ x: f.x, y: f.y + 10, vx: 0, vy: lerp(140, 190, D) * k.D.spd, zig: 1 }); }
+        if (f.y > H + 20) { f.dive = 2; f.y = -20; }
+      } else { const hx = f.gx + fox, hy = f.gy + foy; f.x += (hx - f.x) * Math.min(1, dt * 3); f.y += (hy - f.y) * Math.min(1, dt * 3); if (Math.hypot(hx - f.x, hy - f.y) < 3) f.dive = 0; }
+    }
+    if (form.length && calm <= 0 && Math.random() < dt * lerp(0.45, 2.25, D) * k.D.rate * LV.fr) { const cols = {}; for (const f of form) { const key = Math.round(f.x / 10); if (!cols[key] || cols[key].y < f.y) cols[key] = f; } const f = k.pick(Object.values(cols)); eb.push({ x: f.x, y: f.y + 10, vx: 0, vy: lerp(128, 208, D) * k.D.spd, zig: 1 }); }
+    if (!ufo && LV.uf > 0 && Math.random() < dt * 0.06 * LV.uf) ufo = { x: -30, y: 34, vx: 90, pts: k.pick([50, 100, 150, 300]) };
     if (ufo) { ufo.x += ufo.vx * dt; if (ufo.x > W + 40) ufo = null; }
     for (const s of shots) { if (ufo && !s.dead && Math.abs(s.x - ufo.x) < 18 && Math.abs(s.y - ufo.y) < 10) { s.dead = true; score += ufo.pts; k.float(`+${ufo.pts}`, ufo.x, ufo.y, '#e9b949'); k.burst(ufo.x, ufo.y, '#f0647e', 24); k.sfx('coin'); ufo = null; }
       for (const b of bunkers) if (!b.dead && !s.dead && s.x > b.x - 1 && s.x < b.x + 6 && s.y < b.y + 6 && s.y + 560 * dt > b.y) { b.dead = true; s.dead = true; } } /* barrido: a 560 px/s la bala avanza más que una celda por fotograma */
     for (const e of eb) for (const b of bunkers) if (!b.dead && !e.dead && e.x > b.x - 2 && e.x < b.x + 7 && e.y > b.y && e.y - e.vy * dt < b.y + 6) { b.dead = true; e.dead = true; k.burst(e.x, e.y, '#4cc38a', 3, 60); }
-    for (const f of foes) for (const b of bunkers) if (!b.dead && Math.abs(f.x - b.x) < 14 && Math.abs(f.y - b.y) < 10) b.dead = true;
+    for (const f of foes) { if (f.dive || f.boss) continue; for (const b of bunkers) if (!b.dead && Math.abs(f.x - b.x) < 14 && Math.abs(f.y - b.y) < 10) b.dead = true; }
     bunkers = bunkers.filter((b) => !b.dead);
   } else if (M === 'vertical') {
     if (!foes.some((f) => f.boss) && calm <= 0 && Math.random() < dt * lerp(0.8, 2.56, D) * k.D.rate) { const big = Math.random() < lerp(0.06, 0.22, D); foes.push({ x: k.rnd(24, W - 24), y: -20, r: big ? 18 : 12, hp: big ? 6 : 1, pts: big ? 60 : 15, vy: k.rnd(60, 120) * lerp(0.56, 0.98, D) * k.D.spd, ph: k.rnd(0, 6), big, kind: k.ri(0, 3) }); }
@@ -302,6 +396,7 @@ if (M !== 'coop') k.run((dt) => {
     for (const f of foes) if (f.spider) { f.x += f.dir * lerp(64, 98, D) * k.D.spd * dt; f.y += Math.sin(t * 7 + f.x * 0.05) * 140 * dt; f.y = k.clamp(f.y, H * 0.55, H - 20); if (f.x < -20 || f.x > W + 20) f.dead = true; if (Math.hypot(f.x - p.x, f.y - p.y) < 17) hitPlayer(); mush.forEach((m) => { if (Math.abs(m.x - f.x) < 10 && Math.abs(m.y - f.y) < 10) m.hp = 0; }); }
   }
   for (const b of foes) if (b.boss) {
+    if (b.inv) { bossInv(b, dt, D); continue; }
     b.y += (b.ty - b.y) * Math.min(1, dt * 1.5); b.a += dt; b.x = W / 2 + Math.sin(t * 0.7) * 110; b.phase = b.hp < b.max * 0.33 ? 3 : b.hp < b.max * 0.66 ? 2 : 1;
     /* no dispara hasta estar en posición; anillos y ráfagas crecen con la dificultad y con la fase */
     const n = Math.round(lerp(7, 18, D)) + b.phase * 2, rv = (lerp(68, 88, D) + b.phase * 12) * k.D.spd, av = lerp(132, 168, D) * k.D.spd;
@@ -314,7 +409,10 @@ if (M !== 'coop') k.run((dt) => {
   for (const f of foes) { f.flash = (f.flash || 0) - dt; if (!f.dead && !f.boss && M !== 'centipede' && Math.hypot(f.x - p.x, f.y - p.y) < f.r + 10) { killFoe(f); hitPlayer(); } }
   for (const u of pups) { u.y += 90 * dt; if (Math.hypot(u.x - p.x, u.y - p.y) < 26) { u.dead = true; k.sfx('coin'); if (u.t === 'P') { power = Math.min(3, power + 1); k.float('¡Disparo mejorado!', p.x, p.y - 30, '#5ce1e6'); } else { shield = 10; k.float('¡Escudo!', p.x, p.y - 30, '#9b8afb'); } } }
   shots = shots.filter((s) => !s.dead && s.y > -10); eb = eb.filter((e) => !e.dead && e.y > -20 && e.y < H + 20 && e.x > -20 && e.x < W + 20); foes = foes.filter((f) => !f.dead); pups = pups.filter((u) => !u.dead && u.y < H + 20);
-  if (k.st === 'play' && M !== 'vertical' && !foes.some((f) => !f.spider)) { score += 200 * wave; k.float(`+${200 * wave}`, W / 2, H * 0.5, '#e9b949'); k.sfx('win'); k.confetti(); spawnWave(); }
+  if (k.st === 'play' && M !== 'vertical' && !foes.some((f) => !f.spider)) {
+    score += 200 * wave;
+    if (HAND) return k.levelDone(Math.floor(score), `${lives} vida${lives === 1 ? '' : 's'} · ${Math.floor(score)} puntos`);
+    k.float(`+${200 * wave}`, W / 2, H * 0.5, '#e9b949'); k.sfx('win'); k.confetti(); spawnWave(); }
   if (k.st === 'play' && M === 'vertical' && wave % 3 === 0 && !foes.some((f) => f.boss) && t > 3) { /* jefe vencido */ }
 }, () => {
   background();
@@ -329,7 +427,7 @@ if (M !== 'coop') k.run((dt) => {
     c.restore(); }
   if (M === 'centipede') chain(foes.filter((f) => f.seg));
   for (const f of foes) { const fl = f.flash > 0;
-    if (f.boss) { boss(f, fl); const bw = Math.min(220, W - 150), bx = W / 2 - bw / 2; ART.rr(c, bx - 2, 54, bw + 4, 10, 5); ART.fillOut(c, 'rgba(12,10,24,.7)', 2); c.fillStyle = f.phase > 2 ? '#ff3b5c' : '#f0647e'; ART.rr(c, bx, 56, bw * Math.max(0, f.hp) / f.max, 6, 3); c.fill(); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(bx + 2, 56.5, Math.max(0, bw * f.hp / f.max - 4), 1.5); continue; }
+    if (f.boss) { boss(f, fl); const bw = Math.min(220, W - 150), bx = W / 2 - bw / 2; if (f.inv) label('Nave nodriza', W / 2, 70, 13, '#ffd166', 'center');   /* bajo la barra: arriba están el marcador y los botones del reproductor */ ART.rr(c, bx - 2, 54, bw + 4, 10, 5); ART.fillOut(c, 'rgba(12,10,24,.7)', 2); c.fillStyle = f.phase > 2 ? '#ff3b5c' : '#f0647e'; ART.rr(c, bx, 56, bw * Math.max(0, f.hp) / f.max, 6, 3); c.fill(); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(bx + 2, 56.5, Math.max(0, bw * f.hp / f.max - 4), 1.5); continue; }
     if (f.seg) continue;
     else if (f.spider) { c.save(); c.translate(f.x, f.y); c.lineCap = 'round';
       const legs = [];
@@ -337,7 +435,7 @@ if (M !== 'coop') k.run((dt) => {
       unite(c, legs.concat([[(g) => g.ellipse(0, 1, 9, 8, 0, 0, 6.283), fl ? '#fff' : '#e9b949']]), 1.05);
       clipIn(c, (g) => g.ellipse(0, 1, 9, 8, 0, 0, 6.283), (g) => { g.fillStyle = AL(OUT, 0.22); g.beginPath(); g.arc(3, 4, 8, 0, 6.283); g.fill(); g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(-3, -3, 2.5, 0, 6.283); g.fill(); });
       c.fillStyle = '#ff3b5c'; c.beginPath(); c.arc(-3, 2, 1.8, 0, 6.283); c.arc(3, 2, 1.8, 0, 6.283); c.fill(); c.restore(); }
-    else if (M === 'invaders') alien(f.x, f.y, f.kind, f.fr, fl);
+    else if (M === 'invaders') { alien(f.x, f.y, f.kind, f.fr, fl); if (f.hp > 1) { c.strokeStyle = '#e9b949'; c.lineWidth = 2; c.beginPath(); c.arc(f.x, f.y, 15, 3.6, 5.8); c.stroke(); } }
     else if (M === 'vertical') f.big ? drone(f.x, f.y, f.r, true, fl) : alien(f.x, f.y, f.kind, Math.floor(t * 4) % 2, fl); }
   for (const u of pups) { const col = u.t === 'P' ? '#5ce1e6' : '#9b8afb', b = 1 + Math.sin(t * 6) * 0.08; c.save(); c.translate(u.x, u.y); c.scale(b, b);
     c.globalAlpha = 0.3; c.fillStyle = col; c.beginPath(); c.arc(0, 0, 17, 0, 6.283); c.fill(); c.globalAlpha = 1;
@@ -349,6 +447,7 @@ if (M !== 'coop') k.run((dt) => {
   const ez = gspr('z'), er = gspr(M === 'bullethell' ? 'R' : 'r'); for (const e of eb) { if (e.zig) c.drawImage(ez.cv, e.x + (Math.floor(e.y / 6) % 2 ? 2 : -2) + ez.o, e.y + ez.q, ez.w, ez.h); else c.drawImage(er.cv, e.x + er.o, e.y + er.q, er.w, er.h); }
   if (k.st === 'play' && !(inv > 0 && Math.floor(inv * 10) % 2)) { ship(p.x, p.y, 1, k.clamp(p.tilt, -1.5, 1.5)); if (shield > 0) { c.strokeStyle = `rgba(155,138,251,${0.5 + Math.sin(t * 8) * 0.2})`; c.lineWidth = 3; c.beginPath(); c.arc(p.x, p.y, 26, 0, 6.283); c.stroke(); } if (M === 'bullethell') { c.fillStyle = '#fff'; c.beginPath(); c.arc(p.x, p.y, 3, 0, 6.283); c.fill(); } }
   label(String(Math.floor(score)), 12, 8, 22, '#fff'); for (let i = 0; i < lives; i++) ship(W - 18 - i * 22, 22, 0.55, 0);
+  if (HAND) label(`Nivel ${wave}/${HAND.length}`, 12, H - 22, 13, '#a097ff');   /* abajo a la izquierda: el OVNI cruza por arriba y las vidas ocupan la derecha */
   if (M === 'vertical' && power > 1) for (let i = 1; i < power; i++) { c.beginPath(); c.moveTo(18 + (i - 1) * 16, 36); c.lineTo(25 + (i - 1) * 16, 47); c.lineTo(11 + (i - 1) * 16, 47); c.closePath(); ART.fillOut(c, '#5ce1e6', 2); }
   if (bannerT > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, bannerT); label(banner, W / 2, H * 0.42, 28, '#fff', 'center'); c.globalAlpha = 1; }
 });
