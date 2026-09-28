@@ -2,15 +2,55 @@
  * Mundo en coordenadas absolutas (cam = distancia recorrida); casilla T = 32 px. */
 const M = CFG.mode, port = M === 'flap', cave = M === 'cave', grav0 = M === 'gravity', dbl = M === 'double';
 const TH = ART.THEMES[CFG.theme || (port ? 'meadow' : 'jungle')], OUT = ART.OUT, PAL = CFG.pal || ['#5ce1e6', '#ff5fa2', '#3b2a55'];
-const W = port ? 360 : 640, H = port ? 640 : 360, T = 32;
-const k = Kit({ w: W, h: H, title: CFG.title, bg: cave ? '#120c20' : TH.sky[0] }), c = k.ctx;
-const FLOOR = H - 64, CEIL = 64, PX = port ? 110 : 150;
+let W = port ? 360 : 640, H = port ? 640 : 360;
+const T = 32;
+/* Lienzo fluido (plan Friv): en los runners de suelo el ancho jugable se mantiene y lo que crece
+   es el cielo, así que la pantalla se llena sin cambiar ni una pizca la dificultad. */
+const FLU = !port && !cave && !grav0;
+const k = Kit({ w: W, h: H, fluid: FLU ? { min: 0.3, max: 3.2 } : 0, title: CFG.title, bg: cave ? '#120c20' : TH.sky[0] }), c = k.ctx;
+let FLOOR = H - 64;
+const CEIL = 64, PX = port ? 110 : 150;
+if (FLU) { W = k.W; H = k.H; FLOOR = H - 64;
+  k.onSize = (vw, vh) => { const d = (vh - 64) - FLOOR; W = vw; H = vh; FLOOR = H - 64;
+    if (!d) return;
+    if (p) p.y += d;
+    for (const o of obs || []) o.y += d;
+    for (const q of coins || []) q.y += d;
+  }; }
 const G = 1500, JUMP = 560, JUMP2 = 520, CUT = 200, COYOTE = 0.12, BUFFER = 0.14;
 /* Curva de dificultad según distancia: arranca a ~65 % y llega al máximo hacia los 3 min de buen juego.
  * V0/VMAX en px/s; DIST = px recorridos para dificultad 1 (vel. lineal en distancia → subida suave al principio). */
 const V0 = cave ? 128 : grav0 ? 136 : 140, VMAX = cave ? 340 : grav0 ? 357 : dbl ? 417 : 400, DIST = cave ? 69000 : 78000; // 1.23: más fácil (×0,8 / ×0,85 / ×1,5)
 const lvlOf = () => Math.min(1, cam / DIST), speedOf = () => (V0 + (VMAX - V0) * lvlOf()) * k.D.spd; /* k.D.spd: fácil ×0,8 · difícil ×1,18 */
 let p, obs, coins, holes, decos, cav, bullets, rings, t, cam, speed, bonus, got, nx, jumps, grav, gs, dead, hover, coy, buf, sq, passed, mines, wing;
+/* Tramos a mano (plan Friv): con tabla no hay generación al azar; el nivel termina en bandera. */
+const RLV = (typeof RUNLV !== 'undefined' && RUNLV[CFG.id]) || null;
+let goal = 0, lvNum = 1, lvSpeed = 0;
+function buildHand(n0) {
+  lvNum = k.clamp(n0, 1, RLV.length);
+  lvSpeed = (V0 + (VMAX - V0) * ((lvNum - 1) / (RLV.length - 1)) * 0.92) * k.D.spd;
+  /* Los respiros se escriben en casillas pero se juegan en tiempo: a más velocidad, más metros,
+     para que el ritmo del diseño sea el mismo en el nivel 1 y en el 20. Y siempre hay pista de
+     salida: nada mata en el primer segundo y medio. */
+  const gs2 = Math.max(1, lvSpeed / 180);
+  let x = 4 + Math.ceil(lvSpeed * 1.5 / T), last = { x: 4, n: 2 };
+  for (const tk of RLV[lvNum - 1].split(' ').filter(Boolean)) {
+    const n = +tk.slice(1) || 1, c0 = tk[0];
+    if (c0 === '.') x += Math.round(n * gs2);
+    else if (c0 === 's') { spikes(x, n); last = { x, n }; x += n; }
+    else if (c0 === 'c' || c0 === 'C') { const hgt = c0 === 'C' ? 2 : 1;
+      for (let i = 0; i < n; i++) { for (let j = 0; j < hgt; j++) obs.push({ k: 'crate', x: (x + i) * T, y: FLOOR - (j + 1) * T }); coins.push({ x: (x + i + 0.5) * T, y: FLOOR - hgt * T - 22 }); }
+      last = { x, n }; x += n; }
+    else if (c0 === 'h') { holes.push({ a: x, b: x + n }); last = { x, n }; x += n; }
+    else if (c0 === 'f' || c0 === 'F') { const high = c0 === 'F';
+      obs.push({ k: 'foe', x: x * T, y: high ? FLOOR - 96 : FLOOR - 26, w: 28, h: 26, vx: (high ? -30 : -60) * (0.45 + lvNum / RLV.length * 0.55) * k.D.spd, kind: TH.enemy, ph: 0 });
+      last = { x, n: 2 }; x += 3; }
+    else if (c0 === 'o') coinArc(last.x - 1, n, 78, FLOOR - 26);
+    if (Math.random() < 0) x += 0;   /* sin azar: la tira es la del diseño */
+  }
+  for (let i = 3; i < x; i += 7) decos.push({ x: i * T + 16, s: (i % 5) / 5 });
+  goal = (x + 5) * T; nx = 1e9;
+}
 function reset() {
   p = { y: port || cave ? H / 2 : FLOOR - 28, vy: 0, w: 18, h: 28, on: true, rot: 0 };
   obs = []; coins = []; holes = []; decos = []; bullets = []; rings = []; cav = [];
@@ -18,7 +58,9 @@ function reset() {
   nx = port ? W + 200 : cave ? W + 200 : 28;
   if (cave) for (let x = -40; x <= W + 60; x += 20) cav.push({ x, top: 60, bot: H - 60, cr: Math.random() < 0.1 });
   if (!port && !cave) for (let i = 1; i < 20; i += k.ri(3, 6)) decos.push({ x: i * T + 16, s: Math.random() });
+  if (RLV) { obs = []; coins = []; holes = []; decos = []; buildHand(k.lv); }
 }
+if (RLV) k.levels(RLV.length, { start: (i) => { lvNum = i; reset(); } });
 reset(); k.show(CFG.title, CFG.help);
 /* si el jugador cambia de nivel en la pantalla de inicio, la partida se prepara de nuevo con los valores de k.D */
 k.onDif = () => { if (k.st !== 'play') reset(); };
@@ -95,8 +137,10 @@ k.run((dt) => {
       nx += speed * 1.25 * (k.rnd(1, 2) + (1 - lv) * 0.7) / k.D.rate;
     }
   } else {
-    speed = speedOf();
-    while (nx * T < cam + W + 120) pattern();
+    /* Con tramos a mano la velocidad la marca el nivel, no la distancia recorrida. */
+    speed = RLV ? lvSpeed : speedOf();
+    if (!RLV) while (nx * T < cam + W + 120) pattern();
+    if (RLV && cam + PX > goal) { const sc = total(); return k.levelDone(sc, `${got} moneda${got === 1 ? '' : 's'}`); }
     if (grav0) {
       coy = p.on ? COYOTE : coy - dt; buf = act() ? BUFFER : buf - dt;
       if (buf > 0 && coy > 0) { grav *= -1; buf = 0; coy = 0; p.on = false; k.sfx('jump'); rings.push({ x: PX + p.w / 2, y: p.y + p.h / 2, t: 0 }); }
@@ -346,12 +390,16 @@ function draw() {
     ART.hero(c, 0, p.h / 2 + 1, 0.9, { face: 1, state, t, col: TH.hero, squash: sq });
     c.restore();
   }
+  if (RLV && goal - cam < W + 40) ART.flag(c, goal - cam, FLOOR, t, '#ff5f7a', 100);
   // HUD
   if (port) { label(String(passed + got), W / 2, 58, 46, '#fff', 'center'); }
   else {
     if (cave) { mine({ y: 24, ph: 0, hp: 2, hit: 0 }, 24); label(`× ${mines}`, 44, 13, 18); }
     else { ART.coin(c, 22, 24, 0, 9); label(`× ${got}`, 38, 13, 18); }
-    label(`${metres()} m`, W - 14, 12, 22, '#fff', 'right');
+    if (RLV) { const rest = Math.max(0, Math.ceil((goal - cam - PX) / T));
+      label(`${rest} m`, W - 14, 12, 22, '#fff', 'right');
+      label(`Nivel ${lvNum}/${RLV.length}`, W - 14, 38, 13, '#ffc928', 'right'); }
+    else label(`${metres()} m`, W - 14, 12, 22, '#fff', 'right');
   }
   if (hover && k.st === 'play') { c.globalAlpha = 0.6 + 0.4 * Math.sin(t * 5); label(port ? 'Toca para aletear' : 'Mantén para subir', W / 2, port ? H * 0.62 : H - 110, port ? 20 : 18, '#fff', 'center'); c.globalAlpha = 1; }
 }

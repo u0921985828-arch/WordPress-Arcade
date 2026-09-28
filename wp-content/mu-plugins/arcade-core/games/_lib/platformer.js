@@ -20,7 +20,45 @@ function label(s, x, y, size, col, align) {
   c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = ART.OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
 }
 const tileAt = (x, y) => { const tx = Math.floor(x / T), ty = Math.floor(y / T); if (tx < 0 || tx >= MW) return 1; if (ty < 0 || ty >= MH) return 0; return map[ty][tx]; };
+/* ---------- Niveles a mano (platlv.js) --------------------------------------------------
+   Si el juego tiene tira de niveles diseñada, el azar no pinta nada: se lee la tira tal cual.
+   Los que no la tienen siguen con el generador de siempre. */
+const HAND = (typeof PLATLV !== 'undefined' && PLATLV[CFG.id]) || null;
+let boss = null;
+const TW = (tk) => { const n = +tk.slice(1) || 0; const c0 = tk[0];
+  return c0 === 'f' || c0 === 'g' || c0 === 'x' || c0 === 'p' ? n : c0 === 'u' || c0 === 'd' ? 4 : c0 === 'w' ? 8 : c0 === 'B' ? 14 : 0; };
+function genHand(n0) {
+  const toks = HAND[k.clamp(n0, 1, HAND.length) - 1].split(' ').filter(Boolean);
+  MW = 4 + toks.reduce((a, t) => a + TW(t), 0) + 9;
+  map = Array.from({ length: MH }, () => Array(MW).fill(0));
+  enemies = []; coins = []; anchors = []; decos = []; boss = null;
+  const col = (cx0, hh) => { for (let y = MH - hh; y < MH; y++) if (cx0 >= 0 && cx0 < MW) map[y][cx0] = 1; };
+  let x = 0, h = 3, sx = 0, sw = 4, top = 3;   /* sx/sw/top: lo último colocado (para «e» y «c») */
+  const flat = (n) => { sx = x; sw = n; top = h; for (let i = 0; i < n; i++) col(x + i, h); x += n; };
+  flat(4);
+  const lv01 = Math.min(1, (n0 - 1) / 16);
+  for (const tk of toks) {
+    const n = +tk.slice(1) || 0, c0 = tk[0];
+    if (c0 === 'f') flat(n);
+    else if (c0 === 'u') { h = Math.min(10, h + n); flat(4); }
+    else if (c0 === 'd') { h = Math.max(2, h - n); flat(4); }
+    else if (c0 === 'g') { sx = x; sw = n; top = h; x += n; }
+    else if (c0 === 'x') { flat(n); for (let i = 1; i < n - 1; i++) map[MH - h - 1][sx + i] = 3; }
+    else if (c0 === 'p') { sx = x; sw = n; top = h + 4; const py = MH - h - 5; for (let i = 0; i < n; i++) if (map[py]) map[py][x + i] = 2; x += n; }
+    else if (c0 === 'w') { const nh = h + 5; for (let i = 0; i < 5; i++) col(x + i, h); for (let y = MH - nh - 1; y < MH - h - 3; y++) map[y][x + 1] = 1; x += 5; h = nh; flat(3); }
+    else if (c0 === 'a') anchors.push({ x: x * T, y: (MH - h - 6) * T });
+    else if (c0 === 'e') enemies.push({ x: (sx + 1) * T, y: (MH - top) * T - 24, w: 26, h: 24, vx: (46 + 26 * lv01) * k.D.spd, min: sx * T, max: (sx + sw) * T - 26, alive: true, fly: TH.enemy === 'bird' });
+    else if (c0 === 'c') for (let i = 0; i < 4; i++) coins.push({ x: (sx + sw * (i + 0.5) / 4) * T, y: (MH - top - 1) * T - 8 - Math.sin((i + 0.5) / 4 * Math.PI) * 30 });
+    else if (c0 === 'k') checks.push({ x: x * T, y: (MH - h) * T, on: false });
+    else if (c0 === 'B') { flat(14); boss = { x: (x - 8) * T, y: (MH - h) * T - 54, w: 54, h: 54, vx: 100 * k.D.spd, min: (x - 13) * T, max: (x - 2) * T - 54, hp: 3, iv: 0, face: -1, alive: true }; }
+  }
+  for (let i = 0; i < 9; i++) col(x + i, h);
+  flag = { x: (x + 4) * T, y: (MH - h) * T, hidden: !!boss };
+  spawn = { x: 1.5 * T, y: (MH - 3) * T - 40 };
+  for (let i = 0; i < 3; i++) if (!enemies.length || i < 1) decos.push({ x: (1.5 + i * 1.2) * T, y: (MH - 3) * T });
+}
 function gen() {
+  if (HAND) return genHand(level);
   const lv = RACE ? Math.min(1, (level - 1) / 5) : Math.min(1, (level - 1) / 12); MW = RACE ? 120 + Math.min(level, 6) * 8 : 62 + Math.min(level, 12) * 16; map = Array.from({ length: MH }, () => Array(MW).fill(0)); enemies = []; coins = []; anchors = []; decos = [];
   const col = (x, h) => { for (let y = MH - h; y < MH; y++) if (x >= 0 && x < MW) map[y][x] = 1; };
   const spare = []; // tramos aptos sin enemigo: garantizan un mínimo por nivel
@@ -62,7 +100,7 @@ function gen() {
 function groundY(o) { const tx = Math.floor((o.x + o.w / 2) / T); for (let ty = Math.max(0, Math.floor((o.y + o.h - 1) / T)); ty < MH; ty++) { const v = map[ty] && map[ty][tx]; if (v === 1 || v === 2 || v === 3) return ty * T; } return null; }
 function mkP(s) { return { x: s.x, y: s.y, vx: 0, vy: 0, w: 22, h: 30, face: 1, ground: false, state: 'idle', wall: 0 }; }
 function build() { check = null; checks = []; inv = 0; go = 0; gen(); p = mkP(spawn); t = 0; rope = null; dashT = 0; dashCd = 0; swordT = 0; jumpBuf = 0; coyote = 0; dead = 0; intro = 1.6; landSq = 0; cx = 0; cy = camY(MH * T - H); }
-function reset() { if (RACE) return raceNew(); level = 1; lives = 4 + k.D.life; score = 0; coinsGot = 0; build(); }
+function reset() { if (RACE) return raceNew(); level = HAND ? k.lv : 1; lives = 4 + k.D.life; score = 0; coinsGot = 0; build(); }
 function die() { if (dead || inv > 0) return; dead = 1.1; p.vy = -600; k.sfx('hurt'); k.shake(8); k.flash('rgba(255,60,80,.35)'); }
 function respawn() { lives--; if (lives <= 0) return k.lose(CFG.id, score, 'Sin vidas', `Nivel ${level} · ${coinsGot} moneda${coinsGot === 1 ? '' : 's'}`); const s = check && check.on ? { x: check.x, y: check.y - 40 } : spawn; p = mkP(s); rope = null; dead = 0; dashT = 0; inv = 1.6 / k.D.dmg; }
 /* subpasos: a pocos FPS (dt hasta 0,05 s) una caída a 1100 px/s recorre 55 px y atravesaría tablones de 1 casilla */
@@ -114,11 +152,29 @@ function upd(dt) {
     const ey = e.fly ? e.y - 20 + Math.sin(t * 2 + e.min) * 16 : e.y, hit = p.x + p.w > e.x + 6 && p.x < e.x + e.w - 6 && p.y + p.h > ey + 7 && p.y < ey + e.h - 2;
     if (swordT > 0 && Math.abs(e.x + 13 - (p.x + 11 + p.face * 22)) < 30 && Math.abs(ey + 12 - p.y - 15) < 28) { e.alive = false; score += 100; k.burst(e.x + 13, ey + 12, '#fff', 16); k.float('+100', e.x + 13, ey); k.sfx('hit'); continue; }
     if (hit) { if ((p.vy > 0 && p.y + p.h - ey < 14) || dashT > 0) { e.alive = false; p.vy = -620; score += 100; k.burst(e.x + 13, ey + 12, '#fff', 16); k.float('+100', e.x + 13, ey); k.sfx('hit'); } else return die(); } }
+  /* Jefe del nivel 20: tres impactos (pisotón o espada) y cae la muralla que tapa la bandera. */
+  if (boss && boss.alive) {
+    boss.iv -= dt;
+    const dir = Math.abs(p.x - boss.x) < 420 ? Math.sign(p.x - boss.x) || 1 : Math.sign(boss.vx) || 1;
+    boss.x += Math.abs(boss.vx) * dir * dt;
+    if (boss.x < boss.min || boss.x > boss.max) boss.x = k.clamp(boss.x, boss.min, boss.max);
+    boss.face = dir;
+    const bh = p.x + p.w > boss.x + 8 && p.x < boss.x + boss.w - 8 && p.y + p.h > boss.y + 10 && p.y < boss.y + boss.h - 4;
+    const sw = swordT > 0 && Math.abs(boss.x + boss.w / 2 - (p.x + 11 + p.face * 24)) < 48 && Math.abs(boss.y + boss.h / 2 - p.y - 15) < 46;
+    if (boss.iv <= 0 && (sw || (bh && (p.vy > 0 && p.y + p.h - boss.y < 22)) || (bh && dashT > 0))) {
+      boss.hp--; boss.iv = 0.9; if (!sw) p.vy = -640;
+      k.burst(boss.x + boss.w / 2, boss.y + 20, '#fff', 20); k.shake(6); k.sfx('hit'); score += 250;
+      if (boss.hp <= 0) { boss.alive = false; flag.hidden = false; k.sfx('win'); k.confetti(); k.float('¡Derrotado!', boss.x + boss.w / 2, boss.y, '#ffc928'); }
+    } else if (bh && boss.iv <= 0) return die();
+  }
   for (const co of coins) if (!co.got && Math.abs(co.x - p.x - 11) < 22 && Math.abs(co.y - p.y - 15) < 26) { co.got = true; coinsGot++; score += 10; k.sfx('coin'); k.burst(co.x, co.y, '#ffc928', 6, 80); }
   for (const xx of [p.x + 7, p.x + p.w - 7]) if (tileAt(xx, p.y + p.h - 3) === 3) return die();
   if (p.y > MH * T + 60) { inv = 0; return die(); }
   for (const q of checks) if (!q.on && p.x > q.x - 10) { q.on = true; check = q; k.sfx('coin'); k.float('¡Punto de control!', q.x, q.y - 70, '#7cf7a0'); }
-  if (p.x > flag.x - 10) { k.sfx('win'); k.confetti(); score += 500 * level + coinsGot * 5; level++; const s = score, lv = lives, cg = coinsGot; build(); score = s; lives = lv; coinsGot = cg; return; }
+  if (!flag.hidden && p.x > flag.x - 10) {
+    score += 500 * level + coinsGot * 5;
+    if (HAND) return k.levelDone(score, `${coinsGot} moneda${coinsGot === 1 ? '' : 's'} · ${lives} vida${lives === 1 ? '' : 's'}`);
+    k.sfx('win'); k.confetti(); level++; const s = score, lv = lives, cg = coinsGot; build(); score = s; lives = lv; coinsGot = cg; return; }
   cx += (k.clamp(p.x - W * 0.38 + p.vx * 0.25, 0, Math.max(0, MW * T - W)) - cx) * Math.min(1, dt * 6);
   cy += (camY(p.y - H * 0.55) - cy) * Math.min(1, dt * 5);
 }
@@ -137,6 +193,7 @@ function drw() {
   ART.flag(c, flag.x, flag.y, t, '#ff5f7a', 110);
   for (const co of coins) if (!co.got && co.x > cx - 20 && co.x < cx + W + 20) ART.coin(c, co.x, co.y, t);
   for (const e of enemies) if (e.alive && e.x > cx - 40 && e.x < cx + W + 40) ART.enemy(c, TH.enemy, e.x, e.fly ? e.y - 20 + Math.sin(t * 2 + e.min) * 16 : e.y, e.w, e.h, { t, face: e.vx > 0 ? 1 : -1 });
+  if (boss && boss.alive && Math.floor(boss.iv > 0 ? t * 12 : 0) % 2 === 0) ART.enemy(c, TH.enemy === 'bird' ? 'knight' : TH.enemy, boss.x, boss.y, boss.w, boss.h, { t, face: boss.face || -1, big: 1 });
   if (rope) { c.strokeStyle = ART.OUT; c.lineWidth = 4; c.beginPath(); c.moveTo(rope.a.x, rope.a.y); c.lineTo(p.x + 11, p.y + 12); c.stroke(); c.strokeStyle = '#e6d3a3'; c.lineWidth = 2; c.stroke(); }
   if (dashT > 0) { c.globalAlpha = 0.35; ART.hero(c, p.x + 11 - p.face * 18, p.y + p.h, HS, { face: p.face, state: 'run', t, col: TH.hero }); c.globalAlpha = 1; }
   const sq = landSq > 0 ? landSq : landSq < 0 ? landSq : 0;
@@ -152,7 +209,13 @@ function drw() {
   for (let i = 0; i < 4 + k.D.life; i++) ART.heart(c, hx + i * 24, 22, 1.25, i < lives);
   const cX = nar ? hx + 8 : hx + (4 + k.D.life) * 24 + 12, cY = nar ? 50 : 22;
   ART.coin(c, cX, cY, 0, 8); label(`× ${coinsGot}`, cX + 12, cY - 9, 17, '#fff');
-  label(`${score}`, W - 12, 8, 22, '#fff', 'right'); label(`Nivel ${level}`, W - 12, 34, 13, '#ffc928', 'right');
+  label(`${score}`, W - 12, 8, 22, '#fff', 'right');
+  label(HAND ? `Nivel ${level}/${HAND.length}` : `Nivel ${level}`, W - 12, 34, 13, '#ffc928', 'right');
+  /* Barra del jefe: solo mientras sigue en pie, centrada arriba y sin pisar el marcador. */
+  if (boss && boss.alive && p.x > boss.min - 320) { const bw2 = Math.min(220, W - 180), bx2 = (W - bw2) / 2, by2 = nar ? 76 : 14;
+    ART.rr(c, bx2 - 3, by2 - 3, bw2 + 6, 16, 8); c.fillStyle = 'rgba(26,21,48,.75)'; c.fill();
+    c.fillStyle = '#ff5f7a'; c.fillRect(bx2, by2, bw2 * k.clamp(boss.hp / 3, 0, 1), 10);
+    label('Jefe', bx2 + bw2 / 2, by2 + 16, 12, '#ffd7df', 'center'); }
   if (intro > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, intro); ART.rr(c, W / 2 - 110, H / 2 - 38, 220, 64, 18); c.fillStyle = 'rgba(26,21,48,.8)'; c.fill(); label(`Nivel ${level}`, W / 2, H / 2 - 30, 30, '#fff', 'center'); label(CFG.title, W / 2, H / 2 + 4, 14, '#ffc928', 'center'); c.globalAlpha = 1; }
   gfx();
 }
@@ -319,6 +382,8 @@ function raceDraw() {
   if (R.msgT > 0) { c.globalAlpha = Math.min(1, R.msgT * 2); c.font = '800 24px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const mw = c.measureText(R.msg).width + 40; ART.rr(c, W / 2 - mw / 2, 46, mw, 42, 12); c.fillStyle = 'rgba(26,21,48,.82)'; c.fill(); label(R.msg, W / 2, 54, 24, R.win ? R.win.col : '#ffc928', 'center'); c.globalAlpha = 1; }
 }
 k.onParty = () => { if (!RACE) return; if (k.st !== 'play' || !R) { reset(); return; } const pl = k.players(4); for (const r of R.rs) { r.cpu = pl[r.pl].cpu; r.name = r.cpu ? 'CPU' : pl[r.pl].name; } };
+/* Niveles diseñados a mano (plan Friv): progreso guardado por dificultad en kit.js. */
+if (HAND) k.levels(HAND.length, { start: (i) => { level = i; lives = 4 + k.D.life; score = 0; coinsGot = 0; build(); } });
 reset(); k.show(CFG.title, CFG.help);
 /* si el jugador cambia de nivel en la pantalla de inicio, la partida se prepara de nuevo con los valores de k.D */
 k.onDif = () => { if (k.st !== 'play') reset(); };

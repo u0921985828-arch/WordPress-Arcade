@@ -11,7 +11,7 @@ import catalog as cat
 GAMES_DIR = ROOT / 'wp-content/mu-plugins/arcade-core/games'
 ENG_DIR = ROOT / 'src/eng'
 # Todos los motores cargan antes la librería de arte común (ART, src/eng/art.js)
-DEPS = {}
+DEPS = {'platformer': ['art', 'platlv'], 'platform': ['art', 'barlv'], 'runner': ['art', 'runlv']}
 deps_of = lambda e: DEPS.get(e, ['art'])
 STANDALONE = {'tetra-drop', 'tetra-drop-marathon'}
 
@@ -149,6 +149,9 @@ def main():
     if set(PAD) - set(G): sys.exit(f'PAD sin juego: {set(PAD) - set(G)}')
     if missing or extra: sys.exit(f'Faltan: {missing}  Sobran: {extra}')
     lib = GAMES_DIR / '_lib'; lib.mkdir(parents=True, exist_ok=True)
+    # Cada dependencia se versiona por su hash: así basta con editarla en src/eng para que el
+    # navegador la vuelva a pedir (art.js incluido; ya no hay que tocar el ?v= a mano).
+    dv = lambda d: hashlib.md5((ENG_DIR / f'{d}.js').read_bytes()).hexdigest()[:8]
     engines = sorted({e for e, _ in G.values()} | {d for e, _ in G.values() for d in deps_of(e)})
     for e in engines: shutil.copy(ENG_DIR / f'{e}.js', lib / f'{e}.js')
     for slug, (eng, cfg) in G.items():
@@ -156,13 +159,13 @@ def main():
         if slug in PAD: cfg['pad'] = PAD[slug]
         if slug in MP: cfg['mp'] = list(MP[slug])
         d = GAMES_DIR / slug; d.mkdir(parents=True, exist_ok=True)
-        (d / 'index.html').write_text(TPL.format(title=titles[slug], cfg=json.dumps(cfg, ensure_ascii=False), eng=eng, ev=hashlib.md5((ENG_DIR / f'{eng}.js').read_bytes()).hexdigest()[:8], deps=''.join(f'<script src="../_lib/{d}.js?v=14"></script>' for d in deps_of(eng))), encoding='utf-8')
+        (d / 'index.html').write_text(TPL.format(title=titles[slug], cfg=json.dumps(cfg, ensure_ascii=False), eng=eng, ev=hashlib.md5((ENG_DIR / f'{eng}.js').read_bytes()).hexdigest()[:8], deps=''.join(f'<script src="../_lib/{d}.js?v={dv(d)}"></script>' for d in deps_of(eng))), encoding='utf-8')
     # Lista de scripts de cada juego: el portal la usa para precargarlos (prefetch) en la ficha y que
     # al pulsar «Jugar» no haya espera de red. Los independientes se leen de su index.html.
     dep = {}
     for slug, (eng, cfg) in G.items():
         ev = hashlib.md5((ENG_DIR / f'{eng}.js').read_bytes()).hexdigest()[:8]
-        dep[slug] = ['_lib/kit.js?v=23'] + [f'_lib/{d}.js?v=14' for d in deps_of(eng)] + [f'_lib/{eng}.js?v={ev}']
+        dep[slug] = ['_lib/kit.js?v=23'] + [f'_lib/{d}.js?v={dv(d)}' for d in deps_of(eng)] + [f'_lib/{eng}.js?v={ev}']
     for slug in STANDALONE:
         f = GAMES_DIR / slug / 'index.html'
         if f.exists(): dep[slug] = [m.replace('../', '') for m in re.findall(r'<script src="([^"]+)"', f.read_text(encoding='utf-8'))]

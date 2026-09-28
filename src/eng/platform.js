@@ -21,16 +21,26 @@ function mkP(x, y) { return { x, y, vx: 0, vy: 0, w: port ? 18 : 14, h: port ? 3
 /* ================= Generación ================= */
 const fyRow = (i) => MH - 1 - i * 3; // fila de la viga i (0 = suelo)
 const floorDir = (j) => j === 0 ? 1 : j % 2 ? -1 : 1; // hacia dónde ruedan los barriles en cada piso
+/* Niveles a mano (plan Friv): si hay tabla, manda ella y no el azar. */
+const BLV = (typeof BARLV !== 'undefined' && BARLV[CFG.id]) || null;
+let LD = null;
 function genBarrels() {
+  LD = BLV ? BLV[k.clamp(level, 1, BLV.length) - 1] : null;
   MW = 24; MH = 18; map = Array.from({ length: MH }, () => Array(MW).fill(0)); barrels = []; coins = []; enemies = []; ladders = []; fx = []; bT = 2; throwT = 0; drumT = 0; climbPh = 0;
   for (let x = 0; x < MW; x++) map[MH - 1][x] = 1;
   for (let i = 1; i <= 5; i++) { const y = fyRow(i); for (let x = 0; x < MW; x++) if (i % 2 ? x > 2 : x < MW - 3) map[y][x] = 2; }
+  if (LD) {
+    for (let i = 0; i < 5; i++) for (const cx of LD.lad[i]) ladders.push({ x: cx * T + T / 2, y0: fyRow(i + 1) * T, y1: fyRow(i) * T });
+    /* «12+» = moneda alta: hay que saltar para cogerla. */
+    for (let i = 0; i < 5; i++) for (const q of LD.co[i]) { const hi2 = String(q).endsWith('+'), cx = parseInt(q, 10); coins.push({ x: cx * T + T / 2, y: fyRow(i) * T - 16 - (hi2 ? 26 : 0) }); }
+  } else {
   for (let i = 0; i < 5; i++) { // dos escaleras por tramo, separadas y lejos de huecos, bandera y lanzador
     const up = i + 1, lo = up % 2 ? 5 : 2, hi = up % 2 ? MW - 3 : MW - 6, cols = [];
     for (let n = 0; n < 40 && cols.length < 2; n++) { const cx = k.ri(lo, up === 5 ? MW - 7 : hi); if (up === 5 && cx < 9) continue; if (cols.every((q) => Math.abs(q - cx) >= 6)) cols.push(cx); }
     for (const cx of cols) ladders.push({ x: cx * T + T / 2, y0: fyRow(up) * T, y1: fyRow(i) * T });
   }
   for (let i = 0; i < 5; i++) for (let n = 0; n < 3; n++) { const cx = k.ri(i % 2 ? 4 : 1, i % 2 ? MW - 2 : MW - 5); if (i === 0 && cx > MW - 4) continue; coins.push({ x: cx * T + T / 2, y: fyRow(i) * T - 16 - (n === 1 ? 26 : 0) }); }
+  }
   flag = { x: 7 * T, y: fyRow(5) * T };
   p = mkP(4 * T, (MH - 1) * T - 26); bonus = 3000 + (level - 1) * 500; lvCv = null; intro = 1.5;
 }
@@ -76,7 +86,8 @@ function build() { if (TEJ) return buildTej();
   t = 0; rope = null; dashT = 0; dashCd = 0; swordT = 0; jumpBuf = 0; coyote = 0; cam = 0; dead = 0; sq = 0; steer = 0; diffT = 0; if (M === 'barrels') genBarrels(); else genVert(); }
 let rec = 0;
 function reset() { if (TEJ) return resetTej();
-  try { rec = +localStorage.getItem(k.bkey(CFG.id)) || 0; } catch (e) { /* sin almacenamiento */ } level = 1; lives = 4 + k.D.life; score = 0; got = 0; build(); }
+  try { rec = +localStorage.getItem(k.bkey(CFG.id)) || 0; } catch (e) { /* sin almacenamiento */ } level = BLV ? k.lv : 1; lives = 4 + k.D.life; score = 0; got = 0; build(); }
+if (BLV) k.levels(BLV.length, { start: (i) => { level = i; lives = 4 + k.D.life; score = 0; got = 0; build(); } });
 if (!TEJ) reset(); k.show(CFG.title, CFG.help);
 /* si el jugador cambia de nivel en la pantalla de inicio, la partida se prepara de nuevo con los valores de k.D */
 k.onDif = () => { if (k.st !== 'play') reset(); };
@@ -146,8 +157,11 @@ function upBarrels(dt, L, R, U, D, kx) {
   if (intro > 0) return;
   // lanzador y barriles
   throwT -= dt; bT -= dt;
-  if (bT <= 0) { bT = Math.max(1.5, 4.5 - (level - 1) * 0.2) * k.rnd(0.8, 1.25) / k.D.rate; throwT = 0.45; k.sfx('pop'); barrels.push({ x: W - 78, y: fyRow(5) * T - 16, w: 16, h: 16, vy: 0, dir: -1, a: 0, blue: level >= 3 && Math.random() < Math.min(0.4, 0.12 + level * 0.03), seen: new Set(), ground: true }); }
-  const spd = Math.min(145, 62 + (level - 1) * 7.7) * k.D.spd;
+  /* Con niveles a mano el ritmo lo fija la tabla; en el nivel del jefe el lanzador se
+     enfurece cuando el jugador pisa el último tramo. */
+  const furia = LD && LD.boss && p.y < fyRow(4) * T;
+  if (bT <= 0) { bT = (LD ? LD.rate * (furia ? 0.55 : 1) * k.rnd(0.9, 1.12) : Math.max(1.5, 4.5 - (level - 1) * 0.2) * k.rnd(0.8, 1.25)) / k.D.rate; throwT = 0.45; k.sfx('pop'); barrels.push({ x: W - 78, y: fyRow(5) * T - 16, w: 16, h: 16, vy: 0, dir: -1, a: 0, blue: LD ? Math.random() < LD.blue : level >= 3 && Math.random() < Math.min(0.4, 0.12 + level * 0.03), seen: new Set(), ground: true }); }
+  const spd = (LD ? LD.spd : Math.min(145, 62 + (level - 1) * 7.7)) * k.D.spd;
   for (const b of barrels) {
     const bcx = b.x + 8;
     if (b.lad) { b.y += 100 * dt; b.a += dt * 3; if (b.y + 16 >= b.lad.y1) { b.y = b.lad.y1 - 16; b.lad = null; b.ground = true; b.dir = floorDir(Math.round((MH - 1 - (b.y + 16) / T) / 3)); } }
@@ -157,7 +171,7 @@ function upBarrels(dt, L, R, U, D, kx) {
       if (b.ground && !was) { b.dir = floorDir(Math.round((MH - 1 - (b.y + 16) / T) / 3)); k.shake(1.5); }
       b.x = k.clamp(b.x, 0, W - 16);
       const j = Math.round((MH - 1 - (b.y + 16) / T) / 3);
-      if (b.ground && j > 0) for (const l of ladders) if (l.y0 === b.y + 16 && (bcx - l.x) * (b.x + 8 - l.x) <= 0 && !b.seen.has(l)) { b.seen.add(l); if (b.blue || Math.random() < Math.min(0.55, 0.12 + (level - 1) * 0.05)) { b.lad = l; b.x = l.x - 8; } }
+      if (b.ground && j > 0) for (const l of ladders) if (l.y0 === b.y + 16 && (bcx - l.x) * (b.x + 8 - l.x) <= 0 && !b.seen.has(l)) { b.seen.add(l); if (b.blue || Math.random() < (LD ? LD.hop : Math.min(0.55, 0.12 + (level - 1) * 0.05))) { b.lad = l; b.x = l.x - 8; } }
       if (b.ground && j === 0 && b.x > W - 52) { b.dead = true; drumT = 0.6; k.burst(W - 30, H - T - 36, '#ffb13d', 10, 120); }
     }
     if (Math.abs(b.x + 8 - (p.x + p.w / 2)) < 10 && Math.abs(b.y + 8 - (p.y + p.h / 2)) < 14.5) return die('#ffb13d');
@@ -166,7 +180,9 @@ function upBarrels(dt, L, R, U, D, kx) {
   barrels = barrels.filter((b) => !b.dead);
   for (const co of coins) if (!co.got && Math.abs(co.x - p.x - p.w / 2) < 17 && Math.abs(co.y - p.y - p.h / 2) < 22) coinGet(co, 0);
   if (p.ground && Math.abs(p.y + p.h - flag.y) < 2 && Math.abs(p.x + p.w / 2 - flag.x) < 18) {
-    const b = Math.round(bonus / 100) * 100; score += 500 * level + b; k.sfx('win'); k.confetti(); k.float(`+${500 * level + b}`, flag.x + 30, flag.y - 40, '#ffc928');
+    const b = Math.round(bonus / 100) * 100; score += 500 * level + b;
+    if (BLV) return k.levelDone(score, `${got} moneda${got === 1 ? '' : 's'} · ${lives} vida${lives === 1 ? '' : 's'}`);
+    k.sfx('win'); k.confetti(); k.float(`+${500 * level + b}`, flag.x + 30, flag.y - 40, '#ffc928');
     level++; genBarrels();
   }
 }
@@ -458,7 +474,7 @@ function drawBarrels() {
   for (let i = 0; i < 4 + k.D.life; i++) ART.heart(c, 14 + i * 20, 12, 1, i < lives);
   label(`${score}`, 8, 22, 16, '#fff');
   label(`Bonus ${Math.round(bonus / 100) * 100}`, W - 92, 5, 12, bonus < 1000 ? '#ff9a5c' : '#ffc928', 'right'); // lejos de pausa/sonido
-  label(`Nivel ${level}`, 8, 42, 11, 'rgba(255,255,255,.9)');
+  label(BLV ? `Nivel ${level}/${BLV.length}` : `Nivel ${level}`, 8, 42, 11, 'rgba(255,255,255,.9)');
   if (intro > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, intro * 2); ART.rr(c, W / 2 - 100, H / 2 - 34, 200, 60, 16); ART.fillOut(c, 'rgba(26,21,48,.85)', 2); label(`Nivel ${level}`, W / 2, H / 2 - 26, 26, '#fff', 'center'); label('¡Llega a la bandera!', W / 2, H / 2 + 4, 13, '#ffc928', 'center'); c.globalAlpha = 1; }
 }
 function hud() {
