@@ -5,6 +5,7 @@
  *  'orbita'   Almohadas en Órbita (2–4): gravedad cero; cada almohadazo empuja también a quien lo da.
  *  'gravedad' Gravedad Compartida (2–4, cooperativo): la gravedad apunta hacia donde más jugadores pulsan.
  *  'lava'     El Suelo es Lava (2–4): saltos entre muebles mientras sube la lava, con empujones.
+ *  'torre'    Torre de Bloques (1–4): por turnos, la grúa suelta bloques; el equilibrio estático decide.
  * Integración con subpasos fijos de 1/120 s (los cuerpos no se atraviesan a 30–144 Hz) y muñecos articulados
  * dibujados con cinemática inversa de dos segmentos. La CPU rellena las plazas libres y mejora con las
  * victorias guardadas en localStorage (cpu:<id>). Mando: joystick + A/B (tele, teclado o mando virtual). */
@@ -180,6 +181,7 @@ const MD = {
   orbita: { np: 4, rounds: 3, len: 60, ww: 470, wh: 470, elim: 1 },
   gravedad: { np: 4, rounds: 1, len: 95, ww: 440, wh: 440, coop: 1 },
   lava: { np: 4, rounds: 3, len: 75, ww: 520, wh: 400, elim: 1 },
+  torre: { np: 4, rounds: 3, len: 150, ww: 460, wh: 560, elim: 1 },
 }[M];
 const NP = MD.np, WW = MD.ww, WH = MD.wh;
 /* franja de marcadores arriba; el mundo del modo se escala para caber debajo en las dos orientaciones */
@@ -889,6 +891,148 @@ const MODES = {
       else { rr(c, pf.x, pf.y, pf.w, pf.h, 4); fillOut(c, '#9a6a3f', 2.4); c.fillStyle = alpha('#fff', 0.2); c.fillRect(pf.x + 4, pf.y + 3, pf.w - 8, 3);
         for (let i = 0; i < 3; i++) { const bx = pf.x + 8 + i * 18; rr(c, bx, pf.y - 16, 10, 16, 2); fillOut(c, ['#ff6fb5', '#5b8cff', '#a8cf3f'][i % 3], 1.8); } }
       c.restore();
+    },
+  },
+  /* ---------------------------------------------------------- Torre de Bloques */
+  /* Por turnos: la grúa lleva un bloque, lo sueltas y cae con gravedad. Si apenas pisa el
+   * bloque de abajo resbala; y si el centro de masas de todo lo que hay por encima de
+   * cualquier altura se sale de su apoyo, la torre se viene abajo (equilibrio estático real).
+   * Quien tira el bloque que derriba la torre queda fuera; los demás siguen con una torre nueva. */
+  torre: {
+    hint: ['← → mueve la grúa', 'A: soltar el bloque', 'Mira el centro de la torre'],
+    GY: WH - 46, HKY: 58,
+    newBlock(i) { const w = 96 - Math.min(34, i * 2.6) + (rs(i * 7.3) * 26 - 13); return { w: clamp(w, 52, 104), h: 26, col: ['#ffc94d', '#ff9a6f', '#8fd6ff', '#a8cf3f', '#d3b0ff'][i % 5] }; },
+    tower() { S.tw = { base: { x: WW / 2, w: 168 }, n: 0 }; S.blocks = []; S.lean = 0; },
+    topY() { return S.blocks.length ? S.blocks[S.blocks.length - 1].y : this.GY; },
+    topB() { return S.blocks.length ? S.blocks[S.blocks.length - 1] : { x: WW / 2, w: 168 }; },
+    init() {
+      this.tower(); S.turn = 0; S.hx = WW / 2; S.fall = null; S.topple = null; S.turnT = 0; S.cam = 0;
+      S.nb = this.newBlock(0);
+      P.forEach((pl) => Object.assign(pl, { blocks: 0, x: WW / 2, y: 120 }));
+    },
+    curPl() { const a = alive(); return a.length ? a[S.turn % a.length] : P[0]; },
+    nextTurn() { const a = alive(); if (!a.length) return; S.turn = (S.turn + 1) % a.length; S.turnT = 0; S.nb = this.newBlock(S.blocks.length); S.hx = clamp(this.topB().x, 46, WW - 46); },
+    /* margen de equilibrio: distancia del centro de masas de lo que hay encima al borde del apoyo */
+    margin() {
+      let worst = 1e9;
+      for (let i = -1; i < S.blocks.length - 1; i++) {
+        const sup = i < 0 ? S.tw.base : S.blocks[i];
+        let m = 0, mx = 0;
+        for (let j = i + 1; j < S.blocks.length; j++) { const b = S.blocks[j]; m += b.w; mx += b.w * b.x; }
+        if (!m) continue;
+        const com = mx / m, half = sup.w / 2;
+        worst = Math.min(worst, Math.min(com - (sup.x - half), sup.x + half - com));
+      }
+      return worst === 1e9 ? 99 : worst;
+    },
+    collapse(pl, txt) {
+      S.topple = { t: 0, dir: S.lean >= 0 ? 1 : -1 };
+      k.sfx('explode'); k.shake(8);
+      if (pl) { pl.x = S.hx; pl.y = this.topY() - 40 + S.cam; eliminate(pl, txt || '¡Se cayó!'); }
+    },
+    drop(pl) {
+      if (S.fall || S.topple) return;
+      S.fall = { x: S.hx, y: this.HKY + 14, w: S.nb.w, h: S.nb.h, col: S.nb.col, vy: 0, by: pl };
+      k.sfx('shoot');
+    },
+    step(dt) {
+      if (S.topple) { S.topple.t += dt; return; }
+      /* la cámara baja el mundo a medida que la torre sube; con la torre vacía se queda a cero */
+      const cam = clamp((WH - 210) - this.topY(), 0, 1e5); S.cam += (cam - S.cam) * Math.min(1, dt * 4);
+      if (S.fall) {
+        const f = S.fall; f.vy += 980 * dt; f.y += f.vy * dt;
+        const tb = this.topB(), ty = this.topY();
+        if (f.y + f.h >= ty) {
+          f.y = ty - f.h;
+          const ov = Math.min(f.x + f.w / 2, tb.x + tb.w / 2) - Math.max(f.x - f.w / 2, tb.x - tb.w / 2);
+          const pl = f.by; S.fall = null;
+          if (ov <= f.w * 0.2) { k.sfx('hurt'); this.collapse(pl, '¡Resbaló!'); return; }
+          S.blocks.push({ x: f.x, y: ty - f.h, w: f.w, h: f.h, col: f.col, by: pl.i });
+          if (this.margin() < 0) { this.collapse(pl, '¡Se desploma!'); return; }
+          pl.blocks++; k.sfx('coin'); spark(f.x, ty - f.h + S.cam, f.col, 10, 90);
+          const mg = this.margin(); S.lean = clamp((this.topB().x - S.tw.base.x) / 90, -1, 1) * clamp(1 - mg / 40, 0, 1);
+          if (ov < f.w * 0.45) say('¡Al filo!', f.x, ty - 40 + S.cam, '#ffd166');
+          this.nextTurn();
+        }
+        return;
+      }
+      const pl = this.curPl(); if (!pl.alive) { this.nextTurn(); return; }
+      S.turnT += dt;
+      if (pl.cpu) {
+        /* la CPU apunta al centro del bloque de abajo; el error nunca la saca de su apoyo entero */
+        const tb0 = this.topB(), err = (rs(S.blocks.length * 3.7 + pl.i + round * 11) - 0.5) * 2 * (1 - skill()) * tb0.w * 0.42;
+        const tgt = clamp(tb0.x + err, 46, WW - 46);
+        S.hx += clamp(tgt - S.hx, -1, 1) * 150 * dt;
+        if (Math.abs(tgt - S.hx) < 3 && S.turnT > 0.7) this.drop(pl);
+      } else {
+        const inp = human(pl);
+        S.hx = clamp(S.hx + inp.x * 190 * dt, 46, WW - 46);
+        if (!k.party && pl.p === 0 && k.ptr.down) S.hx = clamp((k.ptr.x - OXo) / SC, 46, WW - 46);
+        if (inp.ah) this.drop(pl);
+      }
+      if (S.turnT > 8) { say('¡Tiempo!', S.hx, this.HKY + 40, '#ff9a3d'); this.drop(pl); }
+    },
+    late() {
+      if (S.topple && S.topple.t > 1.5) { S.topple = null; this.tower(); S.nb = this.newBlock(0); S.turnT = 0; S.cam = 0; S.hx = WW / 2; }
+    },
+    done() { return alive().length <= 1 || rt >= MD.len; },
+    key: (pl) => pl.blocks,
+    val: (pl) => `${pl.blocks} bloque${pl.blocks === 1 ? '' : 's'}`,
+    /* --- arte: bloques de una sola pieza, cacheados por tamaño y color --- */
+    spr(w, h, col) {
+      const key = `b${w}|${h}|${col}`;
+      if (!this._c) this._c = {};
+      if (this._c[key]) return this._c[key];
+      const cv = mk(w + 10, h + 12, (q) => {
+        q.translate(5, 4);
+        rr(q, 0, 0, w, h, 6); q.fillStyle = col; q.lineWidth = 2.6; q.strokeStyle = OUT; q.stroke(); q.fill();
+        q.save(); rr(q, 0, 0, w, h, 6); q.clip();
+        q.fillStyle = dark(col, 0.2); q.fillRect(0, h * 0.55, w, h);
+        q.fillStyle = lite(col, 0.3); q.fillRect(0, 0, w, h * 0.26);
+        q.fillStyle = alpha(OUT, 0.16); for (let i = 1; i < 3; i++) q.fillRect(w * i / 3 - 1, 4, 2, h - 8);
+        q.restore();
+        q.fillStyle = alpha('#fff', 0.55); q.beginPath(); q.ellipse(9, 5, 5, 2.2, 0, 0, TAU); q.fill();
+      });
+      return (this._c[key] = cv);
+    },
+    block(b, t) {
+      const cv = this.spr(Math.round(b.w), Math.round(b.h), b.col);
+      c.drawImage(cv, b.x - b.w / 2 - 5, (b.y == null ? 0 : b.y) - 4, cv.width / 2, cv.height / 2);
+      void t;
+    },
+    draw() {
+      /* cielo y suelo */
+      const sky = c.createLinearGradient(0, 0, 0, WH); sky.addColorStop(0, '#2a2358'); sky.addColorStop(1, '#141030');
+      c.fillStyle = sky; c.fillRect(0, 0, WW, WH);
+      c.fillStyle = alpha('#fff', 0.05);
+      for (let i = 0; i < 26; i++) c.fillRect(rs(i) * WW, (rs(i + 40) * WH + S.cam * 0.2) % WH, 2, 2);
+      c.save(); c.translate(0, S.cam);
+      c.fillStyle = '#3a2f5e'; c.fillRect(0, this.GY, WW, WH + S.cam);
+      c.fillStyle = '#4b3d75'; c.fillRect(0, this.GY, WW, 6);
+      shadow(c, S.tw.base.x, this.GY + 4, S.tw.base.w * 0.55, 0.25);
+      /* plataforma base */
+      rr(c, S.tw.base.x - S.tw.base.w / 2, this.GY - 22, S.tw.base.w, 22, 7); fillOut(c, '#7a6a52', 3);
+      c.fillStyle = alpha('#fff', 0.14); c.fillRect(S.tw.base.x - S.tw.base.w / 2 + 4, this.GY - 19, S.tw.base.w - 8, 4);
+      /* torre (se inclina un poco según el margen de equilibrio) */
+      const tp = S.topple, ang = tp ? tp.dir * Math.min(1.25, tp.t * tp.t * 2.2) : S.lean * 0.05;
+      c.save(); c.translate(S.tw.base.x, this.GY - 22); c.rotate(ang); c.translate(-S.tw.base.x, -(this.GY - 22));
+      for (const b of S.blocks) this.block(b);
+      c.restore();
+      if (S.fall) this.block(S.fall);
+      c.restore();
+      /* grúa */
+      const pl = this.curPl(), busy = S.fall || S.topple;
+      c.fillStyle = '#4b3d75'; c.fillRect(0, this.HKY - 26, WW, 12);
+      c.fillStyle = alpha('#fff', 0.12); c.fillRect(0, this.HKY - 26, WW, 3);
+      if (!busy) {
+        c.strokeStyle = '#8f86c4'; c.lineWidth = 3; c.beginPath(); c.moveTo(S.hx, this.HKY - 14); c.lineTo(S.hx, this.HKY + 2); c.stroke();
+        c.setLineDash([6, 8]); c.strokeStyle = alpha(pl.col, 0.45); c.lineWidth = 2;
+        c.beginPath(); c.moveTo(S.hx, this.HKY + 30); c.lineTo(S.hx, this.topY() + S.cam - 6); c.stroke(); c.setLineDash([]);
+        this.block({ x: S.hx, y: this.HKY + 4, w: S.nb.w, h: S.nb.h, col: S.nb.col });
+        rr(c, S.hx - 16, this.HKY - 16, 32, 16, 5); fillOut(c, pl.col, 2.6);
+      }
+      label(`Altura ${S.blocks.length}`, 10, 16, 16, '#cfc8ff', 'left');
+      if (!busy) label(`Turno de ${tagOf(pl)}`, WW - 10, 16, 16, pl.col, 'right');
     },
   },
 };

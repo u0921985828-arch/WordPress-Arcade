@@ -1,7 +1,9 @@
-/* Juegos de tablero contra la IA. CFG.mode: 'checkers' | 'reversi' | 'four' (Cuatro en Línea: 7×6 con gravedad, 2 jugadores en la tele o contra la IA)
+/* Juegos de tablero contra la IA. CFG.mode: 'checkers' | 'reversi' | 'four' (Cuatro en Línea: 7×6 con gravedad, 2 jugadores en la tele o contra la IA) | 'anidado' (Tres en Raya Anidado)
  * Damas: captura obligatoria, multisalto y la coronación termina el turno. Reversi con pasar turno.
  * Tablero de madera cacheado, fichas con bisel, deslizamientos/saltos, volteo escalonado y jugadas válidas marcadas. */
-const M = CFG.mode, FOUR = M === 'four', W = FOUR ? 640 : 480, H = FOUR ? 480 : 560, OUT = ART.OUT, k = Kit({ w: W, h: H, title: CFG.title, bg: FOUR ? '#1b1740' : '#2a1a12' }), c = k.ctx, N = 8, S = 54, OX = 24, OY = 72;
+const M = CFG.mode, FOUR = M === 'four', NEST = M === 'anidado';
+const W = FOUR ? 640 : NEST ? 520 : 480, H = FOUR ? 480 : NEST ? 660 : 560, OUT = ART.OUT;
+const k = Kit({ w: W, h: H, title: CFG.title, bg: FOUR ? '#1b1740' : NEST ? '#16203a' : '#2a1a12' }), c = k.ctx, N = 8, S = 54, OX = 24, OY = 72;
 let quiet = 0, lvl = 0, b, turn, sel, moves, wins, thinking, msg, chain, at = 0, anims = [], flipA = {}, animEnd = 0, pend = null, last = null, cur = null, kbd = false;
 const DIRS8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 const inb = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
@@ -65,7 +67,7 @@ function tapSquare(x, y) {
   if (owner(b[y][x]) === 1 && !chain) { if (legal.some((q) => q.x === x && q.y === y)) { sel = [x, y]; k.sfx('click'); } else { sel = null; k.sfx('hit'); if (legal.some((q) => q.cap)) { msg = 'Captura obligatoria'; k.float('¡Captura obligatoria!', W / 2, OY + 4 * S, '#ff8a9a'); } } return; }
   if (sel) { const m = legal.find((q) => q.x === sel[0] && q.y === sel[1] && q.nx === x && q.ny === y); if (m) playerStep(m); else if (!chain) sel = null; }
 }
-if (!FOUR) { reset(); k.show(CFG.title, M === 'reversi' ? 'Coloca fichas para encerrar las del rival y darles la vuelta. Los puntos marcan tus jugadas válidas. Gana quien tenga más.' : 'Mueve en diagonal y salta sobre las piezas rivales. Capturar es obligatorio, se encadenan saltos y al coronar termina el turno.');
+if (!FOUR && !NEST) { reset(); k.show(CFG.title, M === 'reversi' ? 'Coloca fichas para encerrar las del rival y darles la vuelta. Los puntos marcan tus jugadas válidas. Gana quien tenga más.' : 'Mueve en diagonal y salta sobre las piezas rivales. Capturar es obligatorio, se encadenan saltos y al coronar termina el turno.');
 k.run((dt) => {
   at += dt; if (!k.gate(reset)) return;
   if (busy()) return;
@@ -295,3 +297,172 @@ function f4Main() {
   });
 }
 if (FOUR) f4Main();
+
+/* ================= Tres en Raya Anidado (CFG.mode 'anidado') =================
+ * Nueve tableros de tres en raya en una rejilla 3×3. La casilla en la que juegas decide
+ * el tablero pequeño en el que tiene que jugar el rival; si ese tablero ya está resuelto o
+ * lleno, el rival juega donde quiera. Se gana un tablero pequeño con tres en raya y la
+ * partida alineando tres tableros ganados. Tablero lleno sin línea = empate.
+ * Reglas puras (utLegal/utPlay/utWin) verificables bot contra bot desde Playwright.
+ * 1–2 jugadores: en la tele juegan dos móviles; en solitario, IA de 3 niveles (cpu:<id>). */
+const UTL = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
+function utNew() { return { b: new Int8Array(81), w: new Int8Array(9), nx: -1, n: 0, over: 0, line: null }; }
+function utLine(v, p) { for (const L of UTL) if (v[L[0]] === p && v[L[1]] === p && v[L[2]] === p) return L; return null; }
+function utSmall(g, B) { const v = g.b.subarray(B * 9, B * 9 + 9); for (const p of [1, 2]) { const L = utLine(v, p); if (L) return { r: p, L }; } return { r: v.every((x) => x) ? 3 : 0, L: null }; }
+function utLegal(g) { const out = []; if (g.over) return out;
+  const free = (B) => { if (g.w[B]) return; for (let i = 0; i < 9; i++) if (!g.b[B * 9 + i]) out.push(B * 9 + i); };
+  if (g.nx >= 0 && !g.w[g.nx]) free(g.nx); else for (let B = 0; B < 9; B++) free(B);
+  return out; }
+function utPlay(g, m, p) { const B = (m / 9) | 0, i = m % 9;
+  const un = { m, p, w: g.w[B], nx: g.nx, over: g.over, line: g.line };
+  g.b[m] = p; g.n++;
+  if (!g.w[B]) { const r = utSmall(g, B); if (r.r) g.w[B] = r.r; }
+  g.nx = i;
+  const L = utLine(g.w, p); if (L) { g.over = p; g.line = L; }
+  else if (g.w.every((x) => x)) g.over = 3;
+  else { let any = false; for (let B2 = 0; B2 < 9; B2++) if (!g.w[B2]) for (let j = 0; j < 9; j++) if (!g.b[B2 * 9 + j]) { any = true; break; } if (!any) g.over = 3; }
+  return un; }
+function utUndo(g, un) { g.b[un.m] = 0; g.n--; g.w[(un.m / 9) | 0] = un.w; g.nx = un.nx; g.over = un.over; g.line = un.line; }
+/* Valoración: tableros ganados, centro, y líneas de tres tableros a medio hacer. */
+function utEval(g, p) { const o = 3 - p; let s = 0;
+  for (let B = 0; B < 9; B++) { const v = g.w[B]; if (v === p) s += 12 + (B === 4 ? 6 : B % 2 === 0 ? 3 : 0); else if (v === o) s -= 12 + (B === 4 ? 6 : B % 2 === 0 ? 3 : 0); }
+  for (const L of UTL) { let a = 0, e = 0; for (const B of L) { if (g.w[B] === p) a++; else if (g.w[B] === o || g.w[B] === 3) e++; } if (a && e) continue; if (a === 2) s += 9; else if (e === 2) s -= 11; }
+  for (let B = 0; B < 9; B++) { if (g.w[B]) continue; const v = g.b.subarray(B * 9, B * 9 + 9);
+    for (const L of UTL) { let a = 0, e = 0; for (const i of L) { if (v[i] === p) a++; else if (v[i] === o) e++; } if (a && e) continue; if (a === 2) s += 2; else if (e === 2) s -= 2.4; } }
+  return s; }
+let utNodes = 0;
+function utNeg(g, p, depth, al, be, ply) {
+  if (g.over) return g.over === 3 ? 0 : g.over === p ? 900 - ply : ply - 900;
+  if (depth <= 0 || ++utNodes > 14000) return utEval(g, p);
+  let best = -1e9;
+  for (const m of utLegal(g)) { const un = utPlay(g, m, p); const v = -utNeg(g, 3 - p, depth - 1, -be, -al, ply + 1); utUndo(g, un);
+    if (v > best) best = v; if (v > al) al = v; if (al >= be) break; }
+  return best === -1e9 ? 0 : best; }
+const UTDEP = [1, 3, 5], UTERR = [0.55, 0.2, 0.05];
+function utAI(g, p, lvl, rnd) { rnd = rnd || Math.random; const L = Math.max(0, Math.min(2, lvl | 0)), ms = utLegal(g); if (!ms.length) return -1;
+  for (const m of ms) { const un = utPlay(g, m, p); const w = g.over === p; utUndo(g, un); if (w) return m; } /* siempre remata */
+  if (rnd() < UTERR[L]) return ms[Math.floor(rnd() * ms.length)];
+  utNodes = 0;
+  let best = [], bv = -1e9;
+  for (const m of ms) { const un = utPlay(g, m, p); const v = -utNeg(g, 3 - p, UTDEP[L] - 1, -1e9, 1e9, 1); utUndo(g, un);
+    if (v > bv + 0.3) { bv = v; best = [m]; } else if (Math.abs(v - bv) <= 0.3) best.push(m); }
+  return best[Math.floor(rnd() * best.length)]; }
+
+function nestMain() {
+  const CS = 46, BS = CS * 3, GAP = 12, BW = BS * 3 + GAP * 2, BX = Math.round((W - BW) / 2), BY = 150;
+  const px = (B, i) => BX + ((B % 3) * (BS + GAP)) + (i % 3) * CS + CS / 2;
+  const py = (B, i) => BY + (((B / 3) | 0) * (BS + GAP)) + (((i / 3) | 0)) * CS + CS / 2;
+  const LS = 'cpu:' + CFG.id; let lvlN = 0; try { lvlN = +localStorage.getItem(LS) || 0; } catch (e) {}
+  let g, turn, first = 0, seats, series, think, pick, tN = 0, endT = 0, pend = 0, cur = 8 * 9 + 4, kbN = false, lastM = -1, pops = [];
+  const seat = () => (seats = k.players(2));
+  const nameOf = (p) => (seats[p].cpu ? 'CPU' : String(seats[p].name).slice(0, 8));
+  const human = (p) => !seats[p].cpu;
+  const LVLN = ['Fácil', 'Normal', 'Difícil'];
+  function newGame() { g = utNew(); turn = first; first = 1 - first; think = 0; pick = -1; endT = 0; pend = 0; lastM = -1; pops = []; cur = 4 * 9 + 4; }
+  function resetN() { series = [0, 0]; seat(); first = 0; newGame(); k.count(3); }
+  k.onParty = () => { seat(); };
+  const BG = (() => { const q0 = document.createElement('canvas'); q0.width = W * 2; q0.height = H * 2; const q = q0.getContext('2d'); q.scale(2, 2);
+    const gr = q.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#26355c'); gr.addColorStop(1, '#101830'); q.fillStyle = gr; q.fillRect(0, 0, W, H);
+    q.fillStyle = 'rgba(255,255,255,.03)'; for (let y = 0; y < H; y += 34) for (let x = (y / 34) % 2 * 17; x < W; x += 34) q.fillRect(x, y, 17, 17);
+    /* mesa de madera bajo el tablero */
+    const wg = q.createLinearGradient(0, BY - 26, 0, BY + BW + 30); wg.addColorStop(0, '#8a5f36'); wg.addColorStop(1, '#4e3320');
+    ART.rr(q, BX - 22, BY - 22, BW + 44, BW + 44, 22); q.fillStyle = wg; q.fill(); q.lineWidth = 3; q.strokeStyle = OUT; q.stroke();
+    q.save(); ART.rr(q, BX - 22, BY - 22, BW + 44, BW + 44, 22); q.clip();
+    q.strokeStyle = 'rgba(40,20,0,.2)'; q.lineWidth = 1.4;
+    for (let i = 0; i < 12; i++) { const y = BY - 20 + i * 42; q.beginPath(); q.moveTo(BX - 24, y); q.bezierCurveTo(BX + BW * 0.3, y + 6, BX + BW * 0.7, y - 6, BX + BW + 24, y + 3); q.stroke(); }
+    q.restore();
+    const vg = q.createRadialGradient(W / 2, H * 0.46, 110, W / 2, H * 0.46, 420); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.42)'); q.fillStyle = vg; q.fillRect(0, 0, W, H);
+    return q0; })();
+  /* Fichas: X y O de una sola pieza (§8), cacheadas por color y tamaño */
+  const MK = {};
+  function mark(p, s) { const key = p + '|' + Math.round(s); if (MK[key]) return MK[key];
+    const cvv = document.createElement('canvas'); cvv.width = cvv.height = Math.ceil(s * 2) * 2; const q = cvv.getContext('2d'); q.scale(2, 2); q.translate(s, s);
+    const col = k.pcol(p), r = s * 0.62, t2 = s * 0.27;
+    const path = p === 0
+      ? (h) => { const a = t2 / 2, b2 = r; h.moveTo(-b2, -b2 + a * 1.4); h.lineTo(-b2 + a * 1.4, -b2); h.lineTo(0, -a * 1.4 + a * 0.6); h.lineTo(b2 - a * 1.4, -b2); h.lineTo(b2, -b2 + a * 1.4); h.lineTo(a * 1.4 - a * 0.6, 0); h.lineTo(b2, b2 - a * 1.4); h.lineTo(b2 - a * 1.4, b2); h.lineTo(0, a * 1.4 - a * 0.6); h.lineTo(-b2 + a * 1.4, b2); h.lineTo(-b2, b2 - a * 1.4); h.lineTo(-a * 1.4 + a * 0.6, 0); h.closePath(); }
+      : (h) => { h.arc(0, 0, r, 0, 6.283); h.arc(0, 0, r - t2, 0, 6.283, true); };
+    const parts = [[path, col]];
+    q.fillStyle = 'rgba(14,8,30,.3)'; q.save(); q.translate(0, s * 0.12); q.beginPath(); path(q); q.fill('evenodd'); q.restore();
+    q.lineJoin = 'round'; q.lineCap = 'round'; q.strokeStyle = OUT; q.lineWidth = 3.2; q.beginPath(); path(q); q.stroke();
+    q.fillStyle = col; q.beginPath(); path(q); q.fill('evenodd');
+    q.save(); q.beginPath(); path(q); q.clip('evenodd');
+    q.fillStyle = ART.lite(col, 0.3); q.beginPath(); path(q); q.translate(-s * 0.08, -s * 0.1); q.fill('evenodd');
+    q.restore();
+    void parts;
+    return (MK[key] = cvv); }
+  const drawMark = (p, x, y, s, a) => { const cvv = mark(p, s); c.globalAlpha = a == null ? 1 : a; c.drawImage(cvv, x - s, y - s, s * 2, s * 2); c.globalAlpha = 1; };
+  function place(m) { if (g.over) return false; if (utLegal(g).indexOf(m) < 0) return false;
+    const p = turn + 1, B = (m / 9) | 0, hadW = g.w[B];
+    utPlay(g, m, p); lastM = m; k.sfx('click');
+    if (!hadW && g.w[B]) { pops.push({ B, t: 0 }); k.sfx(g.w[B] === 3 ? 'pop' : 'coin'); k.burst(px(B, 4), py(B, 4), g.w[B] === 3 ? '#9aa3c0' : k.pcol(turn), 16, 150); }
+    if (g.over) pend = 1; else { turn = 1 - turn; think = 0; pick = -1; }
+    return true; }
+  function finishN() { const vsCPU = seats[0].cpu !== seats[1].cpu, hp = seats[0].cpu ? 1 : 0;
+    if (g.over === 3) return k.podium([{ p: 0, score: series[0] }, { p: 1, score: series[1] }], { head: '¡Empate!', noTie: true, fmt: (v) => `${v} ${v === 1 ? 'partida' : 'partidas'}`, go: 'Toca para la siguiente' });
+    const wp = g.over - 1; series[wp]++;
+    if (vsCPU) { if (wp === hp) lvlN = Math.min(2, lvlN + 0.5); else lvlN = Math.max(0, lvlN - 1); try { localStorage.setItem(LS, lvlN); } catch (e) {} }
+    k.podium([{ p: 0, score: series[0] }, { p: 1, score: series[1] }], { head: `¡Gana ${nameOf(wp)}!`, noTie: true, fmt: (v) => `${v} ${v === 1 ? 'partida' : 'partidas'}`, go: 'Toca para la siguiente' }); }
+  const help = CFG.help || 'Tres en raya en nueve tableros: la casilla donde juegas manda al rival al tablero pequeño de esa misma posición. Gana tres tableros en línea.';
+  resetN(); k.show(CFG.title, help);
+  const again = () => { seat(); newGame(); k.count(2); };
+  let started = false;
+  k.run((dt) => {
+    tN += dt;
+    for (const q of pops) q.t += dt;
+    if (!k.gate(started ? again : resetN)) return; started = true;
+    if (k.counting()) return;
+    if (pend) { endT += dt; if (endT === dt && g.over !== 3) { k.sfx('win'); k.confetti(k.pcol(g.over - 1)); } if (endT > 1.2) { finishN(); pend = 0; } return; }
+    if (g.over) return;
+    const p = turn;
+    if (!human(p)) { think += dt; if (pick < 0 && think > 0.3) pick = utAI(g, p + 1, k.clamp(lvlN + k.D.cpu, 0, 2)); if (pick >= 0 && think > 0.6) place(pick); return; }
+    const legal = utLegal(g);
+    const step = (dx, dy) => { let B = (cur / 9) | 0, i = cur % 9;
+      let gx = (B % 3) * 3 + (i % 3), gy = ((B / 3) | 0) * 3 + (((i / 3) | 0));
+      gx = k.clamp(gx + dx, 0, 8); gy = k.clamp(gy + dy, 0, 8);
+      cur = (((gy / 3) | 0) * 3 + ((gx / 3) | 0)) * 9 + (((gy % 3) | 0) * 3 + (gx % 3)); kbN = true; k.sfx('click'); };
+    if (k.phit(p, 'left')) step(-1, 0); if (k.phit(p, 'right')) step(1, 0);
+    if (k.phit(p, 'up')) step(0, -1); if (k.phit(p, 'down')) step(0, 1);
+    if (k.phit(p, 'a')) { if (!place(cur)) { k.sfx('hit'); k.float('Ahí no', px((cur / 9) | 0, cur % 9), py((cur / 9) | 0, cur % 9) - 18, '#ff9aa8'); } }
+    if (!k.party && k.ptr.hit && p === 0) { kbN = false;
+      const gx = Math.floor((k.ptr.x - BX) / (BS + GAP)), gy = Math.floor((k.ptr.y - BY) / (BS + GAP));
+      if (gx < 0 || gy < 0 || gx > 2 || gy > 2) return;
+      const ox = k.ptr.x - BX - gx * (BS + GAP), oy = k.ptr.y - BY - gy * (BS + GAP);
+      if (ox > BS || oy > BS) return;
+      const m = (gy * 3 + gx) * 9 + (Math.floor(oy / CS) * 3 + Math.floor(ox / CS));
+      if (legal.indexOf(m) < 0) { k.sfx('hit'); k.float('Ahí no', px((m / 9) | 0, m % 9), py((m / 9) | 0, m % 9) - 18, '#ff9aa8'); return; }
+      place(m); }
+  }, () => {
+    c.drawImage(BG, 0, 0, W, H);
+    label(CFG.title, W / 2, 14, 24, '#ffe27a', 'center');
+    const legal = g.over ? [] : utLegal(g);
+    const freeAll = !g.over && (g.nx < 0 || g.w[g.nx] !== 0);
+    for (let B = 0; B < 9; B++) {
+      const bx = BX + (B % 3) * (BS + GAP), by = BY + (((B / 3) | 0)) * (BS + GAP);
+      const act = !g.over && (freeAll ? !g.w[B] : B === g.nx);
+      ART.rr(c, bx - 4, by - 4, BS + 8, BS + 8, 10);
+      c.fillStyle = g.w[B] ? 'rgba(12,10,30,.5)' : act ? ART.alpha(k.pcol(turn), 0.2) : 'rgba(255,255,255,.07)'; c.fill();
+      c.lineWidth = act ? 3.4 : 2; c.strokeStyle = act ? k.pcol(turn) : 'rgba(255,255,255,.18)'; c.stroke();
+      c.strokeStyle = 'rgba(255,255,255,.16)'; c.lineWidth = 1.6;
+      for (let i = 1; i < 3; i++) { c.beginPath(); c.moveTo(bx + i * CS, by + 4); c.lineTo(bx + i * CS, by + BS - 4); c.moveTo(bx + 4, by + i * CS); c.lineTo(bx + BS - 4, by + i * CS); c.stroke(); }
+      for (let i = 0; i < 9; i++) { const v = g.b[B * 9 + i]; if (!v) continue; drawMark(v - 1, px(B, i), py(B, i), CS * 0.32, g.w[B] ? 0.35 : 1); }
+      if (g.w[B]) { const pop = pops.find((q) => q.B === B), sc = pop ? Math.min(1, pop.t * 4) : 1;
+        if (g.w[B] === 3) label('=', bx + BS / 2, by + BS / 2 - 22, 40, '#9aa3c0', 'center');
+        else drawMark(g.w[B] - 1, bx + BS / 2, by + BS / 2, BS * 0.34 * sc, 0.95); }
+      if (!g.w[B] && act && legal.length) for (let i = 0; i < 9; i++) if (legal.indexOf(B * 9 + i) >= 0) { c.fillStyle = ART.alpha(k.pcol(turn), 0.32 + 0.14 * Math.sin(tN * 5)); c.beginPath(); c.arc(px(B, i), py(B, i), 4.5, 0, 6.283); c.fill(); }
+    }
+    if (lastM >= 0) { const B = (lastM / 9) | 0, i = lastM % 9; c.strokeStyle = '#fff'; c.lineWidth = 2.2; ART.rr(c, px(B, i) - CS / 2 + 3, py(B, i) - CS / 2 + 3, CS - 6, CS - 6, 6); c.stroke(); }
+    if (kbN && !g.over && human(turn)) { const B = (cur / 9) | 0, i = cur % 9; c.strokeStyle = '#ffe27a'; c.lineWidth = 3; ART.rr(c, px(B, i) - CS / 2 + 2, py(B, i) - CS / 2 + 2, CS - 4, CS - 4, 6); c.stroke(); }
+    if (g.line) { const a = g.line[0], b2 = g.line[2], pul = 0.5 + 0.5 * Math.sin(tN * 8);
+      const cxL = (B) => BX + (B % 3) * (BS + GAP) + BS / 2, cyL = (B) => BY + (((B / 3) | 0)) * (BS + GAP) + BS / 2;
+      c.lineCap = 'round'; c.strokeStyle = OUT; c.lineWidth = 16; c.beginPath(); c.moveTo(cxL(a), cyL(a)); c.lineTo(cxL(b2), cyL(b2)); c.stroke();
+      c.strokeStyle = `rgba(255,255,255,${0.6 + pul * 0.4})`; c.lineWidth = 9; c.stroke(); }
+    /* marcador */
+    for (const p of [0, 1]) { const x = p ? W - 78 : 78, act = k.st === 'play' && !g.over && turn === p, col = k.pcol(p);
+      ART.rr(c, x - 64, 58, 128, 62, 12); c.fillStyle = act ? ART.alpha(col, 0.26) : 'rgba(20,16,50,.7)'; c.fill(); c.lineWidth = act ? 3 : 2; c.strokeStyle = act ? col : 'rgba(255,255,255,.15)'; c.stroke();
+      drawMark(p, x - 42, 88, 14); label(nameOf(p), x + 6, 68, 16, col, 'center'); label(String(series ? series[p] : 0), x + 6, 90, 22, '#fff', 'center');
+      if (seats && seats[p].cpu) label(LVLN[k.clamp(lvlN + k.D.cpu, 0, 2) | 0], x, 122, 12, '#cfd6ff', 'center'); }
+    const st = g.over ? '' : human(turn) ? (freeAll ? 'Juegas donde quieras' : 'Juegas en el tablero marcado') : 'La CPU piensa' + '.'.repeat(1 + Math.floor(tN * 3) % 3);
+    label(st, W / 2, H - 42, 19, k.pcol(turn), 'center');
+  });
+}
+if (NEST) nestMain();

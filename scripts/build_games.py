@@ -11,7 +11,7 @@ import catalog as cat
 GAMES_DIR = ROOT / 'wp-content/mu-plugins/arcade-core/games'
 ENG_DIR = ROOT / 'src/eng'
 # Todos los motores cargan antes la librería de arte común (ART, src/eng/art.js)
-DEPS = {'platformer': ['art', 'platlv'], 'platform': ['art', 'barlv'], 'runner': ['art', 'runlv']}
+DEPS = {'logica2': ['art', 'l2gen'], 'platformer': ['art', 'platlv'], 'platform': ['art', 'barlv'], 'runner': ['art', 'runlv']}
 deps_of = lambda e: DEPS.get(e, ['art'])
 STANDALONE = {'tetra-drop', 'tetra-drop-marathon'}
 
