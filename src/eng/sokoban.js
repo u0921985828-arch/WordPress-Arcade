@@ -1,7 +1,17 @@
 /* Sokoban (mode 'push': generado por retroceso, siempre resoluble) e Ice (mode 'ice': deslizar hasta la salida, BFS garantiza solución)
- * Arte propio: almacén de losetas con muros de ladrillo y cajas de madera / pista de hielo con rocas nevadas. Movimiento interpolado. */
-const M = CFG.mode, ICE = M === 'ice', W = 480, H = 540, OUT = ART.OUT, R2 = 6.2832;
-const k = Kit({ w: W, h: H, title: CFG.title, bg: ICE ? '#16304d' : '#1b1a2e' }), c = k.ctx;
+ * Arte propio: almacén de losetas con muros de ladrillo y cajas de madera / pista de hielo con rocas nevadas. Movimiento interpolado.
+ *
+ * sokoban-warehouse (plan Friv, tanda 3): 20 almacenes escritos a mano en SOKLV (src/eng/soklv.js),
+ * con mínimo de movimientos verificado por BFS, progreso por dificultad y final de verdad.
+ * Todo lo nuevo va detrás de HAND: el hielo y cualquier otro juego del motor siguen igual. */
+const M = CFG.mode, ICE = M === 'ice', OUT = ART.OUT, R2 = 6.2832;
+const HAND = (M === 'push' && typeof SOKLV !== 'undefined' && SOKLV[CFG.id]) || null;
+const W = 480, H = 540;   /* caja de referencia; con HAND el lienzo es fluido y manda k.W/k.H */
+const k = Kit({
+  w: W, h: H, title: CFG.title, bg: ICE ? '#16304d' : '#1b1a2e',
+  fluid: HAND ? { min: 0.42, max: 2.8, maxW: 1040, maxH: 880 } : false,
+  help: HAND ? 'Empuja las cajas hasta las marcas. Solo se empuja: nunca se tira. Desliza el dedo, toca hacia dónde ir o usa las flechas. B o el botón Deshacer corrige el último paso; Reiniciar empieza el almacén de cero. Iguala el mínimo de movimientos y te llevas la medalla.' : ''
+}), c = k.ctx;
 /* ---------- R5 §8 «pieza única» + cartoon de estudio (helpers locales) ----------
    uni(): contornea TODAS las partes y luego las rellena → solo sobrevive la silueta exterior.
    celp(): 3 tonos de borde duro (cel shading) recortados a la silueta, sin degradados.
@@ -25,8 +35,9 @@ function spec(g, x, y, rx, ry, rot, a) { g.fillStyle = 'rgba(255,255,255,' + (a 
 function contact(g, x, y, rx, ry, a) { g.fillStyle = 'rgba(14,8,30,' + (a == null ? 0.3 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.2832); g.fill(); }
 const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 const D = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
-let N, wall, goals, boxes, pl, level, moves, hist, exitC, total, par, init;
-let S, OX, OY, boardCv, bgCv, pr, boxR, face = 1, walkT = 0, t = 0, queued = null, holdT = 0, bump = null, trail = [], winT = 0, winStars = 0, pushT = 0;
+let N, NW, NH, wall, goals, boxes, pl, level, moves, hist, exitC, total, par, init, dead = null, bestMv = 0;
+let S, OX, OY, BY, BTN = [], boardCv, bgCv, pr, boxR, face = 1, walkT = 0, t = 0, queued = null, holdT = 0, bump = null, trail = [], winT = 0, winStars = 0, pushT = 0;
+const BH = 36, BPAD = 14;   /* alto de los botones y margen del lienzo del tablero (la sombra se sale de la rejilla) */
 const K = (x, y) => x + ',' + y, rnd = (s) => { const x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 function genPush() {
   /* Dificultad: fácil una caja menos y menos revuelto; difícil una más. */
@@ -57,16 +68,61 @@ function genIce() {
   }
   if (bestTry) { wall = bestTry.wall; pl = bestTry.pl; exitC = bestTry.exitC; par = bestTry.par; } /* red de seguridad: nunca se devuelve un tablero inválido */
 }
+/* ---------- Almacenes a mano (solo sokoban-warehouse) ---------- */
+const mvKey = () => 'sokmv:' + CFG.id + ':' + level + (k.dif === 1 ? '' : k.dif === 0 ? '@f' : '@d');
+function loadBest() { let v = 0; try { v = +localStorage.getItem(mvKey()) || 0; } catch (e) {} bestMv = v; }
+function saveBest() { if (bestMv && bestMv <= moves) return; bestMv = moves; try { localStorage.setItem(mvKey(), moves); } catch (e) {} }
+function loadHand(i) {
+  const g = HAND[Math.max(0, Math.min(HAND.length - 1, i - 1))].g;
+  NH = g.length; NW = 0; for (const r of g) NW = Math.max(NW, r.length);
+  N = Math.max(NW, NH); wall = new Set(); goals = []; boxes = []; pl = [1, 1];
+  for (let y = 0; y < NH; y++) for (let x = 0; x < NW; x++) {
+    const ch = g[y][x] || ' ';
+    if (ch === '#') wall.add(K(x, y));
+    if (ch === '.' || ch === '*' || ch === '+') goals.push([x, y]);
+    if (ch === '$' || ch === '*') boxes.push([x, y]);
+    if (ch === '@' || ch === '+') pl = [x, y];
+  }
+  par = HAND[i - 1].m;
+  /* casillas donde una caja se pierde para siempre (esquina de muros sin marca): se señalan en fácil */
+  dead = new Set();
+  for (let y = 1; y < NH - 1; y++) for (let x = 1; x < NW - 1; x++) {
+    if (wall.has(K(x, y)) || goals.some((q) => q[0] === x && q[1] === y)) continue;
+    const w = (a, b) => wall.has(K(a, b));
+    if ((w(x, y - 1) || w(x, y + 1)) && (w(x - 1, y) || w(x + 1, y))) dead.add(K(x, y));
+  }
+  loadBest();
+}
+/* Disposición: la casilla se escala al hueco disponible, así el almacén más grande cabe en
+   cualquier pantalla (y en fluido aprovecha el alto real). */
+function layout() {
+  if (!NW) return;
+  const top = HAND ? 58 : 56, bot = 56;
+  const availW = k.W - 20, availH = k.H - top - bot;
+  S = Math.max(13, Math.floor(Math.min(availW / NW, availH / NH, 78)));
+  OX = Math.round((k.W - S * NW) / 2); OY = Math.round(top + (availH - S * NH) / 2);
+  const bw = Math.round(Math.max(112, Math.min(170, (k.W - 34) / 2)));
+  BY = Math.round(k.H - BH - 10);
+  BTN = ICE ? [['restart', Math.round((k.W - bw) / 2), bw]] : [['undo', Math.round(k.W / 2 - bw - 5), bw], ['restart', Math.round(k.W / 2 + 5), bw]];
+  bgCv = null; boardCv = renderBoard();
+}
 function build() {
-  moves = 0; hist = []; goals = []; boxes = []; winT = 0; queued = null; trail = [];
-  if (M === 'push') genPush(); else genIce();
-  init = JSON.stringify([pl, boxes]); snapR();
-  S = Math.floor(Math.min(460, 432) / N); OX = Math.floor((W - S * N) / 2); OY = 58 + Math.floor((432 - S * N) / 2); boardCv = renderBoard();
+  moves = 0; hist = []; goals = []; boxes = []; winT = 0; queued = null; trail = []; winStars = 0;
+  if (HAND) loadHand(level); else { if (M === 'push') genPush(); else genIce(); NW = NH = N; }
+  init = JSON.stringify([pl, boxes]); snapR(); layout();
 }
 function snapR() { pr = [...pl]; boxR = boxes.map((b) => [...b]); }
-function reset() { level = 1; total = 0; build(); }
+function reset() { level = HAND ? k.lv : 1; total = 0; build(); }
 k.onDif = () => { if (k.st !== 'play') reset(); };
-reset(); k.show(CFG.title, M === 'push' ? 'Empuja todas las cajas a las marcas. Desliza, toca hacia donde ir o usa las flechas. B = deshacer.' : 'Sobre el hielo resbalas hasta chocar. Llega a la bandera con los mínimos movimientos. B = reiniciar.');
+k.onSize = () => { layout(); };
+/* Niveles a mano: kit.js guarda el progreso por dificultad y sirve el menú y la rejilla. */
+/* Saltar de nivel desde la pausa deja pendiente el arranque de kit; pasamos por 'over'
+   para que el gate lo consuma y no reinicie solo la tarjeta de nivel superado. */
+if (HAND) k.levels(HAND.length, { start: (i) => { level = i; total = 0; build(); if (k.st === 'play') k.st = 'over'; } });
+reset();
+k.show(CFG.title, HAND ? `Empuja cada caja hasta su marca. Solo se empuja: piensa antes de mover. 20 almacenes, medalla si igualas el mínimo.`
+  : M === 'push' ? 'Empuja todas las cajas a las marcas. Desliza, toca hacia donde ir o usa las flechas. B = deshacer.'
+    : 'Sobre el hielo resbalas hasta chocar. Llega a la bandera con los mínimos movimientos. B = reiniciar.');
 
 /* ---------- Lógica ---------- */
 const onG = (b) => goals.some((g) => g[0] === b[0] && g[1] === b[1]);
@@ -84,14 +140,34 @@ function move(dn) {
 // caja fuera de marca en una esquina de muros: ya no se puede resolver
 function stuck() { const w = (x, y) => wall.has(K(x, y)); return boxes.some((q) => !onG(q) && (w(q[0] - 1, q[1]) || w(q[0] + 1, q[1])) && (w(q[0], q[1] - 1) || w(q[0], q[1] + 1))); }
 function solved() { return ICE ? pl[0] === exitC[0] && pl[1] === exitC[1] : boxes.every(onG); }
+/* Medalla: en fácil basta con acercarse al mínimo, en difícil hay que clavarlo. */
+const tolMv = () => (k.dif === 0 ? 4 : k.dif === 2 ? 0 : 1);
 function win() {
+  if (HAND) {
+    winStars = moves <= par + tolMv() ? 3 : moves <= Math.round(par * 1.4) + 4 ? 2 : 1;
+    const gain = Math.max(60, 600 - Math.max(0, moves - par) * 12) + level * 20;
+    total += gain; winT = 1.25; saveBest(); k.sfx('win'); k.confetti(); k.float('+' + gain, k.W / 2, k.H / 2 + 90, '#ffd23d');
+    return;
+  }
   const gain = Math.max(50, 400 - moves * (ICE ? 25 : 5)) * level; total += gain; winT = 1.6; k.best(CFG.id, total);
-  winStars = ICE ? (moves <= par ? 3 : moves <= par + 2 ? 2 : 1) : 3; k.sfx('win'); k.confetti(); k.float('+' + gain, W / 2, H / 2 + 90, '#ffd23d');
+  winStars = ICE ? (moves <= par ? 3 : moves <= par + 2 ? 2 : 1) : 3; k.sfx('win'); k.confetti(); k.float('+' + gain, k.W / 2, k.H / 2 + 90, '#ffd23d');
+}
+/* Nivel a mano superado: kit.js desbloquea el siguiente y ofrece Siguiente / Niveles. */
+function handDone() {
+  winT = 0; k.best(CFG.id, total);
+  const lv = HAND[level - 1], st = '★★★'.slice(0, winStars) + '☆☆☆'.slice(0, 3 - winStars);
+  k.levelDone(total, `${lv.n} · ${st}<br>${moves} movimiento${moves === 1 ? '' : 's'} · mínimo ${par}` +
+    (winStars === 3 ? ' · <b style="color:#ffd166">¡Medalla!</b>' : ` · tu mejor marca ${bestMv}`));
 }
 function undo() { if (!ICE && hist.length) { const [p2, b2] = JSON.parse(hist.pop()); pl = p2; boxes = b2; moves++; k.sfx('click'); } }
-function restart() { if (ICE) { pl = JSON.parse(init)[0]; pr = [...pl]; trail = []; moves = 0; } else { const [p2, b2] = JSON.parse(init); if (moves) hist.push(JSON.stringify([pl, boxes])); pl = p2; boxes = b2; moves++; } k.sfx('pop'); }
-const BTN = ICE ? [['restart', W / 2 - 80, 160]] : [['undo', W / 2 - 170, 160], ['restart', W / 2 + 10, 160]];
-const BY = 498, BH = 36;
+/* Con niveles a mano, reiniciar deja el almacén como estaba y el contador a cero: así se puede
+   volver a intentar la medalla. En los generados y en el hielo se conserva el reinicio de antes. */
+function restart() {
+  if (HAND) { const [p2, b2] = JSON.parse(init); pl = p2; boxes = b2; hist = []; moves = 0; queued = null; snapR(); }
+  else if (ICE) { pl = JSON.parse(init)[0]; pr = [...pl]; trail = []; moves = 0; }
+  else { const [p2, b2] = JSON.parse(init); if (moves) hist.push(JSON.stringify([pl, boxes])); pl = p2; boxes = b2; moves++; }
+  k.sfx('pop');
+}
 function btnAt(x, y) { if (y < BY || y > BY + BH) return null; const b = BTN.find((q) => x > q[1] && x < q[1] + q[2]); return b ? b[0] : null; }
 const moving = () => Math.abs(pr[0] - pl[0]) + Math.abs(pr[1] - pl[1]) > 0.02;
 
@@ -106,7 +182,7 @@ k.run((dt) => {
   boxes.forEach((b, i) => { const r = boxR[i], s2 = 11 * dt; r[0] += k.clamp(b[0] - r[0], -s2, s2); r[1] += k.clamp(b[1] - r[1], -s2, s2); });
   for (const q of trail) q.l -= dt; trail = trail.filter((q) => q.l > 0);
   if (bump) { bump.t -= dt; if (bump.t <= 0) bump = null; } if (pushT > 0) pushT -= dt;
-  if (winT > 0) { winT -= dt; if (winT <= 0) { level++; build(); } return; }
+  if (winT > 0) { winT -= dt; if (winT <= 0) { if (HAND) return handDone(); level++; build(); } return; }
   if (!moving() && solved()) { win(); return; }
   // entrada
   let d = k.swipe || ['up', 'down', 'left', 'right'].find((q) => k.hit.has(q));
@@ -124,24 +200,28 @@ function label(s, x, y, size, col, align) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top';
   c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
 }
+/* Fondo a la medida de la pantalla viva (en fluido cambia al girar; se rehace en layout()). */
 function renderBg() {
-  const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2; const g = cv.getContext('2d'); g.scale(2, 2);
-  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, ICE ? '#2a5a88' : '#2b2745'); gr.addColorStop(1, ICE ? '#10263f' : '#141224'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
-  if (ICE) { g.fillStyle = 'rgba(255,255,255,.5)'; for (let i = 0; i < 70; i++) { g.globalAlpha = 0.2 + rnd(i) * 0.5; g.beginPath(); g.arc(rnd(i + 3) * W, rnd(i + 7) * H, 0.8 + rnd(i + 9) * 1.8, 0, R2); g.fill(); } g.globalAlpha = 1; }
-  else { g.strokeStyle = 'rgba(255,255,255,.04)'; g.lineWidth = 1; for (let y = 0; y < H; y += 24) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); for (let x = (y / 24) % 2 ? 0 : 24; x < W; x += 48) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 24); g.stroke(); } } }
+  const BW = Math.ceil(k.W), BH2 = Math.ceil(k.H);
+  const cv = document.createElement('canvas'); cv.width = BW * CDPR; cv.height = BH2 * CDPR; const g = cv.getContext('2d'); g.scale(CDPR, CDPR);
+  const gr = g.createLinearGradient(0, 0, 0, BH2); gr.addColorStop(0, ICE ? '#2a5a88' : '#2b2745'); gr.addColorStop(1, ICE ? '#10263f' : '#141224'); g.fillStyle = gr; g.fillRect(0, 0, BW, BH2);
+  if (ICE) { g.fillStyle = 'rgba(255,255,255,.5)'; for (let i = 0; i < 70; i++) { g.globalAlpha = 0.2 + rnd(i) * 0.5; g.beginPath(); g.arc(rnd(i + 3) * BW, rnd(i + 7) * BH2, 0.8 + rnd(i + 9) * 1.8, 0, R2); g.fill(); } g.globalAlpha = 1; }
+  else { g.strokeStyle = 'rgba(255,255,255,.04)'; g.lineWidth = 1; for (let y = 0; y < BH2; y += 24) { g.beginPath(); g.moveTo(0, y); g.lineTo(BW, y); g.stroke(); for (let x = (y / 24) % 2 ? 0 : 24; x < BW; x += 48) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 24); g.stroke(); } } }
   return cv;
 }
 function renderBoard() {
-  const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2; const g = cv.getContext('2d'); g.scale(2, 2);
-  const isW = (x, y) => x < 0 || y < 0 || x >= N || y >= N || wall.has(K(x, y));
+  const cw = S * NW + BPAD * 2, ch = S * NH + BPAD * 2;
+  const cv = document.createElement('canvas'); cv.width = Math.ceil(cw * CDPR); cv.height = Math.ceil(ch * CDPR);
+  const g = cv.getContext('2d'); g.scale(CDPR, CDPR); g.translate(BPAD - OX, BPAD - OY); cv._w = cw; cv._h = ch;
+  const isW = (x, y) => x < 0 || y < 0 || x >= NW || y >= NH || wall.has(K(x, y));
   // sombra del tablero
-  g.fillStyle = 'rgba(0,0,0,.35)'; ART.rr(g, OX - 2, OY + 6, S * N + 4, S * N + 4, 10); g.fill();
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { if (isW(x, y)) continue; const X = OX + x * S, Y = OY + y * S, r = rnd(x * 31 + y * 7 + level);
+  g.fillStyle = 'rgba(0,0,0,.35)'; ART.rr(g, OX - 2, OY + 6, S * NW + 4, S * NH + 4, 10); g.fill();
+  for (let y = 0; y < NH; y++) for (let x = 0; x < NW; x++) { if (isW(x, y)) continue; const X = OX + x * S, Y = OY + y * S, r = rnd(x * 31 + y * 7 + level);
     if (ICE) { g.fillStyle = (x + y) % 2 ? '#c9ecff' : '#b8e2fb'; g.fillRect(X, Y, S, S); g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(X + S * (0.15 + r * 0.3), Y + S * 0.7); g.lineTo(X + S * (0.45 + r * 0.3), Y + S * 0.3); g.stroke();
       g.fillStyle = 'rgba(90,150,200,.18)'; g.fillRect(X, Y + S - 2, S, 2); }
     else { g.fillStyle = '#8a7a64'; g.fillRect(X, Y, S, S); ART.rr(g, X + 1.5, Y + 1.5, S - 3, S - 3, 4); g.fillStyle = r < 0.5 ? '#c4b196' : '#bcaa8e'; g.fill(); g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(X + 3, Y + 3, S - 6, 2);
       g.fillStyle = 'rgba(90,70,50,.18)'; for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(X + 6 + rnd(r * 90 + i) * (S - 12), Y + 6 + rnd(r * 40 + i * 3) * (S - 12), 1.2, 0, R2); g.fill(); } }
-    if (isW(x, y - 1)) { g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(X, Y, S, S * 0.16); } // sombra del muro de arriba
+    if (isW(x, y - 1) && y > 0) { g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(X, Y, S, S * 0.16); } // sombra del muro de arriba
   }
   // objetivos pintados en el suelo
   for (const q of goals) { const X = OX + (q[0] + 0.5) * S, Y = OY + (q[1] + 0.5) * S; g.strokeStyle = '#e0a31a'; g.lineWidth = 3; g.setLineDash([S * 0.12, S * 0.08]); ART.rr(g, X - S * 0.36, Y - S * 0.36, S * 0.72, S * 0.72, 5); g.stroke(); g.setLineDash([]);
@@ -149,7 +229,7 @@ function renderBoard() {
   if (ICE) { const X = OX + exitC[0] * S, Y = OY + exitC[1] * S; g.fillStyle = 'rgba(124,247,160,.35)'; g.beginPath(); g.ellipse(X + S / 2, Y + S * 0.62, S * 0.42, S * 0.28, 0, 0, R2); g.fill(); g.strokeStyle = '#3fbf6a'; g.lineWidth = 2; g.stroke(); }
   // muros en relieve: cara superior + cara frontal si abajo hay suelo
   const fd = Math.max(5, S * 0.2);
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { if (!isW(x, y)) continue; const X = OX + x * S, Y = OY + y * S, front = !isW(x, y + 1) && y < N - 1, th = front ? S - fd : S;
+  for (let y = 0; y < NH; y++) for (let x = 0; x < NW; x++) { if (!isW(x, y)) continue; const X = OX + x * S, Y = OY + y * S, front = !isW(x, y + 1) && y < NH - 1, th = front ? S - fd : S;
     if (ICE) { g.fillStyle = '#5f7ba3'; g.fillRect(X, Y, S, S); g.fillStyle = '#9fbde0'; g.fillRect(X, Y, S, th); g.strokeStyle = 'rgba(60,90,130,.35)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(X + S * (0.2 + rnd(x + y * 5) * 0.5), Y + th); g.lineTo(X + S * 0.5, Y + th * 0.55); g.lineTo(X + S * 0.85, Y + th * 0.7); g.stroke();
       g.fillStyle = '#f4fbff'; g.beginPath(); g.moveTo(X, Y); g.lineTo(X + S, Y); g.lineTo(X + S, Y + th * 0.3); for (let i = 4; i >= 0; i--) g.lineTo(X + i * S / 4, Y + th * (0.3 + (i % 2) * 0.14 + rnd(x * 3 + y + i) * 0.1)); g.fill();
       if (front) { g.fillStyle = '#56709a'; g.fillRect(X, Y + th, S, fd); g.fillStyle = '#d6ecff'; for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(X + i * S / 3 + 2, Y + th); g.lineTo(X + i * S / 3 + S / 6, Y + th + fd * 0.8); g.lineTo(X + (i + 1) * S / 3 - 2, Y + th); g.fill(); } } }
@@ -160,9 +240,9 @@ function renderBoard() {
   }
   // contorno de la masa de muros
   g.strokeStyle = OUT; g.lineWidth = 2.5; g.lineCap = 'round'; g.beginPath();
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { if (!isW(x, y)) continue; const X = OX + x * S, Y = OY + y * S;
-    if (!isW(x, y - 1) || y === 0) { g.moveTo(X, Y); g.lineTo(X + S, Y); } if (!isW(x, y + 1) || y === N - 1) { g.moveTo(X, Y + S); g.lineTo(X + S, Y + S); }
-    if (!isW(x - 1, y) || x === 0) { g.moveTo(X, Y); g.lineTo(X, Y + S); } if (!isW(x + 1, y) || x === N - 1) { g.moveTo(X + S, Y); g.lineTo(X + S, Y + S); } }
+  for (let y = 0; y < NH; y++) for (let x = 0; x < NW; x++) { if (!isW(x, y)) continue; const X = OX + x * S, Y = OY + y * S;
+    if (!isW(x, y - 1) || y === 0) { g.moveTo(X, Y); g.lineTo(X + S, Y); } if (!isW(x, y + 1) || y === NH - 1) { g.moveTo(X, Y + S); g.lineTo(X + S, Y + S); }
+    if (!isW(x - 1, y) || x === 0) { g.moveTo(X, Y); g.lineTo(X, Y + S); } if (!isW(x + 1, y) || x === NW - 1) { g.moveTo(X + S, Y); g.lineTo(X + S, Y + S); } }
   g.stroke();
   return cv;
 }
@@ -204,8 +284,13 @@ function btn(kind, x, w) {
   label(kind === 'undo' ? 'Deshacer' : 'Reiniciar', x + w / 2 + 12, y + 9, 16, '#fff', 'center');
 }
 function draw() {
-  if (!bgCv) bgCv = renderBg(); c.drawImage(bgCv, 0, 0, W, H); c.drawImage(boardCv, 0, 0, W, H);
+  if (!bgCv) bgCv = renderBg(); c.drawImage(bgCv, 0, 0, k.W, k.H); c.drawImage(boardCv, OX - BPAD, OY - BPAD, boardCv._w, boardCv._h);
   const cx = (gx) => OX + (gx + 0.5) * S, cy = (gy) => OY + (gy + 0.5) * S;
+  /* Ayuda de fácil: las esquinas donde una caja se perdería van marcadas. */
+  if (HAND && dead && k.dif === 0 && !winT) { c.save(); c.globalAlpha = 0.5; c.strokeStyle = '#ff6f8a'; c.lineWidth = Math.max(2, S * 0.07); c.lineCap = 'round';
+    for (const key of dead) { const [x, y] = key.split(',').map(Number), X = cx(x), Y = cy(y), r = S * 0.17;
+      c.beginPath(); c.moveTo(X - r, Y - r); c.lineTo(X + r, Y + r); c.moveTo(X + r, Y - r); c.lineTo(X - r, Y + r); c.stroke(); }
+    c.restore(); }
   if (ICE) { // salida: bandera con brillo
     const X = cx(exitC[0]), Y = cy(exitC[1]); c.globalAlpha = 0.35 + Math.sin(t * 4) * 0.15; c.fillStyle = '#b6ffcc'; c.beginPath(); c.arc(X, Y + S * 0.12, S * 0.45, 0, R2); c.fill(); c.globalAlpha = 1;
     ART.flag(c, X - S * 0.15, Y + S * 0.34, t, '#7cf7a0', S * 0.8);
@@ -219,13 +304,22 @@ function draw() {
       const mv = moving(); ART.hero(c, hx, hy, S / 46, { face, state: mv ? (ICE ? 'jump' : 'run') : 'idle', t: t + walkT, col: ICE ? '#ff5f7a' : '#ffb13d', squash: pushT > 0 ? 0.08 : 0 }); }
     else { const r = boxR[e.i] || boxes[e.i], b = boxes[e.i], on = onG(b) && Math.abs(r[0] - b[0]) + Math.abs(r[1] - b[1]) < 0.05; crate(cx(r[0]), cy(r[1]), S, on, pushT > 0 && Math.abs(r[0] - b[0]) + Math.abs(r[1] - b[1]) > 0.05 ? 0.05 : 0); }
   }
-  // HUD
-  label(`Nivel ${level}`, 14, 10, 20, '#fff'); label(`Movs ${moves}`, 14, 34, 14, '#cfc8ff');
-  label(`${total}`, W - 14, 10, 20, '#ffd23d', 'right');
-  if (ICE) label(`Mínimo ${par}`, W - 14, 34, 14, '#b6ffcc', 'right'); else label(`Cajas ${boxes.filter(onG).length}/${boxes.length}`, W - 14, 34, 14, '#ffd9a0', 'right');
+  // HUD: anclado a los bordes reales, con el centro libre para el botón de pausa del reproductor
+  const L = k.ex(14), R = k.ex2(14), narrow = k.W < 380;
+  if (HAND) {
+    const lv = HAND[level - 1];
+    label(`Nivel ${level}/${HAND.length}`, L, k.ey(8), narrow ? 17 : 20, '#fff');
+    label(`Movs ${moves} · mín ${par}`, L, k.ey(narrow ? 28 : 32), narrow ? 12 : 14, moves > par ? '#cfc8ff' : '#b6ffcc');
+    label(lv.n, R, k.ey(8), narrow ? 14 : 16, '#ffd9a0', 'right');
+    label(`Cajas ${boxes.filter(onG).length}/${boxes.length}`, R, k.ey(narrow ? 28 : 32), narrow ? 12 : 14, '#ffd23d', 'right');
+  } else {
+    label(`Nivel ${level}`, L, k.ey(10), 20, '#fff'); label(`Movs ${moves}`, L, k.ey(34), 14, '#cfc8ff');
+    label(`${total}`, R, k.ey(10), 20, '#ffd23d', 'right');
+    if (ICE) label(`Mínimo ${par}`, R, k.ey(34), 14, '#b6ffcc', 'right'); else label(`Cajas ${boxes.filter(onG).length}/${boxes.length}`, R, k.ey(34), 14, '#ffd9a0', 'right');
+  }
   for (const b of BTN) btn(b[0], b[1], b[2]);
-  if (!ICE && !winT && !moving() && k.dif !== 2 && stuck()) { ART.rr(c, W / 2 - 130, BY - 34, 260, 28, 12); ART.fillOut(c, 'rgba(34,28,66,.92)', 2); label('Caja atascada: deshaz o reinicia', W / 2, BY - 28, 15, '#ffd23d', 'center'); }
-  if (winT > 0) { const p = Math.min(1, (1.6 - winT) * 5), sc = p < 1 ? 0.6 + p * 0.5 - Math.sin(p * 3.14) * 0.1 : 1; c.save(); c.translate(W / 2, H / 2 - 20); c.scale(sc, sc);
+  if (!ICE && !winT && !moving() && k.dif !== 2 && stuck()) { const bw = Math.min(280, k.W - 24); ART.rr(c, k.W / 2 - bw / 2, BY - 34, bw, 28, 12); ART.fillOut(c, 'rgba(34,28,66,.92)', 2); label('Caja atascada: deshaz o reinicia', k.W / 2, BY - 28, Math.min(15, bw / 18), '#ffd23d', 'center'); }
+  if (winT > 0) { const p = Math.min(1, ((HAND ? 1.25 : 1.6) - winT) * 5), sc = p < 1 ? 0.6 + p * 0.5 - Math.sin(p * 3.14) * 0.1 : 1; c.save(); c.translate(k.W / 2, k.H / 2 - 20); c.scale(sc, sc);
     ART.rr(c, -150, -58, 300, 116, 22); ART.fillOut(c, 'rgba(34,28,66,.94)', 3); label('¡Nivel superado!', 0, -44, 28, '#7cf7a0', 'center');
     for (let i = 0; i < 3; i++) star(-44 + i * 44, 20, i < winStars ? 15 : 12, i < winStars && p > i * 0.3);
     c.restore(); }
