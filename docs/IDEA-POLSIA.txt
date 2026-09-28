@@ -1,0 +1,20 @@
+Kuboplay: un portal de juegos HTML5 gratuitos al estilo de los Friv de toda la vida, pero
+hecho para el móvil de hoy y, sobre todo, para la tele. Tenemos 250 juegos propios,
+programados por nosotros y con todo el arte dibujado por código (nada de recursos de
+terceros): plataformas, puzles, cartas, deportes, trivia y juegos de fiesta.
+
+Lo que nos diferencia: 142 de esos juegos se juegan en la televisión. Abres la web en la
+tele, sale un código de cuatro letras con su QR, y hasta cuatro personas escanean con el
+móvil y lo usan como mando. Sin descargar nada, sin cuentas, sin cables: la conexión va
+directa entre navegadores. Es el juego de mesa de después de comer, pero en la tele de casa.
+
+Cada juego es un juego de verdad, no un minijuego de dos minutos: menú propio, niveles
+diseñados a mano, progreso guardado, tres dificultades reales y un final. Todo responsive,
+del móvil vertical a la tele 16:9.
+
+Modelo de negocio: acceso gratuito financiado con publicidad (AdSense), con los anuncios
+fuera de la partida, nunca encima del juego. Está montado sobre WordPress, así que escala
+solo añadiendo juegos al catálogo.
+
+Público: familias y grupos de amigos que quieren jugar juntos en el salón sin comprar una
+consola, y el jugador casual de móvil que busca juegos rápidos y bien hechos.
