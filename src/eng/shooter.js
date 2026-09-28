@@ -8,6 +8,9 @@ let p, shots, foes, eb, score, lives, wave, cool, inv, dirX, t, pt, calm, mush, 
    progreso por dificultad (kit.js) y jefe final. Los demás modos no se enteran. */
 const HAND = M === 'invaders' && typeof SHOOLV !== 'undefined' ? (SHOOLV[CFG.id] || null) : null;
 let fox = 0, foy = 0, divT = 0, N0 = 45, LV = { sp: 1, fr: 1, dr: 10, dv: 0, uf: 1 };
+/* Oleadas escritas a mano del modo vertical (starfall-defender), tabla en src/eng/shoolv.js. */
+const WV = (typeof SHOOLV !== 'undefined' && SHOOLV[CFG.id]) || null, HANDV = M === 'vertical' && !!WV;
+let wt, qi, pui, wdone, endT, banner2;
 /* ---------------------------------------------------------------- arte */
 /* --- Ley de la pieza única (R5, docs/REMASTER.md §8) -------------------------------
    `unite(g, partes, ancho)` traza TODAS las partes y las rellena después: los contornos
@@ -124,6 +127,61 @@ function drone(x, y, r, big, flash) {
   clipIn(c, hex, (g) => { g.fillStyle = AL(OUT, 0.24); g.beginPath(); g.arc(0, 0, r * 0.62, 0, 6.283); g.fill(); });
   c.rotate(-t * (big ? 0.6 : 1.8)); glow('#f0647e', 10); c.fillStyle = '#f0647e'; c.beginPath(); c.arc(0, 0, r * 0.35, 0, 6.283); c.fill(); c.shadowBlur = 0; c.restore();
 }
+/* Minador y cañonera (oleadas a mano): UNA sola silueta continua — lomo, aletas y panza salen del
+   mismo trazado, se rellena una vez y se contornea una vez; el detalle va recortado dentro.
+   Sprite cacheado por tamaño, destello y escala real del lienzo. */
+const MNS = {};
+function minerSpr(big, flash) {
+  const tr = c.getTransform ? c.getTransform().a : 2, S = Math.min(3, Math.max(1, tr));
+  const key = (big ? 1 : 0) + '|' + (flash ? 1 : 0) + '|' + Math.round(S * 4);
+  if (MNS[key]) return MNS[key];
+  const R = big ? 30 : 21, HT = big ? 21 : 15, HB = big ? 24 : 18, P = 3;
+  const cw = (R + P) * 2, ch = HT + HB, cv = document.createElement('canvas');
+  cv.width = Math.ceil(cw * S); cv.height = Math.ceil(ch * S);
+  const g = cv.getContext('2d'); g.scale(S, S); g.translate(R + P, HT);
+  const base = flash ? '#ffffff' : big ? '#8f5ad6' : '#4e7fb8';
+  const hull = (q) => {
+    q.moveTo(-R, -1);
+    q.quadraticCurveTo(-R * 0.76, -HT + 2, 0, -HT + 2.5);
+    q.quadraticCurveTo(R * 0.76, -HT + 2, R, -1);
+    q.lineTo(R * 0.64, 6);
+    q.quadraticCurveTo(R * 0.42, HB - 4, 0, HB - 4);
+    q.quadraticCurveTo(-R * 0.42, HB - 4, -R * 0.64, 6);
+    q.closePath();
+  };
+  const gr = g.createLinearGradient(-R, -HT, R * 0.4, HB); gr.addColorStop(0, LT(base, 0.34)); gr.addColorStop(0.55, base); gr.addColorStop(1, DK(base, 0.34));
+  unite(g, [[hull, gr]], 1.25);
+  clipIn(g, hull, (q) => {
+    q.fillStyle = AL(OUT, 0.34); q.fillRect(-R * 0.52, HB - 12, R * 1.04, 8);            /* compuerta de minas */
+    q.fillStyle = AL('#ffffff', 0.2); q.fillRect(-R, -HT + 3, R * 2, 2.6);
+    q.fillStyle = AL(OUT, 0.26); q.beginPath(); q.ellipse(R * 0.58, HB * 0.2, R * 0.55, HB * 0.6, 0, 0, 6.283); q.fill();
+    q.fillStyle = '#ffd166'; q.beginPath(); q.ellipse(0, -HT * 0.3, R * 0.28, HT * 0.22, 0, 0, 6.283); q.fill();
+    q.fillStyle = AL('#ffffff', 0.5); q.beginPath(); q.ellipse(-R * 0.08, -HT * 0.42, R * 0.12, HT * 0.09, 0, 0, 6.283); q.fill();
+  });
+  return (MNS[key] = { cv, x: R + P, y: HT, w: cw, h: ch });
+}
+function minerArt(x, y, dir, big, flash) {
+  const s = minerSpr(big, flash);
+  if (dir < 0) { c.save(); c.translate(x, y); c.scale(-1, 1); c.drawImage(s.cv, -s.x, -s.y, s.w, s.h); c.restore(); }
+  else c.drawImage(s.cv, x - s.x, y - s.y, s.w, s.h);
+}
+/* Mina: el cuerpo y los pinchos son un único polígono estrellado (un relleno, un contorno). */
+const MIS = {};
+function mineSpr() {
+  const tr = c.getTransform ? c.getTransform().a : 2, S = Math.min(3, Math.max(1, tr)), key = Math.round(S * 4);
+  if (MIS[key]) return MIS[key];
+  const R = 13, cv = document.createElement('canvas'); cv.width = cv.height = Math.ceil(R * 2 * S);
+  const g = cv.getContext('2d'); g.scale(S, S); g.translate(R, R);
+  const star = (q) => { for (let i = 0; i < 16; i++) { const a = i * 0.3927, rr = i % 2 ? 11.2 : 7.4; if (i) q.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); else q.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); } q.closePath(); };
+  const gr = g.createLinearGradient(-8, -8, 8, 8); gr.addColorStop(0, '#e0708a'); gr.addColorStop(0.55, '#c2455f'); gr.addColorStop(1, '#7a2436');
+  unite(g, [[star, gr]], 1.1);
+  clipIn(g, star, (q) => { q.fillStyle = AL(OUT, 0.3); q.beginPath(); q.arc(3, 3.4, 8, 0, 6.283); q.fill(); q.fillStyle = AL('#ffffff', 0.34); q.beginPath(); q.arc(-3, -3.4, 2.6, 0, 6.283); q.fill(); });
+  return (MIS[key] = { cv, r: R });
+}
+function mineArt(x, y) {
+  const s = mineSpr(); c.drawImage(s.cv, x - s.r, y - s.r, s.r * 2, s.r * 2);
+  c.fillStyle = Math.floor(t * 5) % 2 ? '#ffe066' : '#5c1b2a'; c.beginPath(); c.arc(x, y, 2.6, 0, 6.283); c.fill();
+}
 /* El ciempiés es UN cuerpo: los anillos se trazan con sus uniones y se rellenan de una vez; la
    separación entre anillos se lee por sombra propia recortada, nunca por contorno. */
 function chain(segs) {
@@ -239,21 +297,133 @@ function background() {
   if (M === 'centipede') { for (let i = 0; i < 9; i++) { const x = (i * 97 + Math.sin(t * 0.5 + i) * 30 + W) % W, y = (i * 71 + Math.cos(t * 0.4 + i * 2) * 26 + H) % H, a = 0.35 + 0.35 * Math.sin(t * 3 + i * 1.7); c.fillStyle = `rgba(214,255,120,${a * 0.35})`; c.beginPath(); c.arc(x, y, 6, 0, 6.283); c.fill(); c.fillStyle = `rgba(240,255,190,${a})`; c.fillRect(x - 1.2, y - 1.2, 2.4, 2.4); } return; }
   for (const s of stars) { const a = 0.3 + s.z * 0.7; c.fillStyle = `rgba(255,255,255,${a})`; const r = s.z * 2.2; c.fillRect(s.x - r / 2, s.y - r / 2, r, r); if (s.z > 0.85) { c.globalAlpha = 0.35 + 0.3 * Math.sin(t * 4 + s.x); c.fillRect(s.x - 4, s.y - 0.5, 8, 1); c.fillRect(s.x - 0.5, s.y - 4, 1, 8); c.globalAlpha = 1; } }
 }
-function label(s, x, y, size, col, align) {
-  c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top';
+function label(s, x, y, size, col, align, max) {
+  const FT = (z) => `800 ${z}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
+  c.font = FT(size);
+  /* si el rótulo no cabe en el ancho pedido, encoge en vez de desbordar (regla de maquetación 1.29) */
+  if (max) { const wd = c.measureText(s).width; if (wd > max) { size = Math.max(9, size * max / wd); c.font = FT(size); } }
+  c.textAlign = align || 'left'; c.textBaseline = 'top';
   c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
 }
 /* ---------------------------------------------------------------- lógica */
 /* Dificultad 0→1: por tiempo jugado en starfall (máximo hacia los 3,5 min) y por oleada en el resto (máximo en la 9). */
 const lerp = (a, b, q) => a + (b - a) * q, ease = (q) => q * q * (3 - 2 * q);
-function diff() { return M === 'vertical' ? Math.min(1, pt / 315) : HAND ? ease(Math.min(1, (wave - 1) / 19)) : ease(Math.min(1, (wave - 1) / 12)); } // 1.23: más fácil (máx. 5,25 min / oleada 13); con niveles a mano, tope en el 20
-function msg(txt) { banner = txt; bannerT = 1.8; }
+function diff() { return HANDV ? Math.min(1, (wave - 1) / 19) : M === 'vertical' ? Math.min(1, pt / 315) : HAND ? ease(Math.min(1, (wave - 1) / 19)) : ease(Math.min(1, (wave - 1) / 12)); } // 1.23: más fácil; con oleadas/niveles a mano manda la tabla
+function msg(txt, sub, dur) { banner = txt; banner2 = sub || ''; bannerT = dur || 1.8; }
 function spawnWave() {
   wave++; foes = []; calm = wave === 1 ? 5 : 2;
   if (M === 'invaders') { const rows = 5, cols = 9; for (let r = 0; r < rows; r++) for (let i = 0; i < cols; i++) foes.push({ gx: 50 + i * 42, gy: 60 + r * 30, x: 50 + i * 42, y: 60 + r * 30, r: 12, hp: 1, pts: [30, 20, 20, 10, 10][r], kind: r < 1 ? 1 : r < 3 ? 0 : 2, fr: 0, dive: 0 }); dirX = 1; fox = 0; foy = 0; N0 = foes.length; LV = { sp: 1, fr: 1, dr: 10, dv: 0, uf: 1 }; if (wave === 1) makeBunkers(); msg(`Oleada ${wave}`); }
   if (M === 'centipede') { if (wave === 1) { mush = []; for (let i = 0; i < 34; i++) mush.push({ x: k.ri(1, 16) * 20 + 10, y: k.ri(3, 25) * 20 + 10, hp: 3 }); } for (let i = 0; i < Math.min(25, 9 + wave * 2); i++) foes.push({ x: 10 - i * 20, y: 30, r: 9, hp: 1, pts: i === 0 ? 100 : 20, dir: 1, seg: true, head: i === 0 }); msg(`Oleada ${wave}`); }
   if (M === 'bullethell' || (M === 'vertical' && wave % 3 === 0)) { const hp = M === 'bullethell' ? 112 + wave * 40 : 32 + wave * 10; foes.push({ x: W / 2, y: -60, ty: 110, r: 30, hp, max: hp, pts: 500 * wave, boss: true, a: 0, phase: 1 }); msg(M === 'bullethell' ? `Jefe ${wave}` : '¡Jefe!'); }
   else if (M === 'vertical') msg(`Oleada ${wave}`);
+}
+/* ============================================================ oleadas a mano (modo vertical)
+   Cada oleada de SHOOLV se juega tal cual: grupos con su segundo de entrada, mejoras programadas
+   y jefe propio. La oleada se supera cuando ha entrado todo y no queda ninguna nave. */
+function startWave(n) {
+  wave = n; wt = 0; qi = 0; pui = 0; wdone = 0; endT = 0;
+  foes = []; eb = []; pups = []; shots = [];
+  const w = WV[n - 1] || {};
+  power = w.pw || 1; shield = 0; inv = 2.5 / k.D.dmg; cool = 0; score = 0;
+  p = { x: W / 2, y: H - 50, tilt: 0 };
+  msg(`Oleada ${n}/${WV.length}`, w.tip || '', 2.4);
+}
+function gpos(g, i) {
+  const n = g.n || 1, wd = (g.w == null ? 0.6 : g.w) * W, cx = (g.x == null ? 0.5 : g.x) * W;
+  return n === 1 ? cx : k.clamp(cx - wd / 2 + wd * i / (n - 1), 20, W - 20);
+}
+function spawnGroup(g) {
+  if (g.f === 'jefe') return spawnBoss((WV[wave - 1] || {}).boss || { hp: 60, ph: [['anillo']] });
+  const n = g.n || 1, sp = (g.sp || 60) * k.D.spd, gap = g.gap || 0, hp = g.hp || 1;
+  const fire = g.fire ? g.fire / k.D.rate : 0, bs = (g.bs || 120) * k.D.spd;
+  const big = g.f === 'torre' || g.f === 'canon' || g.f === 'mina';
+  const pts = g.f === 'canon' ? 400 : g.f === 'torre' ? 250 : g.f === 'mina' ? 150 : 15 + hp * 12;
+  for (let i = 0; i < n; i++) {
+    const f = { x: gpos(g, i), y: -24, r: big ? (g.f === 'canon' ? 26 : 19) : 12, hp, pts, kind: g.k || 0, mv: g.f, big,
+      fire, pat: g.pat || 'aim', bs, ft: fire ? fire * (0.55 + i * 0.12) : 0, dly: gap * i, age: 0, ph: k.rnd(0, 6.2), flash: 0 };
+    if (g.f === 'fila') { f.vy = sp; f.sw = g.sw || 0; }
+    else if (g.f === 'arco') { f.dir = g.d || 1; f.x = f.dir > 0 ? -26 : W + 26; f.vx = f.dir * sp; f.y0 = (g.y == null ? 0.22 : g.y) * H; f.y = f.y0; f.amp = g.amp || 110; f.dly = gap * i; }
+    else if (g.f === 'kami') { f.y = -24; f.vy = sp; const a = Math.atan2(Math.max(p.y, H * 0.62) - f.y, p.x - f.x); f.kx = Math.cos(a); f.ky = Math.sin(a); }
+    else if (g.f === 'zig') { f.vy = sp; f.vx = (g.vx || 130) * k.D.spd * (i % 2 ? -1 : 1); }
+    else if (g.f === 'torre' || g.f === 'canon') { f.vy = sp; f.ty = (g.y == null ? 0.22 : g.y) * H; f.sw = g.sw || 60; f.stay = g.stay || 14;   /* cuanto más se queda, más dispara: no se escala con la dificultad */ }
+    else if (g.f === 'mina') { f.dir = g.d || 1; f.x = f.dir > 0 ? -28 : W + 28; f.vx = f.dir * sp; f.y = (g.y == null ? 0.16 : g.y) * H; f.per = (g.per || 1.5) / k.D.rate; f.mt = 0.6; }
+    foes.push(f);
+  }
+}
+function ebPush(x, y, vx, vy, o) { const e = { x, y, vx, vy }; if (o) Object.assign(e, o); eb.push(e); }
+function dropMine(f) { ebPush(f.x, f.y + 14, 0, 50 * k.D.spd, { mine: 1, rr: 11 }); }
+function shootFoe(f) {
+  const v = f.bs, a = Math.atan2(p.y - f.y, p.x - f.x);
+  if (f.pat === 'down') ebPush(f.x, f.y + 12, 0, v);
+  else if (f.pat === 'fan') { for (let j = -2; j <= 2; j++) ebPush(f.x, f.y + 12, Math.cos(a + j * 0.24) * v, Math.sin(a + j * 0.24) * v); }
+  else if (f.pat === 'ring') { for (let j = 0; j < 8; j++) ebPush(f.x, f.y, Math.cos(j * 0.7854) * v, Math.sin(j * 0.7854) * v); }
+  else ebPush(f.x, f.y + 10, Math.cos(a) * v, Math.sin(a) * v);
+}
+function stepFoe(f, dt) {
+  if (f.dly > 0) { f.dly -= dt; return; }
+  f.age += dt;
+  if (f.mv === 'fila') { f.y += f.vy * dt; if (f.sw) f.x += Math.sin(t * 1.7 + f.ph) * f.sw * dt; }
+  else if (f.mv === 'arco') { f.x += f.vx * dt; const pr = k.clamp((f.x + 26) / (W + 52), 0, 1); f.y = f.y0 + Math.sin(pr * Math.PI) * f.amp + f.age * 8; if (f.x < -40 || f.x > W + 40) f.dead = true; }
+  else if (f.mv === 'kami') { const s = f.vy * (1 + f.age * 0.45); f.x += f.kx * s * dt; f.y += f.ky * s * dt; if (f.x < -40 || f.x > W + 40) f.dead = true; }
+  else if (f.mv === 'zig') { f.x += f.vx * dt; if (f.x < 18) { f.x = 18; f.vx = Math.abs(f.vx); } if (f.x > W - 18) { f.x = W - 18; f.vx = -Math.abs(f.vx); } f.y += f.vy * dt; }
+  else if (f.mv === 'torre' || f.mv === 'canon') {
+    if (f.y < f.ty) f.y = Math.min(f.ty, f.y + f.vy * dt);
+    else { f.x += Math.sin(t * 0.9 + f.ph) * f.sw * dt; f.stay -= dt; if (f.stay <= 0) f.y += 80 * dt; }
+    f.x = k.clamp(f.x, f.r + 6, W - f.r - 6);
+  } else if (f.mv === 'mina') {
+    f.x += f.vx * dt; f.y += Math.sin(t * 1.2 + f.ph) * 12 * dt;
+    f.mt -= dt; if (f.mt <= 0 && f.x > 16 && f.x < W - 16) { f.mt = f.per; dropMine(f); }
+    if (f.x < -44 || f.x > W + 44) f.dead = true;
+  }
+  if (f.y > H + 36) f.dead = true;
+  if (f.fire && f.y > 12 && f.y < H * 0.8) { f.ft -= dt; if (f.ft <= 0) { f.ft = f.fire * k.rnd(0.85, 1.15); shootFoe(f); } }
+}
+/* Jefe con fases: cada fase lanza sus ataques a la vez, con su propio reloj. */
+function spawnBoss(b) {
+  const hp = Math.round((b.hp || 60) * (0.8 + k.dif * 0.2));
+  foes.push({ x: W / 2, y: -70, ty: 126, r: b.r || 34, hp, max: hp, pts: 600 * wave, boss: true, scr: true, big: true,
+    a: 0, phase: 1, pi: 0, binv: 0, name: b.name || 'Jefe', bph: b.ph || [['anillo']], ct: [0.9, 1.6, 2.4], flash: 0, dly: 0 });
+  msg('¡Jefe!', b.name || '', 2.2); k.sfx('start'); k.shake(6);
+}
+function bossFire(b, atk) {
+  const S = k.D.spd, R = Math.max(0.5, k.D.rate);
+  if (atk === 'anillo') { const n = 12; for (let i = 0; i < n; i++) { const a = b.a * 1.2 + i / n * 6.283; ebPush(b.x, b.y, Math.cos(a) * 88 * S, Math.sin(a) * 88 * S); } k.sfx('shoot'); return 1.9 / R; }
+  if (atk === 'abanico') { const a = Math.atan2(p.y - b.y, p.x - b.x); for (let j = -3; j <= 3; j++) ebPush(b.x, b.y + 12, Math.cos(a + j * 0.16) * 148 * S, Math.sin(a + j * 0.16) * 148 * S); k.sfx('shoot'); return 1.9 / R; }
+  if (atk === 'espiral') { for (let j = 0; j < 3; j++) { const a = b.a * 2.4 + j * 2.094; ebPush(b.x, b.y, Math.cos(a) * 118 * S, Math.sin(a) * 118 * S); } return 0.16 / R; }
+  if (atk === 'barrido') { const a = 1.5708 + Math.sin(b.a * 1.05) * 0.8; ebPush(b.x, b.y + 12, Math.cos(a) * 165 * S, Math.sin(a) * 165 * S); return 0.13 / R; }
+  if (atk === 'minas') { ebPush(b.x + k.rnd(-24, 24), b.y + 18, k.rnd(-30, 30), 54 * S, { mine: 1, rr: 11 }); return 1 / R; }
+  if (atk === 'escolta') { spawnGroup({ f: 'kami', n: 2, k: 0, x: 0.5, w: 0.7, sp: 150, gap: 0.45 }); k.sfx('pop'); return 3.4 / R; }
+  return 2;
+}
+function stepBoss(b, dt) {
+  b.a += dt;
+  b.y += (b.ty - b.y) * Math.min(1, dt * 1.4);
+  b.x = W / 2 + Math.sin(t * 0.55) * (W / 2 - 66);
+  const nph = b.bph.length, fr = Math.max(0, b.hp) / b.max, idx = k.clamp(nph - 1 - Math.floor(fr * nph), 0, nph - 1);
+  if (idx !== b.pi) {
+    b.pi = idx; b.phase = idx + 1; b.binv = 1.3; eb = [];
+    msg(`¡Fase ${idx + 1}!`, b.name, 1.4); k.shake(10); k.flash('rgba(255,255,255,.3)'); k.sfx('explode');
+    b.ct = [0.7, 1.3, 2];
+  }
+  if (b.binv > 0) { b.binv -= dt; return; }
+  if (b.y < b.ty - 24) return;
+  const list = b.bph[b.pi];
+  for (let i = 0; i < list.length; i++) { b.ct[i] -= dt; if (b.ct[i] <= 0) b.ct[i] = bossFire(b, list[i]); }
+}
+function stepWaves(dt) {
+  const w = WV[wave - 1] || { g: [] }, gl = w.g || [];
+  wt += dt;
+  while (qi < gl.length && wt >= gl[qi].t) spawnGroup(gl[qi++]);
+  if (w.p) while (pui < w.p.length && wt >= w.p[pui].t) { const u = w.p[pui++]; pups.push({ x: u.x * W, y: -14, t: u.k || 'P' }); }
+  for (const f of foes) { if (f.boss) stepBoss(f, dt); else stepFoe(f, dt); }   /* el destello lo descuenta el bucle común */
+  if (!wdone && qi >= gl.length && !foes.length) { wdone = 1; endT = 1; }
+  if (wdone === 1) {
+    endT -= dt;
+    if (endT <= 0) {
+      wdone = 2; score += 200 + 60 * wave; eb = [];
+      k.levelDone(Math.floor(score), `Oleada ${wave}/${WV.length} · ${lives} vida${lives === 1 ? '' : 's'}`);
+    }
+  }
 }
 /* spec = cuatro letras: F entero · h medio derruido · - sin búnker (la mordida de «h» es
    determinista: la misma oleada trae siempre el mismo boquete). */
@@ -321,16 +491,18 @@ function bossInv(b, dt, D) {
   }
   k.sfx('shoot');
 }
-function reset() { p = { x: W / 2, y: H - 50, tilt: 0 }; shots = []; foes = []; eb = []; pups = []; score = 0; lives = 4 + k.D.life; wave = 0; cool = 0; inv = 3 / k.D.dmg; t = 0; pt = 0; calm = 0; power = 1; shield = 0; ufo = null; bunkers = []; fox = 0; foy = 0; divT = 0; N0 = 45; LV = { sp: 1, fr: 1, dr: 10, dv: 0, uf: 1 }; stars = Array.from({ length: 70 }, () => ({ x: k.rnd(0, W), y: k.rnd(0, H), z: k.rnd(0.2, 1) })); if (HAND) handLevel(k.lv); else spawnWave(); }
+function reset() { p = { x: W / 2, y: H - 50, tilt: 0 }; shots = []; foes = []; eb = []; pups = []; score = 0; lives = 4 + k.D.life; wave = 0; cool = 0; inv = 3 / k.D.dmg; t = 0; pt = 0; calm = 0; power = 1; shield = 0; ufo = null; bunkers = []; fox = 0; foy = 0; divT = 0; N0 = 45; LV = { sp: 1, fr: 1, dr: 10, dv: 0, uf: 1 }; stars = Array.from({ length: 70 }, () => ({ x: k.rnd(0, W), y: k.rnd(0, H), z: k.rnd(0.2, 1) })); if (HANDV) { lives = 3 + k.D.life; startWave(k.lv); } else if (HAND) handLevel(k.lv); else spawnWave(); }
 /* Niveles diseñados a mano (plan Friv): el progreso lo guarda kit.js por dificultad. */
 if (HAND) k.levels(HAND.length, { start: () => reset() });
+/* Oleadas a mano de starfall-defender: mismo progreso por dificultad. */
+if (HANDV) k.levels(WV.length, { start: () => reset() });
 if (M !== 'coop') { reset(); k.show(CFG.title, CFG.help);
 /* si el jugador cambia de nivel en la pantalla de inicio, la partida se prepara de nuevo con los valores de k.D */
 k.onDif = () => { if (k.st !== 'play') reset(); }; }
-function hitPlayer() { if (inv > 0) return; if (shield > 0) { shield = 0; inv = 1 / k.D.dmg; k.sfx('hit'); k.burst(p.x, p.y, '#5ce1e6', 16); return; } lives--; inv = 2 / k.D.dmg; eb = []; power = Math.max(1, power - 1); k.burst(p.x, p.y, '#ffb347', 30, 220); k.sfx('explode'); k.shake(8); k.flash('rgba(255,80,90,.35)'); if (lives <= 0) k.lose(CFG.id, Math.floor(score), 'Nave destruida', HAND ? `Nivel ${wave} de ${HAND.length}` : `Oleada ${wave}`); }
+function hitPlayer() { if (inv > 0) return; if (shield > 0) { shield = 0; inv = 1 / k.D.dmg; k.sfx('hit'); k.burst(p.x, p.y, '#5ce1e6', 16); return; } lives--; inv = 2 / k.D.dmg; eb = []; power = Math.max(1, power - 1); k.burst(p.x, p.y, '#ffb347', 30, 220); k.sfx('explode'); k.shake(8); k.flash('rgba(255,80,90,.35)'); if (lives <= 0) k.lose(CFG.id, Math.floor(score), 'Nave destruida', HANDV ? `Oleada ${wave}/${WV.length}` : HAND ? `Nivel ${wave} de ${HAND.length}` : `Oleada ${wave}`); }
 function killFoe(f) { f.dead = true; score += f.pts; k.burst(f.x, f.y, f.boss ? '#f0647e' : EC[(f.kind || 0) % 4], f.boss ? 70 : 14, f.boss ? 260 : 160); k.sfx(f.boss ? 'explode' : 'hit'); if (f.boss) { k.shake(12); k.float(`+${f.pts}`, f.x, f.y, '#e9b949'); pups.push({ x: f.x, y: f.y, t: 'P' }); }
   if (M === 'centipede' && f.seg) mush.push({ x: Math.round((f.x - 10) / 20) * 20 + 10, y: f.y, hp: 3 });
-  if (M === 'vertical' && !f.boss && Math.random() < 0.08) pups.push({ x: f.x, y: f.y, t: Math.random() < 0.6 ? 'P' : 'S' }); }
+  if (M === 'vertical' && !HANDV && !f.boss && Math.random() < 0.08) pups.push({ x: f.x, y: f.y, t: Math.random() < 0.6 ? 'P' : 'S' }); }
 if (M !== 'coop') k.run((dt) => {
   t += dt; for (const s of stars) { s.y += (20 + s.z * 90) * dt; if (s.y > H) { s.y = 0; s.x = k.rnd(0, W); } }
   bannerT -= dt;
@@ -381,6 +553,10 @@ if (M !== 'coop') k.run((dt) => {
     for (const e of eb) for (const b of bunkers) if (!b.dead && !e.dead && e.x > b.x - 2 && e.x < b.x + 7 && e.y > b.y && e.y - e.vy * dt < b.y + 6) { b.dead = true; e.dead = true; k.burst(e.x, e.y, '#4cc38a', 3, 60); }
     for (const f of foes) { if (f.dive || f.boss) continue; for (const b of bunkers) if (!b.dead && Math.abs(f.x - b.x) < 14 && Math.abs(f.y - b.y) < 10) b.dead = true; }
     bunkers = bunkers.filter((b) => !b.dead);
+  } else if (HANDV) {
+    stepWaves(dt);
+    /* las minas también se pueden destruir a tiros */
+    for (const s of shots) for (const e of eb) if (e.mine && !e.dead && !s.dead && Math.hypot(s.x - e.x, s.y - e.y) < 13) { e.dead = true; s.dead = true; score += 5; k.burst(e.x, e.y, '#ff8fa3', 10, 120); k.sfx('pop'); }
   } else if (M === 'vertical') {
     if (!foes.some((f) => f.boss) && calm <= 0 && Math.random() < dt * lerp(0.8, 2.56, D) * k.D.rate) { const big = Math.random() < lerp(0.06, 0.22, D); foes.push({ x: k.rnd(24, W - 24), y: -20, r: big ? 18 : 12, hp: big ? 6 : 1, pts: big ? 60 : 15, vy: k.rnd(60, 120) * lerp(0.56, 0.98, D) * k.D.spd, ph: k.rnd(0, 6), big, kind: k.ri(0, 3) }); }
     for (const f of foes) { if (f.boss) continue; f.y += f.vy * dt; f.x += Math.sin(t * 2 + f.ph) * 45 * dt; if (f.big && f.y > 20 && Math.random() < dt * lerp(0.34, 0.75, D) * k.D.rate) { const a = Math.atan2(p.y - f.y, p.x - f.x), v = lerp(112, 152, D) * k.D.spd; eb.push({ x: f.x, y: f.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v }); } if (f.y > H + 30) f.dead = true; }
@@ -396,6 +572,7 @@ if (M !== 'coop') k.run((dt) => {
     for (const f of foes) if (f.spider) { f.x += f.dir * lerp(64, 98, D) * k.D.spd * dt; f.y += Math.sin(t * 7 + f.x * 0.05) * 140 * dt; f.y = k.clamp(f.y, H * 0.55, H - 20); if (f.x < -20 || f.x > W + 20) f.dead = true; if (Math.hypot(f.x - p.x, f.y - p.y) < 17) hitPlayer(); mush.forEach((m) => { if (Math.abs(m.x - f.x) < 10 && Math.abs(m.y - f.y) < 10) m.hp = 0; }); }
   }
   for (const b of foes) if (b.boss) {
+    if (b.scr) continue;   /* jefe de las oleadas a mano: lo lleva stepBoss() */
     if (b.inv) { bossInv(b, dt, D); continue; }
     b.y += (b.ty - b.y) * Math.min(1, dt * 1.5); b.a += dt; b.x = W / 2 + Math.sin(t * 0.7) * 110; b.phase = b.hp < b.max * 0.33 ? 3 : b.hp < b.max * 0.66 ? 2 : 1;
     /* no dispara hasta estar en posición; anillos y ráfagas crecen con la dificultad y con la fase */
@@ -404,9 +581,9 @@ if (M !== 'coop') k.run((dt) => {
     if (b.y > b.ty - 25 && Math.random() < dt * (lerp(0.38, 0.68, D) + b.phase * 0.26) * k.D.rate) { const a = Math.atan2(p.y - b.y, p.x - b.x); for (let j = -1; j <= 1; j++) eb.push({ x: b.x, y: b.y, vx: Math.cos(a + j * 0.2) * av, vy: Math.sin(a + j * 0.2) * av }); }
     if (M === 'bullethell') score += dt * 5;
   }
-  for (const s of shots) for (const f of foes) if (!f.dead && !s.dead && Math.hypot(s.x - f.x, s.y - f.y) < f.r + 4) { s.dead = true; f.flash = 0.06; if (--f.hp <= 0) killFoe(f); }
-  for (const e of eb) { e.x += e.vx * dt; e.y += e.vy * dt; if (Math.hypot(e.x - p.x, e.y - p.y) < (M === 'bullethell' ? 4.25 : 9.4)) { e.dead = true; hitPlayer(); } }
-  for (const f of foes) { f.flash = (f.flash || 0) - dt; if (!f.dead && !f.boss && M !== 'centipede' && Math.hypot(f.x - p.x, f.y - p.y) < f.r + 10) { killFoe(f); hitPlayer(); } }
+  for (const s of shots) for (const f of foes) if (!f.dead && !s.dead && !f.dly && !(f.binv > 0) && Math.hypot(s.x - f.x, s.y - f.y) < f.r + 4) { s.dead = true; f.flash = 0.06; if (--f.hp <= 0) killFoe(f); }
+  for (const e of eb) { e.x += e.vx * dt; e.y += e.vy * dt; if (Math.hypot(e.x - p.x, e.y - p.y) < (e.rr || (M === 'bullethell' ? 4.25 : 9.4))) { e.dead = true; hitPlayer(); } }
+  for (const f of foes) { f.flash = (f.flash || 0) - dt; if (!f.dead && !f.boss && !f.dly && M !== 'centipede' && Math.hypot(f.x - p.x, f.y - p.y) < f.r + 10) { killFoe(f); hitPlayer(); } }
   for (const u of pups) { u.y += 90 * dt; if (Math.hypot(u.x - p.x, u.y - p.y) < 26) { u.dead = true; k.sfx('coin'); if (u.t === 'P') { power = Math.min(3, power + 1); k.float('¡Disparo mejorado!', p.x, p.y - 30, '#5ce1e6'); } else { shield = 10; k.float('¡Escudo!', p.x, p.y - 30, '#9b8afb'); } } }
   shots = shots.filter((s) => !s.dead && s.y > -10); eb = eb.filter((e) => !e.dead && e.y > -20 && e.y < H + 20 && e.x > -20 && e.x < W + 20); foes = foes.filter((f) => !f.dead); pups = pups.filter((u) => !u.dead && u.y < H + 20);
   if (k.st === 'play' && M !== 'vertical' && !foes.some((f) => !f.spider)) {
@@ -426,8 +603,9 @@ if (M !== 'coop') k.run((dt) => {
     clipIn(c, disc, (g) => { g.fillStyle = AL(OUT, 0.24); g.fillRect(-20, -1.2, 40, 2); for (let i = -2; i <= 2; i++) { g.fillStyle = Math.floor(t * 8 + i) % 2 ? '#fff' : '#e9b949'; g.beginPath(); g.arc(i * 7, 4, 1.8, 0, 6.283); g.fill(); } });
     c.restore(); }
   if (M === 'centipede') chain(foes.filter((f) => f.seg));
-  for (const f of foes) { const fl = f.flash > 0;
-    if (f.boss) { boss(f, fl); const bw = Math.min(220, W - 150), bx = W / 2 - bw / 2; if (f.inv) label('Nave nodriza', W / 2, 70, 13, '#ffd166', 'center');   /* bajo la barra: arriba están el marcador y los botones del reproductor */ ART.rr(c, bx - 2, 54, bw + 4, 10, 5); ART.fillOut(c, 'rgba(12,10,24,.7)', 2); c.fillStyle = f.phase > 2 ? '#ff3b5c' : '#f0647e'; ART.rr(c, bx, 56, bw * Math.max(0, f.hp) / f.max, 6, 3); c.fill(); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(bx + 2, 56.5, Math.max(0, bw * f.hp / f.max - 4), 1.5); continue; }
+  for (const f of foes) { const fl = f.flash > 0; if (f.dly > 0) continue;   /* aún no ha entrado */
+    if (f.boss) { boss(f, fl); const bw = Math.min(220, W - 150), bx = W / 2 - bw / 2; if (f.inv) label('Nave nodriza', W / 2, 70, 13, '#ffd166', 'center');   /* bajo la barra: arriba están el marcador y los botones del reproductor */ ART.rr(c, bx - 2, 54, bw + 4, 10, 5); ART.fillOut(c, 'rgba(12,10,24,.7)', 2); c.fillStyle = f.phase > 2 ? '#ff3b5c' : '#f0647e'; ART.rr(c, bx, 56, bw * Math.max(0, f.hp) / f.max, 6, 3); c.fill(); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(bx + 2, 56.5, Math.max(0, bw * f.hp / f.max - 4), 1.5);
+      if (f.name) label(f.name, W / 2, 68, 12, '#ffd7e0', 'center', W - 40);   /* bajo la barra: no choca con la oleada ni con las vidas */ continue; }
     if (f.seg) continue;
     else if (f.spider) { c.save(); c.translate(f.x, f.y); c.lineCap = 'round';
       const legs = [];
@@ -436,6 +614,8 @@ if (M !== 'coop') k.run((dt) => {
       clipIn(c, (g) => g.ellipse(0, 1, 9, 8, 0, 0, 6.283), (g) => { g.fillStyle = AL(OUT, 0.22); g.beginPath(); g.arc(3, 4, 8, 0, 6.283); g.fill(); g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(-3, -3, 2.5, 0, 6.283); g.fill(); });
       c.fillStyle = '#ff3b5c'; c.beginPath(); c.arc(-3, 2, 1.8, 0, 6.283); c.arc(3, 2, 1.8, 0, 6.283); c.fill(); c.restore(); }
     else if (M === 'invaders') { alien(f.x, f.y, f.kind, f.fr, fl); if (f.hp > 1) { c.strokeStyle = '#e9b949'; c.lineWidth = 2; c.beginPath(); c.arc(f.x, f.y, 15, 3.6, 5.8); c.stroke(); } }
+    else if (f.mv === 'mina') minerArt(f.x, f.y, f.dir, false, fl);
+    else if (f.mv === 'canon') minerArt(f.x, f.y, 1, true, fl);
     else if (M === 'vertical') f.big ? drone(f.x, f.y, f.r, true, fl) : alien(f.x, f.y, f.kind, Math.floor(t * 4) % 2, fl); }
   for (const u of pups) { const col = u.t === 'P' ? '#5ce1e6' : '#9b8afb', b = 1 + Math.sin(t * 6) * 0.08; c.save(); c.translate(u.x, u.y); c.scale(b, b);
     c.globalAlpha = 0.3; c.fillStyle = col; c.beginPath(); c.arc(0, 0, 17, 0, 6.283); c.fill(); c.globalAlpha = 1;
@@ -444,12 +624,13 @@ if (M !== 'coop') k.run((dt) => {
     c.fillStyle = 'rgba(255,255,255,.45)'; c.fillRect(-8, -8, 10, 2.5); c.restore(); }
   // balas con brillo: sprites precalculados (shadowBlur en cada bala cuesta un desenfoque por figura y frame)
   const sh = gspr('s'); for (const s of shots) c.drawImage(sh.cv, s.x + sh.o, s.y - 1 + sh.q, sh.w, sh.h);
-  const ez = gspr('z'), er = gspr(M === 'bullethell' ? 'R' : 'r'); for (const e of eb) { if (e.zig) c.drawImage(ez.cv, e.x + (Math.floor(e.y / 6) % 2 ? 2 : -2) + ez.o, e.y + ez.q, ez.w, ez.h); else c.drawImage(er.cv, e.x + er.o, e.y + er.q, er.w, er.h); }
+  const ez = gspr('z'), er = gspr(M === 'bullethell' ? 'R' : 'r'); for (const e of eb) { if (e.mine) { mineArt(e.x, e.y); continue; } if (e.zig) c.drawImage(ez.cv, e.x + (Math.floor(e.y / 6) % 2 ? 2 : -2) + ez.o, e.y + ez.q, ez.w, ez.h); else c.drawImage(er.cv, e.x + er.o, e.y + er.q, er.w, er.h); }
   if (k.st === 'play' && !(inv > 0 && Math.floor(inv * 10) % 2)) { ship(p.x, p.y, 1, k.clamp(p.tilt, -1.5, 1.5)); if (shield > 0) { c.strokeStyle = `rgba(155,138,251,${0.5 + Math.sin(t * 8) * 0.2})`; c.lineWidth = 3; c.beginPath(); c.arc(p.x, p.y, 26, 0, 6.283); c.stroke(); } if (M === 'bullethell') { c.fillStyle = '#fff'; c.beginPath(); c.arc(p.x, p.y, 3, 0, 6.283); c.fill(); } }
   label(String(Math.floor(score)), 12, 8, 22, '#fff'); for (let i = 0; i < lives; i++) ship(W - 18 - i * 22, 22, 0.55, 0);
+  if (M === 'vertical' && power > 1) for (let i = 1; i < power; i++) { c.beginPath(); c.moveTo(18 + (i - 1) * 16, HANDV ? 50 : 36); c.lineTo(25 + (i - 1) * 16, HANDV ? 61 : 47); c.lineTo(11 + (i - 1) * 16, HANDV ? 61 : 47); c.closePath(); ART.fillOut(c, '#5ce1e6', 2); }
+  if (HANDV) label(`Oleada ${wave}/${WV.length}`, 12, 34, 12, '#a097ff');
   if (HAND) label(`Nivel ${wave}/${HAND.length}`, 12, H - 22, 13, '#a097ff');   /* abajo a la izquierda: el OVNI cruza por arriba y las vidas ocupan la derecha */
-  if (M === 'vertical' && power > 1) for (let i = 1; i < power; i++) { c.beginPath(); c.moveTo(18 + (i - 1) * 16, 36); c.lineTo(25 + (i - 1) * 16, 47); c.lineTo(11 + (i - 1) * 16, 47); c.closePath(); ART.fillOut(c, '#5ce1e6', 2); }
-  if (bannerT > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, bannerT); label(banner, W / 2, H * 0.42, 28, '#fff', 'center'); c.globalAlpha = 1; }
+  if (bannerT > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, bannerT); label(banner, W / 2, H * 0.42, 28, '#fff', 'center', W - 28); if (banner2) label(banner2, W / 2, H * 0.42 + 34, 14, '#a097ff', 'center', W - 28); c.globalAlpha = 1; }
 });
 /* ================================================================ modo 'coop': invasores a dúo
    Dos naves en la franja baja (8 direcciones), escudo de energía compartido (un impacto gasta 25),
