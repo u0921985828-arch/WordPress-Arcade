@@ -3,6 +3,10 @@
  * digger: tierra por estratos, gemas, rocas que caen y aplastan bichos; los bichos cruzan la tierra como fantasmas.
  * iso/dungeon: laberinto isométrico por casillas con 3 llaves y salida; dungeon con monstruos, espada y corazones. */
 const M = CFG.mode, GEM = M === 'gemas', ISO = M === 'iso' || M === 'dungeon', OUT = ART.OUT, R2 = 6.2832;
+/* Come-cocos: 20 laberintos dibujados a mano en mazelv.js (plan Friv). Los demás modos no se tocan. */
+const HAND = (M === 'muncher' && typeof MAZELV !== 'undefined' && MAZELV[CFG.id]) || null;
+let LV = null;                       // nivel a mano en curso
+const TUNR = {};                     // filas con túnel lateral
 /* --- Ley de la pieza única (R5, docs/REMASTER.md §8) -------------------------------
    `unite(g, partes, ancho)` traza TODAS las partes y las rellena después: los contornos
    interiores quedan tapados y solo sobrevive la silueta exterior. El detalle interior va
@@ -35,6 +39,7 @@ const k = Kit({ w: W, h: H, title: CFG.title, bg: CFG.bg || '#0d0f24' }), c = k.
 const D = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }, OPP = { up: 'down', down: 'up', left: 'right', right: 'left' }, DIRS = ['up', 'left', 'down', 'right'];
 let invT = 0, g, N, S, BX, BY, pl, foes, items, drops, rocks, score, lives, level, fright, exitC, need, swordT, t = 0, ready, dying, clearT, freeze, msg, msgT, lvT;
 let boardCv, flashCv, dirtCv, floorCv, blockCv, bgCv, vigCv, dirty, fruit, eaten, left, chain, home, homeMap, cam, torches, dragged, dmapF, dmapC, best;
+let fruitAt, dots;   /* casilla por la que asoma la fruta y puntos del nivel (come-cocos) */
 
 /* ---------- Utilidades ---------- */
 function mkCv(w, h, draw) { const cv = document.createElement('canvas'); cv.width = Math.ceil(w * 2); cv.height = Math.ceil(h * 2); const b = cv.getContext('2d'); b.scale(2, 2); draw(b); return cv; }
@@ -75,6 +80,12 @@ function stepEnt(e, dt, pick) {
   e.fx = e.px + (e.x - e.px) * e.t; e.fy = e.py + (e.y - e.py) * e.t; return arr;
 }
 function respawnEnt(e) { e.x = e.px = e.fx = e.sx; e.y = e.py = e.fy = e.sy; e.t = 0; e.dir = e.next = null; }
+/* Túneles laterales del come-cocos: la fila marcada con '=' sale por el otro lado. */
+const wrapX = (x) => ((x % N) + N) % N;
+const mwalk = (x, y) => (TUNR[y] ? x >= -1 && x <= N && walk(wrapX(x), y) : walk(x, y));
+function mstep(e, dt, pick) {
+  return stepEnt(e, dt, (q) => { if (TUNR[q.y] && (q.x < 0 || q.x >= N)) { const nx = wrapX(q.x); q.x = q.px = q.fx = nx; } return pick(q); });
+}
 
 /* ---------- Entrada: teclas, deslizar o arrastrar (en isométrico, la diagonal de pantalla) ---------- */
 function stickDir() {
@@ -93,7 +104,7 @@ function build() {
   if (M === 'muncher') buildMuncher(); else if (M === 'digger') buildDigger(); else buildIso();
   left = items.length;
 }
-function reset() { if (GEM) return resetGem(); score = 0; lives = 4 + k.D.life; level = 1; swordT = 0; invT = 0; best = k.best(CFG.id, 0); build(); }
+function reset() { if (GEM) return resetGem(); score = 0; lives = 4 + k.D.life; level = HAND ? k.lv : 1; swordT = 0; invT = 0; best = k.best(CFG.id, 0); build(); }
 
 /* ================= COME-COCOS ================= */
 const GCOL = ['#ff4d5e', '#ff9ad5', '#4fd8e8', '#ffa94d'];
@@ -120,20 +131,58 @@ function genMuncher() {
   }
   return m;
 }
+/* Lee la planta dibujada a mano: refleja la mitad izquierda y reparte muros, puntos y casa. */
+function handMuncher() {
+  LV = HAND[Math.min(HAND.length, Math.max(1, level)) - 1];
+  const rows = LV.m.map((r) => (r.length >= N ? r : r + r.slice(0, (N - 1) / 2).split('').reverse().join('')));
+  for (const key in TUNR) delete TUNR[key];
+  g = []; let px = (N - 1) / 2, py = N - 2, fx = (N - 1) / 2, fy = (N - 1) / 2 + 3;
+  for (let y = 0; y < N; y++) {
+    g.push([]);
+    if (rows[y][0] === '=') TUNR[y] = 1;
+    for (let x = 0; x < N; x++) {
+      const ch = rows[y][x];
+      g[y].push(ch === '#' ? 1 : 0);
+      if (ch === '.') items.push({ x, y, t: 'dot' });
+      else if (ch === 'o') items.push({ x, y, t: 'power' });
+      else if (ch === 'P') { px = x; py = y; }
+      else if (ch === 'F') { fx = x; fy = y; }
+    }
+  }
+  return [px, py, fx, fy];
+}
 function buildMuncher() {
-  N = 19; S = 25; BX = (W - N * S) / 2; BY = TOP + 2; g = genMuncher(); const h = (N - 1) / 2;
-  home = [h, h]; homeMap = distMap(h, h, walk);
-  const house = (x, y) => y >= h - 1 && y <= h + 1 && x >= h - 2 && x <= h + 2;
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (!g[y][x] && !house(x, y) && !(x === h && y === N - 2)) items.push({ x, y, t: 'dot' });
-  [[1, 3], [N - 2, 3], [1, N - 4], [N - 2, N - 4]].forEach(([x, y]) => { const it = items.find((q) => q.x === x && q.y === y); if (it) it.t = 'power'; });
-  pl = ent(h, N - 2, 7.2); pl.dir = null;
-  foes = [[h, h - 1], [h, h], [h - 1, h], [h + 1, h]].map(([x, y], i) => { const f = ent(x, y, 4.6); f.id = i; return f; });
+  N = 19; S = 25; BX = (W - N * S) / 2; BY = TOP + 2; const h = (N - 1) / 2;
+  let px = h, py = N - 2;
+  if (HAND) { const p = handMuncher(); px = p[0]; py = p[1]; fruitAt = [p[2], p[3]]; }
+  else {
+    LV = null; g = genMuncher(); fruitAt = [h, h + 2];
+    const house = (x, y) => y >= h - 1 && y <= h + 1 && x >= h - 2 && x <= h + 2;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (!g[y][x] && !house(x, y) && !(x === h && y === N - 2)) items.push({ x, y, t: 'dot' });
+    [[1, 3], [N - 2, 3], [1, N - 4], [N - 2, N - 4]].forEach(([x, y]) => { const it = items.find((q) => q.x === x && q.y === y); if (it) it.t = 'power'; });
+  }
+  home = [h, h]; homeMap = distMap(h, h, mwalk);
+  dots = items.filter((q) => q.t === 'dot').length;
+  pl = ent(px, py, 7.2); pl.dir = null;
+  const nf = LV ? Math.max(1, Math.min(4, LV.n)) : 4;
+  foes = [[h, h - 1], [h, h], [h - 1, h], [h + 1, h]].slice(0, nf).map(([x, y], i) => { const f = ent(x, y, 4.6); f.id = i; return f; });
   homeReset(); ready = 1.6;
 }
-function homeReset() { const rel = [0.8, 2.4, 6, 10].map((v) => v * Math.max(0.45, 1 - (level - 1) * 0.1) / k.D.rate); foes.forEach((f, i) => { respawnEnt(f); f.mode = 'house'; f.rel = rel[i]; f.scared = false; }); }
+function homeReset() {
+  const rel = LV ? LV.rel.map((v) => v / k.D.rate)
+    : [0.8, 2.4, 6, 10].map((v) => v * Math.max(0.45, 1 - (level - 1) * 0.1) / k.D.rate);
+  foes.forEach((f, i) => { respawnEnt(f); f.mode = 'house'; f.rel = rel[i] !== undefined ? rel[i] : 1; f.scared = false; });
+}
+/* Dispersión / persecución: los cortes del nivel a mano, o los de siempre. */
+function scatterOn() {
+  if (!LV) return lvT < 6 || (lvT > 26 && lvT < 32);
+  let on = true;
+  for (const b of LV.sc) { if (lvT < b) return on; on = !on; }
+  return false;
+}
 function ghostTarget(f) {
   const corners = [[N - 2, -2], [1, -2], [N - 2, N + 1], [1, N + 1]], d = D[pl.dir || 'left'];
-  if ((lvT < 6 || (lvT > 26 && lvT < 32)) && f.id < 3) return corners[f.id];
+  if (scatterOn() && f.id < 3) return corners[f.id];
   if (f.id === 0) return [pl.x, pl.y];
   if (f.id === 1) return [pl.x + d[0] * 4, pl.y + d[1] * 4];
   if (f.id === 2) { const r = foes[0]; return [2 * (pl.x + d[0] * 2) - r.x, 2 * (pl.y + d[1] * 2) - r.y]; }
@@ -144,8 +193,8 @@ function ghostPick(f) {
     if (f.x === home[0] && f.y === home[1]) { f.mode = 'house'; f.rel = 0.8; f.scared = false; return null; }
     let bd = null, bv = Infinity; for (const d of DIRS) { const v = homeMap[(f.x + D[d][0]) + ',' + (f.y + D[d][1])]; if (v !== undefined && v < bv) { bv = v; bd = d; } } return bd;
   }
-  let opts = DIRS.filter((d) => walk(f.x + D[d][0], f.y + D[d][1]) && d !== OPP[f.dir]);
-  if (!opts.length) opts = DIRS.filter((d) => walk(f.x + D[d][0], f.y + D[d][1]));
+  let opts = DIRS.filter((d) => mwalk(f.x + D[d][0], f.y + D[d][1]) && d !== OPP[f.dir]);
+  if (!opts.length) opts = DIRS.filter((d) => mwalk(f.x + D[d][0], f.y + D[d][1]));
   if (f.scared) return k.pick(opts);
   const [tx, ty] = ghostTarget(f); let bd = null, bv = Infinity;
   for (const d of opts) { const v = Math.hypot(f.x + D[d][0] - tx, f.y + D[d][1] - ty) + Math.random() * Math.max(0.6, 1.8 - (level - 1) * 0.13); if (v < bv) { bv = v; bd = d; } }
@@ -156,27 +205,30 @@ function eatAt(x, y) {
   const it = items.find((q) => !q.got && q.x === x && q.y === y);
   if (it) {
     it.got = true; left--;
-    if (it.t === 'dot') { score += 10; eaten++; if (eaten % 2) k.sfx('pop'); if (eaten === 70 || eaten === 150) fruit = { x: home[0], y: home[1] + 2, t: 9 }; }
-    else {
-      score += 50; fright = Math.max(2.5, 8.5 - (level - 1) * 0.6) * k.D.time; chain = 0; k.sfx('coin'); k.burst(cellX(x), cellY(y), '#fff3d6', 14, 140);
+    if (it.t === 'dot') {
+      score += 10; eaten++; if (eaten % 2) k.sfx('pop');
+      const a = LV ? Math.round(dots * 0.35) : 70, b = LV ? Math.round(dots * 0.7) : 150;
+      if (eaten === a || eaten === b) fruit = { x: fruitAt[0], y: fruitAt[1], t: 10 };
+    } else {
+      score += 50; fright = (LV ? LV.fr : Math.max(2.5, 8.5 - (level - 1) * 0.6)) * k.D.time; chain = 0; k.sfx('coin'); k.burst(cellX(x), cellY(y), '#fff3d6', 14, 140);
       for (const f of foes) if (f.mode !== 'eyes') { if (f.mode === 'go' && !f.scared) reverse(f); f.scared = true; }
     }
     if (left <= 0) { clearT = 1.8; score += 300 * level; k.sfx('win'); k.confetti(); msg = '¡Nivel superado!'; msgT = 1.8; }
   }
-  if (fruit && fruit.x === x && fruit.y === y) { const v = [100, 300, 500, 700, 1000][Math.min(4, level - 1)]; score += v; k.float(`+${v}`, cellX(x), cellY(y) - 10, '#ff7a8a'); k.sfx('coin'); k.burst(cellX(x), cellY(y), '#ff4d5e', 12); fruit = null; }
+  if (fruit && fruit.x === x && fruit.y === y) { const v = LV ? LV.fruit.v : [100, 300, 500, 700, 1000][Math.min(4, level - 1)]; score += v; k.float(`+${v}`, cellX(x), cellY(y) - 10, '#ff7a8a'); k.sfx('coin'); k.burst(cellX(x), cellY(y), '#ff4d5e', 12); fruit = null; }
 }
 function die() { dying = 1.5; fright = 0; foes.forEach((f) => { f.scared = false; }); k.sfx('hurt'); k.shake(6); }
 function updMuncher(dt) {
   const want = k.swipe || DIRS.find((d) => k.hit.has(d)) || heldDir();
   if (want) { if (pl.dir && want === OPP[pl.dir]) reverse(pl); pl.next = want; }
   invT -= dt; lvT += dt; if (fruit && (fruit.t -= dt) <= 0) fruit = null;
-  if (stepEnt(pl, dt, (e) => { for (const d of [e.next, e.dir]) if (d && walk(e.x + D[d][0], e.y + D[d][1])) return d; return null; })) eatAt(pl.px, pl.py);
+  if (mstep(pl, dt, (e) => { for (const d of [e.next, e.dir]) if (d && mwalk(e.x + D[d][0], e.y + D[d][1])) return d; return null; })) eatAt(pl.px, pl.py);
   if (clearT > 0) return;
   if (fright > 0 && (fright -= dt) <= 0) foes.forEach((f) => { f.scared = false; });
-  const base = Math.min(5.8, 3.3 + level * 0.2) * k.D.spd; // 1.23: más fácil (antes 4,4→6,8). k.D.spd por nivel de dificultad
+  const base = (LV ? LV.spd : Math.min(5.8, 3.3 + level * 0.2)) * k.D.spd; // 1.23: más fácil (antes 4,4→6,8). k.D.spd por nivel de dificultad
   for (const f of foes) {
     if (f.mode === 'house') { f.fx = f.x; f.fy = f.y + Math.sin(t * 7 + f.id) * 0.18; if ((f.rel -= dt) <= 0) f.mode = 'go'; }
-    else { f.sp = f.mode === 'eyes' ? 12 : base * (f.scared ? 0.55 : 1); stepEnt(f, dt, ghostPick); }
+    else { f.sp = f.mode === 'eyes' ? 12 : base * (f.scared ? 0.55 : 1); mstep(f, dt, ghostPick); }
     if (f.mode === 'eyes' || Math.hypot(f.fx - pl.fx, f.fy - pl.fy) > 0.51) continue;
     if (f.scared) {
       chain++; const v = 200 * 2 ** Math.min(3, chain - 1); score += v; f.mode = 'eyes'; f.scared = false; freeze = 0.45;
@@ -310,6 +362,8 @@ function updIso(dt) {
 }
 
 /* ================= Bucle ================= */
+/* Niveles dibujados a mano (plan Friv): progreso guardado por dificultad en kit.js. */
+if (HAND) k.levels(HAND.length, { start: (i) => { level = i; score = 0; lives = 4 + k.D.life; build(); } });
 if (!GEM) reset(); k.show(CFG.title, CFG.help);
 /* si el jugador cambia de nivel en la pantalla de inicio, la partida se prepara de nuevo con los valores de k.D */
 k.onDif = () => { if (k.st !== 'play') reset(); };
@@ -320,10 +374,12 @@ k.run((dt) => {
   if (msgT > 0) msgT -= dt;
   if (freeze > 0) { freeze -= dt; return; }
   if (dying > 0) { if ((dying -= dt) <= 0) afterDeath(); return; }
-  if (clearT > 0) { clearT -= dt; if (clearT <= 0) { level++; build(); } return; }
+  if (clearT > 0) { clearT -= dt; if (clearT <= 0) { if (HAND) return handDone(); level++; build(); } return; }
   if (ready > 0) { ready -= dt; if (ready <= 0) invT = Math.max(invT, 2 / k.D.dmg); return; }
   if (M === 'muncher') updMuncher(dt); else if (M === 'digger') updDigger(dt); else updIso(dt);
 }, draw);
+/* Nivel a mano superado: kit.js desbloquea el siguiente y ofrece Siguiente / Niveles. */
+function handDone() { clearT = 0; k.best(CFG.id, score); k.levelDone(score, `${score} puntos · ${lives} vida${lives === 1 ? '' : 's'}`); }
 function afterDeath() {
   if (DG) return k.lose(CFG.id, score, 'Derrotado', `Nivel ${level}`);
   lives--; if (lives <= 0) return k.lose(CFG.id, score, 'Atrapado', `Nivel ${level}`);
@@ -376,20 +432,73 @@ function drawGhost(f, x, y, r) {
   for (const s of [-1, 1]) { const ex = x + s * r * 0.38, ey = y - r * 0.18; c.beginPath(); c.ellipse(ex, ey, r * 0.28, r * 0.35, 0, 0, R2); c.fillStyle = '#fff'; c.fill(); if (f.mode === 'eyes') { c.lineWidth = 1.5; c.strokeStyle = OUT; c.stroke(); }
     c.fillStyle = '#1d2a8a'; c.beginPath(); c.arc(ex + d[0] * r * 0.13, ey + d[1] * r * 0.15, r * 0.15, 0, R2); c.fill(); }
 }
-function drawCherry(x, y) {
+function drawCherryIn(c, x, y) {
   c.strokeStyle = OUT; c.lineWidth = 4; c.lineCap = 'round'; c.beginPath(); c.moveTo(x - 5, y + 2); c.quadraticCurveTo(x - 2, y - 8, x + 4, y - 10); c.moveTo(x + 5, y + 3); c.quadraticCurveTo(x + 4, y - 4, x + 4, y - 10); c.stroke();
   c.strokeStyle = '#3aa845'; c.lineWidth = 2; c.stroke();
   const cer = (g) => { for (const [dx, dy] of [[-5, 4], [5, 5]]) { g.moveTo(x + dx + 5.5, y + dy); g.arc(x + dx, y + dy, 5.5, 0, R2); } };
   unite(c, [[cer, '#ff3b4e']], 1.1);
   clipIn(c, cer, (g) => { for (const [dx, dy] of [[-5, 4], [5, 5]]) { g.fillStyle = AL('#ffffff', 0.7); g.beginPath(); g.arc(x + dx - 2, y + dy - 2, 1.6, 0, R2); g.fill(); g.fillStyle = AL(OUT, 0.2); g.beginPath(); g.arc(x + dx + 2.4, y + dy + 2.8, 4, 0, R2); g.fill(); } });
 }
+/* ---- Frutas del nivel (una sola pieza + rabito, cacheadas) ---- */
+const FRUITCV = {};
+function fruitPaint(b, kind) {
+  const x = 17, y = 18;
+  const stem = (col, path) => { b.lineJoin = b.lineCap = 'round'; b.strokeStyle = OUT; b.lineWidth = 4.4; b.beginPath(); path(b); b.stroke(); b.strokeStyle = col; b.lineWidth = 2.2; b.stroke(); };
+  const gloss = (px, py, r) => { b.fillStyle = AL('#ffffff', 0.62); b.beginPath(); b.ellipse(px, py, r * 0.34, r * 0.2, -0.7, 0, R2); b.fill(); };
+  const shade = (path, col) => clipIn(b, path, (q) => { q.fillStyle = AL(col, 0.22); q.beginPath(); q.arc(x + 5, y + 6, 12, 0, R2); q.fill(); });
+  if (kind === 'fresa') {
+    const p = (q) => { q.moveTo(x - 8, y - 5); q.quadraticCurveTo(x - 9, y + 10, x, y + 12); q.quadraticCurveTo(x + 9, y + 10, x + 8, y - 5); q.quadraticCurveTo(x, y - 11, x - 8, y - 5); };
+    unite(b, [[p, '#ff3b4e']], 1.2); shade(p, OUT);
+    clipIn(b, p, (q) => { q.fillStyle = AL('#fff0b8', 0.85); for (let i = 0; i < 7; i++) { const a = i * 1.7; q.beginPath(); q.ellipse(x + Math.cos(a) * 5, y + Math.sin(a) * 6, 1.1, 1.6, a, 0, R2); q.fill(); } });
+    unite(b, [[(q) => { q.moveTo(x - 7, y - 7); q.lineTo(x, y - 11); q.lineTo(x + 7, y - 7); q.lineTo(x, y - 4); }, '#3aa845']], 1.1);
+    stem('#3aa845', (q) => { q.moveTo(x, y - 9); q.lineTo(x, y - 13); }); gloss(x - 3, y - 1, 9); return;
+  }
+  if (kind === 'naranja' || kind === 'melon') {
+    const col = kind === 'naranja' ? '#ff9a2b' : '#8fd94f';
+    const p = (q) => { q.moveTo(x + 10, y + 1); q.arc(x, y + 1, 10, 0, R2); };
+    unite(b, [[p, col]], 1.2); shade(p, OUT);
+    if (kind === 'melon') clipIn(b, p, (q) => { q.strokeStyle = AL('#2f7a2a', 0.5); q.lineWidth = 2; for (let i = -2; i <= 2; i++) { q.beginPath(); q.moveTo(x + i * 4, y - 9); q.quadraticCurveTo(x + i * 5.5, y + 1, x + i * 4, y + 11); q.stroke(); } });
+    stem('#3aa845', (q) => { q.moveTo(x, y - 9); q.quadraticCurveTo(x + 1, y - 13, x + 4, y - 14); });
+    unite(b, [[(q) => { q.moveTo(x + 4, y - 14); q.quadraticCurveTo(x + 12, y - 16, x + 12, y - 10); q.quadraticCurveTo(x + 7, y - 9, x + 4, y - 14); }, '#3aa845']], 1);
+    gloss(x - 4, y - 4, 10); return;
+  }
+  if (kind === 'manzana') {
+    const p = (q) => { q.moveTo(x, y - 6); q.quadraticCurveTo(x - 4, y - 11, x - 8, y - 7); q.quadraticCurveTo(x - 12, y - 2, x - 9, y + 6); q.quadraticCurveTo(x - 5, y + 13, x, y + 9); q.quadraticCurveTo(x + 5, y + 13, x + 9, y + 6); q.quadraticCurveTo(x + 12, y - 2, x + 8, y - 7); q.quadraticCurveTo(x + 4, y - 11, x, y - 6); };
+    unite(b, [[p, '#ff4d5e']], 1.2); shade(p, OUT);
+    stem('#7a5230', (q) => { q.moveTo(x, y - 7); q.quadraticCurveTo(x + 1, y - 12, x + 4, y - 14); });
+    unite(b, [[(q) => { q.moveTo(x + 4, y - 13); q.quadraticCurveTo(x + 12, y - 16, x + 11, y - 9); q.quadraticCurveTo(x + 6, y - 8, x + 4, y - 13); }, '#3aa845']], 1);
+    gloss(x - 4, y - 2, 10); return;
+  }
+  if (kind === 'uvas') {
+    const p = (q) => { for (const [dx, dy] of [[-6, -1], [0, -3], [6, -1], [-3, 4], [3, 4], [0, 10]]) { q.moveTo(x + dx + 5, y + dy); q.arc(x + dx, y + dy, 5, 0, R2); } };
+    unite(b, [[p, '#a077f0']], 1.2); shade(p, OUT);
+    stem('#3aa845', (q) => { q.moveTo(x, y - 7); q.lineTo(x + 1, y - 13); });
+    unite(b, [[(q) => { q.moveTo(x + 1, y - 12); q.quadraticCurveTo(x + 10, y - 16, x + 10, y - 9); q.quadraticCurveTo(x + 5, y - 8, x + 1, y - 12); }, '#3aa845']], 1);
+    gloss(x - 5, y - 4, 8); return;
+  }
+  if (kind === 'platano') {
+    const p = (q) => { q.moveTo(x - 11, y - 8); q.quadraticCurveTo(x - 6, y + 11, x + 11, y + 8); q.quadraticCurveTo(x + 2, y + 4, x - 6, y - 9); };
+    unite(b, [[p, '#ffd23d']], 1.2); shade(p, OUT); gloss(x - 4, y - 1, 10); return;
+  }
+  if (kind === 'sandia') {
+    const p = (q) => { q.moveTo(x - 12, y - 7); q.lineTo(x + 12, y - 7); q.quadraticCurveTo(x + 8, y + 13, x, y + 13); q.quadraticCurveTo(x - 8, y + 13, x - 12, y - 7); };
+    unite(b, [[p, '#ff4d5e']], 1.2);
+    clipIn(b, p, (q) => {
+      q.fillStyle = '#8fd94f'; q.fillRect(x - 13, y - 9, 26, 4);
+      q.fillStyle = OUT; for (const [dx, dy] of [[-5, 1], [4, 0], [0, 5], [-2, -3], [6, 5]]) { q.beginPath(); q.ellipse(x + dx, y + dy, 1.2, 1.8, 0.3, 0, R2); q.fill(); }
+    });
+    gloss(x - 4, y - 2, 10); return;
+  }
+  drawCherryIn(b, x, y - 3);
+}
+function fruitSpr(kind) { return FRUITCV[kind] || (FRUITCV[kind] = mkCv(34, 36, (b) => fruitPaint(b, kind))); }
 function drawMuncher() {
   if (!boardCv) { const base = CFG.wall || '#4a55d8'; boardCv = renderMaze(base, shade(base, 0.55), shade(base, -0.45)); flashCv = renderMaze('#e8ecff', '#ffffff', '#9aa6d8'); }
   if (!dotCv) { dotCv = mkCv(10, 10, (b) => { b.beginPath(); b.arc(5, 5, 3, 0, R2); b.fillStyle = '#ffe2b0'; b.fill(); b.lineWidth = 1; b.strokeStyle = 'rgba(26,21,48,.8)'; b.stroke(); });
     powCv = mkCv(32, 32, (b) => { const gr = b.createRadialGradient(16, 16, 3, 16, 16, 16); gr.addColorStop(0, 'rgba(255,240,200,.7)'); gr.addColorStop(1, 'rgba(255,240,200,0)'); b.fillStyle = gr; b.fillRect(0, 0, 32, 32); b.beginPath(); b.arc(16, 16, 7, 0, R2); ART.fillOut(b, '#fff3d6', 2); b.fillStyle = '#fff'; b.beginPath(); b.arc(13.5, 13.5, 2.2, 0, R2); b.fill(); }); }
   c.drawImage(clearT > 0 && Math.floor(clearT * 7) % 2 ? flashCv : boardCv, 0, 0, W, H);
   for (const it of items) if (!it.got) { const x = cellX(it.x), y = cellY(it.y); if (it.t === 'dot') c.drawImage(dotCv, x - 5, y - 5, 10, 10); else { const s = 30 * (1 + Math.sin(t * 7) * 0.14); c.drawImage(powCv, x - s / 2, y - s / 2, s, s); } }
-  if (fruit && (fruit.t > 2 || Math.floor(t * 8) % 2)) drawCherry(cellX(fruit.x), cellY(fruit.y) + Math.sin(t * 4) * 1.5);
+  if (fruit && (fruit.t > 2 || Math.floor(t * 8) % 2)) c.drawImage(fruitSpr(LV ? LV.fruit.k : 'cereza'), cellX(fruit.x) - 17, cellY(fruit.y) - 18 + Math.sin(t * 4) * 1.5, 34, 36);
   if (clearT <= 0) for (const f of foes) drawGhost(f, cellX(f.fx), cellY(f.fy), S * 0.43);
   if (lives > 0 && !(invT > 0 && ready <= 0 && Math.floor(t * 10) % 2)) {
     let mouth = pl.dir ? 0.06 + Math.abs(Math.sin(t * 15)) * 0.62 : 0.4, dir = pl.dir || pl.last || 'right';
@@ -399,7 +508,7 @@ function drawMuncher() {
   }
   hudScore();
   for (let i = 0; i < Math.max(0, lives); i++) drawPac(W - 18 - i * 22, 16, 8, 'left', 0.5);
-  label(`Nivel ${level}`, W - 10, 28, 10, 'rgba(255,255,255,.8)', 'right');
+  label(HAND ? `Nivel ${level}/${HAND.length}` : `Nivel ${level}`, W - 10, 28, 10, 'rgba(255,255,255,.8)', 'right');
   if (ready > 0 && k.st === 'play') label('¡Listo!', W / 2, cellY(home[1] + 2) - 11, 20, '#ffd23d', 'center');
 }
 
