@@ -25,6 +25,17 @@ canvas{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);touch-acti
 #ov .dif button.on{background:var(--ac);color:#fff;text-shadow:0 1px 0 rgba(26,21,48,.5)}
 #ov .dif button:disabled{opacity:.55;cursor:default}
 body.party #ov .dif button{font-size:clamp(13px,3.2vmin,30px);padding:1.5vmin 3vmin;border-radius:2vmin}
+#ov .menu{display:flex;flex-direction:column;gap:8px;margin-top:4px;pointer-events:auto;width:min(290px,74vw)}
+#ov .menu button{font:800 clamp(14px,3.6vmin,16px)/1 ui-rounded,"Trebuchet MS",system-ui,sans-serif;padding:13px 16px;border-radius:14px;border:3px solid #1a1530;background:color-mix(in srgb,var(--bg) 40%,#2a2350);color:#f2eefc;cursor:pointer;box-shadow:inset 0 2px 0 rgba(255,255,255,.12),0 4px 0 #1a1530}
+#ov .menu button.pri{background:var(--ac);color:#fff;text-shadow:0 2px 0 rgba(26,21,48,.5)}
+#ov .menu button:active{transform:translateY(2px);box-shadow:inset 0 2px 0 rgba(255,255,255,.12),0 2px 0 #1a1530}
+#ov .lv{display:grid;grid-template-columns:repeat(auto-fit,minmax(48px,1fr));gap:7px;pointer-events:auto;width:min(360px,80vw);max-height:48vh;overflow:auto;padding:2px}
+#ov .lv button{aspect-ratio:1;font:800 15px/1 ui-rounded,"Trebuchet MS",system-ui,sans-serif;border-radius:12px;border:3px solid #1a1530;background:color-mix(in srgb,var(--bg) 40%,#2a2350);color:#f2eefc;cursor:pointer;display:grid;place-items:center;padding:0;box-shadow:inset 0 2px 0 rgba(255,255,255,.12),0 3px 0 #1a1530}
+#ov .lv button.done{background:var(--ac);color:#fff}
+#ov .lv button.now{outline:3px solid #ffd166;outline-offset:2px}
+#ov .lv button:disabled{opacity:.42;cursor:default;box-shadow:none}
+#ov .htxt{max-width:44ch;text-align:left;max-height:46vh;overflow:auto}
+@media (max-height:560px){#ov .lv{grid-template-columns:repeat(auto-fit,minmax(40px,1fr));gap:5px;max-height:52vh;width:min(420px,86vw)}#ov .lv button{font-size:13px;border-width:2px;border-radius:10px}}\n@media (max-height:430px){#ov .menu{gap:5px;width:min(260px,70vw)}#ov .menu button{padding:8px 12px;font-size:13px;border-width:2px}#ov .lv{gap:5px;max-height:40vh}#ov .lv button{font-size:13px;border-width:2px}}
 @keyframes pop{from{transform:scale(.9);opacity:0}}@keyframes bob{50%{transform:translateY(-2px)}}
 @media (max-height:430px){#ov{padding:6px;gap:4px}#ov .card{padding:10px 14px 11px;gap:6px;border-radius:14px;border-width:2px;min-width:min(260px,88vw)}#ov h1{font-size:clamp(17px,5.6vmin,24px);text-shadow:0 2px 0 #1a1530}#ov p{font-size:clamp(11px,3vmin,13px);line-height:1.3;max-width:46ch}#ov .go{margin-top:2px;padding:8px 20px;font-size:14px;box-shadow:inset 0 2px 0 rgba(255,255,255,.3),0 3px 0 #1a1530}#ov .rec{font-size:11px;padding:4px 8px}#ov .dif{margin-top:0;gap:4px}#ov .dif button{font-size:11px;padding:6px 10px;border-width:2px;border-radius:9px}}
 @media (max-height:300px){#ov .card{padding:7px 12px 8px;gap:4px}#ov h1{font-size:clamp(15px,5vmin,20px)}#ov p{font-size:11px;line-height:1.25}#ov .go{padding:6px 16px;font-size:13px}}
@@ -459,7 +470,9 @@ void main(){
       gpPrev = now;
     }
 
-    k.go = () => k.hit.has('a') || k.ptr.hit || (!!k.party && PADS.some((q) => q && q.hit.has('a')));
+    /* Con menú en pantalla no se empieza tocando en cualquier sitio: manda el botón Jugar. */
+    let uiMenu = false, startReq = false;
+    k.go = () => startReq || (!uiMenu && (k.hit.has('a') || k.ptr.hit || (!!k.party && PADS.some((q) => q && q.hit.has('a')))));
     const CFGID = (window.CFG && window.CFG.id) || o.id || o.title;
     /* ---------- Dificultad seleccionable (fácil · normal · difícil) ----------
        Normal es EXACTAMENTE la curva de siempre (todos los factores a 1): un motor que no mire
@@ -485,6 +498,7 @@ void main(){
       k.dif = v; k.D = DIFD[v];
       try { localStorage.setItem('dif:' + CFGID, v); } catch (e) {}
       if (!quiet) { k.sfx('click'); tell('arcade:dif', { v }); }
+      if (k.levelN && k.levelN() > 0) { lvLoad(); k.lv = k.lvMax; }   /* el progreso va por dificultad */
       if (k.onDif) k.onDif(v);
       if (k.paused) k._pauseCard(); else if (k.st === 'ready' && lastReady) k.show(lastReady[0], lastReady[1]);
     };
@@ -499,7 +513,10 @@ void main(){
       const ready = k.st === 'ready';
       if (ready) lastReady = [t, s];
       const rec = ready ? (() => { const b = k.best(CFGID, 0); return b ? `<div class="rec">Mejor puntuación: ${b}${k.dif === 1 ? '' : ' · ' + DIFN[k.dif]}</div>` : ''; })() : '';
-      const html = `<div class="card"><h1>${t}</h1>${body ? `<p>${body}</p>` : ''}${rec}<div class="go">${k.party ? '<span class="ka">A</span>' : ''}${(g2 => g2.charAt(0).toUpperCase() + g2.slice(1))(go.replace(/^Toca para /i, ''))}</div>${ready ? difHtml() : ''}</div>`;
+      const useMenu = ready && menuKind();
+      uiMenu = !!useMenu;
+      const act = useMenu ? menuHtml() : `<div class="go">${k.party ? '<span class="ka">A</span>' : ''}${(g2 => g2.charAt(0).toUpperCase() + g2.slice(1))(go.replace(/^Toca para /i, ''))}</div>`;
+      const html = `<div class="card"><h1>${t}</h1>${body ? `<p>${body}</p>` : ''}${rec}${act}${ready ? difHtml() : ''}</div>`;
       if (k.paused) { ovSaved = { html, win: false }; return; } /* en pausa: se enseña al continuar */
       ov.innerHTML = html;
       ov.classList.remove('hide', 'win');
@@ -565,7 +582,11 @@ void main(){
       if (on) { ovSaved = ov.classList.contains('hide') ? null : { html: ov.innerHTML, win: ov.classList.contains('win') }; k.sfx('click'); k._pauseCard(); ov.classList.remove('hide', 'win'); }
       else { if (ovSaved) { ov.innerHTML = ovSaved.html; ov.classList.toggle('win', ovSaved.win); ov.classList.remove('hide'); } else ov.classList.add('hide'); ovSaved = null; k.held.clear(); }
     };
-    k._pauseCard = () => { ov.innerHTML = `<div class="card"><h1>Pausa</h1><div class="go">${k.party ? '<span class="ka">A</span>' : ''}Continuar</div>${difHtml()}</div>`; };
+    k._setPause = setPause;
+    k._pauseCard = () => {
+      const extra = menuKind() ? `<div class="menu">${k.levelN() > 1 ? mb('lvs', 'Niveles') : ''}${helpTxt() ? mb('help', 'Cómo se juega') : ''}</div>` : '';
+      ov.innerHTML = `<div class="card"><h1>Pausa</h1><div class="go">${k.party ? '<span class="ka">A</span>' : ''}Continuar</div>${extra}${difHtml()}</div>`;
+    };
     bp.addEventListener('pointerdown', (e) => { e.stopPropagation(); setPause(!k.paused); });
     document.addEventListener('visibilitychange', () => { if (document.hidden) setPause(true); });
     /* Puente con el portal: avisa de inicio/fin de partida (pausas publicitarias) y obedece pausa/reanudar. */
@@ -609,11 +630,82 @@ void main(){
        k.ex(12) = 12 px desde el borde izquierdo · k.ex2(12) = 12 px desde el derecho. */
     k.ex = (d) => (d || 0); k.ex2 = (d) => k.W - (d || 0);
     k.ey = (d) => (d || 0); k.ey2 = (d) => k.H - (d || 0);
+    /* ---------- Piel común: menú, niveles, ayuda (plan Friv) ------------------------------
+       Opt-in: un juego sin k.levels() y sin CFG.help arranca exactamente como siempre
+       (tarjeta con «Toca para jugar»). Con niveles declarados, el inicio pasa a ser un menú
+       de verdad y el progreso se guarda por juego y por dificultad. En el modo tele no se usa:
+       allí manda el mando y la partida la monta la tele. */
+    let LVN = 0, lvKey = '', scr = '';
+    k.lv = 1; k.lvMax = 1;
+    const lvK = () => 'lv:' + CFGID + (k.dif === 1 ? '' : k.dif === 0 ? '@f' : '@d');
+    const lvLoad = () => { lvKey = lvK(); let v = 1; try { v = +localStorage.getItem(lvKey) || 1; } catch (e) {} k.lvMax = Math.max(1, Math.min(LVN || 1, v)); k.lv = Math.min(k.lv, k.lvMax); };
+    /* k.levels(n) declara n niveles; el motor recibe cada cambio en k.onLevel(i) y avisa de
+       la victoria con k.levelDone(puntos, extra). k.lv es el nivel en curso. */
+    k.levels = (n, opt) => { LVN = Math.max(1, n | 0); if (opt && opt.start) k.onLevel = opt.start; lvLoad(); k.lv = k.lvMax; return k.lv; };
+    k.levelN = () => LVN;
+    const helpTxt = () => String((window.CFG && window.CFG.help) || o.help || '');
+    function menuKind() { return !k.party && (LVN > 0 || !!helpTxt()); }
+    const mb = (m, t, cls) => `<button type="button" data-m="${m}"${cls ? ` class="${cls}"` : ''}>${t}</button>`;
+    function menuHtml() {
+      const b = [mb('play', LVN > 1 ? `Jugar · nivel ${k.lv}` : 'Jugar', 'pri')];
+      if (LVN > 1) b.push(mb('lvs', 'Niveles'));
+      if (helpTxt()) b.push(mb('help', 'Cómo se juega'));
+      return `<div class="menu">${b.join('')}</div>`;
+    }
+    const LOCK = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round"/><rect x="5" y="11" width="14" height="9" rx="2.5" fill="currentColor"/></svg>';
+    function lvHtml() {
+      let out = '';
+      for (let n = 1; n <= LVN; n++) {
+        const un = n <= k.lvMax, cls = (n < k.lvMax ? 'done' : '') + (n === k.lv ? ' now' : '');
+        out += `<button type="button" data-lv="${n}"${un ? '' : ' disabled'}${cls.trim() ? ` class="${cls.trim()}"` : ''} aria-label="Nivel ${n}">${un ? n : LOCK}</button>`;
+      }
+      return `<div class="lv">${out}</div>`;
+    }
+    k._screen = () => {
+      if (scr === 'lvs') ov.innerHTML = `<div class="card"><h1>Niveles</h1>${lvHtml()}<div class="menu">${mb('back', 'Volver')}</div></div>`;
+      else if (scr === 'help') ov.innerHTML = `<div class="card"><h1>Cómo se juega</h1><p class="htxt">${helpTxt()}</p><div class="menu">${mb('back', 'Volver')}</div></div>`;
+      else return false;
+      ov.classList.remove('hide', 'win'); uiMenu = true; return true;
+    };
+    /* Vuelve a la pantalla de la que se abrió (inicio o pausa). */
+    const backScr = () => { scr = ''; if (k.paused) k._pauseCard(); else if (k.st === 'ready' && lastReady) k.show(lastReady[0], lastReady[1]); else { ov.classList.add('hide'); uiMenu = false; } };
+    k.goLevel = (i) => {
+      k.lv = Math.max(1, Math.min(LVN || 1, i | 0)); scr = '';
+      if (k.paused) k._setPause(false);
+      if (k.st !== 'over' && k.onLevel) try { k.onLevel(k.lv); } catch (e) {}
+      startReq = true; uiMenu = false;
+    };
+    /* Nivel superado: desbloquea el siguiente, lo guarda y ofrece Siguiente / Niveles. */
+    k.levelDone = (score, extra) => {
+      const last = LVN > 0 && k.lv >= LVN;
+      if (LVN > 0 && k.lv >= k.lvMax && !last) { k.lvMax = k.lv + 1; try { localStorage.setItem(lvKey || lvK(), k.lvMax); } catch (e) {} }
+      k.st = 'over'; k.cd = 0; k._lock(700); tell('arcade:over', { score: score || 0 });
+      const b = [];
+      if (!last) b.push(mb('next', 'Siguiente nivel', 'pri'));
+      if (LVN > 1) b.push(mb('lvs', 'Niveles'));
+      ov.innerHTML = `<div class="card"><h1>${last ? '¡Juego completado!' : `¡Nivel ${k.lv} superado!`}</h1>${extra ? `<p>${extra}</p>` : ''}<div class="menu">${b.join('')}</div></div>`;
+      ov.classList.remove('hide'); ov.classList.add('win'); ov.style.setProperty('--wc', '#7cf7a0');
+      uiMenu = true; k.sfx(last ? 'fanfare' : 'win'); k.confetti(); k.flash('rgba(255,255,255,.35)');
+    };
+    ov.addEventListener('pointerdown', (e) => {
+      const t = e.target && e.target.closest && e.target.closest('[data-m],[data-lv]');
+      if (!t || t.disabled) return;
+      e.stopPropagation(); e.preventDefault(); k.sfx('click');
+      if (t.dataset.lv) return k.goLevel(+t.dataset.lv);
+      const m = t.dataset.m;
+      if (m === 'play') { if (LVN > 0) k.goLevel(k.lv); else { startReq = true; uiMenu = false; } }
+      else if (m === 'lvs') { scr = 'lvs'; k._screen(); }
+      else if (m === 'help') { scr = 'help'; k._screen(); }
+      else if (m === 'next') k.goLevel(k.lv + 1);
+      else if (m === 'cont') k._setPause(false);
+      else if (m === 'back') backScr();
+    });
     /* Máquina de estados estándar: 'ready' → 'play' → 'over'. Devuelve true si el juego está activo. */
     k.st = 'ready'; window.__k = k;
-    k.gate = (reset) => { if (k.st === 'play') return true; if (k.st === 'over' && performance.now() < lockT) return false; if (k.go()) { const was = k.st; if (was === 'over') reset(); k.st = 'play'; tell(was === 'over' ? 'arcade:restart' : 'arcade:start'); k.sfx('start'); k.hide(); k.hit.clear(); for (const q of PADS) if (q) q.hit.clear(); k.ptr.hit = false; k.tap = false; if (k.ptr.down) k._skipUp = true; } return false; };
+    k.gate = (reset) => { if (k.st === 'play') return true; if (k.st === 'over' && performance.now() < lockT) return false; if (k.go()) { const was = k.st; startReq = false; uiMenu = false; if (was === 'over') reset(); k.st = 'play'; tell(was === 'over' ? 'arcade:restart' : 'arcade:start'); k.sfx('start'); k.hide(); k.hit.clear(); for (const q of PADS) if (q) q.hit.clear(); k.ptr.hit = false; k.tap = false; if (k.ptr.down) k._skipUp = true; } return false; };
     /* Pantalla de ganador (modo tele): tarjeta y confeti del color del ganador, fanfarria; A no la salta durante 1,5 s. */
     let lockT = 0;
+    k._lock = (ms) => { lockT = performance.now() + (ms || 0); };
     k.win = (head, col, body, score) => {
       k.st = 'over'; k.cd = 0; lockT = performance.now() + 1500; tell('arcade:over', { score: score || 0 });
       k._losing = true; k.show(head, body); k._losing = false;
