@@ -515,7 +515,8 @@ void main(){
       const rec = ready ? (() => { const b = k.best(CFGID, 0); return b ? `<div class="rec">Mejor puntuación: ${b}${k.dif === 1 ? '' : ' · ' + DIFN[k.dif]}</div>` : ''; })() : '';
       const useMenu = ready && menuKind();
       uiMenu = !!useMenu;
-      const act = useMenu ? menuHtml() : `<div class="go">${k.party ? '<span class="ka">A</span>' : ''}${(g2 => g2.charAt(0).toUpperCase() + g2.slice(1))(go.replace(/^Toca para /i, ''))}</div>`;
+      const goLbl = (g2 => g2.charAt(0).toUpperCase() + g2.slice(1))(go.replace(/^Toca para /i, ''));
+      const act = useMenu ? menuHtml(goLbl) : `<div class="go">${k.party ? '<span class="ka">A</span>' : ''}${goLbl}</div>`;
       const html = `<div class="card"><h1>${t}</h1>${body ? `<p>${body}</p>` : ''}${rec}${act}${ready ? difHtml() : ''}</div>`;
       if (k.paused) { ovSaved = { html, win: false }; return; } /* en pausa: se enseña al continuar */
       ov.innerHTML = html;
@@ -646,8 +647,9 @@ void main(){
     const helpTxt = () => String((window.CFG && window.CFG.help) || o.help || '');
     function menuKind() { return !k.party && (LVN > 0 || !!helpTxt()); }
     const mb = (m, t, cls) => `<button type="button" data-m="${m}"${cls ? ` class="${cls}"` : ''}>${t}</button>`;
-    function menuHtml() {
-      const b = [mb('play', LVN > 1 ? `Jugar · nivel ${k.lv}` : 'Jugar', 'pri')];
+    function menuHtml(go) {
+      const lbl = LVN > 1 ? `Jugar · nivel ${k.lv}` : go || 'Jugar';
+      const b = [mb('play', lbl, 'pri')];
       if (LVN > 1) b.push(mb('lvs', 'Niveles'));
       if (helpTxt()) b.push(mb('help', 'Cómo se juega'));
       return `<div class="menu">${b.join('')}</div>`;
