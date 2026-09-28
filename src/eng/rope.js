@@ -168,7 +168,7 @@ function draw() {
   // HUD
   label(`Nivel ${lv}`, 12, 10, 20, '#fff'); for (let i = 0; i < stars.length; i++) star(22 + i * 24, 48, 9, i < got ? '#ffd23d' : 'rgba(255,255,255,.18)');
   label(`${score}`, W - 12, 10, 20, '#ffd23d', 'right'); if (L.wind) label(L.wind > 0 ? 'Viento >>' : '<< Viento', W - 12, 36, 13, '#bfe6ff', 'right');
-  if (extra > 0) label(`Intentos ${extra + 1}`, 12, 36, 13, '#7cf7a0');
+  if (extra > 0) label(`Intentos ${extra + 1}`, W / 2, 12, 15, '#7cf7a0', 'center');
   if (state === 'won') { const p = Math.min(1, winT * 3), sc = 0.7 + p * 0.3 + Math.sin(p * 3.14) * 0.1; c.save(); c.globalAlpha = p; c.translate(W / 2, 250); c.scale(sc, sc); ART.rr(c, -120, -50, 240, 100, 20); ART.fillOut(c, 'rgba(34,28,66,.92)', 3); label('¡Dentro!', 0, -38, 30, '#7cf7a0', 'center');
     for (let i = 0; i < stars.length; i++) star((i - (stars.length - 1) / 2) * 40, 22, i < got ? 15 : 11, i < got && winT > 0.3 + i * 0.2 ? '#ffd23d' : 'rgba(255,255,255,.18)'); c.restore(); }
 }
