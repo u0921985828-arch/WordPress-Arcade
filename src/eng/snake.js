@@ -7,9 +7,17 @@ const OUT = ART.OUT, R2 = 6.2832, ID = CFG.id || 'serpent-grid';
 /* CFG.mode 'mp' (Serpientes Hambrientas): siempre horizontal, tablero 28×14 de 22 px, hasta 4 serpientes (ver snakeMP al final) */
 /* CFG.mode 'comilona' (Comilona a Cuatro): mismo tablero horizontal, dos comedores contra dos fantasmas (ver comilona al final) */
 const MP = CFG.mode === 'mp', CM = CFG.mode === 'comilona', GR = MP || CM;
-const PORT = !GR && innerHeight > innerWidth, CS = CM ? 21 : GR ? 22 : 24;
-const COLS = GR ? 28 : PORT ? 14 : 26, ROWS = GR ? 14 : PORT ? 23 : 13, W = PORT ? 360 : 640, H = PORT ? 640 : 360;
-const X0 = (W - COLS * CS) / 2, Y0 = PORT ? 62 : CM ? 38 : 40, NEED = 8;
+/* Tableros a mano (plan Friv, tanda 3): SOLO para el slug que tiene tabla en snakelv.js y en 1 jugador.
+ * Los modos de tele ('mp' y 'comilona') no pasan por aquí y quedan exactamente como estaban. */
+const HAND = (!GR && typeof SNAKELV !== 'undefined' && SNAKELV[ID]) || null;
+const PORT = !GR && innerHeight > innerWidth;
+/* el tablero a mano se dibuja 17×13; en vertical el motor lo gira 90° (13×17) y se juega igual */
+const HW = HAND ? HAND[0].m[0].length : 0, HH = HAND ? HAND[0].m.length : 0;
+const CS = HAND ? (PORT ? 26 : 22) : CM ? 21 : GR ? 22 : 24;
+const COLS = HAND ? (PORT ? HH : HW) : GR ? 28 : PORT ? 14 : 26;
+const ROWS = HAND ? (PORT ? HW : HH) : GR ? 14 : PORT ? 23 : 13;
+const W = PORT ? 360 : 640, H = PORT ? 640 : 360;
+const X0 = (W - COLS * CS) / 2, Y0 = HAND ? (PORT ? 92 : 40) : PORT ? 62 : CM ? 38 : 40, NEED = 8;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#16241b' }), c = k.ctx;
 /* --- Ley de la pieza única (R5, docs/REMASTER.md §8) + cartoon de estudio -----------------
    `unite(g, partes, ancho)` traza TODAS las partes y las rellena después: los contornos
@@ -59,6 +67,9 @@ const THM = [
 ];
 const SK = { body: '#ffb13d', dark: '#e0762a', light: '#ffe39a' };
 let snake, prev, dir, queue, foods, rocks, score, level, eaten, acc, step, t, grow, bulges, dying, combo, lastEat, slowT, bannerT, floorCv, rockCv, th, anchor, swiped, eatenTotal;
+/* estado de los niveles a mano */
+let LV = null, keys = [], keysTot = 0, keysGot = 0, door = null, doorOpen = false, doneLv = false;
+let wrapX = false, wrapY = false, freezeT = 0, dashT = 0, spT = 0, bannerTxt = '';
 try { const o = +localStorage.getItem('serpent-grid-best') || 0; if (o) k.best(ID, o); } catch (e) { /* sin almacenamiento */ }
 
 /* ---------- utilidades ---------- */
@@ -111,6 +122,29 @@ function apple(x, y, s, kind) {
     unite(c, [[lf, '#5ccf5a'], [bl, '#4a7dff']], 1.7);
     clipIn(c, bl, (q) => { q.fillStyle = PAL(PZO, 0.22); for (const [bx, by] of [[-4, 2], [4, 2], [0, -4]]) { q.beginPath(); q.arc(bx + 1.3, by + 1.6, 5.2, 0, R2); q.fill(); } });
     for (const [bx, by] of [[-4, 2], [4, 2], [0, -4]]) spec(c, bx - 1.7, by - 1.9, 1.5, 1.1, -0.5, 0.6);
+  } else if (kind === 'shrink') {
+    /* gota verde: encoge la cola. Una sola silueta; las flechas van por color, no por trazo. */
+    const dr = (q) => { q.moveTo(0, -12); q.bezierCurveTo(5, -5, 9, -1, 9, 3.5); q.bezierCurveTo(9, 9, 4.6, 12, 0, 12); q.bezierCurveTo(-4.6, 12, -9, 9, -9, 3.5); q.bezierCurveTo(-9, -1, -5, -5, 0, -12); q.closePath(); };
+    unite(c, [[dr, '#5ce0b0']], 1.9);
+    clipIn(c, dr, (q) => {
+      q.fillStyle = PAL(PZO, 0.2); q.beginPath(); q.moveTo(2.4, -9); q.bezierCurveTo(7, -3, 11, 0, 11, 4.5); q.bezierCurveTo(11, 10, 6, 13, 2.4, 13); q.closePath(); q.fill();
+      q.fillStyle = '#eafff6';
+      q.beginPath(); q.moveTo(-5.4, 0.6); q.lineTo(-1.4, -2.4); q.lineTo(-1.4, 3.6); q.closePath(); q.fill();
+      q.beginPath(); q.moveTo(5.4, 0.6); q.lineTo(1.4, -2.4); q.lineTo(1.4, 3.6); q.closePath(); q.fill();
+    });
+    spec(c, -3.8, -4.4, 1.9, 2.8, 0.4, 0.55);
+  } else if (kind === 'freeze') {
+    /* copo de hielo: te deja quieto unos segundos */
+    const fl = (q) => { for (let i = 0; i < 6; i++) { const a = i * R2 / 6; q.moveTo(0, 0); q.lineTo(Math.cos(a) * 11, Math.sin(a) * 11); q.lineTo(Math.cos(a + 0.55) * 4.6, Math.sin(a + 0.55) * 4.6); q.closePath(); } };
+    unite(c, [[fl, '#9fe8ff']], 1.7);
+    clipIn(c, fl, (q) => { q.fillStyle = PAL(PZO, 0.18); q.beginPath(); q.moveTo(0, 0); q.lineTo(13, 4); q.lineTo(4, 13); q.closePath(); q.fill(); });
+    spec(c, -3, -3.6, 2.4, 1.5, -0.7, 0.6);
+  } else if (kind === 'dash') {
+    /* rayo naranja: acelerón */
+    const bo = (q) => { q.moveTo(3.5, -12); q.lineTo(-7, 1.2); q.lineTo(-0.8, 1.2); q.lineTo(-3.5, 12); q.lineTo(7.4, -2.2); q.lineTo(1, -2.2); q.closePath(); };
+    unite(c, [[bo, '#ff9f43']], 1.9);
+    clipIn(c, bo, (q) => { q.fillStyle = PAL(PZO, 0.2); q.beginPath(); q.moveTo(1.4, -12); q.lineTo(-4, 14); q.lineTo(10, 14); q.lineTo(10, -12); q.closePath(); q.fill(); });
+    spec(c, -2.2, -4.6, 1.4, 3, -0.5, 0.6);
   } else {
     const col = kind === 'gold' ? '#ffc928' : '#ff4d5e';
     const body = (q) => { q.moveTo(0, -6); q.bezierCurveTo(6, -11, 12, -4, 9, 4); q.bezierCurveTo(7, 10, 2, 10, 0, 8); q.bezierCurveTo(-2, 10, -7, 10, -9, 4); q.bezierCurveTo(-12, -4, -6, -11, 0, -6); q.closePath(); };
@@ -153,18 +187,136 @@ function buildLevel() {
 }
 function spawnFood(kind, life) {
   const free = [];
-  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (!onSnake(x, y) && !rockAt(x, y) && !foods.some((f) => f.x === x && f.y === y)) free.push([x, y]);
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (!onSnake(x, y) && !rockAt(x, y) && !busy(x, y) && !foods.some((f) => f.x === x && f.y === y)) free.push([x, y]);
   if (!free.length) return;
   const [x, y] = k.pick(free); foods.push({ x, y, kind, life: life || 0, max: life || 0, pop: 0 });
 }
+/* casillas ocupadas por llaves o por la puerta (solo en los niveles a mano) */
+function busy(x, y) { return !!(door && door.x === x && door.y === y) || keys.some((q) => !q.got && q.x === x && q.y === y); }
+
+/* ================= Niveles a mano (serpent-grid) ================= */
+const RCW = { right: 'down', down: 'left', left: 'up', up: 'right' };   /* al girar el tablero 90° */
+const WRAP_CW = { '': '', x: 'y', y: 'x', xy: 'xy' };
+/* gira el dibujo 90° en sentido horario: (x,y) → (R-1-y, x) */
+function rotMap(m) { const R = m.length, C = m[0].length, out = []; for (let x = 0; x < C; x++) { let s = ''; for (let y = R - 1; y >= 0; y--) s += m[y][x]; out.push(s); } return out; }
+/* representación de v más cercana a ref cuando ese eje tiene túnel (sin túnel devuelve v) */
+function nearC(v, ref, n, on) { if (!on) return v; let best = v, bd = Math.abs(v - ref); for (let q = -2; q <= 2; q++) { if (!q) continue; const w = v + q * n, d = Math.abs(w - ref); if (d < bd) { bd = d; best = w; } } return best; }
+function buildHand() {
+  LV = HAND[Math.min(HAND.length, Math.max(1, level)) - 1];
+  const m = PORT ? rotMap(LV.m) : LV.m, wr = PORT ? WRAP_CW[LV.wrap || ''] : (LV.wrap || '');
+  wrapX = wr.indexOf('x') >= 0; wrapY = wr.indexOf('y') >= 0;
+  th = THM[(LV.th == null ? level - 1 : LV.th) % THM.length];
+  rocks = []; keys = []; door = null; doorOpen = false; keysGot = 0;
+  let st = null;
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    const ch = m[y][x];
+    if (ch === '#') rocks.push({ x, y, pop: 1 });
+    else if (ch === 'K') keys.push({ x, y, got: false });
+    else if (ch === 'E') door = { x, y };
+    else if (ch === 'S') st = [x, y];
+  }
+  keysTot = keys.length;
+  dir = PORT ? RCW[LV.d || 'right'] : (LV.d || 'right');
+  const d = DIRS[dir]; st = st || [2, 2];
+  snake = [];
+  for (let i = 0; i < 4; i++) {
+    let x = st[0] - d[0] * i, y = st[1] - d[1] * i;
+    if (wrapX) x = (x + COLS) % COLS; if (wrapY) y = (y + ROWS) % ROWS;
+    snake.push({ x, y });
+  }
+  prev = snake.map((s) => ({ x: s.x, y: s.y }));
+  queue = []; grow = 0; bulges = [];
+  floorCv = renderFloor(); rockCv = renderRock();
+  bannerTxt = `Nivel ${level} · ${LV.name}`;
+}
+/* objetivo cumplido: abre la puerta o da el nivel por superado */
+function checkGoal() {
+  if (!HAND || doneLv) return;
+  const g = LV.go || {};
+  if (g.eat && eaten < g.eat) return;
+  if (g.len && snake.length + grow < g.len) return;
+  if (g.keys && keysGot < keysTot) return;
+  if (g.exit) { if (!doorOpen) { doorOpen = true; bannerTxt = '¡La puerta se abre!'; bannerT = 2; k.sfx('win'); k.flash('rgba(124,247,160,.22)'); if (door) k.burst(cx(door.x), cy(door.y), '#7cf7a0', 18, 150); } return; }
+  doneLevel();
+}
+function doneLevel() {
+  if (doneLv) return;
+  doneLv = true; k.best(ID, score);
+  k.levelDone(score, `Nivel ${level}/${HAND.length} · ${score} puntos · longitud ${snake.length}`);
+}
+function takeKey(q) {
+  q.got = true; keysGot++; score += 30;
+  k.sfx('coin'); k.burst(cx(q.x), cy(q.y), '#ffd23d', 16, 150);
+  k.float(keysGot >= keysTot ? '¡Todas!' : `Llave ${keysGot}/${keysTot}`, cx(q.x), cy(q.y) - 16, '#ffd23d');
+  checkGoal();
+}
+/* rótulo del objetivo, siempre con el progreso a la vista */
+function goalText() {
+  if (!HAND) return '';
+  const g = LV.go || {}, p = [];
+  if (g.eat) p.push(`Manzanas ${Math.min(eaten, g.eat)}/${g.eat}`);
+  if (g.len) p.push(`Longitud ${Math.min(snake.length, g.len)}/${g.len}`);
+  if (g.keys) p.push(`Llaves ${keysGot}/${keysTot}`);
+  if (g.exit) p.push(doorOpen ? '¡A la puerta!' : 'Puerta cerrada');
+  if (freezeT > 0) p.push('Congelado');
+  else if (dashT > 0) p.push('Acelerón');
+  else if (slowT > 0) p.push('Lento');
+  return p.join('  ·  ');
+}
+/* llave dibujada por código (una sola silueta) */
+function keyArt(x, y, s) {
+  c.save(); c.translate(x, y); c.scale(s, s);
+  contact(c, 0, 9, 8, 3, 0.22);
+  const kp = (q) => { q.moveTo(-1.4, 0); q.arc(-5.4, 0, 4.6, 0, R2); q.moveTo(-3.6, -2); q.lineTo(9.4, -2); q.lineTo(9.4, 2); q.lineTo(6.6, 2); q.lineTo(6.6, 5.2); q.lineTo(4.4, 5.2); q.lineTo(4.4, 2); q.lineTo(1.6, 2); q.lineTo(1.6, 4.6); q.lineTo(-0.6, 4.6); q.lineTo(-0.6, 2); q.lineTo(-3.6, 2); q.closePath(); };
+  unite(c, [[kp, '#ffc928']], 1.8);
+  clipIn(c, kp, (q) => {
+    q.fillStyle = PAL(PZO, 0.22); q.beginPath(); q.moveTo(-12, 1.2); q.lineTo(12, 1.2); q.lineTo(12, 8); q.lineTo(-12, 8); q.closePath(); q.fill();
+    q.fillStyle = PAL(PZO, 0.5); q.beginPath(); q.arc(-5.4, 0, 1.9, 0, R2); q.fill();
+  });
+  spec(c, -6.6, -2.6, 1.8, 1.1, -0.6, 0.6);
+  c.restore();
+}
+/* puerta: cerrada con barrotes, abierta como portal */
+function doorArt(x, y, s, open) {
+  c.save(); c.translate(x, y); c.scale(s, s);
+  contact(c, 0, 11, 11, 3.4, 0.24);
+  const ar = (q) => { q.moveTo(-10, 11); q.lineTo(-10, -2); q.bezierCurveTo(-10, -12, 10, -12, 10, -2); q.lineTo(10, 11); q.closePath(); };
+  unite(c, [[ar, open ? '#7cf7a0' : th.edge]], 1.9);
+  clipIn(c, ar, (q) => {
+    q.fillStyle = PAL(PZO, open ? 0.12 : 0.3);
+    q.beginPath(); q.moveTo(2, -13); q.lineTo(13, -13); q.lineTo(13, 13); q.lineTo(2, 13); q.closePath(); q.fill();
+    if (open) { q.fillStyle = 'rgba(255,255,255,.55)'; for (let i = 0; i < 3; i++) { const yy = -8 + ((t * 26 + i * 9) % 20); q.fillRect(-7, yy, 14, 2.2); } }
+    else { q.fillStyle = PAL(PZO, 0.55); for (const bx of [-5.5, 0, 5.5]) q.fillRect(bx - 1.3, -10, 2.6, 22); q.fillRect(-10, -1.4, 20, 2.8); }
+  });
+  if (!open) { c.fillStyle = '#ffc928'; c.beginPath(); c.arc(0, 3, 3.2, 0, R2); c.fill(); c.fillStyle = PZO; c.fillRect(-0.9, 3, 1.8, 4); }
+  c.restore();
+}
+/* flechas de túnel en el borde del tablero */
+function tunnelMarks() {
+  const bw = COLS * CS, bh = ROWS * CS;
+  c.fillStyle = 'rgba(255,255,255,.4)';
+  const tri = (px, py, a) => { c.save(); c.translate(px, py); c.rotate(a); c.beginPath(); c.moveTo(-4, -4); c.lineTo(4, 0); c.lineTo(-4, 4); c.closePath(); c.fill(); c.restore(); };
+  if (wrapX) for (let i = 1; i < ROWS; i += 3) { tri(X0 - 6, Y0 + i * CS + CS / 2, Math.PI); tri(X0 + bw + 6, Y0 + i * CS + CS / 2, 0); }
+  if (wrapY) for (let i = 1; i < COLS; i += 3) { tri(X0 + i * CS + CS / 2, Y0 - 6, -1.5708); tri(X0 + i * CS + CS / 2, Y0 + bh + 6, 1.5708); }
+}
 
 function reset() {
+  if (HAND) return resetHand();
   level = 1; score = 0; eaten = 0; eatenTotal = 0; t = 0; combo = 0; lastEat = -9; slowT = 0; dying = 0; bulges = []; queue = []; grow = 0; bannerT = 0;
   dir = PORT ? 'up' : 'right'; const d = DIRS[dir], sx = PORT ? Math.floor(COLS / 2) : 6, sy = PORT ? ROWS - 6 : Math.floor(ROWS / 2);
   snake = []; for (let i = 0; i < 4; i++) snake.push({ x: sx - d[0] * i, y: sy - d[1] * i });
   prev = snake.map((s) => ({ x: s.x - d[0], y: s.y - d[1] }));
   step = 1 / (3.6 * k.D.spd); acc = step * 0.999; foods = []; rocks = [];
   buildLevel(); spawnFood('apple');
+}
+/* arranque de un nivel a mano: el nivel en curso lo manda kit.js (k.lv) */
+function resetHand() {
+  level = k.lv || 1; score = 0; eaten = 0; eatenTotal = 0; t = 0; combo = 0; lastEat = -9;
+  slowT = 0; freezeT = 0; dashT = 0; dying = 0; doneLv = false; foods = [];
+  buildHand();
+  step = 1 / ((LV.spd || 3.4) * k.D.spd); acc = step * 0.999;
+  spT = k.rnd(7, 11); bannerT = 2.4;
+  spawnFood('apple');
 }
 
 /* ---------- control ---------- */
@@ -203,9 +355,16 @@ function eat(f) {
   if (f.kind === 'apple') {
     grow += 1; eaten++; eatenTotal++; k.sfx('pop'); k.burst(x, y, '#ff4d5e', 10, 120);
     spawnFood('apple');
-    if (!foods.some((q) => q.kind !== 'apple')) { const r = Math.random(); if (r < 0.2) spawnFood('gold', 7); else if (level > 1 && r < 0.34) spawnFood('berry', 8); }
+    if (!HAND && !foods.some((q) => q.kind !== 'apple')) { const r = Math.random(); if (r < 0.2) spawnFood('gold', 7); else if (level > 1 && r < 0.34) spawnFood('berry', 8); }
   } else if (f.kind === 'gold') { grow += 2; k.sfx('coin'); k.burst(x, y, '#ffd23d', 18, 170); k.flash('rgba(255,220,90,.18)'); }
+  else if (f.kind === 'shrink') {
+    const cut = Math.min(4, snake.length - 4);
+    if (cut > 0) { snake.splice(snake.length - cut, cut); prev = snake.map((s) => ({ x: s.x, y: s.y })); }
+    grow = 0; k.sfx('pop'); k.burst(x, y, '#5ce0b0', 14, 150); k.float('Encoger', x, y - 36, '#7ef2d0');
+  } else if (f.kind === 'freeze') { freezeT = 2.5; k.sfx('coin'); k.burst(x, y, '#9fe8ff', 16, 150); k.float('Congelado', x, y - 36, '#9fe8ff'); }
+  else if (f.kind === 'dash') { dashT = 4; score += 40; k.sfx('win'); k.burst(x, y, '#ff9f43', 18, 180); k.float('¡Acelerón!', x, y - 36, '#ffb371'); }
   else { slowT = 5; k.sfx('coin'); k.burst(x, y, '#4a7dff', 14, 150); k.float('Más lento', x, y - 36, '#9fc0ff'); }
+  if (HAND) return checkGoal();
   if (eaten >= NEED) {
     level++; eaten = 0; bannerT = 2; k.sfx('win'); k.confetti(); k.flash('rgba(255,255,255,.35)');
     buildLevel(); foods = foods.filter((q) => !rockAt(q.x, q.y)); if (!foods.some((q) => q.kind === 'apple')) spawnFood('apple');
@@ -213,27 +372,47 @@ function eat(f) {
 }
 function tick() {
   if (queue.length) dir = queue.shift();
-  const h = snake[0], d = DIRS[dir], nx = h.x + d[0], ny = h.y + d[1];
+  const h = snake[0], d = DIRS[dir];
+  let nx = h.x + d[0], ny = h.y + d[1];
+  if (wrapX) nx = (nx + COLS) % COLS;
+  if (wrapY) ny = (ny + ROWS) % ROWS;
   const tailMoves = grow === 0, self = snake.some((s, i) => s.x === nx && s.y === ny && !(tailMoves && i === snake.length - 1));
-  if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS || rockAt(nx, ny) || self) return die();
+  const shut = !!door && !doorOpen && door.x === nx && door.y === ny;
+  if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS || rockAt(nx, ny) || shut || self) return die();
   const old = snake.map((s) => ({ x: s.x, y: s.y }));
   snake.unshift({ x: nx, y: ny });
   if (grow > 0) { grow--; old.push({ ...old[old.length - 1] }); } else snake.pop();
   prev = old;
   const fi = foods.findIndex((f) => f.x === nx && f.y === ny);
   if (fi >= 0) { const f = foods[fi]; foods.splice(fi, 1); eat(f); }
+  if (HAND) {
+    const q = keys.find((r) => !r.got && r.x === nx && r.y === ny);
+    if (q) takeKey(q);
+    if (door && doorOpen && door.x === nx && door.y === ny) { k.sfx('win'); return doneLevel(); }
+  }
 }
 function update(dt) {
   t += dt; bannerT = Math.max(0, bannerT - dt);
   for (const r of rocks) r.pop = Math.min(1, r.pop + dt * 3);
   for (const f of foods) f.pop = Math.min(1, f.pop + dt * 4);
-  if (dying > 0) { dying -= dt; if (dying <= 0) k.lose(ID, score, 'Fin', `Nivel ${level} · Longitud ${snake.length}`); return; }
+  if (dying > 0) { dying -= dt; if (dying <= 0) k.lose(ID, score, 'Fin', HAND ? `Nivel ${level}/${HAND.length} · ${goalText()}` : `Nivel ${level} · Longitud ${snake.length}`); return; }
   input();
   for (let i = foods.length - 1; i >= 0; i--) { const f = foods[i]; if (f.max && (f.life -= dt) <= 0) { k.burst(cx(f.x), cy(f.y), '#fff', 8, 80); foods.splice(i, 1); } }
   slowT = Math.max(0, slowT - dt);
-  /* velocidad continua por manzanas comidas: 4,5 casillas/s al empezar → 11,5 hacia la manzana 64 (nivel 9) */
-  const dq = Math.min(1, eatenTotal / 96); // 1.23: más fácil (antes 4,5 → 11,5 en 64 manzanas)
-  step = 1 / ((3.6 + 6.2 * dq) * k.D.spd) * (slowT > 0 ? 1.45 : 1);   // k.D.spd: la serpiente corre menos en fácil
+  if (HAND) {
+    dashT = Math.max(0, dashT - dt);
+    /* velocidad propia del nivel, algo más rápida con cada manzana */
+    step = 1 / (((LV.spd || 3.4) + (LV.ac == null ? 0.05 : LV.ac) * eatenTotal) * k.D.spd * (dashT > 0 ? 1.7 : 1)) * (slowT > 0 ? 1.45 : 1);
+    if (LV.sp && LV.sp.length) {
+      spT -= dt;
+      if (spT <= 0) { if (foods.some((f) => f.kind !== 'apple')) spT = 3; else { spawnFood(k.pick(LV.sp), 8); spT = k.rnd(9, 14); } }
+    }
+    if (freezeT > 0) { freezeT -= dt; acc = 0; for (const b of bulges) b.d += dt / step; return; }
+  } else {
+    /* velocidad continua por manzanas comidas: 4,5 casillas/s al empezar → 11,5 hacia la manzana 64 (nivel 9) */
+    const dq = Math.min(1, eatenTotal / 96); // 1.23: más fácil (antes 4,5 → 11,5 en 64 manzanas)
+    step = 1 / ((3.6 + 6.2 * dq) * k.D.spd) * (slowT > 0 ? 1.45 : 1);   // k.D.spd: la serpiente corre menos en fácil
+  }
   for (const b of bulges) b.d += dt / step; bulges = bulges.filter((b) => b.d < snake.length + 1);
   acc += dt; if (acc >= step) { acc -= step; if (acc > step) acc = 0; tick(); }
 }
@@ -241,12 +420,30 @@ function update(dt) {
 /* ---------- dibujo de la serpiente ---------- */
 function snakePath(f, snake, prev) {
   const n = snake.length, L = (a, b) => a + (b - a) * f;
-  const pts = [[L(cx(prev[0].x), cx(snake[0].x)), L(cy(prev[0].y), cy(snake[0].y))]];
-  for (let i = 1; i < n; i++) pts.push([cx(snake[i].x), cy(snake[i].y)]);
-  pts.push([L(cx(prev[n - 1].x), cx(snake[n - 1].x)), L(cy(prev[n - 1].y), cy(snake[n - 1].y))]);
+  /* con túneles el cuerpo se «desenrolla»: cada trozo se coloca junto al anterior aunque
+     haya cruzado el borde, y luego se pinta el tablero varias veces desplazado (drawSnake). */
+  const uw = [{ x: snake[0].x, y: snake[0].y }];
+  for (let i = 1; i < n; i++) uw.push({ x: nearC(snake[i].x, uw[i - 1].x, COLS, wrapX), y: nearC(snake[i].y, uw[i - 1].y, ROWS, wrapY) });
+  const p0 = { x: nearC(prev[0].x, uw[0].x, COLS, wrapX), y: nearC(prev[0].y, uw[0].y, ROWS, wrapY) };
+  const pn = { x: nearC(prev[n - 1].x, uw[n - 1].x, COLS, wrapX), y: nearC(prev[n - 1].y, uw[n - 1].y, ROWS, wrapY) };
+  const pts = [[L(cx(p0.x), cx(uw[0].x)), L(cy(p0.y), cy(uw[0].y))]];
+  for (let i = 1; i < n; i++) pts.push([cx(uw[i].x), cy(uw[i].y)]);
+  pts.push([L(cx(pn.x), cx(uw[n - 1].x)), L(cy(pn.y), cy(uw[n - 1].y))]);
   return pts;
 }
-function drawSnake() { drawSnakeOf({ body: snake, prev, bulges, dying, dir, sk: SK, f: dying > 0 ? 1 : k.clamp(acc / step, 0, 1) }); }
+function drawSnake() {
+  const o = { body: snake, prev, bulges, dying, dir, sk: SK, f: dying > 0 ? 1 : k.clamp(acc / step, 0, 1) };
+  if (!wrapX && !wrapY) return drawSnakeOf(o);
+  const pts = snakePath(o.f, snake, prev), bw = COLS * CS, bh = ROWS * CS;
+  let mnx = 1e9, mxx = -1e9, mny = 1e9, mxy = -1e9;
+  for (const p of pts) { if (p[0] < mnx) mnx = p[0]; if (p[0] > mxx) mxx = p[0]; if (p[1] < mny) mny = p[1]; if (p[1] > mxy) mxy = p[1]; }
+  const lim = (a, b) => [Math.max(-4, a), Math.min(4, b)];
+  const [i0, i1] = wrapX ? lim(Math.ceil((X0 - mxx - CS) / bw), Math.floor((X0 + bw - mnx + CS) / bw)) : [0, 0];
+  const [j0, j1] = wrapY ? lim(Math.ceil((Y0 - mxy - CS) / bh), Math.floor((Y0 + bh - mny + CS) / bh)) : [0, 0];
+  c.save(); c.beginPath(); c.rect(X0, Y0, bw, bh); c.clip();
+  for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { c.save(); c.translate(i * bw, j * bh); drawSnakeOf(o); c.restore(); }
+  c.restore();
+}
 /* dibuja una serpiente cualquiera: o = {body, prev, bulges, dying, dir, sk:{body,dark}, f (interpolación), ghost (parpadeo)} */
 function drawSnakeOf(o) {
   const snake = o.body, bulges = o.bulges, dying = o.dying, dir = o.dir, SK = o.sk;
@@ -316,6 +513,11 @@ function label(s, x, y, size, col, align) {
 function draw() {
   c.drawImage(floorCv, 0, 0, W, H);
   for (const r of rocks) { if (r.pop <= 0) continue; const s = r.pop < 1 ? 1 + Math.sin(r.pop * Math.PI) * 0.3 : 1, sz = (CS + 8) * s * Math.min(1, r.pop * 2); c.drawImage(rockCv, cx(r.x) - sz / 2, cy(r.y) - sz / 2 + 1, sz, sz); }
+  if (HAND) {
+    if (wrapX || wrapY) tunnelMarks();
+    if (door) doorArt(cx(door.x), cy(door.y), CS / 24, doorOpen);
+    for (const q of keys) if (!q.got) keyArt(cx(q.x), cy(q.y) + Math.sin(t * 4 + q.x) * 1.5, CS / 24);
+  }
   for (const f of foods) {
     if (f.max && f.life < 2 && Math.floor(f.life * 8) % 2) continue;
     const x = cx(f.x), y = cy(f.y), s = f.pop < 1 ? Math.sin(f.pop * 2.1) * 1.15 : 1 + Math.sin(t * 5 + f.x) * 0.05;
@@ -327,23 +529,55 @@ function draw() {
   // marcador: puntos arriba a la izquierda, nivel y progreso arriba a la derecha (centro libre para pausa/sonido)
   const hy = PORT ? 16 : 8;
   apple(20, hy + 13, 0.9, 'apple'); label(`${score}`, 36, hy + 2, 22, '#fff');
-  const rx = W - 12; label(`Nivel ${level}`, rx, hy - 2, 15, '#fff', 'right');
-  for (let i = 0; i < NEED; i++) { const px = rx - (NEED - 1 - i) * 11 - 4; c.beginPath(); c.arc(px, hy + 24, 4, 0, R2); ART.fillOut(c, i < eaten ? '#ff4d5e' : 'rgba(255,255,255,.18)', 1.5); }
-  if (PORT) label(`Récord ${Math.max(k.best(ID, 0), score)}`, 14, hy + 30, 11, 'rgba(255,255,255,.7)');
-  if (slowT > 0) { const x = PORT ? W - 12 : W - 110; label('Lento', PORT ? x : x, PORT ? hy + 32 : hy + 2, 11, '#9fc0ff', 'right'); }
-  if (combo > 1 && t - lastEat < 3) { const a = 1 - (t - lastEat) / 3; c.globalAlpha = a; label(`Combo x${combo}`, PORT ? W / 2 : W / 2 + 90, PORT ? H - 24 : hy + 4, 14, '#7cf7a0', 'center'); c.globalAlpha = 1; }
+  const rx = W - 12;
+  if (HAND) {
+    /* Nivel n/20 arriba a la derecha y el objetivo en una sola línea bajo el tablero:
+       el centro de la franja superior queda libre para los botones del reproductor. */
+    label(`Nivel ${level}/${HAND.length}`, rx, hy - 2, 15, '#fff', 'right');
+    label(LV.name, rx, hy + 18, 11, 'rgba(255,255,255,.7)', 'right');
+    const oy = Y0 + ROWS * CS + (PORT ? 14 : 6), fs = PORT ? 15 : 13, txt = goalText();
+    c.font = `800 ${fs}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
+    const mw = c.measureText(txt).width + 26;
+    ART.rr(c, W / 2 - mw / 2, oy - 4, mw, fs + 12, 9); c.fillStyle = 'rgba(26,21,48,.6)'; c.fill();
+    label(txt, W / 2, oy, fs, doorOpen ? '#7cf7a0' : '#fff', 'center');
+    if (PORT) label(`Récord ${Math.max(k.best(ID, 0), score)}`, 14, hy + 30, 11, 'rgba(255,255,255,.7)');
+  } else {
+    label(`Nivel ${level}`, rx, hy - 2, 15, '#fff', 'right');
+    for (let i = 0; i < NEED; i++) { const px = rx - (NEED - 1 - i) * 11 - 4; c.beginPath(); c.arc(px, hy + 24, 4, 0, R2); ART.fillOut(c, i < eaten ? '#ff4d5e' : 'rgba(255,255,255,.18)', 1.5); }
+    if (PORT) label(`Récord ${Math.max(k.best(ID, 0), score)}`, 14, hy + 30, 11, 'rgba(255,255,255,.7)');
+    if (slowT > 0) { const x = PORT ? W - 12 : W - 110; label('Lento', x, PORT ? hy + 32 : hy + 2, 11, '#9fc0ff', 'right'); }
+  }
+  if (combo > 1 && t - lastEat < 3) { const a = 1 - (t - lastEat) / 3; c.globalAlpha = a; label(`Combo x${combo}`, PORT ? W / 2 : W / 2 + 90, PORT ? (HAND ? hy + 40 : H - 24) : hy + 4, 14, '#7cf7a0', 'center'); c.globalAlpha = 1; }
   if (bannerT > 0) {
-    const a = Math.min(1, bannerT * 2), s = 1 + Math.max(0, bannerT - 1.7) * 1.5; c.globalAlpha = a;
+    const a = Math.min(1, bannerT * 2), s = 1 + Math.max(0, bannerT - 1.7) * 0.22; c.globalAlpha = a;
     c.save(); c.translate(W / 2, Y0 + ROWS * CS / 2); c.scale(s, s);
-    c.font = '800 24px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const txt = `Nivel ${level} · ${th.name}`, mw = c.measureText(txt).width + 40;
-    ART.rr(c, -mw / 2, -24, mw, 48, 14); c.fillStyle = 'rgba(26,21,48,.85)'; c.fill(); label(txt, 0, -13, 24, '#fff', 'center');
+    const txt = HAND ? bannerTxt : `Nivel ${level} · ${th.name}`;
+    let fs = 24;
+    c.font = `800 ${fs}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
+    const wlim = (COLS * CS) / s;
+    while (fs > 13 && c.measureText(txt).width + 40 > wlim) { fs -= 1; c.font = `800 ${fs}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; }
+    const mw = c.measureText(txt).width + 40, bh2 = fs * 2;
+    ART.rr(c, -mw / 2, -bh2 / 2, mw, bh2, 14); c.fillStyle = 'rgba(26,21,48,.85)'; c.fill(); label(txt, 0, -fs / 2 - 1, fs, '#fff', 'center');
+    if (HAND && LV.tip && bannerT > 0.9) {
+      let ts = PORT ? 12 : 13;
+      c.font = `800 ${ts}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
+      while (ts > 8 && c.measureText(LV.tip).width + 28 > wlim * 0.92) { ts -= 1; c.font = `800 ${ts}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; }
+      const tw = c.measureText(LV.tip).width + 28;
+      ART.rr(c, -tw / 2, bh2 / 2 + 6, tw, ts + 14, 9); c.fillStyle = 'rgba(26,21,48,.8)'; c.fill();
+      label(LV.tip, 0, bh2 / 2 + 13, ts, '#ffd166', 'center');
+    }
     c.restore(); c.globalAlpha = 1;
   }
 }
 
 if (CM) comilona(); else if (MP) snakeMP(); else {
+/* Niveles a mano (plan Friv): menú, rejilla de niveles y progreso por dificultad los pone kit.js. */
+if (HAND) k.levels(HAND.length, { start: () => reset() });
 reset();
-k.show(CFG.title || 'Serpent Grid', 'Come manzanas para crecer. Las doradas valen más y los arándanos te frenan. Cada 8 manzanas, nivel nuevo con rocas. Desliza, toca a un lado de la cabeza o usa las flechas.<br>Toca para empezar');
+k.onDif = () => { if (k.st !== 'play') reset(); };
+k.show(CFG.title || 'Serpent Grid', HAND
+  ? '20 tableros dibujados a mano. Cada uno pide algo distinto: comer manzanas, recoger todas las llaves o crecer hasta cruzar la puerta. Desliza, toca a un lado de la cabeza o usa las flechas.'
+  : 'Come manzanas para crecer. Las doradas valen más y los arándanos te frenan. Cada 8 manzanas, nivel nuevo con rocas. Desliza, toca a un lado de la cabeza o usa las flechas.<br>Toca para empezar');
 k.run((dt) => { if (!k.gate(reset)) { t += dt; for (const f of foods) f.pop = Math.min(1, f.pop + dt * 4); return; } update(dt); }, draw);
 addEventListener('resize', () => { clearTimeout(window.__ot); window.__ot = setTimeout(() => { if ((innerHeight > innerWidth) !== PORT && k.st !== 'play') location.reload(); }, 400); });
 }
