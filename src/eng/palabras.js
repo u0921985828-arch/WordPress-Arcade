@@ -182,11 +182,13 @@ function tile(x, y, s, ch, stt, sy, big) {
 /* ---------- Datos ---------- */
 let SOL = null, VALID = null, CATS = null, LOADERR = false;
 const needW = MODE === 'daily', needC = MODE === 'hang' || MODE === 'sopa';
-let ROSCO = null, ANAG = null;
+let ROSCO = null, ANAG = null, CAEN = null;
 /* Cuando llegan los datos, si aún no se juega se rehace el tablero (si no, la pantalla se queda en «Cargando…»). */
 const ready = () => { try { if (window.__m && k.st !== 'play') window.__m.reset(); } catch (e) { } };
 if (MODE === 'abc') fetch('../_data/rosco-es.json').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((d) => { ROSCO = d; ready(); })
   .catch(() => { LOADERR = true; ROSCO = { letras: 'ABC', r: { A: [{ d: 1, q: 'Insecto que fabrica miel.', a: ['abeja', 'abanico', 'almendra', 'ancla'] }], B: [{ d: 1, q: 'Embarcación pequeña de remos.', a: ['barca', 'bufanda', 'botella', 'bandeja'] }], C: [{ d: 1, q: 'Habitación donde se preparan las comidas.', a: ['cocina', 'cuadro', 'cortina', 'cuchara'] }] } }; ready(); });
+if (MODE === 'caen') fetch('../_data/palabras-caen-es.json').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((d) => { CAEN = d; ready(); })
+  .catch(() => { LOADERR = true; CAEN = { w: { 3: ['SOL', 'MAR', 'PAN', 'LUZ', 'PIE', 'OJO', 'ALA'], 4: ['CASA', 'MESA', 'GATO', 'ROSA', 'LUNA', 'PATO'], 5: ['PLAYA', 'QUESO', 'LIBRO', 'CAMPO'] } }; ready(); });
 if (MODE === 'ana') fetch('../_data/anagramas-es.json').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((d) => { ANAG = d; ready(); })
   .catch(() => { LOADERR = true; ANAG = { racks: [{ l: 'CAMINOS', w: ['CAMINOS', 'CAMINO', 'CASINO', 'MOSCA', 'MINAS', 'MANOS', 'MANO', 'SANO', 'CASO', 'COSA', 'SACO', 'CIMA'] }] }; ready(); });
 if (needW) fetch('../_data/palabras5-es.txt').then((r) => { if (!r.ok) throw new Error(r.status); return r.text(); }).then((t) => {
@@ -1112,8 +1114,223 @@ const AN = (() => {
   };
   return { st: () => ({ rack, letras, cur2, found, seats, turn, time, ronda, phase }), reset, update, draw, onKey, intro: 'Siete letras y muchas palabras escondidas. Forma todas las que puedas de tres letras o más; la que usa las siete vale muchísimo. Dos tandas de cien segundos.' };
 })();
+
+/* ===================================================================================== */
+/* ================================ LETRAS QUE CAEN ==================================== */
+/* ===================================================================================== */
+/* Las letras caen y se amontonan por columnas. Se forman palabras eligiendo letras del montón
+ * (no hace falta que estén juntas): al enviarlas desaparecen y todo lo de arriba baja. Si una
+ * columna llega al techo, se acabó. El surtidor nunca deja el montón sin salida: lleva siempre
+ * una palabra objetivo y va colando sus letras que faltan, así que siempre hay algo que formar. */
+const CN = (() => {
+  const COLS = LAND ? 10 : 7, ROWS = LAND ? 7 : 10;
+  const CELL = LAND ? 46 : 60, BX = Math.round((W - COLS * CELL) / 2), BY = LAND ? 56 : 128;
+  const BH = ROWS * CELL, BW = COLS * CELL;
+  const L = LAND
+    ? { hud: 12, word: BY + BH + 10, wordH: 46, btn: [W - 178, BY + BH + 10, 166, 46], clr: [12, BY + BH + 10, 150, 46] }
+    : { hud: 16, word: BY + BH + 12, wordH: 52, btn: [W - 150, BY + BH + 12, 138, 52], clr: [12, BY + BH + 12, 130, 52] };
+  /* valor de cada letra: las raras pagan más (tabla propia, pensada para partidas cortas) */
+  const VAL = { A: 1, E: 1, I: 1, O: 1, U: 1, L: 1, N: 1, R: 1, S: 1, T: 1, C: 2, D: 2, G: 2, B: 3, M: 3, P: 3, F: 4, H: 4, V: 4, Y: 4, J: 6, Ñ: 8, Q: 8, K: 8, W: 8, X: 10, Z: 10 };
+  /* frecuencia aproximada del español: sin esto salen montones impronunciables */
+  const FREQ = 'AAAAAAAAAAAAEEEEEEEEEEEEOOOOOOOOOSSSSSSSRRRRRRNNNNNNIIIIIIDDDDDLLLLLCCCCTTTTUUUUMMMPPPBBGGVVYYQQHHFFJZXKWÑ';
+  let cols, fall, sel, cur, score, lines, lvl, spawnT, tgt, msg, msgT, shakeT, idleT, glow, dead, combo;
+  let DIC = null, BYLEN = null;
+  function dicReady() { if (!CAEN) return false; if (!DIC) { DIC = new Set(); BYLEN = {}; for (const n of Object.keys(CAEN.w)) { BYLEN[n] = CAEN.w[n]; for (const w of CAEN.w[n]) DIC.add(w); } } return true; }
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  const height = (ci) => cols[ci].length;
+  /* letras que faltan para poder escribir w con lo que hay en el montón */
+  function missing(w) {
+    const have = {}; for (const cl of cols) for (const t of cl) have[t.ch] = (have[t.ch] || 0) + 1;
+    const need = [];
+    for (const ch of w) { if (have[ch]) have[ch]--; else need.push(ch); }
+    return need;
+  }
+  /* palabra objetivo: corta al principio y más larga según sube el nivel */
+  function newTarget() {
+    if (!dicReady()) { tgt = null; return; }
+    const lens = lvl < 2 ? ['3', '4'] : lvl < 5 ? ['3', '4', '5'] : ['4', '5', '6'];
+    let bestW = null, bestN = 99;
+    for (let i = 0; i < 24; i++) { const w = pick(BYLEN[pick(lens)]); const n = missing(w).length; if (n < bestN) { bestN = n; bestW = w; if (n <= 2) break; } }
+    tgt = bestW;
+  }
+  /* ¿hay alguna palabra posible con lo que se ve? (para la pista automática) */
+  function findWord() {
+    if (!dicReady()) return null;
+    const have = {}; for (const cl of cols) for (const t of cl) have[t.ch] = (have[t.ch] || 0) + 1;
+    for (const n of ['6', '5', '4', '3']) {
+      const list = BYLEN[n] || []; const start = Math.floor(Math.random() * list.length);
+      for (let i = 0; i < list.length; i++) {
+        const w = list[(start + i) % list.length], use = {}; let ok = true;
+        for (const ch of w) { use[ch] = (use[ch] || 0) + 1; if (use[ch] > (have[ch] || 0)) { ok = false; break; } }
+        if (ok) return w;
+      }
+    }
+    return null;
+  }
+  /* celdas concretas (columna, altura) que deletrean w; se usa para la pista */
+  function cellsFor(w) {
+    const used = [];
+    for (const ch of w) {
+      let found = null;
+      for (let ci = 0; ci < COLS && !found; ci++) for (let r = cols[ci].length - 1; r >= 0; r--) {
+        if (cols[ci][r].ch === ch && !used.some((u) => u.c === ci && u.r === r)) { found = { c: ci, r }; break; }
+      }
+      if (!found) return null;
+      used.push(found);
+    }
+    return used;
+  }
+  const rate = () => Math.max(0.5, (1.9 - lvl * 0.12) / k.D.rate);            // segundos entre letras
+  const vy = () => (LAND ? 78 : 96) * (0.9 + lvl * 0.07) * k.D.spd;           // píxeles por segundo
+  function reset() {
+    cols = []; for (let i = 0; i < COLS; i++) cols.push([]);
+    fall = []; sel = []; cur = { c: Math.floor(COLS / 2), r: 0 }; score = 0; lines = 0; lvl = 1;
+    spawnT = 0.8; msg = ''; msgT = 0; shakeT = 0; idleT = 0; glow = null; dead = 0; combo = 0;
+    tgt = null; newTarget();
+    /* arranque amable: tres letras ya puestas para que no se empiece con la pantalla vacía */
+    for (let i = 0; i < 3 + (LAND ? 2 : 0); i++) land(Math.floor(Math.random() * COLS), newLetter(), true);
+  }
+  function newLetter() {
+    let ch = FREQ[Math.floor(Math.random() * FREQ.length)];
+    if (tgt) { const need = missing(tgt); if (need.length && Math.random() < 0.55) ch = need[0]; else if (!need.length) newTarget(); }
+    return { ch, gold: Math.random() < 0.06 };
+  }
+  function land(ci, t, quiet) {
+    if (cols[ci].length >= ROWS) { if (!quiet) dead = 1; return; }
+    cols[ci].push(t); if (!quiet) k.sfx('pop');
+  }
+  function spawn() {
+    let ci = Math.floor(Math.random() * COLS), n = 0;
+    while (cols[ci].length >= ROWS - 1 && n++ < COLS) ci = (ci + 1) % COLS;   // evita saturar siempre la misma
+    fall.push({ c: ci, y: BY - CELL * 0.6, t: newLetter() });
+  }
+  const selHas = (ci, r) => sel.some((s) => s.c === ci && s.r === r);
+  function toggle(ci, r) {
+    if (r >= cols[ci].length) return;
+    const i = sel.findIndex((s) => s.c === ci && s.r === r);
+    if (i >= 0) { sel.splice(i, 1); k.sfx('click'); return; }
+    if (sel.length >= 8) return;
+    sel.push({ c: ci, r }); k.sfx('click'); idleT = 0;
+  }
+  const word = () => sel.map((s) => (cols[s.c][s.r] ? cols[s.c][s.r].ch : '')).join('');
+  function send() {
+    const w = word();
+    if (w.length < 3) { say('Al menos tres letras'); k.sfx('hurt'); shakeT = 0.3; return; }
+    if (!dicReady() || !DIC.has(w)) { say(`«${w}» no vale`); k.sfx('hurt'); shakeT = 0.35; sel = []; combo = 0; return; }
+    let pts = 0, gold = false;
+    for (const s of sel) { const t = cols[s.c][s.r]; pts += VAL[t.ch] || 1; if (t.gold) gold = true; }
+    pts = Math.round(pts * w.length * (gold ? 2 : 1) * (1 + combo * 0.15));
+    score += pts; lines++; combo++;
+    const cx = BX + (sel[0].c + 0.5) * CELL, cy = BY + BH - (sel[0].r + 0.5) * CELL;
+    k.float(`+${pts}`, cx, cy - 10, gold ? '#ffd166' : '#7cf7a0'); k.burst(cx, cy, gold ? '#ffd166' : '#7cf7a0', 12, 150);
+    k.sfx(w.length >= 5 ? 'win' : 'coin'); if (gold) k.confetti();
+    /* se quitan de arriba abajo para no descolocar los índices de la misma columna */
+    const byCol = {}; for (const s of sel) (byCol[s.c] = byCol[s.c] || []).push(s.r);
+    for (const ci of Object.keys(byCol)) { byCol[ci].sort((a, b) => b - a); for (const r of byCol[ci]) cols[ci].splice(r, 1); }
+    sel = []; glow = null; idleT = 0;
+    say(`${w} · +${pts}${gold ? ' ¡dorada!' : ''}`);
+    if (lines % 6 === 0) { lvl++; say(`Nivel ${lvl}`); }
+    newTarget();
+  }
+  const say = (s) => { msg = s; msgT = 2.2; };
+  function onKey(e) {
+    if (k.st !== 'play' || k.paused) return false;
+    if (e.code === 'Enter' || e.code === 'Space') { send(); return true; }
+    if (e.code === 'Backspace' || e.code === 'Escape') { sel = []; k.sfx('click'); return true; }
+    return false;
+  }
+  function update(dt) {
+    if (msgT > 0) msgT -= dt;
+    if (shakeT > 0) shakeT -= dt;
+    if (dead) { dead = 0; k.lose(CFG.id || 'letras-que-caen', score, '¡Se llenó la columna!', `${lines} palabras · nivel ${lvl}`); return; }
+    /* caída */
+    const v = vy();
+    for (const f of fall) {
+      f.y += v * dt;
+      const top = BY + BH - cols[f.c].length * CELL;                    // dónde se apoya
+      if (f.y + CELL >= top) { land(f.c, f.t); f.done = 1; }
+    }
+    fall = fall.filter((f) => !f.done);
+    spawnT -= dt; if (spawnT <= 0) { spawn(); spawnT = rate(); }
+    /* cursor y selección con teclado o mando */
+    if (k.hit.has('left')) { cur.c = (cur.c + COLS - 1) % COLS; cur.r = Math.min(cur.r, Math.max(0, height(cur.c) - 1)); }
+    if (k.hit.has('right')) { cur.c = (cur.c + 1) % COLS; cur.r = Math.min(cur.r, Math.max(0, height(cur.c) - 1)); }
+    if (k.hit.has('up')) cur.r = Math.min(Math.max(0, height(cur.c) - 1), cur.r + 1);
+    if (k.hit.has('down')) cur.r = Math.max(0, cur.r - 1);
+    if (k.hit.has('a')) toggle(cur.c, cur.r);
+    if (k.hit.has('b')) { if (sel.length) send(); else say('Elige letras con A'); }
+    /* toque / ratón */
+    if (k.ptr.hit) {
+      const x = k.ptr.x, y = k.ptr.y;
+      if (inR(L.btn, x, y)) send();
+      else if (inR(L.clr, x, y)) { sel = []; k.sfx('click'); }
+      else if (x >= BX && x < BX + BW && y >= BY && y < BY + BH) {
+        const ci = Math.floor((x - BX) / CELL), r = Math.floor((BY + BH - y) / CELL);
+        if (ci >= 0 && ci < COLS && r >= 0) { cur = { c: ci, r: Math.min(r, Math.max(0, height(ci) - 1)) }; toggle(ci, r); }
+      }
+    }
+    /* pista automática: si pasa un rato sin formar nada, se enseña una palabra posible */
+    idleT += dt;
+    if (idleT > 14 && !sel.length) { const w = findWord(); glow = w ? { w, cells: cellsFor(w), t: 1.8 } : null; idleT = 0; if (glow) say('Pista: ' + glow.w); }
+    if (glow) { glow.t -= dt; if (glow.t <= 0) glow = null; }
+    /* techo: si una columna llega arriba se avisa antes de perder */
+    for (let ci = 0; ci < COLS; ci++) if (cols[ci].length >= ROWS) { k.lose(CFG.id || 'letras-que-caen', score, '¡Se llenó la columna!', `${lines} palabras · nivel ${lvl}`); return; }
+  }
+  function draw() {
+    c.drawImage(backdrop('#1a1f3e', '#0f1226', 22), 0, 0, W, H);
+    const sh = shakeT > 0 ? Math.sin(shakeT * 70) * 5 : 0;
+    c.save(); c.translate(sh, 0);
+    /* tablero */
+    panel(BX - 8, BY - 8, BW + 16, BH + 16, 14, '#232a52', { nogl: true });
+    c.save(); ART.rr(c, BX, BY, BW, BH, 8); c.clip();
+    c.fillStyle = 'rgba(8,10,26,.5)'; c.fillRect(BX, BY, BW, BH);
+    for (let i = 1; i < COLS; i++) { c.fillStyle = 'rgba(255,255,255,.05)'; c.fillRect(BX + i * CELL - 1, BY, 2, BH); }
+    /* línea de peligro */
+    const dy = BY + CELL; c.fillStyle = 'rgba(255,95,122,.35)'; c.fillRect(BX, dy - 1, BW, 2);
+    /* montón */
+    for (let ci = 0; ci < COLS; ci++) for (let r = 0; r < cols[ci].length; r++) {
+      const t = cols[ci][r], x = BX + ci * CELL, y = BY + BH - (r + 1) * CELL;
+      const on = selHas(ci, r), hint = glow && glow.cells && glow.cells.some((g) => g.c === ci && g.r === r);
+      tile(x + 3, y + 3, CELL - 6, t.ch, on ? 2 : t.gold ? 1 : 3, 1, 0.52);
+      if (hint) { ART.rr(c, x + 2, y + 2, CELL - 4, CELL - 4, 8); c.lineWidth = 3; c.strokeStyle = '#5ce1e6'; c.stroke(); }
+      if (on) { const i = sel.findIndex((s) => s.c === ci && s.r === r); outlined(String(i + 1), x + CELL - 11, y + 12, 12, '#fff', 'center', 3); }
+    }
+    /* letras cayendo: haz de luz en su columna para que se vea dónde va a caer */
+    for (const f of fall) {
+      const top = BY + BH - cols[f.c].length * CELL, fx = BX + f.c * CELL;
+      c.fillStyle = 'rgba(255,209,102,.55)'; ART.rr(c, fx + 7, top - 5, CELL - 14, 4, 2); c.fill();  // dónde va a caer
+      c.fillStyle = 'rgba(6,4,20,.38)'; ART.rr(c, fx + 7, f.y + 10, CELL - 14, CELL - 8, 8); c.fill();
+      tile(BX + f.c * CELL + 3, f.y + 3, CELL - 6, f.t.ch, f.t.gold ? 1 : 3, 1, 0.52);
+    }
+    /* cursor */
+    if (!k.ptr.down) { const x = BX + cur.c * CELL, y = BY + BH - (cur.r + 1) * CELL;
+      ART.rr(c, x + 1, y + 1, CELL - 2, CELL - 2, 9); c.lineWidth = 3; c.strokeStyle = '#ffd166'; c.stroke(); }
+    c.restore();
+    /* HUD */
+    outlined(String(score), 14, L.hud + 14, LAND ? 30 : 32, '#fff', 'left', 5);
+    txt(`nivel ${lvl} · ${lines} palabras`, 14, L.hud + 38, 14, '#b8b0ff', 'left');
+    if (tgt) txt('objetivo: ' + tgt, W - 14, L.hud + 14, 16, '#ffd166', 'right');
+    if (msgT > 0) { c.globalAlpha = Math.min(1, msgT); txt(msg, W / 2, L.hud + 20, fitSize(msg, W - 240, 17, 11, 900), '#d8d4f5', 'center', 900); c.globalAlpha = 1; }
+    /* barra de la palabra y botones */
+    panel(L.clr[0], L.clr[1], L.clr[2], L.clr[3], 12, '#3a3556');
+    txt('Borrar', L.clr[0] + L.clr[2] / 2, L.clr[1] + L.clr[3] / 2, 17, '#fff', 'center', 900);
+    panel(L.btn[0], L.btn[1], L.btn[2], L.btn[3], 12, sel.length >= 3 ? '#4caf62' : '#2c4a86');
+    txt('¡Palabra!', L.btn[0] + L.btn[2] / 2, L.btn[1] + L.btn[3] / 2, 17, '#fff', 'center', 900);
+    const wx = L.clr[0] + L.clr[2] + 10, ww = L.btn[0] - wx - 10, w = word();
+    panel(wx, L.word, ww, L.wordH, 12, '#171c36', { nogl: true });
+    if (w) outlined(w, wx + ww / 2, L.word + L.wordH / 2, fitSize(w, ww - 20, LAND ? 26 : 28, 12, 900), sel.length >= 3 ? '#7cf7a0' : '#f4f0ff', 'center', 5);
+    else txt('elige letras', wx + ww / 2, L.word + L.wordH / 2, 15, '#6f6a99', 'center');
+    c.restore();
+    if (!dicReady()) { c.fillStyle = 'rgba(10,7,26,.7)'; c.fillRect(0, 0, W, H); outlined(LOADERR ? 'Sin diccionario' : 'Cargando…', W / 2, H / 2, 24, '#fff'); }
+  }
+  /* ganchos de prueba (Playwright): diccionario cargado y geometría del tablero */
+  window.__caenDic = () => (CAEN ? CAEN.w : null);
+  window.__caenGeo = () => ({ BX, BY, BW, BH, CELL, COLS, ROWS });
+  return { st: () => ({ cols, fall, sel, score, lvl, lines, tgt }), reset, update, draw, onKey,
+    intro: 'Las letras caen y se amontonan. Elige letras del montón (no hace falta que estén juntas) para formar una palabra y envíala: desaparecen y todo baja. Si una columna llega al techo, se acabó. Con teclado o mando: flechas para moverte, A para elegir, B o Intro para enviar.' };
+})();
 /* ---------- Arranque ---------- */
-const M = MODE === 'hang' ? HG : MODE === 'sopa' ? SP : MODE === 'abc' ? AB : MODE === 'ana' ? AN : D; window.__m = M;
+const M = MODE === 'hang' ? HG : MODE === 'sopa' ? SP : MODE === 'abc' ? AB : MODE === 'ana' ? AN : MODE === 'caen' ? CN : D; window.__m = M;
 /* Teclado físico: las letras (incluida P, que el kit usa para pausar) se capturan antes que el kit mientras se juega. */
 addEventListener('keydown', (e) => { if (M.onKey(e)) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
 M.reset();

@@ -118,7 +118,7 @@ function mouth8(g, x, y, w, m, col) {
   g.stroke();
 }
 const OUT = ART.OUT, R2 = 6.2832;
-if (CFG.mode === 'drums') drumsGame(); else if (CFG.mode === 'dance') danceGame(); else if (CFG.mode === 'piano') pianoGame(); else {
+if (CFG.mode === 'drums') drumsGame(); else if (CFG.mode === 'dance') danceGame(); else if (CFG.mode === 'piano') pianoGame(); else if (CFG.mode === 'palmas') palmasGame(); else {
 const k = Kit({ w: 360, h: 640, title: CFG.title, bg: '#0d0a1f' }), c = k.ctx;
 const LANES = 4, LW = 90, HITY = 530, SPEED = 420, COLS = ['#ff5f7a', '#f2d15c', '#5ce1e6', '#7cf7a0'], SCALE = [0, 3, 5, 7, 10, 12];
 const JUD = [[0.05, 'PERFECTO', 100, 1, '#fff27a'], [0.09, 'GENIAL', 70, 0.8, '#7cf7a0'], [0.16, 'BIEN', 40, 0.5, '#5ce1e6']];
@@ -758,5 +758,237 @@ function pianoGame() {
   window.__pi = { get notes() { return notes; }, get t() { return t; }, get score() { return score; }, get si() { return si; }, get hp() { return hp; },
     get flash() { return flash; }, get combo() { return combo; }, get acc() { return accN ? Math.round((accSum / accN) * 100) : 100; } };
   k.show(CFG.title || 'Piano de Colores', 'Ocho teclas de colores y melodías de siempre. Toca la tecla justo cuando su nota llega abajo; puedes usar varios dedos a la vez. Con teclado, A S D F G H J K (o del 1 al 8). Cinco melodías encadenadas, cada una un poco más rápida.<br>Toca para empezar');
+  k.run(update, draw);
+}
+
+/* ================= Palmas Flamencas (CFG.mode 'palmas'): el compás en una rueda de 12 ==============
+ * Nada de notas que bajan: aquí se lee un reloj. Una aguja gira por el compás y hay que dar la palma
+ * justo cuando cruza una marca fuerte (A) o marcar los pitos en las marcas pequeñas (B). El palo cambia
+ * cada pocos compases —soleá, tangos, bulería, rumba— y con él cambian el ritmo y dónde caen los acentos,
+ * así que la gracia está en aprenderse el patrón antes de que la aguja llegue. Hasta 4 jugadores en la tele
+ * dando palmas a la vez sobre el mismo compás; la CPU ocupa las plazas libres. */
+function palmasGame() {
+  const W = 640, H = 360, NP = 4, ID = CFG.id || 'palmas-flamencas';
+  const k = Kit({ w: W, h: H, title: CFG.title, bg: '#1b0d26' }), c = k.ctx;
+  const CX = 320, CY = 152, RAD = 98, CA = '#ff8a3c', CB = '#5ce1e6', CD = '#ffd166', JW = [0.06, 0.13, 0.17];
+  /* Palos: n nombre · b pulsos del compás · f palmas fuertes (A) · p pitos (B) · bpm · c color · s compases */
+  const PALOS = [
+    { n: 'Soleá', b: 12, f: [3, 6, 8, 10, 12], p: [], bpm: 96, c: '#ff8a3c', s: 3, d: 'Compás de 12. Palma en 3, 6, 8, 10 y 12.' },
+    { n: 'Tangos', b: 4, f: [2, 4], p: [3], bpm: 104, c: '#ff6fb5', s: 6, d: 'Compás de 4. Palma en 2 y 4, pitos en el 3.' },
+    { n: 'Soleá por bulerías', b: 12, f: [12, 3, 6, 8, 10], p: [1], bpm: 118, c: '#a8cf3f', s: 4, d: 'Como la soleá pero más viva, con pitos en el 1.' },
+    { n: 'Rumba', b: 8, f: [1, 4, 7], p: [3, 6], bpm: 170, c: '#5b8cff', s: 8, d: 'Tres-tres-dos: palma en 1, 4 y 7.' },
+    { n: 'Bulería', b: 12, f: [12, 3, 6, 8, 10], p: [1, 7], bpm: 148, c: '#ffd166', s: 6, d: 'El palo más rápido: no te adelantes.' },
+  ];
+  let P = [], ev = [], bars = [], total = 0, t = 0, over = false, overT = 0, cpuLv = 0, cpuLv0 = 0, ac = null;
+  const lsGet = (key) => { try { return +localStorage.getItem(key) || 0; } catch (e) { return 0; } };
+  const lsSet = (key, v) => { try { localStorage.setItem(key, v); } catch (e) { /* sin almacenamiento */ } };
+  /* ---------- sonido: palma (ruido corto filtrado) y pitos (chasquido agudo) ---------- */
+  function audio() { if (k.muted()) return; if (!ac) try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { /* sin audio */ } if (ac && ac.state === 'suspended') ac.resume(); }
+  let NOISE = null;
+  function noiseBuf() {
+    if (NOISE || !ac) return NOISE;
+    const n = Math.floor(ac.sampleRate * 0.25); NOISE = ac.createBuffer(1, n, ac.sampleRate); const d = NOISE.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    return NOISE;
+  }
+  function clap(kind, when, vol) {
+    if (!ac || k.muted()) return; const w0 = Math.max(ac.currentTime, when || 0), b = noiseBuf(); if (!b) return;
+    const s = ac.createBufferSource(); s.buffer = b; const f = ac.createBiquadFilter(), g = ac.createGain();
+    f.type = 'bandpass'; f.frequency.value = kind === 'b' ? 3200 : 1500; f.Q.value = kind === 'b' ? 6 : 1.2;
+    const d = kind === 'b' ? 0.05 : 0.11; g.gain.setValueAtTime(vol || 0.5, w0); g.gain.exponentialRampToValueAtTime(0.001, w0 + d);
+    s.connect(f).connect(g).connect(ac.destination); s.start(w0); s.stop(w0 + d + 0.02);
+  }
+  function tick(when, strong) {
+    if (!ac || k.muted()) return; const w0 = Math.max(ac.currentTime, when || 0), o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(strong ? 160 : 300, w0); o.frequency.exponentialRampToValueAtTime(strong ? 70 : 220, w0 + 0.1);
+    g.gain.setValueAtTime(strong ? 0.3 : 0.12, w0); g.gain.exponentialRampToValueAtTime(0.001, w0 + 0.16);
+    o.connect(g).connect(ac.destination); o.start(w0); o.stop(w0 + 0.2);
+  }
+  /* ---------- partitura: compases enteros, un palo detrás de otro ---------- */
+  function compose() {
+    ev = []; bars = []; let at = 2.4;
+    for (let si = 0; si < PALOS.length; si++) {
+      const pa = PALOS[si], beat = 60 / pa.bpm, dur = beat * pa.b;
+      for (let b = 0; b < pa.s; b++) {
+        const t0 = at, last = si === PALOS.length - 1 && b === pa.s - 1;
+        bars.push({ t0, dur, pa, si, n: b, first: b === 0, remate: last });
+        for (let i = 1; i <= pa.b; i++) {
+          const tm = t0 + (i - 1) * beat;
+          /* el primer compás de cada palo es de escucha: suena el patrón pero no puntúa */
+          const kind = last ? 'a' : pa.f.indexOf(i) >= 0 ? 'a' : pa.p.indexOf(i) >= 0 ? 'b' : null;
+          if (!kind) continue;
+          ev.push({ t: tm, kind, bar: bars.length - 1, beat: i, free: b === 0, st: {}, id: ev.length });
+        }
+        at += dur;
+      }
+      at += 60 / pa.bpm; // respiro de un pulso entre palos
+    }
+    total = at;
+  }
+  /* ---------- jugadores ---------- */
+  function mk(pl) { return { p: pl.p, cpu: pl.cpu, name: pl.name, col: pl.color, score: 0, combo: 0, maxC: 0, perf: 0, good: 0, miss: 0, judge: '', jc: '#fff', jt: 0, fa: 0, fb: 0, plan: [], rings: [] }; }
+  function setup() { const pl = k.players(NP); if (P.length !== NP) P = pl.map(mk); else P.forEach((q, i) => { q.cpu = pl[i].cpu; q.name = pl[i].name; q.col = pl[i].color; q.plan = []; }); }
+  k.onParty = () => setup();
+  function reset() {
+    cpuLv0 = Math.min(10, lsGet('cpu:' + ID)); cpuLv = k.clamp(cpuLv0 + k.D.cpu * 2, -2, 12);
+    P = []; setup(); compose(); t = -0.2; over = false; overT = 0; sounded = 0; k.count(3);
+  }
+  const mult = (q) => Math.min(4, 1 + Math.floor(q.combo / 8));
+  const say = (q, s, col) => { q.judge = s; q.jc = col; q.jt = 0.6; };
+  function award(q, n, offv) {
+    const pf = offv < JW[0], pts = (pf ? 100 : 50) * mult(q);
+    q.combo++; q.maxC = Math.max(q.maxC, q.combo); q.score += pts; if (pf) q.perf++; else q.good++;
+    say(q, pf ? '¡OLÉ!' : 'BIEN', pf ? '#fff27a' : '#7cf7a0');
+    q.rings.push({ b: n.beat, bar: n.bar, t: 0, big: pf, col: n.kind === 'a' ? CA : CB });
+    if (q.combo % 8 === 0 && q.combo <= 24) k.float(`x${mult(q)}`, plaqueX(q.p) + 74, 300, '#fff27a');
+  }
+  const breakCombo = (q, s) => { if (q.combo >= 8 && !q.cpu) k.sfx('hurt'); q.combo = 0; say(q, s || 'FALLO', '#ff5f7a'); };
+  /* palma de un jugador: 'a' fuerte, 'b' pitos */
+  function hit(q, d) {
+    if (d === 'a') q.fa = 1; else q.fb = 1;
+    if (!q.cpu) clap(d, 0, 0.4);
+    let best = null, bd = 9;
+    for (const n of ev) { if (n.st[q.p] || n.kind !== d) continue; const o = Math.abs(n.t - t); if (o < bd) { bd = o; best = n; } }
+    if (best && bd < JW[1]) { best.st[q.p] = 'hit'; if (!best.free) award(q, best, bd); else { say(q, 'ESCUCHA', '#b8b0ff'); q.rings.push({ b: best.beat, bar: best.bar, t: 0, big: false, col: '#b8b0ff' }); } return; }
+    if (!best || bd > JW[2] + 0.1) breakCombo(q, 'A DESTIEMPO');
+  }
+  /* CPU: planifica cada acento al aparecer */
+  function cpuPlan(q, n) {
+    if (n.free) { if (Math.random() < 0.6) q.plan.push({ at: n.t + (Math.random() * 0.06 - 0.03), d: n.kind }); return; }
+    const pMiss = Math.max(0.05, 0.22 - cpuLv * 0.013), pPerf = Math.min(0.7, 0.26 + cpuLv * 0.035), r = Math.random();
+    if (r < pMiss) return;
+    const offv = (r < pMiss + pPerf ? 0.038 : 0.11) * (Math.random() * 2 - 1);
+    q.plan.push({ at: n.t + offv, d: n.kind });
+  }
+  /* ---------- toque en solitario: mitad izquierda palma, derecha pitos ---------- */
+  const taps = [];
+  addEventListener('pointerdown', (e) => { audio(); if (k.st !== 'play' || k.paused || k.party) return; const r = k.cv.getBoundingClientRect(), x = (e.clientX - r.left) / k.scale; taps.push(x < W / 2 ? 'a' : 'b'); });
+  /* ---------- bucle ---------- */
+  const barAt = (tm) => { for (let i = bars.length - 1; i >= 0; i--) if (tm >= bars[i].t0) return bars[i]; return bars[0]; };
+  let sounded = 0;
+  function guide() { /* el compás suena solo: así se aprende de oído, no solo de vista */
+    if (!ac || k.st !== 'play' || k.counting() || k.paused || over) return;
+    for (const n of ev) { if (n.t <= sounded || n.t > t + 0.15) continue; sounded = n.t; if (n.free || n.beat === 1 || n.beat === 12) tick(ac.currentTime + Math.max(0, n.t - t), n.kind === 'a'); }
+  }
+  function update(dt) {
+    for (const q of P) { q.jt -= dt; q.fa = Math.max(0, q.fa - dt * 5); q.fb = Math.max(0, q.fb - dt * 5); q.rings.forEach((r) => (r.t += dt)); q.rings = q.rings.filter((r) => r.t < 0.4); }
+    if (!k.gate(reset)) { taps.length = 0; return; }
+    if (k.counting()) { taps.length = 0; return; }
+    audio();
+    if (over) { overT += dt; if (overT > 1.4) finish(); return; }
+    t += dt;
+    for (const n of ev) if (!n.pl && n.t < t + 2.2) { n.pl = 1; for (const q of P) if (q.cpu) cpuPlan(q, n); }
+    for (const q of P) {
+      if (q.cpu) { while (q.plan.length && q.plan[0].at <= t) hit(q, q.plan.shift().d); continue; }
+      if (k.phit(q.p, 'a') || k.phit(q.p, 'left')) hit(q, 'a');
+      if (k.phit(q.p, 'b') || k.phit(q.p, 'right')) hit(q, 'b');
+      if (q.p === 0 && !k.party) for (const d of taps) hit(q, d);
+    }
+    taps.length = 0;
+    for (const n of ev) if (!n.free && t - n.t > JW[1]) for (const q of P) if (!n.st[q.p]) { n.st[q.p] = 'miss'; q.miss++; breakCombo(q); }
+    if (t >= total + 1) { over = true; overT = 0; k.sfx('win'); k.confetti(); }
+  }
+  function finish() {
+    over = false; const rows = P.map((q) => ({ p: q.p, score: q.score })), hu = P.filter((q) => !q.cpu), top = Math.max(...rows.map((r) => r.score));
+    if (hu.length === 1 && hu[0].score === top) lsSet('cpu:' + ID, Math.min(10, cpuLv0 + 0.5));
+    k.podium(rows, { fmt: (v) => v + ' pts', head: hu.length === 1 && hu[0].score === top && rows.filter((r) => r.score === top).length === 1 ? '¡Has ganado!' : undefined });
+  }
+  /* ---------- dibujo ---------- */
+  function off(w, h, draw) { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const g = cv.getContext('2d'); g.scale(2, 2); draw(g); return cv; }
+  const BG = off(W, H, (g) => {
+    const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#4a1236'); gr.addColorStop(0.55, '#26102f'); gr.addColorStop(1, '#130a1e'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    /* tablao: foco cálido y arcos de yesería, todo por código */
+    const rg = g.createRadialGradient(CX, CY - 20, 20, CX, CY, 320); rg.addColorStop(0, 'rgba(255,209,102,.18)'); rg.addColorStop(1, 'rgba(255,209,102,0)'); g.fillStyle = rg; g.fillRect(0, 0, W, H);
+    g.strokeStyle = 'rgba(255,255,255,.055)'; g.lineWidth = 3;
+    for (let i = 0; i < 7; i++) { const x = 40 + i * 94; g.beginPath(); g.moveTo(x, H); g.lineTo(x, 108); g.arc(x + 30, 108, 30, Math.PI, 0); g.lineTo(x + 60, H); g.stroke(); }
+    g.fillStyle = 'rgba(10,6,20,.45)'; g.fillRect(0, 286, W, H - 286);
+    for (let i = 0; i < 46; i++) { const r = Math.sin(i * 77.3) * 43758.5, f = r - Math.floor(r); g.fillStyle = `rgba(255,209,102,${0.06 + f * 0.16})`; g.beginPath(); g.arc((i * 137) % W, (f * 733) % 280, 1 + f * 1.6, 0, P8T); g.fill(); }
+  });
+  function label(s, x, y, size, col, align, base, lw) {
+    c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = base || 'top';
+    c.lineJoin = 'round'; c.lineWidth = lw || size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
+  }
+  const fit = (s, maxW, size) => { let z = size; c.font = `800 ${z}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; while (z > 9 && c.measureText(s).width > maxW) { z--; c.font = `800 ${z}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; } return z; };
+  /* §8: el par de manos es UNA silueta (dos manoplas que se tocan); horneado por color y apertura */
+  const handSpr = (col, open) => spr8(`pl_${col}_${open}`, 62, 46, 31, 23, (g) => {
+    const d = 3 + open * 9;
+    unite8(g, [[(q) => { mitt8(-d, 2, 0.5, 13, 1)(q); mitt8(d, 2, Math.PI - 0.5, 13, -1)(q); }, col, { dx: 2, dy: 2 }]], 1.5);
+    shine8(g, -d - 4, -4, 4.5, 2.4, -0.5, 0.34); shine8(g, d - 1, -5, 4, 2.2, -0.5, 0.26);
+  }, 3);
+  /* marca del compás: círculo grande (palma), pequeño (pito) o punto (pulso mudo) */
+  const markSpr = (kind, col) => spr8(`pm_${kind}_${col}`, 40, 40, 20, 20, (g) => {
+    const r = kind === 'a' ? 13 : kind === 'b' ? 9 : 4.5;
+    unite8(g, [[(q) => { q.moveTo(r, 0); q.arc(0, 0, r, 0, P8T); }, col, { dx: 1.8, dy: 1.6 }]], 1.45);
+    if (r > 6) shine8(g, -r * 0.32, -r * 0.4, r * 0.4, r * 0.24, -0.4, 0.45);
+  }, 3);
+  const plaqueX = (p) => 8 + p * 158;
+  /* texto en varias líneas dentro de un ancho: nada de cortes a ojo */
+  function wrap(s, x, y, maxW, size, col, align) {
+    c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
+    const words = String(s).split(' '), lines = []; let ln = '';
+    for (const w0 of words) { const tryL = ln ? ln + ' ' + w0 : w0; if (c.measureText(tryL).width > maxW && ln) { lines.push(ln); ln = w0; } else ln = tryL; }
+    if (ln) lines.push(ln);
+    for (let i = 0; i < lines.length; i++) label(lines[i], x, y + i * (size + 4), size, col, align, 'top', 3.5);
+  }
+  function draw() {
+    guide();
+    c.drawImage(BG, 0, 0, W, H);
+    const tv = k.st === 'play' ? t : 0, bar = bars.length ? barAt(Math.max(bars[0].t0, tv)) : null;
+    if (!bar) return;
+    const pa = bar.pa, beat = bar.dur / pa.b, prog = k.clamp((tv - bar.t0) / bar.dur, 0, 1);
+    const ang = (i) => -Math.PI / 2 + P8T * (i / pa.b);            // i = 0..pa.b-1 → pulso i+1
+    const mx = (i, r) => CX + Math.cos(ang(i)) * (r == null ? RAD : r), my = (i, r) => CY + Math.sin(ang(i)) * (r == null ? RAD : r);
+    /* aro del compás */
+    c.beginPath(); c.arc(CX, CY, RAD, 0, P8T); c.lineWidth = 16; c.strokeStyle = 'rgba(10,6,22,.6)'; c.stroke();
+    c.lineWidth = 3; c.strokeStyle = ART.alpha(pa.c, 0.5); c.stroke();
+    /* marcas del compás con anticipación: la que va a tocar crece */
+    for (let i = 0; i < pa.b; i++) {
+      const bn = i + 1, kind = bar.remate ? 'a' : pa.f.indexOf(bn) >= 0 ? 'a' : pa.p.indexOf(bn) >= 0 ? 'b' : 'x';
+      const tm = bar.t0 + i * beat, d = Math.abs(tv - tm), near = k.clamp(1 - d / (beat * 0.9), 0, 1);
+      const col = kind === 'a' ? (bar.remate ? CD : pa.c) : kind === 'b' ? CB : 'rgba(255,255,255,.35)';
+      const s = kind === 'x' ? 1 : 1 + near * 0.55;
+      if (kind !== 'x' && near > 0.05) { c.globalAlpha = near * 0.35; c.beginPath(); c.arc(mx(i), my(i), 20 + near * 12, 0, P8T); c.fillStyle = col; c.fill(); c.globalAlpha = 1; }
+      blit8(c, markSpr(kind, kind === 'x' ? '#ffffff' : col), mx(i), my(i), s);
+      if (kind !== 'x') label(String(bn), mx(i, RAD + 22), my(i, RAD + 22), 13, near > 0.5 ? '#fff' : '#b8a8c8', 'center', 'middle', 3.5);
+    }
+    /* aguja */
+    const a0 = -Math.PI / 2 + P8T * prog;
+    c.save(); c.translate(CX, CY); c.rotate(a0);
+    c.beginPath(); c.moveTo(0, -6); c.lineTo(RAD - 2, -2.5); c.lineTo(RAD - 2, 2.5); c.lineTo(0, 6); c.closePath();
+    c.fillStyle = '#fff4e0'; c.lineWidth = 3; c.strokeStyle = OUT; c.stroke(); c.fill(); c.restore();
+    c.beginPath(); c.arc(CX, CY, 13, 0, P8T); c.fillStyle = pa.c; c.lineWidth = 3; c.strokeStyle = OUT; c.stroke(); c.fill();
+    /* anillos de acierto sobre la marca */
+    const bi = bars.indexOf(bar);
+    for (const q of P) for (const r of q.rings) {
+      if (r.bar !== bi) continue;                                   // solo el compás que se está tocando
+      const i = r.b - 1; if (i < 0 || i >= pa.b) continue; const p = r.t / 0.4;
+      c.globalAlpha = 1 - p; c.lineWidth = r.big ? 4.5 : 3; c.strokeStyle = r.big ? '#fff27a' : r.col;
+      c.beginPath(); c.arc(mx(i), my(i), 14 + p * (r.big ? 26 : 18), 0, P8T); c.stroke(); c.globalAlpha = 1; }
+    /* palo en curso, en el centro */
+    label(pa.n, CX, CY - 40, fit(pa.n, 160, 21), '#fff', 'center', 'middle');
+    label(`compás ${bar.n + 1}/${pa.s}`, CX, CY + 36, 13, '#d8c8e8', 'center', 'middle', 3.5);
+    if (bar.first && !bar.remate) label('ESCUCHA', CX, CY + 56, 14, CD, 'center', 'middle', 4);
+    else if (bar.remate) label('¡REMATE!', CX, CY + 56, 15, CD, 'center', 'middle', 4);
+    /* placas de los jugadores */
+    for (const q of P) {
+      const x0 = plaqueX(q.p);
+      ART.rr(c, x0, 296, 148, 56, 12); ART.fillOut(c, 'rgba(26,21,48,.9)', 2.5);
+      c.fillStyle = q.col; ART.rr(c, x0 + 4, 300, 6, 48, 3); c.fill();
+      blit8(c, handSpr(q.col, Math.max(q.fa, q.fb)), x0 + 34, 322, 0.62);
+      label(q.name.slice(0, 8), x0 + 58, 300, 15, q.col);
+      label(String(q.score), x0 + 58, 320, 20, '#fff');
+      label(`x${mult(q)}`, x0 + 142, 322, 15, mult(q) > 1 ? '#fff27a' : '#8a86b5', 'right');
+      if (q.jt > 0) { c.globalAlpha = Math.min(1, q.jt / 0.25); label(q.judge, x0 + 74, 288, fit(q.judge, 140, 17), q.jc, 'center', 'bottom'); c.globalAlpha = 1; }
+    }
+    /* cabecera: progreso y ayuda del palo */
+    const pr = k.clamp(t / total, 0, 1); ART.rr(c, 10, 12, 230, 10, 5); c.fillStyle = '#26123a'; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
+    if (pr > 0) { ART.rr(c, 12, 14, 226 * pr, 6, 3); c.fillStyle = pa.c; c.fill(); }
+    /* las columnas laterales quedan libres (la rueda ocupa 198–442): ahí van el aviso del palo y los controles */
+    wrap(pa.d, 10, 34, 178, 15, '#e6d8f2', 'left');
+    label('A palma', W - 12, 34, 14, CA, 'right'); label('B pitos', W - 12, 54, 14, CB, 'right');
+  }
+  window.__pa = { get P() { return P; }, get ev() { return ev; }, get t() { return t; }, get bars() { return bars; } };
+  reset();
+  k.show(CFG.title || 'Palmas Flamencas', 'Una aguja gira por el compás. Da la palma (A) cuando cruce una marca grande y marca los pitos (B) en las pequeñas. El palo cambia cada pocos compases y con él los acentos: el primer compás de cada palo solo hay que escucharlo. En el móvil, mitad izquierda palma y derecha pitos.<br>Toca para jugar');
   k.run(update, draw);
 }
