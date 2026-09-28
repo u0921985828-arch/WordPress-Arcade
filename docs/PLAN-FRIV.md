@@ -69,4 +69,5 @@ gladiadores-de-juguete · balon-prisionero · parchis-de-la-plaza
 - **F3** Los 40, en tandas de 8: niveles a mano, progreso, final, QA responsive en los 7 tamaños.
   - Tanda 1 (1.32.1): pixel-dash, castle-knight, barrel-climb, spike-run.
   - Tanda 2 (1.35.0): pixel-invaders, starfall-defender, dungeon-micro, maze-muncher.
+  - Tanda 3 (1.36.0): tetra-drop, serpent-grid, 2048-classic, sokoban-warehouse.
 - **F4** Portada: la portada muestra solo los 40; el resto queda en «más juegos».
