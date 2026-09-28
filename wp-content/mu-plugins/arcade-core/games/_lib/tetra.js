@@ -5,7 +5,13 @@
  * (T-giro, back-to-back, combo, tablero limpio). Disposición vertical 360×640 u horizontal 640×360 según la pantalla. */
 const MODE = window.TETRA_MODE === 'marathon' ? 'marathon' : 'classic';
 const LAND = innerWidth > innerHeight;
-window.CFG = Object.assign({ id: 'tetra-' + MODE }, window.CFG || {}, LAND ? { hud: 'tr' } : {});
+/* Niveles a mano (plan Friv, tanda 3): SOLO el modo classic, que carga tetralv.js.
+ * El maratón no lo carga (HAND queda null) y todo lo nuevo queda desactivado: juega igual que siempre. */
+const HAND = (MODE === 'classic' && typeof TETRALV !== 'undefined' && TETRALV['tetra-drop']) || null;
+const HELP = 'Arrastra la pieza para moverla, tócala para girarla, desliza abajo para dejarla caer y arriba para guardarla en la reserva. '
+  + 'Cada uno de los 20 niveles tiene su objetivo: líneas, dobles, triples, tetris, T-giros o limpiar toda la basura. '
+  + 'Teclado: ← → mover · ↓ bajar · ↑ o Espacio girar · Z girar al revés · X caída · C reserva.';
+window.CFG = Object.assign({ id: 'tetra-' + MODE }, window.CFG || {}, LAND ? { hud: 'tr' } : {}, HAND ? { help: HELP } : {});
 const W = LAND ? 640 : 360, H = LAND ? 360 : 640;
 const k = Kit({ w: W, h: H, title: MODE === 'marathon' ? 'Tetra Drop Marathon' : 'Tetra Drop', bg: '#0f0d25' }), c = k.ctx;
 const OUT = '#1a1530', ACC = '#6e62f5';
@@ -18,10 +24,12 @@ const P = LAND ? {
   S: 17, BX: 235, BY: 10, STEP: 20, m1: 16, m2: 12,
   score: { x: 20, y: 10, w: 195, h: 52 }, hold: { x: 115, y: 70, w: 100, h: 86 }, stats: { x: 20, y: 70, w: 88, h: 86 },
   next: { x: 425, y: 10, w: 100, h: 172 }, chips: { x: 20, y: 168, w: 195, row: true },
+  obj: { x: 20, y: 222, w: 195, h: 56 },
 } : {
   S: 27, BX: 8, BY: 50, STEP: 26, m1: 14, m2: 11,
   score: null, hold: { x: 286, y: 230, w: 66, h: 76 }, stats: { x: 286, y: 314, w: 66, h: 118 },
   next: { x: 286, y: 50, w: 66, h: 172 }, chips: { x: 286, y: 442, w: 66, row: false },
+  obj: null,   // en vertical el objetivo va dentro del panel de estadísticas
 };
 const { S, BX, BY } = P, BW = COLS * S, BH = ROWS * S;
 const BTN = (LAND ? [[20, 284, 92, 64], [123, 284, 92, 64], [425, 284, 92, 64], [528, 284, 92, 64]]
@@ -30,7 +38,7 @@ const BTN = (LAND ? [[20, 284, 92, 64], [123, 284, 92, 64], [425, 284, 92, 64], 
 
 /* ---------- Piezas y SRS ---------- */
 const SHAPES = { I: [[0, 1], [1, 1], [2, 1], [3, 1]], J: [[0, 0], [0, 1], [1, 1], [2, 1]], L: [[2, 0], [0, 1], [1, 1], [2, 1]], O: [[1, 0], [2, 0], [1, 1], [2, 1]], S: [[1, 0], [2, 0], [0, 1], [1, 1]], T: [[1, 0], [0, 1], [1, 1], [2, 1]], Z: [[0, 0], [1, 0], [1, 1], [2, 1]] };
-const COLORS = { I: '#45d6ea', J: '#4f7cff', L: '#ff9a3c', O: '#f7d046', S: '#5fdc6e', T: '#b36cf0', Z: '#ff5a6a' };
+const COLORS = { I: '#45d6ea', J: '#4f7cff', L: '#ff9a3c', O: '#f7d046', S: '#5fdc6e', T: '#b36cf0', Z: '#ff5a6a', G: '#6f6a92' };   // G = basura (solo en los niveles a mano)
 const ROT = {};   // 4 estados por pieza; giro horario en su caja n×n: (x,y) → (n-1-y, x)
 for (const t in SHAPES) { const n = t === 'I' || t === 'O' ? 4 : 3; let s = SHAPES[t]; ROT[t] = [s]; for (let i = 1; i < 4; i++) { if (t !== 'O') s = s.map(([x, y]) => [n - 1 - y, x]); ROT[t].push(s); } }
 // Tablas de wall kicks SRS (y positiva = arriba, como en la guía)
@@ -41,14 +49,17 @@ const KI = { '0>1': [[0, 0], [-2, 0], [1, 0], [-2, -1], [1, 2]], '1>0': [[0, 0],
 let board, cur, queue, bag, hold, holdUsed, score, lines, level, combo, b2b;
 let bestV = 0, fallT, lockT, resets, lowest, lastRot, lastKick, clearing, clearT, dying, dieT, ended, won;
 let vis = { x: 0, y: 0 }, trails = [], pops = [], lockFx = null, rowFx = null, shown = 0, holdPop = 0, qAnim = 0, lvlFx = 0, G = null, dasDir = 0, dasT = 0, time = 0;
+/* Niveles a mano: LV = nivel en curso (null en maratón), contadores del objetivo y basura que sube. */
+let LV = null, nDbl = 0, nTri = 0, nTet = 0, nTsp = 0, garb0 = 0, risesLeft = 0, riseT = 0, banT = 0;
 const RAW = new Set();   // teclas extra (Z = girar al revés, C = reserva) que el kit no distingue
 addEventListener('keydown', (e) => { if (!e.repeat) RAW.add(e.code); });
 
 const fits = (t, r, x, y) => ROT[t][r].every(([cx, cy]) => { const X = x + cx, Y = y + cy; return X >= 0 && X < COLS && Y < R && (Y < 0 || !board[Y][X]); });
 const grounded = () => !fits(cur.t, cur.r, cur.x, cur.y + 1);
 /* segundos por fila: nivel 1 = 1,5 s, curva continua con las líneas (sin saltos al subir de nivel); nivel 10 ≈ 0,47 s, suelo 0,053 s */
-const grav = () => Math.max(0.053, 1.5 * Math.pow(0.88, START - 1 + lines / 10)); // 1.23: más fácil (antes 1,2 s·0,845^n, tope 0,045)
-function fromBag() { if (!bag.length) bag = k.shuffle(Object.keys(SHAPES)); return bag.pop(); }
+const grav = () => (LV ? Math.max(0.05, LV.spd / k.D.spd)                        // niveles a mano: velocidad propia del nivel
+  : Math.max(0.053, 1.5 * Math.pow(0.88, START - 1 + lines / 10))); // 1.23: más fácil (antes 1,2 s·0,845^n, tope 0,045)
+function fromBag() { if (!bag.length) bag = k.shuffle(LV && LV.bag ? LV.bag.split('') : Object.keys(SHAPES)); return bag.pop(); }
 function ghostY() { let y = cur.y; while (fits(cur.t, cur.r, cur.x, y + 1)) y++; return y; }
 
 function spawn(t) {
@@ -116,7 +127,38 @@ function lockPiece() {
   if (full.length) {
     clearing = full; clearT = CLR; cur = null;
     for (const y of full) for (let x = 0; x < COLS; x++) k.burst(BX + (x + 0.5) * S, BY + (y - HID + 0.5) * S, COLORS[board[y][x]], 3, 170);
-  } else nextPiece();
+  } else advance();
+}
+
+/* ---------- Objetivo del nivel (solo modo classic con tabla a mano) ---------- */
+const OBJN = { lines: 'Líneas', dbl: 'Dobles', tri: 'Triples', tet: 'Tetris', tsp: 'T-giros', clean: 'Basura' };
+const garbRows = () => { let n = 0; for (let y = 0; y < R; y++) if (board[y].some((v) => v === 'G')) n++; return n; };
+function objInfo() {
+  const o = LV.o, key = Object.keys(o)[0];
+  if (key === 'clean') return { key, name: OBJN.clean, cur: Math.max(0, garb0 - garbRows() - risesLeft), max: garb0 };
+  const got = { lines, dbl: nDbl, tri: nTri, tet: nTet, tsp: nTsp }[key];
+  return { key, name: OBJN[key], cur: Math.min(o[key], got), max: o[key] };
+}
+const goalDone = () => { if (!LV) return false; const i = objInfo(); return i.key === 'clean' ? (risesLeft <= 0 && garbRows() === 0) : i.cur >= i.max; };
+function levelWin() {
+  cur = null; clearing = null; dying = false; ended = true;
+  k.best('tetra-' + MODE, score);
+  k.levelDone(score, `Objetivo cumplido · Puntos: ${score} · Líneas: ${lines}`);
+}
+/* Siguiente pieza, salvo que el objetivo ya esté cumplido (en maratón goalDone() es siempre falso). */
+function advance() { if (goalDone()) return levelWin(); nextPiece(); }
+/* Nivel 20: una fila de basura sube desde el suelo cada X segundos. */
+function pushGarbage() {
+  if (board[0].some(Boolean)) return die();
+  const hole = k.ri(0, COLS - 1);
+  board.shift(); board.push(Array.from({ length: COLS }, (_, x) => (x === hole ? null : 'G')));
+  if (cur) { cur.y--; vis.y--; lowest = cur.y; if (!fits(cur.t, cur.r, cur.x, cur.y)) return die(); }
+  k.sfx('hurt'); k.shake(3); k.flash('rgba(255,90,106,.18)');
+}
+function riseTick(dt) {
+  if (!LV || !LV.rise || risesLeft <= 0) return;
+  riseT -= dt;
+  if (riseT <= 0) { risesLeft--; riseT = LV.rise.every * k.D.time; pushGarbage(); }
 }
 
 function scoreLock(full, ts, cx, cy) {
@@ -144,8 +186,11 @@ function scoreLock(full, ts, cx, cy) {
   if (n === 4) { k.sfx('win'); k.shake(7); k.flash('rgba(255,255,255,.35)'); }
   else if (n) { k.sfx('coin'); k.shake(1 + n * 1.5); if (ts) k.sfx('pop'); }
   else if (ts) k.sfx('pop');
+  if (ts) nTsp++;
   if (n) {
     lines += n;
+    if (n === 2) nDbl++; else if (n === 3) nTri++; else if (n === 4) nTet++;
+    if (LV) return;   // en los niveles a mano la velocidad la fija el nivel: no sube sola
     const nl = START + Math.floor(lines / 10);
     if (nl > level) { level = nl; lvlFx = 1; setTimeout(() => k.sfx('start'), 250); pop('NIVEL ' + level, '#a99fff', 20); }
   }
@@ -159,7 +204,7 @@ function finishClear() {
   while (board.length < R) board.unshift(Array(COLS).fill(null));
   rowFx = { shift, t: 0.14 };
   if (GOAL && lines >= GOAL) return win();
-  nextPiece();
+  advance();
 }
 function die() { dying = true; dieT = 0; cur = null; clearing = null; k.sfx('hurt'); k.shake(5); }
 function win() {
@@ -169,9 +214,17 @@ function win() {
 function pop(txt, col, size) { pops.push({ txt, col, size, t: 1.25, max: 1.25 }); if (pops.length > 4) pops.shift(); }
 
 function reset() {
+  LV = HAND ? HAND[Math.max(1, Math.min(HAND.length, k.lv)) - 1] : null;
   board = Array.from({ length: R }, () => Array(COLS).fill(null));
+  nDbl = nTri = nTet = nTsp = 0; garb0 = 0; risesLeft = 0; riseT = 0; banT = 0;
+  if (LV) {
+    if (LV.g) LV.g.forEach((row, i) => { const y = R - LV.g.length + i; for (let x = 0; x < COLS; x++) board[y][x] = row[x] === '#' ? 'G' : null; });
+    garb0 = (LV.g ? LV.g.length : 0) + (LV.rise ? LV.rise.n : 0);
+    if (LV.rise) { risesLeft = LV.rise.n; riseT = LV.rise.every * k.D.time; }
+    banT = 5.2;
+  }
   bag = []; queue = [fromBag(), fromBag(), fromBag()]; hold = null;
-  score = 0; shown = 0; lines = 0; level = START; combo = -1; b2b = false;
+  score = 0; shown = 0; lines = 0; level = LV ? Math.max(1, Math.ceil(k.lv / 2)) : START; combo = -1; b2b = false;
   clearing = null; dying = false; ended = false; won = false; trails = []; pops = []; lockFx = null; rowFx = null; G = null; dasDir = 0;
   bestV = k.best('tetra-' + MODE, 0); nextPiece(); qAnim = 0;
 }
@@ -239,6 +292,7 @@ function effects(dt) {
   if (rowFx && (rowFx.t -= dt) <= 0) rowFx = null;
   for (const b of BTN) b.pt = Math.max(0, b.pt - dt);
   holdPop = Math.max(0, holdPop - dt * 5); qAnim = Math.max(0, qAnim - dt * 7); lvlFx = Math.max(0, lvlFx - dt * 1.2);
+  if (banT > 0 && k.st === 'play') banT -= dt;
 }
 
 /* ---------- Dibujo: utilidades y cachés ---------- */
@@ -304,6 +358,7 @@ const STATIC = (() => {
   g.strokeStyle = 'rgba(255,255,255,.14)'; g.lineWidth = 1.2; rr(g, BX - F + 2.5, BY - F + 2.5, BW + 2 * F - 5, BH + 2 * F - 5, 8); g.stroke();
   panel(g, P.next, 'SIGUIENTE'); panel(g, P.hold, 'RESERVA'); panel(g, P.stats, '');
   if (P.score) panel(g, P.score, '');
+  if (HAND && P.obj) panel(g, P.obj, '');
   return cv;
 })();
 
@@ -364,6 +419,49 @@ function drawBoard() {
     rr(c, BX - 3, BY - 3, BW + 6, BH + 6, 8); c.stroke(); c.globalAlpha = 1;
   }
 }
+/* HUD de los niveles a mano: «Nivel n/20» y el objetivo con su barra, dentro de los paneles
+ * (vertical: el de estadísticas; horizontal: estadísticas + panel propio bajo los chips). */
+function drawGoal() {
+  const i = objInfo(), st = P.stats, cx = st.x + st.w / 2, pct = i.max ? Math.min(1, i.cur / i.max) : 0;
+  if (LAND) {
+    small(c, 'NIVEL', cx, st.y + 7); label(`${k.lv}/${HAND.length}`, cx, st.y + 19, 18, '#fff', 'center');
+    small(c, 'LÍNEAS', cx, st.y + 49); label(String(lines), cx, st.y + 61, 18, '#fff', 'center');
+    const o = P.obj;
+    small(c, 'OBJETIVO', o.x + 10, o.y + 7, 'left');
+    label(i.name, o.x + 10, o.y + 20, 16, '#fff', 'left');
+    label(`${i.cur}/${i.max}`, o.x + o.w - 10, o.y + 18, 20, pct >= 1 ? '#7cf7a0' : '#c9c3ff', 'right');
+    rr(c, o.x + 10, o.y + 42, o.w - 20, 8, 4); fillOut(c, '#0c0a20', 1.5);
+    if (pct > 0) { rr(c, o.x + 11, o.y + 43, (o.w - 22) * pct, 6, 3); c.fillStyle = pct >= 1 ? '#7cf7a0' : ACC; c.fill(); }
+  } else {
+    small(c, 'NIVEL', cx, st.y + 7); label(`${k.lv}/${HAND.length}`, cx, st.y + 18, 17, '#fff', 'center');
+    small(c, 'OBJETIVO', cx, st.y + 42); label(i.name, cx, st.y + 53, 12, '#fff', 'center');
+    label(`${i.cur}/${i.max}`, cx, st.y + 70, 18, pct >= 1 ? '#7cf7a0' : '#c9c3ff', 'center');
+    const bx = st.x + 8, bw = st.w - 16, by = st.y + st.h - 18;
+    rr(c, bx, by, bw, 8, 4); fillOut(c, '#0c0a20', 1.5);
+    if (pct > 0) { rr(c, bx + 1, by + 1, (bw - 2) * pct, 6, 3); c.fillStyle = pct >= 1 ? '#7cf7a0' : ACC; c.fill(); }
+  }
+}
+/* Cartel del objetivo al empezar el nivel (5 s, se desvanece). */
+function drawBanner() {
+  if (!LV || banT <= 0 || k.st !== 'play') return;
+  const a = Math.min(1, banT / 0.7), fs = LAND ? 10.5 : 12.5, lh = fs * 1.35, bw = Math.min(W - 24, LAND ? 204 : BW + 4);
+  c.font = `700 ${fs}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
+  const ls = []; let ln = '';
+  for (const w2 of String(LV.tip || '').split(' ')) {
+    const t = ln ? ln + ' ' + w2 : w2;
+    if (ln && c.measureText(t).width > bw - 24) { ls.push(ln); ln = w2; } else ln = t;
+  }
+  if (ln) ls.push(ln);
+  // siempre centrado sobre el TABLERO: así no tapa los paneles laterales ni en vertical ni en horizontal
+  const cb = BX + BW / 2;
+  const i = objInfo(), bh = 26 + ls.length * lh + 8, bx = cb - bw / 2, by = LAND ? 8 : BY + 6;
+  c.save(); c.globalAlpha = a;
+  rr(c, bx, by, bw, bh, 12); fillOut(c, 'rgba(12,10,32,.93)', 2.5);
+  label(`NIVEL ${k.lv}/${HAND.length} · ${i.name.toUpperCase()} ${i.max}`, cb, by + 8, 12, '#a99fff', 'center');
+  c.font = `700 ${fs}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = 'center'; c.textBaseline = 'top'; c.fillStyle = '#e9e4ff';
+  ls.forEach((s, j) => c.fillText(s, cb, by + 26 + j * lh));
+  c.restore();
+}
 function drawPanels() {
   const n = P.next, slots = [[n.y + 44, P.m1], [n.y + 100, P.m2], [n.y + 144, P.m2], [n.y + 184, P.m2]];
   c.save(); c.beginPath(); c.rect(n.x, n.y + 18, n.w, n.h - 20); c.clip();
@@ -383,24 +481,28 @@ function drawPanels() {
     small(c, 'PUNTOS', 10, 6, 'left'); label(String(Math.round(shown)), 10, 18, 22, '#fff');
     small(c, 'RÉCORD', W - 8, 6, 'right'); label(String(best), W - 8, 20, 15, '#c9c3ff', 'right');
   }
-  // nivel y líneas
-  const st = P.stats, cx = st.x + st.w / 2, dy = LAND ? 42 : 46, sz = LAND ? 18 : 20;
-  small(c, 'NIVEL', cx, st.y + 7); label(String(level), cx, st.y + 19, sz, lvlFx > 0 ? '#c9c3ff' : '#fff', 'center');
-  small(c, 'LÍNEAS', cx, st.y + 7 + dy - (LAND ? 2 : 0)); label(GOAL ? `${lines}/${GOAL}` : String(lines), cx, st.y + 18 + dy - (LAND ? 2 : 0), GOAL ? 14 : sz, '#fff', 'center');
-  if (!LAND) {   // barra hacia el siguiente nivel
-    const bx = st.x + 8, bw = st.w - 16, by = st.y + st.h - 18;
-    rr(c, bx, by, bw, 8, 4); fillOut(c, '#0c0a20', 1.5);
-    if (lines % 10) { rr(c, bx + 1, by + 1, (bw - 2) * (lines % 10) / 10, 6, 3); c.fillStyle = ACC; c.fill(); }
-  } else {
-    const bx = P.chips.x, bw = P.chips.w, by = 162;
-    rr(c, bx, by, bw, 6, 3); fillOut(c, '#0c0a20', 1.5);
-    if (lines % 10) { rr(c, bx + 1, by + 1, (bw - 2) * (lines % 10) / 10, 4, 2); c.fillStyle = ACC; c.fill(); }
+  if (LV) drawGoal();
+  else {
+    // nivel y líneas
+    const st = P.stats, cx = st.x + st.w / 2, dy = LAND ? 42 : 46, sz = LAND ? 18 : 20;
+    small(c, 'NIVEL', cx, st.y + 7); label(String(level), cx, st.y + 19, sz, lvlFx > 0 ? '#c9c3ff' : '#fff', 'center');
+    small(c, 'LÍNEAS', cx, st.y + 7 + dy - (LAND ? 2 : 0)); label(GOAL ? `${lines}/${GOAL}` : String(lines), cx, st.y + 18 + dy - (LAND ? 2 : 0), GOAL ? 14 : sz, '#fff', 'center');
+    if (!LAND) {   // barra hacia el siguiente nivel
+      const bx = st.x + 8, bw = st.w - 16, by = st.y + st.h - 18;
+      rr(c, bx, by, bw, 8, 4); fillOut(c, '#0c0a20', 1.5);
+      if (lines % 10) { rr(c, bx + 1, by + 1, (bw - 2) * (lines % 10) / 10, 6, 3); c.fillStyle = ACC; c.fill(); }
+    } else {
+      const bx = P.chips.x, bw = P.chips.w, by = 162;
+      rr(c, bx, by, bw, 6, 3); fillOut(c, '#0c0a20', 1.5);
+      if (lines % 10) { rr(c, bx + 1, by + 1, (bw - 2) * (lines % 10) / 10, 4, 2); c.fillStyle = ACC; c.fill(); }
+    }
   }
   // chips de combo y back-to-back
   const ch = P.chips, list = [];
+  if (LV && LV.rise && risesLeft > 0) list.push(['SUBE', Math.max(0, Math.ceil(riseT)) + ' s', '#ff5a6a']);
   if (combo > 0) list.push(['COMBO', '×' + combo, '#ffb35c']);
   if (b2b) list.push(['B2B', 'ACTIVO', '#7ff0ff']);
-  list.forEach(([a, b2, col], i) => {
+  list.slice(0, ch.row ? 2 : 3).forEach(([a, b2, col], i) => {
     const w = ch.row ? 92 : ch.w, x = ch.row ? ch.x + i * (w + 11) : ch.x, y = ch.row ? ch.y + 8 : ch.y + i * 48;
     rr(c, x, y, w, 40, 9); fillOut(c, '#1a1740', 2.5); c.fillStyle = col; c.fillRect(x + 6, y + 6, 3, 28);
     small(c, a, x + w / 2 + 3, y + 7, 'center', col); label(b2, x + w / 2 + 3, y + 19, 14, '#fff', 'center');
@@ -451,15 +553,19 @@ function drawPops() {
 /* ---------- Bucle ---------- */
 let flip = false;
 addEventListener('resize', () => { flip = (innerWidth > innerHeight) !== LAND; });   // al girar fuera de partida se recarga
+if (HAND) k.levels(HAND.length, { start: () => reset() });   // el progreso lo guarda kit.js por dificultad
 reset();
-k.show(document.title, (MODE === 'marathon' ? 'Llega a 150 líneas empezando en nivel 5. ' : 'Completa líneas para borrarlas; cada 10 líneas sube el nivel. ')
-  + 'Arrastra para mover, toca para girar, desliza abajo para dejar caer y arriba para guardar. Teclado: ← → mover · ↓ bajar · ↑/Espacio girar · Z al revés · X caída · C reserva');
+k.show(document.title, HAND
+  ? '20 niveles a mano, cada uno con su objetivo: líneas, dobles, triples, tetris, T-giros o limpiar toda la basura. Al final, la basura sube sola.'
+  : ((MODE === 'marathon' ? 'Llega a 150 líneas empezando en nivel 5. ' : 'Completa líneas para borrarlas; cada 10 líneas sube el nivel. ')
+    + 'Arrastra para mover, toca para girar, desliza abajo para dejar caer y arriba para guardar. Teclado: ← → mover · ↓ bajar · ↑/Espacio girar · Z al revés · X caída · C reserva'));
 k.run((dt) => {
   const raw = new Set(RAW); RAW.clear();
   effects(dt);
   if (!k.gate(reset)) return;
-  if (dying) { dieT += dt; if (dieT > 0.95 && !ended) { ended = true; k.lose('tetra-' + MODE, score, 'Fin de partida', `Líneas: ${lines} · Nivel ${level}`); } return; }
+  if (dying) { dieT += dt; if (dieT > 0.95 && !ended) { ended = true; const i = LV && objInfo(); k.lose('tetra-' + MODE, score, 'Fin de partida', i ? `Nivel ${k.lv} · ${i.name} ${i.cur}/${i.max}` : `Líneas: ${lines} · Nivel ${level}`); } return; }
   if (clearing) { clearT -= dt; if (clearT <= 0) finishClear(); if (k.ptr.up) G = null; return; }
+  riseTick(dt);
   if (!cur) return;
   keyboard(dt, raw);
   if (cur && !clearing && !dying) touch(dt); else if (k.ptr.up) G = null;
@@ -467,5 +573,5 @@ k.run((dt) => {
 }, () => {
   if (flip && k.st !== 'play') location.reload();
   c.drawImage(STATIC, 0, 0, W, H);
-  drawBoard(); drawPanels(); drawButtons(); drawPops();
+  drawBoard(); drawPanels(); drawButtons(); drawPops(); drawBanner();
 });
