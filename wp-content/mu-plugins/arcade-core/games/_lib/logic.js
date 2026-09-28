@@ -4,6 +4,15 @@
 const M = CFG.mode, W = 480, H = 600, OUT = ART.OUT, R2 = 6.2832;
 const BG = { sudoku: ['#2d3a5c', '#161f35'], mines: ['#2f4a3a', '#15241c'], lights: ['#2a2350', '#110d24'], pipes: ['#23374f', '#0f1b2b'], slide: ['#4a3426', '#20150e'] }[M];
 const k = Kit({ w: W, h: H, title: CFG.title, bg: BG[1] }), c = k.ctx;
+/* ---------- Plan Friv (tanda 4): mine-sweep con 20 tableros a mano ----------
+   HAND solo existe en el modo 'mines' del juego que tenga tabla en MINELV; los demás
+   modos (sudoku, luces, tuberías, 15) y cualquier otro slug no ven nada de esto. */
+const HAND = (M === 'mines' && typeof MINELV !== 'undefined' && MINELV[CFG.id]) || null;
+const LVN = HAND ? HAND.length : 0;
+const lvOf = () => HAND[k.clamp(level || 1, 1, LVN) - 1];
+const medKey = () => 'med:' + CFG.id + (k.dif === 0 ? '@f' : k.dif === 2 ? '@d' : '');
+function medRead() { try { const v = JSON.parse(localStorage.getItem(medKey()) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+function medSave(i) { const v = medRead(); v[i] = 1; try { localStorage.setItem(medKey(), JSON.stringify(v)); } catch (e) { /* sin almacenamiento */ } }
 /* ---------- R5 §8 «pieza única» + cartoon de estudio (helpers locales) ----------
    uni(): contornea TODAS las partes y luego las rellena → solo sobrevive la silueta exterior.
    celp(): 3 tonos de borde duro (cel shading) recortados a la silueta, sin degradados.
@@ -29,6 +38,7 @@ const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 const later = (fn, ms) => setTimeout(function f() { if (k.paused) setTimeout(f, 150); else fn(); }, ms); /* 1.23: la pantalla final espera si el juego está en pausa */
 let lost = false, g, N, S, OX = 24, OY = 90, sel, score, level, t, done, flagMode, first, sol, given, src;
 let shield = 0; /* buscaminas: minas que se desactivan solas (k.D.life) — en normal 0, exactamente como siempre */
+let hints = 0, usedHint = 0, hintI = -1, hintT = 0, medal = false, banner = null;
 let clk = 0, litN = 0, padHit = 0, downIn = false, skipSw = false, cur = [0, 0], kb = false, anim, fx = [], moves = 0, bgCv, boardCv, keyNum = null, pressT = 0, longDone = false, boom = null, doneT = 0, conf = new Set(), rp, glow;
 const inb = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
 const DD = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -39,7 +49,8 @@ function build() {
   done = false; t = 0; sel = null; first = true; flagMode = false; moves = 0; boom = null; doneT = 0; fx = []; longDone = false;
   shield = M === 'mines' ? (k.D.life | 0) : 0;
   if (M === 'sudoku') { N = 9; S = 48; sol = sudokuGen(); const holes = Math.min(54, 28 + (level - 1) * 2) + (k.dif === 0 ? -6 : k.dif === 2 ? 6 : 0); /* 1.23: nivel 1: 28 huecos → 54 en el nivel 14 */ g = [...sol]; k.shuffle([...Array(81).keys()]).slice(0, holes).forEach((i) => (g[i] = 0)); given = g.map((v) => v > 0); calcConf(); }
-  if (M === 'mines') { N = 9; S = 48; g = Array.from({ length: 81 }, () => ({ mine: false, open: false, flag: false, n: 0, ot: 0 })); }
+  if (M === 'mines' && HAND) buildHand();
+  else if (M === 'mines') { N = 9; S = 48; g = Array.from({ length: 81 }, () => ({ mine: false, open: false, flag: false, n: 0, ot: 0 })); }
   // luces: se parte de todo apagado y se aplican pulsaciones aleatorias → siempre resoluble
   if (M === 'lights') { N = 5; S = 80; g = Array(25).fill(false); k.shuffle([...Array(25).keys()]).slice(0, k.clamp(Math.min(13, 2 + Math.floor((level + 1) * 0.6)) + (k.dif === 0 ? -1 : k.dif === 2 ? 2 : 0), 1, 20)).forEach((i) => toggle(i % 5, Math.floor(i / 5))); /* nivel 1: 3 toques distintos */ if (g.every((v) => !v)) toggle(2, 2); glow = g.map((v) => (v ? 1 : 0)); }
   // tuberías: árbol de expansión desde la fuente y giro aleatorio de cada pieza → siempre resoluble
@@ -52,6 +63,19 @@ function build() {
     do { let pe = -1; for (let i = 0, nm = Math.round(Math.min(300, 10 + (level - 1) * 20) * (k.dif === 0 ? 0.6 : k.dif === 2 ? 1.5 : 1)); i < nm; i++) { const e = g.indexOf(0), ex = e % 4, ey = Math.floor(e / 4); const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [ex + dx, ey + dy]).filter(([x, y]) => inb(x, y) && y * 4 + x !== pe); const [x, y] = k.pick(nb); g[e] = g[y * 4 + x]; g[y * 4 + x] = 0; pe = e; } } while (g.every((v, i) => v === (i === 15 ? 0 : i + 1)));
     rp = []; g.forEach((v, i) => (rp[v] = [i % 4, Math.floor(i / 4)])); }
   OX = Math.floor((W - N * S) / 2); anim = Array(N * N).fill(0); cur = [Math.floor(N / 2), Math.floor(N / 2)]; boardCv = null;
+  if (M === 'mines' && HAND) { OY = HOY + Math.max(0, Math.floor((HBH - (N * S + 58)) / 2)); openCell(lvOf().fc[0], lvOf().fc[1], 0); }
+}
+/* Tablero escrito a mano: minas colocadas tal cual, primera casilla abierta de salida.
+   HOY/HBH: banda libre entre el cartel de la técnica y el borde inferior. */
+const HOY = 132, HBH = 460;
+function buildHand() {
+  const L = lvOf(); N = L.n; S = Math.max(22, Math.min(48, Math.floor(Math.min(432 / N, (HBH - 58) / N))));
+  g = Array.from({ length: N * N }, () => ({ mine: false, open: false, flag: false, n: 0, ot: 0 }));
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (L.b[y][x] === '*') g[y * N + x].mine = true;
+  g.forEach((q, i) => { const x = i % N, y = Math.floor(i / N); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(x + dx, y + dy) && g[(y + dy) * N + x + dx].mine) q.n++; });
+  first = false; usedHint = 0; hintI = -1; hintT = 0; medal = medRead()[level - 1] === 1;
+  hints = k.dif === 0 ? 2 : k.dif === 1 ? 1 : 0;
+  banner = { t: L.t, d: L.d, a: 0 };
 }
 function toggle(x, y) { for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) if (inb(x + dx, y + dy)) g[(y + dy) * N + x + dx] = !g[(y + dy) * N + x + dx]; }
 function lit() { const on = new Map([[src.join(), 0]]), q = [src]; while (q.length) { const [x, y] = q.shift(), cl = g[y * N + x], d0 = on.get(x + ',' + y); DD.forEach((d, i) => { const nx = x + d[0], ny = y + d[1]; if (cl.c[i] && inb(nx, ny) && g[ny * N + nx].c[(i + 2) % 4] && !on.has(nx + ',' + ny)) { on.set(nx + ',' + ny, d0 + 1); q.push([nx, ny]); } }); } return on; }
@@ -63,7 +87,7 @@ function openCell(x, y, depth) {
     done = true; lost = true; cl.boom = true; boom = { x: OX + (x + 0.5) * S, y: OY + (y + 0.5) * S, t: 0 };
     let n = 0; g.forEach((q, i) => { if (q.mine && !q.open) { q.open = true; q.ot = clk + 0.25 + (n++) * 0.06; } });
     k.sfx('explode'); k.shake(12); k.flash('rgba(255,120,60,.55)'); k.burst(boom.x, boom.y, '#ff9a3d', 30, 260); k.burst(boom.x, boom.y, '#3a3346', 16, 180);
-    later(() => k.lose(CFG.id, score, '¡Boom!', `Nivel ${level}`), 1500); return; }
+    later(() => k.lose(CFG.id, score, '¡Boom!', HAND ? `Nivel ${level}/${LVN} · Prueba otra vez` : `Nivel ${level}`), 1500); return; }
   if (!cl.n) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(x + dx, y + dy)) openCell(x + dx, y + dy, (depth || 0) + 1);
 }
 function solvedCheck() {
@@ -75,6 +99,7 @@ function solvedCheck() {
   if (M === 'slide') ok = g.every((v, i) => v === (i === 15 ? 0 : i + 1));
   if (ok && !done) { done = true; doneT = 0; const gain = Math.max(50, 1000 - Math.floor(t) * 3) * level; score += gain; k.best(CFG.id, score); k.sfx('coin'); k.float('+' + gain, W / 2, OY + N * S / 2 + 56, '#ffd23d');
     if (M === 'mines') g.forEach((q) => { if (q.mine) q.flag = true; });
+    if (HAND) return later(handDone, 1100);
     later(() => { k.st = 'over'; k.show('¡Resuelto!', `Nivel ${level} · Tiempo ${Math.floor(t)} s${moves ? ' · ' + moves + ' movimientos' : ''} · Puntos ${score}<br>Toca para el siguiente`); level++; }, 1100); }
 }
 function validSudoku() { for (let i = 0; i < 9; i++) { const r = new Set(), cc = new Set(), b = new Set(); for (let j = 0; j < 9; j++) { r.add(g[i * 9 + j]); cc.add(g[j * 9 + i]); b.add(g[(Math.floor(i / 3) * 3 + Math.floor(j / 3)) * 9 + (i % 3) * 3 + j % 3]); } if (r.size < 9 || cc.size < 9 || b.size < 9) return false; } return true; }
@@ -89,11 +114,37 @@ function setNum(n) {
   solvedCheck();
 }
 /* Dificultad: dos minas menos en fácil y dos más en difícil. */
-function nMines() { return 7 + (k.dif === 0 ? -2 : k.dif === 2 ? 2 : 0) + Math.min(10, (level || 1) - 1); } /* 1.23: 7 minas en el nivel 1 → 17 en el 11 */
-function reset() { if (level === undefined || lost) { level = 1; score = 0; lost = false; } build(); }
+function nMines() { if (HAND) return lvOf().m; return 7 + (k.dif === 0 ? -2 : k.dif === 2 ? 2 : 0) + Math.min(10, (level || 1) - 1); } /* 1.23: 7 minas en el nivel 1 → 17 en el 11 */
+function reset() { if (HAND) { level = k.lv; score = 0; lost = false; build(); return; } if (level === undefined || lost) { level = 1; score = 0; lost = false; } build(); }
 addEventListener('keydown', (e) => { if (M !== 'sudoku') return; const m = /^(Digit|Numpad)([0-9])$/.exec(e.code); if (m) keyNum = +m[2]; else if (e.code === 'Backspace' || e.code === 'Delete') keyNum = 0; });
-k.onDif = () => { if (k.st !== 'play') build(); };
-level = undefined; reset(); k.show(CFG.title, CFG.help);
+k.onDif = () => { if (k.st !== 'play') { if (HAND) level = k.lv; build(); } };
+level = undefined;
+if (HAND) { level = k.levels(LVN, { start: (i) => { level = i; score = 0; lost = false; build(); } }); }
+reset(); k.show(CFG.title, CFG.help);
+/* Nivel superado: medalla si se baja del tiempo objetivo (en fácil y normal vale también
+   terminarlo sin gastar pistas y con holgura). El nivel 20 cierra el juego. */
+function handDone() {
+  const L = lvOf(), tt = Math.floor(t), par = L.par;
+  const win = t <= par || (k.dif < 2 && usedHint === 0 && t <= par * 1.6);
+  if (win && !medal) { medal = true; medSave(level - 1); }
+  const fmt = (v) => `${Math.floor(v / 60)}:${String(Math.floor(v) % 60).padStart(2, '0')}`;
+  k.best(CFG.id, score);
+  k.levelDone(score, `Tiempo ${fmt(tt)} · Objetivo ${fmt(par)}${win ? ' · ¡Medalla!' : ''} · ${L.m} minas · ${score} puntos`);
+}
+/* Pista: abre una casilla segura pegada a lo ya descubierto (fácil 2, normal 1, difícil 0). */
+function hint() {
+  if (!HAND || hints <= 0 || done || k.st !== 'play') return;
+  const near = [], far = [];
+  for (let i = 0; i < N * N; i++) { const q = g[i]; if (q.open || q.flag || q.mine) continue;
+    const x = i % N, y = Math.floor(i / N); let adj = false;
+    for (let dy = -1; dy <= 1 && !adj; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(x + dx, y + dy) && g[(y + dy) * N + x + dx].open) { adj = true; break; }
+    (adj ? near : far).push(i); }
+  const pool = near.length ? near : far; if (!pool.length) return;
+  const i = pool[Math.floor(Math.random() * pool.length)];
+  hints--; usedHint++; hintI = i; hintT = 1.4;
+  k.sfx('pop'); k.float('¡Aquí no hay mina!', OX + (i % N + 0.5) * S, OY + Math.floor(i / N) * S - 6, '#7cf7a0');
+  openCell(i % N, Math.floor(i / N), 0); if (!done) solvedCheck();
+}
 
 /* ---------- Acciones ---------- */
 function minesTap(cx, cy, flag) {
@@ -103,7 +154,7 @@ function minesTap(cx, cy, flag) {
     let f = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(cx + dx, cy + dy) && g[(cy + dy) * N + cx + dx].flag) f++;
     if (f === cl.n) { k.sfx('click'); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(cx + dx, cy + dy) && !done) openCell(cx + dx, cy + dy, 1); } }
   else if (!cl.open && !cl.flag) {
-    if (first) { first = false; const safe = new Set(), sr = k.dif === 0 ? 2 : 1; for (let dy = -sr; dy <= sr; dy++) for (let dx = -sr; dx <= sr; dx++) if (inb(cx + dx, cy + dy)) safe.add((cy + dy) * N + cx + dx); /* fácil: 5×5 seguro → siempre se abre una zona grande */ const cand = k.shuffle([...Array(81).keys()].filter((i) => !safe.has(i))); cand.slice(0, nMines()).forEach((i) => (g[i].mine = true)); g.forEach((q, i) => { const x = i % N, y = Math.floor(i / N); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(x + dx, y + dy) && g[(y + dy) * N + x + dx].mine) q.n++; }); }
+    if (first && !HAND) { first = false; const safe = new Set(), sr = k.dif === 0 ? 2 : 1; for (let dy = -sr; dy <= sr; dy++) for (let dx = -sr; dx <= sr; dx++) if (inb(cx + dx, cy + dy)) safe.add((cy + dy) * N + cx + dx); /* fácil: 5×5 seguro → siempre se abre una zona grande */ const cand = k.shuffle([...Array(81).keys()].filter((i) => !safe.has(i))); cand.slice(0, nMines()).forEach((i) => (g[i].mine = true)); g.forEach((q, i) => { const x = i % N, y = Math.floor(i / N); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inb(x + dx, y + dy) && g[(y + dy) * N + x + dx].mine) q.n++; }); }
     k.sfx('click'); openCell(cx, cy, 0); }
   if (!done) solvedCheck();
 }
@@ -139,10 +190,13 @@ k.run((dt) => {
     if (k.ptr.hit) { pressT = 0; longDone = false; downIn = true; }
     if (k.ptr.down && on && !longDone && Math.hypot(k.ptr.x - k.ptr.sx, k.ptr.y - k.ptr.sy) < 14) { pressT += dt; if (pressT > 0.38 && !g[cy * N + cx].open) { longDone = true; minesTap(cx, cy, true); navigator.vibrate && navigator.vibrate(15); } }
     if (k.ptr.up && downIn && !longDone && on) minesTap(cx, cy, flagMode);
-    if (k.ptr.up && downIn && !longDone && k.ptr.y > OY + N * S + 10) { flagMode = !flagMode; k.sfx('pop'); }
+    if (k.ptr.up && downIn && !longDone && k.ptr.y > OY + N * S + 10 && k.ptr.y < OY + N * S + 56) {
+      if (HAND && k.ptr.x > W / 2 + 34) { if (hints > 0) hint(); else k.sfx('hurt'); }
+      else { flagMode = !flagMode; k.sfx('pop'); } }
     if (k.ptr.up) downIn = false;
     if (!k.ptr.down) pressT = 0;
     if (kb && k.hit.has('a')) minesTap(cur[0], cur[1], flagMode); if (kb && k.hit.has('b')) minesTap(cur[0], cur[1], true);
+    if (HAND) { if (hintT > 0) hintT -= dt; if (banner) banner.a = Math.min(1, banner.a + dt * 3); }
   }
   if (M === 'lights') { if (k.ptr.hit && on) lightsTap(cx, cy); if (k.hit.has('a')) lightsTap(cur[0], cur[1]); }
   if (M === 'pipes') { if (k.ptr.hit && on) pipesTap(cx, cy); if (k.hit.has('a')) pipesTap(cur[0], cur[1]); if (k.hit.has('b')) pipesTap(cur[0], cur[1], true); }
@@ -173,7 +227,27 @@ function renderBg() { return offscreen((q) => {
 }); }
 // halo de bombilla cacheado
 const haloCv = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 200; const q = cv.getContext('2d'), gr = q.createRadialGradient(100, 100, 5, 100, 100, 100); gr.addColorStop(0, 'rgba(255,230,120,.9)'); gr.addColorStop(0.4, 'rgba(255,200,60,.35)'); gr.addColorStop(1, 'rgba(255,200,60,0)'); q.fillStyle = gr; q.fillRect(0, 0, 200, 200); return cv; })();
+function wrap(s, size, maxw) {
+  c.font = `700 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
+  const words = s.split(' '), out = []; let ln = '';
+  for (const w of words) { const test = ln ? ln + ' ' + w : w; if (c.measureText(test).width > maxw && ln) { out.push(ln); ln = w; } else ln = test; }
+  if (ln) out.push(ln); return out;
+}
+/* Cartel de la técnica del nivel: título + explicación corta, siempre encima del tablero. */
+function handBanner() {
+  if (!banner) return;
+  const bw = 432, bx = (W - bw) / 2, by = 62, lines = wrap(banner.d, 12.5, bw - 24).slice(0, 3);
+  const bh = 24 + 15 * lines.length + 8;
+  c.globalAlpha = 0.35 + banner.a * 0.65;
+  ART.rr(c, bx, by, bw, bh, 12); ART.fillOut(c, 'rgba(22,38,28,.86)', 2.5);
+  c.fillStyle = 'rgba(255,255,255,.1)'; ART.rr(c, bx + 8, by + 3, bw - 16, 3, 2); c.fill();
+  label(banner.t, bx + 12, by + 6, 15, medal ? '#ffd23d' : '#8fd14f');
+  if (medal) label('★ Medalla', bx + bw - 12, by + 7, 13, '#ffd23d', 'right');
+  for (let i = 0; i < lines.length; i++) label(lines[i], bx + 12, by + 25 + i * 15, 12.5, '#dff0d6');
+  c.globalAlpha = 1;
+}
 function hud() {
+  if (HAND) return hudHand();
   label(CFG.title, 16, 13, 19, '#ffd23d'); label(`Nivel ${level || 1}`, 16, 40, 14, '#cfd6ff');
   const tt = Math.floor(t), ts = `${Math.floor(tt / 60)}:${String(tt % 60).padStart(2, '0')}`; clock(W - 86, 24); label(ts, W - 18, 12, 22, '#fff', 'right');
   let sub = `Puntos ${score}`;
@@ -182,6 +256,18 @@ function hud() {
   if (M === 'pipes') sub = `Conectadas ${litN}/${N * N}`;
   if (M === 'slide') sub = `Movimientos ${moves}`;
   label(sub, W - 18, 40, 14, '#cfd6ff', 'right');
+}
+/* HUD del modo con niveles: título + «Nivel n/20» a la izquierda, minas y reloj a la derecha.
+   Se queda dentro de los 58 px de arriba, lejos de los botones de pausa/sonido del reproductor. */
+function hudHand() {
+  label(CFG.title, 16, 10, 17, '#ffd23d');
+  label(`Nivel ${level}/${LVN}`, 16, 33, 14, '#cfd6ff');
+  const tt = Math.floor(t), ts = `${Math.floor(tt / 60)}:${String(tt % 60).padStart(2, '0')}`;
+  const par = lvOf().par, late = tt > par;
+  clock(W - 84, 21); label(ts, W - 18, 10, 20, late ? '#ffb4a0' : '#fff', 'right');
+  const left = nMines() - g.filter((q) => q.flag).length;
+  label(`Minas ${left}${shield > 0 ? ' · Escudo' : ''}`, W - 18, 33, 14, left < 0 ? '#ffb4a0' : '#cfd6ff', 'right');
+  handBanner();
 }
 function clock(x, y) { c.beginPath(); c.arc(x, y, 9, 0, R2); ART.fillOut(c, '#fff', 2); c.strokeStyle = OUT; c.lineWidth = 2; c.lineCap = 'round'; c.beginPath(); c.moveTo(x, y); c.lineTo(x, y - 5); c.moveTo(x, y); c.lineTo(x + 4, y + 1); c.stroke(); }
 function cursorBox(x, y) { if (!kb || done) return; c.strokeStyle = '#fff'; c.lineWidth = 3; c.setLineDash([8, 5]); c.lineDashOffset = -clk * 20; ART.rr(c, OX + x * S + 2, OY + y * S + 2, S - 4, S - 4, 8); c.stroke(); c.setLineDash([]); }
@@ -237,10 +323,21 @@ function drawMines() {
   if (k.ptr.down && !longDone && pressT > 0.08 && !done) { c.strokeStyle = '#fff'; c.lineWidth = 4; c.lineCap = 'round'; c.beginPath(); c.arc(k.ptr.x, k.ptr.y - 34, 14, -Math.PI / 2, -Math.PI / 2 + R2 * Math.min(1, pressT / 0.38)); c.stroke(); }
   ART.rr(c, OX, OY, N * S, N * S, 6); c.strokeStyle = OUT; c.lineWidth = 3; c.stroke(); cursorBox(cur[0], cur[1]);
   if (boom && boom.t < 0.6) { c.globalAlpha = 1 - boom.t / 0.6; c.fillStyle = '#ffd23d'; c.beginPath(); c.arc(boom.x, boom.y, 20 + boom.t * 160, 0, R2); c.fill(); c.globalAlpha = 1; }
-  const by = OY + N * S + 12, yy = key3d(W / 2 - 110, by, 220, 42, flagMode ? '#ff6b7a' : '#6e62f5', k.ptr.down && k.ptr.y > by - 4);
-  if (flagMode) flagIcon(W / 2 - 80, yy + 21, 0.85); else shovelIcon(W / 2 - 80, yy + 21);
-  label(flagMode ? 'Modo bandera' : 'Modo excavar', W / 2 + 12, yy + 11, 18, '#fff', 'center');
-  label('Mantén pulsado para poner bandera', W / 2, by + 49, 12, '#cfe6c0', 'center');
+  if (hintT > 0 && hintI >= 0) { const hx = OX + (hintI % N) * S, hy = OY + Math.floor(hintI / N) * S;
+    c.strokeStyle = '#7cf7a0'; c.lineWidth = 3.5; ART.rr(c, hx + 2, hy + 2, S - 4, S - 4, 6); c.globalAlpha = Math.min(1, hintT); c.stroke(); c.globalAlpha = 1; }
+  const by = OY + N * S + 12, down = k.ptr.down && k.ptr.y > by - 4 && k.ptr.y < by + 46;
+  if (!HAND) {
+    const yy = key3d(W / 2 - 110, by, 220, 42, flagMode ? '#ff6b7a' : '#6e62f5', down);
+    if (flagMode) flagIcon(W / 2 - 80, yy + 21, 0.85); else shovelIcon(W / 2 - 80, yy + 21);
+    label(flagMode ? 'Modo bandera' : 'Modo excavar', W / 2 + 12, yy + 11, 18, '#fff', 'center');
+    label('Mantén pulsado para poner bandera', W / 2, by + 49, 12, '#cfe6c0', 'center');
+    return;
+  }
+  const bx = 34, bw = 262, yy = key3d(bx, by, bw, 42, flagMode ? '#ff6b7a' : '#6e62f5', down && k.ptr.x <= W / 2 + 34);
+  if (flagMode) flagIcon(bx + 30, yy + 21, 0.8); else shovelIcon(bx + 30, yy + 21);
+  label(flagMode ? 'Modo bandera' : 'Modo excavar', bx + 56, yy + 12, 16, '#fff');
+  const hx = W / 2 + 46, hw = W - 34 - hx, hyy = key3d(hx, by, hw, 42, hints > 0 ? '#3f8f52' : '#4a4a5e', down && k.ptr.x > W / 2 + 34);
+  label(hints > 0 ? `Pista ${hints}` : 'Sin pistas', hx + hw / 2, hyy + 12, hints > 0 ? 16 : 14, hints > 0 ? '#fff' : '#b9bdd6', 'center');
 }
 /* Bombilla: pieza única (casquillo + globo fundidos) cacheada por brillo (R5 §8) */
 const bulbCv = {};
@@ -301,7 +398,7 @@ function drawSlide() {
   if (done) { c.globalAlpha = Math.min(0.5, doneT) * (0.6 + Math.sin(doneT * 8) * 0.4); c.fillStyle = '#fff6c8'; ART.rr(c, OX, OY, N * S, N * S, 10); c.fill(); c.globalAlpha = 1; }
 }
 const _draw = () => {
-  if (!bgCv || bgCv.n !== N * 100 + S) { bgCv = renderBg(); bgCv.n = N * 100 + S; }
+  if (!bgCv || bgCv.n !== N * 1000 + S * 10 + (OY % 10)) { bgCv = renderBg(); bgCv.n = N * 1000 + S * 10 + (OY % 10); }
   c.drawImage(bgCv, 0, 0, W, H); hud();
   if (M === 'sudoku') drawSudoku(); if (M === 'mines') drawMines(); if (M === 'lights') drawLights(); if (M === 'pipes') drawPipes(); if (M === 'slide') drawSlide();
   if (done && !lost) { const p = Math.min(1, doneT * 3), sc = 0.7 + p * 0.3 + Math.sin(p * 3.14) * 0.08; c.save(); c.globalAlpha = p; c.translate(W / 2, OY + N * S / 2); c.scale(sc, sc); ART.rr(c, -130, -34, 260, 68, 20); ART.fillOut(c, 'rgba(34,28,66,.92)', 3); label('¡Resuelto!', 0, -18, 32, '#7cf7a0', 'center'); c.restore(); }
