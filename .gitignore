@@ -3,3 +3,6 @@ shots/
 smoke_*.json
 audit_*.json
 __pycache__/
+
+# worktrees temporales de los agentes
+.claude/
