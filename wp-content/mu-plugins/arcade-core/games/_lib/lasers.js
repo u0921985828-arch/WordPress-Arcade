@@ -151,6 +151,8 @@ function draw() {
   // espejos (encima del rayo): placa con marco que gira
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const cl = grid[y][x]; if (!cl.m) continue; const [X, Y] = P([x, y]), L = S * 0.42, f = 1 + cl.p * 0.12;
     const q = mirSprite(L); c.save(); c.translate(X, Y); c.rotate(cl.a); c.drawImage(q, -(L + 8) * f, -12 * f, (L + 8) * 2 * f, 24 * f); c.restore();
+    /* Pista de «fácil»: se señalan los espejos que forman parte del camino (no su orientación). */
+    if (k.dif === 0 && cl.sol && !beam.hit) { c.strokeStyle = 'rgba(255,210,61,.55)'; c.lineWidth = 2; c.setLineDash([4, 4]); c.lineDashOffset = -t * 12; c.beginPath(); c.arc(X, Y, S * 0.46, 0, 6.283); c.stroke(); c.setLineDash([]); c.lineDashOffset = 0; }
     c.beginPath(); c.arc(X, Y, 4, 0, 6.283); ART.fillOut(c, '#ffd23d', 2); }
   if (kbd && !done) { const X = OX + cur[0] * S, Y = OY + cur[1] * S; c.strokeStyle = '#fff'; c.lineWidth = 3; c.setLineDash([5, 4]); ART.rr(c, X + 2, Y + 2, S - 4, S - 4, 8); c.stroke(); c.setLineDash([]); }
   if (hitT) { c.globalAlpha = Math.min(1, hitT * 3); label('¡Conectado!', W / 2, OY + N * S + 24, 28, '#7cf7a0', 'center', 'middle'); c.globalAlpha = 1; }

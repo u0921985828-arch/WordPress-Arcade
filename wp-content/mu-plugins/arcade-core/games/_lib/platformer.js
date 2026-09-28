@@ -3,8 +3,15 @@
  * CFG.mode 'race': carrera a 4 (1 humano + CPU o hasta 4 en la tele) por rondas con cámara que sigue al líder. */
 const A = CFG.abil || {}, RACE = CFG.mode === 'race';
 let TH = ART.THEMES[CFG.theme || 'meadow'];
-const W = 640, H = 360, T = 32, MH = 16, HS = 1.24; /* HS: escala de dibujo del héroe (la caja de colisión no cambia) */
-const k = Kit({ w: W, h: H, title: CFG.title, bg: TH.sky[0] }), c = k.ctx;
+let W = 640, H = 360;   /* caja de referencia; en modo fluido pasan a ser el lienzo visible */
+const T = 32, MH = 16, HS = 1.24; /* HS: escala de dibujo del héroe (la caja de colisión no cambia) */
+const k = Kit({ w: W, h: H, fluid: { min: 0.42, max: 2.6, maxH: 900 }, title: CFG.title, bg: TH.sky[0] }), c = k.ctx;
+/* Lienzo elástico: el juego ocupa toda la pantalla y la cámara se ajusta al vuelo. */
+k.onSize = (vw, vh) => { W = vw; H = vh; };
+/* Cámara vertical: si la pantalla es más alta que el mapa, el suelo queda abajo
+   del todo y el cielo llena el resto (nada de metros de tierra bajo los pies). */
+const camY = (y) => (H >= MH * T ? MH * T - H : k.clamp(y, Math.min(0, MH * T - H), Math.max(0, MH * T - H)));
+W = k.W; H = k.H;
 /* Física ajustada a la escala de 32 px */
 const G = 2300, JUMP = 830, CUT = 350, RUN = A.swing ? 250 : 285, FALL = 1100, COYOTE = 0.13, BUFFER = 0.15;
 let map, MW, p, enemies, coins, anchors, decos, flag, check, checks = [], inv = 0, go = 0, cx = 0, cy = 0, level, lives, score, coinsGot, t, jumpBuf, coyote, rope, dashT, dashCd, swordT, dead, intro, landSq, spawn;
@@ -54,7 +61,7 @@ function gen() {
 /* Suelo bajo el personaje: la sombra proyectada se dibuja ahí y se encoge al saltar */
 function groundY(o) { const tx = Math.floor((o.x + o.w / 2) / T); for (let ty = Math.max(0, Math.floor((o.y + o.h - 1) / T)); ty < MH; ty++) { const v = map[ty] && map[ty][tx]; if (v === 1 || v === 2 || v === 3) return ty * T; } return null; }
 function mkP(s) { return { x: s.x, y: s.y, vx: 0, vy: 0, w: 22, h: 30, face: 1, ground: false, state: 'idle', wall: 0 }; }
-function build() { check = null; checks = []; inv = 0; go = 0; gen(); p = mkP(spawn); t = 0; rope = null; dashT = 0; dashCd = 0; swordT = 0; jumpBuf = 0; coyote = 0; dead = 0; intro = 1.6; landSq = 0; cx = 0; cy = (MH * T - H); }
+function build() { check = null; checks = []; inv = 0; go = 0; gen(); p = mkP(spawn); t = 0; rope = null; dashT = 0; dashCd = 0; swordT = 0; jumpBuf = 0; coyote = 0; dead = 0; intro = 1.6; landSq = 0; cx = 0; cy = camY(MH * T - H); }
 function reset() { if (RACE) return raceNew(); level = 1; lives = 4 + k.D.life; score = 0; coinsGot = 0; build(); }
 function die() { if (dead || inv > 0) return; dead = 1.1; p.vy = -600; k.sfx('hurt'); k.shake(8); k.flash('rgba(255,60,80,.35)'); }
 function respawn() { lives--; if (lives <= 0) return k.lose(CFG.id, score, 'Sin vidas', `Nivel ${level} · ${coinsGot} moneda${coinsGot === 1 ? '' : 's'}`); const s = check && check.on ? { x: check.x, y: check.y - 40 } : spawn; p = mkP(s); rope = null; dead = 0; dashT = 0; inv = 1.6 / k.D.dmg; }
@@ -112,11 +119,13 @@ function upd(dt) {
   if (p.y > MH * T + 60) { inv = 0; return die(); }
   for (const q of checks) if (!q.on && p.x > q.x - 10) { q.on = true; check = q; k.sfx('coin'); k.float('¡Punto de control!', q.x, q.y - 70, '#7cf7a0'); }
   if (p.x > flag.x - 10) { k.sfx('win'); k.confetti(); score += 500 * level + coinsGot * 5; level++; const s = score, lv = lives, cg = coinsGot; build(); score = s; lives = lv; coinsGot = cg; return; }
-  cx += (k.clamp(p.x - W * 0.38 + p.vx * 0.25, 0, MW * T - W) - cx) * Math.min(1, dt * 6);
-  cy += (k.clamp(p.y - H * 0.55, 0, MH * T - H) - cy) * Math.min(1, dt * 5);
+  cx += (k.clamp(p.x - W * 0.38 + p.vx * 0.25, 0, Math.max(0, MW * T - W)) - cx) * Math.min(1, dt * 6);
+  cy += (camY(p.y - H * 0.55) - cy) * Math.min(1, dt * 5);
 }
 function drw() {
   ART.background(c, TH, W, H, cx, cy, t);
+  /* Modo fluido: si la pantalla es más alta que el mapa, el subsuelo continúa hasta el borde. */
+  if (cy + H > MH * T) { c.fillStyle = TH.groundD; c.fillRect(0, MH * T - cy, W, cy + H - MH * T + 2); }
   c.save(); c.translate(-Math.round(cx), -Math.round(cy));
   const x0 = Math.max(0, Math.floor(cx / T) - 1), x1 = Math.min(MW, x0 + Math.ceil(W / T) + 3);
   for (const d of decos) if (d.x > cx - 60 && d.x < cx + W + 60) ART.deco(c, TH, d.x, d.y, T);
@@ -137,8 +146,12 @@ function drw() {
   c.restore();
   ART.vignette(c, W, H);
   // HUD
-  for (let i = 0; i < 4 + k.D.life; i++) ART.heart(c, 22 + i * 24, 22, 1.25, i < lives);
-  ART.coin(c, 128, 22, 0, 8); label(`× ${coinsGot}`, 140, 13, 17, '#fff');
+  /* Pantalla estrecha (móvil en vertical): las monedas bajan a una segunda fila para no
+     meterse bajo los botones de pausa y sonido, que van centrados arriba. */
+  const nar = W < 560, hx = nar ? 20 : 22;
+  for (let i = 0; i < 4 + k.D.life; i++) ART.heart(c, hx + i * 24, 22, 1.25, i < lives);
+  const cX = nar ? hx + 8 : hx + (4 + k.D.life) * 24 + 12, cY = nar ? 50 : 22;
+  ART.coin(c, cX, cY, 0, 8); label(`× ${coinsGot}`, cX + 12, cY - 9, 17, '#fff');
   label(`${score}`, W - 12, 8, 22, '#fff', 'right'); label(`Nivel ${level}`, W - 12, 34, 13, '#ffc928', 'right');
   if (intro > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, intro); ART.rr(c, W / 2 - 110, H / 2 - 38, 220, 64, 18); c.fillStyle = 'rgba(26,21,48,.8)'; c.fill(); label(`Nivel ${level}`, W / 2, H / 2 - 30, 30, '#fff', 'center'); label(CFG.title, W / 2, H / 2 + 4, 14, '#ffc928', 'center'); c.globalAlpha = 1; }
   gfx();
@@ -192,7 +205,7 @@ let R = null, rcpu = 0; try { rcpu = Math.max(0, Math.min(5, +localStorage.getIt
 function raceNew() { const pl = k.players(4); R = { rs: pl.map((q) => ({ pl: q.p, col: q.color, name: q.cpu ? 'CPU' : q.name, cpu: q.cpu, wins: 0 })), round: 0 }; raceRound(); }
 function raceRound() {
   R.round++; level = R.round; TH = ART.THEMES[RTH[(R.round - 1) % RTH.length]]; check = null; checks = []; gen(); check = null;
-  t = 0; cx = 0; cy = MH * T - H; R.between = 0; R.win = null; R.scroll = 0; R.msg = `Ronda ${R.round}`; R.msgT = 2.4; R.cd = true; R.order = [];
+  t = 0; cx = 0; cy = camY(MH * T - H); R.between = 0; R.win = null; R.scroll = 0; R.msg = `Ronda ${R.round}`; R.msgT = 2.4; R.cd = true; R.order = [];
   const ord = R.rs.map((r, i) => i).sort((a, b) => R.rs[b].wins - R.rs[a].wins || a - b); /* quien va ganando sale detrás */
   ord.forEach((ri, slot) => { const r = R.rs[ri]; Object.assign(r, mkP({ x: (0.6 + slot * 1.3) * T, y: (MH - 3) * T - 30 }), { out: false, dead: 0, jb: 0, co: 0, dashT: 0, dashCd: 0, stun: 0, sq: 0, ai: { miss: 0, hold: 0, lag: 0 }, face: 1 }); });
 }
@@ -259,8 +272,8 @@ function raceUpdate(dt) {
   /* cámara: sigue al líder y avanza sola despacio; quien queda a la izquierda del borde, fuera */
   const lead = live.filter((r) => !r.dead).sort((a, b) => b.x - a.x)[0];
   if (lead && !R.between) {
-    R.scroll = Math.min(128, 20 + t * 2.3); const tx = k.clamp(Math.max(lead.x - W * 0.6, cx + R.scroll * dt), 0, MW * T - W);
-    cx += Math.max(0, tx - cx) * Math.min(1, dt * 5); cy += (k.clamp(lead.y - H * 0.55, 0, MH * T - H) - cy) * Math.min(1, dt * 4);
+    R.scroll = Math.min(128, 20 + t * 2.3); const tx = k.clamp(Math.max(lead.x - W * 0.6, cx + R.scroll * dt), 0, Math.max(0, MW * T - W));
+    cx += Math.max(0, tx - cx) * Math.min(1, dt * 5); cy += (camY(lead.y - H * 0.55) - cy) * Math.min(1, dt * 4);
     for (const r of live) if (!r.dead && r.x + r.w < cx - 2) raceOut(r, '¡Fuera de cámara!');
   }
   for (const e of enemies) if (e.alive) { e.x += e.vx * dt; if (e.x < e.min || e.x > e.max) { e.vx *= -1; e.x = k.clamp(e.x, e.min, e.max); } }
@@ -276,6 +289,8 @@ function raceEnd(ch) {
 }
 function raceDraw() {
   ART.background(c, TH, W, H, cx, cy, t);
+  /* Modo fluido: si la pantalla es más alta que el mapa, el subsuelo continúa hasta el borde. */
+  if (cy + H > MH * T) { c.fillStyle = TH.groundD; c.fillRect(0, MH * T - cy, W, cy + H - MH * T + 2); }
   c.save(); c.translate(-Math.round(cx), -Math.round(cy));
   const x0 = Math.max(0, Math.floor(cx / T) - 1), x1 = Math.min(MW, x0 + Math.ceil(W / T) + 3);
   for (const d of decos) if (d.x > cx - 60 && d.x < cx + W + 60) ART.deco(c, TH, d.x, d.y, T);

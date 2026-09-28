@@ -329,13 +329,46 @@ void main(){
     if (gxOn) { document.body.insertBefore(GX.el, ov); cv.style.visibility = 'hidden'; }
     const k = { w, h, ctx, cv, held: new Set(), hit: new Set(), ptr: { x: w / 2, y: h / 2, down: false, hit: false, up: false }, swipe: null, tap: false, scale: 1 };
 
+    /* ---------- Lienzo elástico (modo fluido) ----------
+       Clásico: el lienzo mide w×h y se centra con bandas negras alrededor.
+       Fluido (CFG.fluid o Kit({fluid:true})): el lienzo ocupa TODA la pantalla. El origen 0,0
+       sigue siendo la esquina superior izquierda de lo que se ve, pero ahora el lienzo mide
+       k.W × k.H (que cambian al girar o redimensionar) y la caja de referencia w×h se queda
+       centrada dentro, en k.safe. El juego dibuja con k.W/k.H y ancla su HUD con k.ex/k.ey.
+         k.W,k.H   tamaño lógico visible (= w,h fuera del modo fluido)
+         k.safe    caja de referencia centrada {x,y,w,h}: lo imprescindible cabe aquí
+         k.ox,k.oy esquina de esa caja
+       Un juego que ignore estos campos dibuja exactamente igual que antes. */
+    const fo = o.fluid || (window.CFG && window.CFG.fluid) || false;
+    const fluid = !!fo;
+    /* Margen de proporciones que el juego admite estirándose. Fuera de él se vuelve a la caja
+       centrada de siempre: más vale una banda que un juego imposible de leer. */
+    const MINAR = (fo && fo.min) || 9 / 21, MAXAR = (fo && fo.max) || 21 / 9;
+    /* Topes lógicos: si al llenar la pantalla el juego vería demasiado mundo (móvil muy
+       alargado), se acerca la cámara en vez de enseñar metros de cielo vacío. */
+    const MAXW = (fo && fo.maxW) || 0, MAXH = (fo && fo.maxH) || 0;
+    k.W = w; k.H = h; k.ox = 0; k.oy = 0;
+    k.safe = { x: 0, y: 0, w, h };
     function fit() {
-      const s = Math.min(innerWidth / w, innerHeight / h), dpr = Math.min(2, devicePixelRatio || 1); // ×3 cuesta 2,25 veces más píxeles sin diferencia visible
+      let s = Math.min(innerWidth / w, innerHeight / h);
+      const dpr = Math.min(2, devicePixelRatio || 1); // ×3 cuesta 2,25 veces más píxeles sin diferencia visible
+      let cw = w * s, ch = h * s;
+      if (fluid) {
+        const ar = innerWidth / innerHeight;
+        cw = ar > MAXAR ? innerHeight * MAXAR : innerWidth;
+        ch = ar < MINAR ? innerWidth / MINAR : innerHeight;
+        if (MAXH && ch / s > MAXH) s = ch / MAXH;
+        if (MAXW && cw / s > MAXW) s = cw / MAXW;
+      }
       k.scale = s;
-      cv.style.width = w * s + 'px'; cv.style.height = h * s + 'px';
-      cv.width = Math.round(w * s * dpr); cv.height = Math.round(h * s * dpr);
+      k.W = cw / s; k.H = ch / s;
+      k.ox = (k.W - w) / 2; k.oy = (k.H - h) / 2;
+      k.safe.x = k.ox; k.safe.y = k.oy;
+      cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+      cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
       ctx.setTransform(s * dpr, 0, 0, s * dpr, 0, 0);
-      if (gxOn) GX.resize(w * s, h * s, cv.width, cv.height, Math.max(2, cv.width >> 1), Math.max(2, cv.height >> 1));
+      if (gxOn) GX.resize(cw, ch, cv.width, cv.height, Math.max(2, cv.width >> 1), Math.max(2, cv.height >> 1));
+      if (k.onSize) try { k.onSize(k.W, k.H); } catch (e) {}
     }
     addEventListener('resize', () => { fit(); pDrawn = 0; }); fit();
 
@@ -547,7 +580,7 @@ void main(){
     /* Mando del portal: el juego describe qué controles necesita (se colocan fuera del lienzo). */
     /* Saludo al reproductor del portal: tamaño, colores y ayuda del juego. El portal coloca el menú
        (pausa, sonido, pantalla completa) y el mando fuera del lienzo y responde con 'arcade:hud'. */
-    { const C = window.CFG || {}, hi = { w, h, bg, ac: acc, hud: C.hud || '', muted, dif: k.dif, difs: DIFN, title: C.title || o.title || '', help: C.help || '' };
+    { const C = window.CFG || {}, hi = { w, h, bg, ac: acc, hud: C.hud || '', muted, dif: k.dif, difs: DIFN, title: C.title || o.title || '', help: C.help || '', fluid };
       if ('pad' in C) hi.pad = C.pad;
       if (C.mp) hi.mp = C.mp;
       tell('arcade:hello', hi); }
@@ -571,7 +604,11 @@ void main(){
     k.rect = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); };
     k.circle = (x, y, r, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill(); };
     k.rrect = (x, y, w, h, r, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); ctx.fill(); };
-    k.clear = (col) => { ctx.fillStyle = col || bg; ctx.fillRect(0, 0, w, h); };
+    k.clear = (col) => { ctx.fillStyle = col || bg; ctx.fillRect(0, 0, k.W, k.H); };
+    /* Anclaje a los bordes REALES de la pantalla (iguales a 0/w/h fuera del modo fluido):
+       k.ex(12) = 12 px desde el borde izquierdo · k.ex2(12) = 12 px desde el derecho. */
+    k.ex = (d) => (d || 0); k.ex2 = (d) => k.W - (d || 0);
+    k.ey = (d) => (d || 0); k.ey2 = (d) => k.H - (d || 0);
     /* Máquina de estados estándar: 'ready' → 'play' → 'over'. Devuelve true si el juego está activo. */
     k.st = 'ready'; window.__k = k;
     k.gate = (reset) => { if (k.st === 'play') return true; if (k.st === 'over' && performance.now() < lockT) return false; if (k.go()) { const was = k.st; if (was === 'over') reset(); k.st = 'play'; tell(was === 'over' ? 'arcade:restart' : 'arcade:start'); k.sfx('start'); k.hide(); k.hit.clear(); for (const q of PADS) if (q) q.hit.clear(); k.ptr.hit = false; k.tap = false; if (k.ptr.down) k._skipUp = true; } return false; };
@@ -594,9 +631,9 @@ void main(){
     }
     function cdDraw() {
       if (!(k.cd > 0 || goT > 0) || k.st !== 'play') return;
-      const m = Math.min(w, h), n = Math.ceil(k.cd / 0.8), p = k.cd > 0 ? 1 - (k.cd % 0.8) / 0.8 : 1 - goT / 0.7;
+      const m = Math.min(k.W, k.H), n = Math.ceil(k.cd / 0.8), p = k.cd > 0 ? 1 - (k.cd % 0.8) / 0.8 : 1 - goT / 0.7;
       const s = k.cd > 0 ? 1 + Math.max(0, 1 - p * 4) * 0.7 : 1 + p * 0.5, txt = k.cd > 0 ? String(n) : '¡Ya!';
-      ctx.save(); ctx.globalAlpha = k.cd > 0 ? Math.min(1, (1 - p) * 4 + 0.35) : 1 - p; ctx.translate(w / 2, h / 2); ctx.scale(s, s);
+      ctx.save(); ctx.globalAlpha = k.cd > 0 ? Math.min(1, (1 - p) * 4 + 0.35) : 1 - p; ctx.translate(k.W / 2, k.H / 2); ctx.scale(s, s);
       ctx.font = `900 ${Math.round(m * (k.cd > 0 ? 0.34 : 0.24))}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
       ctx.lineWidth = m * 0.03; ctx.strokeStyle = '#1a1530'; ctx.strokeText(txt, 0, 0); ctx.fillStyle = k.cd > 0 ? '#fff' : '#7cf7a0'; ctx.fillText(txt, 0, 0);
       ctx.restore();

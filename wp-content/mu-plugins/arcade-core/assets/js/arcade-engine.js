@@ -291,7 +291,7 @@ export class ArcadePlayer {
       if (e.data.type === 'arcade:restart' || e.data.type === 'arcade:adbreak') this._adBreak('next');
       else if (e.data.type === 'arcade:hello') this._hello(e.data);
       else if (e.data.type === 'arcade:dif') this._echoDif(e.data.v | 0);
-      else if (e.data.type === 'arcade:pad') { this.padSpec = e.data.pad || false; this.gameAR = e.data.w / e.data.h || 0; this._dropPad(); this._syncPad(); }
+      else if (e.data.type === 'arcade:pad') { this.padSpec = e.data.pad || false; this.gameAR = this.gameFluid ? 0 : e.data.w / e.data.h || 0; this._dropPad(); this._syncPad(); }
     }, sig);
     // Franja del mando: abajo si el reproductor es vertical, a los lados si es horizontal.
     if (window.ResizeObserver) { this._ro = new ResizeObserver(() => { this._padLayout(); this._placeUI(); }); this._ro.observe(this.root); }
@@ -312,6 +312,7 @@ export class ArcadePlayer {
     this._dropPad();
     this.padSpec = undefined;
     this.gameAR = 0;
+    this.gameFluid = false;
     if (this._isFs()) this.exitFullscreen();
     this._pseudoFs(false);
     if (this.iframe) {
@@ -366,7 +367,9 @@ export class ArcadePlayer {
     const col = (c, def) => (/^#[0-9a-f]{3,8}$/i.test(c || '') ? c : def);
     this.root.style.setProperty('--g-bg', col(d.bg, '#12151c'));
     this.root.style.setProperty('--g-ac', col(d.ac, '#6e62f5'));
-    this.gameAR = w / h;
+    /* Juego fluido: llena el marco que le demos, así que no hay proporción que reservar. */
+    this.gameFluid = !!d.fluid;
+    this.gameAR = d.fluid ? 0 : w / h;
     if ('pad' in d) this.padSpec = d.pad || false;
     this._say('arcade:hud');
     this._buildMenu();

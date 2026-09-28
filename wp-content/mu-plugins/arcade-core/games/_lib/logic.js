@@ -28,6 +28,7 @@ function contact(g, x, y, rx, ry, a) { g.fillStyle = 'rgba(14,8,30,' + (a == nul
 const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 const later = (fn, ms) => setTimeout(function f() { if (k.paused) setTimeout(f, 150); else fn(); }, ms); /* 1.23: la pantalla final espera si el juego está en pausa */
 let lost = false, g, N, S, OX = 24, OY = 90, sel, score, level, t, done, flagMode, first, sol, given, src;
+let shield = 0; /* buscaminas: minas que se desactivan solas (k.D.life) — en normal 0, exactamente como siempre */
 let clk = 0, litN = 0, padHit = 0, downIn = false, skipSw = false, cur = [0, 0], kb = false, anim, fx = [], moves = 0, bgCv, boardCv, keyNum = null, pressT = 0, longDone = false, boom = null, doneT = 0, conf = new Set(), rp, glow;
 const inb = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
 const DD = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -36,6 +37,7 @@ function sudokuGen() { const b = Array(81).fill(0); const ok = (i, v) => { const
   const fillB = (i) => { if (i === 81) return true; for (const v of k.shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9])) if (ok(i, v)) { b[i] = v; if (fillB(i + 1)) return true; b[i] = 0; } return false; }; fillB(0); return b; }
 function build() {
   done = false; t = 0; sel = null; first = true; flagMode = false; moves = 0; boom = null; doneT = 0; fx = []; longDone = false;
+  shield = M === 'mines' ? (k.D.life | 0) : 0;
   if (M === 'sudoku') { N = 9; S = 48; sol = sudokuGen(); const holes = Math.min(54, 28 + (level - 1) * 2) + (k.dif === 0 ? -6 : k.dif === 2 ? 6 : 0); /* 1.23: nivel 1: 28 huecos → 54 en el nivel 14 */ g = [...sol]; k.shuffle([...Array(81).keys()]).slice(0, holes).forEach((i) => (g[i] = 0)); given = g.map((v) => v > 0); calcConf(); }
   if (M === 'mines') { N = 9; S = 48; g = Array.from({ length: 81 }, () => ({ mine: false, open: false, flag: false, n: 0, ot: 0 })); }
   // luces: se parte de todo apagado y se aplican pulsaciones aleatorias → siempre resoluble
@@ -55,7 +57,10 @@ function toggle(x, y) { for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1],
 function lit() { const on = new Map([[src.join(), 0]]), q = [src]; while (q.length) { const [x, y] = q.shift(), cl = g[y * N + x], d0 = on.get(x + ',' + y); DD.forEach((d, i) => { const nx = x + d[0], ny = y + d[1]; if (cl.c[i] && inb(nx, ny) && g[ny * N + nx].c[(i + 2) % 4] && !on.has(nx + ',' + ny)) { on.set(nx + ',' + ny, d0 + 1); q.push([nx, ny]); } }); } return on; }
 function openCell(x, y, depth) {
   const cl = g[y * N + x]; if (cl.open || cl.flag) return; cl.open = true; cl.ot = clk + (depth || 0) * 0.025;
-  if (cl.mine) { done = true; lost = true; cl.boom = true; boom = { x: OX + (x + 0.5) * S, y: OY + (y + 0.5) * S, t: 0 };
+  if (cl.mine) {
+    /* Fácil: la primera mina se desactiva en vez de estallar (k.D.life). */
+    if (shield > 0) { shield--; cl.open = false; cl.flag = true; anim[y * N + x] = 1; k.sfx('hurt'); k.shake(7); k.flash('rgba(255,180,60,.3)'); k.float('¡Mina desactivada!', OX + (x + 0.5) * S, OY + y * S - 4, '#ffd23d'); return; }
+    done = true; lost = true; cl.boom = true; boom = { x: OX + (x + 0.5) * S, y: OY + (y + 0.5) * S, t: 0 };
     let n = 0; g.forEach((q, i) => { if (q.mine && !q.open) { q.open = true; q.ot = clk + 0.25 + (n++) * 0.06; } });
     k.sfx('explode'); k.shake(12); k.flash('rgba(255,120,60,.55)'); k.burst(boom.x, boom.y, '#ff9a3d', 30, 260); k.burst(boom.x, boom.y, '#3a3346', 16, 180);
     later(() => k.lose(CFG.id, score, '¡Boom!', `Nivel ${level}`), 1500); return; }
@@ -172,7 +177,7 @@ function hud() {
   label(CFG.title, 16, 13, 19, '#ffd23d'); label(`Nivel ${level || 1}`, 16, 40, 14, '#cfd6ff');
   const tt = Math.floor(t), ts = `${Math.floor(tt / 60)}:${String(tt % 60).padStart(2, '0')}`; clock(W - 86, 24); label(ts, W - 18, 12, 22, '#fff', 'right');
   let sub = `Puntos ${score}`;
-  if (M === 'mines') sub = `Minas ${nMines() - g.filter((q) => q.flag).length}`;
+  if (M === 'mines') sub = `Minas ${nMines() - g.filter((q) => q.flag).length}` + (shield > 0 ? ' · Escudo' : '');
   if (M === 'lights') sub = `Toques ${moves} · Luces ${g.filter(Boolean).length}`;
   if (M === 'pipes') sub = `Conectadas ${litN}/${N * N}`;
   if (M === 'slide') sub = `Movimientos ${moves}`;

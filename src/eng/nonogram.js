@@ -1,7 +1,7 @@
 /* Nonogramas. CFG.size, CFG.daily
  * Tablero de papel con bloques en relieve, herramientas Pintar / Marcar, arrastre bloqueado a fila o columna,
  * pistas que se apagan al cumplirse, resaltado de fila y columna, cronómetro y revelado en color al resolver. */
-const N = CFG.size || 10, W = 480, H = 560, OUT = ART.OUT, k = Kit({ w: W, h: H, title: CFG.title, bg: '#1b2440' }), c = k.ctx;
+const NB = CFG.size || 10, W = 480, H = 560, OUT = ART.OUT, k = Kit({ w: W, h: H, title: CFG.title, bg: '#1b2440' }), c = k.ctx;
 /* ---------- R5 §8 «pieza única» + cartoon de estudio (helpers locales) ----------
    uni(): contornea TODAS las partes y luego las rellena → solo sobrevive la silueta exterior.
    celp(): 3 tonos de borde duro (cel shading) recortados a la silueta, sin degradados.
@@ -24,11 +24,22 @@ function celm(g, parts, dx, dy) { for (let i = 0; i < parts.length; i++) celp(g,
 function spec(g, x, y, rx, ry, rot, a) { g.fillStyle = 'rgba(255,255,255,' + (a == null ? 0.7 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, rot || 0, 0, 6.2832); g.fill(); }
 function contact(g, x, y, rx, ry, a) { g.fillStyle = 'rgba(14,8,30,' + (a == null ? 0.3 : a) + ')'; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 6.2832); g.fill(); }
 const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
-const FS = N > 10 ? 11 : 15, LH = FS + (N > 10 ? 2 : 3), PT = 54, OX = N > 10 ? 116 : 112, S = Math.floor((468 - OX) / N), OY = PT + Math.ceil(N / 2) * LH + 14;
+const PT = 54;
+/* Dificultad (normal = exactamente como siempre): la rejilla encoge dos casillas en fácil y crece dos en
+   difícil, siempre que el tablero siga cabiendo en el alto de siempre; si no cabe, se queda como está. */
+let N, FS, LH, OX, S, OY, TBY, TB;
+function geo(n) { const fs = n > 10 ? 11 : 15, lh = fs + (n > 10 ? 2 : 3), ox = n > 10 ? 116 : 112, s = Math.floor((468 - ox) / n); return { n, fs, lh, ox, s, oy: PT + Math.ceil(n / 2) * lh + 14 }; }
+function layout() {
+  const base = geo(NB), lim = base.oy + base.n * base.s, d = k.dif === 0 ? -2 : k.dif === 2 ? 2 : 0; let q = base;
+  for (let i = Math.abs(d); i > 0; i--) { const t2 = geo(k.clamp(NB + Math.sign(d) * i, 5, 20)); if (t2.oy + t2.n * t2.s <= lim) { q = t2; break; } }
+  N = q.n; FS = q.fs; LH = q.lh; OX = q.ox; S = q.s; OY = q.oy;
+  TBY = OY + N * S + 12; TB = [{ t: 1, x: W / 2 - TBW - 8, n: 'Pintar' }, { t: 2, x: W / 2 + 8, n: 'Marcar' }]; bgCv = null;
+}
 let sol, grid, rows, cols, solved, paint, mistakes, puzzle, seedR, tool, from, start, axis, cur, kbd, tm, revT, rowOk, colOk, pulse;
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const clue = (line) => { const r = []; let n = 0; for (const v of line) { if (v) n++; else if (n) { r.push(n); n = 0; } } if (n) r.push(n); return r.length ? r : [0]; };
 function build() {
+  layout();
   const d = new Date(); seedR = CFG.daily ? mulberry(d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate() + puzzle * 7919) : Math.random;
   const fill = Math.max(k.dif === 0 ? 0.66 : k.dif === 2 ? 0.55 : 0.6, (k.dif === 0 ? 0.8 : k.dif === 2 ? 0.68 : 0.74) - puzzle * 0.025); /* 1.23: más lleno al principio */ /* primeros puzzles más llenos (bloques largos, más fáciles de deducir) */
   sol = Array.from({ length: N }, () => Array.from({ length: N }, () => seedR() < fill));
@@ -67,7 +78,7 @@ function makeBg() {
   return cv;
 }
 function label(s, x, y, size, col, align, base) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = base || 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
-const TBY = OY + N * S + 12, TBW = 130, TB = [{ t: 1, x: W / 2 - TBW - 8, n: 'Pintar' }, { t: 2, x: W / 2 + 8, n: 'Marcar' }];
+const TBW = 130;
 /* Casilla pintada: pieza única con 3 tonos duros, cacheada por color (R5 §8) */
 const cellCv = {};
 function cellSprite(col) {
@@ -82,7 +93,6 @@ function cellSprite(col) {
 }
 function cross(x, y, s, col, lw) { c.strokeStyle = col; c.lineWidth = lw; c.lineCap = 'round'; c.beginPath(); c.moveTo(x - s, y - s); c.lineTo(x + s, y + s); c.moveTo(x + s, y - s); c.lineTo(x - s, y + s); c.stroke(); }
 
-k.onDif = () => { if (k.st !== 'play') build(); };
 k.onDif = () => { if (k.st !== 'play') build(); };
 reset(); k.show(CFG.title, 'Rellena las casillas según las pistas: cada número es un bloque seguido de casillas pintadas. Elige Pintar o Marcar y toca o arrastra. Teclado: flechas, A pinta, B marca.');
 k.run((dt) => {
@@ -131,7 +141,7 @@ k.run((dt) => {
     if (v === 1) { const w = revT ? Math.min(1, Math.max(0, revT * 2.2 - (x + y) / N * 0.8)) : 0, col = w > 0 ? `hsl(${190 + ((x + y) / (2 * N)) * 170},75%,${40 + 18 * Math.round(w * 4) / 4}%)` : '#3a3f8f';
       c.drawImage(cellSprite(col), X, Y, S, S); }
     else if (v === 2 && !revT) cross(X + S / 2, Y + S / 2, S * 0.22, '#d04848', N > 10 ? 2.2 : 3);
-    else if (!v && !revT && (rowOk[y] || colOk[x])) cross(X + S / 2, Y + S / 2, S * 0.13, 'rgba(60,50,40,.18)', 1.5); }
+    else if (!v && !revT && k.dif !== 2 && (rowOk[y] || colOk[x])) /* difícil: sin las cruces de cortesía */ cross(X + S / 2, Y + S / 2, S * 0.13, 'rgba(60,50,40,.18)', 1.5); }
   // líneas gruesas cada 5 y marco
   c.strokeStyle = '#5a4a36'; c.lineWidth = 2; for (let i = 5; i < N; i += 5) { c.beginPath(); c.moveTo(OX + i * S, OY); c.lineTo(OX + i * S, OY + N * S); c.moveTo(OX, OY + i * S); c.lineTo(OX + N * S, OY + i * S); c.stroke(); }
   c.strokeStyle = OUT; c.lineWidth = 3; c.strokeRect(OX, OY, N * S, N * S);
