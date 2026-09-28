@@ -74,6 +74,11 @@ if (typeof Kit === 'function') (() => {
   const LVL = ['Fácil', 'Normal', 'Difícil'];
   let g, seats, series = [0, 0], first = 0, cur = 0, kbd = false, think = 0, pick = -1;
   let anim = null, msg = '', msgT = 0, tN = 0, pend = 0, endT = 0, started = false;
+  let prev = null, taught = 0, demoT = 0;
+  const GUIDE = ['Toca un hoyo tuyo y verás dónde cae cada semilla. Vuelve a tocarlo para sembrar.',
+    'La última semilla manda: si cae en tu granero, repites turno.',
+    'Si la última cae en un hoyo tuyo vacío, te llevas esa y todas las de enfrente.'];
+  try { taught = +localStorage.getItem('mnT:' + CFG.id) || 0; } catch (e) {}
   const seat = () => (seats = k.players(2));
   const nameOf = (p) => (seats[p].cpu ? 'CPU' : String(seats[p].name).slice(0, 8));
   const human = (p) => !seats[p].cpu;
@@ -159,6 +164,20 @@ if (typeof Kit === 'function') (() => {
     c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(t, x, y); c.fillStyle = col || '#fff'; c.fillText(t, x, y); }
   const say = (t, col) => { msg = t; msgT = 1.8; void col; };
 
+  /* Simulación en una copia: a dónde va cada semilla y qué pasa al final. */
+  function previewOf(i) {
+    const h = MN.clone(g), r = MN.play(h, i);
+    return { i, path: r.path, extra: r.extra, cap: r.cap, capAt: r.capAt, end: r.end };
+  }
+  /* Parte un texto en líneas que quepan en `w`. */
+  function wrap(t, w, size) {
+    c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
+    const ws = t.split(' '), out = []; let ln = '';
+    for (const q of ws) { const t2 = ln ? ln + ' ' + q : q;
+      if (c.measureText(t2).width > w && ln) { out.push(ln); ln = q; } else ln = t2; }
+    if (ln) out.push(ln); return out;
+  }
+
   /* --- partida ----------------------------------------------------------- */
   function newGame() { g = MN.nuevo(4); g.t = first; first = 1 - first; anim = null; think = 0; pick = -1; pend = 0; endT = 0; cur = g.t ? 7 : 0; }
   function resetG() { series = [0, 0]; seat(); first = 0; newGame(); k.count(3); }
@@ -174,6 +193,8 @@ if (typeof Kit === 'function') (() => {
     anim = { path: r.path.slice(), k: 0, t: 0, from, r, shown: sh };
     if (r.cap) anim.hold = { at: r.capAt, opp: 12 - r.capAt, n: r.cap };
     void n;
+    prev = null;
+    if (human(from) && k.st === 'play') { taught++; try { localStorage.setItem('mnT:' + CFG.id, taught); } catch (e) {} }
     k.sfx('pop');
     return true; }
   function stepAnim(dt) {
@@ -202,12 +223,22 @@ if (typeof Kit === 'function') (() => {
   const help = CFG.help || 'Coge las semillas de uno de tus hoyos y siémbralas una a una hacia tu granero. Si la última cae en tu granero repites; si cae en un hoyo tuyo vacío, te llevas las de enfrente.';
   resetG();
   addEventListener('resize', () => { clearTimeout(window.__ot); window.__ot = setTimeout(() => { if ((innerHeight > innerWidth) !== PORT && k.st !== 'play') location.reload(); }, 400); });
-  k.show(CFG.title, help);
+  /* el menú lleva un texto corto para que se vea el tablero jugando solo detrás */
+  k.show(CFG.title, 'Siembra tus semillas hacia tu granero y quédate con las del rival.<br>El tablero de detrás está jugando solo.');
+  void help;
   const again = () => { seat(); newGame(); k.count(2); };
+
+  /* El tablero juega solo detrás del menú para que se vea de qué va. */
+  function demo(dt) {
+    if (anim) { const wasOver = g.over; stepAnim(dt); if (wasOver) { pend = 0; } return; }
+    if (g.over) { g = MN.nuevo(4); g.t = 0; pend = 0; prev = null; demoT = 0; return; }
+    demoT += dt; if (demoT < 0.85) return; demoT = 0;
+    const m = MN.ai(g, 1); if (m >= 0) sow(m); else g = MN.nuevo(4);
+  }
 
   k.run((dt) => {
     tN += dt; if (msgT > 0) msgT -= dt;
-    if (!k.gate(started ? again : resetG)) return; started = true;
+    if (!k.gate(started ? again : resetG)) { demo(dt); return; } started = true;
     if (k.counting()) return;
     if (anim) return stepAnim(dt);
     if (pend) { endT += dt; if (endT === dt && g.over !== 3) { k.sfx('win'); k.confetti(k.pcol(g.over - 1)); } if (endT > 1.2) { finish(); pend = 0; } return; }
@@ -215,22 +246,26 @@ if (typeof Kit === 'function') (() => {
     const p = g.t;
     if (!human(p)) { think += dt; if (pick < 0 && think > 0.35) pick = MN.ai(g, k.clamp(lvl + k.D.cpu, 0, 2)); if (pick >= 0 && think > 0.75) { sow(pick); pick = -1; } return; }
     const ms = MN.moves(g), base = p ? 7 : 0;
-    const step = (d) => { for (let n = 1; n <= 6; n++) { const i = base + ((cur - base + d * n) % 6 + 6) % 6; if (g.p[i] > 0) { cur = i; kbd = true; k.sfx('click'); return; } } };
+    const step = (d) => { for (let n = 1; n <= 6; n++) { const i = base + ((cur - base + d * n) % 6 + 6) % 6; if (g.p[i] > 0) { cur = i; kbd = true; prev = previewOf(i); k.sfx('click'); return; } } };
     if (k.phit(p, PORT ? 'up' : 'left')) step(p ? 1 : -1);
     if (k.phit(p, PORT ? 'down' : 'right')) step(p ? -1 : 1);
     if (k.phit(p, 'a')) { if (!sow(cur)) { k.sfx('hit'); say('Ese hoyo está vacío'); } }
+    if (!prev && kbd && ms.indexOf(cur) >= 0) prev = previewOf(cur);
     if (!k.party && k.ptr.hit && p === 0) { kbd = false;
       for (const i of [0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12]) { const P = POS[i];
         if (Math.hypot((k.ptr.x - P.x) / (P.rx + 8), (k.ptr.y - P.y) / (P.ry + 8)) > 1) continue;
         if (ms.indexOf(i) < 0) { k.sfx('hit'); k.float(g.p[i] ? 'No es tuyo' : 'Vacío', P.x, P.y - 26, '#ff9aa8'); return; }
+        /* las tres primeras veces: primer toque enseña el recorrido, el segundo siembra */
+        if (taught < 3 && (!prev || prev.i !== i)) { prev = previewOf(i); cur = i; k.sfx('click'); return; }
         sow(i); return; } }
   }, () => {
     c.drawImage(BG, 0, 0, W, H);
     const view = anim ? anim.shown : g.p;
     const turnCol = k.pcol(g.t);
     /* hoyos jugables resaltados */
-    if (!g.over && !anim && !k.counting()) for (const i of MN.moves(g)) { const P = POS[i];
+    if (!g.over && !anim && !k.counting() && !showPrev()) for (const i of MN.moves(g)) { const P = POS[i];
       oval(c, P, 7); c.lineWidth = 3.4; c.strokeStyle = ART.alpha(turnCol, 0.5 + 0.3 * Math.sin(tN * 5)); c.stroke(); }
+    if (showPrev()) { const P = POS[prev.i]; oval(c, P, 7); c.lineWidth = 3.4; c.strokeStyle = turnCol; c.stroke(); }
     /* aro del color de cada jugador en su granero */
     for (const p of [0, 1]) { oval(c, POS[MN.ST[p]], 6); c.lineWidth = 3; c.strokeStyle = ART.alpha(k.pcol(p), 0.55); c.stroke(); }
     for (let i = 0; i < 14; i++) { const P = POS[i]; drawSeeds(i, view[i]);
@@ -247,7 +282,44 @@ if (typeof Kit === 'function') (() => {
       const sd = view[MN.ST[p]];
       label(`${sd} ${sd === 1 ? 'semilla' : 'semillas'} · ${series[p]}`, x, y + 20, 14, act ? '#fff' : 'rgba(255,255,255,.5)', al); }
     const st = g.over ? '' : anim ? '' : human(g.t) ? 'Toca uno de tus hoyos' : 'La CPU piensa' + '.'.repeat(1 + Math.floor(tN * 3) % 3);
-    label(msgT > 0 ? msg : st, W / 2, H - 34, 17, msgT > 0 ? '#ffe27a' : turnCol, 'center');
+    /* líneas de abajo: recorrido previsto, lección y estado */
+    const lines = [];
+    if (showPrev()) { drawPrev();
+      for (const t of wrap(prevText(), W - 24, 15)) lines.push({ t, s: 15, c: '#ffe27a' }); }
+    if (taught < 3 && k.st === 'play' && !g.over && !anim && human(g.t)) {
+      for (const t of wrap(GUIDE[taught], W - 24, 13)) lines.push({ t, s: 13, c: '#cfe6ff' });
+    } else lines.push({ t: msgT > 0 ? msg : st, s: 17, c: msgT > 0 ? '#ffe27a' : turnCol });
+    let hh = 0; for (const l of lines) hh += l.s + 5;
+    let yy = H - 8 - hh;
+    for (const l of lines) { label(l.t, W / 2, yy, l.s, l.c, 'center'); yy += l.s + 5; }
   });
-  window.__mn = { MN, get g() { return g; }, sow };
+  function showPrev() { return !!(prev && !anim && !g.over && k.st === 'play' && human(g.t) && MN.moves(g).indexOf(prev.i) >= 0); }
+  function prevText() {
+    if (prev.extra) return 'La última cae en tu granero: repites turno';
+    if (prev.cap) return `La última cae en un hoyo tuyo vacío: te llevas ${prev.cap} semillas`;
+    return `${prev.path.length} semilla${prev.path.length === 1 ? '' : 's'}, una en cada hoyo; la última acaba ahí`;
+  }
+  /* recorrido previsto: línea de puntos por los hoyos y el destino marcado */
+  function drawPrev() {
+    const pts = [POS[prev.i]].concat(prev.path.map((i) => POS[i]));
+    c.save();
+    c.setLineDash([5, 7]); c.lineDashOffset = -tN * 26; c.lineWidth = 3; c.lineJoin = 'round';
+    c.strokeStyle = 'rgba(255,226,122,.85)';
+    c.beginPath(); c.moveTo(pts[0].x, pts[0].y);
+    for (let n = 1; n < pts.length; n++) c.lineTo(pts[n].x, pts[n].y);
+    c.stroke(); c.setLineDash([]);
+    /* número de orden de cada semilla */
+    if (prev.path.length <= 14) prev.path.forEach((i, n) => { const P = POS[i];
+      /* la insignia va por fuera del hoyo, al lado contrario del centro del tablero */
+      const bx = PORT ? P.x + (P.x > W / 2 ? 1 : -1) * (P.rx + 11) : P.x;
+      const by = PORT ? P.y : P.y + (P.y > H / 2 ? 1 : -1) * (P.ry + 11);
+      c.beginPath(); c.arc(bx, by, 11, 0, R2); c.fillStyle = '#241c3c'; c.fill();
+      c.lineWidth = 2.4; c.strokeStyle = '#ffe27a'; c.stroke();
+      label(String(n + 1), bx, by, 13, '#ffe27a', 'center', 'middle'); });
+    const E = POS[prev.end];
+    oval(c, E, 12); c.lineWidth = 4; c.strokeStyle = prev.extra ? '#a8cf3f' : prev.cap ? '#ff9a6f' : '#ffe27a'; c.stroke();
+    if (prev.cap) { const O = POS[12 - prev.capAt]; oval(c, O, 10); c.lineWidth = 3.5; c.strokeStyle = '#ff9a6f'; c.stroke(); }
+    c.restore();
+  }
+  window.__mn = { MN, POS, get g() { return g; }, get prev() { return prev; }, sow };
 })();
