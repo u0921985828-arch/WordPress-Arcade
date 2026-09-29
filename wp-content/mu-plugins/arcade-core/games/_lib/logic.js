@@ -10,6 +10,13 @@ const k = Kit({ w: W, h: H, title: CFG.title, bg: BG[1] }), c = k.ctx;
 const HAND = (M === 'mines' && typeof MINELV !== 'undefined' && MINELV[CFG.id]) || null;
 const LVN = HAND ? HAND.length : 0;
 const lvOf = () => HAND[k.clamp(level || 1, 1, LVN) - 1];
+/* ---------- Plan Friv: sudoku-zen con 20 puzles escritos a mano (tabla SUDLV) ----------
+   SH solo existe en el modo 'sudoku' del slug que tenga tabla; el resto de modos y de
+   slugs del motor no ven nada de esto (el sudoku al azar de siempre sigue intacto). */
+const SH = (M === 'sudoku' && typeof SUDLV !== 'undefined' && SUDLV[CFG.id]) || null;
+const SLVN = SH ? SH.length : 0;
+const sOf = () => SH[k.clamp(level || 1, 1, SLVN) - 1];
+const SDIFT = [1.5, 1, 0.8]; /* el tiempo objetivo se estira en fácil y se aprieta en difícil */
 const medKey = () => 'med:' + CFG.id + (k.dif === 0 ? '@f' : k.dif === 2 ? '@d' : '');
 function medRead() { try { const v = JSON.parse(localStorage.getItem(medKey()) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
 function medSave(i) { const v = medRead(); v[i] = 1; try { localStorage.setItem(medKey(), JSON.stringify(v)); } catch (e) { /* sin almacenamiento */ } }
@@ -39,6 +46,8 @@ const later = (fn, ms) => setTimeout(function f() { if (k.paused) setTimeout(f, 
 let lost = false, g, N, S, OX = 24, OY = 90, sel, score, level, t, done, flagMode, first, sol, given, src;
 let shield = 0; /* buscaminas: minas que se desactivan solas (k.D.life) — en normal 0, exactamente como siempre */
 let hints = 0, usedHint = 0, hintI = -1, hintT = 0, medal = false, banner = null;
+/* Sudoku: tamaño y cajas (9/3/3 en el modo de siempre, 4/2/2 y 6/3/2 en los niveles a mano). */
+let SN = 9, BW = 3, BH = 3, notes = null, noteMode = false, undoS = [], mistakes = 0, checkT = 0, chain = 0, chainT = 0, KY = 0, TY = 0, KW = 43.2;
 let clk = 0, litN = 0, padHit = 0, downIn = false, skipSw = false, cur = [0, 0], kb = false, anim, fx = [], moves = 0, bgCv, boardCv, keyNum = null, pressT = 0, longDone = false, boom = null, doneT = 0, conf = new Set(), rp, glow;
 const inb = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
 const DD = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -48,7 +57,8 @@ function sudokuGen() { const b = Array(81).fill(0); const ok = (i, v) => { const
 function build() {
   done = false; t = 0; sel = null; first = true; flagMode = false; moves = 0; boom = null; doneT = 0; fx = []; longDone = false;
   shield = M === 'mines' ? (k.D.life | 0) : 0;
-  if (M === 'sudoku') { N = 9; S = 48; sol = sudokuGen(); const holes = Math.min(54, 28 + (level - 1) * 2) + (k.dif === 0 ? -6 : k.dif === 2 ? 6 : 0); /* 1.23: nivel 1: 28 huecos → 54 en el nivel 14 */ g = [...sol]; k.shuffle([...Array(81).keys()]).slice(0, holes).forEach((i) => (g[i] = 0)); given = g.map((v) => v > 0); calcConf(); }
+  if (M === 'sudoku' && SH) buildSud();
+  else if (M === 'sudoku') { SN = 9; BW = 3; BH = 3; N = 9; S = 48; OY = 90; sol = sudokuGen(); const holes = Math.min(54, 28 + (level - 1) * 2) + (k.dif === 0 ? -6 : k.dif === 2 ? 6 : 0); /* 1.23: nivel 1: 28 huecos → 54 en el nivel 14 */ g = [...sol]; k.shuffle([...Array(81).keys()]).slice(0, holes).forEach((i) => (g[i] = 0)); given = g.map((v) => v > 0); calcConf(); }
   if (M === 'mines' && HAND) buildHand();
   else if (M === 'mines') { N = 9; S = 48; g = Array.from({ length: 81 }, () => ({ mine: false, open: false, flag: false, n: 0, ot: 0 })); }
   // luces: se parte de todo apagado y se aplican pulsaciones aleatorias → siempre resoluble
@@ -77,6 +87,80 @@ function buildHand() {
   hints = k.dif === 0 ? 2 : k.dif === 1 ? 1 : 0;
   banner = { t: L.t, d: L.d, a: 0 };
 }
+/* ---------- Sudoku Zen: puzle escrito a mano ---------- */
+const SBT = 148, SBH = 328; /* banda libre del tablero: cabe entre el cartel de la técnica y la barra de progreso, que va justo encima del teclado */
+function buildSud() {
+  const L = sOf(); SN = L.n; BW = SN === 4 ? 2 : 3; BH = SN === 9 ? 3 : 2; N = SN;
+  S = Math.floor(Math.min(456 / SN, SBH / SN));
+  OY = SBT + Math.floor((SBH - SN * S) / 2);
+  KY = 496; TY = 552; KW = 456 / (SN + 1);
+  g = L.g.split('').map((ch) => (ch === '.' ? 0 : +ch));
+  sol = solveSud(g.slice());
+  given = g.map((v) => v > 0);
+  notes = new Array(SN * SN).fill(0);
+  if (k.dif === 0) autoNotes();
+  noteMode = false; undoS = []; mistakes = 0; checkT = 0; chain = 0; chainT = 0;
+  usedHint = 0; hintI = -1; hintT = 0;
+  hints = k.dif === 0 ? 3 : k.dif === 1 ? 2 : 1;
+  medal = medRead()[level - 1] === 1;
+  banner = { t: L.t + ' · ' + L.q, d: L.d, a: 0 };
+  calcConf();
+}
+/* Resolutor de respaldo (retroceso): da la solución del puzle, que es única por construcción. */
+function solveSud(b) {
+  const okv = (i, v) => !unitsOf(i).some((u) => u.some((j) => j !== i && b[j] === v));
+  const rec = () => { let bi = -1, bc = SN + 1, bl = null;
+    for (let i = 0; i < SN * SN; i++) { if (b[i]) continue; const c2 = []; for (let v = 1; v <= SN; v++) if (okv(i, v)) c2.push(v); if (c2.length < bc) { bc = c2.length; bi = i; bl = c2; if (!bc) return false; } }
+    if (bi < 0) return true;
+    for (const v of bl) { b[bi] = v; if (rec()) return true; b[bi] = 0; } return false; };
+  rec(); return b;
+}
+/* Candidatos automáticos (solo en fácil): se rellenan las marcas de todas las casillas vacías. */
+function autoNotes() {
+  for (let i = 0; i < SN * SN; i++) { if (g[i]) { notes[i] = 0; continue; } let m = 0;
+    for (let v = 1; v <= SN; v++) if (!unitsOf(i).some((u) => u.some((j) => g[j] === v))) m |= 1 << v;
+    notes[i] = m; }
+}
+function sudUndo() {
+  if (!SH || !undoS.length || done) return;
+  const u = undoS.pop(); g[u.i] = u.v; notes[u.i] = u.nt; anim[u.i] = 1; sel = u.i; calcConf(); k.sfx('pop');
+}
+/* Comprobación opcional: marca en rojo 1,6 s los números que no encajan con la solución. */
+function sudCheck() {
+  if (!SH || done) return;
+  const bad = []; for (let i = 0; i < SN * SN; i++) if (g[i] && !given[i] && g[i] !== sol[i]) bad.push(i);
+  usedHint++; checkT = 1.6;
+  if (!bad.length) { k.sfx('coin'); k.float('Todo correcto', W / 2, OY - 10, '#7cf7a0'); }
+  else { k.sfx('hurt'); fx.push({ cells: bad, t: 1.6, col: 'rgba(255,80,90,' }); k.float(bad.length + (bad.length === 1 ? ' fallo' : ' fallos'), W / 2, OY - 10, '#ff8a8a'); }
+}
+/* Pista: rellena una casilla vacía (la que menos candidatos tenga) con su número correcto. */
+function sudHint() {
+  if (!SH || hints <= 0 || done || k.st !== 'play') return;
+  let bi = -1, bc = SN + 1;
+  for (let i = 0; i < SN * SN; i++) { if (g[i] === sol[i]) continue; let n2 = 0; for (let v = 1; v <= SN; v++) if (!unitsOf(i).some((u) => u.some((j) => j !== i && g[j] === v))) n2++; if (n2 < bc) { bc = n2; bi = i; } }
+  if (bi < 0) return;
+  hints--; usedHint++; hintI = bi; hintT = 1.6;
+  const prev = sel; sel = bi; const nm = noteMode; noteMode = false;
+  g[bi] = 0; setNum(sol[bi]); noteMode = nm; if (prev !== null && !done) sel = bi;
+  k.float('Pista', OX + (bi % SN + 0.5) * S, OY + Math.floor(bi / SN) * S - 4, '#ffd23d');
+}
+/* Nivel superado: 2★ por tiempo, 3★ por tiempo + sin pistas/comprobaciones + sin errores. */
+function sudDone() {
+  const L = sOf(), tt = Math.floor(t), p2 = Math.round(L.p2 * SDIFT[k.dif]), p3 = Math.round(L.p3 * SDIFT[k.dif]);
+  const stars = tt <= p3 && !usedHint && !mistakes ? 3 : tt <= p2 ? 2 : 1;
+  if (stars >= 2 && !medal) { medal = true; medSave(level - 1); }
+  const fmt = (v) => `${Math.floor(v / 60)}:${String(Math.floor(v) % 60).padStart(2, '0')}`;
+  k.best(CFG.id, score);
+  /* La tarjeta dice qué falta exactamente para la siguiente estrella. */
+  let falta = '';
+  if (stars === 1) falta = `Para 2★: termínalo en ${fmt(p2)} o menos.`;
+  else if (stars === 2) { const f = [];
+    if (tt > p3) f.push(`en ${fmt(p3)} o menos`);
+    if (usedHint) f.push('sin pistas ni comprobaciones');
+    if (mistakes) f.push('sin ningún fallo');
+    falta = 'Para 3★: ' + f.join(', ') + '.'; }
+  k.levelDone(score, `${L.t} · Tiempo ${fmt(tt)} (2★ ${fmt(p2)} · 3★ ${fmt(p3)}) · Fallos ${mistakes} · Ayudas ${usedHint}${falta ? '<br><b>' + falta + '</b>' : ''}`, { stars });
+}
 function toggle(x, y) { for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) if (inb(x + dx, y + dy)) g[(y + dy) * N + x + dx] = !g[(y + dy) * N + x + dx]; }
 function lit() { const on = new Map([[src.join(), 0]]), q = [src]; while (q.length) { const [x, y] = q.shift(), cl = g[y * N + x], d0 = on.get(x + ',' + y); DD.forEach((d, i) => { const nx = x + d[0], ny = y + d[1]; if (cl.c[i] && inb(nx, ny) && g[ny * N + nx].c[(i + 2) % 4] && !on.has(nx + ',' + ny)) { on.set(nx + ',' + ny, d0 + 1); q.push([nx, ny]); } }); } return on; }
 function openCell(x, y, depth) {
@@ -99,27 +183,51 @@ function solvedCheck() {
   if (M === 'slide') ok = g.every((v, i) => v === (i === 15 ? 0 : i + 1));
   if (ok && !done) { done = true; doneT = 0; const gain = Math.max(50, 1000 - Math.floor(t) * 3) * level; score += gain; k.best(CFG.id, score); k.sfx('coin'); k.float('+' + gain, W / 2, OY + N * S / 2 + 56, '#ffd23d');
     if (M === 'mines') g.forEach((q) => { if (q.mine) q.flag = true; });
+    if (SH) { k.confetti(); k.punch && k.punch(9); return later(sudDone, 1100); }
     if (HAND) return later(handDone, 1100);
     later(() => { k.st = 'over'; k.show('¡Resuelto!', `Nivel ${level} · Tiempo ${Math.floor(t)} s${moves ? ' · ' + moves + ' movimientos' : ''} · Puntos ${score}<br>Toca para el siguiente`); level++; }, 1100); }
 }
-function validSudoku() { for (let i = 0; i < 9; i++) { const r = new Set(), cc = new Set(), b = new Set(); for (let j = 0; j < 9; j++) { r.add(g[i * 9 + j]); cc.add(g[j * 9 + i]); b.add(g[(Math.floor(i / 3) * 3 + Math.floor(j / 3)) * 9 + (i % 3) * 3 + j % 3]); } if (r.size < 9 || cc.size < 9 || b.size < 9) return false; } return true; }
-const unitsOf = (i) => { const r = Math.floor(i / 9), cc = i % 9, br = r - r % 3, bc = cc - cc % 3; return [[...Array(9).keys()].map((j) => r * 9 + j), [...Array(9).keys()].map((j) => j * 9 + cc), [...Array(9).keys()].map((j) => (br + Math.floor(j / 3)) * 9 + bc + j % 3)]; };
+function validSudoku() { for (let i = 0; i < SN; i++) { const r = new Set(), cc = new Set(), b = new Set(); for (let j = 0; j < SN; j++) { r.add(g[i * SN + j]); cc.add(g[j * SN + i]); const br = Math.floor(i / (SN / BW)) * BH, bc = (i % (SN / BW)) * BW; b.add(g[(br + Math.floor(j / BW)) * SN + bc + j % BW]); } if (r.size < SN || cc.size < SN || b.size < SN) return false; } return true; }
+const unitsOf = (i) => { const r = Math.floor(i / SN), cc = i % SN, br = r - r % BH, bc = cc - cc % BW; return [[...Array(SN).keys()].map((j) => r * SN + j), [...Array(SN).keys()].map((j) => j * SN + cc), [...Array(SN).keys()].map((j) => (br + Math.floor(j / BW)) * SN + bc + j % BW)]; };
 /* Dificultad: en difícil no se marcan en rojo los números en conflicto (solo aviso visual; la lógica no cambia). */
 const SHOWC = () => k.dif !== 2;
-function calcConf() { conf = new Set(); for (let i = 0; i < 81; i++) if (g[i]) for (const u of unitsOf(i)) for (const j of u) if (j !== i && g[j] === g[i]) conf.add(i); }
+function calcConf() { conf = new Set(); for (let i = 0; i < SN * SN; i++) if (g[i]) for (const u of unitsOf(i)) for (const j of u) if (j !== i && g[j] === g[i]) conf.add(i); }
 function setNum(n) {
-  if (sel === null || given[sel] || done) return; if (g[sel] === n) return; g[sel] = n; anim[sel] = 1; k.sfx(n ? 'click' : 'pop'); calcConf();
+  if (sel === null || given[sel] || done) return;
+  if (SH && n > SN) return;
+  if (SH && noteMode && n) { /* marca de candidato: no ocupa la casilla */
+    if (g[sel]) return; undoS.push({ i: sel, v: g[sel], nt: notes[sel] }); notes[sel] = notes[sel] ^ (1 << n); k.sfx('click'); if (undoS.length > 200) undoS.shift(); return; }
+  if (g[sel] === n) return;
+  if (SH) { undoS.push({ i: sel, v: g[sel], nt: notes[sel] }); if (undoS.length > 200) undoS.shift(); notes[sel] = 0; }
+  g[sel] = n; anim[sel] = 1; k.sfx(n ? 'click' : 'pop'); calcConf();
+  if (SH && n) { if (n !== sol[sel]) { mistakes++; chain = 0; k.chainReset && k.chainReset(); k.sfx('hurt'); k.hitstop && k.hitstop(0.05); k.shake(5); k.float('Ahí no', OX + (sel % SN + 0.5) * S, OY + Math.floor(sel / SN) * S - 4, '#ff8a8a'); }
+    else { notes.forEach((v, j) => { if (v && unitsOf(sel).some((u) => u.includes(j))) notes[j] = v & ~(1 << n); }); } }
   if (n && conf.has(sel)) { k.sfx('hit'); fx.push({ cells: [sel], t: 0.5, col: 'rgba(255,80,90,' }); }
-  else if (n) for (const u of unitsOf(sel)) if (u.every((j) => g[j] && !conf.has(j))) { fx.push({ cells: u, t: 0.7, col: 'rgba(124,247,160,' }); k.sfx('coin'); }
+  else if (n) { let done2 = 0;
+    for (const u of unitsOf(sel)) if (u.every((j) => g[j] && !conf.has(j))) { fx.push({ cells: u, t: 0.7, col: 'rgba(124,247,160,' }); done2++; }
+    if (done2 && SH) unitReward(done2); else if (done2) k.sfx('coin'); }
   solvedCheck();
+}
+/* Gancho: cada fila, columna o caja terminada suma cadena, suena más agudo y saca rótulo. */
+function unitReward(n2) {
+  chain += n2; chainT = 4;
+  k.sfx('coin'); k.chime && k.chime(Math.min(7, chain - 1));
+  const X = OX + (sel % SN + 0.5) * S, Y = OY + (Math.floor(sel / SN) + 0.5) * S;
+  k.burst(X, Y, '#7cf7a0', 10, 110);
+  if (chain >= 2) k.combo && k.combo(chain, X, Y - 24);
+  if (chain === 3) k.reward && k.reward('¡EN RACHA!', '#7cf7a0');
+  else if (chain === 6) k.reward && k.reward('¡IMPARABLE!', '#ffd23d');
+  k.punch && k.punch(2 + n2);
 }
 /* Dificultad: dos minas menos en fácil y dos más en difícil. */
 function nMines() { if (HAND) return lvOf().m; return 7 + (k.dif === 0 ? -2 : k.dif === 2 ? 2 : 0) + Math.min(10, (level || 1) - 1); } /* 1.23: 7 minas en el nivel 1 → 17 en el 11 */
-function reset() { if (HAND) { level = k.lv; score = 0; lost = false; build(); return; } if (level === undefined || lost) { level = 1; score = 0; lost = false; } build(); }
+function reset() { if (SH) { level = k.lv; score = 0; lost = false; build(); return; } if (HAND) { level = k.lv; score = 0; lost = false; build(); return; } if (level === undefined || lost) { level = 1; score = 0; lost = false; } build(); }
 addEventListener('keydown', (e) => { if (M !== 'sudoku') return; const m = /^(Digit|Numpad)([0-9])$/.exec(e.code); if (m) keyNum = +m[2]; else if (e.code === 'Backspace' || e.code === 'Delete') keyNum = 0; });
-k.onDif = () => { if (k.st !== 'play') { if (HAND) level = k.lv; build(); } };
+k.onDif = () => { if (k.st !== 'play') { if (HAND || SH) level = k.lv; build(); } };
 level = undefined;
 if (HAND) { level = k.levels(LVN, { start: (i) => { level = i; score = 0; lost = false; build(); } }); }
+if (SH) { level = k.levels(SLVN, { start: (i) => { level = i; score = 0; lost = false; build(); } }); }
+if (SH) CFG.help = 'Rellena el tablero: cada fila, cada columna y cada caja llevan todos los n\u00fameros una sola vez. Toca una casilla y pulsa un n\u00famero. \u00abNotas\u00bb apunta candidatos, \u00abDeshacer\u00bb retira la \u00faltima jugada, \u00abComprobar\u00bb marca los fallos y \u00abPista\u00bb rellena una casilla. Con mando: flechas mueven, A cambia el n\u00famero y B borra. Tres estrellas: dentro del tiempo, sin ayudas y sin fallos.';
 reset(); k.show(CFG.title, CFG.help);
 /* Nivel superado: medalla si se baja del tiempo objetivo (en fácil y normal vale también
    terminarlo sin gastar pistas y con holgura). El nivel 20 cierra el juego. */
@@ -179,11 +287,22 @@ k.run((dt) => {
   if (k.ptr.hit) kb = false;
   if (kd && M !== 'slide' && M !== 'sudoku') { kb = true; const d = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[kd]; cur = [k.clamp(cur[0] + d[0], 0, N - 1), k.clamp(cur[1] + d[1], 0, N - 1)]; k.sfx('click'); }
   if (M === 'sudoku') {
-    if (k.ptr.hit && on) { sel = cy * 9 + cx; k.sfx('click'); }
-    if (k.ptr.hit && k.ptr.y > OY + 9 * S + 12) { const n = Math.floor((k.ptr.x - 24) / 43.2) + 1; if (n >= 1 && n <= 10) { padHit = n; setNum(n === 10 ? 0 : n); } }
-    if (kd) { if (sel === null) sel = 40; else { const dd = { up: -9, down: 9, left: -1, right: 1 }[kd]; sel = k.clamp(sel + dd, 0, 80); } }
+    const mid = Math.floor(SN * SN / 2);
+    if (k.ptr.hit && on) { sel = cy * SN + cx; k.sfx('click'); }
+    if (SH) {
+      if (k.ptr.hit && k.ptr.y >= KY && k.ptr.y < KY + 46) { const n = Math.floor((k.ptr.x - 12) / KW) + 1; if (n >= 1 && n <= SN + 1) { padHit = n; setNum(n === SN + 1 ? 0 : n); } }
+      if (k.ptr.hit && k.ptr.y >= TY && k.ptr.y < TY + 38) { const i2 = Math.floor((k.ptr.x - 12) / 116);
+        if (i2 === 0) { noteMode = !noteMode; k.sfx('pop'); }
+        else if (i2 === 1) sudUndo();
+        else if (i2 === 2) sudCheck();
+        else if (i2 === 3) { if (hints > 0) sudHint(); else k.sfx('hurt'); } }
+      if (checkT > 0) checkT -= dt; if (hintT > 0) hintT -= dt;
+      if (chainT > 0) { chainT -= dt; if (chainT <= 0) { chain = 0; k.chainReset && k.chainReset(); } }
+      if (banner) banner.a = Math.min(1, banner.a + dt * 3);
+    } else if (k.ptr.hit && k.ptr.y > OY + SN * S + 12) { const n = Math.floor((k.ptr.x - 24) / 43.2) + 1; if (n >= 1 && n <= 10) { padHit = n; setNum(n === 10 ? 0 : n); } }
+    if (kd) { if (sel === null) sel = mid; else { const dd = { up: -SN, down: SN, left: -1, right: 1 }[kd]; sel = k.clamp(sel + dd, 0, SN * SN - 1); } }
     if (keyNum !== null) { setNum(keyNum); keyNum = null; }
-    if (k.hit.has('a')) { if (sel === null) sel = 40; else if (!given[sel]) setNum((g[sel] + 1) % 10); } /* mando: A cambia el número (1→9→vacío), B borra */
+    if (k.hit.has('a')) { if (sel === null) sel = mid; else if (!given[sel]) setNum((g[sel] + 1) % (SN + 1)); } /* mando: A cambia el número (1→N→vacío), B borra */
     if (k.hit.has('b') && sel !== null) setNum(0);
   }
   if (M === 'mines') {
@@ -246,7 +365,35 @@ function handBanner() {
   for (let i = 0; i < lines.length; i++) label(lines[i], bx + 12, by + 25 + i * 15, 12.5, '#dff0d6');
   c.globalAlpha = 1;
 }
+/* HUD de Sudoku Zen: nivel, reloj contra el objetivo de 2★, fallos, cadena y barra de casillas. */
+function hudSud() {
+  const L = sOf(), p2 = Math.round(L.p2 * SDIFT[k.dif]);
+  label(CFG.title, 16, 10, 17, '#ffd23d');
+  label(`Nivel ${level}/${SLVN} · ${SN}×${SN}`, 16, 33, 14, '#cfd6ff');
+  const tt = Math.floor(t), ts = `${Math.floor(tt / 60)}:${String(tt % 60).padStart(2, '0')}`;
+  clock(W - 84, 21); label(ts, W - 18, 10, 20, tt > p2 ? '#ffb4a0' : '#fff', 'right');
+  label(`Fallos ${mistakes}${chain >= 2 ? ' · Cadena ×' + chain : ''}`, W - 18, 33, 14, mistakes ? '#ffb4a0' : '#cfd6ff', 'right');
+  sudBanner();
+  const tot = SN * SN, fill = g.reduce((a, v) => a + (v ? 1 : 0), 0), bw = SN * S, by = OY + SN * S + 10;
+  ART.rr(c, OX, by, bw, 8, 4); c.fillStyle = 'rgba(0,0,0,.45)'; c.fill();
+  if (fill) { ART.rr(c, OX, by, Math.max(8, bw * fill / tot), 8, 4); c.fillStyle = fill === tot ? '#7cf7a0' : '#6e62f5'; c.fill(); }
+  label(`${fill}/${tot}`, OX + bw, by - 3, 12, '#cfd6ff', 'right');
+}
+function sudBanner() {
+  if (!banner) return;
+  const bw = 432, bx = (W - bw) / 2, by = 62, lines = wrap(banner.d, 12.5, bw - 24).slice(0, 3);
+  const bh = 24 + 15 * lines.length + 8;
+  c.globalAlpha = 0.35 + banner.a * 0.65;
+  ART.rr(c, bx, by, bw, bh, 12); ART.fillOut(c, 'rgba(26,28,56,.88)', 2.5);
+  c.fillStyle = 'rgba(255,255,255,.1)'; ART.rr(c, bx + 8, by + 3, bw - 16, 3, 2); c.fill();
+  const st = k.starsOf ? k.starsOf(level) : 0;
+  label(banner.t, bx + 12, by + 6, 15, st === 3 ? '#ffd23d' : '#a9bbff');
+  if (st) label('★'.repeat(st), bx + bw - 12, by + 7, 13, '#ffd23d', 'right');
+  for (let i = 0; i < lines.length; i++) label(lines[i], bx + 12, by + 25 + i * 15, 12.5, '#dfe3ff');
+  c.globalAlpha = 1;
+}
 function hud() {
+  if (SH) return hudSud();
   if (HAND) return hudHand();
   label(CFG.title, 16, 13, 19, '#ffd23d'); label(`Nivel ${level || 1}`, 16, 40, 14, '#cfd6ff');
   const tt = Math.floor(t), ts = `${Math.floor(tt / 60)}:${String(tt % 60).padStart(2, '0')}`; clock(W - 86, 24); label(ts, W - 18, 12, 22, '#fff', 'right');
@@ -289,24 +436,47 @@ function shovelIcon(x, y) { c.save(); c.translate(x, y); c.rotate(0.6);
 function key3d(x, y, w, h, face, pressed) { ART.rr(c, x, y + 4, w, h, 10); c.fillStyle = OUT; c.fill(); const yy = y + (pressed ? 3 : 0); ART.rr(c, x, yy, w, h, 10); ART.fillOut(c, face, 2.5); c.fillStyle = 'rgba(255,255,255,.35)'; ART.rr(c, x + 6, yy + 4, w - 12, 4, 2); c.fill(); return yy; }
 
 function drawSudoku() {
-  const sr = sel !== null ? Math.floor(sel / 9) : -1, sc = sel !== null ? sel % 9 : -1, sb = sel !== null ? Math.floor(sr / 3) * 3 + Math.floor(sc / 3) : -1, sv = sel !== null ? g[sel] : 0;
-  for (let i = 0; i < 81; i++) { const x = i % 9, y = Math.floor(i / 9), X = OX + x * S, Y = OY + y * S, b = Math.floor(y / 3) * 3 + Math.floor(x / 3);
-    let col = (Math.floor(x / 3) + Math.floor(y / 3)) % 2 ? '#fbf6ea' : '#f4eedd';
+  const sr = sel !== null ? Math.floor(sel / SN) : -1, sc = sel !== null ? sel % SN : -1;
+  const sb = sel !== null ? Math.floor(sr / BH) * BH * 100 + Math.floor(sc / BW) : -1, sv = sel !== null ? g[sel] : 0;
+  for (let i = 0; i < SN * SN; i++) { const x = i % SN, y = Math.floor(i / SN), X = OX + x * S, Y = OY + y * S, b = Math.floor(y / BH) * BH * 100 + Math.floor(x / BW);
+    let col = (Math.floor(x / BW) + Math.floor(y / BH)) % 2 ? '#fbf6ea' : '#f4eedd';
     if (sel !== null && (y === sr || x === sc || b === sb)) col = '#e3e8fb'; if (sv && g[i] === sv) col = '#c8d3fb'; if (SHOWC() && conf.has(i) && !given[i]) col = '#ffd9d9'; if (i === sel) col = '#a9bbff';
+    if (SH && i === hintI && hintT > 0) col = '#ffe9a8';
     c.fillStyle = col; c.fillRect(X, Y, S, S); }
-  for (const f of fx) { c.fillStyle = f.col + Math.min(0.55, f.t) + ')'; for (const i of f.cells) c.fillRect(OX + (i % 9) * S, OY + Math.floor(i / 9) * S, S, S); }
-  c.strokeStyle = '#cfc5ad'; c.lineWidth = 1; c.beginPath(); for (let i = 1; i < 9; i++) if (i % 3) { c.moveTo(OX + i * S, OY); c.lineTo(OX + i * S, OY + 9 * S); c.moveTo(OX, OY + i * S); c.lineTo(OX + 9 * S, OY + i * S); } c.stroke();
-  c.strokeStyle = '#3a3f66'; c.lineWidth = 2.5; c.beginPath(); for (let i = 3; i < 9; i += 3) { c.moveTo(OX + i * S, OY); c.lineTo(OX + i * S, OY + 9 * S); c.moveTo(OX, OY + i * S); c.lineTo(OX + 9 * S, OY + i * S); } c.stroke();
-  ART.rr(c, OX, OY, 9 * S, 9 * S, 6); c.strokeStyle = OUT; c.lineWidth = 3; c.stroke();
-  for (let i = 0; i < 81; i++) { if (!g[i]) continue; const X = OX + (i % 9 + 0.5) * S, Y = OY + (Math.floor(i / 9) + 0.5) * S + 1, a = anim[i], sz = 27 * (1 + a * 0.45);
+  for (const f of fx) { c.fillStyle = f.col + Math.min(0.55, f.t) + ')'; for (const i of f.cells) c.fillRect(OX + (i % SN) * S, OY + Math.floor(i / SN) * S, S, S); }
+  c.strokeStyle = '#cfc5ad'; c.lineWidth = 1; c.beginPath(); for (let i = 1; i < SN; i++) { if (i % BW) { c.moveTo(OX + i * S, OY); c.lineTo(OX + i * S, OY + SN * S); } if (i % BH) { c.moveTo(OX, OY + i * S); c.lineTo(OX + SN * S, OY + i * S); } } c.stroke();
+  c.strokeStyle = '#3a3f66'; c.lineWidth = 2.5; c.beginPath(); for (let i = BW; i < SN; i += BW) { c.moveTo(OX + i * S, OY); c.lineTo(OX + i * S, OY + SN * S); } for (let i = BH; i < SN; i += BH) { c.moveTo(OX, OY + i * S); c.lineTo(OX + SN * S, OY + i * S); } c.stroke();
+  ART.rr(c, OX, OY, SN * S, SN * S, 6); c.strokeStyle = OUT; c.lineWidth = 3; c.stroke();
+  if (SH) for (let i = 0; i < SN * SN; i++) { const m = notes[i]; if (g[i] || !m) continue; /* marcas de candidatos: rejilla pequeña dentro de la casilla */
+    const X = OX + (i % SN) * S, Y = OY + Math.floor(i / SN) * S, cols = SN === 4 ? 2 : 3, sz = Math.max(8, S * 0.26);
+    for (let v = 1; v <= SN; v++) if (m & (1 << v)) num(v, X + ((v - 1) % cols + 0.5) * (S / cols), Y + (Math.floor((v - 1) / cols) + 0.5) * (S / Math.ceil(SN / cols)), sz, '#8b8fae', 700); }
+  for (let i = 0; i < SN * SN; i++) { if (!g[i]) continue; const X = OX + (i % SN + 0.5) * S, Y = OY + (Math.floor(i / SN) + 0.5) * S + 1, a = anim[i], sz = (SH ? S * 0.58 : 27) * (1 + a * 0.45);
     num(g[i], X, Y, sz, given[i] ? '#262a4a' : SHOWC() && conf.has(i) ? '#e0344a' : '#4b5de0', given[i] ? 800 : 700); }
-  if (sel !== null) { const X = OX + sc * S, Y = OY + sr * S; c.strokeStyle = '#4b5de0'; c.lineWidth = 3; ART.rr(c, X + 1.5, Y + 1.5, S - 3, S - 3, 6); c.stroke(); }
+  if (sel !== null) { const X = OX + sc * S, Y = OY + sr * S; c.strokeStyle = noteMode ? '#f0a500' : '#4b5de0'; c.lineWidth = 3; ART.rr(c, X + 1.5, Y + 1.5, S - 3, S - 3, 6); c.stroke(); }
   // teclado numérico
-  const cnt = Array(10).fill(0); g.forEach((v) => v && cnt[v]++);
+  const cnt = Array(SN + 1).fill(0); g.forEach((v) => v && cnt[v]++);
+  if (SH) {
+    for (let n = 1; n <= SN + 1; n++) { const x = 12 + (n - 1) * KW + 2, w = KW - 4, full = n <= SN && cnt[n] >= SN;
+      const pressed = k.ptr.down && k.ptr.y >= KY && k.ptr.y < KY + 46 && Math.floor((k.ptr.x - 12) / KW) + 1 === n;
+      const yy = key3d(x, KY, w, 44, n === SN + 1 ? '#ff8a8a' : full ? '#b9bdd6' : noteMode ? '#ffe6b0' : '#ffffff', pressed);
+      if (n <= SN) num(n, x + w / 2, yy + 23, Math.min(24, w * 0.6), full ? '#7d82a3' : '#2a2f55');
+      else eraseIcon(x + w / 2, yy + 22); }
+    const TL = [noteMode ? 'Notas ON' : 'Notas', 'Deshacer', 'Comprobar', 'Pista ' + hints];
+    for (let i = 0; i < 4; i++) { const x = 12 + i * 116, w = 108;
+      const pressed = k.ptr.down && k.ptr.y >= TY && k.ptr.y < TY + 38 && Math.floor((k.ptr.x - 12) / 116) === i;
+      const off = i === 0 && noteMode ? '#f0a500' : i === 3 && hints <= 0 ? '#8b8fae' : '#dfe3ff';
+      const yy = key3d(x, TY, w, 36, i === 0 && noteMode ? '#ffd98a' : '#3b4478', pressed);
+      label(TL[i], x + w / 2, yy + 10, 13.5, i === 0 && noteMode ? '#2a2f55' : off, 'center'); }
+    return;
+  }
   for (let n = 1; n <= 10; n++) { const x = 24 + (n - 1) * 43.2 + 2, y = OY + 9 * S + 18, full = n < 10 && cnt[n] >= 9, pressed = k.ptr.down && k.ptr.y > y - 6 && Math.floor((k.ptr.x - 24) / 43.2) + 1 === n;
     const yy = key3d(x, y, 39, 44, n === 10 ? '#ff8a8a' : full ? '#b9bdd6' : '#ffffff', pressed);
     if (n < 10) num(n, x + 19.5, yy + 23, 24, full ? '#7d82a3' : '#2a2f55');
-    else { const cx = x + 20, cy = yy + 22; c.beginPath(); c.moveTo(cx - 12, cy); c.lineTo(cx - 5, cy - 8); c.lineTo(cx + 11, cy - 8); c.lineTo(cx + 11, cy + 8); c.lineTo(cx - 5, cy + 8); c.closePath(); ART.fillOut(c, '#fff', 2); c.strokeStyle = '#e0344a'; c.lineWidth = 2.2; c.lineCap = 'round'; c.beginPath(); c.moveTo(cx - 1, cy - 4); c.lineTo(cx + 6, cy + 4); c.moveTo(cx + 6, cy - 4); c.lineTo(cx - 1, cy + 4); c.stroke(); } }
+    else eraseIcon(x + 20, yy + 22); }
+}
+function eraseIcon(cx, cy) {
+  c.beginPath(); c.moveTo(cx - 12, cy); c.lineTo(cx - 5, cy - 8); c.lineTo(cx + 11, cy - 8); c.lineTo(cx + 11, cy + 8); c.lineTo(cx - 5, cy + 8); c.closePath(); ART.fillOut(c, '#fff', 2);
+  c.strokeStyle = '#e0344a'; c.lineWidth = 2.2; c.lineCap = 'round'; c.beginPath(); c.moveTo(cx - 1, cy - 4); c.lineTo(cx + 6, cy + 4); c.moveTo(cx + 6, cy - 4); c.lineTo(cx - 1, cy + 4); c.stroke();
 }
 function drawMines() {
   const NC = ['', '#2f6fd6', '#2e9e4a', '#e0443a', '#7a3fc4', '#d9821a', '#1aa3a3', '#333', '#888'];
