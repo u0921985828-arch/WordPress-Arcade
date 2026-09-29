@@ -32,6 +32,10 @@ body.party #ov .dif button{font-size:clamp(13px,3.2vmin,30px);padding:1.5vmin 3v
 #ov .lv{display:grid;grid-template-columns:repeat(auto-fit,minmax(48px,1fr));gap:7px;pointer-events:auto;width:min(360px,80vw);max-height:48vh;overflow:auto;padding:2px}
 #ov .lv button{aspect-ratio:1;font:800 15px/1 ui-rounded,"Trebuchet MS",system-ui,sans-serif;border-radius:12px;border:3px solid #1a1530;background:color-mix(in srgb,var(--bg) 40%,#2a2350);color:#f2eefc;cursor:pointer;display:grid;place-items:center;padding:0;box-shadow:inset 0 2px 0 rgba(255,255,255,.12),0 3px 0 #1a1530}
 #ov .lv button.done{background:var(--ac);color:#fff}
+#ov .stars{display:flex;gap:2px;justify-content:center;line-height:1;font-size:9px;color:rgba(255,255,255,.28);margin-top:2px}
+#ov .stars i{font-style:normal}
+#ov .stars i.on{color:#ffd166;text-shadow:0 1px 0 #1a1530}
+#ov .stars.big{font-size:clamp(22px,7vmin,34px);gap:6px;margin:2px 0 0}
 #ov .lv button.now{outline:3px solid #ffd166;outline-offset:2px}
 #ov .lv button:disabled{opacity:.42;cursor:default;box-shadow:none}
 #ov .htxt{max-width:44ch;text-align:left;max-height:46vh;overflow:auto}
@@ -516,10 +520,15 @@ void main(){
       const ready = k.st === 'ready';
       if (ready) lastReady = [t, s];
       const rec = ready ? (() => { const b = k.best(CFGID, 0); return b ? `<div class="rec">Mejor puntuación: ${b}${k.dif === 1 ? '' : ' · ' + DIFN[k.dif]}</div>` : ''; })() : '';
-      const useMenu = ready && menuKind();
+      /* Fin de partida de un juego con niveles: botones en vez de «toca donde sea»,
+         con Reintentar el primero (docs/GANCHO.md §A5). El resto del catálogo no cambia. */
+      const overMenu = k.st === 'over' && LVN > 0 && !k.party;
+      const useMenu = (ready && menuKind()) || overMenu;
       uiMenu = !!useMenu;
       const goLbl = (g2 => g2.charAt(0).toUpperCase() + g2.slice(1))(go.replace(/^Toca para /i, ''));
-      const act = useMenu ? menuHtml(goLbl) : `<div class="go">${k.party ? '<span class="ka">A</span>' : ''}${goLbl}</div>`;
+      const act = overMenu
+        ? `<div class="menu">${mb('play', 'Reintentar', 'pri')}${LVN > 1 ? mb('lvs', 'Niveles') : ''}${helpTxt() ? mb('help', 'Cómo se juega') : ''}</div>`
+        : useMenu ? menuHtml(goLbl) : `<div class="go">${k.party ? '<span class="ka">A</span>' : ''}${goLbl}</div>`;
       const html = `<div class="card"><h1>${t}</h1>${body ? `<p>${body}</p>` : ''}${rec}${act}${ready ? difHtml() : ''}</div>`;
       if (k.paused) { ovSaved = { html, win: false }; return; } /* en pausa: se enseña al continuar */
       ov.innerHTML = html;
@@ -562,11 +571,32 @@ void main(){
     /* ---------- Efectos: partículas, textos flotantes, temblor, destello ---------- */
     const parts = [], floats = [], pool = [];
     const part = () => pool.pop() || {}; let shakeA = 0, flashC = null, flashT = 0;
+    let hsT = 0, punchA = 0, rwd = null, chI = 0, chT = 0;
     k.burst = (x, y, col, n, spd) => { n = n || 12; spd = spd || 160; for (let i = 0; i < n && parts.length < 400; i++) { const a = Math.random() * 6.283, v = spd * (0.3 + Math.random()); const q = part(); q.x = x; q.y = y; q.vx = Math.cos(a) * v; q.vy = Math.sin(a) * v; q.life = 0.4 + Math.random() * 0.4; q.max = 0.8; q.col = col || '#fff'; q.r = 1.5 + Math.random() * 2.5; q.conf = false; parts.push(q); } };
     k.float = (txt, x, y, col) => floats.push({ txt: String(txt), x, y, col: col || '#fff', t: 0.9 });
     k.shake = (a) => { shakeA = Math.max(shakeA, a || 5); };
     k.flash = (col) => { flashC = col || 'rgba(255,255,255,.5)'; flashT = 0.25; };
     k.confetti = (col, n) => { const cols = col ? [col, col, '#fff', col, '#ffd166'] : ['#f2d15c', '#ff5fa2', '#5ce1e6', '#7cf7a0', '#b98cff']; for (let i = 0; i < (n || 70) && parts.length < 600; i++) { const q = part(); q.x = Math.random() * w; q.y = -10 - Math.random() * 40; q.vx = (Math.random() - 0.5) * 80; q.vy = 80 + Math.random() * 160; q.life = 1.6 + Math.random(); q.max = 2.6; q.col = cols[i % 5]; q.r = 2 + Math.random() * 3; q.conf = true; parts.push(q); } };
+    /* ---------- Gancho (docs/GANCHO.md) ----------------------------------------------
+       Reacciones cortas y baratas que cualquier motor puede pedir sin reimplementarlas. */
+    k.hitstop = (sec) => { hsT = Math.min(0.14, Math.max(hsT, sec || 0.05)); };
+    k.punch = (a) => { punchA = Math.max(punchA, Math.min(0.22, a || 0.05)); };
+    k.reward = (txt, col) => { rwd = { txt: String(txt), col: col || '#ffd166', t: 0.95 }; };
+    /* Nota ascendente de cadena: k.chime(0) grave, cada acierto seguido sube. Si pasan
+       más de 1,2 s sin cadena, vuelve a empezar por abajo. */
+    const PENT = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
+    k.chime = (i) => {
+      const n = i == null ? chI : i | 0;
+      const semi = PENT[Math.min(PENT.length - 1, Math.max(0, n))], f = 523.25 * Math.pow(2, semi / 12);
+      if (!muted && ac()) { tone(f, f * 1.002, 0.13, 'triangle', 0.075); tone(f * 2, f * 2, 0.07, 'square', 0.02); }
+      chI = Math.min(PENT.length - 1, n + 1); chT = 1.2;
+    };
+    k.chainReset = () => { chI = 0; chT = 0; };
+    /* Texto de multiplicador: k.combo(3, x, y) → «x3» con color según lo alto que sea. */
+    k.combo = (n, x, y) => {
+      const c = n >= 8 ? '#ff5fa2' : n >= 5 ? '#ffd166' : n >= 3 ? '#7cf7a0' : '#a097ff';
+      k.float('x' + n, x == null ? k.W / 2 : x, y == null ? k.H / 2 : y, c); k.chime();
+    };
     function fx(dt) {
       for (const p of parts) { p.x += p.vx * dt; p.y += p.vy * dt; if (p.conf) p.vx += Math.sin(p.y / 20) * 20 * dt; else { p.vx *= 1 - 2 * dt; p.vy = p.vy * (1 - 2 * dt) + 240 * dt; } p.life -= dt; }
       for (let i = parts.length - 1; i >= 0; i--) if (parts[i].life <= 0) { const q = parts[i]; parts[i] = parts[parts.length - 1]; parts.pop(); if (pool.length < 600) pool.push(q); }
@@ -574,6 +604,21 @@ void main(){
       ctx.globalAlpha = 1;
       for (let i = floats.length - 1; i >= 0; i--) { const f = floats[i]; f.t -= dt; f.y -= 40 * dt; if (f.t <= 0) { floats.splice(i, 1); continue; } ctx.globalAlpha = Math.min(1, f.t / 0.3); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.font = '800 18px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; /* 1.29: el texto flotante se mantiene dentro del lienzo; antes se cortaba al salir cerca de un borde. */ const fw = ctx.measureText(f.txt).width / 2 + 6, fx2 = Math.max(fw, Math.min(w - fw, f.x)), fy2 = Math.max(14, Math.min(h - 10, f.y)); ctx.strokeText(f.txt, fx2, fy2); ctx.fillStyle = f.col; ctx.fillText(f.txt, fx2, fy2); }
       ctx.globalAlpha = 1;
+      if (rwd) {
+        rwd.t -= dt;
+        if (rwd.t <= 0) { rwd = null; }
+        else {
+          const p = 1 - rwd.t / 0.95, sc = p < 0.18 ? 0.5 + (p / 0.18) * 0.72 : p < 0.3 ? 1.22 - ((p - 0.18) / 0.12) * 0.22 : 1;
+          const m = Math.min(k.W, k.H);
+          ctx.save(); ctx.globalAlpha = p > 0.75 ? Math.max(0, (1 - p) / 0.25) : 1;
+          ctx.translate(k.W / 2, k.H * 0.32); ctx.scale(sc, sc);
+          ctx.font = `900 ${Math.round(m * 0.1)}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+          ctx.lineWidth = m * 0.022; ctx.strokeStyle = '#1a1530'; ctx.strokeText(rwd.txt, 0, 0);
+          ctx.fillStyle = rwd.col; ctx.fillText(rwd.txt, 0, 0); ctx.restore(); ctx.globalAlpha = 1;
+        }
+      }
+      if (chT > 0) { chT -= dt; if (chT <= 0) chI = 0; }
       if (flashT > 0) { flashT -= dt; ctx.globalAlpha = Math.max(0, flashT / 0.25); ctx.fillStyle = flashC; ctx.fillRect(0, 0, w, h); ctx.globalAlpha = 1; }
     }
     /* ---------- Pausa ---------- */
@@ -647,6 +692,15 @@ void main(){
        la victoria con k.levelDone(puntos, extra). k.lv es el nivel en curso. */
     k.levels = (n, opt) => { LVN = Math.max(1, n | 0); if (opt && opt.start) k.onLevel = opt.start; lvLoad(); k.lv = k.lvMax; return k.lv; };
     k.levelN = () => LVN;
+    /* Estrellas por nivel (1 superado · 2 bien · 3 bordado), guardadas por dificultad.
+       Son la colección que engancha: la rejilla de niveles y el menú las enseñan. */
+    const stK = () => 'st:' + CFGID + (k.dif === 1 ? '' : k.dif === 0 ? '@f' : '@d');
+    const stMap = () => { try { return JSON.parse(localStorage.getItem(stK()) || '{}') || {}; } catch (e) { return {}; } };
+    k.starsOf = (n) => Math.max(0, Math.min(3, +stMap()[n] || 0));
+    k.starsTotal = () => { const m = stMap(); let t = 0; for (let n = 1; n <= LVN; n++) t += Math.max(0, Math.min(3, +m[n] || 0)); return t; };
+    const setStars = (n, v) => { v = Math.max(0, Math.min(3, v | 0)); const m = stMap(); if ((+m[n] || 0) >= v) return; m[n] = v; try { localStorage.setItem(stK(), JSON.stringify(m)); } catch (e) {} };
+    const starRow = (v, big) => `<div class="stars${big ? ' big' : ''}">${[1, 2, 3].map((i) => `<i class="${i <= v ? 'on' : ''}">\u2605</i>`).join('')}</div>`;
+
     const helpTxt = () => String((window.CFG && window.CFG.help) || o.help || '');
     function menuKind() { return !k.party && (LVN > 0 || !!helpTxt()); }
     const mb = (m, t, cls) => `<button type="button" data-m="${m}"${cls ? ` class="${cls}"` : ''}>${t}</button>`;
@@ -662,12 +716,13 @@ void main(){
       let out = '';
       for (let n = 1; n <= LVN; n++) {
         const un = n <= k.lvMax, cls = (n < k.lvMax ? 'done' : '') + (n === k.lv ? ' now' : '');
-        out += `<button type="button" data-lv="${n}"${un ? '' : ' disabled'}${cls.trim() ? ` class="${cls.trim()}"` : ''} aria-label="Nivel ${n}">${un ? n : LOCK}</button>`;
+        const sv = un ? k.starsOf(n) : 0;
+        out += `<button type="button" data-lv="${n}"${un ? '' : ' disabled'}${cls.trim() ? ` class="${cls.trim()}"` : ''} aria-label="Nivel ${n}${sv ? `, ${sv} de 3 estrellas` : ''}">${un ? n + (sv ? starRow(sv) : '') : LOCK}</button>`;
       }
       return `<div class="lv">${out}</div>`;
     }
     k._screen = () => {
-      if (scr === 'lvs') ov.innerHTML = `<div class="card"><h1>Niveles</h1>${lvHtml()}<div class="menu">${mb('back', 'Volver')}</div></div>`;
+      if (scr === 'lvs') ov.innerHTML = `<div class="card"><h1>Niveles</h1><div class="rec">\u2605 ${k.starsTotal()} de ${LVN * 3}</div>${lvHtml()}<div class="menu">${mb('back', 'Volver')}</div></div>`;
       else if (scr === 'help') ov.innerHTML = `<div class="card"><h1>Cómo se juega</h1><p class="htxt">${helpTxt()}</p><div class="menu">${mb('back', 'Volver')}</div></div>`;
       else return false;
       ov.classList.remove('hide', 'win'); uiMenu = true; return true;
@@ -681,14 +736,17 @@ void main(){
       startReq = true; uiMenu = false;
     };
     /* Nivel superado: desbloquea el siguiente, lo guarda y ofrece Siguiente / Niveles. */
-    k.levelDone = (score, extra) => {
+    k.levelDone = (score, extra, opt) => {
       const last = LVN > 0 && k.lv >= LVN;
+      const stars = opt && opt.stars != null ? Math.max(1, Math.min(3, opt.stars | 0)) : 0;
+      if (stars) setStars(k.lv, stars);
       if (LVN > 0 && k.lv >= k.lvMax && !last) { k.lvMax = k.lv + 1; try { localStorage.setItem(lvKey || lvK(), k.lvMax); } catch (e) {} }
       k.st = 'over'; k.cd = 0; k._lock(700); tell('arcade:over', { score: score || 0 });
       const b = [];
       if (!last) b.push(mb('next', 'Siguiente nivel', 'pri'));
       if (LVN > 1) b.push(mb('lvs', 'Niveles'));
-      ov.innerHTML = `<div class="card"><h1>${last ? '¡Juego completado!' : `¡Nivel ${k.lv} superado!`}</h1>${extra ? `<p>${extra}</p>` : ''}<div class="menu">${b.join('')}</div></div>`;
+      const tot = LVN > 1 ? `<div class="rec">\u2605 ${k.starsTotal()} de ${LVN * 3}</div>` : '';
+      ov.innerHTML = `<div class="card"><h1>${last ? '¡Juego completado!' : `¡Nivel ${k.lv} superado!`}</h1>${stars ? starRow(stars, 1) : ''}${extra ? `<p>${extra}</p>` : ''}${tot}<div class="menu">${b.join('')}</div></div>`;
       ov.classList.remove('hide'); ov.classList.add('win'); ov.style.setProperty('--wc', '#7cf7a0');
       uiMenu = true; k.sfx(last ? 'fanfare' : 'win'); k.confetti(); k.flash('rgba(255,255,255,.35)');
     };
@@ -798,13 +856,18 @@ void main(){
       function frame(t) {
         if (k.paused && pDrawn > 1) { poll(); if (!k.ptr.hit && !k.hit.size && !PADS.some((q) => q && q.hit.size)) { last = t; k.ptr.up = false; k.swipe = null; k.tap = false; requestAnimationFrame(frame); return; } }
         pDrawn = k.paused ? pDrawn + 1 : 0;
-        const dt = Math.min(0.05, (t - last) / 1000); last = t;
+        const dtr = Math.min(0.05, (t - last) / 1000); last = t;
+        /* Hit-stop: la acción se congela unas centésimas al impactar (el dibujo y los efectos siguen). */
+        let dt = dtr; if (hsT > 0 && !k.paused) { hsT -= dtr; dt = 0; }
         poll();
         if (k.paused) { if (k.ptr.hit || k.hit.has('a') || k.hit.has('pause') || PADS.some((q) => q && q.hit.has('a'))) { setPause(false); if (k.ptr.down) k._skipUp = true; } }
         else { if (k.hit.has('pause') && k.st === 'play') setPause(true); else { stWatch(); update(dt); stWatch(); } }
-        const sx = shakeA ? (Math.random() - 0.5) * shakeA * 2 : 0, sy = shakeA ? (Math.random() - 0.5) * shakeA * 2 : 0; shakeA = Math.max(0, shakeA - dt * 30);
+        const sx = shakeA ? (Math.random() - 0.5) * shakeA * 2 : 0, sy = shakeA ? (Math.random() - 0.5) * shakeA * 2 : 0; shakeA = Math.max(0, shakeA - dtr * 30);
         if (gxOn) { eUse = false; hUse = false; nL = 0; }
-        ctx.save(); ctx.translate(sx, sy); draw(); ctx.restore(); if (!k.paused) cdTick(dt); cdDraw(); fx(k.paused ? 0 : dt);
+        ctx.save(); ctx.translate(sx, sy);
+        if (punchA > 0.002) { const z = 1 + punchA; ctx.translate(k.W / 2, k.H / 2); ctx.scale(z, z); ctx.translate(-k.W / 2, -k.H / 2); }
+        draw(); ctx.restore(); punchA = Math.max(0, punchA - dtr * 0.55);
+        if (!k.paused) cdTick(dtr); cdDraw(); fx(k.paused ? 0 : dtr);
         if (gxOn) composite(t);
         k.hit.clear(); for (const q of PADS) if (q) q.hit.clear(); k.ptr.hit = false; k.ptr.up = false; k.swipe = null; k.tap = false;
         requestAnimationFrame(frame);
