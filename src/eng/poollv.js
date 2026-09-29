@@ -44,7 +44,7 @@ var POOLLV = (function () {
       cue: [180, 500], balls: [[1, 90, 180], [2, 270, 180], [8, 180, 300]], forbid: [8], goal: 'clear', shots: 7, par: 3 },
 
     { name: 'Por orden', tip: 'De menor a mayor: primero la 1 y después la 2. Meterlas fuera de orden es falta y cuesta un tiro.',
-      cue: [180, 470], balls: [[1, 82, 122], [2, 278, 122]], goal: 'order', shots: 14, par: 4 },
+      cue: [180, 470], balls: [[1, 82, 122], [2, 278, 122]], goal: 'order', shots: 7, par: 3 },
 
     { name: 'Carambola', tip: 'Carambola: en el mismo tiro la blanca tiene que tocar dos bolas distintas. No hace falta meter nada.',
       cue: [180, 500], balls: [[4, 140, 300], [6, 230, 240]], goal: 'carom', need: 2, closed: [0, 1, 2, 3, 4, 5], shots: 6, par: 2 },
@@ -59,7 +59,7 @@ var POOLLV = (function () {
 
     { name: 'Orden con bloque', tip: 'El orden manda aunque el bloque estorbe: usa las bandas para llegar a la que toca.',
       cue: [180, 500], balls: [[1, 82, 122], [2, 278, 122], [3, 278, 430]],
-      obs: [[150, 250, 60, 110]], goal: 'order', shots: 20, par: 6 },
+      obs: [[150, 250, 60, 110]], goal: 'order', shots: 10, par: 4 },
 
     { name: 'Tres carambolas', tip: 'Tres carambolas. Deja la blanca entre las dos bolas y repite el truco.',
       cue: [120, 460], balls: [[5, 230, 330], [9, 130, 220]], obs: [[46, 380, 70, 20], [244, 380, 70, 20]],
@@ -79,7 +79,7 @@ var POOLLV = (function () {
 
     { name: 'Orden largo', tip: 'Cinco bolas, de la 1 a la 5, en su orden. Mira siempre dónde se queda la blanca.',
       cue: [180, 520], balls: [[1, 90, 420], [2, 270, 420], [3, 90, 240], [4, 270, 240], [5, 180, 150]],
-      goal: 'order', shots: 20, par: 6 },
+      goal: 'order', shots: 15, par: 7 },
 
     { name: 'Laberinto', tip: 'Tres bloques y poco sitio: a veces el mejor tiro es el que solo coloca la blanca.',
       cue: [180, 530], balls: [[1, 70, 180], [2, 180, 180], [3, 290, 180], [4, 70, 330], [5, 290, 330]],
@@ -87,7 +87,7 @@ var POOLLV = (function () {
 
     { name: 'El reto', tip: 'Orden, troneras tapadas y una negra que no se toca. El desafío de verdad.',
       cue: [180, 520], balls: [[1, 90, 430], [2, 270, 430], [3, 90, 220], [4, 270, 220], [8, 180, 320]],
-      forbid: [8], closed: [2, 3], goal: 'order', shots: 22, par: 7 },
+      forbid: [8], closed: [2, 3], goal: 'order', shots: 16, par: 7 },
 
     { name: 'Mesa final', tip: 'Ocho bolas, dos bloques y las dos troneras del centro tapadas. Limpia la mesa y se acabó.',
       cue: [180, 530], balls: [[1, 100, 150], [2, 180, 130], [3, 260, 150], [4, 80, 260], [5, 280, 260],
@@ -188,7 +188,9 @@ var POOLLV = (function () {
   /* Reglas al pararse la mesa. Devuelve { faults:[motivo…], potted:[n…], carom, done, dead } */
   function resolve(S) {
     var sh = S.shot || { pots: [], hits: [], set: [] }, F = [], potted = [], i, n;
-    var order = S.order ? left(S).slice().sort(function (a, b) { return a - b; }) : null;
+    /* El orden se juzga con la mesa ANTES del tiro: step() ya ha quitado las bolas que han caido,
+     * asi que hay que volver a meter en la lista las que se han metido en este mismo tiro. */
+    var order = S.order ? S.targets.filter(function (n) { return has(S, n) || sh.pots.indexOf(n) >= 0; }).sort(function (a, b) { return a - b; }) : null;
     var next = order && order.length ? order[0] : null;
     for (i = 0; i < sh.pots.length; i++) { n = sh.pots[i];
       if (n === 0) { F.push('blanca'); continue; }
