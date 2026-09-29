@@ -10,7 +10,11 @@ const OUT = ART.OUT, TAU = 6.2832, MODE = CFG.mode || 'arcoiris', ID = CFG.id ||
 /* Niveles a mano: solo Burbujas Arcoíris (burblv.js). Los dos juegos de fusión no los miran. */
 const HAND = (MODE === 'arcoiris' && typeof BURBLV !== 'undefined' && BURBLV[ID]) || null;
 const W = 360, H = 640;
-const k = Kit({ w: W, h: H, title: CFG.title, bg: MODE === 'solar' ? '#0c0a1f' : MODE === 'fruta' ? '#241a3d' : '#1b1436' }), c = k.ctx;
+/* Solo Burbujas Arcoíris usa lienzo fluido: llena la pantalla y la columna de juego (360×640)
+   se centra dentro, así la dificultad es idéntica en todos los tamaños. Los dos juegos de fusión
+   siguen en la caja centrada de siempre. */
+const k = Kit({ w: W, h: H, title: CFG.title, bg: MODE === 'solar' ? '#0c0a1f' : MODE === 'fruta' ? '#241a3d' : '#1b1436',
+  fluid: MODE === 'arcoiris' ? { min: 0.42, max: 2.7 } : false }), c = k.ctx;
 /* ---------- R5 §8 «pieza única» + cartoon de estudio (helpers locales) ----------
    uni(): contornea TODAS las partes y luego las rellena → solo sobrevive la silueta exterior.
    celp(): 3 tonos de borde duro (cel shading) recortados a la silueta, sin degradados.
@@ -45,7 +49,16 @@ if (MODE === 'arcoiris') arcoiris(); else fusion();
 
 /* ===================================================================== Burbujas Arcoíris ===== */
 function arcoiris() {
-  const R = 19, RS = 33, COLS = 9, X0 = (W - COLS * 2 * R) / 2, TOP = HAND ? 84 : 66, LINE = H - 104, LX = W / 2, LY = H - 56;
+  /* Lienzo fluido: la columna de juego mide siempre 360×640 (misma dificultad en todas las
+     pantallas) y se centra en (OX,OY); lo que sobra se llena de decorado y marcador. */
+  const R = 19, RS = 33, COLS = 9, X0 = (W - COLS * 2 * R) / 2, TOP = 84, LINE = H - 104, LX = W / 2, LY = H - 56;
+  const FLOORY = LINE + 34;                               // donde revientan las burbujas que caen
+  let OX = 0, OY = 0, SIDE = 0, UP = 0;
+  /* UP: si la pantalla es mas alta que la caja, el HUD estrecho sube al margen libre y deja
+     de pisar el remate del techo; sin margen se queda donde estaba. */
+  function relayout() { OX = Math.round(k.ox); OY = Math.round(k.oy); const m = (k.W - W) / 2; SIDE = m >= 148 ? Math.min(206, m - 10) : 0; UP = Math.round(Math.min(26, Math.max(0, (k.H - H) / 2 - 6))); }
+  k.onSize = relayout; relayout();
+
   const COL = [
     { c: '#ff6fb5', s: 'star' }, { c: '#5b8cff', s: 'dot' }, { c: '#a8cf3f', s: 'leaf' },
     { c: '#ffc94d', s: 'ring' }, { c: '#a097ff', s: 'tri' }, { c: '#ff7a59', s: 'cross' },
@@ -54,12 +67,20 @@ function arcoiris() {
      'r' arcoíris (comodín) · 'b' bomba · 'o' objeto que hay que bajar. */
   const POPPABLE = { n: 1, i: 1, c: 1, r: 1, b: 1 };
   let G, par, ang, cur, next, shot, shots, drops, score, over, slide, fallers, t, msg, msgT, sprite = [];
-  let LV = null, ammo = 0, need = 0, freed = 0, dropped = 0, won = 0, lvCols = 3, lvPush = 0, tip = null, tipT = 0;
+  let LV = null, ammo = 0, ammo0 = 0, need = 0, freed = 0, dropped = 0, won = 0, lvCols = 3, lvPush = 0, tip = null, tipT = 0;
+  let chain = 0, mult = 1, pops = [], flo = [], gridV = 0, aimC = null, aimA = 1e9, aimV = -1, aimS = -1;
+  let par2 = 0, par3 = 0, stars = 0, warn = 0, fireT = 0, mood = 0, moodT = 0, flashT = 0, flashC = '#fff';
+  let winStage = 0, winT = 0, winQ = [], bonus = 0, swapT = 0;
   const lp = { x: LX, y: LY };
   const rowPar = (r) => (r + par) & 1;              // 1 = fila corta desplazada media burbuja
   const rowLen = (r) => (rowPar(r) ? COLS - 1 : COLS);
   const cellX = (r, i) => X0 + R + i * 2 * R + (rowPar(r) ? R : 0);
   const cellY = (r) => TOP + R + r * RS;
+
+  /* ---------- textos flotantes propios (los de kit.js se recortan a la caja de referencia,
+     que en modo fluido no coincide con la pantalla) ---------- */
+  function fl(txt, x, y, col, s) { if (flo.length < 40) flo.push({ txt: String(txt), x: x + OX, y: y + OY, col: col || '#fff', t: 0.95, s: s || 18 }); }
+  function flash(col, dur) { flashC = col; flashT = dur || 0.2; }
 
   const SS = R * 2 + 8;
   for (let i = 0; i < COL.length; i++) sprite.push(bubbleSprite(COL[i]));
@@ -75,6 +96,7 @@ function arcoiris() {
       uni(g, parts, 1.5);
       celp(g, parts, cc.c, R * 0.42, R * 0.42);
       spec(g, -R * 0.34, -R * 0.4, R * 0.3, R * 0.19, -0.6, 0.72);
+      spec(g, R * 0.36, R * 0.3, R * 0.15, R * 0.1, 0.5, 0.3);
       // símbolo interior (también distingue los colores sin depender del tono)
       g.fillStyle = ART.dark(cc.c, 0.55); g.strokeStyle = ART.dark(cc.c, 0.55); g.lineWidth = 2.6; g.lineCap = 'round';
       const s = cc.s;
@@ -145,14 +167,32 @@ function arcoiris() {
       }
     });
   }
-  const bg = off(W, H, (g) => {
-    const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#2d2159'); gr.addColorStop(1, '#140f2b'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
-    g.fillStyle = 'rgba(255,255,255,.05)';
-    for (let i = 0; i < 40; i++) { g.beginPath(); g.arc(R2(i) * W, R2(i + 31) * H, 3 + R2(i + 7) * 12, 0, TAU); g.fill(); }
-    // marco del tubo
-    ART.rr(g, 6, TOP - 12, W - 12, LINE - TOP + 20, 16); g.lineWidth = 5; g.strokeStyle = 'rgba(160,151,255,.35)'; g.stroke();
-    ART.rr(g, 10, TOP - 9, W - 20, 9, 5); g.fillStyle = 'rgba(255,255,255,.12)'; g.fill();
+  /* ---------- decorado ---------- */
+  /* Telón de fondo: se estira a la pantalla entera (color desaturado, jerarquía §B10). */
+  const sky = off(180, 320, (g) => {
+    const gr = g.createLinearGradient(0, 0, 0, 320); gr.addColorStop(0, '#2a2056'); gr.addColorStop(0.55, '#1c1540'); gr.addColorStop(1, '#100c26');
+    g.fillStyle = gr; g.fillRect(0, 0, 180, 320);
+    g.fillStyle = 'rgba(160,151,255,.055)';
+    for (let i = 0; i < 34; i++) { g.beginPath(); g.arc(R2(i) * 180, R2(i + 31) * 320, 3 + R2(i + 7) * 13, 0, TAU); g.fill(); }
   });
+  /* Tubo de cristal: marco, brillo lateral y sombra interior. Una sola pieza (R5 §8). */
+  const tube = off(W, H, (g) => {
+    g.fillStyle = 'rgba(12,8,28,.42)'; ART.rr(g, 8, TOP - 14, W - 16, LINE - TOP + 24, 18); g.fill();
+    ART.rr(g, 8, TOP - 14, W - 16, LINE - TOP + 24, 18); g.lineWidth = 5; g.strokeStyle = 'rgba(160,151,255,.4)'; g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.07)'; ART.rr(g, 15, TOP - 4, 7, LINE - TOP + 4, 4); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.04)'; ART.rr(g, W - 25, TOP + 40, 5, LINE - TOP - 60, 3); g.fill();
+  });
+  /* Techo dentado: la barra que baja. Silueta única con dientes. */
+  const ceil = off(W, 30, (g) => {
+    g.beginPath(); g.moveTo(6, 0); g.lineTo(W - 6, 0); g.lineTo(W - 6, 13);
+    for (let i = 0; i < 12; i++) { const x = W - 6 - (i + 0.5) * (W - 12) / 12; g.lineTo(x, 13 + (i % 2 ? 9 : 5)); g.lineTo(x - (W - 12) / 24, 13); }
+    g.lineTo(6, 13); g.closePath();
+    g.lineJoin = 'round'; g.lineWidth = 3.4; g.strokeStyle = ART.OUT; g.stroke();
+    g.fillStyle = '#463ac4'; g.fill();
+    g.save(); g.clip(); g.fillStyle = ART.lite('#463ac4', 0.34); g.fillRect(0, 0, W, 6); g.fillStyle = ART.dark('#463ac4', 0.3); g.fillRect(0, 12, W, 20); g.restore();
+  });
+  /* Burbujas del fondo (decorado que respira, §B9) */
+  const amb = []; for (let i = 0; i < 12; i++) amb.push({ x: R2(i) * W, y: R2(i + 5) * H, r: 5 + R2(i + 11) * 16, v: 12 + R2(i + 17) * 22, a: 0.05 + R2(i + 23) * 0.06 });
 
   /* Dificultad: colores en juego y disparos antes de que baje el techo (partida sin fin). */
   function colorsNow() { return k.clamp(Math.min(COL.length, 3 + Math.floor(drops / 4)) + (k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0), 3, COL.length); }
@@ -186,33 +226,59 @@ function arcoiris() {
     if (ch === 'o') return { c: -1, t: 'o', pop: 1 };
     return null;
   };
-  function newRow(r) { const a = []; for (let i = 0; i < rowLen(r); i++) a.push({ c: k.ri(0, palette() - 1), t: 'n', pop: 1 }); return a; }
+  function newRow(r) { const a = []; for (let i = 0; i < rowLen(r); i++) a.push({ c: k.ri(0, palette() - 1), t: 'n', pop: 0 }); return a; }
+  function common() {
+    par = 0; G = []; score = 0; drops = 0; over = 0; slide = 0; fallers = []; pops = []; flo = []; t = 0;
+    msg = ''; msgT = 0; shot = null; ang = 0; chain = 0; mult = 1; gridV++; aimV = -1; warn = 0; fireT = 0;
+    mood = 0; moodT = 0; flashT = 0; winStage = 0; winT = 0; winQ = []; bonus = 0; stars = 0; swapT = 0;
+    k.chainReset();
+  }
   function reset() {
     if (HAND) return loadLevel(k.lv);
-    par = 0; G = []; score = 0; drops = 0; shots = SH0(); over = 0; slide = 0; fallers = []; t = 0; msg = ''; msgT = 0; shot = null; ang = 0;
-    LV = null; won = 0; tipT = 0;
+    common(); shots = SH0(); LV = null; won = 0; tipT = 0; freed = 0; dropped = 0; ammo = 0; ammo0 = 0; par2 = par3 = 0;
     for (let r = 0; r < 5; r++) { G.push([]); for (let i = 0; i < rowLen(r); i++) G[r].push(r < 4 || Math.random() < 0.45 ? { c: k.ri(0, 2), t: 'n', pop: 1 } : null); }
     cur = pickShot(); next = pickShot();
   }
   /* ---------- Niveles a mano (solo burbujas-arcoiris) ---------- */
   function loadLevel(i) {
     LV = HAND[k.clamp(i | 0, 1, HAND.length) - 1];
+    const am = k.dif === 0 ? 1.4 : k.dif === 2 ? 0.85 : 1;
     lvCols = k.clamp((LV.cols || 3) + (k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0), 3, COL.length);
     lvPush = LV.push ? Math.max(3, LV.push + (k.dif === 0 ? 4 : k.dif === 2 ? -2 : 0)) : 0;
-    ammo = Math.round((LV.shots || 24) * (k.dif === 0 ? 1.4 : k.dif === 2 ? 0.85 : 1));
+    ammo = ammo0 = Math.round((LV.shots || 24) * am);
+    /* Estrellas: ★ superarlo · ★★ en ≤ par2 tiros · ★★★ en ≤ par3 tiros (escalados con la
+       dificultad igual que la munición, para que exigir lo mismo cueste lo mismo). */
+    const pp = LV.par || [Math.round((LV.shots || 24) * 0.8), Math.round((LV.shots || 24) * 0.6)];
+    par2 = Math.max(1, Math.round(pp[0] * am)); par3 = Math.max(1, Math.round(pp[1] * am));
     need = LV.need || 0;
-    par = 0; G = []; score = 0; drops = 0; shots = lvPush; over = 0; slide = 0; fallers = []; t = 0;
-    msg = ''; msgT = 0; shot = null; ang = 0; freed = 0; dropped = 0; won = 0;
+    common(); shots = lvPush; freed = 0; dropped = 0; won = 0;
     for (let r = 0; r < LV.m.length; r++) { const row = []; for (let q = 0; q < rowLen(r); q++) row.push(mkCell(LV.m[r][q] || '.')); G.push(row); }
     cur = pickShot(); next = pickShot();
-    tip = LV.tip || ''; tipT = tip ? 4.5 : 0;
+    tip = LV.tip || ''; tipT = tip ? 4.8 : 0;
   }
+  const used = () => ammo0 - ammo;
+  function starsNow() { return used() <= par3 ? 3 : used() <= par2 ? 2 : 1; }
   function goalText() {
     if (!LV) return '';
-    if (LV.goal === 'drop') return `Baja los objetos · ${Math.min(dropped, need)}/${need}`;
-    if (LV.goal === 'rescue') return `Rescata atrapadas · ${Math.min(freed, need)}/${need}`;
-    if (LV.goal === 'hold') return `Aguanta el techo · ${Math.min(drops, need)}/${need}`;
-    return `Limpia el tubo · quedan ${left()}`;
+    if (LV.goal === 'drop') return 'Baja los objetos';
+    if (LV.goal === 'rescue') return 'Rescata atrapadas';
+    if (LV.goal === 'hold') return 'Aguanta el techo';
+    return 'Limpia el tubo';
+  }
+  /* Progreso del objetivo: 0..1 y el texto «hecho/faltan». */
+  function goalHave() { return !LV ? 0 : LV.goal === 'drop' ? dropped : LV.goal === 'rescue' ? freed : LV.goal === 'hold' ? drops : (goalTot() - left()); }
+  /* En «limpiar» el total crece si el tubo se llena más de lo que estaba: así la barra nunca
+     retrocede por debajo de cero y siempre dice cuánto queda de verdad. */
+  function goalTot() { return !LV ? 1 : LV.goal === 'clear' ? Math.max(LV._tot || 1, left()) : need; }
+  function goalMiss() { return Math.max(0, goalTot() - goalHave()); }
+  function missText() {
+    if (!LV) return '';
+    const m = goalMiss();
+    if (LV.goal === 'drop') return `Te faltaba${m === 1 ? '' : 'n'} ${m} objeto${m === 1 ? '' : 's'}`;
+    if (LV.goal === 'rescue') return `Te faltaba${m === 1 ? '' : 'n'} ${m} rescate${m === 1 ? '' : 's'}`;
+    if (LV.goal === 'hold') return `Te faltaba${m === 1 ? '' : 'n'} ${m} bajada${m === 1 ? '' : 's'}`;
+    const q = left();
+    return `Te quedaba${q === 1 ? '' : 'n'} ${q} burbuja${q === 1 ? '' : 's'}`;
   }
   function left() { let n = 0; for (let r = 0; r < G.length; r++) for (let i = 0; i < G[r].length; i++) { const q = G[r][i]; if (q && POPPABLE[q.t]) n++; } return n; }
   function goalDone() {
@@ -234,6 +300,9 @@ function arcoiris() {
   /* ¿esta casilla hace juego con el color col? El arcoíris hace juego con todos. */
   const same = (cell, col) => !!cell && (cell.t === 'r' || ((cell.t === 'n' || cell.t === 'i' || cell.t === 'c') && cell.c === col));
   function ensureRows(r) { while (G.length <= r) { const n = G.length; G.push(new Array(rowLen(n)).fill(null)); } }
+  /* snapTo() crea la fila de debajo para poder medir; las que se quedan vacías se retiran,
+     si no la rejilla crecería una fila por cada vez que se mueve la puntería. */
+  function trimRows() { while (G.length > 1) { const row = G[G.length - 1]; let e = 1; for (let i = 0; i < row.length; i++) if (row[i]) { e = 0; break; } if (!e) break; G.pop(); } }
   /* casilla libre más cercana al punto de contacto (con vecina ocupada o en la primera fila) */
   function snapTo(x, y) {
     let best = null, bd = 1e9; const lim = G.length;
@@ -256,27 +325,33 @@ function arcoiris() {
     }
     return out;
   }
-  /* Quita una casilla y apunta lo que valga para el objetivo. */
-  function rm(r, i) {
+  const cellCol = (cell) => (cell.c >= 0 ? COL[cell.c].c : cell.t === 'b' ? '#ffd166' : cell.t === 'o' ? '#ffc94d' : '#cdd3ef');
+  /* Quita una casilla: deja su animación de reventón (nada desaparece de golpe, §B8). */
+  function rm(r, i, quiet) {
     const cell = G[r][i]; if (!cell) return null;
-    G[r][i] = null;
+    G[r][i] = null; gridV++;
     if (cell.t === 'c') freed++;
     if (cell.t === 'o') dropped++;
-    k.burst(cellX(r, i), cellY(r) - slide, cell.c >= 0 ? COL[cell.c].c : cell.t === 'b' ? '#ffd166' : '#cdd3ef', 7, 130);
+    const x = cellX(r, i), y = cellY(r) - slide;
+    if (pops.length < 90) pops.push({ x, y, cell, t: 0 });
+    if (!quiet) k.burst(x + OX, y + OY, cellCol(cell), 7, 130);
     return cell;
   }
+  /* Todo lo que se queda sin sujeción cae. Se sueltan escalonadas: el derrumbe se ve venir. */
   function detachFloating() {
     const keep = new Set();
     for (let i = 0; i < (G[0] || []).length; i++) if (G[0][i]) for (const [a, b] of cluster(0, i, null)) keep.add(a + ',' + b);
     const loose = [];
-    for (let r = 0; r < G.length; r++) for (let i = 0; i < G[r].length; i++) if (G[r][i] && !keep.has(r + ',' + i)) { loose.push([r, i]); }
-    for (const [r, i] of loose) {
-      const cell = G[r][i];
+    for (let r = 0; r < G.length; r++) for (let i = 0; i < G[r].length; i++) if (G[r][i] && !keep.has(r + ',' + i)) loose.push([r, i]);
+    loose.sort((p, q) => p[0] - q[0]);
+    for (let n = 0; n < loose.length; n++) {
+      const [r, i] = loose[n], cell = G[r][i];
       if (cell.t === 'c') freed++;
       if (cell.t === 'o') dropped++;
-      fallers.push({ x: cellX(r, i), y: cellY(r) - slide, vx: k.rnd(-40, 40), vy: -60, cell });
+      fallers.push({ x: cellX(r, i), y: cellY(r) - slide, vx: k.rnd(-50, 50), vy: -70 - Math.random() * 40, cell, rot: 0, vr: k.rnd(-5, 5), d: n * 0.035, n: n + 1 });
       G[r][i] = null;
     }
+    if (loose.length) gridV++;
     return loose.length;
   }
   /* Bombas: cualquiera pegada a algo que acaba de estallar revienta a sus seis vecinas (en cadena). */
@@ -288,6 +363,7 @@ function arcoiris() {
       const [a, b] = q.pop(), key = a + ',' + b;
       if (done.has(key)) continue; done.add(key);
       const cell = at(a, b); if (!cell || cell.t !== 'b') continue;
+      k.burst(cellX(a, b) + OX, cellY(a) - slide + OY, '#ffd166', 16, 220);
       rm(a, b); n++; k.shake(3);
       for (const [x, y] of neighbors(a, b)) {
         const q2 = at(x, y); if (!q2) continue;
@@ -297,42 +373,60 @@ function arcoiris() {
     }
     return n;
   }
+  /* Puntuación de un derrumbe: cada burbuja que cae vale más que la anterior. */
+  const dropPts = (n) => 20 * Math.min(12, n);
+  /* Remate común de un disparo que ha hecho algo: cadena, multiplicador, sacudida y cartel. */
+  function reward(pts, cx, cy, clen, boom, drop) {
+    chain++; mult = Math.min(5, 1 + (chain >> 1));
+    const tot = Math.round(pts * mult);
+    score += tot;
+    fl('+' + tot, cx, cy - 22, drop ? '#ffd166' : '#fff', drop ? 22 : 18);
+    if (mult > 1) fl('x' + mult, cx + 26, cy - 44, mult >= 4 ? '#ff5fa2' : mult >= 3 ? '#ffd166' : '#7cf7a0', 16);
+    k.chime();
+    if (clen >= 5 || boom || drop >= 3) k.hitstop(0.04);
+    if (drop >= 3 || boom >= 4) { k.punch(0.04 + Math.min(0.08, drop * 0.006)); k.shake(4 + Math.min(6, drop)); }
+    if (drop >= 4) { k.reward('¡DERRUMBE x' + drop + '!', '#ffd166'); flash('rgba(255,220,120,.25)', 0.18); }
+    else if (boom >= 5) k.reward('¡BOMBAZO!', '#ff9a3d');
+    else if (clen >= 6) k.reward('¡RACIMO x' + clen + '!', '#7cf7a0');
+    mood = 1; moodT = 0.9;
+    return tot;
+  }
   function popAt(r, i, col) {
     const cl = cluster(r, i, col);
     if (cl.length < 3) { k.sfx('click'); return 0; }
     const dead = [];
     for (const [a, b] of cl) {
       const cell = G[a][b];
-      if (cell.t === 'i') { cell.t = 'n'; cell.pop = 0.25; k.burst(cellX(a, b), cellY(a) - slide, '#cfeeff', 5, 90); continue; }
+      if (cell.t === 'i') { cell.t = 'n'; cell.pop = 0.25; k.burst(cellX(a, b) + OX, cellY(a) - slide + OY, '#cfeeff', 6, 100); continue; }
       dead.push([a, b]);
     }
     for (const [a, b] of dead) rm(a, b);
     let boom = 0;
     for (const [a, b] of dead) for (const [x, y] of neighbors(a, b)) { const q2 = at(x, y); if (q2 && q2.t === 'b') boom += blast([[x, y]]); }
-    const drop = detachFloating(), pts = cl.length * 10 + boom * 15 + drop * 25;
-    score += pts; k.sfx(drop || boom ? 'explode' : 'pop'); if (drop || boom) k.shake(3);
-    k.float('+' + pts, cellX(r, i), cellY(r) - slide - 20, drop ? '#ffd166' : '#fff');
-    if (drop >= 3) { msg = '¡' + drop + ' caídas!'; msgT = 1.4; }
+    const drop = detachFloating(), pts = cl.length * 10 + boom * 15;
+    k.sfx(drop || boom ? 'explode' : 'pop');
+    reward(pts, cellX(r, i), cellY(r) - slide, cl.length, boom, drop);
     return cl.length;
   }
   function pushRow() {
-    drops++; par ^= 1; G.unshift(newRow(0)); slide = RS;
+    drops++; par ^= 1; G.unshift(newRow(0)); slide = RS; gridV++;
     shots = HAND ? lvPush : Math.max(Math.round(4 / k.D.rate), SH0() - Math.floor(drops / 3));
-    k.sfx('hit'); k.shake(2);
+    k.sfx('hit'); k.shake(4); warn = 0;
+    if (LV && LV.goal === 'hold') fl('Bajada ' + Math.min(drops, need) + '/' + need, LX, TOP + 40, '#ff6fb5', 20);
   }
   function fire() {
-    if (shot || over || won) return;
+    if (shot || over || won || k.st !== 'play') return;
     if (HAND && ammo <= 0) return;
     shot = { x: LX, y: LY - 22, vx: Math.sin(ang) * 660, vy: -Math.cos(ang) * 660, cell: cur };
     cur = next; next = pickShot(); if (HAND) ammo--;
-    k.sfx('shoot');
+    k.sfx('shoot'); fireT = 1; aimV = -1;
   }
   function stepShot(dt) {
     const steps = Math.ceil(Math.hypot(shot.vx, shot.vy) * dt / 5) || 1;
     for (let s = 0; s < steps && shot; s++) {
       shot.x += shot.vx * dt / steps; shot.y += shot.vy * dt / steps;
-      if (shot.x < X0 + R) { shot.x = X0 + R; shot.vx = Math.abs(shot.vx); k.sfx('click'); }
-      if (shot.x > W - X0 - R) { shot.x = W - X0 - R; shot.vx = -Math.abs(shot.vx); k.sfx('click'); }
+      if (shot.x < X0 + R) { shot.x = X0 + R; shot.vx = Math.abs(shot.vx); k.sfx('click'); k.burst(shot.x + OX, shot.y + OY, '#a097ff', 4, 80); }
+      if (shot.x > W - X0 - R) { shot.x = W - X0 - R; shot.vx = -Math.abs(shot.vx); k.sfx('click'); k.burst(shot.x + OX, shot.y + OY, '#a097ff', 4, 80); }
       let hit = shot.y - R <= TOP - 2;
       if (!hit) for (let r = 0; r < G.length && !hit; r++) for (let i = 0; i < G[r].length; i++) {
         if (!G[r][i]) continue;
@@ -355,48 +449,136 @@ function arcoiris() {
   function land() {
     const cell = snapTo(shot.x, shot.y + slide), put = shot.cell; shot = null;
     if (!cell) return;
-    const [r, i] = cell; ensureRows(r);
+    const [r, i] = cell; ensureRows(r); gridV++;
     if (put.t === 'b') {                                   // la bomba estalla al tocar
       G[r][i] = { c: -1, t: 'b', pop: 1 };
-      const boom = blast([[r, i]]), drop = detachFloating(), pts = boom * 15 + drop * 25;
-      score += pts; k.sfx('explode'); k.shake(5); k.float('+' + pts, cellX(r, i), cellY(r) - slide - 20, '#ffd166');
+      const boom = blast([[r, i]]), drop = detachFloating();
+      k.sfx('explode'); k.shake(6);
+      reward(boom * 15, cellX(r, i), cellY(r) - slide, 0, boom, drop);
     } else {
       let col = put.c;
       G[r][i] = { c: col, t: put.t === 'r' ? 'r' : 'n', pop: 0 };
       if (put.t === 'r') { col = rbColor(r, i); if (col < 0) col = 0; }
-      if (!popAt(r, i, col)) { if (!HAND && --shots <= 0) pushRow(); }
-      else if (!HAND) shots = Math.max(shots, 1);
+      if (!popAt(r, i, col)) {                              // tiro desperdiciado: se pierde la cadena
+        if (chain > 0) { chain = 0; mult = 1; k.chainReset(); }
+        /* Consuelo: si al menos ha pegado con su color, algo se gana (§A2: nunca seis segundos
+           sin recompensa). Es poco, para que no compense fallar. */
+        let touch = 0;
+        for (const [a, b] of neighbors(r, i)) if (same(at(a, b), col)) touch++;
+        if (touch) { score += 5; fl('+5', cellX(r, i), cellY(r) - slide - 18, 'rgba(255,255,255,.8)', 14); }
+        if (!HAND && --shots <= 0) pushRow();
+      } else if (!HAND) shots = Math.max(shots, 1);
     }
+    trimRows();
     if (HAND && lvPush && --shots <= 0) pushRow();
-    if (HAND && goalDone()) { won = 0.9; k.sfx('win'); return; }
+    if (HAND && goalDone()) { startWin(); return; }
     for (let r2 = 0; r2 < G.length; r2++) for (let i2 = 0; i2 < G[r2].length; i2++) if (G[r2][i2] && cellY(r2) + R > LINE) over = 1;
-    if (over) { k.sfx('hurt'); k.shake(8); }
-    else if (HAND && ammo <= 0) { over = 1; msg = 'Sin disparos'; msgT = 2; k.sfx('lose'); }
+    if (over) { k.sfx('hurt'); k.shake(9); mood = -1; moodT = 3; flash('rgba(255,90,140,.3)', 0.3); }
+    else if (HAND && ammo <= 0 && !fallers.length) { over = 1; msg = 'Sin disparos'; msgT = 2; k.sfx('lose'); mood = -1; moodT = 3; }
+  }
+  /* ---------- victoria: lluvia de lo que queda + bonus + estrellas (§B11) ---------- */
+  function startWin() {
+    won = 1; winStage = 1; winT = 0; winQ = []; stars = starsNow();
+    for (let r = G.length - 1; r >= 0; r--) for (let i = 0; i < G[r].length; i++) if (G[r][i]) winQ.push([r, i]);
+    bonus = Math.max(0, ammo) * 40;
+    k.sfx('win'); k.reward('¡OBJETIVO!', '#7cf7a0'); flash('rgba(160,255,190,.22)', 0.25);
+  }
+  function stepWin(dt) {
+    winT += dt;
+    if (winStage === 1) {
+      while (winQ.length && winT > 0.05) {
+        winT -= 0.05; const [r, i] = winQ.pop(); const cell = G[r][i]; if (!cell) continue;
+        G[r][i] = null;
+        fallers.push({ x: cellX(r, i), y: cellY(r) - slide, vx: k.rnd(-70, 70), vy: -90, cell, rot: 0, vr: k.rnd(-6, 6), d: 0, n: 1 });
+      }
+      if (!winQ.length) { winStage = 2; winT = 0; }
+    } else if (winStage === 2) {
+      if (winT > 0.45 && !fallers.length) {
+        winStage = 3; winT = 0;
+        if (bonus) { score += bonus; fl('Bonus +' + bonus, LX, LINE - 90, '#ffd166', 24); k.sfx('coin'); }
+      }
+    } else if (winStage === 3 && winT > 0.8) {
+      winStage = 4; k.best(ID, score);
+      k.levelDone(score, `${goalText()} · ${score} puntos · ${used()} tiro${used() === 1 ? '' : 's'} usado${used() === 1 ? '' : 's'}${stars < 3 ? ` · ★★★ en ${par3}` : ''}`, { stars });
+    }
+  }
+  /* ---------- puntería: trayectoria, burbuja fantasma y racimo que reventaría ---------- */
+  function predict() {
+    if (aimV === gridV && aimS === slide && Math.abs(aimA - ang) < 0.004) return aimC;
+    aimA = ang; aimV = gridV; aimS = slide;
+    const occ = [], RR = (2 * R - 4) ** 2, pts = [];
+    for (let r = 0; r < G.length; r++) for (let i = 0; i < G[r].length; i++) if (G[r][i]) occ.push(cellX(r, i), cellY(r) - slide);
+    let x = LX, y = LY - 22, vx = Math.sin(ang), vy = -Math.cos(ang), cell = null;
+    pts.push(x, y);
+    for (let s = 0; s < 900; s++) {
+      x += vx * 5; y += vy * 5;
+      if (x < X0 + R) { x = X0 + R; vx = -vx; pts.push(x, y); }
+      else if (x > W - X0 - R) { x = W - X0 - R; vx = -vx; pts.push(x, y); }
+      let hit = y - R <= TOP - 2;
+      if (!hit) for (let q = 0; q < occ.length; q += 2) { const dx = occ[q] - x, dy = occ[q + 1] - y; if (dx * dx + dy * dy < RR) { hit = true; break; } }
+      if (hit) { cell = snapTo(x, y + slide); break; }
+      if (y < -60) break;
+    }
+    pts.push(x, y);
+    let mark = null, n = 0;
+    if (cell && cur && cur.t !== 'b') {
+      const [r, i] = cell; ensureRows(r);
+      const save = G[r][i];
+      let col = cur.c;
+      G[r][i] = { c: col, t: cur.t === 'r' ? 'r' : 'n', pop: 1 };
+      if (cur.t === 'r') { const cc = rbColor(r, i); if (cc >= 0) col = cc; }
+      const cl = cluster(r, i, col);
+      if (cl.length >= 3) { mark = cl; n = cl.length; }
+      G[r][i] = save;
+    }
+    trimRows();
+    aimC = { pts, cell, mark, n };
+    return aimC;
   }
   function update(dt) {
     t += dt;
     if (!k.gate(reset)) return;
     slide = Math.max(0, slide - dt * 90);
-    for (let r = 0; r < G.length; r++) for (const cell of G[r]) if (cell) cell.pop = Math.min(1, cell.pop + dt * 6);
-    for (let i = fallers.length - 1; i >= 0; i--) { const f = fallers[i]; f.vy += 1500 * dt; f.x += f.vx * dt; f.y += f.vy * dt; if (f.y > H + 30) fallers.splice(i, 1); }
+    for (let r = 0; r < G.length; r++) for (const cell of G[r]) if (cell) cell.pop = Math.min(1, cell.pop + dt * 5);
+    for (let i = pops.length - 1; i >= 0; i--) { pops[i].t += dt * 4.6; if (pops[i].t >= 1) { pops[i] = pops[pops.length - 1]; pops.pop(); } }
+    for (let i = flo.length - 1; i >= 0; i--) { const f = flo[i]; f.t -= dt; f.y -= 36 * dt; if (f.t <= 0) { flo[i] = flo[flo.length - 1]; flo.pop(); } }
+    flashT = Math.max(0, flashT - dt); moodT = Math.max(0, moodT - dt); if (!moodT) mood = 0;
+    fireT = Math.max(0, fireT - dt * 3.4); swapT = Math.max(0, swapT - dt * 4);
+    /* burbujas que caen: gravedad, rebote en las paredes y reventón al llegar al suelo */
+    for (let i = fallers.length - 1; i >= 0; i--) {
+      const f = fallers[i];
+      if (f.d > 0) { f.d -= dt; continue; }
+      f.vy += 1500 * dt; f.x += f.vx * dt; f.y += f.vy * dt; f.rot += f.vr * dt;
+      if (f.x < X0 + R) { f.x = X0 + R; f.vx = Math.abs(f.vx) * 0.6; }
+      if (f.x > W - X0 - R) { f.x = W - X0 - R; f.vx = -Math.abs(f.vx) * 0.6; }
+      if (f.y >= FLOORY) {
+        k.burst(f.x + OX, FLOORY + OY, cellCol(f.cell), 12, 190);
+        if (pops.length < 90) pops.push({ x: f.x, y: FLOORY, cell: f.cell, t: 0 });
+        if (!won) { const p = Math.round(dropPts(f.n) * mult); score += p; fl('+' + p, f.x, FLOORY - 16, '#ffd166', 16); }
+        else { score += 30; }
+        k.chime(); k.sfx('pop');
+        fallers[i] = fallers[fallers.length - 1]; fallers.pop();
+      }
+    }
     msgT = Math.max(0, msgT - dt); tipT = Math.max(0, tipT - dt);
-    if (won) { won += dt; if (won > 1.6) { k.best(ID, score); k.levelDone(score, `${goalLabel()} · ${score} puntos · ${ammo} disparo${ammo === 1 ? '' : 's'} de sobra`); won = 0; } return; }
+    if (won) { stepWin(dt); return; }
     if (over) {
       over += dt;
-      if (over > 1.2) k.lose(ID, score, HAND ? (ammo <= 0 ? 'Sin disparos' : 'Se llenó el tubo') : 'Se llenó el tubo',
-        HAND ? `Nivel ${k.lv}/${HAND.length} · ${goalText()}` : `${drops} bajadas del techo`);
+      if (over > 1.4) k.lose(ID, score, HAND ? (ammo <= 0 ? 'Sin disparos' : 'Se llenó el tubo') : 'Se llenó el tubo',
+        HAND ? `${missText()} · nivel ${k.lv}/${HAND.length}` : `${drops} bajadas del techo`);
       return;
     }
     // puntería: ratón/dedo apuntan hacia el punto tocado; cruceta y flechas giran
-    const p = k.ptr;
-    if (p.x !== lp.x || p.y !== lp.y) { lp.x = p.x; lp.y = p.y; if (p.y < LY - 6) ang = k.clamp(Math.atan2(p.x - LX, LY - p.y), -1.34, 1.34); }
+    const p = k.ptr, px = p.x - OX, py = p.y - OY;
+    if (p.x !== lp.x || p.y !== lp.y) { lp.x = p.x; lp.y = p.y; if (py < LY - 6) ang = k.clamp(Math.atan2(px - LX, LY - py), -1.34, 1.34); }
     if (k.held.has('left')) ang = k.clamp(ang - 2.1 * dt, -1.34, 1.34);
     if (k.held.has('right')) ang = k.clamp(ang + 2.1 * dt, -1.34, 1.34);
-    if (k.hit.has('a') || k.hit.has('up') || (p.up && p.y < LY - 10)) fire();
-    if (k.hit.has('b') || k.hit.has('down')) { const q = cur; cur = next; next = q; k.sfx('click'); }
+    if (k.hit.has('a') || k.hit.has('up') || (p.up && py < LY - 10)) fire();
+    if (k.hit.has('b') || k.hit.has('down')) { const q = cur; cur = next; next = q; k.sfx('click'); swapT = 1; aimV = -1; }
     if (shot) stepShot(dt);
+    if (HAND && lvPush && shots === 1 && warn === 0) { warn = 1; k.sfx('hurt'); fl('¡Baja el techo!', LX, TOP + 26, '#ff6fb5', 19); }
+    if (HAND && ammo <= 0 && !shot && !fallers.length && !over) { over = 1; msg = 'Sin disparos'; msgT = 2; k.sfx('lose'); mood = -1; moodT = 3; }
   }
-  const goalLabel = () => (!LV ? '' : LV.goal === 'drop' ? 'Objetos bajados' : LV.goal === 'rescue' ? 'Atrapadas rescatadas' : LV.goal === 'hold' ? 'Techo aguantado' : 'Tubo limpio');
   function cellSprite(cell) {
     if (cell.t === 'i') return spIce[cell.c];
     if (cell.t === 'c') return spCap[cell.c];
@@ -406,55 +588,189 @@ function arcoiris() {
     if (cell.t === 'o') return spObj;
     return sprite[cell.c];
   }
-  function drawCell(x, y, cell, s) { const S = SS * (s || 1); c.drawImage(cellSprite(cell), x - S / 2, y - S / 2, S, S); }
-  function draw() {
-    c.drawImage(bg, 0, 0, W, H);
-    // línea de peligro
-    c.save(); c.setLineDash([9, 7]); c.lineWidth = 2.5; c.strokeStyle = 'rgba(255,111,181,.7)';
-    c.beginPath(); c.moveTo(12, LINE); c.lineTo(W - 12, LINE); c.stroke(); c.restore();
-    // guía de puntería con un rebote
-    if (!shot && !over && !won && k.st === 'play') {
-      let x = LX, y = LY - 22, vx = Math.sin(ang), vy = -Math.cos(ang), bounce = 1;
-      c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 3; c.setLineDash([6, 10]); c.beginPath(); c.moveTo(x, y);
-      for (let s = 0; s < 220; s++) {
-        x += vx * 6; y += vy * 6;
-        if (x < X0 + R || x > W - X0 - R) { if (!bounce--) break; x = k.clamp(x, X0 + R, W - X0 - R); vx = -vx; c.lineTo(x, y); }
-        if (y < TOP + R) break;
-        let stop = false;
-        for (let r = 0; r < G.length && !stop; r++) for (let i = 0; i < G[r].length; i++) if (G[r][i] && (cellX(r, i) - x) ** 2 + (cellY(r) - slide - y) ** 2 < (2 * R - 4) ** 2) { stop = true; break; }
-        if (stop) break;
-      }
-      c.lineTo(x, y); c.stroke(); c.setLineDash([]);
+  function drawCell(x, y, cell, s, rot) {
+    const S = SS * (s == null ? 1 : s);
+    if (rot) { c.save(); c.translate(x, y); c.rotate(rot); c.drawImage(cellSprite(cell), -S / 2, -S / 2, S, S); c.restore(); }
+    else c.drawImage(cellSprite(cell), x - S / 2, y - S / 2, S, S);
+  }
+  /* ---------- el cañón: un bicho con cara que mira adonde apunta (§B12) ---------- */
+  const body = off(70, 64, (g) => {
+    g.translate(35, 40);
+    contact(g, 0, 20, 26, 7, 0.34);
+    const parts = [[(h) => {                       // una sola silueta: cuerpo + patas + orejas
+      h.moveTo(-26, 4); h.quadraticCurveTo(-28, -18, -12, -22); h.quadraticCurveTo(-10, -34, -2, -25);
+      h.quadraticCurveTo(0, -26, 2, -25); h.quadraticCurveTo(10, -34, 12, -22); h.quadraticCurveTo(28, -18, 26, 4);
+      h.quadraticCurveTo(26, 22, 0, 22); h.quadraticCurveTo(-26, 22, -26, 4); h.closePath();
+    }, '#6e62f5']];
+    uni(g, parts, 1.7); celp(g, parts, '#6e62f5', 9, 9);
+    spec(g, -12, -12, 8, 5, -0.6, 0.42);
+  });
+  const barrel = off(34, 52, (g) => {
+    g.translate(17, 44);
+    const parts = [[(h) => { h.moveTo(-11, 4); h.quadraticCurveTo(-13, -30, -8, -38); h.quadraticCurveTo(0, -42, 8, -38); h.quadraticCurveTo(13, -30, 11, 4); h.quadraticCurveTo(0, 9, -11, 4); h.closePath(); }, '#463ac4']];
+    uni(g, parts, 1.7); celp(g, parts, '#463ac4', 6, 8);
+    g.fillStyle = 'rgba(255,255,255,.22)'; ART.rr(g, -7, -34, 5, 30, 2.5); g.fill();
+  });
+  function face(x, y, look) {
+    const ex = Math.sin(look) * 3.6, ey = -Math.cos(look) * 1.6 - 1;
+    const blink = (t % 4.2) > 4.06 ? 0.15 : 1;
+    for (const s of [-1, 1]) {
+      c.fillStyle = '#fff'; c.beginPath(); c.ellipse(x + s * 8.5, y - 4, 5.4, 6 * blink, 0, 0, TAU); c.fill();
+      c.fillStyle = ART.OUT; c.beginPath(); c.ellipse(x + s * 8.5 + ex, y - 4 + ey, 2.7, 3 * blink, 0, 0, TAU); c.fill();
+      if (mood < 0) { c.strokeStyle = ART.OUT; c.lineWidth = 2.2; c.lineCap = 'round'; c.beginPath(); c.moveTo(x + s * 13, y - 13); c.lineTo(x + s * 4.5, y - 10); c.stroke(); }
     }
-    c.save(); c.beginPath(); c.rect(0, TOP - 6, W, H - TOP + 6); c.clip();  // las filas nuevas salen de debajo del techo, nunca sobre el marcador
+    c.strokeStyle = ART.OUT; c.lineWidth = 2.4; c.lineCap = 'round'; c.beginPath();
+    if (mood > 0) { c.arc(x, y + 5, 5.5, 0.3, 2.84); }
+    else if (mood < 0) { c.arc(x, y + 12, 5.5, 3.44, 6.0); }
+    else { c.moveTo(x - 4, y + 7); c.lineTo(x + 4, y + 7); }
+    c.stroke();
+  }
+  /* ---------- marcador ---------- */
+  function bar(x, y, w2, h2, v, col) {
+    ART.rr(c, x, y, w2, h2, h2 / 2); c.fillStyle = 'rgba(12,8,28,.55)'; c.fill(); c.lineWidth = 2; c.strokeStyle = 'rgba(255,255,255,.18)'; c.stroke();
+    const ww = Math.max(0, Math.min(1, v)) * (w2 - 4);
+    if (ww > 1) { ART.rr(c, x + 2, y + 2, ww, h2 - 4, (h2 - 4) / 2); c.fillStyle = col; c.fill(); }
+  }
+  function starRow(x, y, n, s) {
+    for (let i = 0; i < 3; i++) {
+      c.beginPath();
+      for (let q = 0; q < 10; q++) { const a = -1.5708 + q * TAU / 10, rr = q % 2 ? s * 0.42 : s; const xx = x + i * s * 2.4 + Math.cos(a) * rr, yy = y + Math.sin(a) * rr; c[q ? 'lineTo' : 'moveTo'](xx, yy); }
+      c.closePath(); c.lineWidth = 2.4; c.lineJoin = 'round'; c.strokeStyle = ART.OUT; c.stroke();
+      c.fillStyle = i < n ? '#ffd166' : 'rgba(255,255,255,.16)'; c.fill();
+    }
+  }
+  function panel(x, y, w2, h2) { ART.rr(c, x, y, w2, h2, 14); c.fillStyle = 'rgba(16,11,38,.72)'; c.fill(); c.lineWidth = 2; c.strokeStyle = 'rgba(160,151,255,.28)'; c.stroke(); }
+  function hud() {
+    if (!HAND) {
+      label(String(score), OX + 14, OY + 10, 24, '#fff');
+      label('Récord ' + Math.max(k.best(ID, 0), score), OX + 14, OY + 36, 11, 'rgba(255,255,255,.65)');
+      label('Techo', OX + W - 14, OY + 10, 12, 'rgba(255,255,255,.7)', 'right');
+      for (let i = 0; i < 7; i++) { c.beginPath(); c.arc(OX + W - 14 - i * 12, OY + 34, 4, 0, TAU); ART.fillOut(c, i < shots ? '#a8cf3f' : 'rgba(255,255,255,.18)', 1.5); }
+      return;
+    }
+    const st = starsNow(), hv = goalHave(), tt = goalTot();
+    if (SIDE) {                                    // pantalla ancha: dos paneles a los lados
+      const lw = SIDE - 8, lx = k.ex(10), rx = k.ex2(10 + lw);
+      panel(lx, k.ey(14), lw, 150);
+      label(`Nivel ${k.lv}/${HAND.length}`, lx + 14, k.ey(28), 20, '#fff');
+      label(goalText(), lx + 14, k.ey(54), 14, '#a8cf3f');
+      bar(lx + 14, k.ey(76), lw - 28, 13, tt ? hv / tt : 0, '#a8cf3f');
+      label(`${Math.min(hv, tt)} de ${tt}`, lx + 14, k.ey(93), 13, 'rgba(255,255,255,.8)');
+      starRow(lx + 24, k.ey(126), st, 10);
+      label(st < 3 ? `★★★ en ${par3} tiros` : '¡Bordado!', lx + 14, k.ey(140), 12, st < 3 ? 'rgba(255,255,255,.65)' : '#ffd166');
+      panel(rx, k.ey(14), lw, 150);
+      label(`${ammo}`, rx + 14, k.ey(26), 30, ammo <= 3 ? '#ff6fb5' : '#fff');
+      label('tiros', rx + 14 + c.measureText(String(ammo)).width + 8, k.ey(42), 13, 'rgba(255,255,255,.7)');
+      label(`Usados ${used()} · ★★ ${par2}`, rx + 14, k.ey(62), 12, used() <= par3 ? '#7cf7a0' : used() <= par2 ? '#ffd166' : 'rgba(255,255,255,.55)');
+      label(`${score} puntos`, rx + 14, k.ey(82), 15, '#fff');
+      if (mult > 1) label(`Cadena x${mult}`, rx + 14, k.ey(104), 15, mult >= 4 ? '#ff5fa2' : '#ffd166');
+      if (lvPush) { label('Techo', rx + 14, k.ey(126), 12, 'rgba(255,255,255,.6)'); for (let i = 0; i < Math.min(lvPush, 8); i++) { c.beginPath(); c.arc(rx + 22 + i * 13, k.ey(146), 4.6, 0, TAU); ART.fillOut(c, i < shots ? (shots === 1 ? '#ff6fb5' : '#a8cf3f') : 'rgba(255,255,255,.16)', 1.6); } }
+      else label('Sin techo', rx + 14, k.ey(126), 12, 'rgba(255,255,255,.55)');
+      return;
+    }
+    /* Pantalla estrecha: cuatro filas en la franja de 84 px sobre el tubo. El centro de arriba
+       se deja libre: ahí pone el reproductor su botón de pausa cuando no cabe fuera. */
+    const HY = OY - UP;
+    label(`Nivel ${k.lv}/${HAND.length}`, OX + 12, HY + 3, 16, '#fff');
+    label(`${ammo} tiro${ammo === 1 ? '' : 's'}`, OX + W - 12, HY + 2, 17, ammo <= 3 ? '#ff6fb5' : '#fff', 'right');
+    label(goalText(), OX + 12, HY + 23, 12, '#a8cf3f');
+    label(st < 3 ? `★★★ en ${par3} tiros` : '¡Bordado!', OX + W - 12, HY + 24, 11, st < 3 ? 'rgba(255,255,255,.62)' : '#ffd166', 'right');
+    bar(OX + 12, HY + 40, 112, 11, tt ? hv / tt : 0, '#a8cf3f');
+    label(`${Math.min(hv, tt)}/${tt}`, OX + 128, HY + 40, 12, 'rgba(255,255,255,.85)');
+    if (lvPush) { for (let i = 0; i < Math.min(lvPush, 8); i++) { c.beginPath(); c.arc(OX + W - 16 - i * 12, HY + 45, 4, 0, TAU); ART.fillOut(c, i < shots ? (shots === 1 ? '#ff6fb5' : '#a8cf3f') : 'rgba(255,255,255,.16)', 1.5); } }
+    label(`${score}`, OX + 12, HY + 58, 14, 'rgba(255,255,255,.8)');
+    if (mult > 1) label(`Cadena x${mult}`, OX + 84, HY + 59, 13, mult >= 4 ? '#ff5fa2' : '#ffd166');
+    starRow(OX + W - 58, HY + 64, st, 7.5);
+  }
+  function draw() {
+    // fondo estirado a toda la pantalla + burbujas que suben (§B9)
+    c.drawImage(sky, 0, 0, k.W, k.H);
+    for (const a of amb) {
+      a.y -= a.v * 0.016; if (a.y < -a.r) { a.y = k.H + a.r; a.x = Math.random() * k.W; }
+      if (a.x > k.W) a.x = Math.random() * k.W;
+      c.globalAlpha = a.a; c.fillStyle = '#a097ff'; c.beginPath(); c.arc(a.x, a.y, a.r, 0, TAU); c.fill();
+      c.globalAlpha = a.a * 1.6; c.beginPath(); c.arc(a.x - a.r * 0.3, a.y - a.r * 0.35, a.r * 0.24, 0, TAU); c.fill();
+    }
+    c.globalAlpha = 1;
+    c.save(); c.translate(OX, OY);
+    c.drawImage(tube, 0, 0, W, H);
+    // línea de peligro
+    c.save(); c.setLineDash([9, 7]); c.lineDashOffset = -t * 18; c.lineWidth = 2.5;
+    const dg = !over && !won && nearLine();
+    c.strokeStyle = dg ? `rgba(255,90,140,${0.65 + 0.3 * Math.sin(t * 9)})` : 'rgba(255,111,181,.55)';
+    c.beginPath(); c.moveTo(12, LINE); c.lineTo(W - 12, LINE); c.stroke(); c.restore();
+    // techo
+    c.drawImage(ceil, 0, TOP - 24 - slide * 0.3, W, 30);
+    // guía de puntería: trayectoria animada, burbuja fantasma y racimo que reventaría
+    if (!shot && !over && !won && k.st === 'play' && (!HAND || ammo > 0)) {
+      const a = predict();
+      c.save(); c.setLineDash([7, 9]); c.lineDashOffset = -t * 60; c.lineWidth = 3; c.lineCap = 'round';
+      c.strokeStyle = a.n >= 3 ? 'rgba(168,207,63,.85)' : 'rgba(255,255,255,.34)';
+      c.beginPath(); c.moveTo(a.pts[0], a.pts[1]); for (let i = 2; i < a.pts.length; i += 2) c.lineTo(a.pts[i], a.pts[i + 1]); c.stroke(); c.restore();
+      if (a.cell) {
+        const gx = cellX(a.cell[0], a.cell[1]), gy = cellY(a.cell[0]) - slide;
+        c.globalAlpha = 0.42; drawCell(gx, gy, cur, 0.9); c.globalAlpha = 1;
+        c.lineWidth = 2.4; c.strokeStyle = a.n >= 3 ? '#a8cf3f' : 'rgba(255,255,255,.5)';
+        c.beginPath(); c.arc(gx, gy, R + 2 + Math.sin(t * 6) * 1.6, 0, TAU); c.stroke();
+      }
+      if (a.mark && k.dif < 2) {
+        c.lineWidth = 3; c.strokeStyle = `rgba(168,207,63,${0.5 + 0.35 * Math.sin(t * 7)})`;
+        for (const [r, i] of a.mark) { const y = cellY(r) - slide; if (y < TOP - R) continue; c.beginPath(); c.arc(cellX(r, i), y, R + 1, 0, TAU); c.stroke(); }
+        if (a.cell) label(String(a.n), cellX(a.cell[0], a.cell[1]), cellY(a.cell[0]) - slide - R - 20, 17, '#a8cf3f', 'center');
+      }
+    }
+    c.save(); c.beginPath(); c.rect(0, TOP - 6, W, H - TOP + 6); c.clip();  // las filas nuevas salen de debajo del techo
     for (let r = 0; r < G.length; r++) for (let i = 0; i < G[r].length; i++) {
       const cell = G[r][i]; if (!cell) continue;
       const y = cellY(r) - slide; if (y < TOP - R) continue;
-      drawCell(cellX(r, i), y, cell, cell.pop < 1 ? 0.6 + 0.5 * Math.sin(cell.pop * 2.1) : 1);
+      drawCell(cellX(r, i), y, cell, cell.pop < 1 ? 0.55 + 0.6 * Math.sin(cell.pop * 2.1) : 1);
     }
+    // reventones: escala 1 → 1,35 y se apagan (§B8)
+    for (const p of pops) { c.globalAlpha = 1 - p.t; drawCell(p.x, p.y, p.cell, 1 + p.t * 0.35); }
+    c.globalAlpha = 1;
     c.restore();
-    for (const f of fallers) drawCell(f.x, f.y, f.cell, 1);
+    for (const f of fallers) if (f.d <= 0) drawCell(f.x, f.y, f.cell, 1, f.rot);
     if (shot) drawCell(shot.x, shot.y, shot.cell, 1);
-    // lanzador
-    c.save(); c.translate(LX, LY); c.rotate(ang);
-    ART.rr(c, -11, -34, 22, 40, 8); ART.fillOut(c, '#6e62f5', 2.6);
-    c.fillStyle = 'rgba(255,255,255,.25)'; ART.rr(c, -7, -30, 6, 30, 3); c.fill();
+    // cañón con cara
+    const rec = fireT * 7, look = ang;
+    c.save(); c.translate(LX, LY + 4 + rec * 0.5); c.rotate(ang);
+    c.drawImage(barrel, -17, -44 - 4 + rec, 34, 52);
     c.restore();
-    c.beginPath(); c.arc(LX, LY + 6, 21, 0, TAU); ART.fillOut(c, '#463ac4', 2.6);
-    c.beginPath(); c.arc(LX, LY + 6, 13, 0, TAU); ART.fillOut(c, '#2a2350', 2);
-    if (!shot && !over && !won) drawCell(LX + Math.sin(ang) * 26, LY + 6 - Math.cos(ang) * 26, cur, 0.92);
-    drawCell(W - 34, LY + 2, next, 0.64);
-    label('Siguiente', W - 34, LY + 22, 10, 'rgba(255,255,255,.65)', 'center');
-    label('Cambiar', 40, LY - 30, 10, 'rgba(255,255,255,.5)', 'center');  // arriba: abajo-izq van pausa y sonido del reproductor
+    c.save(); c.translate(LX, LY + 10); const sq = 1 + fireT * 0.12; c.scale(sq, 2 - sq);
+    c.drawImage(body, -35, -40, 70, 64); c.restore();
+    face(LX, LY + 8, look);
+    if (!shot && !over && !won && (!HAND || ammo > 0)) drawCell(LX + Math.sin(ang) * 30, LY + 6 - Math.cos(ang) * 30, cur, 0.92 - fireT * 0.2);
+    /* Siguiente burbuja + aviso de que se puede cambiar. Va abajo a la DERECHA: la esquina
+       de abajo a la izquierda la ocupan la pausa y el sonido del reproductor (CFG.hud='bl'). */
+    const nx = W - 34, ny = LY - 12;
+    label('Siguiente', nx, ny - 32, 10, 'rgba(255,255,255,.7)', 'center');
+    c.beginPath(); c.arc(nx, ny, 19, 0, TAU); c.fillStyle = 'rgba(16,11,38,.66)'; c.fill(); c.lineWidth = 2; c.strokeStyle = 'rgba(160,151,255,.4)'; c.stroke();
+    drawCell(nx, ny, next, 0.6 + swapT * 0.28);
+    const sx = nx - 15, sy = ny + 20;
+    c.beginPath(); c.arc(sx, sy, 11, 0, TAU); c.fillStyle = 'rgba(70,58,196,.9)'; c.fill(); c.lineWidth = 2; c.strokeStyle = ART.OUT; c.stroke();
+    c.lineWidth = 2.2; c.lineCap = 'round'; c.strokeStyle = '#fff'; c.beginPath(); c.arc(sx, sy, 5.4, 0.7, 5.3); c.stroke();
+    c.beginPath(); c.moveTo(sx + 6.2, sy - 4.6); c.lineTo(sx + 2, sy - 0.6); c.lineTo(sx + 7.6, sy + 0.8); c.closePath(); c.fillStyle = '#fff'; c.fill();
+    c.restore();
     hud();
+    // consejo del nivel
     if (tipT > 0 && LV && tip) {
-      c.globalAlpha = Math.min(1, tipT); c.fillStyle = 'rgba(20,14,44,.72)';
-      const lines = wrapTip(tip, W - 52, 13);
-      ART.rr(c, 20, LINE - 26 - lines.length * 17, W - 40, lines.length * 17 + 16, 12); c.fill();
-      for (let i = 0; i < lines.length; i++) label(lines[i], W / 2, LINE - 18 - lines.length * 17 + i * 17, 13, '#e8e4ff', 'center');
+      c.globalAlpha = Math.min(1, tipT);
+      const lines = wrapTip(tip, W - 52, 13), bw = W - 40, bx = OX + 20, by = OY + LINE - 26 - lines.length * 17;
+      c.fillStyle = 'rgba(20,14,44,.86)'; ART.rr(c, bx, by, bw, lines.length * 17 + 16, 12); c.fill();
+      c.lineWidth = 2; c.strokeStyle = 'rgba(160,151,255,.35)'; c.stroke();
+      for (let i = 0; i < lines.length; i++) label(lines[i], OX + W / 2, by + 8 + i * 17, 13, '#e8e4ff', 'center');
       c.globalAlpha = 1;
     }
-    if (msgT > 0) { c.globalAlpha = Math.min(1, msgT * 2); label(msg, W / 2, LINE - 62, 22, '#ffd166', 'center'); c.globalAlpha = 1; }
+    if (msgT > 0) { c.globalAlpha = Math.min(1, msgT * 2); label(msg, OX + W / 2, OY + LINE - 62, 22, '#ffd166', 'center'); c.globalAlpha = 1; }
+    // textos flotantes propios (en coordenadas de pantalla: el modo fluido los recorta de otro modo)
+    for (const f of flo) { c.globalAlpha = Math.min(1, f.t / 0.3); label(f.txt, f.x, f.y, f.s, f.col, 'center'); }
+    c.globalAlpha = 1;
+    if (flashT > 0) { c.globalAlpha = flashT * 3; c.fillStyle = flashC; c.fillRect(0, 0, k.W, k.H); c.globalAlpha = 1; }
+  }
+  /* ¿hay algo a menos de dos filas de la línea de peligro? (aviso, §A1) */
+  function nearLine() {
+    for (let r = G.length - 1; r >= 0; r--) for (let i = 0; i < G[r].length; i++) if (G[r][i]) return cellY(r) + R > LINE - RS * 1.6;
+    return false;
   }
   function wrapTip(s, maxW, size) {
     c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
@@ -462,23 +778,6 @@ function arcoiris() {
     for (const w of words) { const q = line ? line + ' ' + w : w; if (c.measureText(q).width > maxW && line) { out.push(line); line = w; } else line = q; }
     if (line) out.push(line);
     return out;
-  }
-  /* Marcador: columna izquierda (nivel, objetivo, puntos) y derecha (disparos y techo).
-     El centro se deja libre: ahí coloca el reproductor su botón de pausa cuando no cabe fuera. */
-  function hud() {
-    if (HAND) {
-      label(`Nivel ${k.lv}/${HAND.length}`, 12, 6, 17, '#fff');
-      label(goalText(), 12, 28, 12, '#a8cf3f');
-      label(`${score} puntos`, 12, 46, 11, 'rgba(255,255,255,.6)');
-      label(`${ammo} tiro${ammo === 1 ? '' : 's'}`, W - 12, 6, 17, ammo <= 3 ? '#ff6fb5' : '#fff', 'right');
-      if (lvPush) { for (let i = 0; i < Math.min(lvPush, 8); i++) { c.beginPath(); c.arc(W - 16 - i * 12, 36, 4, 0, TAU); ART.fillOut(c, i < shots ? '#a8cf3f' : 'rgba(255,255,255,.18)', 1.5); } label('Techo', W - 12, 46, 10, 'rgba(255,255,255,.55)', 'right'); }
-      else label('Sin techo', W - 12, 30, 11, 'rgba(255,255,255,.55)', 'right');
-      return;
-    }
-    label(String(score), 14, 10, 24, '#fff');
-    label('Récord ' + Math.max(k.best(ID, 0), score), 14, 36, 11, 'rgba(255,255,255,.65)');
-    label('Techo', W - 14, 10, 12, 'rgba(255,255,255,.7)', 'right');
-    for (let i = 0; i < 7; i++) { c.beginPath(); c.arc(W - 14 - i * 12, 34, 4, 0, TAU); ART.fillOut(c, i < shots ? '#a8cf3f' : 'rgba(255,255,255,.18)', 1.5); }
   }
   /* Trayectoria pura (misma física que stepShot) — la usan las pruebas automáticas. */
   function trace(a) {
@@ -500,13 +799,17 @@ function arcoiris() {
     get G() { return G; }, get score() { return score; }, get shot() { return shot; }, fire, get over() { return over; },
     get shots() { return shots; }, get colores() { return palette(); }, get ammo() { return ammo; }, get cur() { return cur; },
     get next() { return next; }, get lv() { return LV; }, get won() { return won; }, get par() { return par; },
+    get fallers() { return fallers; }, get stars() { return stars; }, get used() { return used(); },
+    get par2() { return par2; }, get par3() { return par3; }, get chain() { return mult; }, get done() { return goalDone(); },
+    get need() { return goalTot(); }, get have() { return goalHave(); },
     aim: (a) => { ang = k.clamp(a, -1.34, 1.34); }, trace, swap: () => { const q = cur; cur = next; next = q; },
   };
   k.onDif = () => { if (k.st !== 'play') reset(); };
+  if (HAND) { for (const L of HAND) if (L.goal === 'clear') { let n = 0; for (const row of L.m) for (const ch of row) if ('123456abcdefABCDEF?*'.indexOf(ch) >= 0) n++; L._tot = n; } }
   if (HAND) k.levels(HAND.length, { start: (i) => loadLevel(i) });
   reset();
   k.show(CFG.title || 'Burbujas Arcoíris', HAND
-    ? 'Veinte tubos dibujados a mano. Apunta, rebota en las paredes y junta tres iguales; cada nivel tiene su objetivo y sus disparos contados.<br>Toca para jugar'
+    ? 'Veinte tubos dibujados a mano. Apunta, rebota en las paredes y junta tres iguales: lo que se queda colgando se derrumba y vale el doble. Cada nivel tiene su objetivo, sus tiros contados y sus tres estrellas.'
     : 'Apunta con el dedo o el ratón y suelta para lanzar. Tres burbujas iguales estallan y las que se quedan sueltas caen. Cada pocos disparos baja el techo: no dejes que llegue a la línea rosa.<br>Toca para jugar');
   k.run(update, draw);
 }
