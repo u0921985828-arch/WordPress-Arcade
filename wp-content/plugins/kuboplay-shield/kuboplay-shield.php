@@ -89,7 +89,7 @@ final class KP_Shield {
 	}
 
 	public static function boot() {
-		foreach ( array( 'security', 'perf', 'php', 'admin', 'fields' ) as $mod ) {
+		foreach ( array( 'security', 'perf', 'php', 'scan', 'admin', 'fields' ) as $mod ) {
 			$f = self::dir() . ( 'admin' === $mod ? 'admin/settings.php' : ( 'fields' === $mod ? 'admin/fields.php' : 'includes/' . $mod . '.php' ) );
 			if ( is_readable( $f ) ) {
 				require_once $f;

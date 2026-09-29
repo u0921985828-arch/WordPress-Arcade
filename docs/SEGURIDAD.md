@@ -116,3 +116,79 @@ Si ya no puedes entrar, se arregla en 2 minutos **desde el panel de IONOS**, sin
 | Algo dejó de funcionar | Plugin → apagar interruptores de uno en uno |
 | No puedo entrar | IONOS → Administrador de archivos → renombrar `kuboplay-shield` |
 | Se ha roto algo de verdad | Restaurar copia de seguridad de IONOS |
+
+---
+
+## 6. La pestaña «Vigilancia»: buscar puertas traseras que ya estén puestas
+
+Los apartados anteriores impiden que entren. Este sirve para lo otro: **comprobar
+que no haya entrado nadie ya** y que no queden descuidos abiertos.
+
+Está en **Escritorio → Kuboplay Shield → Vigilancia**. Se analiza solo una vez al
+día, en segundo plano, y cuando tú pulsas el botón. **Nunca se ejecuta mientras
+alguien juega**, así que no ralentiza la web (medido: 5.500 ficheros, con los 278
+juegos instalados, en 0,7 segundos; el análisis va por trozos con tope de tiempo
+para no cargar el servidor).
+
+### Qué mira
+
+1. **Ficheros.** Programas PHP dentro de la carpeta de imágenes (`uploads`) o de
+   la caché, que es donde se dejan las puertas traseras; ficheros con nombre de
+   panel de intruso; y código con las marcas típicas: texto que se ejecuta
+   (`eval`), código escondido en base64, órdenes del sistema operativo, ficheros
+   que escriben sobre el `wp-config.php`, código disfrazado de imagen…
+2. **Cuentas.** Administradores de más, cuentas creadas hace poco con permisos
+   totales, un usuario llamado `admin`, correos de dominios que no pintan nada,
+   cuentas que no ha usado nadie nunca y registro abierto al público.
+3. **Configuración.** Permisos del `wp-config.php`, las ocho claves de seguridad
+   (SALT), el editor de código del escritorio, los errores de PHP a la vista, el
+   prefijo de las tablas, la versión de PHP y de WordPress, el candado (HTTPS) y
+   las tareas programadas atascadas o repetidas.
+4. **Plugins y temas.** Los que están instalados pero apagados (siguen siendo
+   atacables aunque no se usen), los que no vienen del repositorio oficial, los
+   que tienen actualización pendiente y los programas sueltos en `wp-content`.
+5. **Integridad.** Al instalarse guarda una huella (un número único) de cada
+   fichero de Kuboplay Shield y del arcade. Si alguno cambia **sin que tú hayas
+   subido una versión nueva**, sale un aviso grave: es exactamente lo que pasa
+   cuando alguien modifica el código para dejarse una puerta abierta.
+
+### Cómo se lee la lista
+
+Cada hallazgo trae cuatro cosas: **qué es**, **qué pasa si no lo arreglas**,
+**dónde está** (fichero y línea) y **los pasos exactos** para arreglarlo desde el
+escritorio de WordPress o desde el Administrador de archivos de IONOS. Van
+ordenados: primero **GRAVE**, luego **MEDIO**, luego **AVISO**. Arriba sale una
+nota sobre 100 para ver de un vistazo si vas bien.
+
+Si sale algo en rojo y no lo entiendes: **no borres nada a lo loco**. Descarga
+antes el fichero a tu ordenador (es tu copia de seguridad) y luego bórralo del
+servidor; si la web se rompe, lo vuelves a subir.
+
+### Lo que el análisis NO hace
+
+- **No borra ni cambia nada por su cuenta.** Solo mira e informa.
+- **No manda nada fuera.** No hay listas remotas, ni servicios externos, ni
+  estadísticas: todo se analiza dentro de tu servidor.
+- No sustituye a una copia de seguridad. Si aparecen varios avisos graves a la
+  vez, lo más rápido y seguro sigue siendo **restaurar una copia de IONOS**
+  anterior a la fecha de los ficheros raros y **cambiar todas las contraseñas**.
+
+### Los tres botones
+
+- **Analizar ahora**: lanza el análisis. Tarda unos segundos; si la web es muy
+  grande, continúa solo en pasadas siguientes y la lista se completa sola.
+- **Volver a tomar las huellas**: úsalo **solo** después de subir tú a mano una
+  versión nueva del plugin o del arcade. Le dice «esto es lo correcto ahora».
+- **Blindar la carpeta de caché**: crea un fichero que impide ejecutar programas
+  dentro de `wp-content/cache`. Es inofensivo y se deshace borrando ese fichero.
+
+### Si sale «Las claves de seguridad están sin poner»
+
+Es el aviso más importante de los que se arreglan en cinco minutos:
+
+1. Abre `https://api.wordpress.org/secret-key/1.1/salt/` en el navegador. Sale un
+   bloque de ocho líneas.
+2. IONOS → Administrador de archivos → `wp-config.php` → Editar.
+3. Busca las ocho líneas que empiezan por `define( 'AUTH_KEY'…`, bórralas y pega
+   en su sitio el bloque nuevo.
+4. Guarda. Se cerrará tu sesión (es lo normal): vuelve a entrar.
