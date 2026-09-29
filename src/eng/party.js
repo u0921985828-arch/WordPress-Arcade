@@ -2636,7 +2636,6 @@ function hud() {
     label(String(score[p]), x + 176, y + 20, 24, '#fff', 'right');
     const lead = Math.max(...score); if (lead > 0 && score[p] === lead) star(x + 84, y + 19, 10);
   }
-  if (CD && MODE === 'roulette') label(`Nivel ${k.lv} · objetivo ${CD.goal[clamp(k.dif | 0, 0, 2)]} pts`, 400, 60, 19, '#c9c3ef');
 }
 function banner() {
   const small = phase === 'play';
@@ -2673,5 +2672,5 @@ function drawBoard() {
   if (CD) label(`${CD.n} · objetivo ${CD.goal[clamp(k.dif | 0, 0, 2)]} pts`, 200, 106, 19, '#c9c3ef');
   const order = [0, 1, 2, 3].sort((a, b) => score[b] - score[a]), mx = Math.max(1, ...score);
   order.forEach((p, i) => { const y = (CD ? 146 : 130) + i * 58; panel(30, y - 22, 340, 46, 12, 'rgba(26,21,48,.9)', 2.5); tagDraw(p, 70, y + 1); if (score[p]) { ART.rr(c, 110, y - 9, 190 * score[p] / mx, 18, 8); ART.fillOut(c, col(p), 2); } label(String(score[p]), 356, y + 1, 24, '#fff', 'right'); });
-  if (phT < 1 && seq && seq[round]) { panel(400, 390, 380, 50, 14, 'rgba(26,21,48,.92)', 3); label('Siguiente: ' + NAMES[seq[round]], 590, 415, 22, '#fff'); }
+  if (phT < 1 && seq && seq[round]) { panel(30, 386, 340, 48, 14, 'rgba(26,21,48,.92)', 3); { const nm = 'Siguiente: ' + (NAMES[seq[round]] || seq[round]); let fs = 20; c.font = FONT(fs); while (fs > 12 && c.measureText(nm).width > 316) { fs -= 1; c.font = FONT(fs); } label(nm, 200, 410, fs, '#fff'); } }
 }
