@@ -7,11 +7,31 @@ let idleH = 0, tab, stock, waste, found, cells, hs, moves, score, sel, done, rem
 const CW = M === 'spider' ? 44 : M === 'freecell' ? 54 : M === 'tripeaks' ? 46 : 60, CH = Math.round(CW * 1.4), CR = Math.round(CW * 0.1), PAD = 7;
 const NC = M === 'spider' ? 10 : M === 'freecell' ? 8 : 7, GAP = (W - NC * CW) / (NC + 1), colX = (i) => GAP + i * (CW + GAP);
 const TOP = 58, TY = TOP + CH + 22, BOT = 632, BY = 640;
+/* ---------- Tabla de niveles: SOLO klondike-solitaire y freecell ----------
+   Los otros tres solitarios (spider, pyramid, tripeaks) no la cargan y se quedan exactamente igual. */
+const LVG = CFG.id === 'klondike-solitaire' ? 'K' : CFG.id === 'freecell' ? 'F' : null;
+const LVT = LVG && typeof CARDLV !== 'undefined' ? CARDLV[LVG] : null;
+const DLY = LVT ? CARDLV[LVG === 'K' ? 'DK' : 'DF'] : null;
+const A52 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+let daily = false, LV = null, used = 0, chain = 0, chainT = 0, brief = 0;
+/* día local (el reto del día cambia a las 00:00 del jugador) */
+const DAY = () => Math.floor((Date.now() - new Date().getTimezoneOffset() * 6e4) / 864e5);
+const curLV = () => (daily ? DLY[DAY() % DLY.length] : LVT[Math.max(1, Math.min(LVT.length, k.lv)) - 1]);
+/* Dificultad: no cambia el reparto ni las reglas, solo los objetivos de estrella y el margen. */
+const DFT = () => (k.dif === 0 ? 1.55 : k.dif === 2 ? 0.85 : 1.15);
+const DFM = () => (k.dif === 0 ? 14 : k.dif === 2 ? 0 : 6);
+const TM = () => Math.round((LV ? LV.tm : 60) * DFT());
+const PAR = () => (LV ? LV.par : 99) + DFM();
+const TLIM = () => TM() * 2;
+const MLIM = () => PAR() * 2 + 30;
+const CN = () => (LV && LV.nc ? LV.nc : 4);
+const RECL = () => (LV && LV.rec != null ? LV.rec : 1e9);
+const fCount = () => found.reduce((s, f) => s + f.length, 0);
 const SPAWN = { klondike: [colX(0), TOP], spider: [colX(9), TOP], freecell: [W / 2 - CW / 2, H + 30], pyramid: [70, 468], tripeaks: [130, 400] }[M];
 function deck(n, suits) { const d = []; for (let i = 0; i < n; i++) for (const s of suits) for (let r = 1; r <= 13; r++) d.push({ r, s, up: false, id: uid++ }); return k.shuffle(d); }
 /* Dificultad: las REGLAS del solitario no se tocan (Spider 2 palos, Klondike robo 1, Pyramid 2 reciclados…);
    cambian las ayudas: pista automática al quedarse parado y cuántos deshacer quedan. */
-const IDLEH = () => (k.dif === 0 ? 8 : k.dif === 2 ? 1e9 : 15);
+const IDLEH = () => (LVT ? 1e9 : k.dif === 0 ? 8 : k.dif === 2 ? 1e9 : 15);
 const HINTT = () => (k.dif === 0 ? 4 : 2.4);
 const NHINT = () => (k.dif === 2 ? 5 : Infinity);
 let undoLeft = Infinity, hintLeft = Infinity;
@@ -19,24 +39,38 @@ function build() {
   undoLeft = k.dif === 2 ? 3 : Infinity; hintLeft = NHINT();
   moves = 0; sel = null; done = false; hist = []; found = [[], [], [], []]; cells = [null, null, null, null]; waste = []; streak = 0; comp = []; disc = []; time = 0;
   auto = false; autoT = 0; drag = null; hintT = 0; hintR = null; casc = null; newAsk = 0; stuckT = 0; AP.clear(); spawnQ = 0.25;
+  chain = 0; chainT = 0;
+  if (LVT) return dealLV();
   if (M === 'klondike') { const d = deck(1, [0, 1, 2, 3]); tab = []; for (let i = 0; i < 7; i++) { tab.push(d.splice(0, i + 1)); tab[i][i].up = true; } stock = d; recycles = 0; }
   if (M === 'spider') { const d = deck(4, [0, 1]); tab = []; for (let i = 0; i < 10; i++) { tab.push(d.splice(0, i < 4 ? 6 : 5)); tab[i][tab[i].length - 1].up = true; } stock = d; removed = 0; }
   if (M === 'freecell') { const d = deck(1, [0, 1, 2, 3]); d.forEach((cd) => (cd.up = true)); tab = Array.from({ length: 8 }, () => []); d.forEach((cd, i) => tab[i % 8].push(cd)); stock = []; }
   if (M === 'pyramid') { const d = deck(1, [0, 1, 2, 3]); pyr = []; for (let r = 0; r < 7; r++) { pyr.push(d.splice(0, r + 1)); pyr[r].forEach((cd) => (cd.up = true)); } stock = d; recycles = 0; }
   if (M === 'tripeaks') { const d = deck(1, [0, 1, 2, 3]); peaks = [d.splice(0, 3), d.splice(0, 6), d.splice(0, 9), d.splice(0, 10)]; peaks[3].forEach((cd) => (cd.up = true)); stock = d; waste = [stock.pop()]; waste[0].up = true; }
 }
+/* Reparto escrito a mano: bases ya subidas (LV.f), pilas de tamaño LV.p y resto al mazo.
+   El orden de LV.d es exactamente el que verificó el resolutor en Node. */
+function dealLV() {
+  LV = curLV(); brief = daily ? 0 : 5;   /* cartel de escuela: qué enseña este nivel */
+  const cards = []; for (let i = 0; i < LV.d.length; i++) { const v = A52.indexOf(LV.d[i]); cards.push({ r: (v % 13) + 1, s: (v / 13) | 0, up: M === 'freecell', id: uid++ }); }
+  found = [[], [], [], []];
+  for (let s = 0; s < 4; s++) for (let r = 1; r <= (LV.f[s] || 0); r++) found[s].push({ r, s, up: true, id: uid++ });
+  tab = []; let i = 0;
+  for (const n of LV.p) { const pile = cards.slice(i, i + n); i += n; if (M === 'klondike' && pile.length) pile[pile.length - 1].up = true; tab.push(pile); }
+  while (tab.length < NC) tab.push([]);
+  stock = M === 'klondike' ? cards.slice(i) : []; recycles = 0;
+}
 function snapshot() { hist.push(JSON.stringify({ tab, stock, waste, found, cells, pyr, peaks, removed, recycles, score, streak, comp, disc })); if (hist.length > 80) hist.shift(); hintR = null; }
-function undo() { if (!hist.length || auto || undoLeft <= 0) { if (hist.length && undoLeft <= 0) { k.float('Sin deshacer', W / 2, 600, '#ffe27a'); k.sfx('hurt'); } return; } undoLeft--; const s = JSON.parse(hist.pop()); ({ tab, stock, waste, found, cells, pyr, peaks, removed, recycles, score, streak, comp, disc } = s); moves++; sel = null; stuckT = 0; hintR = null; k.sfx('click'); }
+function undo() { if (!hist.length || auto || undoLeft <= 0) { if (hist.length && undoLeft <= 0) { k.float('Sin deshacer', W / 2, 600, '#ffe27a'); k.sfx('hurt'); } return; } undoLeft--; used = 1; const s = JSON.parse(hist.pop()); ({ tab, stock, waste, found, cells, pyr, peaks, removed, recycles, score, streak, comp, disc } = s); moves++; sel = null; stuckT = 0; hintR = null; k.sfx('click'); }
 function flipTops() { if (tab) for (const col of tab) if (col.length && !col[col.length - 1].up) { col[col.length - 1].up = true; if (M === 'klondike') score += 5; } }
 const fits = (f, cd) => (!f.length && cd.r === 1) || (f.length > 0 && f[f.length - 1].s === cd.s && f[f.length - 1].r === cd.r - 1);
 function canFound(cd) { return found.findIndex((f) => fits(f, cd)); }
 function tabOk(stack, col, kind) { const top = col[col.length - 1], b = stack[0]; if (!top) return kind === 'spider' ? true : b.r === 13 || M === 'freecell'; if (!top.up) return false; return top.r === b.r + 1 && (M === 'spider' ? true : red(top) !== red(b)); }
 function validRun(stack) { for (let i = 0; i < stack.length - 1; i++) { const a = stack[i], b = stack[i + 1]; if (!b.up || a.r !== b.r + 1 || (M === 'spider' ? a.s !== b.s : red(a) === red(b))) return false; } return stack.every((q) => q.up); }
-function freeCellCap(targetEmpty) { const fc = cells.filter((q) => !q).length, ec = tab.filter((q) => !q.length).length - (targetEmpty ? 1 : 0); return (fc + 1) * Math.pow(2, Math.max(0, ec)); }
+function freeCellCap(targetEmpty) { const fc = cells.filter((q, i) => !q && i < CN()).length, ec = tab.filter((q) => !q.length).length - (targetEmpty ? 1 : 0); return (fc + 1) * Math.pow(2, Math.max(0, ec)); }
 /* ¿Se puede soltar el grupo en el destino? */
 function canDrop(stack, from, d) {
   if (d.t === 'found') return M !== 'spider' && stack.length === 1 && from.t !== 'found' && fits(found[d.i], stack[0]);
-  if (d.t === 'cell') return M === 'freecell' && stack.length === 1 && !cells[d.i] && from.t !== 'cell';
+  if (d.t === 'cell') return M === 'freecell' && d.i < CN() && stack.length === 1 && !cells[d.i] && from.t !== 'cell';
   if (from.t === 'tab' && from.i === d.i) return false;
   const col = tab[d.i]; if (!tabOk(stack, col, M)) return false;
   if (M === 'freecell' && stack.length > freeCellCap(!col.length)) return false;
@@ -48,12 +82,19 @@ function findDest(stack, from) {
   const pri = (i) => (tab[i].length ? 0 : 2) + (M === 'spider' && tab[i].length && tab[i][tab[i].length - 1].s !== stack[0].s ? 1 : 0);
   const order = tab.map((col, i) => i).sort((a, b) => pri(a) - pri(b));
   for (const i of order) if (canDrop(stack, from, { t: 'tab', i })) return { t: 'tab', i };
-  if (M === 'freecell' && stack.length === 1 && from.t !== 'cell') { const e = cells.indexOf(null); if (e >= 0) return { t: 'cell', i: e }; }
+  if (M === 'freecell' && stack.length === 1 && from.t !== 'cell') { const e = cells.findIndex((q, i) => i < CN() && !q); if (e >= 0) return { t: 'cell', i: e }; }
   return null;
 }
 function doMove(stack, from, d) {
   snapshot(); take(from, stack.length); hintR = null;
-  if (d.t === 'found') { found[d.i].push(stack[0]); score += 10; k.sfx('pop'); const r = SL.found[d.i]; if (r) { k.float('+10', r.x + CW / 2, r.y + CH / 2, '#ffe27a'); k.burst(r.x + CW / 2, r.y + CH / 2, '#ffe27a', 8, 90); } }
+  if (d.t === 'found') { found[d.i].push(stack[0]); const r = SL.found[d.i], cx = r ? r.x + CW / 2 : W / 2, cy = r ? r.y + CH / 2 : TOP + CH / 2;
+    /* Cadena: subir a la base seguido sube el multiplicador; se enfría en 7 s. */
+    if (LVT) { chain = chainT > 0 ? chain + 1 : 1; chainT = 7; const mul = Math.min(5, chain); const pts = 10 * mul; score += pts;
+      if (chain === 1) k.chainReset(); k.chime();
+      if (chain >= 3) { k.combo(mul, cx, cy - 14); k.hitstop(0.035); } else k.float('+' + pts, cx, cy, '#ffe27a');
+      if (chain === 5) { k.reward('¡Cadena x5!', '#ffd166'); k.punch(0.04); }
+      k.burst(cx, cy, '#ffe27a', chain >= 3 ? 12 : 8, 90); k.sfx(chain >= 3 ? 'coin' : 'pop'); }
+    else { score += 10; k.sfx('pop'); if (r) { k.float('+10', cx, cy, '#ffe27a'); k.burst(cx, cy, '#ffe27a', 8, 90); } } }
   else if (d.t === 'cell') { cells[d.i] = stack[0]; k.sfx('click'); }
   else { tab[d.i].push(...stack); score += 5; k.sfx('click'); if (M === 'spider') checkRun(d.i); }
   checkWin(); if (!done && !auto && autoOk()) { auto = true; autoT = 0.35; k.float('Autocompletar', W / 2, H / 2, '#ffe27a'); }
@@ -68,7 +109,23 @@ function autoStep() {
   src.sort((a, b) => a[0].r - b[0].r); for (const [cd, from] of src) { const f = canFound(cd); if (f >= 0) { doMove([cd], from, { t: 'found', i: f }); return true; } } return false;
 }
 function win() { done = true; auto = false; score += 500; startCascade(); }
-function finishWin() { casc = null; k.st = 'over'; k.show('¡Ganaste!', `${moves} movimiento${moves === 1 ? "" : "s"} · ${fmt(time)} · ${score} puntos · Récord ${k.best(CFG.id, score)}<br>Toca para una partida nueva`); }
+function finishWin() { casc = null; if (LVT) return lvWin(); k.st = 'over'; k.show('¡Ganaste!', `${moves} movimiento${moves === 1 ? "" : "s"} · ${fmt(time)} · ${score} puntos · Récord ${k.best(CFG.id, score)}<br>Toca para una partida nueva`); }
+/* ---------- Niveles: estrellas, reto del día y derrota ---------- */
+/* 1★ ganar · 2★ dentro del tiempo · 3★ tiempo + movimientos objetivo + sin deshacer ni pistas */
+function lvStars() { let s = 1; if (time <= TM()) s = 2; if (s === 2 && moves <= PAR() && !used) s = 3; return s; }
+const dKey = 'dia:' + CFG.id;
+function dRead() { try { return JSON.parse(localStorage.getItem(dKey) || '{}') || {}; } catch (e) { return {}; } }
+function dSave() { const d = dRead(), n = DAY(); if (d.n === n) return d.s || 1; const s = d.n === n - 1 ? (d.s || 0) + 1 : 1; const o = { n, s, b: Math.min(d.b || 1e9, moves) }; try { localStorage.setItem(dKey, JSON.stringify(o)); } catch (e) {} return s; }
+const dDone = () => dRead().n === DAY();
+function lvWin() {
+  if (daily) { const st = dSave(); k.st = 'over'; k.cd = 0;
+    k.show('¡Reto del día resuelto!', `${moves} movimiento${moves === 1 ? '' : 's'} · ${fmt(time)}<br>Racha de ${st} día${st === 1 ? '' : 's'} seguido${st === 1 ? '' : 's'}`);
+    k.sfx('fanfare'); k.confetti(); return; }
+  const s = lvStars();
+  const falta = s === 3 ? '¡Bordado!' : s === 2 ? (moves > PAR() ? `Para 3★: acabar en ${PAR()} movimientos.` : 'Para 3★: sin deshacer ni pistas.') : `Para 2★: acabar en ${fmt(TM())}.`;
+  k.levelDone(score, `${moves} movs (objetivo ${PAR()}) · ${fmt(time)} (objetivo ${fmt(TM())})<br>${falta}`, { stars: s });
+}
+function lvLose(t) { const q = 52 - fCount(); k.lose(CFG.id, score, t, `Te faltaban ${q} carta${q === 1 ? '' : 's'} para las bases`); }
 function checkWin() { if (done) return; if (M === 'spider' && removed === 8) win(); if ((M === 'klondike' || M === 'freecell') && found.every((f) => f.length === 13)) win(); if (M === 'pyramid' && pyr.every((r) => r.every((q) => !q))) win(); if (M === 'tripeaks' && peaks.every((r) => r.every((q) => !q))) win(); }
 function pyrFree(r, j) { if (!pyr[r][j]) return false; if (r === 6) return true; return !pyr[r + 1][j] && !pyr[r + 1][j + 1]; }
 function peakFree(r, j) { if (!peaks[r][j]) return false; if (r === 3) return true; const cov = r === 0 ? [2 * j, 2 * j + 1] : r === 1 ? [j + Math.floor(j / 2), j + Math.floor(j / 2) + 1] : [j, j + 1]; return cov.every((q) => !peaks[r + 1][q]); }
@@ -76,7 +133,7 @@ function peakFree(r, j) { if (!peaks[r][j]) return false; if (r === 3) return tr
 function pyrPairs() { const fr = []; pyr.forEach((row, r) => row.forEach((q, j) => q && pyrFree(r, j) && fr.push(q))); if (waste.length) fr.push(waste[waste.length - 1]); const o = []; fr.forEach((a, i) => { if (a.r === 13) o.push([a]); for (let j = i + 1; j < fr.length; j++) if (a.r + fr[j].r === 13) o.push([a, fr[j]]); }); return o; }
 function peakPlays() { const top = waste[waste.length - 1], o = []; peaks.forEach((row, r) => row.forEach((q, j) => { if (q && peakFree(r, j)) { const d = Math.abs(q.r - top.r); if (d === 1 || d === 12) o.push(q); } })); return o; }
 function stuckCheck() { if (done) return; const st = M === 'pyramid' ? !stock.length && (recycles >= 2 || !waste.length) && !pyrPairs().length : M === 'tripeaks' ? !stock.length && !peakPlays().length : false; if (st) stuckT = 1.1; }
-function reset() { score = 0; build(); }
+function reset() { score = 0; used = 0; build(); }
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 /* ---------- Pistas ---------- */
@@ -99,22 +156,27 @@ function findHint() {
   }
   if (best) return best;
   // FreeCell: sugiere liberar la carta más baja que quede a menos profundidad usando una celda
-  if (M === 'freecell' && cells.includes(null)) { let bi = -1, bv = 1e9; tab.forEach((col, i) => col.forEach((q, idx) => { const v = q.r * 3 + (col.length - 1 - idx) * 4; if (col.length > 1 && idx < col.length - 1 && v < bv) { bv = v; bi = i; } }));
-    if (bi >= 0) { const col = tab[bi]; return [rc(col[col.length - 1]), slotR(SL.cells[cells.indexOf(null)])]; } }
+  const freeCell = () => cells.findIndex((q, i) => i < CN() && !q);
+  if (M === 'freecell' && freeCell() >= 0) { let bi = -1, bv = 1e9; tab.forEach((col, i) => col.forEach((q, idx) => { const v = q.r * 3 + (col.length - 1 - idx) * 4; if (col.length > 1 && idx < col.length - 1 && v < bv) { bv = v; bi = i; } }));
+    if (bi >= 0) { const col = tab[bi]; return [rc(col[col.length - 1]), slotR(SL.cells[freeCell()])]; } }
   if ((M === 'klondike' && (stock.length || waste.length)) || (M === 'spider' && stock.length)) return [slotR(SL.stock)];
   return null;
 }
-function showHint() { if (hintLeft <= 0) { k.float('Sin pistas', W / 2, 600, '#ffe27a'); k.sfx('hurt'); return; } const h = findHint(); if (!h || !h[0]) { k.float(M === 'freecell' && cells.includes(null) ? 'Prueba a pasar una carta a una celda' : 'Sin movimientos útiles', W / 2, 600, '#ffe27a'); k.sfx('hurt'); return; } hintLeft--; hintR = h.filter(Boolean); hintT = HINTT(); k.sfx('click'); }
+function showHint() { if (hintLeft <= 0) { k.float('Sin pistas', W / 2, 600, '#ffe27a'); k.sfx('hurt'); return; } const h = findHint(); if (!h || !h[0]) { k.float(M === 'freecell' && cells.some((q, i) => i < CN() && !q) ? 'Prueba a pasar una carta a una celda' : 'Sin movimientos útiles', W / 2, 600, '#ffe27a'); k.sfx('hurt'); return; } hintLeft--; used = 1; hintR = h.filter(Boolean); hintT = HINTT(); k.sfx('click'); }
 
 /* ---------- Acciones de toque ---------- */
 function act(h) {
   if (!h) { sel = null; return; }
   if (h.a === 'undo') return undo();
   if (h.a === 'hint') return showHint();
-  if (h.a === 'new') { if (newAsk > 0) { reset(); k.sfx('start'); } else { newAsk = 2.2; k.float('Toca otra vez para repartir', W / 2, 610, '#fff'); } return; }
+  if (h.a === 'new') {
+    if (LVT) { daily = !daily; reset(); k.sfx('start'); k.float(daily ? 'Reto del día' : 'Nivel ' + k.lv, W / 2, 610, '#ffe27a'); return; }
+    if (newAsk > 0) { reset(); k.sfx('start'); } else { newAsk = 2.2; k.float('Toca otra vez para repartir', W / 2, 610, '#fff'); } return; }
   if (auto) return;
   if (h.a === 'stock') {
-    if (M === 'klondike') { snapshot(); if (stock.length) { const cd = stock.pop(); cd.up = true; waste.push(cd); k.sfx('click'); } else if (waste.length) { stock = waste.reverse().map((q) => ({ ...q, up: false })); waste = []; score = Math.max(0, score - 20); k.sfx('pop'); } moves++; }
+    if (M === 'klondike') {
+      if (!stock.length && waste.length && recycles >= RECL()) { k.float('No quedan vueltas al mazo', W / 2, 600, '#ffe27a'); k.sfx('hurt'); return; }
+      snapshot(); if (stock.length) { const cd = stock.pop(); cd.up = true; waste.push(cd); k.sfx('click'); } else if (waste.length) { stock = waste.reverse().map((q) => ({ ...q, up: false })); waste = []; recycles++; score = Math.max(0, score - 20); k.sfx('pop'); } moves++; }
     if (M === 'spider' && stock.length) { if (!tab.every((q) => q.length)) { k.float('Llena antes las columnas vacías', W / 2, 600, '#ffe27a'); navigator.vibrate && navigator.vibrate(20); return; }
       snapshot(); tab.forEach((col, i) => { const cd = stock.pop(); cd.up = true; col.push(cd); const a = AP.get(cd.id); if (a) a.d = i * 0.05; }); tab.forEach((_, i) => checkRun(i)); moves++; k.sfx('shoot'); }
     if (M === 'pyramid') { if (stock.length) { snapshot(); const cd = stock.pop(); cd.up = true; waste.push(cd); moves++; k.sfx('click'); } else if (recycles < 2 && waste.length) { snapshot(); stock = waste.reverse(); stock.forEach((q) => (q.up = false)); waste = []; recycles++; moves++; k.sfx('pop'); } sel = null; stuckCheck(); }
@@ -502,6 +564,8 @@ function slot(r, kind) { if (!r) return; const { x, y } = r; c.drawImage(SLOTC, 
   if (kind === 'redo') { c.lineWidth = 3; c.beginPath(); c.arc(cx, cy, CW * 0.2, -1.2, 4.2); c.stroke(); const a = -1.2, ex = cx + Math.cos(a) * CW * 0.2, ey = cy + Math.sin(a) * CW * 0.2; c.beginPath(); c.moveTo(ex + 6, ey - 2); c.lineTo(ex - 3, ey - 6); c.lineTo(ex - 1, ey + 4); c.closePath(); c.fill(); }
   if (kind === 'x') { c.lineWidth = 3; c.beginPath(); c.moveTo(cx - 8, cy - 8); c.lineTo(cx + 8, cy + 8); c.moveTo(cx + 8, cy - 8); c.lineTo(cx - 8, cy + 8); c.stroke(); }
   if (kind === 'cell') { c.lineWidth = 2; ART.rr(c, cx - 7, cy - 9, 14, 18, 3); c.stroke(); }
+  if (kind === 'lock') { c.fillStyle = 'rgba(8,30,20,.45)'; ART.rr(c, x, y, CW, CH, CR); c.fill();
+    c.strokeStyle = c.fillStyle = 'rgba(255,255,255,.4)'; c.lineWidth = 2.6; c.beginPath(); c.arc(cx, cy - 3, 6, Math.PI, 0); c.stroke(); ART.rr(c, cx - 9, cy - 3, 18, 13, 3); c.fill(); }
 }
 function btn(x, w, txt, icon, on, h) { const y = BY, hh = 34, hv = h && hitAt(k.ptr.x, k.ptr.y) === h && !k.ptr.down;
   ART.rr(c, x, y + 3, w, hh, 12); c.fillStyle = OUT; c.fill(); ART.rr(c, x, y, w, hh, 12); ART.fillOut(c, !on ? '#8d8a97' : hv ? '#fff3c4' : '#f4e6c4', 2);
@@ -525,7 +589,7 @@ function layout() {
       pile(stock, sx, TOP, 0, 1.2, 6); pushH({ x: sx, y: TOP, w: CW, h: CH, a: 'stock', card: 1 });
       waste.forEach((cd) => !(dragged && dragged.has(cd.id)) && put(cd, wx, TOP)); pushH({ x: wx, y: TOP, w: CW, h: CH, a: 'waste', card: 1 });
       for (let i = 0; i < 4; i++) { const x = colX(3 + i); SL.found[i] = { x, y: TOP }; found[i].forEach((cd) => !(dragged && dragged.has(cd.id)) && !(gone && gone.has(cd.id)) && put(cd, x, TOP)); pushH({ x, y: TOP, w: CW, h: CH, a: 'found', i, card: 1 }); } }
-    if (M === 'freecell') for (let i = 0; i < 4; i++) { const x = colX(i); SL.cells[i] = { x, y: TOP }; if (cells[i] && !(dragged && dragged.has(cells[i].id))) put(cells[i], x, TOP); pushH({ x, y: TOP, w: CW, h: CH, a: 'cell', i, card: 1 });
+    if (M === 'freecell') for (let i = 0; i < 4; i++) { const x = colX(i); SL.cells[i] = { x, y: TOP }; if (cells[i] && !(dragged && dragged.has(cells[i].id))) put(cells[i], x, TOP); if (i < CN()) pushH({ x, y: TOP, w: CW, h: CH, a: 'cell', i, card: 1 });
       const fx = colX(4 + i); SL.found[i] = { x: fx, y: TOP }; found[i].forEach((cd) => !(gone && gone.has(cd.id)) && put(cd, fx, TOP)); }
     if (M === 'spider') { const sx = colX(9); SL.stock = { x: sx, y: TOP }; stock.forEach((cd, i) => put(cd, sx - (4 - Math.floor(i / 10)) * 7, TOP)); pushH({ x: sx - 28, y: TOP, w: CW + 28, h: CH, a: 'stock', card: 1 });
       comp.forEach((run, n) => run.forEach((cd) => !(gone && gone.has(cd.id)) && put(cd, colX(0) + n * 9, TOP))); }
@@ -556,12 +620,53 @@ function drawCard(it) {
   if (it.o.hl) { c.strokeStyle = '#ffd84a'; c.lineWidth = 3.5; ART.rr(c, -CW / 2 - 1.5, -CH / 2 - 1.5, CW + 3, CH + 3, CR + 1); c.stroke(); }
   c.restore();
 }
+/* Rotulo que encoge hasta caber (nunca se sale ni se corta) */
+function labelFit(t, x, y, size, col, max, align) {
+  let fs = size; c.font = `800 ${fs}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
+  while (fs > 8 && c.measureText(t).width > max) { fs -= 1; c.font = `800 ${fs}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; }
+  label(t, x, y + (size - fs) / 2, fs, col, align);
+}
+function gauge(x, y, w, h, f, col) {
+  ART.rr(c, x, y, w, h, h / 2); c.fillStyle = 'rgba(0,0,0,.42)'; c.fill();
+  const fw = Math.max(0, Math.min(1, f)) * w; if (fw > 1) { ART.rr(c, x, y, Math.max(h, fw), h, h / 2); c.fillStyle = col; c.fill(); }
+  ART.rr(c, x + 0.5, y + 0.5, w - 1, h - 1, h / 2); c.lineWidth = 1; c.strokeStyle = 'rgba(255,255,255,.22)'; c.stroke();
+}
+/* Meta siempre visible: nombre del nivel, cartas que faltan, movimientos frente al objetivo y reloj */
+function hudLV(now) {
+  const fc = fCount(), tl = TLIM(), ap = time > TM();
+  /* Los botones de pausa/sonido del reproductor caen en el centro de arriba (x 190..290):
+     la columna izquierda se queda en 172 px y la derecha alineada a la derecha. */
+  labelFit(daily ? 'Reto del día' : `${k.lv}. ${LV.n}`, 12, 4, 14, daily ? '#ffd166' : '#ffe27a', 172);
+  label(`${score}`, W - 12, 3, 17, '#fff', 'right');
+  gauge(12, 24, 170, 8, fc / 52, fc === 52 ? '#7cf7a0' : '#6ee7a8');
+  if (chain > 1) { const sc = 1 + 0.06 * Math.sin(now / 90); c.save(); c.translate(12, 41); c.scale(sc, sc); labelFit(`Cadena x${Math.min(5, chain)}`, 0, -8, 13, chain >= 3 ? '#ffb0e0' : '#ffe27a', 170); c.restore(); }
+  else labelFit(`${fc}/52 a las bases`, 12, 36, 11, '#cfe9d8', 170);
+  const mc = moves > PAR() ? '#ffb0a0' : '#cfe9d8';
+  label(`${moves}/${PAR()} movs`, W - 12, 24, 12, mc, 'right');
+  const tc = time > tl * 0.85 ? (Math.floor(now / 250) % 2 ? '#ff8f7a' : '#ffd0c4') : ap ? '#ffb0a0' : '#cfe9d8';
+  label(`${fmt(time)} / ${fmt(TM())}`, W - 12, 38, 12, tc, 'right');
+}
+/* Cartel de escuela: el nombre del nivel y la idea nueva que trae, encima de la fila de botones.
+   Se desvanece solo (5 s, o menos en cuanto haces el primer movimiento) y no traga toques. */
+function briefCard() {
+  const a = Math.min(1, brief / 0.6); if (a <= 0) return;
+  const t1 = `${k.lv}. ${LV.n}`, t2 = LV.e || '';
+  c.save(); c.globalAlpha = a;
+  c.font = '800 15px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const w1 = c.measureText(t1).width;
+  c.font = '700 13px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const w2 = c.measureText(t2).width;
+  const bw = Math.min(W - 24, Math.max(w1, w2) + 34), bh = t2 ? 52 : 32, bx = (W - bw) / 2, by = BY - bh - 12;
+  ART.rr(c, bx, by + 3, bw, bh, 13); c.fillStyle = OUT; c.fill();
+  ART.rr(c, bx, by, bw, bh, 13); ART.fillOut(c, 'rgba(24,18,46,.93)', 2);
+  labelFit(t1, W / 2, by + 7, 15, '#ffe27a', bw - 26, 'center');
+  if (t2) labelFit(t2, W / 2, by + 28, 13, '#cfe9d8', bw - 26, 'center');
+  c.restore();
+}
 function draw() {
   const now = performance.now(), dt = Math.min(0.05, (now - (lastT || now)) / 1000); lastT = now;
   c.drawImage(FELT, 0, 0, W, H); layout();
   // huecos
   if (SL.stock) slot(SL.stock, M === 'klondike' ? 'redo' : M === 'pyramid' ? (recycles < 2 ? 'redo' : 'x') : '');
-  if (SL.waste) slot(SL.waste); if (SL.disc) slot(SL.disc); SL.found.forEach((r) => slot(r, 'A')); SL.cells.forEach((r) => slot(r, 'cell')); SL.tab.forEach((r) => slot(r, M === 'klondike' ? 'K' : ''));
+  if (SL.waste) slot(SL.waste); if (SL.disc) slot(SL.disc); SL.found.forEach((r) => slot(r, 'A')); SL.cells.forEach((r, i) => slot(r, i < CN() ? 'cell' : 'lock')); SL.tab.forEach((r) => slot(r, M === 'klondike' ? 'K' : ''));
   if (M === 'spider' && !comp.length) slot({ x: colX(0), y: TOP }, 'K');
   // cartas: las que vuelan se pintan encima
   const kk = 1 - Math.exp(-dt * 13), mv = [];
@@ -576,14 +681,17 @@ function draw() {
   if (hintR) { const pu = 0.75 + 0.25 * Math.sin(now / 120); c.strokeStyle = `rgba(255,216,74,${pu})`; c.lineWidth = 4; hintR.forEach((r) => { ART.rr(c, r.x - 3, r.y - 3, r.w + 6, r.h + 6, CR + 3); c.stroke(); }); }
   if (kbd && !done) { const q = curH(); if (q) { const hh = q.card ? CH : q.h; c.strokeStyle = '#5ce1e6'; c.lineWidth = 3; c.setLineDash([6, 4]); ART.rr(c, q.x - 3, q.y - 3, q.w + 6, hh + 6, 8); c.stroke(); c.setLineDash([]); } }
   // HUD
-  label(CFG.title, 12, 12, 15, '#ffe27a'); label(`${score} pts`, W - 12, 8, 18, '#fff', 'right'); label(`${moves} movs · ${fmt(time || 0)}`, W - 12, 31, 12, '#cfe9d8', 'right');
+  if (LVT) hudLV(now);
+  else { label(CFG.title, 12, 12, 15, '#ffe27a'); label(`${score} pts`, W - 12, 8, 18, '#fff', 'right'); label(`${moves} movs · ${fmt(time || 0)}`, W - 12, 31, 12, '#cfe9d8', 'right'); }
   if (M === 'spider') { label(`${removed}/8 escaleras`, W / 2 - 6, TOP + CH / 2 - 8, 14, '#fff', 'center'); label(`${stock.length / 10} repartos`, colX(9) + CW / 2 - 14, TOP + CH + 3, 11, '#cfe9d8', 'center'); }
   if (M === 'klondike' && stock.length) label(String(stock.length), colX(0) + CW / 2, TOP + CH + 3, 11, '#cfe9d8', 'center');
+  if (LVT && M === 'klondike') { const vl = Math.max(0, RECL() - recycles); label(vl ? `${vl} vuelta${vl === 1 ? '' : 's'}` : 'Sin vueltas', colX(1) + CW / 2, TOP + CH + 3, 11, vl ? '#cfe9d8' : '#ffb0a0', 'center'); }
   if (M === 'pyramid') { label(`Mazo ${stock.length} · Reciclados ${recycles}/2`, 70 + CW / 2, 468 + CH + 6, 12, '#cfe9d8', 'left'); label('Parejas que sumen 13 · la K sola', W / 2, 598, 13, '#fff', 'center'); label('A=1  J=11  Q=12  K=13', 350 + CW / 2, 468 + CH + 6, 11, '#cfe9d8', 'center'); }
   if (M === 'tripeaks') { label(`${stock.length}`, 130 + CW / 2, 400 + CH + 6, 13, '#cfe9d8', 'center'); label('Una arriba o abajo · K y A enlazan', W / 2, 598, 13, '#fff', 'center');
     if (streak > 1) { const s = 1 + 0.08 * Math.sin(now / 90); c.save(); c.translate(W / 2, 520); c.scale(s, s); label(`Racha x${streak}`, 0, -12, 24, streak > 4 ? '#ffb0e0' : '#ffe27a', 'center'); c.restore(); } }
   if (auto) label('Autocompletando…', W / 2, BY - 26, 14, '#ffe27a', 'center');
-  const H3 = hs.slice(-3); btn(16, 120, newAsk > 0 ? '¿Seguro?' : 'Nueva', 'new', true, H3[0]); btn(180, 120, undoLeft === Infinity ? 'Deshacer' : 'Deshacer ' + undoLeft, 'undo', hist.length > 0 && undoLeft > 0, H3[1]); btn(344, 120, hintLeft === Infinity ? 'Pista' : 'Pista ' + hintLeft, 'hint', hintLeft > 0, H3[2]);
+  if (LVT && brief > 0 && !done) briefCard();
+  const H3 = hs.slice(-3); btn(16, 120, LVT ? (daily ? 'Volver' : 'Reto hoy') : newAsk > 0 ? '¿Seguro?' : 'Nueva', 'new', true, H3[0]); btn(180, 120, undoLeft === Infinity ? 'Deshacer' : 'Deshacer ' + undoLeft, 'undo', hist.length > 0 && undoLeft > 0, H3[1]); btn(344, 120, hintLeft === Infinity ? 'Pista' : 'Pista ' + hintLeft, 'hint', hintLeft > 0, H3[2]);
 }
 /* ---------- Cascada de celebración ---------- */
 function startCascade() {
@@ -601,11 +709,16 @@ function stepCascade(dt) {
 }
 
 k.onDif = () => { if (k.st !== 'play') reset(); };
+if (LVT) k.levels(LVT.length, { start: () => { daily = false; reset(); } });
 reset(); k.show(CFG.title, CFG.help);
 k.run((dt) => {
   if (!k.gate(reset)) return;
   if (done) { if (casc) { stepCascade(dt); if (casc.end || k.ptr.hit || k.hit.has('a')) finishWin(); } return; }
   time += dt; newAsk = Math.max(0, newAsk - dt); spawnQ = Math.max(0, spawnQ - dt); if (hintT > 0 && (hintT -= dt) <= 0) hintR = null;
+  if (chainT > 0 && (chainT -= dt) <= 0) chain = 0;
+  if (brief > 0) brief = moves ? Math.min(brief, 0.9) - dt : brief - dt;
+  /* Presión: reloj y tope de movimientos por nivel (holgados, pero el reparto hay que resolverlo) */
+  if (LVT && !auto) { if (time > TLIM()) return lvLose('Se acabó el tiempo'); if (moves > MLIM()) return lvLose('Demasiados movimientos'); }
   if (stuckT > 0 && (stuckT -= dt) <= 0) { k.lose(CFG.id, score, 'Sin movimientos', `${moves} movimiento${moves === 1 ? "" : "s"}`); return; }
   if (auto) { autoT -= dt; if (autoT <= 0) { autoT = 0.09; if (!autoStep()) auto = false; } return; }
   /* 1.23: más fácil — pista automática tras 15 s sin tocar */
