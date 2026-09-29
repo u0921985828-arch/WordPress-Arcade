@@ -11,7 +11,7 @@ import catalog as cat
 GAMES_DIR = ROOT / 'wp-content/mu-plugins/arcade-core/games'
 ENG_DIR = ROOT / 'src/eng'
 # Todos los motores cargan antes la librería de arte común (ART, src/eng/art.js)
-DEPS = {'esquinas': ['art', 'esqrul'], 'triangulos': ['art', 'triorul'], 'fichas': ['art', 'fichasrul'], 'logica2': ['art', 'l2gen'], 'platformer': ['art', 'platlv'], 'platform': ['art', 'barlv'], 'runner': ['art', 'runlv'], 'shooter': ['art', 'shoolv'], 'maze': ['art', 'mazelv'], 'topdown': ['art', 'dunlv'], 'snake': ['art', 'snakelv'], 'g2048': ['art', 'g2048lv'], 'sokoban': ['art', 'soklv'], 'burbujas': ['art', 'burblv'], 'columnas': ['art', 'collv'], 'match3': ['art', 'swaplv'], 'logic': ['art', 'minelv']}
+DEPS = {'esquinas': ['art', 'esqrul'], 'triangulos': ['art', 'triorul'], 'fichas': ['art', 'fichasrul'], 'logica2': ['art', 'l2gen'], 'platformer': ['art', 'platlv'], 'platform': ['art', 'barlv'], 'runner': ['art', 'runlv'], 'shooter': ['art', 'shoolv'], 'maze': ['art', 'mazelv'], 'topdown': ['art', 'dunlv'], 'snake': ['art', 'snakelv'], 'g2048': ['art', 'g2048lv'], 'sokoban': ['art', 'soklv'], 'burbujas': ['art', 'burblv'], 'columnas': ['art', 'collv'], 'match3': ['art', 'swaplv'], 'logic': ['art', 'minelv'], 'paddle': ['art', 'hockeylv'], 'td': ['art', 'tdlv'], 'teamball': ['art', 'futlv'], 'road': ['art', 'roadlv'], 'racer2d': ['art', 'kartlv'], 'mahjong': ['art', 'mahlv'], 'poly': ['art', 'polylv']}
 deps_of = lambda e: DEPS.get(e, ['art'])
 STANDALONE = {'tetra-drop', 'tetra-drop-marathon'}
 
@@ -49,7 +49,7 @@ G = {
  'lights-out': ('logic', dict(mode='lights', help='Cada toque cambia la luz y sus vecinas. Apágalas todas.')),
  'pipe-connect': ('logic', dict(mode='pipes', help='Toca las piezas para girarlas y conecta todas las tuberías con la fuente amarilla.')),
  'slide-15': ('logic', dict(mode='slide', help='Toca o desliza las fichas hacia el hueco para ordenarlas del 1 al 15.')),
- 'flow-lines': ('flow', dict()), 'color-sort': ('colorsort', dict()), 'laser-mirrors': ('lasers', dict()), 'tangram-studio': ('poly', dict()),
+ 'flow-lines': ('flow', dict()), 'color-sort': ('colorsort', dict()), 'laser-mirrors': ('lasers', dict()), 'tangram-studio': ('poly', dict(help='Arrastra cada pieza al hueco que le toca hasta completar la figura. Tócala para girarla y usa Voltear con las marcadas del revés. Sacar devuelve la última pieza a la bandeja. Cuantos menos movimientos y giros, más estrellas.')),
  # ---------- Plataformas ----------
  'pixel-dash': ('platformer', dict(theme='meadow', spikes=0.2, enemies=0.35, help='← → correr, ↑/A saltar (mantén para saltar más). Pisa a los enemigos, esquiva los pinchos y llega a la bandera.')),
  'wall-jumper': ('platformer', dict(theme='snow', abil=dict(wall=True), spikes=0.08, enemies=0.25, help='← → correr, ↑/A saltar. Salta contra una pared en el aire para rebotar y subir por las chimeneas de hielo.')),
@@ -77,7 +77,7 @@ G = {
  'freecell': ('cards', dict(mode='freecell', help='Toca una carta para moverla sola: a la base, a otra columna o a una celda libre.')),
  'pyramid-solitaire': ('cards', dict(mode='pyramid', help='Toca dos cartas libres que sumen 13 para retirarlas (la K sola). Toca el mazo para robar.')),
  'tripeaks-solitaire': ('cards', dict(mode='tripeaks', help='Toca cartas libres una por encima o por debajo de la del montón. Encadena rachas.')),
- 'mahjong-solitaire': ('mahjong', dict()),
+ 'mahjong-solitaire': ('mahjong', dict(help='Empareja dos fichas iguales que estén libres: sin nada encima y con la izquierda o la derecha despejada. La dorada es comodín, la helada necesita parejas al lado y la del reloj te quita segundos si llega a cero. Encadena parejas seguidas para multiplicar.')),
  'tower-guard': ('td', dict(mode='path')), 'maze-defense': ('td', dict(mode='maze')), 'hex-defense': ('td', dict(mode='hex')),
  'micro-tactics': ('tactics', dict()), 'hex-skirmish': ('tactics', dict(hex=True)),
  'checkers': ('board', dict(mode='checkers')), 'reversi': ('board', dict(mode='reversi')),

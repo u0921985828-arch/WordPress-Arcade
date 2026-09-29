@@ -211,7 +211,7 @@ function mkBodies() {
   for (let tm = 0; tm < 2; tm++) for (let i = 0; i < TS; i++) { const s = slotOf(tm, i); B.push({ team: tm, i, slot: s, ctl: s >= 0 && k.human(s) ? s : -1, x: 0, y: 0, vx: 0, vy: 0, a: tm ? Math.PI : 0, st: 0, cd: 0, chg: -1, anim: 0, gk: (MODE === 'sala' || MODE === 'balonmano') && i === 2, hair: ['#3a2a4a', '#8a4b2a', '#f2d15c', '#1a1530', '#c94f3a', '#5a3a2a'][(tm * 3 + i) % 6] }); }
 }
 function refreshCtl() { for (const b of B) b.ctl = b.slot >= 0 && k.human(b.slot) ? b.slot : -1; }
-k.onParty = () => { if (k.st !== 'play') { reset(); return; } refreshCtl(); };
+k.onParty = () => { const was = FC; FC = !!FLV && !k.party; if (was !== FC) FIELD = null; if (k.st !== 'play') { reset(); return; } refreshCtl(); };
 /* 1.28.1: con más de una CPU se numeran (CPU 1, CPU 2…) para no ver varios rótulos iguales. */
 const nameOf = (b) => (b.ctl >= 0 ? (k.party ? 'J' + (b.ctl + 1) : 'TÚ') : B.filter((o) => o.ctl < 0).length > 1 ? 'CPU ' + (B.filter((o) => o.ctl < 0).indexOf(b) + 1) : 'CPU');
 const humanTeam = () => { const h = B.filter((b) => b.ctl >= 0).map((b) => b.team); return h.length && h.every((x) => x === h[0]) ? h[0] : -1; };
@@ -232,12 +232,26 @@ const M = {
   balonmano: { r: 11, br: 7, spd: 158, acc: 12, fr: 1.7, rest: 0.55, gw: 74, cut: 26, shot: [330, 700], pass: true, area: 92 },
 }[MODE] || {};
 const GY0 = FH / 2 - (M.gw || 0) / 2, GY1 = FH / 2 + (M.gw || 0) / 2;
+/* ---------- CAMPAÑA de futbol-de-plaza (futlv.js) ----------------------------------------
+ * 20 desafíos de 1 jugador. Solo la usa futbol-de-plaza y solo fuera del modo tele: en la tele
+ * manda el mando y el partido es el de siempre. Los otros 11 juegos de este motor no ven nada
+ * de esto, porque todo cuelga de FC. */
+let FIELD = null;
+const FLV = (MODE === 'futbol' && CFG.id === 'futbol-de-plaza' && typeof FUTLV !== 'undefined') ? FUTLV['futbol-de-plaza'] : null;
+let FC = !!FLV, L = FLV ? FLV[0] : null, STY = FLV ? FUTSTY.novato : null;
+let gof = [0, 0], conceded = 0, lastShotX = null, AUTO = false;
+if (FLV) k.levels(FLV.length);
+const goff = (sd) => (FC ? gof[sd] : 0);          /* desplazamiento vertical de cada portería */
+const gside = (gx) => (gx > FW / 2 ? 1 : 0);      /* 0 = portería de la izquierda · 1 = la de la derecha */
 const SEG = [];
-if (!SIDE) {
-  const C = M.cut;
+function mkSeg() {
+  SEG.length = 0;
+  const C = M.cut, o0 = goff(0), o1 = goff(1);
   SEG.push([C, 0, FW - C, 0], [C, FH, FW - C, FH]);
-  if (M.gw) SEG.push([0, C, 0, GY0], [0, GY1, 0, FH - C], [FW, C, FW, GY0], [FW, GY1, FW, FH - C]); else SEG.push([0, C, 0, FH - C], [FW, C, FW, FH - C]);
-  if (C) SEG.push([0, C, C, 0], [FW - C, 0, FW, C], [0, FH - C, C, FH], [FW - C, FH, FW, FH - C]);
+  if (M.gw) SEG.push([0, C, 0, GY0 + o0], [0, GY1 + o0, 0, FH - C], [FW, C, FW, GY0 + o1], [FW, GY1 + o1, FW, FH - C]); else SEG.push([0, C, 0, FH - C], [FW, C, FW, FH - C]);
+}
+if (!SIDE) {
+  mkSeg();
 }
 function segHit(o, r, s, e) {
   const [ax, ay, bx, by] = s, dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy || 1, q = clamp(((o.x - ax) * dx + (o.y - ay) * dy) / L, 0, 1);
@@ -246,7 +260,7 @@ function segHit(o, r, s, e) {
   const nx = ex / d, ny = ey / d; o.x = px + nx * r; o.y = py + ny * r; const vn = o.vx * nx + o.vy * ny;
   if (vn < 0) { o.vx -= (1 + e) * vn * nx; o.vy -= (1 + e) * vn * ny; } return true;
 }
-function walls(o, r, e) { let hit = false; for (const s of SEG) if (segHit(o, r, s, e)) hit = true; for (const py of M.gw ? [GY0, GY1] : []) for (const px of [0, FW]) { const d = hyp(o.x - px, o.y - py); if (d < r + 3 && d > 0) { const nx = (o.x - px) / d, ny = (o.y - py) / d; o.x = px + nx * (r + 3); o.y = py + ny * (r + 3); const vn = o.vx * nx + o.vy * ny; if (vn < 0) { o.vx -= (1 + e) * vn * nx; o.vy -= (1 + e) * vn * ny; } hit = true; } } return hit; }
+function walls(o, r, e) { let hit = false; for (const s of SEG) if (segHit(o, r, s, e)) hit = true; for (const [px, po] of M.gw ? [[0, goff(0)], [FW, goff(1)]] : []) for (const py of [GY0 + po, GY1 + po]) { const d = hyp(o.x - px, o.y - py); if (d < r + 3 && d > 0) { const nx = (o.x - px) / d, ny = (o.y - py) / d; o.x = px + nx * (r + 3); o.y = py + ny * (r + 3); const vn = o.vx * nx + o.vy * ny; if (vn < 0) { o.vx -= (1 + e) * vn * nx; o.vy -= (1 + e) * vn * ny; } hit = true; } } return hit; }
 function keepIn(b) { // jugadores dentro del campo (y de su zona en balón prisionero)
   const r = M.r; let x0 = r, x1 = FW - r;
   if (MODE === 'prisionero') { const z = zoneOf(b); x0 = z[0] + r; x1 = z[1] - r; }
@@ -260,10 +274,51 @@ function keepIn(b) { // jugadores dentro del campo (y de su zona en balón prisi
   if (M.cut) walls(b, r, 0.1);
 }
 
+/* ---------- Campo de la campaña: conos, charcos, viento y porterías móviles ---------- */
+const cones = () => (FC && L.obs) || [];
+const pools = () => (FC && L.mud) || [];
+/* ¿está el punto dentro de un charco? (los charcos frenan a quien los pisa y al balón) */
+function inMud(x, y) { for (const [mx, my, mr] of pools()) if (hyp(x - mx, y - my) < mr) return true; return false; }
+/* choque circular contra un cono: sirve igual para el balón que para un jugador */
+function hitCones(o, r, e) {
+  let hit = false;
+  for (const [cx, cy, cr] of cones()) {
+    const dx = o.x - cx, dy = o.y - cy, d = hyp(dx, dy);
+    if (d >= r + cr || d <= 0) continue;
+    const nx = dx / d, ny = dy / d; o.x = cx + nx * (r + cr); o.y = cy + ny * (r + cr);
+    const vn = o.vx * nx + o.vy * ny; if (vn < 0) { o.vx -= (1 + e) * vn * nx; o.vy -= (1 + e) * vn * ny; }
+    hit = true;
+  }
+  return hit;
+}
+/* vaivén de las porterías: mg = [amplitud tuya, periodo, amplitud rival, periodo] */
+function moveGoals(dt) {
+  if (!FC || !L.mg) return;
+  const [a0, p0, a1, p1] = L.mg, lim = (FH / 2 - M.gw / 2 - 16);
+  gof[0] = a0 ? clamp(Math.sin(t * TAU / (p0 || 6)) * a0, -lim, lim) : 0;
+  gof[1] = a1 ? clamp(Math.sin(t * TAU / (p1 || 6) + 1.7) * a1, -lim, lim) : 0;
+  mkSeg();
+}
+function showLvF() { k.show(k.lv + '. ' + L.n, L.i + '<br><br>Consejo: ' + L.tip); }
+/* 1★ ganar · 2★ ganar por s2 goles (la dificultad la mueve) · 3★ eso y además sin encajar */
+const s2F = () => Math.max(1, L.s2 + (k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0));
+function endLvF() {
+  phase = 'end';
+  const d = score[0] - score[1];
+  if (d <= 0) { const pts = score[0] * 10; return k.lose(CFG.id, pts, d === 0 ? 'Empate' : 'Derrota', `${TEAM[0].name} ${score[0]} – ${score[1]} ${TEAM[1].name}<br>Hay que GANAR el desafío`); }
+  const need = s2F(), st = conceded === 0 && d >= need ? 3 : d >= need ? 2 : 1;
+  const extra = st >= 3 ? '¡Ganado por ' + d + ' y a puerta a cero!'
+    : st === 2 ? `Gana sin encajar para la 3.ª estrella (te metieron ${conceded})`
+    : `Gana por ${need} gol${need > 1 ? 'es' : ''} de diferencia para la 2.ª estrella`;
+  k.levelDone(score[0] * 100 + d * 50 + (conceded === 0 ? 150 : 0), extra, { stars: st });
+}
+
 /* ---------------- Arranque de partido / saques ---------------- */
 function reset() {
-  skill = clamp(clamp(0.2 + lsGet(CPUK, 0) * 0.04, 0.2, 0.85) + DC * 0.09, 0.08, 0.95); // 1.23: más fácil (subida 0.08→0.04 por victoria, tope 0.92→0.85)
-  mkBodies(); score = [0, 0]; clock = DUR; golden = false; msg = ''; msgT = 0; rounds = [0, 0]; roundNo = 1; lastTouch = null;
+  if (FC) { L = FLV[Math.min(FLV.length, Math.max(1, k.lv)) - 1]; STY = FUTSTY[L.sty] || FUTSTY.novato; gof = [0, 0]; conceded = 0; lastShotX = null; FIELD = null; mkSeg(); }
+  skill = FC ? clamp(L.cpu + (k.dif === 0 ? -0.12 : k.dif === 2 ? 0.12 : 0), 0.05, 0.95)
+    : clamp(clamp(0.2 + lsGet(CPUK, 0) * 0.04, 0.2, 0.85) + DC * 0.09, 0.08, 0.95); // 1.23: más fácil (subida 0.08→0.04 por victoria, tope 0.92→0.85)
+  mkBodies(); score = [0, 0]; clock = FC ? Math.round(L.dur * k.D.time) : DUR; golden = false; msg = ''; msgT = 0; rounds = [0, 0]; roundNo = 1; lastTouch = null;
   serveTeam = 0; serveIdx = [0, 0]; touches = [0, 0];
   kickTeam = Math.random() < 0.5 ? 0 : 1; kickoff(); cdPend = true;
 }
@@ -285,13 +340,17 @@ function kickoff() {
   ball = { x: FW / 2, y: FH / 2, vx: 0, vy: 0, z: MODE === 'coches' ? 60 : 0, vz: 0, r: M.br, own: null, spin: 0, nt: null, ntT: 0 };
 }
 function goal(team, how) {
-  score[team]++; phase = 'goal'; phT = 2; lastTouch = null; kickTeam = 1 - team;
+  let dbl = false;
+  if (FC) { if (team === 1) conceded++; if (L.long && lastShotX != null && Math.abs(lastShotX - goalX(team)) > L.long) dbl = true; }
+  score[team] += dbl ? 2 : 1; phase = 'goal'; phT = 2; lastTouch = null; kickTeam = 1 - team;
   const [sx, sy] = SIDE ? [ball.x, ball.y] : V(ball.x, ball.y);
-  msg = golden ? '¡Gol de oro!' : how || '¡GOL!'; msgT = 2; k.sfx('win'); k.shake(8); k.flash('rgba(255,255,255,.35)');
+  msg = golden ? '¡Gol de oro!' : dbl ? '¡GOLAZO DE LEJOS! ×2' : how || '¡GOL!'; msgT = 2; k.sfx('win'); k.shake(8); k.flash('rgba(255,255,255,.35)');
   k.confetti(TEAM[team].col, 90); k.burst(sx, sy, TEAM[team].col, 40, 280);
   if (golden) phT = 1.4;
+  if (FC) lastShotX = null;
 }
 function finish() {
+  if (FC) return endLvF();
   phase = 'end'; const d = score[0] - score[1], wt = d > 0 ? 0 : 1, ht = humanTeam();
   if (d === 0) { k.sfx('tick'); return k.win('¡Empate!', '#ffd166', `${TEAM[0].name} ${score[0]} – ${score[1]} ${TEAM[1].name}<br>Nadie marcó en la prórroga<br>Toca para la revancha`, 0); }
   if (!k.party && ht >= 0) lsSet(CPUK, Math.max(0, lsGet(CPUK, 0) + (wt === ht ? 1 : -0.5)));
@@ -312,6 +371,7 @@ function doPass(b, to) {
   release(b, (lx - ball.x) / d * sp, (ly - ball.y) / d * sp); to.recv = 0.8; k.sfx('pop');
 }
 function doShot(b, dir, power) {
+  if (FC) lastShotX = b.x;
   const gx = goalX(b.team), gy = FH / 2; let ax = dir ? dir.x : Math.cos(b.a), ay = dir ? dir.y : Math.sin(b.a);
   const tx = gx - ball.x, ty = gy - ball.y, td = hyp(tx, ty) || 1;
   if ((ax * tx + ay * ty) / td > Math.cos(0.7)) { // ayuda de puntería: hacia un palo del lado al que apuntas
@@ -327,7 +387,8 @@ function steal(from, by) {
 
 /* ---------- IA fútbol / hockey ---------- */
 function lineClear(b, gx) { // ¿hay hueco? ningún rival cerca de la línea de tiro hacia alguno de los palos
-  return [GY0 + 14, FH / 2, GY1 - 14].some((gy) => { const dx = gx - b.x, dy = gy - b.y, L = dx * dx + dy * dy || 1;
+  const _o = goff(gside(gx));
+  return [GY0 + _o + 14, FH / 2 + _o, GY1 + _o - 14].some((gy) => { const dx = gx - b.x, dy = gy - b.y, L = dx * dx + dy * dy || 1;
     return B.every((o) => { if (o.team === b.team) return true; const q = clamp(((o.x - b.x) * dx + (o.y - b.y) * dy) / L, 0, 1); return hyp(b.x + dx * q - o.x, b.y + dy * q - o.y) > M.r + 16; }); });
 }
 function aiField(b, dt) {
@@ -337,7 +398,7 @@ function aiField(b, dt) {
   if (b.gk) { // sala: portero CPU que no sale de su área salvo balón suelto cerca
     const og = goalX(1 - b.team), inA = Math.abs(ball.x - og) < 95 && Math.abs(ball.y - FH / 2) < 90;
     if (own === b) { b.holdT = (b.holdT || 0) + dt; if (b.holdT > 0.7) { const m = B.filter((o) => o.team === b.team && o !== b).sort((p, q) => (q.x - p.x) * s)[0]; doPass(b, m); b.holdT = 0; } tx = og + s * 40; ty = FH / 2; }
-    else { b.holdT = 0; if (!own && inA && hyp(ball.vx, ball.vy) < 260) { tx = ball.x; ty = ball.y; } else { tx = og + s * 20; ty = clamp(lerp(FH / 2, ball.y + ball.vy * 0.15, 0.7), GY0 - 6, GY1 + 6); } }
+    else { b.holdT = 0; if (!own && inA && hyp(ball.vx, ball.vy) < 260) { tx = ball.x; ty = ball.y; } else { tx = og + s * 20; const _o = goff(gside(og)); ty = clamp(lerp(FH / 2 + _o, ball.y + ball.vy * 0.15, 0.7), GY0 + _o - 6, GY1 + _o + 6); } }
     const dx = tx - b.x, dy = ty - b.y, d = hyp(dx, dy); return d > 4 ? { x: dx / d * Math.min(1, d / 24), y: dy / d * Math.min(1, d / 24), sp } : null;
   }
   if (own === b) {
@@ -345,7 +406,7 @@ function aiField(b, dt) {
     const foeAhead = foe && hyp(foe.x - b.x, foe.y - b.y) < 70 && (foe.x - b.x) * s > -5;
     if (b.chg >= 0) { b.chg += dt; if (b.chg >= b.chgT) { doShot(b, null, clamp(b.chg / 0.8, 0.35, 1)); b.chg = -1; } }
     else if (b.passReq > 0 && mate) { doPass(b, mate); b.passReq = 0; }
-    else if (dg < (MODE === 'hockey' ? 210 : 200) && Math.abs(b.y - FH / 2) < 150 && b.think <= 0 && (lineClear(b, gx) || dg < 60 || Math.random() < 0.08) && Math.random() < (weakCpu(b) ? (ease(b) ** 2 * 1.1 - 0.1) * (0.6 + 0.4 * skill) : ease(b) * 1.1 - 0.1)) { b.chg = 0; b.chgT = lerp(0.2, 0.55, dg / 260) + k.rnd(0, 0.15); b.a = Math.atan2(FH / 2 - b.y, gx - b.x); }
+    else if (dg < (MODE === 'hockey' ? 210 : 200) && Math.abs(b.y - FH / 2) < 150 && b.think <= 0 && (lineClear(b, gx) || dg < 60 || Math.random() < 0.08) && Math.random() < (weakCpu(b) ? (ease(b) ** 2 * 1.1 - 0.1) * (0.6 + 0.4 * skill) : ease(b) * 1.1 - 0.1) * (FC && b.team === 1 ? STY.shoot : 1)) { b.chg = 0; b.chgT = lerp(0.2, 0.55, dg / 260) + k.rnd(0, 0.15); b.a = Math.atan2(FH / 2 - b.y, gx - b.x); }
     else if (foeAhead && mate && b.think <= 0 && (mate.x - b.x) * s > -40 && !B.some((o) => o.team !== b.team && hyp(o.x - mate.x, o.y - mate.y) < 45) && Math.random() < 0.5 + skill * 0.4) { doPass(b, mate); }
     else { tx = gx; ty = FH / 2 + (b.y < FH / 2 ? -30 : 30); if (foeAhead) ty = b.y + (foe.y > b.y ? -90 : 90); }
     if (b.think <= 0) b.think = lerp(0.5, 0.15, skill);
@@ -354,15 +415,21 @@ function aiField(b, dt) {
     const teamHas = own && own.team === b.team;
     const hMate = MODE !== 'prisionero' && B.some((o) => o !== b && o.team === b.team && o.ctl >= 0), og0 = goalX(1 - b.team);
     if (hMate && own !== b && !(chaser === b && Math.abs(ball.x - og0) < FW * 0.4) && !(teamHas && Math.abs(own.x - og0) < FW * 0.35)) { // con compañero humano: la CPU cubre atrás
-      tx = teamHas ? lerp(og0, ball.x, 0.45) : og0 + s * (26 + 0.14 * Math.abs(ball.x - og0)); ty = teamHas ? (ball.y < FH / 2 ? FH * 0.65 : FH * 0.35) : clamp(lerp(FH / 2, ball.y + ball.vy * 0.2, 0.65), GY0 - 12, GY1 + 12); run = 1; }
+      tx = teamHas ? lerp(og0, ball.x, 0.45) : og0 + s * (26 + 0.14 * Math.abs(ball.x - og0)); ty = teamHas ? (ball.y < FH / 2 ? FH * 0.65 : FH * 0.35) : clamp(lerp(FH / 2 + goff(gside(og0)), ball.y + ball.vy * 0.2, 0.65), GY0 + goff(gside(og0)) - 12, GY1 + goff(gside(og0)) + 12); run = 1; }
     else if (teamHas) { // apoyo: por delante si el poseedor está en su campo; si ataca, se queda de cierre algo retrasado y abierto
       const og = goalX(1 - b.team), adv = (own.x - og) * s; tx = adv < FW * 0.5 ? clamp(own.x + s * 130, 40, FW - 40) : clamp(own.x - s * (90 - 40 * skill), 40, FW - 40); ty = own.y < FH / 2 ? FH * 0.7 : FH * 0.3; run = 0.85; }
     else if (chaser === b || b.recv > 0 || (chaser.ctl >= 0 && hyp(b.x - ball.x, b.y - ball.y) < 60)) {
       const lead = own ? 0.15 : clamp(hyp(ball.vx, ball.vy) / 600, 0, 0.5); tx = ball.x + ball.vx * lead; ty = ball.y + ball.vy * lead;
       if (own && own.team !== b.team && hyp(own.x - b.x, own.y - b.y) < 42 && b.cd <= 0 && Math.random() < dt * (2 + skill * 6)) { b.a = Math.atan2(own.y - b.y, own.x - b.x); tackle(b); }
       if (!own) { tx -= s * 6; } // se coloca un poco por detrás para empujar hacia delante
+      if (FC && b.team === 1 && own && own.team !== b.team && STY.press > 0) { tx = own.x + own.vx * 0.12; ty = own.y + own.vy * 0.12; run = STY.run * (1 + STY.press * 0.15); }
     } else if (MODE === 'sala' || MODE === 'balonmano') { const og = goalX(1 - b.team); tx = lerp(og, ball.x, 0.55); ty = lerp(FH / 2, ball.y, 0.6); run = 0.9; } // sala: el portero ya cubre, el otro defiende a media distancia
-    else { const og = goalX(1 - b.team); tx = og + s * (26 + 0.14 * Math.abs(ball.x - og)); ty = clamp(lerp(FH / 2, ball.y + ball.vy * 0.2, 0.65), GY0 - 12, GY1 + 12); run = 1; } // portero: entre balón y portería
+    else { const og = goalX(1 - b.team), _o = goff(gside(og));
+      /* campaña: el estilo decide cuánto se mete atrás el segundo hombre del rival, y si el
+       * desafío es «sin portero» sale a presionar en vez de quedarse en la línea */
+      const st = FC && b.team === 1 ? STY : null, deep = st ? st.deep : 0;
+      if (st && L.gk === 0) { tx = lerp(og, ball.x, 0.62); ty = lerp(FH / 2 + _o, ball.y, 0.62); run = st.run; }
+      else { tx = og + s * (26 + 0.14 * Math.abs(ball.x - og)) * (1 - deep); ty = clamp(lerp(FH / 2 + _o, ball.y + ball.vy * 0.2, 0.65), GY0 + _o - 12, GY1 + _o + 12); run = st ? st.run : 1; } } // portero: entre balón y portería
   }
   const dx = tx - b.x, dy = ty - b.y, d = hyp(dx, dy);
   return d > 6 ? { x: dx / d * Math.min(1, d / 30) * run, y: dy / d * Math.min(1, d / 30) * run, sp } : null;
@@ -388,10 +455,12 @@ function separate() {
 
 /* ---------- Fútbol y hockey ---------- */
 function stepField(dt) {
+  if (FC) moveGoals(dt);
   for (const b of B) {
     b.recv = Math.max(0, (b.recv || 0) - dt); b.cd = Math.max(0, b.cd - dt); b.passReq = Math.max(0, (b.passReq || 0) - dt);
     let dir = null, spd = M.spd;
-    if (b.ctl >= 0) {
+    if (b.ctl >= 0 && AUTO) { const r0 = aiField(b, dt); if (r0) { dir = { x: r0.x, y: r0.y }; spd = r0.sp; } }
+    else if (b.ctl >= 0) {
       dir = inDir(b.ctl); const p = b.ctl;
       if (ball.own === b) {
         if (k.phit(p, 'a')) { if (TS > 1) doPass(b, nearestMate(b)); else doShot(b, dir, 0.3); }
@@ -410,6 +479,7 @@ function stepField(dt) {
     if (dir && b.chg >= 0 && b.ctl >= 0) b.a = Math.atan2(dir.y, dir.x);
   }
   separate();
+  if (FC) for (const b of B) { hitCones(b, M.r, 0.2); if (inMud(b.x, b.y)) { b.vx *= Math.max(0, 1 - 3.2 * dt); b.vy *= Math.max(0, 1 - 3.2 * dt); } }
   // balón
   ball.ntT = Math.max(0, ball.ntT - dt); if (ball.ntT <= 0) ball.nt = null;
   if (ball.own) {
@@ -419,11 +489,13 @@ function stepField(dt) {
     for (const q of B) if (q.team !== o.team && q.st <= 0 && hyp(q.x - ball.x, q.y - ball.y) < M.r + ball.r - 1 && (q.slide > 0 || Math.random() < dt * 1.5)) { steal(o, q); break; }
     if (o.st > 0) { ball.own = null; }
   } else {
+    if (FC) { if (L.wind) ball.vy += L.wind * dt; if (inMud(ball.x, ball.y)) { ball.vx *= Math.max(0, 1 - 2.4 * dt); ball.vy *= Math.max(0, 1 - 2.4 * dt); } }
     ball.x += ball.vx * dt; ball.y += ball.vy * dt; const f = Math.max(0, 1 - M.fr * dt); ball.vx *= f; ball.vy *= f; ball.spin += hyp(ball.vx, ball.vy) * dt * 0.1;
+    if (FC && hitCones(ball, ball.r, 0.82)) k.sfx('click');
     if (walls(ball, ball.r, M.rest) && hyp(ball.vx, ball.vy) > 120) { k.sfx('click'); if (M.neon) { glow.push({ x: ball.x, y: ball.y, t: 0.5 }); const [gx, gy] = V(ball.x, ball.y); k.burst(gx, gy, '#ff4fd8', 8, 140); } }
     const v = hyp(ball.vx, ball.vy);
     for (const q of B) { if (q === ball.nt || q.st > 0) continue; const dx = ball.x - q.x, dy = ball.y - q.y, d = hyp(dx, dy);
-      const keeper = Math.abs(q.x - goalX(1 - q.team)) < 90 && q.y > GY0 - 30 && q.y < GY1 + 30, reach = M.r + ball.r + 3 + (keeper ? (weakCpu(q) ? 4 + 14 * skill : 18) : 0); // el que guarda la portería llega más lejos (estirada)
+      const _ko = goff(q.team), keeper = Math.abs(q.x - goalX(1 - q.team)) < 90 && q.y > GY0 + _ko - 30 && q.y < GY1 + _ko + 30, reach = M.r + ball.r + 3 + (keeper ? (weakCpu(q) ? 4 + 14 * skill : 18) * (FC && q.team === 1 ? STY.keep * (L.gk === 0 ? 0 : L.gk === 2 ? 1.4 : 1) : 1) : 0); // el que guarda la portería llega más lejos (estirada)
       if (d < reach) {
         const rel = hyp(ball.vx - q.vx, ball.vy - q.vy);
         if (keeper && d > M.r + ball.r + 3) { const [sx, sy] = V(q.x, q.y); k.float('¡Parada!', sx, sy - 20, TEAM[q.team].col); }
@@ -433,7 +505,8 @@ function stepField(dt) {
     if (v < 0.5) { ball.vx = ball.vy = 0; }
   }
   // gol
-  if (ball.y > GY0 && ball.y < GY1 && (ball.x < -ball.r * 0.2 || ball.x > FW + ball.r * 0.2)) { ball.own = null; goal(ball.x < 0 ? 1 : 0); }
+  const o0 = ball.x < -ball.r * 0.2, o1 = ball.x > FW + ball.r * 0.2, _go = goff(o0 ? 0 : 1);
+  if ((o0 || o1) && ball.y > GY0 + _go && ball.y < GY1 + _go) { ball.own = null; goal(o0 ? 1 : 0); }
   else { ball.x = clamp(ball.x, -30, FW + 30); ball.y = clamp(ball.y, 2, FH - 2); }
 }
 
@@ -888,7 +961,11 @@ function aiHead(b, dt) {
 /* =====================================================================================
  *  Bucle
  * ===================================================================================== */
-reset(); k.show(CFG.title, CFG.help);
+if (FLV) k.onLevel = () => { reset(); if (k.st !== 'play') showLvF(); };
+reset();
+if (FC) showLvF(); else k.show(CFG.title, CFG.help);
+/* gancho de pruebas (scripts/fut_play.py): el bot deja que la IA del motor pilote al humano */
+if (FLV) window.__fb = { auto: (v) => { AUTO = !!v; }, now: () => ({ st: k.st, lv: k.lv, phase, score: score.slice(), clock: Math.max(0, Math.round(clock)), conceded, s2: s2F(), stars: k.starsOf(k.lv), dif: k.dif }) };
 addEventListener('resize', () => { if (!SIDE && k.st !== 'play' && !k.party && (innerHeight > innerWidth * 1.08) !== VERT) location.reload(); });
 k.run((dt) => {
   if (!k.gate(reset)) return;
@@ -932,7 +1009,6 @@ k.run((dt) => {
 /* =====================================================================================
  *  Dibujo
  * ===================================================================================== */
-let FIELD = null;
 function courtArt() { // patio de colegio: asfalto, zona pintada, línea de triple y valla
   return mk(W, H, (g) => {
     g.fillStyle = '#1f1a33'; g.fillRect(0, 0, W, H);
@@ -986,7 +1062,7 @@ function fieldArt() {
     g.save(); worldT(g);
     const C = M.cut, path = () => { g.beginPath(); if (C) { g.moveTo(C, 0); g.lineTo(FW - C, 0); g.lineTo(FW, C); g.lineTo(FW, FH - C); g.lineTo(FW - C, FH); g.lineTo(C, FH); g.lineTo(0, FH - C); g.lineTo(0, C); g.closePath(); } else g.rect(0, 0, FW, FH); };
     // redes de las porterías (fuera del campo)
-    if (M.gw) for (const s of [0, 1]) { const x0 = s ? FW : -22; ART.rr(g, x0, GY0 - 4, 22, M.gw + 8, 5); g.fillStyle = 'rgba(255,255,255,.18)'; g.fill(); g.lineWidth = 2.5; g.strokeStyle = OUT; g.stroke();
+    if (M.gw && !FC) for (const s of [0, 1]) { const x0 = s ? FW : -22; ART.rr(g, x0, GY0 - 4, 22, M.gw + 8, 5); g.fillStyle = 'rgba(255,255,255,.18)'; g.fill(); g.lineWidth = 2.5; g.strokeStyle = OUT; g.stroke();
       g.strokeStyle = 'rgba(255,255,255,.45)'; g.lineWidth = 1; for (let y = GY0; y < GY1; y += 8) { g.beginPath(); g.moveTo(x0 + 2, y); g.lineTo(x0 + 20, y); g.stroke(); } for (let x = 0; x < 22; x += 7) { g.beginPath(); g.moveTo(x0 + x, GY0); g.lineTo(x0 + x, GY1); g.stroke(); } }
     path(); g.save(); g.clip();
     if (MODE === 'futbol') { for (let i = 0; i < 12; i++) { g.fillStyle = i % 2 ? '#47b358' : '#52c063'; g.fillRect(i * FW / 12, 0, FW / 12 + 1, FH); } }
@@ -1016,6 +1092,7 @@ function fieldArt() {
       for (const x of [0, FW]) { const s = x ? -1 : 1; g.beginPath(); g.moveTo(x + s * 132, FH / 2 - 9); g.lineTo(x + s * 132, FH / 2 + 9); g.stroke(); } }
     if (MODE === 'sala') { g.strokeStyle = '#5ce1e6'; for (const [x, a0] of [[0, -Math.PI / 2], [FW, Math.PI / 2]]) { g.beginPath(); g.arc(x, FH / 2, 78, a0, a0 + Math.PI); g.stroke(); } g.fillStyle = '#5ce1e6'; for (const x of [70, FW - 70]) { g.beginPath(); g.arc(x, FH / 2, 3, 0, TAU); g.fill(); } }
     if (M.neon) { g.shadowBlur = 0; g.shadowColor = 'transparent'; }
+    if (FC) campField(g);
     if (MODE === 'prisionero') { g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 3; for (const x of [34, 566]) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, FH); g.stroke(); } g.beginPath(); g.arc(FW / 2, FH / 2, 40, 0, TAU); g.stroke(); }
     // vallas
     path(); g.lineWidth = 9; g.strokeStyle = OUT; g.stroke(); g.lineWidth = 5; g.strokeStyle = MODE === 'hockey' ? '#ffd166' : MODE === 'coches' ? '#5ce1e6' : MODE === 'futbol' || MODE === 'balonmano' ? '#f5f1e6' : MODE === 'sala' ? '#ff4fd8' : '#8a5a3b';
@@ -1224,10 +1301,47 @@ function hud() {
     label(nm, x, BY + BH / 2, fs, '#fff'); }
   label(`${score[0]} – ${score[1]}`, W / 2, BY + BH / 2, 20, '#fff');
   let sub; if (MODE === 'voley') sub = `a ${PTS} · saca ${TEAM[serveTeam].name.toLowerCase()}`; else if (MODE === 'canasta') sub = needClear && ball.own && ball.own.team === poss ? '¡sácala del triple!' : `a ${PTS_B} · atacan ${TEAM[poss].name.toLowerCase()}`; else if (MODE === 'futbolin') sub = `a ${PTS_F} goles`; else if (golden) sub = MODE === 'prisionero' ? 'bola de oro' : 'gol de oro'; else sub = `${MODE === 'prisionero' ? 'ronda ' + roundNo + ' · ' : ''}${Math.floor(Math.max(0, clock) / 60)}:${String(Math.floor(Math.max(0, clock) % 60)).padStart(2, '0')}`;
+  if (FC && L.wind) { const dn = L.wind > 0, ax = W / 2 + 118, ay = 18; c.strokeStyle = '#9fd8ff'; c.lineWidth = 2.4; c.lineCap = 'round';
+    for (let i = 0; i < 3; i++) { const yy = ay + i * 7; c.beginPath(); c.moveTo(ax - 10, yy); c.lineTo(ax + 8 - i * 3, yy); c.stroke(); }
+    c.beginPath(); c.moveTo(ax + 6, ay + (dn ? -2 : 16)); c.lineTo(ax + 12, ay + 7); c.lineTo(ax + 6, ay + (dn ? 16 : -2)); c.stroke(); }
   label(sub, W / 2, 40, 13, golden || (MODE === 'canasta' && needClear && ball.own) ? '#ffd166' : '#d8d0f0');
   if (msgT > 0 || phase === 'serve') { const m = phase === 'serve' && msgT <= 0 ? (ball.srv.ctl >= 0 ? `Saca ${nameOf(ball.srv)}: pulsa A` : '') : msg; if (m) {
     c.globalAlpha = Math.min(1, (msgT || 1) * 2); c.font = '900 26px ui-rounded,"Trebuchet MS",system-ui,sans-serif'; const mw = c.measureText(m).width + 40, my = SIDE ? 80 : H / 2 + (VERT ? -40 : 0);
     ART.rr(c, W / 2 - mw / 2, my - 24, mw, 48, 14); c.fillStyle = 'rgba(26,21,48,.88)'; c.fill(); c.lineWidth = 3; c.strokeStyle = '#ffd166'; c.stroke(); label(m, W / 2, my, 24, '#fff'); c.globalAlpha = 1; } }
+}
+/* charcos y conos del desafío, horneados con el campo (no cambian durante el partido).
+ * §8: cada cono es UNA pieza (base y cuerpo en un trazado); la franja blanca es color, no borde. */
+function campField(g) {
+  for (const [mx, my, mr] of pools()) {
+    g.fillStyle = 'rgba(58,40,26,.55)'; g.beginPath(); g.ellipse(mx, my, mr, mr * 0.72, 0, 0, TAU); g.fill();
+    g.fillStyle = 'rgba(96,70,44,.5)'; g.beginPath(); g.ellipse(mx - mr * 0.15, my - mr * 0.12, mr * 0.66, mr * 0.44, 0, 0, TAU); g.fill();
+    g.strokeStyle = 'rgba(20,14,10,.35)'; g.lineWidth = 2; g.beginPath(); g.ellipse(mx, my, mr, mr * 0.72, 0, 0, TAU); g.stroke();
+    for (let i = 0; i < 7; i++) { g.fillStyle = 'rgba(255,255,255,.12)'; g.beginPath(); g.ellipse(mx + (rnd(mx + i) - 0.5) * mr, my + (rnd(my + i * 3) - 0.5) * mr * 0.8, 5, 2.4, 0, 0, TAU); g.fill(); }
+  }
+  for (const [cx, cy, cr] of cones()) {
+    g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(cx, cy + cr * 0.55, cr * 1.15, cr * 0.4, 0, 0, TAU); g.fill();
+    g.beginPath(); g.moveTo(cx - cr * 1.15, cy + cr * 0.6); g.lineTo(cx - cr * 0.34, cy - cr * 1.25);
+    g.quadraticCurveTo(cx, cy - cr * 1.6, cx + cr * 0.34, cy - cr * 1.25); g.lineTo(cx + cr * 1.15, cy + cr * 0.6); g.closePath();
+    ART.fillOut(g, '#ff8a3d', 2.2);
+    g.save(); g.beginPath(); g.moveTo(cx - cr * 1.15, cy + cr * 0.6); g.lineTo(cx - cr * 0.34, cy - cr * 1.25); g.quadraticCurveTo(cx, cy - cr * 1.6, cx + cr * 0.34, cy - cr * 1.25); g.lineTo(cx + cr * 1.15, cy + cr * 0.6); g.closePath(); g.clip();
+    g.fillStyle = '#fff3e0'; g.fillRect(cx - cr * 1.2, cy - cr * 0.46, cr * 2.4, cr * 0.42);
+    g.fillStyle = 'rgba(26,21,48,.16)'; g.fillRect(cx + cr * 0.22, cy - cr * 1.7, cr * 1.1, cr * 2.4);
+    g.restore();
+  }
+}
+/* porterías que se mueven: se pintan vivas (la red horneada se salta cuando hay campaña) */
+function drawGoalsF() {
+  if (!M.gw) return;
+  c.save(); worldT(c);
+  for (const sd of [0, 1]) {
+    const x0 = sd ? FW : -22, o = gof[sd];
+    ART.rr(c, x0, GY0 + o - 4, 22, M.gw + 8, 5); c.fillStyle = 'rgba(255,255,255,.2)'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
+    c.strokeStyle = 'rgba(255,255,255,.45)'; c.lineWidth = 1;
+    for (let y = GY0 + o; y < GY1 + o; y += 8) { c.beginPath(); c.moveTo(x0 + 2, y); c.lineTo(x0 + 20, y); c.stroke(); }
+    for (let x = 0; x < 22; x += 7) { c.beginPath(); c.moveTo(x0 + x, GY0 + o); c.lineTo(x0 + x, GY1 + o); c.stroke(); }
+    for (const y of [GY0 + o, GY1 + o]) { c.beginPath(); c.arc(sd ? FW : 0, y, 4.5, 0, TAU); c.fillStyle = '#fff'; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke(); }
+  }
+  c.restore();
 }
 function draw() {
   if (!FIELD) FIELD = SIDE ? sideArt() : fieldArt();
@@ -1242,6 +1356,7 @@ function draw() {
   else if (MODE === 'canasta') drawCourt();
   else {
     const list = B.slice().sort((p, q) => V(p.x, p.y)[1] - V(q.x, q.y)[1]);
+    if (FC) drawGoalsF();
     if (M.neon) for (const g of glow) { const [x, y] = V(g.x, g.y), q = g.t / 0.5; c.globalAlpha = q; c.strokeStyle = '#ff4fd8'; c.lineWidth = 4; c.beginPath(); c.arc(x, y, 8 + (1 - q) * 22, 0, TAU); c.stroke(); c.globalAlpha = 1; }
     if (MODE === 'prisionero') for (const bl of balls) if (!bl.hold) { const [x, y] = V(bl.x, bl.y); if (bl.live) { c.globalAlpha = 0.35; c.strokeStyle = '#fff'; c.lineWidth = bl.r * 1.4; c.beginPath(); const [px, py] = V(bl.x - bl.vx * 0.05, bl.y - bl.vy * 0.05); c.moveTo(px, py); c.lineTo(x, y); c.stroke(); c.globalAlpha = 1; } drawBall(x, y, bl.r, bl.spin, 'dodge'); }
     if (MODE !== 'prisionero' && MODE !== 'coches') { const [x, y] = V(ball.x, ball.y); const v = hyp(ball.vx, ball.vy); if (!ball.own && v > (M.neon ? 200 : 380)) { c.globalAlpha = 0.3; c.strokeStyle = M.neon ? '#5ce1e6' : '#fff'; c.lineWidth = ball.r * 1.5; c.beginPath(); const [px, py] = V(ball.x - ball.vx * 0.05, ball.y - ball.vy * 0.05); c.moveTo(px, py); c.lineTo(x, y); c.stroke(); c.globalAlpha = 1; } ART.shadow(c, x + 2, y + 4, ball.r, 0.25); drawBall(x, y, ball.r, ball.spin, MODE === 'hockey' ? 'puck' : 'ball'); }

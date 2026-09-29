@@ -141,6 +141,37 @@ const FT = {
   boss: { art: 'slime', hp: 8.8, sp: 0.62, w: 44, h: 38, gold: 60, col: '#b36cff' },
 };
 let grid, path, towers, foes, bullets, gold, lives, wave, spawnQ, spawnT, pick, score, between, fxs, sel, preview, banner, msg, tt, bg, cur, kbd, START, GOAL;
+/* ---------- CAMPAÑA de tower-guard (tdlv.js) -----------------------------------------------
+ * 20 mapas escritos a mano, con sus oleadas, su presupuesto y el Coloso al final. Solo la usa
+ * tower-guard: maze-defense y hex-defense siguen con el mapa al azar y las oleadas de siempre,
+ * porque todo lo de aquí abajo cuelga de CMP (null en los otros dos). */
+const CMP = (M === 'path' && CFG.id === 'tower-guard' && typeof TDLV !== 'undefined') ? TDLV['tower-guard'] : null;
+let L = null, HIGH = null, SPC = null, PATHS = null, STARTS = null, leaks = 0, hpW = 0, spawnN = 0, spawnK = 0, seenT = null;
+if (CMP) {
+  /* bichos nuevos de la campaña (los tres de siempre no se tocan salvo el acorazado, que aquí
+   * pega menos para que el hielo y las ballestas sigan sirviendo) */
+  FT.armor = { art: 'knight', hp: 1.7, sp: 0.95, w: 22, h: 26, gold: 11, armor: 2 };
+  FT.boss.big = 5;
+  FT.fly = { art: 'bird', hp: 0.8, sp: 1.5, w: 26, h: 22, gold: 7, col: '#8fd0ff', fly: 1 };
+  FT.heal = { art: 'ghost', hp: 1.4, sp: 1.1, w: 26, h: 24, gold: 12, col: '#7cf0b0', heal: 6 };
+  FT.split = { art: 'slime', hp: 1.5, sp: 1.15, w: 28, h: 24, gold: 8, col: '#ffbe4d', split: 2 };
+  FT.ward = { art: 'knight', hp: 1.6, sp: 1.2, w: 22, h: 26, gold: 9, col: '#d7a0ff', ward: 1 };
+  FT.king = { art: 'robot', hp: 26, sp: 0.55, w: 52, h: 46, gold: 140, col: '#ff7ad1', big: 10, king: 1 };
+  k.levels(CMP.length);
+}
+const LET = { n: 'norm', f: 'fast', a: 'armor', y: 'fly', h: 'heal', s: 'split', w: 'ward', B: 'boss', K: 'king' };
+const NEWS = { fast: 'rápidos', armor: 'acorazados', fly: 'voladores', heal: 'sanadores', split: 'cascarones', ward: 'talismanes', boss: '¡llega un jefe!', king: '¡EL COLOSO DEL PRISMA!' };
+const s2of = () => Math.min(L.lives - 1, Math.max(1, L.s2 + (k.dif === 0 ? 1 : k.dif === 2 ? -1 : 0)));
+const hiAt = (x, y) => !!(HIGH && HIGH.has(x + ',' + y));
+const spcOf = (cl) => (SPC ? SPC[Math.round(cl[0]) + ',' + Math.round(cl[1])] : 0);
+/* cadena de oleada «16n,9a» → lista de tipos, alternando grupos para que no lleguen en bloques */
+function spawnStr(str) {
+  const by = [];
+  for (const g of String(str).split(',')) { const mm = /^(\d+)([nfayhswBK])$/.exec(g.trim()); if (!mm) continue; by.push(Array.from({ length: +mm[1] }, () => LET[mm[2]])); }
+  const mix = []; let any = true;
+  while (any) { any = false; for (const a of by) if (a.length) { mix.push(a.pop()); any = true; } }
+  return mix;
+}
 
 /* ---------- Geometría (cuadrícula u hexágonos) ---------- */
 const center = ([x, y]) => HEX ? [HX0 + x * HR * 1.5, HY0 + y * CELL + (x & 1) * CELL / 2] : [x * S + S / 2, OY + y * S + S / 2];
@@ -161,7 +192,64 @@ function bfs(from) {
 }
 
 /* ---------- Mapa ---------- */
+/* camino de una entrada a la meta por las casillas de carretera (1) y puertas (4) */
+function roadPath(from, to) {
+  const prev = {}, q = [from], seen = new Set([from.join()]);
+  while (q.length) { const cu = q.shift();
+    if (cu[0] === to[0] && cu[1] === to[1]) { const out = [cu]; let kk = cu.join(); while (prev[kk]) { out.unshift(prev[kk]); kk = prev[kk].join(); } return out; }
+    for (const [nx, ny] of nbs(cu[0], cu[1])) { const kk = nx + ',' + ny; if (!inb(nx, ny) || seen.has(kk) || (grid[ny][nx] !== 1 && grid[ny][nx] !== 4)) continue; seen.add(kk); prev[kk] = cu; q.push([nx, ny]); } }
+  return null;
+}
+/* ruta recta de los voladores, partida en tramos de una casilla (center() admite decimales) */
+function flyPath(s0, g0) { const n = Math.max(2, Math.round(Math.hypot(g0[0] - s0[0], g0[1] - s0[1]))), out = []; for (let i = 0; i <= n; i++) out.push([s0[0] + (g0[0] - s0[0]) * i / n, s0[1] + (g0[1] - s0[1]) * i / n]); return out; }
+/* adornos de la campaña horneados en el fondo: rayas de viento, velo de niebla y plataforma de
+ * atalaya. Todo dibujado por código y una sola vez (van dentro de bake(), no del bucle). */
+function campArt(g) {
+  for (const key in SPC) {
+    const px = key.split(','), [cx, cy] = center([+px[0], +px[1]]);
+    if (SPC[key] === '~') {
+      g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 2.2; g.lineCap = 'round';
+      for (let i = 0; i < 3; i++) { const yy = cy - CELL * 0.24 + i * CELL * 0.24, w0 = CELL * (0.2 + 0.14 * i);
+        g.beginPath(); g.moveTo(cx - CELL * 0.34, yy); g.lineTo(cx - CELL * 0.34 + w0 * 2, yy); g.stroke(); }
+    } else {
+      g.fillStyle = 'rgba(226,230,246,.6)';
+      for (let i = 0; i < 6; i++) { g.beginPath(); g.ellipse(cx + (rnd(+px[0] * 31 + +px[1] * 7 + i) - 0.5) * CELL * 0.9, cy + (rnd(+px[0] * 13 + +px[1] * 5 + i + 2) - 0.5) * CELL * 0.8, CELL * 0.3, CELL * 0.19, 0, 0, R2); g.fill(); }
+    }
+  }
+  if (HIGH) for (const key of HIGH) {
+    const px = key.split(','), [cx, cy] = center([+px[0], +px[1]]);
+    g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.ellipse(cx, cy + CELL * 0.24, CELL * 0.34, CELL * 0.11, 0, 0, R2); g.fill();
+    /* §8: la atalaya es UNA plataforma; los tablones se leen por sombra propia, sin contornos dentro */
+    ART.rr(g, cx - CELL * 0.35, cy - CELL * 0.3, CELL * 0.7, CELL * 0.56, 5); ART.fillOut(g, '#c0ad88', 2);
+    g.fillStyle = 'rgba(255,255,255,.26)'; g.fillRect(cx - CELL * 0.31, cy - CELL * 0.26, CELL * 0.62, CELL * 0.13);
+    g.fillStyle = 'rgba(26,21,48,.2)'; for (let i = 1; i < 3; i++) g.fillRect(cx - CELL * 0.35 + i * CELL * 0.233, cy - CELL * 0.28, 1.6, CELL * 0.52);
+  }
+}
+/* mapa escrito a mano: 8 filas de 12. En horizontal va tal cual (una columna a la derecha);
+ * en vertical se TRASPONE, así la entrada queda arriba y la meta abajo con el mismo dibujo.
+ * Lo que sobra del tablero se marca roca para que el mapa jugable sea exactamente el diseñado. */
+function buildLv() {
+  L = CMP[k.lv - 1] || CMP[0];
+  const m = L.m, MH = m.length, MW = m[0].length, ox = PORT ? 0 : 1;
+  const put = (x, y) => (PORT ? [y, x] : [x + ox, y]);
+  grid = Array.from({ length: ROWS }, () => Array(COLS).fill(3));
+  HIGH = new Set(); SPC = {}; STARTS = []; let goal = null;
+  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+    const ch = m[y][x], g2 = put(x, y), gx = g2[0], gy = g2[1]; if (!inb(gx, gy)) continue;
+    if (ch === '#') { grid[gy][gx] = 3; continue; }
+    if (ch === '.') { grid[gy][gx] = 0; continue; }
+    if (ch === 'o') { grid[gy][gx] = 0; HIGH.add(gx + ',' + gy); continue; }
+    grid[gy][gx] = 'ACB'.includes(ch) ? 4 : 1;
+    if (ch === '~' || ch === 'n') SPC[gx + ',' + gy] = ch;
+    if (ch === 'A' || ch === 'C') STARTS.push([gx, gy]); else if (ch === 'B') goal = [gx, gy];
+  }
+  GOAL = goal; START = STARTS[0];
+  PATHS = STARTS.map((s0) => roadPath(s0, GOAL)).filter(Boolean);
+  path = PATHS[0];
+  bake();
+}
 function build() {
+  if (CMP) return buildLv();
   for (let tries = 0; tries < 50; tries++) {
     grid = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
     if (M === 'maze') { START = PORT ? [4, 0] : [0, 3]; GOAL = PORT ? [4, ROWS - 1] : [COLS - 1, 4]; grid[START[1]][START[0]] = grid[GOAL[1]][GOAL[0]] = 4; }
@@ -190,7 +278,8 @@ function build() {
   }
   bake();
 }
-function reset() { towers = []; foes = []; bullets = []; fxs = []; gold = 200 + 50 * k.D.life; lives = 25 + 5 * k.D.life; /* 1.23: más fácil (antes 150 oro, 20 vidas) · fácil: +50 oro y +5 vidas */ wave = 0; spawnQ = []; spawnT = 0; pick = 0; score = 0; between = 12; sel = null; preview = null; banner = null; msg = null; tt = 0; cur = [2, 3]; kbd = false; build(); }
+function reset() { towers = []; foes = []; bullets = []; fxs = []; leaks = 0; spawnN = 0; gold = 200 + 50 * k.D.life; lives = 25 + 5 * k.D.life;
+  if (CMP) { L = CMP[k.lv - 1] || CMP[0]; gold = Math.round(L.gold * (k.dif === 0 ? 1.25 : k.dif === 2 ? 0.85 : 1)); lives = L.lives; seenT = new Set(['norm']); spawnK = 0; } /* 1.23: más fácil (antes 150 oro, 20 vidas) · fácil: +50 oro y +5 vidas */ wave = 0; spawnQ = []; spawnT = 0; pick = 0; score = 0; between = 12; sel = null; preview = null; banner = null; msg = null; tt = 0; cur = [2, 3]; kbd = false; build(); }
 
 /* ---------- Fondo cacheado a 2× ---------- */
 const rnd = (s) => { const x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -205,10 +294,14 @@ function bake() {
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) { const [cx, cy] = center([x, y]); if (HEX) { hexPath(g, cx, cy, HR - 1); g.stroke(); } else g.strokeRect(cx - S / 2 + 0.5, cy - S / 2 + 0.5, S - 1, S - 1); }
   // camino de tierra (modo fijo)
   if (M !== 'maze') {
-    const pts = path.map(center), [dx, dy] = PORT ? [0, CELL] : [CELL, 0]; pts.unshift([pts[0][0] - dx, pts[0][1] - dy]); pts.push([pts[pts.length - 1][0] + dx, pts[pts.length - 1][1] + dy]);
-    const road = (lw, col) => { g.lineJoin = 'round'; g.lineCap = 'round'; g.lineWidth = lw; g.strokeStyle = col; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke(); };
-    road(CELL * 0.86 + 5, OUT); road(CELL * 0.86, '#a8784a'); road(CELL * 0.62, '#c99a64'); road(CELL * 0.2, 'rgba(255,230,180,.18)');
-    for (let i = 0; i < path.length * 5; i++) { const [cx, cy] = center(path[i % path.length]); g.fillStyle = rnd(i + 9) < 0.5 ? 'rgba(110,70,40,.45)' : 'rgba(255,235,200,.4)'; g.beginPath(); g.ellipse(cx + (rnd(i) - 0.5) * CELL * 0.6, cy + (rnd(i + 1) - 0.5) * CELL * 0.6, 1.8, 1.2, 0, 0, R2); g.fill(); }
+    const [dx, dy] = PORT ? [0, CELL] : [CELL, 0];
+    for (const PP of (CMP ? PATHS : [path])) {
+      const pts = PP.map(center); pts.unshift([pts[0][0] - dx, pts[0][1] - dy]); pts.push([pts[pts.length - 1][0] + dx, pts[pts.length - 1][1] + dy]);
+      const road = (lw, col) => { g.lineJoin = 'round'; g.lineCap = 'round'; g.lineWidth = lw; g.strokeStyle = col; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke(); };
+      road(CELL * 0.86 + 5, OUT); road(CELL * 0.86, '#a8784a'); road(CELL * 0.62, '#c99a64'); road(CELL * 0.2, 'rgba(255,230,180,.18)');
+      for (let i = 0; i < PP.length * 5; i++) { const [cx, cy] = center(PP[i % PP.length]); g.fillStyle = rnd(i + 9) < 0.5 ? 'rgba(110,70,40,.45)' : 'rgba(255,235,200,.4)'; g.beginPath(); g.ellipse(cx + (rnd(i) - 0.5) * CELL * 0.6, cy + (rnd(i + 1) - 0.5) * CELL * 0.6, 1.8, 1.2, 0, 0, R2); g.fill(); }
+    }
+    if (CMP) campArt(g);
   }
   // rocas
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (grid[y][x] === 3) {
@@ -218,14 +311,15 @@ function bake() {
     else { g.save(); g.translate(cx, cy + 10 * s); g.scale(0.78 * s, 0.78 * s); ART.deco(g, { deco: 'pine', near: '#3d8f4a' }, 0, 0, 32, 0); g.restore(); }
   }
   // entrada (cueva) y salida (castillo)
-  const [sx, sy] = center(START), [ex, ey] = center(GOAL), s = SC;
+  const [ex, ey] = center(GOAL), s = SC;
+  for (const S0 of (CMP ? STARTS : [START])) { const [sx, sy] = center(S0);
     /* §8: la cueva es UNA roca; la boca es oscuridad (cambio de color), no otra forma con su contorno */
   g.save(); g.translate(sx - (PORT ? 0 : CELL * 0.35), sy - (PORT ? CELL * 0.1 : 0)); g.scale(s, s);
   const rock = (q) => { q.moveTo(-20, 18); q.lineTo(-20, -6); q.quadraticCurveTo(-18, -26, 2, -24); q.quadraticCurveTo(16, -20, 14, 18); q.closePath(); };
   const mouth = (q) => { q.moveTo(-10, 18); q.lineTo(-10, 0); q.quadraticCurveTo(-8, -12, 1, -12); q.quadraticCurveTo(9, -10, 8, 18); q.closePath(); };
   unite8(g, [[rock, '#77748f', { dx: 2.4, dy: 2.2 }, (q) => { q.fillStyle = '#17122a'; q.beginPath(); mouth(q); q.fill();
     q.fillStyle = DK8('#77748f', 0.3); q.beginPath(); q.moveTo(-12, 18); q.lineTo(-12, -1); q.quadraticCurveTo(-9, -14, 1, -14); q.quadraticCurveTo(-6, -10, -7.6, 2); q.lineTo(-7.6, 18); q.closePath(); q.fill(); }]], 1.5);
-  g.restore();
+  g.restore(); }
   g.save(); g.translate(ex + (PORT ? 0 : CELL * 0.1), ey + 4 * s); g.scale(s, s);
   g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.ellipse(0, 16, 22, 6, 0, 0, R2); g.fill();
   /* §8: torre + almenas = un solo trazado; la puerta se lee por color, no por contorno */
@@ -247,7 +341,7 @@ function bake() {
 }
 
 /* ---------- Reglas ---------- */
-const stat = (tw) => { const T = TOWERS[tw.t], l = tw.lv - 1; return { r: T.r * SC * (1 + l * 0.14), dmg: T.dmg * (1 + l * 0.65), rate: T.rate * (1 - l * 0.1) }; };
+const stat = (tw) => { const T = TOWERS[tw.t], l = tw.lv - 1; return { r: T.r * SC * (1 + l * 0.14) * (hiAt(tw.x, tw.y) ? 1.25 : 1), dmg: T.dmg * (1 + l * 0.65), rate: T.rate * (1 - l * 0.1) }; };
 const upCost = (tw) => Math.round(TOWERS[tw.t].cost * 0.7 * tw.lv), sellVal = (tw) => Math.floor(tw.spent * 0.6);
 const towerAt = (x, y) => towers.find((q) => q.x === x && q.y === y);
 function nextCell(f) { return f.path[Math.min(f.i + 1, f.path.length - 1)]; }
@@ -279,12 +373,39 @@ function sell(tw) {
   select(null);
 }
 function say(t) { msg = { t, life: 1.6 }; }
+/* un enemigo de la campaña: los voladores van en línea recta (su propia ruta), el resto por la
+ * carretera pi. i/p permiten nacer a media ruta (crías de cascarón, escolta del Coloso). */
+function mkFoe(ty, hp, pi, i, p) {
+  const T = FT[ty], j = pi % PATHS.length, pth = T.fly ? flyPath(STARTS[j % STARTS.length], GOAL) : PATHS[j].slice();
+  return { ty, i: Math.min(i || 0, pth.length - 1), p: p || 0, hp, max: hp, slow: 0, hf: 0, face: 1, ph: Math.random() * 6,
+    path: pth, pi: j, x: -20, y: 0, walked: i || 0, rage: 1, roar: 0, healed: 0, zn: 0, fly: !!T.fly, spk: L.spd };
+}
+function showLv() { k.show(k.lv + '. ' + L.n, L.i + '<br><br>Consejo: ' + L.tip); }
+/* fin del nivel: 1★ aguantar · 2★ terminar con s2 vidas (por dificultad) · 3★ sin una sola fuga */
+function endLv() {
+  const s2 = s2of(), st = leaks === 0 ? 3 : lives >= s2 ? 2 : 1;
+  score += lives * 20; k.sfx('win'); k.confetti();
+  const extra = st >= 3 ? '¡Sin una sola fuga!' : st === 2 ? `Sin fugas para la 3ª estrella (se te colaron ${leaks})` : `Termina con ${s2} vidas o más para la 2ª estrella`;
+  k.levelDone(score, extra, { stars: st });
+}
 function startWave() {
   if (between <= 0) return; if (wave > 0 && between > 1) { const b = Math.ceil(between) * 2; gold += b; const r = waveR(); k.float('+' + b, r.x + r.w / 2, r.y + 10, '#ffd23d'); }
-  between = 0; wave++; const n = Math.min(Math.round((4 + wave * 2) * k.D.rate), 32);   // k.D.rate: oleadas más o menos numerosas
+  between = 0; wave++;
+  if (CMP) return startWaveC();
+  const n = Math.min(Math.round((4 + wave * 2) * k.D.rate), 32);   // k.D.rate: oleadas más o menos numerosas
   spawnQ = Array.from({ length: n }, (_, i) => (wave % 5 === 0 && i === n - 1 ? 'boss' : wave >= 4 && i % 5 === 2 ? 'armor' : wave >= 3 && i % 4 === 0 ? 'fast' : 'norm'));
   banner = { t: 2.4, head: 'Oleada ' + wave, sub: wave % 5 === 0 ? '¡Llega un jefe!' : wave === 3 ? 'Cuidado: pájaros rápidos' : wave === 4 ? 'Caballeros con armadura' : n + ' enemigos' };
   k.sfx(wave % 5 === 0 ? 'hurt' : 'start'); spawnT = 0.4;
+}
+/* oleada de la campaña: la cadena escrita a mano, su vida propia y aviso del bicho nuevo */
+function startWaveC() {
+  spawnQ = spawnStr(L.w[wave - 1] || L.w[L.w.length - 1]); spawnN = spawnQ.length;
+  hpW = Math.round((L.h0 + L.hs * (wave - 1)) * (k.dif === 0 ? 0.85 : k.dif === 2 ? 1.15 : 1));
+  let nw = null; for (const t of spawnQ) if (NEWS[t] && !seenT.has(t)) { nw = t; break; }
+  for (const t of spawnQ) seenT.add(t);
+  const big = spawnQ.includes('boss') || spawnQ.includes('king');
+  banner = { t: 2.4, big, head: 'Oleada ' + wave + '/' + L.w.length, sub: nw ? (NEWS[nw][0] === '¡' ? NEWS[nw] : 'Nuevo: ' + NEWS[nw]) : spawnN + ' enemigos' };
+  k.sfx(big ? 'hurt' : 'start'); spawnT = 0.4;
 }
 /* Primeras oleadas suaves: 0 en la oleada 1 → 1 en la 5 (vida, velocidad y separación de enemigos). */
 const easeW = () => Math.min(1, (wave - 1) / 6); // 1.23: rampa hasta la oleada 7 (antes 5)
@@ -305,7 +426,20 @@ function popup() {
 reset();
 /* al girar el móvil fuera de partida se recarga con la otra disposición */
 addEventListener('resize', () => { clearTimeout(window.__ot); window.__ot = setTimeout(() => { if ((innerHeight > innerWidth) !== PORT && k.st !== 'play') location.reload(); }, 400); });
-k.show(CFG.title, M === 'maze' ? 'Construye torres en el prado para alargar el camino de los enemigos (no puedes cerrarlo del todo). Toca una casilla dos veces para construir.' : 'Elige torre a la derecha y toca dos veces una casilla de hierba para construir. Toca una torre para mejorarla o venderla.');
+if (CMP) k.onLevel = () => { reset(); if (k.st !== 'play') showLv(); };
+/* gancho de pruebas (scripts/td_play.py): deja al bot ver el mapa y construir como un jugador */
+if (CMP) window.__td = {
+  COLS, ROWS, TOWERS,
+  paths: () => PATHS, high: (x, y) => hiAt(x, y), spc: (x, y) => spcOf([x, y]),
+  free: (x, y) => grid[y] && grid[y][x] === 0,
+  towers: () => towers.map((q) => ({ x: q.x, y: q.y, t: q.t, lv: q.lv })),
+  start: () => { if (k.st !== 'play') k.hit.add('a'); else startWave(); },
+  pickT: (i) => { pick = i; }, build: (x, y) => { select([x, y]); buildAt(x, y); },
+  up: (x, y) => { const q = towerAt(x, y); if (q) upgrade(q); },
+  now: () => ({ gold, lives, wave, waves: L.w.length, leaks, foes: foes.length, queue: spawnQ.length, st: k.st, lv: k.lv, s2: s2of(), stars: k.starsOf(k.lv) }),
+};
+if (CMP) showLv();
+else k.show(CFG.title, M === 'maze' ? 'Construye torres en el prado para alargar el camino de los enemigos (no puedes cerrarlo del todo). Toca una casilla dos veces para construir.' : 'Elige torre a la derecha y toca dos veces una casilla de hierba para construir. Toca una torre para mejorarla o venderla.');
 
 k.run((dt) => {
   if (!k.gate(reset)) return;
@@ -334,20 +468,37 @@ k.run((dt) => {
   if (banner) { banner.t -= dt; if (banner.t <= 0) banner = null; }
   if (msg) { msg.life -= dt; if (msg.life <= 0) msg = null; }
   spawnT -= dt;
-  if (spawnQ.length && spawnT <= 0) { const ty = spawnQ.shift(), T = FT[ty]; spawnT = (ty === 'fast' ? 0.56 : 0.94) * (1 + 0.5 * (1 - easeW())) / k.D.rate; const hp = Math.round((18 + wave * 8 + wave * wave * 0.7) * T.hp * (0.5 + 0.5 * easeW()) * 0.9);
-    foes.push({ ty, i: 0, p: 0, hp, max: hp, slow: 0, hf: 0, face: 1, ph: Math.random() * 6, path: path.slice(), x: -20, y: 0, walked: 0, spk: (0.65 + 0.2 * easeW()) * k.D.spd }); }
+  if (CMP && spawnQ.length && spawnT <= 0) { const ty = spawnQ.shift(), T = FT[ty];
+    spawnT = ty === 'fast' ? 0.42 : (ty === 'boss' || ty === 'king') ? 1.4 : 0.66;
+    const hp = Math.max(6, Math.round(hpW * T.hp)), pi = (++spawnK) % PATHS.length;
+    foes.push(mkFoe(ty, hp, pi, 0));
+  } else if (spawnQ.length && spawnT <= 0) { const ty = spawnQ.shift(), T = FT[ty]; spawnT = (ty === 'fast' ? 0.56 : 0.94) * (1 + 0.5 * (1 - easeW())) / k.D.rate; const hp = Math.round((18 + wave * 8 + wave * wave * 0.7) * T.hp * (0.5 + 0.5 * easeW()) * 0.9);
+    foes.push({ ty, i: 0, p: 0, hp, max: hp, slow: 0, hf: 0, face: 1, ph: Math.random() * 6, path: path.slice(), x: -20, y: 0, walked: 0, rage: 1, spk: (0.65 + 0.2 * easeW()) * k.D.spd }); }
   /* --- enemigos --- */
+  const born = [];
   for (const f of foes) {
-    f.slow -= dt; f.hf -= dt; const sp = FT[f.ty].sp * f.spk * (f.slow > 0 ? 0.5 : 1); f.p += sp * dt; f.walked += sp * dt;
+    f.slow -= dt; f.hf -= dt;
+    let sp = FT[f.ty].sp * f.spk * f.rage;
+    if (f.slow > 0 && !(CMP && FT[f.ty].ward)) sp *= 0.5;
+    if (CMP) { const T2 = FT[f.ty]; f.zn = f.fly ? 0 : spcOf(f.path[f.i]); if (f.zn === '~') sp *= 1.6;
+      if (T2.heal) for (const o of foes) if (o !== f && !o.dead && o.hp < o.max && Math.hypot(o.x - f.x, o.y - f.y) < 2.2 * CELL) { o.hp = Math.min(o.max, o.hp + T2.heal * dt); o.healed = 0.2; }
+      if (T2.king) {
+        if (!f.p2 && f.hp < f.max * 0.66) { f.p2 = 1; f.rage = 1.25; f.roar = 1; k.shake(7); k.flash('rgba(255,120,220,.2)'); k.sfx('explode'); for (let i = 0; i < 4; i++) born.push(mkFoe('fast', Math.round(hpW * 0.55), f.pi, f.i, f.p)); }
+        if (!f.p3 && f.hp < f.max * 0.33) { f.p3 = 1; f.rage = 1.5; f.roar = 1; k.shake(9); k.flash('rgba(255,120,220,.28)'); k.sfx('explode'); for (let i = 0; i < 4; i++) born.push(mkFoe('armor', Math.round(hpW * 1.7), f.pi, f.i, f.p)); }
+      }
+      if (f.roar > 0) f.roar -= dt; if (f.healed > 0) f.healed -= dt;
+    }
+    f.p += sp * dt; f.walked += sp * dt;
     while (f.p >= 1 && f.i < f.path.length - 1) { f.p -= 1; f.i++; }
     const a = f.path[f.i], b = nextCell(f), [ax, ay] = center(a), [bx, by] = center(b);
     if (bx !== ax) f.face = Math.sign(bx - ax); f.x = ax + (bx - ax) * f.p; f.y = ay + (by - ay) * f.p;
-    if (f.i >= f.path.length - 1) { f.dead = true; f.leak = true; lives -= f.ty === 'boss' ? 5 : 1; k.burst(f.x, f.y, '#ff4d6d', 12, 120); k.flash('rgba(255,60,80,.25)'); k.shake(5); k.sfx('hurt'); }
+    if (f.i >= f.path.length - 1) { f.dead = true; f.leak = true; if (CMP) leaks++; lives -= CMP ? (FT[f.ty].big || 1) : (f.ty === 'boss' ? 5 : 1); k.burst(f.x, f.y, '#ff4d6d', 12, 120); k.flash('rgba(255,60,80,.25)'); k.shake(5); k.sfx('hurt'); }
   }
+  if (born.length) foes.push(...born);
   /* --- torres --- */
   for (const tw of towers) {
     const T = TOWERS[tw.t], st = stat(tw), [tx, ty] = center([tw.x, tw.y]); tw.cd -= dt; tw.rec = Math.max(0, tw.rec - dt * 4); tw.pop = Math.max(0, tw.pop - dt);
-    let tg = null, bestP = -1; for (const f of foes) if (!f.dead && Math.hypot(f.x - tx, f.y - ty) < st.r) { const pr = f.walked - (f.path.length - f.i) * 0.001; if (pr > bestP) { bestP = pr; tg = f; } }
+    let tg = null, bestP = -1; for (const f of foes) if (!f.dead && !(f.zn === 'n' && !f.fly) && Math.hypot(f.x - tx, f.y - ty) < st.r) { const pr = f.walked - (f.path.length - f.i) * 0.001; if (pr > bestP) { bestP = pr; tg = f; } }
     if (tg) { const want = Math.atan2(tg.y - ty, tg.x - tx); let d = ((want - tw.a + Math.PI * 3) % R2) - Math.PI; tw.a += d * Math.min(1, dt * 12); }
     if (tw.cd > 0 || !tg) continue;
     tw.cd = st.rate; tw.rec = 1; const mx = tx + Math.cos(tw.a) * 14 * SC, my = ty - 6 * SC + Math.sin(tw.a) * 14 * SC;
@@ -363,14 +514,21 @@ k.run((dt) => {
     if (b.tg.dead) { b.dead = true; continue; }
     const a = Math.atan2(b.tg.y - 6 * SC - b.y, b.tg.x - b.x), st = Math.min(b.sp * dt, Math.hypot(b.tg.x - b.x, b.tg.y - 6 * SC - b.y)); b.a = a; b.x += Math.cos(a) * st; b.y += Math.sin(a) * st; /* sin pasarse del blanco (con dt alto oscilaba) */
     if (Math.hypot(b.tg.x - b.x, b.tg.y - 6 * SC - b.y) < 9) { b.dead = true; damage(b.tg, b.dmg);
-      if (b.slow) { b.tg.slow = b.slow; fxs.push({ k: 'ring', x: b.tg.x, y: b.tg.y - 6, r: 16, life: 0.25, max: 0.25, col: '#bff0ff' }); k.burst(b.tg.x, b.tg.y - 6, '#bff0ff', 5, 60); }
+      if (b.slow && CMP && FT[b.tg.ty].ward) { k.float('inmune', b.tg.x, b.tg.y - 22, '#d7a0ff'); }
+      else if (b.slow) { b.tg.slow = b.slow; fxs.push({ k: 'ring', x: b.tg.x, y: b.tg.y - 6, r: 16, life: 0.25, max: 0.25, col: '#bff0ff' }); k.burst(b.tg.x, b.tg.y - 6, '#bff0ff', 5, 60); }
       else k.burst(b.x, b.y, '#fff2c9', 4, 60); }
   }
-  for (const f of foes) if (f.hp <= 0 && !f.dead) { f.dead = true; const gd = FT[f.ty].gold + Math.floor(wave / 3); gold += gd; score += f.ty === 'boss' ? 150 : 10;
+  for (const f of foes) if (f.hp <= 0 && !f.dead) { f.dead = true; const gd = FT[f.ty].gold + Math.floor(wave / (CMP ? 2 : 3)); gold += gd; score += f.ty === 'king' ? 400 : f.ty === 'boss' ? 150 : 10;
+    if (CMP && FT[f.ty].split) { for (let i = 0; i < FT[f.ty].split; i++) foes.push(mkFoe('norm', Math.max(4, Math.round(f.max * 0.35)), f.pi, f.i, f.p)); k.float('¡se parte!', f.x, f.y - 30, '#ffbe4d'); }
     k.burst(f.x, f.y - 6, FT[f.ty].col || (f.ty === 'fast' ? '#ff9a3d' : '#c7d0da'), f.ty === 'boss' ? 30 : 12, 130); k.float('+' + gd, f.x, f.y - 20, '#ffd23d'); k.sfx(f.ty === 'boss' ? 'explode' : 'pop'); if (f.ty === 'boss') k.shake(6); }
   foes = foes.filter((f) => !f.dead); bullets = bullets.filter((b) => !b.dead);
   for (const e of fxs) e.life -= dt; fxs = fxs.filter((e) => e.life > 0);
   if (lives <= 0) { lives = 0; return k.lose(CFG.id, score, 'La base ha caído', `Oleada ${wave}`); }
+  if (CMP && !spawnQ.length && !foes.length && between <= 0 && wave > 0) {
+    if (wave >= L.w.length) return endLv();
+    between = 8; const bonus = 30 + wave * 8; score += wave * 20; gold += bonus;
+    k.float(`¡Oleada superada! +${bonus}`, PX / 2, (OY + BB) / 2, '#ffd23d'); k.sfx('win'); return;
+  }
   if (!spawnQ.length && !foes.length && between <= 0 && wave > 0) { between = 8; const bonus = 20 + wave * 5; score += wave * 20; gold += bonus; k.float(`¡Oleada superada! +${bonus}`, PX / 2, (OY + BB) / 2, '#ffd23d'); k.sfx('win'); }
 }, draw);
 
@@ -442,15 +600,19 @@ function drawTower(x, y, t, lv, a, rec, s, ghost) {
   c.restore();
 }
 function drawFoe(f) {
-  const T = FT[f.ty], s = SC, w = T.w * s, h = T.h * s, fy = f.y + 8 * s, fly = f.ty === 'fast';
+  const T = FT[f.ty], s = SC, w = T.w * s, h = T.h * s, fy = f.y + 8 * s, fly = f.ty === 'fast' || f.fly;
+  if (f.zn === 'n' && !f.fly) c.globalAlpha = 0.45;
   c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(f.x, fy, w * 0.42, 3.5 * s, 0, 0, R2); c.fill();
   const yy = fly ? fy - h - 6 * s + Math.sin(tt * 6 + f.ph) * 2 : fy - h;
   ART.enemy(c, T.art, f.x - w / 2, yy, w, h, { t: tt + f.ph, face: f.face, col: f.slow > 0 && T.col ? '#9fe3ff' : T.col });
-  if (f.ty === 'boss') { c.beginPath(); const cx = f.x, cy = yy - 2; c.moveTo(cx - 9, cy + 4); c.lineTo(cx - 10, cy - 7); c.lineTo(cx - 4, cy - 2); c.lineTo(cx, cy - 9); c.lineTo(cx + 4, cy - 2); c.lineTo(cx + 10, cy - 7); c.lineTo(cx + 9, cy + 4); c.closePath(); ART.fillOut(c, '#ffd23d', 1.8); }
+  if (f.healed > 0) { c.strokeStyle = 'rgba(124,240,176,.9)'; c.lineWidth = 2; c.beginPath(); c.arc(f.x, yy + h * 0.5, w * 0.6, 0, R2); c.stroke(); }
+  if (f.roar > 0) { c.strokeStyle = 'rgba(255,122,209,.8)'; c.lineWidth = 3; c.beginPath(); c.arc(f.x, yy + h * 0.5, w * (0.6 + (1 - f.roar) * 1.2), 0, R2); c.stroke(); }
+  if (f.ty === 'boss' || f.ty === 'king') { c.beginPath(); const cx = f.x, cy = yy - 2; c.moveTo(cx - 9, cy + 4); c.lineTo(cx - 10, cy - 7); c.lineTo(cx - 4, cy - 2); c.lineTo(cx, cy - 9); c.lineTo(cx + 4, cy - 2); c.lineTo(cx + 10, cy - 7); c.lineTo(cx + 9, cy + 4); c.closePath(); ART.fillOut(c, '#ffd23d', 1.8); }
   if (f.slow > 0) { c.fillStyle = 'rgba(191,240,255,.9)'; for (let i = 0; i < 3; i++) { const a = tt * 2 + i * 2.1 + f.ph; c.fillRect(f.x + Math.cos(a) * w * 0.55 - 1.5, yy + h * 0.5 + Math.sin(a) * h * 0.3 - 1.5, 3, 3); } }
   if (f.hf > 0) { c.globalAlpha = 0.5; c.fillStyle = '#fff'; c.beginPath(); c.ellipse(f.x, yy + h * 0.55, w * 0.45, h * 0.45, 0, 0, R2); c.fill(); c.globalAlpha = 1; }
-  if (f.hp < f.max) { const bw = f.ty === 'boss' ? 36 : 22, bx = f.x - bw / 2, by = yy - (f.ty === 'boss' ? 14 : 8), q = Math.max(0, f.hp / f.max);
+  if (f.hp < f.max) { const bw = f.ty === 'king' ? 54 : f.ty === 'boss' ? 36 : 22, bx = f.x - bw / 2, by = yy - (f.ty === 'boss' ? 14 : 8), q = Math.max(0, f.hp / f.max);
     c.fillStyle = OUT; c.fillRect(bx - 1.5, by - 1.5, bw + 3, 6); c.fillStyle = '#4a1f2a'; c.fillRect(bx, by, bw, 3); c.fillStyle = q > 0.5 ? '#7cf06a' : q > 0.25 ? '#ffd23d' : '#ff5f5f'; c.fillRect(bx, by, bw * q, 3); }
+  c.globalAlpha = 1;
 }
 function button(b, sub) {
   ART.rr(c, b.x, b.y, b.w, b.h, 8); ART.fillOut(c, !b.on ? '#5d5870' : b.red ? '#e0564a' : '#5bc85a', 2.2);
@@ -495,8 +657,10 @@ function draw() {
   // HUD superior (esquinas; el centro es de pausa/sonido)
   coinIcon(18, 20, 9); label(String(gold), 32, 20, 18, '#ffd23d');
   ART.heart(c, PORT ? 98 : 104, 21, 1.35, true); label(String(lives), PORT ? 112 : 118, 20, 18, '#fff');
-  if (PORT) { label('Oleada ' + wave, W - 8, 12, 13, '#fff', 'right'); label(score + ' pts', W - 8, 29, 13, '#bdf5a0', 'right'); }
-  else { label('Oleada ' + wave, 380, 20, 16, '#fff'); label(score + ' pts', PX - 6, 20, 16, '#bdf5a0', 'right'); }
+  const wtxt = CMP ? 'Oleada ' + wave + '/' + L.w.length : 'Oleada ' + wave;
+  if (PORT) { label(wtxt, W - 8, 12, 13, '#fff', 'right'); label(score + ' pts', W - 8, 29, 13, '#bdf5a0', 'right'); }
+  else { label(wtxt, 344, 20, 16, '#fff'); label(score + ' pts', PX - 6, 20, 16, '#bdf5a0', 'right'); }
+  if (CMP) label('Nivel ' + k.lv, PORT ? 150 : 250, PORT ? 12 : 20, PORT ? 12 : 14, '#e8d9c4');
   // panel de torres
   TOWERS.forEach((T, i) => { const r = cardR(i), y = r.y, on = pick === i, can = gold >= T.cost;
     ART.rr(c, r.x, y, r.w, r.h, 9); ART.fillOut(c, on ? '#f2d15c' : '#5a4636', on ? 3 : 2); if (on) { ART.rr(c, r.x + 3, y + 3, r.w - 6, 20, 7); c.fillStyle = 'rgba(255,255,255,.3)'; c.fill(); }
@@ -515,7 +679,7 @@ function draw() {
   else { label('En curso', wb.x + wb.w / 2, wb.y + 18, 11, '#e8d9c4', 'center'); const n = spawnQ.length + foes.length; label(n + ' enem.', wb.x + wb.w / 2, wb.y + 35, 11, '#ffb3a8', 'center'); }
   // aviso de oleada
   if (banner) { const q = banner.t, x = q > 2.1 ? PX / 2 + (q - 2.1) / 0.3 * -PX : q < 0.3 ? PX / 2 + (0.3 - q) / 0.3 * PX : PX / 2, by = (OY + BB) / 2 - 50;
-    c.globalAlpha = Math.min(1, q / 0.3, (2.4 - q) / 0.2 + 0.2); ART.rr(c, x - 130, by, 260, 60, 14); ART.fillOut(c, wave % 5 === 0 ? '#8a2b3a' : '#2d2442', 3);
-    label(banner.head, x, by + 20, 24, wave % 5 === 0 ? '#ffd23d' : '#fff', 'center'); label(banner.sub, x, by + 45, 12, '#d8d0f0', 'center'); c.globalAlpha = 1; }
+    c.globalAlpha = Math.min(1, q / 0.3, (2.4 - q) / 0.2 + 0.2); ART.rr(c, x - 130, by, 260, 60, 14); ART.fillOut(c, (CMP ? banner.big : wave % 5 === 0) ? '#8a2b3a' : '#2d2442', 3);
+    label(banner.head, x, by + 20, 24, (CMP ? banner.big : wave % 5 === 0) ? '#ffd23d' : '#fff', 'center'); label(banner.sub, x, by + 45, 12, '#d8d0f0', 'center'); c.globalAlpha = 1; }
   if (msg) { c.globalAlpha = Math.min(1, msg.life / 0.3); label(msg.t, PX / 2, BB - 20, 15, '#ffb3a8', 'center'); c.globalAlpha = 1; }
 }
