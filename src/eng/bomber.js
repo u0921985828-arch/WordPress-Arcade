@@ -340,12 +340,14 @@ const ICON = {};
 function itemIcon(kind) {
   if (ICON[kind]) return ICON[kind];
   return (ICON[kind] = mk(28, 28, (g) => {
-    ART.rr(g, 2, 2, 24, 24, 7); const col = { r: '#ff7a45', b: '#ff5f7a', s: '#3fb6ea', k: '#8f6cff' }[kind], gr = g.createLinearGradient(0, 2, 0, 26); gr.addColorStop(0, lite(col, 0.25)); gr.addColorStop(1, dark(col, 0.2)); g.fillStyle = gr; g.fill(); g.lineWidth = 2.2; g.strokeStyle = OUT; g.stroke();
+    ART.rr(g, 2, 2, 24, 24, 7); const col = { r: '#ff7a45', b: '#ff5f7a', s: '#3fb6ea', k: '#8f6cff', K: '#b98a2e', g: '#4a9a63' }[kind], gr = g.createLinearGradient(0, 2, 0, 26); gr.addColorStop(0, lite(col, 0.25)); gr.addColorStop(1, dark(col, 0.2)); g.fillStyle = gr; g.fill(); g.lineWidth = 2.2; g.strokeStyle = OUT; g.stroke();
     g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(6, 5, 16, 2);
     g.fillStyle = '#fff'; g.strokeStyle = OUT; g.lineWidth = 1.6;
     if (kind === 'r') { g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * TAU / 10, r = i % 2 ? 4 : 9; g.lineTo(14 + Math.cos(a) * r, 15 + Math.sin(a) * r); } g.closePath(); g.fillStyle = '#fff4b8'; g.fill(); g.stroke(); }
     if (kind === 'b') { ART.rr(g, 10, 9, 8, 13, 3); g.fillStyle = '#fff'; g.fill(); g.stroke(); g.fillStyle = '#ffd166'; g.fillRect(10.5, 12, 7, 2.5); g.beginPath(); g.moveTo(14, 9); g.quadraticCurveTo(16, 5, 19, 6); g.stroke(); }
     if (kind === 's') { g.beginPath(); g.moveTo(16, 5); g.lineTo(8, 16); g.lineTo(13, 16); g.lineTo(11, 24); g.lineTo(20, 12); g.lineTo(15, 12); g.closePath(); g.fillStyle = '#fff4b8'; g.fill(); g.stroke(); }
+    if (kind === 'K') { g.lineWidth = 3; g.strokeStyle = '#fff4b8'; g.beginPath(); g.arc(11, 12, 5, 0, TAU); g.stroke(); g.fillStyle = '#fff4b8'; g.fillRect(13, 10.5, 3, 11); g.fillRect(15, 17, 5, 3); g.lineWidth = 1.6; g.strokeStyle = OUT; g.beginPath(); g.arc(11, 12, 6.7, 0, TAU); g.stroke(); g.beginPath(); g.arc(11, 12, 3.2, 0, TAU); g.stroke(); g.strokeRect(13, 10.5, 3, 11); g.strokeRect(15, 17, 5, 3); }
+    if (kind === 'g') { ART.rr(g, 6, 11, 16, 11, 3); g.fillStyle = '#7cf7a0'; g.fill(); g.stroke(); g.beginPath(); g.moveTo(14, 11); g.quadraticCurveTo(8, 4, 6.5, 8.5); g.quadraticCurveTo(9.5, 11, 14, 11); g.moveTo(14, 11); g.quadraticCurveTo(20, 4, 21.5, 8.5); g.quadraticCurveTo(18.5, 11, 14, 11); g.fillStyle = '#ff6fb5'; g.fill(); g.stroke(); g.fillStyle = '#ff6fb5'; g.fillRect(12.5, 11, 3, 11); g.strokeRect(12.5, 11, 3, 11); }
     if (kind === 'k') { g.beginPath(); g.moveTo(10, 6); g.lineTo(16, 6); g.lineTo(16, 16); g.lineTo(22, 18); g.quadraticCurveTo(23, 22, 20, 22); g.lineTo(9, 22); g.closePath(); g.fillStyle = '#fff'; g.fill(); g.stroke(); }
   }));
 }
@@ -385,11 +387,13 @@ k.onParty = () => { if (k.st !== 'play') { reset(); return; } refreshCtl(); };
 
 function reset() {
   skill = Math.max(0.12, Math.min(0.75, 0.21 + Math.min(18, lsGet(CPUK, 0) + k.D.cpu) * 0.03));   /* k.D.cpu: nivel de las CPU, sin tocar lo guardado */ /* 1.23: más fácil (antes 0,3 + 0,06/victoria, tope 0,88) */
+  CM = !!BLV && !k.party;
   pl = null; newPlayers(); round = 0; newRound();
 }
 function newRound() {
-  round++; buildMap(); bombs = []; crumbs = []; hot = null; hotN = 0; hotT = UNICA ? 1.8 : 0; rT = 0; sudden = false; sudI = 0; sudT = 0; endT = 0; msg = ''; msgT = 0; fast = false;
-  placePlayers(); cdPend = true;
+  round++; if (!CM) buildMap(); bombs = []; crumbs = []; hot = null; hotN = 0; hotT = UNICA ? 1.8 : 0; rT = 0; sudden = false; sudI = 0; sudT = 0; endT = 0; msg = ''; msgT = 0; fast = false;
+  if (CM) cmLevel(); else placePlayers();
+  cdPend = true;
 }
 
 /* ---------------- Movimiento en rejilla con ayuda en esquinas ---------------- */
@@ -423,6 +427,7 @@ const plAt = (x, y) => pl.some((q) => q.alive && Math.floor(q.x) === x && Math.f
 /* ---------------- Petardos y explosiones ---------------- */
 function placeBomb(q, slide = RU.slide) {
   const [x, y] = cellOf(q);
+  if (CM && ice[y][x]) slide = true;
   if (bombs.filter((b) => b.own === q).length >= q.max || bombAt(x, y) || grid[y][x]) return false;
   const b = { x, y, t: RU.fuse, range: q.range, own: q, pass: new Set(pl.filter((o) => o.alive && Math.floor(o.x) === x && Math.floor(o.y) === y)), sl: null, born: t };
   bombs.push(b); k.sfx('click'); q.bombT = 0.18;
@@ -442,10 +447,11 @@ function explode(b) {
   k.burst((b.x + 0.5) * T, TOP + (b.y + 0.5) * T, PAINT ? b.own.col : '#ffd166', 16, 200); k.burst((b.x + 0.5) * T, TOP + (b.y + 0.5) * T, PAINT ? '#fff' : '#ff5f7a', 10, 160);
   for (const [x, y, bit] of blast(b)) {
     fireT[y][x] = FIRE_T; fireD[y][x] = bit === 0 ? 3 : (fireD[y][x] | bit); fireO[y][x] = oi;
+    if (CM && cmCell(x, y, b)) continue;
     if (grid[y][x] === 3) { const bi = BASE.findIndex(([a, b2]) => a === x && b2 === y);
       if (bi >= 0 && bhp[bi] > 0) { bhp[bi]--; k.sfx('hurt'); k.shake(6); k.burst((x + 0.5) * T, TOP + (y + 0.5) * T, '#ffb13d', 18, 190);
         if (bhp[bi] <= 0) { grid[y][x] = 0; baseDown(bi); } else flo('¡Carro tocado!', (x + 0.5) * T, TOP + y * T - 8, '#ffd166'); } }
-    else if (grid[y][x] === 2) { grid[y][x] = 0; crumbs.push({ x, y, t: 0 }); k.burst((x + 0.5) * T, TOP + (y + 0.5) * T, '#c98a4b', 10, 150); if (Math.random() < RU.drop) items[y][x] = k.pick(UNICA ? ['s'] : ['r', 'r', 'b', 'b', 's', 's', 'k']); fireT[y][x] = FIRE_T; }
+    else if (grid[y][x] === 2) { grid[y][x] = 0; crumbs.push({ x, y, t: 0 }); k.burst((x + 0.5) * T, TOP + (y + 0.5) * T, '#c98a4b', 10, 150); if (!CM && Math.random() < RU.drop) items[y][x] = k.pick(UNICA ? ['s'] : ['r', 'r', 'b', 'b', 's', 's', 'k']); fireT[y][x] = FIRE_T; }
     else if (items[y][x] && bit) { items[y][x] = 0; k.burst((x + 0.5) * T, TOP + (y + 0.5) * T, '#fff', 8, 120); }
     const o = bombAt(x, y); if (o && o !== b) o.t = Math.min(o.t, 0.06);
     if (PAINT) paintCell(x, y, oi);
@@ -457,7 +463,17 @@ function baseDown(bi) {
   msg = `¡Carro del equipo ${bi ? 'B' : 'A'} por los aires!`; msgT = 2.4; if (!endT) endT = 1.6;
 }
 function kill(q, why) {
-  if (!q.alive) return; q.alive = false; q.dead = 1; k.sfx('hurt'); k.shake(7);
+  if (!q.alive) return;
+  if (CM && q === pl[0] && CS.hp > 1) { // fallar cuesta un chamuscón, no el reto (docs/VARA.md §7)
+    CS.hp--; CS.lost++; q.inv = 2.6; k.sfx('hurt'); k.shake(6);
+    k.burst(q.x * T, TOP + q.y * T, q.col, 20, 200);
+    msg = CS.hp === 1 ? '¡Último chamuscón!' : '¡Chamuscón! Te quedan ' + CS.hp; msgT = 1.8;
+    flo('−1', q.x * T, TOP + q.y * T - 22, '#ff8fa3'); return;
+  }
+  q.alive = false; q.dead = 1; k.sfx('hurt'); k.shake(7);
+  if (CM) { k.burst(q.x * T, TOP + q.y * T, q.col, 26, 220); k.burst(q.x * T, TOP + q.y * T, '#fff', 10, 140);
+    if (q === pl[0]) cmLose(); else { k.sfx('explode'); if (q.ty === 'B') { k.confetti(q.col, 40); k.shake(9); } flo(q.ty === 'B' ? '¡El Petardero cae!' : '¡Fuera!', q.x * T, TOP + q.y * T - 20, q.col); }
+    return; }
   if (PAINT) { // pintura: nadie queda eliminado; el que te alcanza salpica tu casilla y las de alrededor, y reapareces en tu esquina
     const [cx, cy] = cellOf(q), oi = fireO[cy][cx], by = pl[oi]; q.out = 1.6;
     if (by && by !== q) { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) paintCell(cx + dx, cy + dy, oi); k.burst(q.x * T, TOP + q.y * T, by.col, 30, 240); }
@@ -572,6 +588,220 @@ function aiDir(q, D) {
   const dx = nx + 0.5 - q.x, dy = ny + 0.5 - q.y; return Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)];
 }
 
+/* ---------------- Campaña de un jugador de «Petardo Plaza» (docs/VARA.md) ----------------
+   Todo lo de aquí abajo se enciende SOLO en el juego «petardo-plaza» y SOLO fuera del modo tele
+   (CM): la fiesta de 1–4 en la tele y los otros cinco modos de bomber.js no ejecutan ni una línea.
+   Verbos que se estrenan de uno en uno: barril de pólvora, brasero, caja de fiesta, llave y
+   puerta, placa y reja, hielo; y El Petardero como final. */
+const BLV = (CFG.id === 'petardo-plaza' && typeof BOMLV !== 'undefined') ? BOMLV : null;
+let CM = false, LVB = BLV ? BLV[0] : null, CS = null, ice = null;
+if (BLV) { LVB = BLV[k.levels(BLV.length) - 1]; k.onLevel = (i) => { LVB = BLV[i - 1] || BLV[0]; if (CM) cmLevel(); }; }
+const CMS = {}, cmS = (key, w, h, fn) => CMS[key] || (CMS[key] = mk(w, h, fn));
+const FCOL = { 1: '#ff8fa3', 2: '#ffb13d', 3: '#5b8cff', B: '#a8cf3f' };
+const FNAM = { 1: 'Vecino', 2: 'Artificiero', 3: 'Guardia', B: 'Petardero' };
+const bsk = (v) => Math.min(0.9, Math.max(0.05, v * (k.dif === 0 ? 0.78 : k.dif === 2 ? 1.16 : 1)));
+const bt2 = () => Math.max(12, LVB.t2 + (k.dif === 0 ? 12 : k.dif === 2 ? -6 : 0));
+const bt3 = () => Math.max(8, LVB.t3 + (k.dif === 0 ? 8 : k.dif === 2 ? -4 : 0));
+const cmWarn = () => (k.dif === 0 ? 1.15 : k.dif === 2 ? 0.7 : 0.9); // aviso del brasero
+
+function cmLevel() {
+  LVB = BLV[k.lv - 1] || BLV[0];
+  skill = bsk(LVB.sk);
+  grid = []; items = []; fireT = []; fireD = []; fireO = []; paint = []; ice = []; pcount = [0, 0, 0, 0]; FREE = 1;
+  CS = { braz: [], plates: [], gates: [], door: null, key: false, needKey: false, gifts: 0, got: 0, party: 0, open: false, fail: '', bg: null, tipT: 4.5, lost: 0, hp: Math.max(1, (LVB.hp || 3) + (k.dif === 0 ? 1 : k.dif === 2 ? -1 : 0)) };
+  const foes = []; let me = [1, 1];
+  for (let y = 0; y < RO; y++) {
+    grid.push([]); items.push([]); fireT.push([]); fireD.push([]); fireO.push([]); paint.push([]); ice.push([]);
+    for (let x = 0; x < CO; x++) {
+      const ch = LVB.map[y][x]; let g = 0, it = 0, ic = 0;
+      if (ch === '#') g = 1;
+      else if (ch === 'x') g = 2;
+      else if (ch === 'V') g = 4;
+      else if (ch === 'G') { g = 5; CS.gates.push([x, y]); }
+      else if (ch === 'D') { g = 6; CS.door = [x, y]; }
+      else if (ch === 'o') { g = 7; CS.party++; }
+      else if (ch === 'F') CS.braz.push({ x, y, ph: ((x * 3 + y * 5) % 10) / 10, w: false });
+      else if (ch === 'P') CS.plates.push({ x, y, on: false });
+      else if (ch === '~') ic = 1;
+      else if (ch === 'K') { it = 'K'; CS.needKey = true; }
+      else if (ch === 'g') { it = 'g'; CS.gifts++; }
+      else if (ch === 'r' || ch === 'b' || ch === 's' || ch === 'k') it = ch;
+      else if (ch === '@') me = [x, y];
+      else if (ch === '1' || ch === '2' || ch === '3' || ch === 'B') foes.push({ x, y, ty: ch });
+      grid[y].push(g); items[y].push(it); fireT[y].push(0); fireD[y].push(0); fireO[y].push(-1); paint[y].push(-1); ice[y].push(ic);
+    }
+  }
+  SPIRAL = []; sudden = false; sudI = 0;
+  pl = [{ p: 0, cpu: false, name: 'Tú', col: k.pcol(0), hat: HATS[0], wins: 0, ty: '@' }];
+  foes.forEach((f, i) => pl.push({ p: 0, cpu: true, name: FNAM[f.ty], col: FCOL[f.ty], hat: HATS[(i + 1) % 4], wins: 0, ty: f.ty }));
+  pl.forEach((q, i) => {
+    const src = i ? foes[i - 1] : { x: me[0], y: me[1] };
+    Object.assign(q, { x: src.x + 0.5, y: src.y + 0.5, dir: [0, 1], spd: RU.speed, max: i ? RU.bombs : 2, range: RU.range, kick: false, alive: true, dead: 0, out: 0, gl: false, inv: i ? 2.5 : 3.5, mv: 0, ai: null, think: k.rnd(0.2, 0.8), anim: 0, bombT: 0, ghost: false, gcd: 0, hp: 1 });
+    if (q.ty === '2') { q.max = 2; q.range = 3; }
+    if (q.ty === '3') { q.max = 0; q.spd = RU.speed * 1.3; }
+    if (q.ty === 'B') { q.max = 2; q.range = 4; q.spd = RU.speed * 1.12; q.hp = 4; }
+  });
+  CS.bg = mk(W, RO * T, (g) => { // el hielo se hornea una vez por nivel
+    for (let y = 0; y < RO; y++) for (let x = 0; x < CO; x++) if (ice[y][x]) {
+      const X = x * T, Y = y * T, v = rnd(x * 17 + y * 5);
+      ART.rr(g, X + 1, Y + 1, T - 2, T - 2, 6); g.fillStyle = 'rgba(160,215,255,.5)'; g.fill();
+      g.lineWidth = 1.6; g.strokeStyle = 'rgba(223,244,255,.55)'; g.stroke();
+      g.globalAlpha = 0.5; g.fillStyle = '#fff'; g.beginPath(); g.ellipse(X + 8 + v * 14, Y + 9 + v * 8, 6, 2.4, -0.5, 0, TAU); g.fill(); g.globalAlpha = 1;
+    }
+  });
+}
+function cmFlare(f) { // el brasero escupe fuego en cruz (sin dueño: no perdona a nadie)
+  k.sfx('shoot');
+  for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const x = f.x + dx, y = f.y + dy; if (!inG(x, y) || grid[y][x]) continue;
+    fireT[y][x] = FIRE_T * 0.85; fireD[y][x] = 3; fireO[y][x] = -1;
+  }
+  k.burst((f.x + 0.5) * T, TOP + (f.y + 0.5) * T, '#ffb13d', 10, 140);
+}
+function cmGates() {
+  if (!CS.gates.length) return;
+  for (const [x, y] of CS.gates) if (grid[y][x] === 5) { grid[y][x] = 0; crumbs.push({ x, y, t: 0, drop: true }); }
+  CS.gates = []; k.sfx('win'); k.shake(3); msg = '¡Rejas arriba!'; msgT = 1.6;
+}
+function cmCell(x, y, b) { // barriles y cajas de fiesta (el resto del suelo lo lleva explode())
+  const g = grid[y][x];
+  if (g === 4) { grid[y][x] = 0; crumbs.push({ x, y, t: 0 }); k.sfx('explode'); k.shake(3);
+    k.burst((x + 0.5) * T, TOP + (y + 0.5) * T, '#ffb13d', 14, 180);
+    bombs.push({ x, y, t: 0.16, range: 3, own: b.own, pass: new Set(), sl: null, born: t, bar: 1 }); return true; }
+  if (g === 7) { grid[y][x] = 0; CS.party--; crumbs.push({ x, y, t: 0 }); k.sfx('coin');
+    k.burst((x + 0.5) * T, TOP + (y + 0.5) * T, '#ffd166', 16, 190); flo('¡Caja de fiesta!', (x + 0.5) * T, TOP + y * T - 6, '#ffd166'); return true; }
+  return false;
+}
+function cmShield(q) { // El Petardero aguanta cuatro petardazos
+  if (!q.hp || q.hp <= 1) return false;
+  q.hp--; q.inv = 1.7; q.ai = null; k.sfx('hurt'); k.shake(6); k.punch && k.punch(4);
+  k.burst(q.x * T, TOP + q.y * T, q.col, 20, 200); flo('¡Aguanta ' + q.hp + '!', q.x * T, TOP + q.y * T - 26, q.col);
+  return true;
+}
+function cmStep(dt) {
+  const cyc = LVB.bc || 3.2, wv = cmWarn() / cyc;
+  for (const f of CS.braz) { f.ph += dt / cyc; if (f.ph >= 1) { f.ph -= 1; cmFlare(f); } f.w = f.ph > 1 - wv; }
+  const me = pl[0];
+  if (me.alive) for (const p of CS.plates) if (!p.on && Math.floor(me.x) === p.x && Math.floor(me.y) === p.y) {
+    p.on = true; k.sfx('coin'); flo('¡Placa!', (p.x + 0.5) * T, TOP + p.y * T - 6, '#a8cf3f');
+    if (CS.plates.every((q) => q.on)) cmGates();
+  }
+  if (CS.door && !CS.open && (CS.needKey ? CS.key : CS.plates.length ? CS.plates.every((p) => p.on) : true)) {
+    CS.open = true; grid[CS.door[1]][CS.door[0]] = 0; k.sfx('win'); msg = '¡La puerta se abre!'; msgT = 1.8;
+  }
+  CS.tipT = Math.max(0, CS.tipT - dt);
+}
+function cmCheck() {
+  if (k.st !== 'play') return;
+  const foes = pl.filter((q, i) => i > 0 && q.alive).length;
+  const done = LVB.obj === 'foes' ? foes === 0
+    : LVB.obj === 'crates' ? CS.party <= 0
+      : CS.open && Math.floor(pl[0].x) === CS.door[0] && Math.floor(pl[0].y) === CS.door[1];
+  if (done) cmWin(); else if (rT > LVB.lim) { CS.fail = 'tiempo'; cmLose(); }
+}
+function cmWin() {
+  if (k.st !== 'play') return;
+  const tm = rT, st = 1 + (tm <= bt2() ? 1 : 0) + (tm <= bt3() && CS.got >= CS.gifts ? 1 : 0);
+  k.sfx('win'); k.confetti(pl[0].col, 60);
+  const pts = Math.max(60, Math.round(900 + Math.max(0, LVB.lim - tm) * 12 + CS.got * 120));
+  k.levelDone(pts, `Tiempo ${tm.toFixed(1)} s · regalos ${CS.got}/${CS.gifts}`, { stars: st });
+}
+function cmLose() {
+  if (k.st !== 'play') return;
+  const tiempo = CS.fail === 'tiempo';
+  k.lose(CFG.id, Math.round(rT * 10), tiempo ? '¡Se acabó la verbena!' : '¡Te ha pillado!',
+    'Nivel ' + k.lv + ' · ' + LVB.n + (tiempo ? ' · se acabó el tiempo' : ''));
+}
+/* ---------------- Dibujo de la campaña ---------------- */
+const cmBarril = () => cmS('V', T, T + 8, (g) => {
+  ART.shadow(g, T / 2 + 1, T + 4, 13, 0.3);
+  ART.rr(g, 4, 8, T - 8, T - 4, 7); const gr = g.createLinearGradient(4, 0, T - 4, 0);
+  gr.addColorStop(0, '#b9773f'); gr.addColorStop(0.5, '#8d5228'); gr.addColorStop(1, '#5f3518');
+  g.fillStyle = gr; g.fill(); g.lineWidth = 2.4; g.strokeStyle = OUT; g.stroke();
+  g.strokeStyle = 'rgba(255,255,255,.3)'; g.lineWidth = 2; for (const y of [15, 26]) { g.beginPath(); g.moveTo(6, y); g.lineTo(T - 6, y); g.stroke(); }
+  g.beginPath(); g.arc(T / 2, 22, 6.5, 0, TAU); g.fillStyle = '#ffd166'; g.fill(); g.lineWidth = 1.8; g.strokeStyle = OUT; g.stroke();
+  g.beginPath(); g.moveTo(T / 2 - 3, 22); g.lineTo(T / 2 + 3, 22); g.moveTo(T / 2, 19); g.lineTo(T / 2, 25); g.lineWidth = 2; g.strokeStyle = OUT; g.stroke();
+  g.beginPath(); g.moveTo(T / 2, 8); g.quadraticCurveTo(T / 2 + 7, 2, T / 2 + 3, 0); g.lineWidth = 2.2; g.strokeStyle = '#3a2a4a'; g.stroke();
+});
+const cmReja = () => cmS('G', T, T + 10, (g) => {
+  ART.shadow(g, T / 2 + 1, T + 6, 13, 0.28);
+  ART.rr(g, 2, 2, T - 4, T + 4, 4); g.fillStyle = 'rgba(26,21,48,.45)'; g.fill();
+  g.lineWidth = 2.6; g.strokeStyle = OUT; g.stroke();
+  for (let i = 0; i < 3; i++) { const x = 7 + i * 9; ART.rr(g, x, 4, 4.5, T, 2.2); g.fillStyle = '#8f96b8'; g.fill(); g.lineWidth = 1.6; g.strokeStyle = OUT; g.stroke(); }
+  for (const y of [9, 26]) { ART.rr(g, 4, y, T - 8, 4, 2); g.fillStyle = '#6d7396'; g.fill(); g.lineWidth = 1.5; g.strokeStyle = OUT; g.stroke(); }
+});
+const cmPuerta = () => cmS('D', T, T + 12, (g) => {
+  ART.shadow(g, T / 2 + 1, T + 8, 13, 0.3);
+  ART.rr(g, 3, 2, T - 6, T + 6, 7); const gr = g.createLinearGradient(0, 2, 0, T + 8);
+  gr.addColorStop(0, '#a4652f'); gr.addColorStop(1, '#6b3d1a'); g.fillStyle = gr; g.fill(); g.lineWidth = 2.6; g.strokeStyle = OUT; g.stroke();
+  g.strokeStyle = 'rgba(26,21,48,.35)'; g.lineWidth = 1.6; for (const x of [12, 20]) { g.beginPath(); g.moveTo(x, 6); g.lineTo(x, T + 4); g.stroke(); }
+  g.beginPath(); g.arc(T - 9, 22, 3.4, 0, TAU); g.fillStyle = '#ffd166'; g.fill(); g.lineWidth = 1.6; g.strokeStyle = OUT; g.stroke();
+});
+const cmFiesta = () => cmS('o', T, T + 6, (g) => {
+  g.drawImage(CRATE, 0, 0, T, T + 6);
+  const cols = ['#ff6fb5', '#5b8cff', '#a8cf3f', '#ffc94d'];
+  for (let i = 0; i < 4; i++) { const x = 5 + i * 7.5, y = 4 + (i % 2) * 3;
+    g.beginPath(); g.ellipse(x, y, 3, 3.8, 0, 0, TAU); g.fillStyle = cols[i]; g.fill(); g.lineWidth = 1.5; g.strokeStyle = OUT; g.stroke(); }
+});
+const cmBrasero = () => cmS('F', T, T + 8, (g) => {
+  ART.shadow(g, T / 2 + 1, T + 4, 12, 0.3);
+  g.beginPath(); g.moveTo(8, T + 2); g.lineTo(11, 16); g.lineTo(T - 11, 16); g.lineTo(T - 8, T + 2); g.closePath();
+  g.fillStyle = '#6d7396'; g.fill(); g.lineWidth = 2.4; g.strokeStyle = OUT; g.stroke();
+  ART.rr(g, 6, 10, T - 12, 9, 4); g.fillStyle = '#8f96b8'; g.fill(); g.lineWidth = 2.2; g.strokeStyle = OUT; g.stroke();
+  g.beginPath(); g.arc(T / 2, 13, 5, 0, TAU); g.fillStyle = '#ff8b3d'; g.fill();
+});
+const cmPlaca = (on) => cmS('P' + on, T, T, (g) => {
+  ART.rr(g, 5, 7, T - 10, T - 12, 5); g.fillStyle = on ? '#a8cf3f' : '#6d7396'; g.fill();
+  g.lineWidth = 2.2; g.strokeStyle = OUT; g.stroke();
+  if (!on) { g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 2; g.beginPath(); g.moveTo(9, 12); g.lineTo(T - 9, 12); g.stroke(); }
+});
+function cmFloor() {
+  c.drawImage(CS.bg, 0, TOP, W, RO * T);
+  for (const p of CS.plates) c.drawImage(cmPlaca(p.on ? 1 : 0), p.x * T, TOP + p.y * T, T, T);
+  if (CS.door && CS.open) { const [x, y] = CS.door; // el umbral ya libre: alfombra de salida
+    ART.rr(c, x * T + 3, TOP + y * T + 3, T - 6, T - 6, 6); c.fillStyle = 'rgba(168,207,63,.35)'; c.fill();
+    c.lineWidth = 2.4; c.strokeStyle = '#a8cf3f'; c.stroke();
+    label('SAL', (x + 0.5) * T, TOP + (y + 0.5) * T, 12, '#dff4c8'); }
+  for (const f of CS.braz) { // el aviso: el brasero chisporrotea antes de soltar el fuego
+    if (!f.w) continue; const a = 0.25 + 0.4 * Math.abs(Math.sin(t * 16));
+    c.globalAlpha = a; c.fillStyle = '#ff8b3d';
+    for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) { const x = f.x + dx, y = f.y + dy; if (!inG(x, y) || grid[y][x]) continue;
+      ART.rr(c, x * T + 4, TOP + y * T + 4, T - 8, T - 8, 7); c.fill(); }
+    c.globalAlpha = 1;
+  }
+}
+function cmObj(x, y) {
+  const g = grid[y][x], X = x * T, Y = TOP + y * T;
+  if (g === 4) c.drawImage(cmBarril(), X, Y - 8, T, T + 8);
+  else if (g === 5) c.drawImage(cmReja(), X, Y - 10, T, T + 10);
+  else if (g === 6) c.drawImage(cmPuerta(), X, Y - 12, T, T + 12);
+  else if (g === 7) c.drawImage(cmFiesta(), X, Y - 6, T, T + 6);
+}
+function cmHUD() {
+  const me = pl[0], foes = pl.filter((q, i) => i > 0 && q.alive).length;
+  label('NIVEL ' + k.lv, 10, 16, 15, '#a097ff', 'left');
+  label(fitName(LVB.n, 150, 15), 10, 34, 15, '#fff', 'left');
+  const ob = LVB.obj === 'foes' ? 'Vecinos: ' + foes
+    : LVB.obj === 'crates' ? 'Cajas de fiesta: ' + Math.max(0, CS.party)
+      : CS.open ? '¡A la puerta!' : CS.needKey ? 'Busca la llave' : 'Placas: ' + CS.plates.filter((p) => p.on).length + '/' + CS.plates.length;
+  ART.rr(c, 168, 7, 150, 32, 9); c.fillStyle = 'rgba(26,21,48,.85)'; c.fill(); c.lineWidth = 2.2; c.strokeStyle = '#ffd166'; c.stroke();
+  label(fitName(ob, 140, 15), 243, 23, 15, '#ffd166');
+  const tm = rT, col = tm <= bt3() ? '#a8cf3f' : tm <= bt2() ? '#ffd166' : '#ff8fa3';
+  label(tm.toFixed(1) + ' s', 336, 17, 15, col, 'left');
+  label('Regalos ' + CS.got + '/' + CS.gifts, 336, 35, 13, CS.got >= CS.gifts ? '#a8cf3f' : '#c9c2e8', 'left');
+  c.drawImage(itemIcon('r'), 424, 6, 14, 14); label('' + me.range, 441, 14, 13, '#fff', 'left');
+  c.drawImage(itemIcon('b'), 424, 24, 14, 14); label('' + me.max, 441, 32, 13, '#fff', 'left');
+  label('♥ ' + CS.hp, 466, 23, 16, CS.hp > 1 ? '#a8cf3f' : '#ff8fa3', 'left');
+  const boss = pl.find((q) => q.ty === 'B' && q.alive);
+  if (boss) { ART.rr(c, W / 2 - 70, TOP + 6, 140, 12, 6); c.fillStyle = 'rgba(26,21,48,.8)'; c.fill();
+    ART.rr(c, W / 2 - 67, TOP + 9, 134 * boss.hp / 4, 6, 3); c.fillStyle = '#a8cf3f'; c.fill();
+    label('EL PETARDERO', W / 2, TOP + 26, 13, '#a8cf3f'); }
+  if (CS.tipT > 0 && k.st === 'play') { const a = Math.min(1, CS.tipT);
+    c.globalAlpha = a; const s = fitSize(LVB.i, W - 40, 15), bw = Math.min(W - 12, c.measureText(LVB.i).width + 26);
+    ART.rr(c, W / 2 - bw / 2, H - 34, bw, 26, 9); c.fillStyle = 'rgba(26,21,48,.9)'; c.fill(); c.lineWidth = 2; c.strokeStyle = '#6e62f5'; c.stroke();
+    label(LVB.i, W / 2, H - 21, s, '#fff'); c.globalAlpha = 1; }
+}
+
 /* ---------------- Bucle ---------------- */
 reset(); k.show(CFG.title, CFG.help);
 k.run((dt) => {
@@ -579,7 +809,7 @@ k.run((dt) => {
   if (cdPend) { cdPend = false; k.count(3); }
   if (k.counting()) { t += dt; return; }
   const humans = pl.filter((q) => !q.cpu && q.alive).length;
-  fast = !PAINT && !GHOST && humans === 0 && pl.some((q) => !q.cpu) && !endT;
+  fast = !CM && !PAINT && !GHOST && humans === 0 && pl.some((q) => !q.cpu) && !endT;
   for (let s = 0; s < (fast ? 4 : 1); s++) step(dt);
 }, draw);
 
@@ -588,7 +818,8 @@ function step(dt) {
   if (endT) { endT -= dt; for (const q of pl) if (q.dead) q.dead = Math.max(0, q.dead - dt); if (endT <= 0) finishRound(); return; }
   for (let y = 0; y < RO; y++) for (let x = 0; x < CO; x++) if (fireT[y][x] > 0) { fireT[y][x] -= dt; if (fireT[y][x] <= 0) { fireT[y][x] = 0; fireD[y][x] = 0; } }
   for (const cr of crumbs) cr.t += dt; crumbs = crumbs.filter((cr) => cr.t < 0.5);
-  if (!PAINT && !sudden && rT > RU.round) { sudden = true; msg = '¡Muerte súbita!'; msgT = 2.2; k.sfx('lose'); k.flash('rgba(255,90,95,.3)'); }
+  if (CM) cmStep(dt);
+  if (!CM && !PAINT && !sudden && rT > RU.round) { sudden = true; msg = '¡Muerte súbita!'; msgT = 2.2; k.sfx('lose'); k.flash('rgba(255,90,95,.3)'); }
   if (sudden && sudI < SPIRAL.length) { sudT -= dt; if (sudT <= 0) { sudT = 0.25; const [x, y] = SPIRAL[sudI++]; grid[y][x] = 1; items[y][x] = 0; crumbs.push({ x, y, t: 0, drop: true });
     const b = bombAt(x, y); if (b) { bombs.splice(bombs.indexOf(b), 1); if (b === hot) { hot = null; hotT = 1.5; } } k.sfx('hit'); k.shake(2);
     for (const q of pl) if (q.alive && Math.floor(q.x) === x && Math.floor(q.y) === y) kill(q, '¡Aplastado!'); } }
@@ -631,10 +862,13 @@ function step(dt) {
       if (it === 'r') { q.range = Math.min(8, q.range + 1); k.float('+Alcance', q.x * T, TOP + q.y * T - 18, '#ffb13d'); }
       if (it === 'b') { q.max = Math.min(6, q.max + 1); k.float('+Petardo', q.x * T, TOP + q.y * T - 18, '#ff8fa3'); }
       if (it === 's') { q.spd = Math.min(MAXSPD, q.spd + 0.55); k.float('+Velocidad', q.x * T, TOP + q.y * T - 18, '#8fdcff'); }
-      if (it === 'k') { q.kick = true; k.float('¡Patada!', q.x * T, TOP + q.y * T - 18, '#c9b8ff'); } }
-    if (fireT[cy][cx] > 0 && q.inv <= 0 && !friendly(q, fireO[cy][cx])) kill(q);
+      if (it === 'k') { q.kick = true; k.float('¡Patada!', q.x * T, TOP + q.y * T - 18, '#c9b8ff'); }
+      if (it === 'K') { CS.key = true; k.float('¡Llave!', q.x * T, TOP + q.y * T - 18, '#ffd166'); }
+      if (it === 'g') { CS.got++; k.confetti(q.col, 12); k.float('¡Regalo ' + CS.got + '/' + CS.gifts + '!', q.x * T, TOP + q.y * T - 18, '#7cf7a0'); } }
+    if (fireT[cy][cx] > 0 && q.inv <= 0 && !friendly(q, fireO[cy][cx])) { if (!(CM && cmShield(q))) kill(q); }
   }
   if (PAINT) { if (rT >= RU.round && !endT) { endT = 1.4; k.sfx('tick'); } return; }
+  if (CM) { cmCheck(); return; }
   const alive = pl.filter((q) => q.alive);
   const over = PAIR ? baseLost >= 0 || !alive.some((q) => team(q) === 0) || !alive.some((q) => team(q) === 1) : alive.length <= 1;
   if ((over || (sudI >= SPIRAL.length && rT > RU.round + SPIRAL.length * 0.25 + 15)) && !endT) endT = 1.2;
@@ -838,6 +1072,7 @@ function drawBase(x, y) {
 function draw() {
   c.fillStyle = '#2a1f3a'; c.fillRect(0, 0, W, H);
   c.drawImage(FLOOR, 0, TOP, W, RO * T);
+  if (CM) cmFloor();
   if (PAINT) for (let y = 1; y < RO - 1; y++) for (let x = 1; x < CO - 1; x++) { const o = paint[y][x]; if (o < 0 || !pl[o]) continue; // manchas de pintura
     const X = x * T, Y = TOP + y * T, col = pl[o].col, v = rnd(x * 7 + y * 31); c.fillStyle = col; c.globalAlpha = 0.82;
     ART.rr(c, X + 1.5, Y + 1.5, T - 3, T - 3, 9); c.fill(); c.beginPath(); c.arc(X + 4 + v * 24, Y + (v > 0.5 ? 1 : T - 1), 3.5, 0, TAU); c.arc(X + (v > 0.3 ? T - 1 : 1), Y + 6 + v * 20, 3, 0, TAU); c.fill();
@@ -852,13 +1087,14 @@ function draw() {
   L.sort((a, b) => a[0] - b[0]);
   for (const e of L) {
     if (e[1] === 0) { const [, , x, y] = e, cr = crumbs.find((q) => q.drop && q.x === x && q.y === y), dy = cr ? -(1 - cr.t / 0.5) * 40 : 0;
-      if (grid[y][x] === 3) drawBase(x, y); else if (grid[y][x] === 2) c.drawImage(CRATE, x * T, TOP + y * T - 6, T, T + 6); else if (x % 2 === 0 && y % 2 === 0) c.drawImage(PILLAR, x * T, TOP + y * T - 10, T, T + 10);
+      if (CM && grid[y][x] >= 4) cmObj(x, y); else if (grid[y][x] === 3) drawBase(x, y); else if (grid[y][x] === 2) c.drawImage(CRATE, x * T, TOP + y * T - 6, T, T + 6); else if (x % 2 === 0 && y % 2 === 0) c.drawImage(PILLAR, x * T, TOP + y * T - 10, T, T + 10);
       else { c.save(); c.translate(0, dy); c.drawImage(PILLAR, x * T, TOP + y * T - 10, T, T + 10); c.fillStyle = 'rgba(255,90,95,.35)'; ART.rr(c, x * T + 4, TOP + y * T + 2, T - 8, T - 6, 6); c.fill(); c.restore(); } }
     else if (e[1] === 1) drawBomb(e[2]); else drawPlayer(e[2]);
   }
   for (const cr of crumbs) if (!cr.drop) { c.globalAlpha = 1 - cr.t / 0.5; for (let i = 0; i < 4; i++) { const a = i * 1.7, r = cr.t * 50; c.fillStyle = '#c98a4b'; c.fillRect((cr.x + 0.5) * T + Math.cos(a) * r - 3, TOP + (cr.y + 0.5) * T + Math.sin(a) * r - 3 + cr.t * cr.t * 60, 6, 6); } c.globalAlpha = 1; }
   // marcador
   const gr = c.createLinearGradient(0, 0, 0, TOP); gr.addColorStop(0, '#3b2d5c'); gr.addColorStop(1, '#2a1f45'); c.fillStyle = gr; c.fillRect(0, 0, W, TOP);
+  if (CM) cmHUD(); else {
   if (PAIR) for (let i = 0; i < 2; i++) { const bx = 6 + i * (2 * 96 + 72); ART.rr(c, bx, 1.5, 2 * 92 + 4, 3.5, 1.8); c.fillStyle = pl[i * 2].col; c.fill(); }
   const cw = 92; pl.forEach((q, i) => { const x = 6 + i * (cw + 4) + (i >= 2 ? 72 : 0);
     ART.rr(c, x, 6, cw, 34, 10); c.fillStyle = q.alive ? 'rgba(26,21,48,.9)' : 'rgba(26,21,48,.45)'; c.fill(); c.lineWidth = 2.5; c.strokeStyle = q.col; c.stroke();
@@ -871,11 +1107,12 @@ function draw() {
     if (PAINT) { ART.rr(c, x + 60, 26, 28, 12, 4); c.fillStyle = q.col; c.fill(); label(pct(i) + '%', x + 74, 32, k.party ? 13 : 10, '#fff'); }
     else { if (q.kick) c.drawImage(itemIcon('k'), x + 62, 26, 12, 12); if (q.spd > RU.speed + 0.1) c.drawImage(itemIcon('s'), x + 76, 26, 12, 12); } });
   const left = Math.max(0, RU.round - rT); label(sudden ? '¡YA!' : `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 232, 23, 18, sudden ? '#ff5f7a' : left < 10 ? '#ffd166' : '#fff');
+  }
   if (msgT > 0 || endT) { const al = pl.filter((q) => q.alive);
     const m = endT && PAINT ? '¡Tiempo!' : endT && PAIR ? (al.length ? `¡Equipo ${team(al[0]) ? 'B' : 'A'}!` : '¡Nadie en pie!') : endT ? (al.length === 1 ? `¡${al[0].name === 'Tú' ? 'Aguantas' : al[0].name + ' aguanta'}!` : '¡Nadie en pie!') : msg;
     c.globalAlpha = endT ? 1 : Math.min(1, msgT * 2);
     const mz = fitSize(m, W - 64, 26), mw = Math.min(W - 16, c.measureText(m).width + 40), mh = mz + 26;
     ART.rr(c, W / 2 - mw / 2, TOP + RO * T / 2 - mh / 2, mw, mh, 14); c.fillStyle = 'rgba(26,21,48,.88)'; c.fill(); c.lineWidth = 3; c.strokeStyle = '#ffd166'; c.stroke(); label(m, W / 2, TOP + RO * T / 2, mz, '#fff'); c.globalAlpha = 1; }
   if (fast) { const ft = 'Te han eliminado · la ronda termina a toda prisa'; label(ft, W / 2, H - 14, fitSize(ft, W - 20, k.party ? 18 : 13), '#ffd166'); }
-  if (k.st === 'play' && rT < 3 && !k.counting()) label('Ronda ' + round, W / 2, TOP + 22, 20, '#fff');
+  if (!CM && k.st === 'play' && rT < 3 && !k.counting()) label('Ronda ' + round, W / 2, TOP + 22, 20, '#fff');
 }

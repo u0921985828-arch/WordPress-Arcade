@@ -190,8 +190,18 @@ const CORN = [[-1, -1], [-1, 1], [1, -1], [1, 1]]; /* J1 arriba izq., J2 abajo i
 const PIL = MD.pil ? [[220, 92, 24], [220, 348, 24], [92, 220, 24], [348, 220, 24]] : [];
 const lerp = (a, b, t) => a + (b - a) * Math.max(0, Math.min(1, t)), adiff = (a) => Math.atan2(Math.sin(a), Math.cos(a)), hyp = Math.hypot;
 let P = [], round = 0, rt = 0, T = 0, phase = 'play', btw = 0, banner = null, cdPend = false, elimOrder = [], S = {}, waves = [];
+/* ---------- Campaña de un jugador: Patata Explosiva (docs/VARA.md) ----------
+   20 retos escritos a mano en src/eng/patalv.js. TODO lo de la campaña está acotado a
+   CFG.id === 'patata-explosiva' Y a !k.party (la bandera CM): en el modo tele y en los otros 16
+   modos de arena.js no se ejecuta ni una línea, y el equilibrio de la fiesta queda intacto. */
+const PLV = (M === 'patata' && CFG.id === 'patata-explosiva' && typeof PATALV !== 'undefined') ? PATALV : null;
+let CM = false, LV = PLV ? PLV[0] : null, PS = {};
+if (PLV) { k.levels(PLV.length); LV = PLV[k.lv - 1]; k.onLevel = (i) => { LV = PLV[i - 1] || PLV[0]; if (CM) newRound(); }; }
+const dsk = (v) => Math.min(0.92, Math.max(0.05, v * (k.dif === 0 ? 0.78 : k.dif === 2 ? 1.16 : 1)));
+const t2of = () => Math.max(4, LV.t2 + (k.dif === 0 ? 3.5 : k.dif === 2 ? -2 : 0));
+const t3of = () => Math.max(3, LV.t3 + (k.dif === 0 ? 2.5 : k.dif === 2 ? -1.5 : 0));
 let CPU = 0; try { CPU = Math.min(8, +localStorage.getItem('cpu:' + CFG.id) || 0); } catch (e) { /* sin almacenamiento */ }
-const skill = () => Math.min(0.8, Math.max(0.06, 0.21 + (CPU + k.D.cpu) * 0.05 + (round - 1) * 0.03));   /* k.D.cpu: nivel de las CPU */ /* 1.23: más fácil (antes 0,3 + 0,1/victoria, tope 0,95) */
+const skill = () => (CM ? dsk(LV.sk) : Math.min(0.8, Math.max(0.06, 0.21 + (CPU + k.D.cpu) * 0.05 + (round - 1) * 0.03)));   /* k.D.cpu: nivel de las CPU */ /* 1.23: más fácil (antes 0,3 + 0,1/victoria, tope 0,95) */
 const spdK = () => lerp(0.8, 1, rt / 20); /* arranque suave: 80 % → 100 % en 20 s */
 function mk(w, h, fn) { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const q = cv.getContext('2d'); q.scale(2, 2); if (fn) fn(q); return cv; }
 function label(s, x, y, size, col, align, q) {
@@ -257,7 +267,8 @@ const FLOOR = {
   patata(q) { q.save(); clipBox(q); const g = q.createRadialGradient(CX, CY, 30, CX, CY, 320); g.addColorStop(0, '#f1d9a0'); g.addColorStop(1, '#c9a064'); q.fillStyle = g; q.fillRect(0, 0, AW, AW);
     for (let i = 0; i < 90; i++) { q.fillStyle = alpha(i % 2 ? '#a07a45' : '#fff4d2', 0.5); q.beginPath(); q.ellipse(rs(i) * AW, rs(i + 90) * AW, 2 + rs(i + 5) * 3, 1.5 + rs(i + 6) * 2, 0, 0, TAU); q.fill(); }
     q.strokeStyle = 'rgba(255,255,255,.35)'; q.lineWidth = 4; q.setLineDash([14, 12]); q.beginPath(); q.arc(CX, CY, 70, 0, TAU); q.stroke(); q.setLineDash([]); q.restore();
-    PIL.forEach(([x, y, r]) => pillar(q, x, y, r, 'bush')); frame(q, '#d0773a', '#ffb070'); },
+    if (!PLV) PIL.forEach(([x, y, r]) => pillar(q, x, y, r, 'bush')); /* en campaña los arbustos cambian de sitio con el reto: se pintan vivos desde un sprite cacheado */
+    frame(q, '#d0773a', '#ffb070'); },
   corona(q) { q.save(); clipBox(q); for (let y = 0; y < 11; y++) for (let x = 0; x < 11; x++) { q.fillStyle = (x + y) % 2 ? '#8d8aa8' : '#7b7898'; q.fillRect(x * 40, y * 40, 40, 40); q.fillStyle = 'rgba(255,255,255,.08)'; q.fillRect(x * 40, y * 40, 40, 3); q.fillStyle = 'rgba(0,0,0,.18)'; q.fillRect(x * 40, y * 40 + 38, 40, 2); }
     q.fillStyle = '#a3263a'; q.fillRect(CX - 26, 0, 52, AW); q.fillRect(0, CY - 26, AW, 52); q.fillStyle = '#ffd166'; q.fillRect(CX - 26, 0, 4, AW); q.fillRect(CX + 22, 0, 4, AW); q.fillRect(0, CY - 26, AW, 4); q.fillRect(0, CY + 22, AW, 4);
     q.beginPath(); q.arc(CX, CY, 42, 0, TAU); q.fillStyle = '#c23a4f'; q.fill(); q.lineWidth = 4; q.strokeStyle = '#ffd166'; q.stroke(); q.restore();
@@ -354,6 +365,8 @@ Object.assign(FLOOR, {
     q.restore(); frame(q, '#3a5f8c', '#9fd8f2'); },
 });
 const BG = mk(W, H, scene);
+/* arbusto suelto de la campaña (un solo sprite, se pega donde toque) */
+const BUSH = PLV ? mk(60, 60, (q) => pillar(q, 30, 28, 24, 'bush')) : null;
 /* baldosa de hielo */
 const ICE = mk(40, 40, (q) => { ART.rr(q, 1.5, 1.5, 37, 37, 6); const g = q.createLinearGradient(0, 0, 40, 40); g.addColorStop(0, '#f2fbff'); g.addColorStop(0.5, '#bfe9fb'); g.addColorStop(1, '#8fcbe8'); q.fillStyle = g; q.fill(); q.lineWidth = 2; q.strokeStyle = alpha(OUT, 0.55); q.stroke();
   q.strokeStyle = 'rgba(255,255,255,.8)'; q.lineWidth = 2.5; q.lineCap = 'round'; q.beginPath(); q.moveTo(8, 14); q.lineTo(15, 7); q.moveTo(10, 20); q.lineTo(21, 9); q.stroke(); });
@@ -499,10 +512,12 @@ function syncPlayers() { const pl = k.players(4); P.forEach((x, i) => { x.cpu = 
 k.onParty = () => { if (k.st !== 'play') { reset(); return; } syncPlayers(); };
 function newRound() {
   round++; rt = 0; phase = 'play'; elimOrder = []; cdPend = true; banner = null; waves = []; S = {};
+  if (PLV) { CM = !k.party; if (CM) patLevel(); }
   P.forEach((pl, i) => { const [sx, sy] = CORN[i], d = MD.sp;
     Object.assign(pl, { x: CX + sx * d * 0.7071, y: CY + sy * d * 0.7071, vx: 0, vy: 0, r: MD.r, fx: -sx * 0.7071, fy: -sy * 0.7071, h: Math.atan2(-sy, -sx), alive: true, fall: 0, dash: 0, kb: 0, cd: 0, cd2: 0,
-      chg: 0, z: 0, zt: 0, stun: 0, inv: 0, val: 0, slip: 0, aH: false, brace: false, turbo: 0, balloons: 3, m: 12, gone: 0, bark: 0, lie: false, seat: -1, ai: { t: 0 }, gain: 0 }); });
+      chg: 0, z: 0, zt: 0, stun: 0, inv: 0, val: 0, slip: 0, aH: false, brace: false, turbo: 0, balloons: 3, m: 12, gone: 0, bark: 0, lie: false, seat: -1, ai: { t: 0 }, gain: 0, counted: 0, burn: 0 }); });
   MODES[M].init();
+  if (CM) patInit();
 }
 function reset() { mkPlayers(); round = 0; newRound(); }
 function dash(pl, pow, dur, kb) { pl.vx += pl.fx * pow; pl.vy += pl.fy * pow; pl.dash = dur; pl.kb = kb || 0; k.sfx('jump'); k.burst(W2(pl.x - pl.fx * pl.r), H2(pl.y - pl.fy * pl.r), '#e8e2ff', 6, 90); }
@@ -711,13 +726,14 @@ const MODES = {
     hint: ['Pasa la bomba tocando', 'A: acelerón', 'B: finta lateral'],
     init() { S.hold = -1; S.fuse = 0; S.wait = 0.2; S.nb = -1; S.nbT = 0; S.tk = 0; },
     act(pl, inp) {
-      if (inp.ah && pl.cd <= 0) { dash(pl, 250, 0.25, 50); pl.cd = 1.3; }
+      if (inp.ah && pl.cd <= 0) { dash(pl, CM ? 275 : 250, 0.25, 50); pl.cd = CM ? 0.95 : 1.3; }
       if (inp.bh && pl.cd2 <= 0) { const s = inp.x * -pl.fy + inp.y * pl.fx >= 0 ? 1 : -1; pl.vx += -pl.fy * s * 240; pl.vy += pl.fx * s * 240; pl.cd2 = 1.4; k.sfx('jump'); }
-      return 1;
+      return CM && patMud(pl) ? 0.52 : 1;
     },
-    spd: (pl) => (S.hold === pl.i ? 1.12 : 1),
+    spd: (pl) => (CM ? (patCarry(pl.i) ? 1.18 : 1) * (patMud(pl) ? 0.6 : 1) : S.hold === pl.i ? 1.12 : 1),
     give(pl, first) { S.hold = pl.i; S.fuse = first ? k.rnd(9, 15) : k.rnd(8, 14); k.sfx('pop'); k.float('¡La bomba!', W2(pl.x), H2(pl.y) - 30, pl.col); },
     step(dt) {
+      if (CM) return patStep(dt);
       S.nbT -= dt;
       if (S.hold < 0) { S.wait -= dt; if (S.wait <= 0) { const al = standing(); if (al.length) this.give(k.pick(al), elimOrder.length === 0); } return; }
       S.fuse -= dt; S.tk -= dt; if (S.tk <= 0) { S.tk = k.rnd(0.35, 0.6); k.sfx('click'); }
@@ -726,10 +742,12 @@ const MODES = {
         for (const o of standing()) if (o !== h) { const dx = o.x - h.x, dy = o.y - h.y, d = hyp(dx, dy) || 1; if (d < 120) { o.vx += dx / d * 260 * (1 - d / 120); o.vy += dy / d * 260 * (1 - d / 120); } }
         eliminate(h); }
     },
-    hit(a, b) { for (const [x, y] of [[a, b], [b, a]]) if (S.hold === x.i && y.alive && !y.fall && (S.nbT <= 0 || y.i !== S.nb)) { S.hold = y.i; S.nb = x.i; S.nbT = 1; y.stun = 0.15; k.sfx('pop'); k.float('¡Toma!', W2(y.x), H2(y.y) - 28, x.col); return; } },
+    hit(a, b) { if (CM) return patHit(a, b);
+      for (const [x, y] of [[a, b], [b, a]]) if (S.hold === x.i && y.alive && !y.fall && (S.nbT <= 0 || y.i !== S.nb)) { S.hold = y.i; S.nb = x.i; S.nbT = 1; y.stun = 0.15; k.sfx('pop'); k.float('¡Toma!', W2(y.x), H2(y.y) - 28, x.col); return; } },
     key: () => 0,
-    val: (pl) => (!pl.alive ? '¡Bum!' : S.hold === pl.i ? '¡Tiene la bomba!' : 'A salvo'),
+    val: (pl) => (!pl.alive ? '¡Bum!' : (CM ? patCarry(pl.i) : S.hold === pl.i) ? '¡Tiene la bomba!' : 'A salvo'),
     ai(pl, ai, s) {
+      if (CM) return patAI(pl, ai, s);
       const al = standing();
       if (S.hold === pl.i) { const [o, d] = near(pl, al.filter((q) => S.nbT <= 0 || q.i !== S.nb)); if (!o) return { x: 0, y: 0 }; const mv = seek(pl, o.x + o.vx * 0.3, o.y + o.vy * 0.3, 0.1); if (ai.go) ai.dash = d < 90 && facing(pl, o, 0.5) && Math.random() < 0.3 + s * 0.6; return { x: mv.x, y: mv.y, ah: ai.dash }; }
       if (S.hold < 0) return seek(pl, CX + (pl.x - CX) * 0.9, CY + (pl.y - CY) * 0.9);
@@ -1389,6 +1407,300 @@ Object.assign(MODES, {
   },
 });
 
+/* ================================================================ Campaña de Patata Explosiva
+   20 retos escritos a mano (src/eng/patalv.js) para un jugador. Nada de esto corre si CM es
+   falso, y CM solo es cierto en el juego «patata-explosiva» fuera del modo tele. Verbos nuevos
+   que se acumulan: arbustos → charcos → ventarrón → chispas → dos bombas → anillo de fuego. */
+function patLevel() {
+  LV = PLV[Math.max(0, Math.min(PLV.length - 1, k.lv - 1))];
+  PIL.length = 0;
+  const lay = LV.pil === 1 ? [[220, 96], [220, 344], [96, 220], [344, 220]]
+    : LV.pil === 2 ? [[220, 220], [220, 140], [220, 300], [140, 220], [300, 220]]
+      : LV.pil === 3 ? [[118, 118], [322, 118], [118, 322], [322, 322], [220, 96], [220, 344], [96, 220], [344, 220]] : [];
+  for (const [x, y] of lay) PIL.push([x, y, 24]);
+}
+const patFree = (x, y, m) => !PIL.some(([px, py, pr]) => hyp(x - px, y - py) < pr + (m || 20));
+function patInit() {
+  const hp0 = Math.max(1, (LV.hp || 3) + (k.dif === 0 ? 1 : k.dif === 2 ? -1 : 0));
+  PS = { B: [], done: 0, sent: LV.foes, carry: 0, shock: 0, lost: 0, hp: hp0, hp0, resp: [], mud: [], spk: [], gT: 5, gust: 0, gdir: 0, gph: 0, rr: 238, fuM: 1, msg: '', msgT: 0, hint: 5 };
+  for (let b = 0; b < (LV.two ? 2 : 1); b++) PS.B.push({ h: -1, fu: 0, wait: 0.4 + b * 2.2, nb: -1, nbT: 0, tk: 0 });
+  for (let i = 0; i < (LV.mud || 0); i++) {
+    let x = CX, y = CY, tr = 0;
+    do { x = k.rnd(58, 382); y = k.rnd(58, 382); tr++; }
+    while (tr < 80 && (hyp(x - CX, y - CY) < 52 || !patFree(x, y, 48) || PS.mud.some((m) => hyp(x - m.x, y - m.y) < 74) || P.some((q) => !q.gone && hyp(x - q.x, y - q.y) < 70)));
+    PS.mud.push({ x, y, r: k.rnd(30, 42), s: k.rnd(0, 6.2) });
+  }
+  for (let i = 0; i < (LV.spk || 0); i++) { const a = i * 1.9 + 0.4; PS.spk.push({ x: CX + Math.cos(a) * 138, y: CY + Math.sin(a) * 138, vx: Math.cos(a + 1.9) * 118, vy: Math.sin(a + 1.9) * 118, w: 1 }); }
+  P.forEach((pl, i) => { if (i > LV.foes) { pl.gone = 1; pl.alive = false; pl.counted = 1; } });
+}
+function patMud(pl) { for (const m of PS.mud || []) if (hyp(pl.x - m.x, pl.y - m.y) < m.r) return true; return false; }
+function patCarry(i) { let n = 0; for (const b of PS.B || []) if (b.h === i) n++; return n; }
+function patTag(pl) { return pl.i === 0 ? 'TÚ' : LV.boss && PS.done >= LV.tot - 1 ? 'LA TRACA' : 'RIVAL'; }
+function patGive(b, pl) {
+  b.h = pl.i; b.fu = k.rnd(LV.fu[0], LV.fu[1]) * PS.fuM * (k.dif === 0 ? 1.12 : k.dif === 2 ? 0.9 : 1); b.nb = -1; b.nbT = 0; b.tk = 0;
+  k.sfx('pop'); k.float('¡La bomba!', W2(pl.x), H2(pl.y) - 30, pl.col);
+}
+function patSpawn(i) {
+  const pl = P[i]; let best = [CX, 40], bd = -1;
+  for (let a = 0; a < TAU; a += TAU / 16) {
+    const x = CX + Math.cos(a) * 176, y = CY + Math.sin(a) * 176;
+    if (!patFree(x, y, 26)) continue;
+    const d = hyp(x - P[0].x, y - P[0].y) + (LV.ring && hyp(x - CX, y - CY) > PS.rr - 30 ? -400 : 0);
+    if (d > bd) { bd = d; best = [x, y]; }
+  }
+  Object.assign(pl, { x: best[0], y: best[1], vx: 0, vy: 0, fx: (CX - best[0]) / 176, fy: (CY - best[1]) / 176, alive: true, fall: 0, gone: 0, counted: 0, stun: 0, inv: 0, burn: 0, dash: 0, kb: 0, cd: 0, cd2: 0, ai: { t: 0 } });
+  k.burst(W2(pl.x), H2(pl.y), pl.col, 18, 170); k.sfx('coin'); k.float('¡Otro vecino!', W2(pl.x), H2(pl.y) - 30, pl.col);
+}
+function patFoeDown() {
+  if (PS.done >= LV.tot) return;
+  if (LV.boss) { PS.fuM = Math.max(0.55, PS.fuM - 0.09); PS.msg = PS.done === LV.tot - 1 ? '¡Llega La Traca!' : '¡La mecha se acorta!'; PS.msgT = 2.4; k.sfx('lose'); }
+}
+function patBoom(b) {
+  const h = P[b.h]; b.h = -1; b.wait = 1.7; b.nb = -1; b.nbT = 0;
+  k.sfx('explode'); k.shake(11); k.flash('rgba(255,170,80,.5)');
+  k.burst(W2(h.x), H2(h.y), '#ffb13d', 40, 320); k.burst(W2(h.x), H2(h.y), '#1a1530', 20, 200); k.float('¡BUM!', W2(h.x), H2(h.y) - 20, '#ffd166');
+  for (const o of standing()) if (o !== h) {
+    const dx = o.x - h.x, dy = o.y - h.y, d = hyp(dx, dy) || 1;
+    if (d < 120) { o.vx += dx / d * 260 * (1 - d / 120); o.vy += dy / d * 260 * (1 - d / 120); if (o.i === 0) { PS.shock++; k.float('¡Onda!', W2(o.x), H2(o.y) - 34, '#ff8a3d'); } }
+  }
+  /* si el que estalla llevaba también la otra bomba, sale disparada al rival más cercano */
+  for (const o of PS.B) if (o !== b && o.h === h.i) {
+    const cand = standing().filter((q) => q !== h).sort((a2, c2) => hyp(a2.x - h.x, a2.y - h.y) - hyp(c2.x - h.x, c2.y - h.y));
+    if (cand.length) { o.h = cand[0].i; o.nb = -1; o.nbT = 0; k.float('¡Sale disparada!', W2(cand[0].x), H2(cand[0].y) - 34, '#ffd166'); } else { o.h = -1; o.wait = 1.4; }
+  }
+  if (h.i === 0 && PS.hp > 1) { // fallar cuesta un petardazo, no la partida (docs/VARA.md §7)
+    PS.hp--; PS.lost++; h.inv = 2.2; h.stun = 0.25; h.burn = 0;
+    PS.msg = PS.hp === 1 ? '¡Último petardazo!' : '¡Petardazo! Te quedan ' + PS.hp; PS.msgT = 2.2;
+    k.float('−1 petardazo', W2(h.x), H2(h.y) - 44, '#ff8a6a');
+    return;
+  }
+  eliminate(h);
+}
+function patStep(dt) {
+  PS.msgT = Math.max(0, PS.msgT - dt); PS.hint -= dt;
+  /* rivales caídos: se cuentan y, si quedan por venir, entra otro por el borde */
+  for (let i = 1; i < 4; i++) {
+    const pl = P[i]; if (pl.counted || pl.alive || pl.fall) continue;
+    pl.counted = 1; PS.done++; patFoeDown();
+    if (PS.sent < LV.tot) { PS.sent++; PS.resp.push({ i, t: 1.7 }); }
+  }
+  for (const r of PS.resp) r.t -= dt;
+  for (const r of PS.resp) if (r.t <= 0) patSpawn(r.i);
+  PS.resp = PS.resp.filter((r) => r.t > 0);
+  /* ventarrón: hojas 1,2 s antes (telegrafía) y después empuja 1,9 s */
+  if (LV.gust) {
+    PS.gT -= dt;
+    if (PS.gph === 0 && PS.gT <= 0) { PS.gph = 1; PS.gT = 1.2; PS.gdir = k.ri(0, 7) * (TAU / 8); k.sfx('click'); }
+    else if (PS.gph === 1 && PS.gT <= 0) { PS.gph = 2; PS.gT = 1.9; k.sfx('shoot'); }
+    else if (PS.gph === 2 && PS.gT <= 0) { PS.gph = 0; PS.gT = k.rnd(3.6, 5.4); }
+    PS.gust = PS.gph === 2 ? LV.gust : 0;
+    if (PS.gust) {
+      const gx = Math.cos(PS.gdir) * PS.gust * dt, gy = Math.sin(PS.gdir) * PS.gust * dt;
+      for (const pl of standing()) { const cen = 0.5 + Math.min(1, hyp(pl.x - CX, pl.y - CY) / 190) * 0.5; pl.vx += gx * cen; pl.vy += gy * cen; }
+    }
+  }
+  /* chispas errantes: le quitan 2 s a la mecha del que lleva la bomba */
+  for (const s of PS.spk) {
+    s.x += s.vx * dt; s.y += s.vy * dt; s.w -= dt;
+    if (s.x < 16 || s.x > AW - 16) { s.vx *= -1; s.x = k.clamp(s.x, 16, AW - 16); }
+    if (s.y < 16 || s.y > AW - 16) { s.vy *= -1; s.y = k.clamp(s.y, 16, AW - 16); }
+    for (const [px, py, pr] of PIL) { const d = hyp(s.x - px, s.y - py);
+      if (d < pr + 9 && d > 0.01) { const nx = (s.x - px) / d, ny = (s.y - py) / d; s.x = px + nx * (pr + 9); s.y = py + ny * (pr + 9); const vn = s.vx * nx + s.vy * ny; s.vx -= 2 * vn * nx; s.vy -= 2 * vn * ny; } }
+    if (s.w > 0) continue;
+    for (const b of PS.B) {
+      if (b.h < 0) continue; const pl = P[b.h];
+      if (hyp(pl.x - s.x, pl.y - s.y) > pl.r + 11) continue;
+      b.fu = Math.max(0.7, b.fu - 2); s.w = 1.4; k.sfx('hurt'); k.shake(4);
+      k.float('−2 s de mecha', W2(pl.x), H2(pl.y) - 42, '#ffd166'); k.burst(W2(s.x), H2(s.y), '#ffe08a', 12, 150); break;
+    }
+  }
+  /* anillo de fuego: empieza a los 8 s y no mata sin avisar (1,3 s dentro del fuego) */
+  if (LV.ring) {
+    const tgt = LV.boss ? Math.max(62, 94 - PS.done * 6) : 92;
+    PS.rr = lerp(238, tgt, k.clamp((rt - 8) / LV.ring, 0, 1));
+    for (const pl of standing()) {
+      const d = hyp(pl.x - CX, pl.y - CY) || 1;
+      if (d > PS.rr - pl.r * 0.4) {
+        pl.burn += dt; const nx = (pl.x - CX) / d, ny = (pl.y - CY) / d;
+        pl.vx -= nx * 430 * dt; pl.vy -= ny * 430 * dt;
+        if (Math.random() < dt * 14) k.burst(W2(pl.x), H2(pl.y), '#ff8a3d', 2, 80);
+        if (pl.burn > 1.3) { pl.burn = 0; fallOut(pl, '¡Chamuscado!'); }
+      } else pl.burn = Math.max(0, pl.burn - dt * 1.8);
+    }
+  }
+  /* bombas (una o dos) */
+  for (const b of PS.B) {
+    b.nbT -= dt;
+    if (b.h < 0) {
+      if (PS.done >= LV.tot) continue;
+      b.wait -= dt; if (b.wait > 0) continue;
+      const busy = PS.B.filter((o) => o !== b && o.h >= 0).map((o) => o.h);
+      const al = standing(), free = al.filter((q) => !busy.includes(q.i));
+      if (al.length) patGive(b, k.pick(free.length ? free : al));
+      continue;
+    }
+    const pl = P[b.h];
+    if (!pl.alive || pl.fall) { b.h = -1; b.wait = 1.2; continue; }
+    if (b.h === 0) PS.carry += dt;
+    b.fu -= dt; b.tk -= dt;
+    if (b.tk <= 0) { b.tk = k.rnd(0.3, 0.55) * k.clamp(b.fu / 6, 0.32, 1); k.sfx('click'); }
+    if (b.fu <= 0) patBoom(b);
+  }
+}
+function patHit(a, b) {
+  for (const [x, y] of [[a, b], [b, a]]) {
+    if (!y.alive || y.fall || !x.alive || x.fall) continue;
+    for (const bo of PS.B) {
+      if (bo.h !== x.i || (bo.nbT > 0 && y.i === bo.nb)) continue;
+      bo.h = y.i; bo.nb = x.i; bo.nbT = 1; y.stun = 0.15;
+      k.sfx('pop'); k.float('¡Toma!', W2(y.x), H2(y.y) - 28, x.col); return;
+    }
+  }
+}
+function patAI(pl, ai, s) {
+  const al = standing(), mine = PS.B.filter((b) => b.h === pl.i);
+  let x = 0, y = 0;
+  if (mine.length) {
+    const no = mine.map((b) => (b.nbT > 0 ? b.nb : -9));
+    const cand = al.filter((q) => q !== pl && !no.includes(q.i)), lst = cand.length ? cand : al.filter((q) => q !== pl);
+    const [o, d] = near(pl, lst);
+    if (!o) return { x: 0, y: 0 };
+    const mv = seek(pl, o.x + o.vx * 0.3, o.y + o.vy * 0.3, 0.1);
+    if (ai.go) ai.dash = d < 95 && facing(pl, o, 0.5) && Math.random() < 0.25 + s * 0.6;
+    x = mv.x; y = mv.y;
+  } else {
+    let any = false;
+    for (const b of PS.B) {
+      if (b.h < 0 || b.h === pl.i) continue;
+      const h = P[b.h], dx = pl.x - h.x, dy = pl.y - h.y, d = hyp(dx, dy) || 1, w = d > 180 ? 0.25 : 1;
+      x += dx / d * w; y += dy / d * w; any = true;
+    }
+    if (!any) { const m = seek(pl, CX + (pl.x - CX) * 0.9, CY + (pl.y - CY) * 0.9); x = m.x; y = m.y; }
+    x += (CX - pl.x) / 150; y += (CY - pl.y) / 150;
+    if (ai.go) ai.fint = Math.random() < s * 0.7;
+  }
+  for (const m of PS.mud) { const d = hyp(pl.x - m.x, pl.y - m.y);
+    if (d < m.r + 26 && d > 0.01) { const w = (1 - d / (m.r + 26)) * (mine.length ? 1.6 : 1.1) * s; x += (pl.x - m.x) / d * w; y += (pl.y - m.y) / d * w; } }
+  if (mine.length) for (const sp of PS.spk) { const d = hyp(pl.x - sp.x, pl.y - sp.y);
+    if (d < 62 && d > 0.01) { x += (pl.x - sp.x) / d * 1.2; y += (pl.y - sp.y) / d * 1.2; } }
+  if (LV.ring) { const d = hyp(pl.x - CX, pl.y - CY) || 1; if (d > PS.rr - 48) { x += (CX - pl.x) / d * 2.4; y += (CY - pl.y) / d * 2.4; } }
+  if (PS.gust) { x -= Math.cos(PS.gdir) * 0.45; y -= Math.sin(PS.gdir) * 0.45; }
+  return { x, y, ah: mine.length ? !!ai.dash : false, bh: !mine.length && !!ai.fint };
+}
+function patCheck(falling) {
+  if (k.st !== 'play' || phase !== 'play') return;
+  if (!P[0].alive && !P[0].fall) { phase = 'over'; patLose(); return; }
+  if (PS.done >= LV.tot && !falling && !P.some((q, i) => i > 0 && (q.alive || q.fall))) { phase = 'over'; patWin(); }
+}
+function patLose() {
+  k.lose(CFG.id, PS.done * 100, '¡BUM!', `Reto ${k.lv} · ${LV.n}<br>Rivales fuera: ${PS.done} de ${LV.tot}`);
+}
+function patWin() {
+  const t2 = t2of(), t3 = t3of(), ok2 = PS.carry <= t2, ok3 = PS.carry <= t3 && PS.lost === 0;
+  const st = ok3 ? 3 : ok2 ? 2 : 1;
+  const falta = st === 3 ? '¡Bordado!' : st === 2 ? `Para 3★: ${t3.toFixed(0)} s o menos con la bomba y sin un solo petardazo.` : `Para 2★: ${t2.toFixed(0)} s o menos con la bomba.`;
+  k.levelDone(Math.round(Math.max(0, t2 * 2 - PS.carry) * 10) + PS.done * 50,
+    `<b>${LV.n}</b> · ${LV.tot} rivales fuera.<br>Con la bomba: ${PS.carry.toFixed(1)} s · petardazos: ${PS.lost}<br>${falta}`, { stars: st });
+}
+/* ---- dibujo de la campaña ---- */
+function patFloor() {
+  for (const m of PS.mud || []) {
+    c.save(); c.beginPath(); c.ellipse(m.x, m.y, m.r, m.r * 0.82, m.s, 0, TAU); ART.fillOut(c, '#5b4327', 3);
+    c.clip(); c.fillStyle = 'rgba(255,255,255,.10)';
+    for (let j = 0; j < 4; j++) { c.beginPath(); c.ellipse(m.x - m.r * 0.32 + j * 10, m.y - m.r * 0.28 + Math.sin(T * 1.6 + j + m.s) * 3, 7, 3.2, 0.5, 0, TAU); c.fill(); }
+    c.fillStyle = 'rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(m.x + m.r * 0.18, m.y + m.r * 0.22, m.r * 0.5, m.r * 0.3, m.s, 0, TAU); c.fill(); c.restore();
+  }
+  for (const [x, y] of PIL) c.drawImage(BUSH, x - 30, y - 28, 60, 60);
+  if (LV.ring && PS.rr < 236) {
+    c.save(); c.beginPath(); c.rect(0, 0, AW, AW); c.arc(CX, CY, PS.rr, 0, TAU, true); c.fillStyle = 'rgba(255,90,40,.22)'; c.fill(); c.restore();
+    c.beginPath(); c.arc(CX, CY, PS.rr, 0, TAU); c.lineWidth = 8; c.strokeStyle = OUT; c.stroke();
+    c.lineWidth = 5; c.strokeStyle = Math.sin(T * 9) > 0 ? '#ff8a3d' : '#ffd166'; c.stroke();
+    for (let j = 0; j < 20; j++) { const a = j * TAU / 20 + T * 0.5, r2 = PS.rr + Math.sin(T * 6 + j) * 5;
+      c.beginPath(); c.arc(CX + Math.cos(a) * r2, CY + Math.sin(a) * r2, 4.4, 0, TAU); c.fillStyle = alpha('#ffb13d', 0.85); c.fill(); }
+  }
+  if (PS.gph) {
+    c.save(); c.globalAlpha = PS.gph === 1 ? 0.3 + 0.28 * Math.sin(T * 12) : 0.55;
+    c.strokeStyle = '#e6f2ff'; c.lineWidth = 3; c.lineCap = 'round';
+    const dx = Math.cos(PS.gdir), dy = Math.sin(PS.gdir);
+    for (let j = 0; j < 14; j++) {
+      const o = (T * (PS.gust ? 320 : 70) + j * 101) % 560 - 60, s2 = (j * 79) % 440 - 220;
+      const px = CX - dx * 280 + dx * o - dy * s2, py = CY - dy * 280 + dy * o + dx * s2;
+      if (px < -24 || px > AW + 24 || py < -24 || py > AW + 24) continue;
+      c.beginPath(); c.moveTo(px, py); c.lineTo(px + dx * 26, py + dy * 26);
+      c.moveTo(px + dx * 26, py + dy * 26); c.lineTo(px + dx * 15 - dy * 7, py + dy * 15 + dx * 7);
+      c.moveTo(px + dx * 26, py + dy * 26); c.lineTo(px + dx * 15 + dy * 7, py + dy * 15 - dx * 7); c.stroke();
+    }
+    c.restore();
+  }
+}
+function patEnts(list) { for (const s of PS.spk || []) list.push([s.y, 9, () => patSpark(s)]); }
+function patSpark(s) {
+  ART.shadow(c, s.x + 2, s.y + 9, 8, 0.28);
+  c.save(); c.translate(s.x, s.y - 4); c.rotate(T * 5 + s.x * 0.05);
+  c.beginPath();
+  for (let j = 0; j < 10; j++) { const r2 = j % 2 ? 4.6 : 10.6, an = j * TAU / 10 - Math.PI / 2; c.lineTo(Math.cos(an) * r2, Math.sin(an) * r2); }
+  c.closePath(); ART.fillOut(c, '#ffd166', 2.6); c.restore();
+  c.fillStyle = OUT; c.beginPath(); c.arc(s.x - 3, s.y - 6, 1.7, 0, TAU); c.arc(s.x + 3, s.y - 6, 1.7, 0, TAU); c.fill();
+}
+function patBombOver(pl, top) {
+  const held = (PS.B || []).filter((b) => b.h === pl.i);
+  held.forEach((b, j) => bombAt(pl.x + (held.length > 1 ? (j ? 15 : -15) : 0), top - 10, 0.95, b.fu < 1.2));
+}
+function patFit(s, x, y, maxW, size, cl, align) {
+  let fs = size; do { c.font = `800 ${fs}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; } while (c.measureText(s).width > maxW && --fs > 9);
+  label(s, x, y, fs, cl, align);
+}
+function patStars(x, y, n, r) {
+  for (let j = 0; j < 3; j++) {
+    c.beginPath();
+    for (let q = 0; q < 10; q++) { const rr = q % 2 ? r * 0.44 : r, a = q * TAU / 10 - Math.PI / 2; c.lineTo(x + j * (r * 2.4) + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+    c.closePath(); ART.fillOut(c, j < n ? '#ffd166' : '#3a3458', 2);
+  }
+}
+function patHUD() {
+  const box = (x, y, w, h, cl) => { ART.rr(c, x, y, w, h, 14); c.fillStyle = 'rgba(34,28,70,.92)'; c.fill(); c.lineWidth = 3; c.strokeStyle = cl || '#6e62f5'; c.stroke(); };
+  const t2 = t2of(), t3 = t3of(), carry = PS.carry || 0;
+  const ccol = carry <= t3 && PS.lost === 0 ? '#7cf7a0' : carry <= t2 ? '#ffd166' : '#ff8a6a';
+  const est = !P[0] || !P[0].alive ? '¡Fuera!' : patCarry(0) > 1 ? '¡Llevas las DOS!' : patCarry(0) ? '¡Tienes la bomba!' : 'A salvo';
+  const ecol = patCarry(0) ? '#ff8a6a' : '#7cf7a0';
+  if (PORT) {
+    box(8, 8, 464, 124);
+    patFit(`Reto ${k.lv}/${PLV.length}`, 20, 30, 150, 17, '#cfc8ff', 'left');
+    patFit(LV.n, 20, 60, 300, 24, '#fff', 'left');
+    patStars(392, 30, k.starsOf(k.lv), 11);
+    patFit(`Rivales fuera ${PS.done}/${LV.tot}`, 20, 96, 210, 19, '#ffd166', 'left');
+    patFit(`Petardazos ${PS.hp}`, 240, 96, 120, 19, PS.hp > 1 ? '#7cf7a0' : '#ff8a6a');
+    patFit(`Con la bomba ${carry.toFixed(1)} s · 2★ ≤ ${t2.toFixed(0)} s`, 452, 96, 190, 17, ccol, 'right');
+    box(8, 588, 464, 124, patCarry(0) ? '#ff8a6a' : '#3d3470');
+    patFit(est, 240, 614, 440, 26, ecol);
+    patFit(LV.tip, 240, 648, 440, 15, '#cfc8ff');
+    patFit('A: acelerón · B: finta · toca a un rival para pasársela', 240, 682, 440, 15, '#8a86a5');
+  } else {
+    box(8, 20, 144, 216);
+    patFit(`Reto ${k.lv}/${PLV.length}`, 80, 44, 126, 17, '#cfc8ff');
+    patFit(LV.n, 80, 74, 126, 20, '#fff');
+    patStars(48, 106, k.starsOf(k.lv), 10);
+    patFit('Rivales fuera', 80, 142, 126, 14, '#cfc8ff');
+    patFit(`${PS.done} / ${LV.tot}`, 80, 172, 126, 30, '#ffd166');
+    patFit(`Bomba ${carry.toFixed(1)} s`, 80, 206, 126, 16, ccol);
+    box(604, 20, 148, 216, patCarry(0) ? '#ff8a6a' : '#3d3470');
+    patFit(est, 678, 48, 132, 19, ecol);
+    patFit(`2★ ≤ ${t2.toFixed(0)} s`, 678, 80, 132, 16, '#cfc8ff');
+    patFit(`3★ ≤ ${t3.toFixed(0)} s, sin ondas`, 678, 104, 132, 14, '#cfc8ff');
+    patFit(`Petardazos: ${PS.hp}`, 678, 130, 132, 16, PS.hp > 1 ? '#7cf7a0' : '#ff8a6a');
+    patFit('A: acelerón', 678, 168, 132, 15, '#8a86a5');
+    patFit('B: finta lateral', 678, 192, 132, 15, '#8a86a5');
+    patFit('Toca para pasarla', 678, 216, 132, 15, '#8a86a5');
+  }
+  if (PS.msgT > 0) { const y = H2(CY) - 150; patFit(PS.msg, W / 2, y, W - 60, 30, '#ffd166'); }
+  if (PS.hint > 0 && k.st === 'play' && !k.counting()) {
+    const a = Math.min(1, PS.hint / 0.8), bw = Math.min(W - 40, 430), bx = W / 2 - bw / 2, by = H2(CY) - 62;
+    c.save(); c.globalAlpha = a; ART.rr(c, bx, by, bw, 76, 16); c.fillStyle = 'rgba(18,14,38,.92)'; c.fill(); c.lineWidth = 3; c.strokeStyle = '#ffd166'; c.stroke();
+    patFit(LV.n, W / 2, by + 24, bw - 24, 22, '#ffd166');
+    patFit(LV.i, W / 2, by + 54, bw - 24, 15, '#fff'); c.restore();
+  }
+}
+
 /* ---------------------------------------------------------------- Bucle */
 reset(); k.show(CFG.title, CFG.help);
 let rz = 0; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if ((innerHeight > innerWidth * 1.05) !== PORT && k.st !== 'play') location.reload(); }, 350); });
@@ -1417,13 +1729,15 @@ k.run((dt) => {
   for (const pl of act) walls(pl);
   md.step(dt);
   const falling = P.some((pl) => pl.alive && pl.fall);
-  if (MD.elim) { if (standing().length <= 1 && !falling) endRound(); else if (MD.len && rt >= MD.len && !falling) endRound(); }
+  if (CM) patCheck(falling);
+  else if (MD.elim) { if (standing().length <= 1 && !falling) endRound(); else if (MD.len && rt >= MD.len && !falling) endRound(); }
   else if (rt >= MD.len || (md.done && md.done())) endRound();
 }, draw);
 
 /* ---------------------------------------------------------------- Dibujo */
 function drawWorld() {
   const md = MODES[M];
+  if (CM) patFloor();
   if (M === 'sumo') { const R = S.R + Math.sin(T * 10) * 4 * S.wob;
     c.beginPath(); c.arc(CX, CY + 6, R + 10, 0, TAU); c.fillStyle = 'rgba(0,0,0,.3)'; c.fill();
     c.beginPath(); c.arc(CX, CY, R, 0, TAU); const g = c.createRadialGradient(CX - 40, CY - 50, 10, CX, CY, R); g.addColorStop(0, '#f5ead0'); g.addColorStop(1, '#cdb279'); c.fillStyle = g; c.fill();
@@ -1465,7 +1779,8 @@ function drawWorld() {
   for (const pl of P) if ((pl.alive || pl.fall) && !(pl.gone > 0)) L.push([pl.y, 0, pl]);
   if (M === 'pastores') for (const s of S.sh) L.push([s.y, 1, s]);
   if (M === 'corona' && S.h < 0) L.push([S.y, 2]);
-  if (M === 'patata' && S.hold < 0 && elimOrder.length === 0 && phase === 'play') L.push([CY, 3]);
+  if (M === 'patata' && !CM && S.hold < 0 && elimOrder.length === 0 && phase === 'play') L.push([CY, 3]);
+  if (CM) patEnts(L);
   if (md.ents) md.ents(L);
   L.sort((a, b) => a[0] - b[0]);
   for (const [, t, e] of L) {
@@ -1486,10 +1801,11 @@ function drawWorld() {
     if (pl.stun > 0) for (let j = 0; j < 3; j++) ART.glint(c, pl.x + Math.cos(T * 8 + j * 2.1) * pl.r, pl.y - pl.r - 4 + Math.sin(T * 8 + j * 2.1) * 4, 3.5, '#ffd166');
     const top = pl.y - (MD.car ? 22 : pl.r * 1.2) - pl.z;
     if (M === 'corona' && S.h === pl.i) crownAt(pl.x, top - 6, 0.95);
-    if (M === 'patata' && S.hold === pl.i) bombAt(pl.x, top - 10, 0.95, S.fuse < 1);
+    if (CM) patBombOver(pl, top);
+    else if (M === 'patata' && S.hold === pl.i) bombAt(pl.x, top - 10, 0.95, S.fuse < 1);
     if (md.over) md.over(pl, top);
     c.restore();
-    if (!pl.fall && !(md.nolabel && md.nolabel(pl))) label(tagOf(pl), pl.x, top - (M === 'corona' && S.h === pl.i ? 26 : M === 'patata' && S.hold === pl.i ? 34 : 10), 15, pl.col);
+    if (!pl.fall && !(md.nolabel && md.nolabel(pl))) label(CM ? patTag(pl) : tagOf(pl), pl.x, top - (M === 'corona' && S.h === pl.i ? 26 : (CM ? patCarry(pl.i) > 0 : M === 'patata' && S.hold === pl.i) ? 34 : 10), 15, pl.col);
   }
   if (md.top) md.top();
 }
@@ -1521,7 +1837,8 @@ function hints(x, y, w, h) {
 function draw() {
   c.drawImage(BG, 0, 0, W, H);
   c.save(); c.translate(OX, OY); drawWorld(); c.restore();
-  if (PORT) { card(P[0], 8, 8, 150, 122); info(164, 8, 152, 122); card(P[2], 322, 8, 150, 122); card(P[1], 8, 590, 150, 122); hints(164, 590, 152, 122); card(P[3], 322, 590, 150, 122); }
+  if (CM) patHUD();
+  else if (PORT) { card(P[0], 8, 8, 150, 122); info(164, 8, 152, 122); card(P[2], 322, 8, 150, 122); card(P[1], 8, 590, 150, 122); hints(164, 590, 152, 122); card(P[3], 322, 590, 150, 122); }
   else { card(P[0], 8, 20, 144, 112); info(8, 150, 144, 112); card(P[1], 8, 348, 144, 112); card(P[2], 608, 20, 144, 112); hints(608, 150, 144, 112); card(P[3], 608, 348, 144, 112); }
   if (phase === 'between' && banner && k.st === 'play') {
     const a = Math.min(1, (3.4 - btw) * 4), bw = 340, bh = 90 + banner.order.length * 30, bx = W2(CX) - bw / 2, by = H2(CY) - bh / 2;

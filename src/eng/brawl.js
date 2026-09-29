@@ -219,7 +219,7 @@ function setPhase(i, instant) {
   if (!instant) { banner = { txt: ph.name, sub: SUBS[ph.fx] || 'Todo en calma', t: 2.4 }; k.sfx('start'); }
 }
 function updStage(dt, live) {
-  if (live) { phT += dt; if (phT >= PH_LEN) { phT -= PH_LEN; setPhase(phI + 1); } }
+  if (live && !CM) { phT += dt; if (phT >= PH_LEN) { phT -= PH_LEN; setPhase(phI + 1); } }
   const ph = phase(); morph = Math.min(1, morph + dt / 1.6); const q = ease(morph);
   plats.forEach((P, j) => {
     const ox = P.x, oy = P.y;
@@ -278,6 +278,7 @@ function mkFighter(p) {
 function reset() {
   demo = false; F = [0, 1, 2, 3].map(mkFighter); items = []; shots = []; elim = 0; stop = 0; itemT = TOYS ? 4 : 8; endT = -1; clock = 0; overTxt = ''; feathers.length = 0; debris.length = 0;
   order = [0].concat(k.shuffle([1, 2, 3])); phT = 0; setPhase(0, true); banner = null;
+  CM = !!RLV && !k.party; if (CM) cmSetup();
 }
 function demoReset() { F = [0, 1, 2, 3].map(mkFighter); items = []; shots = []; elim = 0; itemT = 4; clock = 0; }
 
@@ -325,6 +326,7 @@ const vuln = (g) => alive(g) && g.inv <= 0 && g.dodge <= 0;
 function applyHit(g, from, dmg, base, gr, ang, dir, mul) {
   g.pct = Math.min(999, g.pct + dmg);
   if (SCRAP) mul = (mul || 1) * (1 + 0.32 * light(g));
+  if (CM && g.big) mul = (mul || 1) * 0.58; // acorazado: pesa más y cuesta mucho más echarlo
   const kb = (base + gr * g.pct) * (mul || 1), ax = Math.cos(ang) * dir, ay = -Math.sin(ang);
   g.vx = ax * kb; g.vy = Math.min(ay * kb, g.on ? -140 : ay * kb); g.on = null;
   g.stun = 0.12 + kb * 0.0012; g.spin = 0; g.atk = null; g.chg = -1; g.last = from; g.lastT = 6; g.jumps = 1; g.upUsed = false;
@@ -479,9 +481,9 @@ function updFighter(f, dt) {
 const ITYPES = TOYS ? Object.keys(WPN) : SCRAP ? ['wrench', 'battery', 'bomb', 'wrench'] : ['giant', 'ball', 'bomb'];
 const INAME = { giant: '¡Almohadón!', ball: '¡Pelota!', bomb: SCRAP ? '¡Bomba de tuercas!' : '¡Bomba de plumas!', wrench: '¡Llave inglesa!', battery: '¡Batería!' };
 function updItems(dt, live) {
-  if ((itemT -= dt) <= 0 && items.length < (TOYS ? 3 : 2)) { itemT = k.rnd(9, 14) * (live ? 1 : 0.6) * (TOYS ? 0.65 : 1);
+  if ((itemT -= dt) <= 0 && items.length < (TOYS ? 3 : 2) && !(CM && !CIT)) { itemT = k.rnd(9, 14) * (live ? 1 : 0.6) * (TOYS ? 0.65 : 1);
     const sp = [[MX0 + 30, MX1 - 30]].concat(plats.filter((P) => P.w > 60).map((P) => [P.x + 16, P.x + P.w - 16])), s = k.pick(sp);
-    items.push({ type: k.pick(ITYPES), x: k.rnd(s[0], s[1]), y: -30, vy: 70, on: false, life: 14, sw: Math.random() * 6 }); }
+    items.push({ type: k.pick(CM && CIT ? CIT : ITYPES), x: k.rnd(s[0], s[1]), y: -30, vy: 70, on: false, life: 14, sw: Math.random() * 6 }); }
   for (const it of items) {
     it.sw += dt; if (it.nog > 0) it.nog -= dt;
     if (!it.on) { const oy = it.y; it.y += it.vy * dt; it.x += Math.sin(it.sw * 1.6) * 18 * dt + wind * 0.15 * dt;
@@ -534,7 +536,7 @@ function aiInput(f) {
   return o;
 }
 function aiCore(f) {
-  const ai = f.ai, sk = SK() * (demo ? 0.8 : lerp(0.6, 1, ease(clock / 105))), o = { x: 0, y: 0, aHit: false, aHeld: false, bHit: false, upHit: false };
+  const ai = f.ai, sk = (f.sk != null ? f.sk : SK()) * (demo ? 0.8 : CM ? lerp(0.8, 1, ease(clock / 45)) : lerp(0.6, 1, ease(clock / 105))), o = { x: 0, y: 0, aHit: false, aHeld: false, bHit: false, upHit: false };
   ai.atkCd -= 1 / 60; ai.think -= 1 / 60; ai.tgtT -= 1 / 60;
   if (ai.hold > 0) { ai.hold -= 1 / 60; o.aHeld = true; }
   if (f.stun > 0) return o;
@@ -926,6 +928,7 @@ function hud() {
     if (SCRAP && !outd) { for (let i = 0; i < 4; i++) { ART.rr(c, x + 88 + i * 13, y + 37, 10, 4, 2); c.fillStyle = i < f.parts.length ? '#b8c2cc' : 'rgba(255,255,255,.15)'; c.fill(); } if (f.elec > 0) scrapIcon('battery', x + 66, y + 23, 0.55); }
     c.restore();
   }
+  if (CM) { cmTop(); return; }
   const left = Math.max(0, MATCH - clock), mm = Math.floor(left / 60), ss = Math.floor(left % 60);
   panel(352, 6, 96, 34, 12, 'rgba(26,21,48,.85)', 2.5); label(`${mm}:${String(ss).padStart(2, '0')}`, 400, 24, 22, left < 15 ? '#ff6a6a' : '#fff');
 }
@@ -940,11 +943,88 @@ function drawWind() {
     c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + 20 * Math.sign(wind), y - 4, x + 44 * Math.sign(wind), y); c.stroke(); }
 }
 
+/* ---------------- Campaña de un jugador de «Gladiadores de Juguete» (docs/VARA.md) ----------------
+   Todo lo de aquí abajo se enciende SOLO en «gladiadores-de-juguete» y SOLO fuera del modo tele
+   (CM): el combate de 1–4 en la tele y los modos almohada y chatarra no ejecutan ni una línea.
+   Verbos que se estrenan de uno en uno: armas fijas, escenarios con efecto, bloques que se
+   desmoronan, lluvia de bombas, objetivos de aguantar y de hacer KO, y rivales acorazados. */
+const RLV = (ID === 'gladiadores-de-juguete' && typeof BRAWLV !== 'undefined') ? BRAWLV : null;
+let CM = false, LVR = RLV ? RLV[0] : null, CS = null, CIT = null;
+CM = !!RLV && !k.party;
+if (RLV) { LVR = RLV[k.levels(RLV.length) - 1]; k.onLevel = (i) => { LVR = RLV[i - 1] || RLV[0]; live = false; }; }
+const csk = (v) => clamp(v * (k.dif === 0 ? 0.78 : k.dif === 2 ? 1.16 : 1), 0.05, 0.95);
+const ct3 = () => Math.max(12, (LVR.t3 || 60) + (k.dif === 0 ? 12 : k.dif === 2 ? -6 : 0));
+
+function cmSetup() {
+  LVR = RLV[k.lv - 1] || RLV[0];
+  order = [clamp(LVR.ph || 0, 0, 3)]; phI = 0; phT = 0; setPhase(0, true);
+  banner = { txt: 'Reto ' + k.lv + ' · ' + LVR.n, sub: LVR.i, t: 4.2 };
+  F = [Object.assign(mkFighter(0), { stocks: LVR.me || 3 })];
+  LVR.foes.forEach((fo, i) => {
+    const f = mkFighter(i + 1);
+    f.stocks = fo.st || 2; f.sk = csk(fo.sk); f.big = !!fo.big;
+    if (fo.it) f.item = { type: fo.it, uses: (WPN[fo.it] ? WPN[fo.it].uses : 6) + 4, t: 1e9 };
+    F.push(f);
+  });
+  CIT = LVR.it === '*' ? ITYPES : LVR.it ? [LVR.it] : null;
+  itemT = CIT ? 4 : 1e9;
+  CS = { won: false, lives0: F[0].stocks, fr: plats.map((P) => ({ w: P.tw, t: LVR.frail || 0, off: 0 })), rainT: LVR.rain ? 3 : 0, warn: [] };
+}
+function cmStep(dt) {
+  if (LVR.frail) for (let j = 0; j < plats.length; j++) { // bloques que se desmoronan al pisarlos
+    const P = plats[j], s = CS.fr[j]; if (!s.w) continue;
+    if (s.off > 0) { s.off -= dt; if (s.off <= 0) { P.tw = s.w; s.t = LVR.frail; k.sfx('pop'); } continue; }
+    if (F.some((f) => alive(f) && f.on === j)) { s.t -= dt;
+      if (s.t <= 0) { P.tw = 0; s.off = 3.2; k.sfx('hit'); k.shake(3); puff(P.x + P.w / 2, P.y + 6, 14, '#c98a4b', 160); } }
+    else s.t = Math.min(LVR.frail, s.t + dt * 0.6);
+  }
+  if (LVR.rain) { // bombas del techo: la diana avisa un segundo antes
+    if ((CS.rainT -= dt) <= 0) { CS.rainT = LVR.rain; CS.warn.push({ x: k.rnd(MX0 + 24, MX1 - 24), t: 1 }); k.sfx('click'); }
+    for (const w of CS.warn) if ((w.t -= dt) <= 0) { w.done = true;
+      shots.push({ type: 'bomb', x: w.x, y: -24, vx: 0, vy: 230, from: -1, safe: 0, life: 6, bounces: 0, rot: 0, rest: false }); }
+    CS.warn = CS.warn.filter((w) => !w.done);
+  }
+}
+function cmCheck() {
+  if (endT >= 0) return;
+  const me = F[0], foesLeft = F.filter((f, i) => i > 0 && f.stocks > 0).length;
+  if (me.stocks <= 0) { CS.won = false; return finish('¡Te han eliminado!'); }
+  const done = foesLeft === 0 || (LVR.obj === 'time' ? clock >= LVR.hold : LVR.obj === 'kos' ? me.kos >= LVR.nk : false);
+  if (done) { CS.won = true; return finish('¡Reto superado!'); }
+  if (clock >= (LVR.lim || MATCH)) { CS.won = LVR.obj === 'time' && clock >= LVR.hold; finish(CS.won ? '¡Reto superado!' : '¡Se acabó el tiempo!'); }
+}
+function cmEnd() {
+  const me = F[0], tm = clock;
+  if (!CS.won) { k.lose(ID, Math.round(me.kos * 500 + tm * 5), '¡Fuera del combate!', 'Reto ' + k.lv + ' · ' + LVR.n); return; }
+  const full = me.stocks >= CS.lives0;
+  const st = 1 + (me.stocks >= (LVR.s2 || 2) ? 1 : 0) + (full && tm <= ct3() ? 1 : 0);
+  const pts = Math.round(600 + me.stocks * 500 + me.kos * 300 + Math.max(0, (LVR.lim || MATCH) - tm) * 6);
+  k.levelDone(pts, `Vidas ${me.stocks}/${CS.lives0} · ${me.kos} KO · ${tm.toFixed(1)} s`, { stars: Math.min(3, st) });
+}
+function cmTop() { // reloj propio del reto: objetivo a la izquierda y tiempo a la derecha
+  const me = F[0], ob = LVR.obj === 'time' ? 'Aguanta ' + Math.max(0, Math.ceil(LVR.hold - clock)) + ' s'
+    : LVR.obj === 'kos' ? 'KO ' + me.kos + '/' + LVR.nk
+      : 'Rivales ' + F.filter((f, i) => i > 0 && f.stocks > 0).length;
+  panel(268, 6, 264, 34, 12, 'rgba(26,21,48,.85)', 2.5);
+  label('RETO ' + k.lv, 284, 24, 15, '#a097ff', 'left');
+  label(ob, 400, 24, 17, '#ffd166');
+  const left = Math.max(0, (LVR.lim || MATCH) - clock);
+  label(Math.ceil(left) + ' s', 516, 24, 17, left < 12 ? '#ff6a6a' : '#fff', 'right');
+}
+function cmMarks() { // dianas de las bombas que van a caer
+  for (const w of CS.warn) { const a = 0.35 + 0.45 * Math.abs(Math.sin(t * 14)), r = 16 + (1 - w.t) * 10;
+    c.save(); c.globalAlpha = a; c.strokeStyle = '#ff6a6a'; c.lineWidth = 3;
+    c.beginPath(); c.arc(w.x, TOP - 4, r, 0, TAU); c.stroke();
+    c.beginPath(); c.moveTo(w.x - r - 6, TOP - 4); c.lineTo(w.x + r + 6, TOP - 4); c.moveTo(w.x, TOP - 10 - r); c.lineTo(w.x, TOP + 2 + r); c.stroke();
+    c.restore(); }
+}
+
 /* ---------------- Partida ---------------- */
 function finish(txt) {
   if (endT >= 0) return; endT = 1.6; overTxt = txt; k.sfx(txt === '¡Tiempo!' ? 'lose' : 'win');
 }
 function endMatch() {
+  if (CM) return cmEnd();
   const val = (f) => (f.stocks > 0 ? 10000 + f.stocks * 1000 - Math.min(999, Math.round(f.pct)) : 100 + f.out * 10);
   const rows = F.map((f) => ({ p: f.p, score: val(f), name: nm(f.p), txt: `${f.stocks > 0 ? f.stocks + (f.stocks === 1 ? ' vida' : ' vidas') + ' · ' + Math.round(f.pct) + '%' : 'eliminado'} · ${f.kos} KO` }));
   const byScore = new Map(rows.map((r) => [r.score, r.txt]));
@@ -955,7 +1035,7 @@ function endMatch() {
   k.podium(rows, { head, fmt: (s) => byScore.get(s) || '' });
 }
 setPhase(0, true); demoReset();
-k.show(CFG.title, (CFG.help || '') + '<br>Toca para jugar');
+k.show(CFG.title, (CFG.help || '') + (CM ? '' : '<br>Toca para jugar'));
 let live = false;
 k.run((dt) => {
   t += dt;
@@ -968,8 +1048,9 @@ k.run((dt) => {
   if (k.counting()) { updStage(dt, false); return; }
   if (endT >= 0) { endT -= dt; F.forEach((f) => { if (f.stun > 0) updFighter(f, dt * 0.35); }); if (endT < 0) { endT = -2; live = false; endMatch(); } return; }
   if (stop > 0) { stop -= dt; return; }
-  clock += dt; updStage(dt, true);
+  clock += dt; updStage(dt, true); if (CM) cmStep(dt);
   F.forEach((f) => updFighter(f, dt)); updItems(dt, true);
+  if (CM) { cmCheck(); return; }
   const standing = F.filter((f) => f.stocks > 0), hum = F.filter((f) => !cpu(f.p));
   if (standing.length <= 1) finish('¡Fin del combate!');
   else if (hum.length && hum.every((f) => f.stocks <= 0)) finish('¡Eliminado!');
@@ -995,6 +1076,7 @@ k.run((dt) => {
     else if (SCRAP) nutBomb(s.x, s.y - (s.rest ? 13 : 0), s.rot, s.rest && Math.floor(t * 10) % 2);
     else bomb(s.x, s.y - (s.rest ? 13 : 0), s.rot, s.rest && Math.floor(t * 10) % 2); }
   F.forEach(drawFighter);
+  if (CM && !demo) cmMarks();
   drawFeathers();
   F.forEach(offscreen);
   if (!demo) hud();
