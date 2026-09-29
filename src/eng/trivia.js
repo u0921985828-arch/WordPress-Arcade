@@ -245,13 +245,42 @@ function moveSel(s, d, n) {
 k.onPick = (p, v) => { const s = seat && seat.find((x) => x.p === p); if (s && phase === 'ask' && hum(p) && typeof v === 'number') lock(s, v); };
 k.onParty = () => { if (k.st !== 'play') reset(); };
 
-/* ---------- Bucle ---------- */
+/* ---------- Bucle ----------
+ * Trivia de Sobremesa, FUERA del modo tele, juega los 20 RETOS a mano de trivlv.js (QUEST, más
+ * abajo). En la tele (k.party) y en la «Ronda libre» del menú corre el mismo camino clásico de
+ * siempre; Verdad o Bulo y los modos de la oleada 3 no miran nada de esto. */
+const QST = NM === 'quiz' && CFG.id === 'trivia-de-sobremesa' && typeof TRIVLV !== 'undefined';
+let QS = null, FREE = false, wantFree = false;
+const soloLv = () => QST && !k.party && !FREE;
 if (NEW) NEWGAME(); else {
 reset();
+if (QST) {
+  QS = QUEST();
+  k.levels(TRIVLV.L.length);
+  k.onLevel = () => { FREE = wantFree; wantFree = false; if (FREE) reset(); else QS.load(k.lv); };
+  k.onDif = () => { if (k.st !== 'play' && !FREE) QS.load(k.lv); };
+  /* Botón «Ronda libre» añadido al menú del kit (el kit ignora los data-m que no conoce). */
+  const ovq = document.getElementById('ov');
+  const addFree = () => {
+    if (k.st !== 'ready' || k.paused || k.party) return;
+    const m = ovq.querySelector('.card .menu'); if (!m || !m.querySelector('[data-m="play"]') || m.querySelector('[data-m="free"]')) return;
+    const b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-m', 'free'); b.textContent = 'Ronda libre'; m.appendChild(b);
+  };
+  new MutationObserver(addFree).observe(ovq, { childList: true, subtree: true });
+  ovq.addEventListener('pointerdown', (e) => { const t = e.target && e.target.closest && e.target.closest('[data-m="free"]'); if (!t) return; wantFree = true; k.goLevel(k.lv); });
+  addFree();
+  /* Teclado del ordenador: 1–4 responden, Q y E gastan comodín (con mando: joystick + A). */
+  addEventListener('keydown', (e) => {
+    if (!e.isTrusted || !soloLv() || k.st !== 'play' || k.paused || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (QS.key(e.key)) { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
+}
 k.show(CFG.title, TF
   ? 'Lee la afirmación y decide si es verdad o un bulo. Acertar rápido suma más; fallar resta. Tras cada respuesta verás la explicación.'
-  : 'Diez preguntas de seis categorías. Elige A, B, C o D antes que tus rivales: acertar rápido suma más y la última vale doble.');
+  : QST ? 'Veinte retos escritos a mano: categorías que se mezclan, comodines contados, reloj compartido, racha con multiplicador y una ronda de campeón al final.'
+    : 'Diez preguntas de seis categorías. Elige A, B, C o D antes que tus rivales: acertar rápido suma más y la última vale doble.');
 k.run((dt) => {
+  if (soloLv()) { if (!k.gate(QS.reset)) return; QS.update(dt); return; }
   if (!k.gate(reset)) return;
   if (!DATA) return;
   if (!started) { started = true; seat = mkSeats(); Qs = deck(); k.count(3); return; }
@@ -286,7 +315,7 @@ k.run((dt) => {
     const dur = TF ? 5 : 3.2, skip = pt > 1.2 && !k.party && (k.hit.has('a') || k.ptr.hit);
     if (pt > dur || skip) { if (qi >= NQ - 1) { phase = 'end'; finish(); } else beginQ(); }
   }
-}, draw);
+}, () => (soloLv() ? QS.draw() : draw()));
 }
 addEventListener('resize', () => { clearTimeout(window.__ot); window.__ot = setTimeout(() => { if ((innerWidth >= innerHeight * 0.98) !== LAND && k.st !== 'play') location.reload(); }, 400); });
 
@@ -463,6 +492,275 @@ function draw() {
     c.fillText(tx, W / 2, LAND ? 361 : 640);
   }
   seat.forEach((s, i) => lectern(i, s, t));
+}
+
+/* =========================================================================================
+ * RETOS DE TRIVIA DE SOBREMESA (1 jugador, fuera del modo tele) — la vara, tanda 6.
+ * 20 desafíos escritos a mano en src/eng/trivlv.js: categorías que se combinan, comodines
+ * contados, vidas, reloj por pregunta o compartido, racha con multiplicador, doble o nada y
+ * ronda de campeón final. Todo dentro de esta función: el camino clásico de 'quiz' (tele y
+ * «Ronda libre») y el resto de modos del motor quedan intactos.
+ * ========================================================================================= */
+function QUEST() {
+  /* Disposición propia: la franja de atriles se convierte en el panel del jugador. En apaisado
+   * se aparta de la esquina inferior izquierda, donde el reproductor deja el HUD del kit. */
+  const Q = LAND
+    ? { bar: [[24, 10, 320, 34], [446, 10, 330, 34]], card: [24, 58, 752, 128], nm: [38, 27, 292], clk: [452, 16, 186, 22], cnt: 662, hrt: [690, 27],
+        sc: [92, 364, 196, 44], mu: [296, 364, 104, 44], w1: [408, 364, 180, 44], w2: [596, 364, 180, 44], hint: 430, hw: 600 }
+    : { bar: [[16, 56, 418, 46]], card: [16, 106, 418, 226], nm: [28, 74, 250], clk: [28, 88, 236, 14], cnt: 300, hrt: [344, 78],
+        sc: [16, 626, 200, 48], mu: [224, 626, 100, 48], w1: [16, 684, 205, 52], w2: [229, 684, 205, 52], hint: 756, hw: 260 };
+  const S = { lv: 1, P: null, qs: null, i: 0, phase: 'load', pt: 0, qt: 0, clock: 0, lives: 0, wild: 0,
+    streak: 0, score: 0, fails: 0, used: 0, sel: -1, lock: -1, hid: null, res: 0, tickN: 0, msg: '', msgT: 0, dead: false };
+  const cur = () => S.qs && S.qs[S.i];
+  const nQ = () => (S.P ? S.P.qs.length : 0);
+  const qTime = () => (S.P.t ? S.P.t * k.D.time : 0);
+  const say = (m) => { S.msg = m; S.msgT = 1.6; };
+
+  function load(n) {
+    S.lv = Math.max(1, Math.min(TRIVLV.L.length, n | 0));
+    S.P = TRIVLV.of(S.lv, k.dif);
+    S.qs = null; S.i = 0; S.phase = 'load'; S.pt = 0; S.qt = 0; S.tickN = 0;
+    S.clock = S.P.T * k.D.time; S.lives = S.P.lives; S.wild = S.P.wild;
+    S.streak = 0; S.score = 0; S.fails = 0; S.used = 0; S.sel = -1; S.lock = -1; S.hid = null; S.res = 0; S.dead = false;
+    S.msg = ''; S.msgT = 0;
+  }
+  /* Mazo del reto: una pregunta por casilla de la tabla, con su categoría de turno y su
+   * dificultad. Se prefieren las que no has visto y se afloja el filtro si no quedan. */
+  function build() {
+    const all = DATA.q, seen = new Set(seenGet()), used = new Set(), out = [];
+    S.P.qs.forEach((d, i) => {
+      const cat = S.P.cats[i % S.P.cats.length];
+      const filt = [
+        (j) => all[j].c === cat && all[j].d === d && !seen.has(j),
+        (j) => all[j].c === cat && all[j].d === d,
+        (j) => all[j].c === cat && Math.abs(all[j].d - d) <= 1,
+        (j) => all[j].d === d,
+        () => true,
+      ];
+      let idx = -1;
+      for (const f of filt) { const p = []; for (let j = 0; j < all.length; j++) if (!used.has(j) && f(j)) p.push(j); if (p.length) { idx = k.pick(p); break; } }
+      if (idx < 0) idx = i % all.length;
+      used.add(idx);
+      const src = all[idx], ord = k.shuffle([0, 1, 2, 3]);
+      out.push({ id: idx, c: src.c, d: src.d, t: src.q, opts: ord.map((j) => src.a[j]), right: ord.indexOf(0), n: 4, dbl: !!S.P.dbl && i === S.P.qs.length - 1 });
+    });
+    seenAdd(out.map((q) => q.id));
+    S.qs = out;
+  }
+  function startQ() { S.phase = 'ask'; S.qt = 0; S.sel = -1; S.lock = -1; S.hid = null; S.tickN = 0; }
+  function useWild(kind) {
+    if (S.phase !== 'ask' || S.wild <= 0) { if (S.phase === 'ask') say('Sin comodines'); return; }
+    const q = cur();
+    if (kind === 0) {
+      if (S.hid) { say('Ya has usado el 50/50'); return; }
+      const bad = []; for (let i = 0; i < q.n; i++) if (i !== q.right) bad.push(i);
+      S.hid = k.shuffle(bad).slice(0, 2);
+      if (S.sel >= 0 && S.hid.indexOf(S.sel) >= 0) S.sel = -1;
+      say('50/50: quedan dos'); k.sfx('pop'); k.burst(W / 2, H / 2, '#ffd36b', 14, 160);
+    } else {
+      if (S.P.T) S.clock += 6 * k.D.time; else S.qt = Math.max(0, S.qt - 6 * k.D.time);
+      say('+6 segundos'); k.sfx('coin');
+    }
+    S.wild--; S.used++;
+  }
+  function answer(i) {
+    const q = cur(); S.lock = i;
+    const ok = i === q.right;
+    const ref = S.P.t ? qTime() : 10 * k.D.time;
+    const frac = 1 - Math.min(1, S.qt / Math.max(1, ref));
+    if (ok) {
+      const g = TRIVLV.pts(S.streak, frac, q.dbl);
+      S.score += g; S.streak++;
+      const r = L.opt(i);
+      k.float('+' + g, r[0] + r[2] / 2, r[1] + 8, '#7cf7a0'); k.chime(); k.sfx('coin'); k.hitstop(0.05);
+      if (S.streak >= 2) k.combo(S.streak, W / 2, LAND ? 180 : 320);
+      if (q.dbl) k.reward('¡DOBLE!', '#ffd36b');
+      k.burst(r[0] + r[2] / 2, r[1] + r[3] / 2, '#7cf7a0', 22, 200);
+    } else {
+      S.fails++; S.streak = 0; k.chainReset();
+      S.score = Math.max(0, S.score + TRIVLV.miss(q.dbl));
+      if (S.P.lives) S.lives--;
+      k.sfx('hurt'); k.shake(5); k.punch(0.05);
+      if (i < 0) say('Se acabó el tiempo');
+    }
+    S.res = ok ? 1 : 0; S.phase = 'reveal'; S.pt = 0;
+  }
+  function finishLv() {
+    const P = S.P, pts = S.score;
+    k.best(CFG.id, pts);
+    const two = pts >= P.g2, three = two && S.fails === 0;
+    const stars = 1 + (two ? 1 : 0) + (three ? 1 : 0);
+    const falta = three ? 'Reto bordado: pleno de aciertos.' : two ? `Para la 3.ª estrella: pleno de aciertos (has fallado ${S.fails}).` : `Para la 2.ª estrella: ${P.g2} puntos (te faltan ${P.g2 - pts}).`;
+    k.levelDone(pts, `${pts} puntos · ${nQ() - S.fails} de ${nQ()} aciertos<br>${falta}`, { stars });
+    S.phase = 'end';
+  }
+  function fail() {
+    S.dead = true; S.phase = 'end';
+    k.lose(CFG.id, S.score, 'Sin vidas', `Reto ${S.lv} · ${S.P.name} · ${S.i + 1}ª de ${nQ()}`);
+  }
+  function update(dt) {
+    if (!DATA) return;
+    if (!S.P) load(k.lv);
+    S.msgT = Math.max(0, S.msgT - dt);
+    if (S.phase === 'load') { build(); S.phase = 'tip'; S.pt = 0; return; }
+    S.pt += dt;
+    if (S.phase === 'tip') { if (S.pt > 2.8 || (S.pt > 0.4 && (k.hit.has('a') || k.ptr.hit))) startQ(); return; }
+    if (S.phase === 'ask') {
+      S.qt += dt; if (S.P.T) S.clock = Math.max(0, S.clock - dt);
+      /* comodines: se tocan, o teclas Q y E */
+      if (k.ptr.hit) {
+        if (inQ(Q.w1)) { useWild(0); return; }
+        if (inQ(Q.w2)) { useWild(1); return; }
+        for (let i = 0; i < cur().n; i++) { const r = L.opt(i); if (S.hid && S.hid.indexOf(i) >= 0) continue; if (k.ptr.x >= r[0] && k.ptr.x <= r[0] + r[2] && k.ptr.y >= r[1] && k.ptr.y <= r[1] + r[3]) { answer(i); return; } }
+      }
+      const dx = (k.hit.has('right') ? 1 : 0) - (k.hit.has('left') ? 1 : 0), dy = (k.hit.has('down') ? 1 : 0) - (k.hit.has('up') ? 1 : 0);
+      if (dx || dy) { move(dx, dy); k.sfx('click'); }
+      if (k.hit.has('a')) { if (S.sel >= 0) answer(S.sel); else { S.sel = firstFree(); k.sfx('click'); } }
+      const left = S.P.T ? S.clock : Math.max(0, qTime() - S.qt);
+      if (left < 3.6 && Math.ceil(left) !== S.tickN) { S.tickN = Math.ceil(left); if (S.tickN > 0) k.sfx('tick'); }
+      if (left <= 0) answer(-1);
+      return;
+    }
+    if (S.phase === 'reveal') {
+      const skip = S.pt > 0.7 && (k.hit.has('a') || k.ptr.hit);
+      if (S.pt > 2 || skip) {
+        if (S.P.lives && S.lives <= 0) return fail();
+        if (S.i >= nQ() - 1) return finishLv();
+        S.i++; startQ();
+      }
+    }
+  }
+  function inQ(r) { return k.ptr.x >= r[0] && k.ptr.x <= r[0] + r[2] && k.ptr.y >= r[1] && k.ptr.y <= r[1] + r[3]; }
+  const hidden = (i) => !!(S.hid && S.hid.indexOf(i) >= 0);
+  function firstFree() { for (let i = 0; i < 4; i++) if (!hidden(i)) return i; return 0; }
+  function move(dx, dy) {
+    let i = S.sel < 0 ? firstFree() : S.sel, cx = i % 2, cy = i >> 1;
+    if (S.sel < 0) { S.sel = i; if (!hidden(i)) return; }
+    if (dx) cx = dx > 0 ? 1 : 0; if (dy) cy = dy > 0 ? 1 : 0;
+    let n = cy * 2 + cx;
+    for (let t = 0; t < 4 && hidden(n); t++) n = (n + 1) % 4;
+    S.sel = n;
+  }
+  function key(kk) {
+    if (S.phase !== 'ask') return false;
+    if (kk >= '1' && kk <= '4') { const i = +kk - 1; if (!hidden(i)) answer(i); return true; }
+    const low = String(kk).toLowerCase();
+    if (low === 'q') { useWild(0); return true; }
+    if (low === 'e') { useWild(1); return true; }
+    return false;
+  }
+
+  /* ---------------------------------- Dibujo ---------------------------------- */
+  function heart(x, y, s, on) {
+    c.save(); c.translate(x, y); c.scale(s / 16, s / 16);
+    c.beginPath(); c.moveTo(0, 5); c.bezierCurveTo(-9, -3, -7, -11, -0.4, -6.4); c.bezierCurveTo(-0.2, -6.2, 0.2, -6.2, 0.4, -6.4); c.bezierCurveTo(7, -11, 9, -3, 0, 5); c.closePath();
+    c.fillStyle = on ? '#ff6b8a' : 'rgba(255,255,255,.16)'; c.fill(); c.lineWidth = 2.4; c.strokeStyle = OUT; c.stroke(); c.restore();
+  }
+  function star(x, y, r, on) {
+    c.save(); c.translate(x, y); c.beginPath();
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 ? r * 0.46 : r; c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+    c.closePath(); c.fillStyle = on ? '#ffd36b' : 'rgba(255,255,255,.18)'; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke(); c.restore();
+  }
+  function bar(r, fr, col) {
+    panel(r[0], r[1], r[2], r[3], r[3] / 2, '#15112e', { drop: 2 });
+    if (fr > 0) { c.save(); ART.rr(c, r[0] + 3, r[1] + 3, Math.max(6, (r[2] - 6) * Math.min(1, fr)), r[3] - 6, (r[3] - 6) / 2); c.fillStyle = col; c.fill(); c.restore(); }
+  }
+  function qOpt(i, q, t) {
+    const [x, y, w, h] = L.opt(i), rev = S.phase === 'reveal', right = rev && i === q.right, bad = rev && S.lock === i && i !== q.right;
+    if (hidden(i)) { c.save(); c.globalAlpha = 0.35; panel(x, y, w, h, 16, '#241f4a'); c.restore(); return; }
+    let fill = '#2d2a5c';
+    if (rev && !right) fill = ART.dark(fill, 0.35);
+    if (right) fill = '#34b36b'; if (bad) fill = '#a3384a';
+    const pulse = right ? Math.sin(t * 8) * 2 : 0, sh = bad ? Math.sin(S.pt * 40) * Math.max(0, 1 - S.pt * 2) * 5 : 0;
+    panel(x - pulse + sh, y - pulse, w + pulse * 2, h + pulse * 2, 16, fill, { stroke: right ? '#eafff0' : OUT, lw: right ? 4 : 3 });
+    const bx = x + (LAND ? 30 : 24), by = LAND ? y + h / 2 : y + 24, lr = LAND ? 20 : 16;
+    c.beginPath(); c.arc(bx + sh, by, lr, 0, TAU); c.fillStyle = OPC[i]; c.fill(); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke();
+    outlined(LET[i], bx + sh, by + 1, LAND ? 22 : 18, '#fff', 'center', 4);
+    if (LAND) textBlock(q.opts[i], x + 58 + sh, y + 6, w - 70, h - 12, L.of, 14, '#fff', 800, 'left');
+    else textBlock(q.opts[i], x + 10 + sh, y + 40, w - 20, h - 48, L.of, 13, '#fff', 800);
+    if (S.phase === 'ask' && S.sel === i) { c.save(); c.strokeStyle = 'rgba(255,209,102,.35)'; c.lineWidth = 9; ART.rr(c, x - 4, y - 4, w + 8, h + 8, 19); c.stroke(); c.strokeStyle = '#ffd166'; c.lineWidth = 5; c.stroke(); c.restore(); }
+    if (rev && right) check(x + w - 26, y + (LAND ? h / 2 : 24), 20, '#eafff0');
+    if (bad) cross(x + w - 26, y + (LAND ? h / 2 : 24), 20, '#ffd9df');
+  }
+  function drawWild(r, lab, sub, on) {
+    panel(r[0], r[1], r[2], r[3], 13, on ? '#4a3f9e' : '#2a2548', { drop: 3 });
+    outlined(lab, r[0] + r[2] / 2, r[1] + r[3] / 2 - 7, LAND ? 18 : 19, on ? '#fff' : 'rgba(255,255,255,.45)', 'center', 4);
+    c.font = FONT(12, 700); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = on ? '#cfc8ff' : 'rgba(255,255,255,.3)';
+    c.fillText(sub, r[0] + r[2] / 2, r[1] + r[3] - 13);
+  }
+  function draw() {
+    const t = performance.now() / 1000;
+    c.drawImage(stageBg(), 0, 0); spot(t);
+    const [cx0, cy0, cw, ch] = Q.card, q = cur();
+    if (!DATA || !S.P || !S.qs) {
+      panel(cx0, cy0, cw, ch, 20, '#f6f1ff');
+      outlined(CFG.title, W / 2, cy0 + ch * 0.4, LAND ? 38 : 32, '#ffd36b', 'center', 7);
+      c.font = FONT(18, 700); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = OUT;
+      c.fillText(DATA ? 'Preparando el reto…' : 'Cargando preguntas…', W / 2, cy0 + ch * 0.68);
+      return;
+    }
+    /* barra superior: reto, reloj, pregunta y vidas */
+    Q.bar.forEach((r) => panel(r[0], r[1], r[2], r[3], 12, '#3a3478', { drop: 3 }));
+    const nm = `Reto ${S.lv}/${TRIVLV.L.length} · ${S.P.name}`;
+    c.font = FONT(LAND ? 17 : 15, 900);
+    let ns = LAND ? 17 : 15; while (ns > 11 && c.measureText(nm).width > Q.nm[2]) { ns--; c.font = FONT(ns, 900); }
+    outlined(nm, Q.nm[0], Q.nm[1], ns, '#fff', 'left', 4);
+    const tot = S.P.T ? S.P.T * k.D.time : qTime(), left = S.P.T ? S.clock : Math.max(0, qTime() - S.qt);
+    const fr = tot ? left / tot : 0, col = fr > 0.5 ? '#6fd66f' : fr > 0.25 ? '#ffc94a' : '#ff6b6b';
+    bar(Q.clk, S.phase === 'ask' || S.phase === 'reveal' ? fr : 1, S.phase === 'ask' ? col : '#6fd66f');
+    outlined(String(Math.ceil(left)), Q.clk[0] + Q.clk[2] - 16, Q.clk[1] + Q.clk[3] / 2, 14, '#fff', 'center', 3);
+    outlined(`${Math.min(S.i + 1, nQ())}/${nQ()}`, Q.cnt, Q.nm[1], LAND ? 17 : 15, '#ffd36b', 'center', 4);
+    if (S.P.lives) for (let i = 0; i < Math.max(S.P.lives, S.lives); i++) heart(Q.hrt[0] + i * 22, Q.hrt[1], 17, i < S.lives);
+    /* tarjeta de la pregunta (o cartel del reto) */
+    if (S.phase === 'tip') {
+      panel(cx0, cy0, cw, ch, 20, '#fbf8ff');
+      outlined(S.P.name, W / 2, cy0 + (LAND ? 44 : 50), LAND ? 34 : 28, '#6e62f5', 'center', 6);
+      textBlock(S.P.tip, cx0 + 24, cy0 + (LAND ? 62 : 70), cw - 48, ch - (LAND ? 84 : 104), LAND ? 20 : 22, 13, OUT, 800);
+      c.font = FONT(14, 700); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#6a6394';
+      c.fillText('Toca para empezar', W / 2, cy0 + ch - (LAND ? 16 : 20));
+    } else {
+      const catC = DATA.cats[q.c] ? DATA.cats[q.c].col : '#6e62f5';
+      panel(cx0, cy0, cw, ch, 20, '#fbf8ff');
+      c.save(); ART.rr(c, cx0, cy0, cw, ch, 20); c.clip(); c.fillStyle = catC; c.fillRect(cx0, cy0, cw, LAND ? 30 : 34); c.restore();
+      ART.rr(c, cx0, cy0, cw, ch, 20); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke();
+      const lab = (DATA.cats[q.c] ? DATA.cats[q.c].n : '') + ' · ' + ['', 'Fácil', 'Media', 'Difícil'][q.d];
+      outlined(lab, cx0 + 16, cy0 + (LAND ? 15 : 17), 16, '#fff', 'left', 4);
+      if (q.dbl) outlined('DOBLE O NADA', cx0 + cw - 16, cy0 + (LAND ? 15 : 17), 16, '#ffe9a8', 'right', 4);
+      textBlock(q.t, cx0 + 18, cy0 + (LAND ? 36 : 44), cw - 36, ch - (LAND ? 44 : 56), L.fs + (LAND ? 1 : 2), 14, OUT, 800);
+      for (let i = 0; i < q.n; i++) qOpt(i, q, t);
+    }
+    /* panel del jugador */
+    panel(Q.sc[0], Q.sc[1], Q.sc[2], Q.sc[3], 13, '#2a2548', { drop: 3 });
+    c.font = FONT(12, 700); c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillStyle = '#b8b0ff';
+    c.fillText('PUNTOS', Q.sc[0] + 12, Q.sc[1] + 13);
+    outlined(String(S.score), Q.sc[0] + 12, Q.sc[1] + Q.sc[3] - 15, 24, '#fff', 'left', 5);
+    const mult = TRIVLV.mult(S.streak);
+    panel(Q.mu[0], Q.mu[1], Q.mu[2], Q.mu[3], 13, mult > 1 ? '#4a3f9e' : '#2a2548', { drop: 3 });
+    outlined('×' + String(mult).replace('.', ','), Q.mu[0] + Q.mu[2] / 2, Q.mu[1] + Q.mu[3] / 2 - 7, 22, mult > 1 ? '#ffd36b' : 'rgba(255,255,255,.45)', 'center', 5);
+    c.font = FONT(12, 700); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = mult > 1 ? '#cfc8ff' : 'rgba(255,255,255,.3)';
+    c.fillText('racha ' + S.streak, Q.mu[0] + Q.mu[2] / 2, Q.mu[1] + Q.mu[3] - 13);
+    drawWild(Q.w1, '50/50', S.hid ? 'usado' : S.wild + ' comodín' + (S.wild === 1 ? '' : 'es'), S.wild > 0 && !S.hid && S.phase === 'ask');
+    drawWild(Q.w2, '+6 s', S.wild + ' comodín' + (S.wild === 1 ? '' : 'es'), S.wild > 0 && S.phase === 'ask');
+    /* estrellas del reto y aviso */
+    const sx = LAND ? W - 64 : W / 2 + 150, sy = LAND ? 428 : 756;
+    const two = S.score >= S.P.g2;
+    [1, 2, 3].forEach((n, i) => star(sx + i * 20, sy, 8, n === 1 || (n === 2 && two) || (n === 3 && two && S.fails === 0)));
+    if (S.msgT > 0 && S.msg) {
+      c.save(); c.globalAlpha = Math.min(1, S.msgT * 3);
+      c.font = FONT(18, 900); const mw = c.measureText(S.msg).width + 34, mx = W / 2, my = LAND ? 340 : 600;
+      panel(mx - mw / 2, my - 18, mw, 36, 18, '#f4f0ff', { drop: 3, lw: 3 });
+      outlined(S.msg, mx, my, 18, OUT, 'center', 0.1); c.restore();
+    } else if (S.phase === 'ask' && S.i === 0 && S.lv <= 2) {
+      c.font = FONT(LAND ? 13 : 14, 700); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = 'rgba(255,255,255,.7)';
+      c.fillText('Toca tu respuesta (o flechas + Espacio)', LAND ? W / 2 : W / 2 - 60, LAND ? 428 : 756);
+    } else if (S.phase === 'ask') {
+      c.font = FONT(12, 700); c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillStyle = 'rgba(255,255,255,.55)';
+      c.fillText('objetivo 2★: ' + S.P.g2, LAND ? 92 : 20, LAND ? 428 : 756);
+    }
+  }
+  /* ganchos de prueba (Playwright) */
+  window.__triv = { st: () => S, answer: (i) => answer(i), wild: (n) => useWild(n), load };
+  return { load, update, draw, key, reset: () => load(k.lv) };
 }
 
 /* =========================================================================================

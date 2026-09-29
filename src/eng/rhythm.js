@@ -439,22 +439,42 @@ function danceGame() {
   const DIRS = ['left', 'down', 'up', 'right'], DCOL = ['#ff6fb5', '#5b8cff', '#a8cf3f', '#ffc94d'], ROT = [-Math.PI / 2, Math.PI, 0, Math.PI / 2];
   const JW = [0.05, 0.1, 0.15], JN = ['¡PERFECTO!', '¡GENIAL!', 'BIEN'], JC = ['#fff27a', '#7cf7a0', '#8fd3ff'], JP = [100, 70, 40], CNAME = ['roja', 'azul', 'amarilla', 'verde'];
   let P = [], notes = [], beats = [], t = 0, bpm = 100, nextBeat = 0, beatN = 0, over = false, overT = 0, LV = 0, LV0 = 0, rng = Math.random, busy = [0, 0, 0, 0], lastD = -1, touchUI = false;
+  /* ---------- coreografías escritas a mano (src/eng/dnclv.js) ----------
+   * Solo para el juego de un jugador. En el modo tele (k.party) no se usan: allí manda la
+   * tele y el motor sigue con la coreografía procedimental y el equilibrio de siempre. */
+  const HAND = (ID === 'flechas-de-baile' && typeof DNCLV !== 'undefined' && DNCLV[ID]) || null;
+  const hand = () => !!(HAND && !k.party);
+  const TAPC = { l: 0, d: 1, u: 2, r: 3 }, HOLDC = { L: 0, D: 1, U: 2, R: 3 };
+  const DBLC = { j: [0, 3], k: [1, 2], q: [0, 1], w: [0, 2], e: [1, 3], t: [2, 3] };
+  let CH = null, SLEN = SONG, SPD = SPEED, hp = 100, hpMax = 100, JWx = JW.slice(), song = null;
+  let AUTO = null, aHold = [0, 0, 0, 0], nJudged = 0, nBad = 0, accW = 0, tipT = 0;
   const lsGet = (key) => { try { return +localStorage.getItem(key) || 0; } catch (e) { return 0; } };
   const lsSet = (key, v) => { try { localStorage.setItem(key, v); } catch (e) { /* sin almacenamiento */ } };
   const mulberry = (a) => () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let q = Math.imul(a ^ (a >>> 15), 1 | a); q = (q + Math.imul(q ^ (q >>> 7), 61 | q)) ^ q; return ((q ^ (q >>> 14)) >>> 0) / 4294967296; };
   const gauss = () => { let u = 0; while (!u) u = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(R2 * Math.random()); };
-  const nLanes = () => (k.party ? Math.max(2, ...k.party.map((q) => q.p + 1)) : 2);
+  const nLanes = () => (k.party ? Math.max(2, ...k.party.map((q) => q.p + 1)) : hand() ? 1 : 2);
   /* ---------- música: bombo y charles sintetizados por pulso ---------- */
   let ac = null, kicked = 0;
   function audio() { if (k.muted()) return; if (!ac) try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { /* sin audio */ } if (ac && ac.state === 'suspended') ac.resume(); }
   function tone(f0, f1, d, when, vol, type) { if (!ac || k.muted()) return; const w0 = Math.max(ac.currentTime, when), o = ac.createOscillator(), g = ac.createGain(); o.type = type || 'sine'; o.frequency.setValueAtTime(f0, w0); o.frequency.exponentialRampToValueAtTime(f1, w0 + d * 0.8); g.gain.setValueAtTime(vol, w0); g.gain.exponentialRampToValueAtTime(0.001, w0 + d); o.connect(g).connect(ac.destination); o.start(w0); o.stop(w0 + d + 0.02); }
   const BASS = [55, 55, 65.4, 73.4, 49, 49, 58.3, 65.4];
-  function music() { if (!ac || over || k.st !== 'play' || k.counting() || k.paused) return; for (let i = 0; i < beats.length; i++) { const b = beats[i]; if (b.at > kicked && b.at <= t + 0.12) { kicked = b.at; const w = ac.currentTime + Math.max(0, b.at - t); tone(130, 42, 0.2, w, 0.45); tone(BASS[(b.n >> 1) % 8] * 2, BASS[(b.n >> 1) % 8] * 2, 0.22, w + 0.01, 0.12, 'triangle'); tone(900, 700, 0.05, w + 60 / bpm / 2, 0.06, 'square'); } } }
+  const semi = (root, sv) => root * Math.pow(2, sv / 12);
+  /* Cada coreografía a mano trae su bajo (prog) y su melodía (mel) en semitonos sobre root. */
+  function musicHand(b, w) {
+    const bb = 60 / tempo(b.at), root = song.root || 55, pr = song.prog || [0, 0, 5, 5, 7, 7, 5, 3], mel = song.mel || [];
+    tone(130, 42, 0.2, w, 0.42);
+    const bf = semi(root, pr[b.n % pr.length]); tone(bf, bf, bb * 0.9, w + 0.01, 0.14, 'triangle');
+    tone(900, 700, 0.05, w + bb / 2, 0.055, 'square');
+    if (b.n % 4 === 2) { tone(240, 120, 0.13, w, 0.15, 'square'); tone(1700, 900, 0.09, w, 0.045, 'square'); }
+    for (let h = 0; h < 2 && mel.length; h++) { const sv = mel[(b.n * 2 + h) % mel.length]; if (sv > -20) { const f = semi(root * 4, sv); tone(f, f, bb * 0.42, w + h * bb / 2, 0.07, 'triangle'); } }
+  }
+  function music() { if (!ac || over || k.st !== 'play' || k.counting() || k.paused) return; for (let i = 0; i < beats.length; i++) { const b = beats[i]; if (b.at > kicked && b.at <= t + 0.12) { kicked = b.at; const w = ac.currentTime + Math.max(0, b.at - t); if (CH) { musicHand(b, w); continue; } tone(130, 42, 0.2, w, 0.45); tone(BASS[(b.n >> 1) % 8] * 2, BASS[(b.n >> 1) % 8] * 2, 0.22, w + 0.01, 0.12, 'triangle'); tone(900, 700, 0.05, w + 60 / bpm / 2, 0.06, 'square'); } } }
   /* ---------- coreografía compartida ---------- */
-  const tempo = (x) => 100 + 40 * Math.min(1, x / SONG);
+  const tempo = (x) => { if (!CH) return 100 + 40 * Math.min(1, x / SONG); let b = CH.bpms[0].bpm; for (const q of CH.bpms) if (q.at <= x + 0.001) b = q.bpm; return b; };
   function pickDir(avoid) { for (let n = 0; n < 12; n++) { const d = (rng() * 4) | 0; if (busy[d] > nextBeat - 0.01 || avoid.indexOf(d) >= 0) continue; if (d === lastD && rng() < 0.6) continue; return d; } return -1; }
   function add(d, at, end) { const n = { d, time: at, end: end || 0, st: {}, hs: {}, id: notes.length }; notes.push(n); lastD = d; if (end) busy[d] = end + 0.15; return n; }
   function compose(upTo) {
+    if (CH) return;
     while (nextBeat < upTo && nextBeat < SONG) {
       const at = nextBeat, e = Math.min(1, at / SONG), beat = 60 / tempo(at), bar = beatN % 16; beats.push({ at, n: beatN }); beatN++;
       if (at >= 3 && !(bar >= 14 && Math.floor(beatN / 16) % 4 === 3)) {   // respiro al final de cada cuarta frase
@@ -468,14 +488,55 @@ function danceGame() {
       nextBeat += beat;
     }
   }
+  /* ---------- parser de la coreografía: cada carácter es un paso (ver cabecera de dnclv.js) ---------- */
+  function buildChart(S) {
+    const out = { notes: [], beats: [], bpms: [], blind: [], len: 0, total: 0 };
+    let tt = 2.2, ph = 0, bn = 0, last = null;
+    for (const sec of S.sec) {
+      const reps = Math.max(1, sec.x || 1), b0 = sec.b || S.bpm || 100, dst = sec.d == null ? 0.5 : sec.d, step = dst * 60 / b0;
+      for (let rp = 0; rp < reps; rp++) {
+        const t0 = tt; out.bpms.push({ at: tt, bpm: b0 });
+        for (const bar of sec.s) for (let i = 0; i < bar.length; i++) {
+          const ch = bar[i];
+          if (Math.abs(ph - Math.round(ph)) < 1e-6) out.beats.push({ at: tt, n: bn++ });
+          const mk = (d, end) => { const n = { d, time: tt, end: end || 0, st: {}, hs: {}, id: out.notes.length, bl: sec.blind ? 1 : 0, pl: 1 }; out.notes.push(n); return n; };
+          if (ch === '>') { if (last) last.end = tt + step; }
+          else if (ch in TAPC) { mk(TAPC[ch]); last = null; }
+          else if (ch in HOLDC) last = mk(HOLDC[ch], tt + step);
+          else if (ch in DBLC) { const pr = DBLC[ch]; mk(pr[0]).dbl = true; mk(pr[1]).dbl = true; last = null; }
+          else last = null;
+          tt += step; ph += dst;
+        }
+        if (sec.blind) out.blind.push([t0, tt]);
+      }
+    }
+    out.len = tt + 1.2; out.total = out.notes.length;
+    return out;
+  }
+  const blindNow = () => { if (!CH) return false; for (const b of CH.blind) if (t > b[0] - 1.2 && t < b[1]) return true; return false; };
+  const accPct = () => (nJudged ? Math.round(1000 * accW / nJudged) / 10 : 100);
+  const goal2 = () => (song && song.a2 ? song.a2[k.clamp(k.dif, 0, 2)] : 85);
   /* ---------- jugadores ---------- */
   function mk(pl) { return { p: pl.p, cpu: pl.cpu, name: pl.name, col: pl.color, score: 0, combo: 0, maxC: 0, cnt: [0, 0, 0, 0], judge: '', jc: '#fff', jt: 0, fl: [0, 0, 0, 0], plan: [], hold: [0, 0, 0, 0], rings: [] }; }
   const nm = (q) => (q.cpu ? 'CPU ' + CNAME[q.p % 4] : String(q.name).slice(0, 10));
   function setup() { const n = nLanes(), pl = k.players(n); if (P.length !== n) P = pl.map(mk); else P.forEach((q, i) => { q.cpu = pl[i].cpu; q.name = pl[i].name; q.col = pl[i].color; q.plan = []; }); }
-  k.onParty = () => { if (k.st !== 'play') { P = []; setup(); } else setup(); };
+  k.onParty = () => { if (CH && k.party) { P = []; reset(); return; } if (k.st !== 'play') { P = []; setup(); } else setup(); };
   function reset() {
-    LV0 = Math.min(10, lsGet('cpu:' + ID)); LV = k.clamp(LV0 + k.D.cpu * 2, -2, 12); // lo guardado (LV0) no se toca: la dificultad solo se suma al leerlo P = []; setup(); notes = []; beats = []; t = -0.2; nextBeat = 1.4; beatN = 0; over = false; overT = 0; busy = [0, 0, 0, 0]; lastD = -1; kicked = 0;
-    rng = mulberry((Math.random() * 1e9) | 0); compose(8); k.count(3);
+    /* lo guardado (LV0) no se toca: la dificultad solo se suma al leerlo */
+    LV0 = Math.min(10, lsGet('cpu:' + ID)); LV = k.clamp(LV0 + k.D.cpu * 2, -2, 12);
+    P = []; setup(); notes = []; beats = []; t = -0.2; nextBeat = 1.4; beatN = 0; over = false; overT = 0; busy = [0, 0, 0, 0]; lastD = -1; kicked = 0;
+    rng = mulberry((Math.random() * 1e9) | 0);
+    CH = null; song = null; SLEN = SONG; SPD = SPEED; JWx = JW.slice(); AUTO = null; aHold = [0, 0, 0, 0];
+    hp = hpMax = 100; nJudged = nBad = 0; accW = 0; tipT = 0;
+    if (hand()) {
+      song = HAND[k.clamp((k.lv || 1) | 0, 1, HAND.length) - 1];
+      CH = buildChart(song); notes = CH.notes.map((n) => ({ ...n, st: {}, hs: {} })); beats = CH.beats.slice();
+      SLEN = CH.len; nextBeat = 1e9; bpm = song.bpm || 100; tipT = 4.5;
+      SPD = k.clamp(SPEED * (song.bpm || 100) / 100, 200, 340);
+      const wf = k.dif === 0 ? 1.35 : k.dif === 2 ? 0.82 : 1; JWx = JW.map((v) => v * wf);
+      hp = hpMax = 80;
+    }
+    compose(8); k.count(3);
   }
   const mult = (q) => Math.min(4, 1 + Math.floor(q.combo / 10));
   const laneX = (q) => { const LW = W / P.length; return q.p * LW; };
@@ -485,10 +546,11 @@ function danceGame() {
   function press(q, di) {
     q.fl[di] = 1; let best = null, bd = 9;
     for (const n of notes) { if (n.d !== di || n.st[q.p]) continue; const o = Math.abs(n.time - t); if (o < bd) { bd = o; best = n; } }
-    if (!best || bd > JW[2]) return;
-    const j = bd < JW[0] ? 0 : bd < JW[1] ? 1 : 2; best.st[q.p] = 'hit'; q.cnt[j]++; q.combo++; q.maxC = Math.max(q.maxC, q.combo); q.score += JP[j] * mult(q);
+    if (!best || bd > JWx[2]) return;
+    const j = bd < JWx[0] ? 0 : bd < JWx[1] ? 1 : 2; best.st[q.p] = 'hit'; q.cnt[j]++; q.combo++; q.maxC = Math.max(q.maxC, q.combo); q.score += JP[j] * mult(q);
     say(q, JN[j], JC[j]); q.rings.push({ d: di, t: 0, big: j === 0 }); k.burst(colX(q, di), TOPY, j === 0 ? '#fff27a' : DCOL[di], j === 0 ? 8 : 5, 120);
     if (best.end) best.hs[q.p] = 'on';
+    if (CH && !q.cpu) { nJudged++; accW += [1, 0.7, 0.4][j]; hp = Math.min(hpMax, hp + [1.8, 1.2, 0.6][j]); }
     if (q.combo % 10 === 0 && q.combo <= 30) k.float(`x${mult(q)}`, laneX(q) + W / P.length / 2, 150, '#fff27a');
   }
   function cpuPlan(q, n) {
@@ -512,7 +574,7 @@ function danceGame() {
     if (k.counting()) { tHit.clear(); return; }
     audio();
     if (over) { overT += dt; if (overT > 1.4) finish(); return; }
-    t += dt; bpm = tempo(t); compose(t + (H - TOPY) / SPEED + 0.4);
+    t += dt; bpm = tempo(t); compose(t + (H - TOPY) / SPEED + 0.4); if (tipT > 0) tipT -= dt;
     for (const n of notes) if (!n.pl) { n.pl = 1; for (const q of P) if (q.cpu) cpuPlan(q, n); }
     while (beats.length && beats[0].at < t - 0.5) beats.shift();
     for (const q of P) {
@@ -520,6 +582,9 @@ function danceGame() {
       if (q.cpu) {
         while (q.plan.length && q.plan[0].at <= t) { const pl = q.plan.shift(); press(q, pl.d); q.hold[pl.d] = pl.rel; }
         held = (d) => q.hold[d] > t;
+      } else if (AUTO != null) {   // piloto de pruebas: pulsa según los datos del mapa (scripts/dance_bot.py)
+        for (const n of notes) if (!n.ap && !n.st[q.p] && t >= n.time + AUTO) { n.ap = 1; press(q, n.d); if (n.end) aHold[n.d] = n.end + 0.06; }
+        held = (d) => aHold[d] > t;
       } else {
         const solo = q.p === 0 && !k.party;
         for (let d = 0; d < 4; d++) if (k.phit(q.p, DIRS[d]) || (solo && tHit.has(d))) press(q, d);
@@ -529,16 +594,30 @@ function danceGame() {
       // largas: mantener hasta el final
       for (const n of notes) if (n.end && n.hs[q.p] === 'on') {
         if (t >= n.end) { n.hs[q.p] = 'ok'; q.score += 50 * mult(q); say(q, '¡AGUANTA!', '#fff27a'); q.rings.push({ d: n.d, t: 0, big: true }); }
-        else if (!held(n.d) && t < n.end - 0.1) { n.hs[q.p] = 'drop'; breakCombo(q, 'SOLTADA'); }
+        else if (!held(n.d) && t < n.end - 0.1) { n.hs[q.p] = 'drop'; breakCombo(q, 'SOLTADA'); if (CH && !q.cpu) { nBad++; accW = Math.max(0, accW - 0.6); hp -= 5 * k.D.dmg; } }
       }
     }
     tHit.clear();
-    for (const n of notes) if (t - n.time > JW[2]) for (const q of P) if (!n.st[q.p]) { n.st[q.p] = 'miss'; q.cnt[3]++; breakCombo(q); }
+    for (const n of notes) if (t - n.time > JWx[2]) for (const q of P) if (!n.st[q.p]) { n.st[q.p] = 'miss'; q.cnt[3]++; breakCombo(q); if (CH && !q.cpu) { nJudged++; nBad++; hp -= 7 * k.D.dmg; } }
+    if (CH && hp <= 0 && !over) { hp = 0; return fail(); }
     notes = notes.filter((n) => t - Math.max(n.time, n.end) < 0.6);
-    if (t >= SONG + 1.6) { over = true; overT = 0; k.sfx('win'); k.confetti(); }
+    if (t >= (CH ? SLEN : SONG + 1.6)) { over = true; overT = 0; k.sfx('win'); if (!CH) k.confetti(); }
+  }
+  /* nivel fallido: la barra de energía se vacía. La tarjeta de kit trae «Reintentar» el primero. */
+  function fail() {
+    over = false; k.sfx('lose');
+    return k.lose(ID, P[0] ? P[0].score : 0, 'Se te fue el ritmo',
+      `${song.name} · nivel ${k.lv}/${HAND.length} · precisión ${accPct()} % · ${nBad} fallo${nBad === 1 ? '' : 's'}`);
   }
   function finish() {
-    over = false; const rows = P.map((q) => ({ p: q.p, score: q.score, name: nm(q) })), hu = P.filter((q) => !q.cpu), top = Math.max(...rows.map((r) => r.score));
+    over = false;
+    if (CH) {   // coreografía a mano: estrellas por precisión y, la tercera, sin un solo fallo
+      const q = P[0], a = accPct(), g = goal2(), clean = nBad === 0, stars = a >= g ? (clean ? 3 : 2) : 1;
+      const falta = stars === 3 ? '¡Bordado!' : stars === 2 ? 'Sin ningún fallo para la 3.ª ★' : `${g} % de precisión para la 2.ª ★`;
+      k.chainReset();
+      return k.levelDone(q.score, `${song.name} · precisión ${a} % · combo máx. ${q.maxC} · ${nBad} fallo${nBad === 1 ? '' : 's'} · ${falta}`, { stars });
+    }
+    const rows = P.map((q) => ({ p: q.p, score: q.score, name: nm(q) })), hu = P.filter((q) => !q.cpu), top = Math.max(...rows.map((r) => r.score));
     if (hu.length === 1) { const win = hu[0].score === top && rows.filter((r) => r.score === top).length === 1; lsSet('cpu:' + ID, Math.max(0, Math.min(10, LV0 + (win ? 0.5 : -0.5)))); }
     k.podium(rows, { fmt: (v) => v + ' pts' });
   }
@@ -575,7 +654,7 @@ function danceGame() {
     if (!BG || bgN !== P.length) buildBG();
     c.drawImage(BG, 0, 0, W, H);
     const bp = ((t > 0 ? t : 0) * bpm / 60) % 1, pulse = t > 0 && k.st === 'play' && !over ? Math.pow(1 - bp, 3) : 0;
-    const tv = k.st === 'ready' ? (notes.length ? notes[0].time - 0.9 : 0) : t, Y = (tm) => TOPY + (tm - tv) * SPEED;
+    const tv = k.st === 'ready' ? (notes.length ? notes[0].time - 0.9 : 0) : t, Y = (tm) => TOPY + (tm - tv) * SPD;
     const LW = W / P.length;
     for (const q of P) {
       const x0 = laneX(q), xm = x0 + LW / 2, sc = Math.min(1.25, (Math.min(58, (LW - 20) / 4)) / 44);
@@ -585,28 +664,51 @@ function danceGame() {
       for (let d = 0; d < 4; d++) { spr(d, 1, colX(q, d), TOPY, sc * (1 + q.fl[d] * 0.12)); if (q.fl[d] > 0) { c.globalAlpha = q.fl[d] * 0.7; spr(d, 0, colX(q, d), TOPY, sc * (1 + q.fl[d] * 0.12)); c.globalAlpha = 1; } }
       // largas: cola detrás de la cabeza
       for (const n of notes) { if (!n.end) continue; const hs = n.hs[q.p], y1 = Y(n.end), y0 = hs === 'on' ? TOPY : Y(n.time); if (y0 > H + 30 || y1 < TOPY - 20 || hs === 'ok') continue; const x = colX(q, n.d), w = 16 * sc;
-        c.globalAlpha = hs === 'drop' || n.st[q.p] === 'miss' ? 0.3 : 0.85; ART.rr(c, x - w / 2, Math.max(TOPY, y0), w, Math.max(0, y1 - Math.max(TOPY, y0)), w / 2); ART.fillOut(c, ART.alpha(DCOL[n.d], 0.8), 2); c.globalAlpha = 1; }
+        c.globalAlpha = (hs === 'drop' || n.st[q.p] === 'miss' ? 0.3 : 0.85) * (n.bl && hs !== 'on' ? k.clamp((y1 - TOPY - 46) / 120, 0, 1) : 1); ART.rr(c, x - w / 2, Math.max(TOPY, y0), w, Math.max(0, y1 - Math.max(TOPY, y0)), w / 2); ART.fillOut(c, ART.alpha(DCOL[n.d], 0.8), 2); c.globalAlpha = 1; }
       // enlaces de dobles
       for (let i = 0; i < notes.length; i++) { const n = notes[i]; if (!n.dbl || n.st[q.p] === 'hit') continue; const m = notes[i + 1]; if (m && m.dbl && m.time === n.time && m.st[q.p] !== 'hit') { const y = Y(n.time); if (y < H + 20) { c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 4; c.beginPath(); c.moveTo(colX(q, n.d), y); c.lineTo(colX(q, m.d), y); c.stroke(); } } }
       for (const n of notes) { const st = n.st[q.p]; if (st === 'hit' && !(n.end && n.hs[q.p] === 'on')) continue; const y = st === 'hit' ? TOPY : Y(n.time); if (y > H + 30 || y < TOPY - 40) continue;
-        c.globalAlpha = st === 'miss' ? 0.3 : 1; spr(n.d, 0, colX(q, n.d), y, sc); c.globalAlpha = 1; }
+        let al = st === 'miss' ? 0.3 : 1;
+        if (n.bl && st !== 'hit') { al *= k.clamp((y - TOPY - 46) / 120, 0, 1); if (al < 0.03) continue; }
+        c.globalAlpha = al; spr(n.d, 0, colX(q, n.d), y, sc); c.globalAlpha = 1; }
       for (const r of q.rings) { const p = r.t / 0.3; c.globalAlpha = 1 - p; c.lineWidth = r.big ? 4 : 3; c.strokeStyle = r.big ? '#fff27a' : DCOL[r.d]; c.beginPath(); c.arc(colX(q, r.d), TOPY, (16 + p * (r.big ? 26 : 16)) * sc, 0, R2); c.stroke(); c.globalAlpha = 1; }
       c.restore();
       if (q.combo >= 5) { c.globalAlpha = 0.75; label(String(q.combo), xm, 196, 30, mult(q) >= 4 ? '#fff27a' : '#fff', 'center'); label('COMBO', xm, 220, 12, '#b8b0ff', 'center'); c.globalAlpha = 1; }
       if (q.jt > 0) { const p = 1 - q.jt / 0.6, s = p < 0.15 ? 0.6 + p / 0.15 * 0.5 : 1.1 - Math.min(0.1, (p - 0.15) * 0.4); c.save(); c.translate(xm, 138 - p * 8); c.scale(s, s); c.globalAlpha = Math.min(1, q.jt / 0.2); label(q.judge, 0, 0, LW < 200 ? 16 : 20, q.jc, 'center'); c.restore(); c.globalAlpha = 1; }
       // placa del jugador (arriba)
       ART.rr(c, x0 + 6, 4, LW - 12, 34, 10); ART.fillOut(c, 'rgba(26,21,48,.92)', 2.5); c.fillStyle = q.col; ART.rr(c, x0 + 10, 8, 5, 26, 2.5); c.fill();
-      label(nm(q).slice(0, LW < 200 ? 7 : 10), x0 + 20, 21, 14, q.col); label(String(q.score), x0 + LW - (LW < 200 ? 16 : 52), 21, 16, '#fff', 'right');
+      label(CH ? `${k.lv}. ${song.name}` : nm(q).slice(0, LW < 200 ? 7 : 10), x0 + 20, 21, 14, CH ? '#fff' : q.col); label(String(q.score), x0 + LW - (LW < 200 ? 16 : 52), 21, 16, '#fff', 'right');
       if (LW >= 200) label(`x${mult(q)}`, x0 + LW - 14, 21, 14, mult(q) > 1 ? '#fff27a' : '#8a86b5', 'right');
     }
     // progreso de la canción
-    const pr = Math.max(0, Math.min(1, t / SONG)); c.fillStyle = 'rgba(0,0,0,.4)'; c.fillRect(0, 40, W, 3); c.fillStyle = '#b98cff'; c.fillRect(0, 40, W * pr, 3);
+    const pr = Math.max(0, Math.min(1, t / (CH ? SLEN : SONG))); c.fillStyle = 'rgba(0,0,0,.4)'; c.fillRect(0, 40, W, 3); c.fillStyle = '#b98cff'; c.fillRect(0, 40, W * pr, 3);
+    if (CH && P.length) {
+      const LW2 = W / P.length, bx = LW2 - 22, by0 = 58, by1 = H - (touchUI ? 58 : 20), hh = by1 - by0;
+      ART.rr(c, bx, by0, 10, hh, 5); ART.fillOut(c, 'rgba(12,8,32,.8)', 2);
+      const fr = k.clamp(hp / hpMax, 0, 1), col = fr > 0.5 ? '#7cf7a0' : fr > 0.25 ? '#ffc94d' : '#ff5f7a';
+      if (fr > 0.01) { ART.rr(c, bx + 2, by0 + 2 + (hh - 4) * (1 - fr), 6, (hh - 4) * fr, 3); c.fillStyle = col; c.fill(); }
+      label('ENERGÍA', bx + 10, by0 - 9, 9, '#b8b0ff', 'right');
+      const a = accPct(), g = goal2();
+      label(`${a.toFixed(1)} %`, 16, 56, 15, a >= g ? '#7cf7a0' : '#fff');
+      label(`★★ ${g} %`, 16, 73, 11, '#b8b0ff');
+      if (nBad) label(`${nBad} fallo${nBad === 1 ? '' : 's'}`, 16, 89, 11, '#ff9ab0');
+      if (blindNow() && k.st === 'play') label('A CIEGAS', W / 2, 60, 15, '#b98cff', 'center');
+      if (tipT > 0 && k.st === 'play') { const ty = touchUI ? H - 102 : H - 60; c.globalAlpha = Math.min(1, tipT); ART.rr(c, W / 2 - 190, ty, 380, 30, 12); ART.fillOut(c, 'rgba(26,21,48,.92)', 2.5); label(song.tip, W / 2, ty + 15, 13, '#e8e4ff', 'center'); c.globalAlpha = 1; }
+    }
     // botones táctiles de J1 en solitario
     if (touchUI && !k.party && k.st === 'play') for (let d = 0; d < 4; d++) { const x = W / 8 + d * W / 4, on = tHeld(d); c.globalAlpha = on ? 0.9 : 0.45; ART.rr(c, x - W / 8 + 6, H - 44, W / 4 - 12, 38, 12); ART.fillOut(c, on ? ART.alpha(DCOL[d], 0.6) : 'rgba(26,21,48,.7)', 2); spr(d, 0, x, H - 25, 0.7); c.globalAlpha = 1; }
   }
-  window.__da = { get P() { return P; }, get notes() { return notes; }, get t() { return t; } };
+  window.__da = {
+    get P() { return P; }, get notes() { return notes; }, get t() { return t; }, get chart() { return CH; },
+    get hp() { return hp; }, get acc() { return accPct(); }, get bad() { return nBad; }, get song() { return song; },
+    get len() { return SLEN; }, get goal() { return goal2(); }, get over() { return over; },
+    /* piloto de pruebas: pulsa cada flecha del mapa con el desfase dado (0 = al instante justo) */
+    auto: (off) => { AUTO = off == null ? null : +off; },
+  };
+  if (HAND) k.levels(HAND.length, { start: () => reset() });
+  k.onDif = () => { if (HAND && k.st !== 'play') reset(); };
   reset();
-  k.show(CFG.title || 'Flechas de Baile', 'Pulsa ← ↓ ↑ → cuando cada flecha que sube llegue a su hueco. Las dobles piden dos direcciones a la vez (usa la diagonal) y las largas hay que mantenerlas. PERFECTO, GENIAL o BIEN; el combo multiplica hasta ×4. En el móvil, la pantalla se divide en cuatro columnas: toca la de cada flecha.<br>Toca para jugar');
+  k.show(CFG.title || 'Flechas de Baile', HAND ? 'Veinte coreografías escritas a mano, cada una con su canción y su tempo. Pulsa ← ↓ ↑ → cuando la flecha llega a su hueco: PERFECTO, GENIAL o BIEN. Las largas se mantienen, las dobles piden dos direcciones y en los tramos a ciegas las flechas se apagan antes de llegar. Si la energía se vacía, se acaba el baile.' : 'Pulsa ← ↓ ↑ → cuando cada flecha que sube llegue a su hueco. Las dobles piden dos direcciones a la vez (usa la diagonal) y las largas hay que mantenerlas. PERFECTO, GENIAL o BIEN; el combo multiplica hasta ×4. En el móvil, la pantalla se divide en cuatro columnas: toca la de cada flecha.<br>Toca para jugar');
   k.run(update, draw);
 }
 

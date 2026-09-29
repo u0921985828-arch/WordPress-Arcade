@@ -1329,11 +1329,321 @@ const CN = (() => {
   return { st: () => ({ cols, fall, sel, score, lvl, lines, tgt }), reset, update, draw, onKey,
     intro: 'Las letras caen y se amontonan. Elige letras del montón (no hace falta que estén juntas) para formar una palabra y envíala: desaparecen y todo baja. Si una columna llega al techo, se acabó. Con teclado o mando: flechas para moverte, A para elegir, B o Intro para enviar.' };
 })();
-/* ---------- Arranque ---------- */
-const M = MODE === 'hang' ? HG : MODE === 'sopa' ? SP : MODE === 'abc' ? AB : MODE === 'ana' ? AN : MODE === 'caen' ? CN : D; window.__m = M;
+/* ===================================================================================== */
+/* ===================== RETOS DE PALABRA DEL DÍA (1 jugador) ========================== */
+/* La vara, tanda 6: 20 desafíos escritos a mano en src/eng/pddlv.js, con reloj, intentos
+ * contados, comodines, dobles simultáneos, cadenas con multiplicador y duelo final. Todo
+ * vive aquí dentro: la Palabra del Día de cada jornada sigue intacta en el «Modo diario»
+ * del menú (módulo D) y los demás modos del motor ni se enteran. */
+const QD = MODE === 'daily' ? (() => {
+  const KB = ['QWERTYUIOP', 'ASDFGHJKLÑ', '>ZXCVBNM<'];
+  const L = LAND
+    ? { kx: 386, ky: 146, kw: 36.5, kh: 68, kg: 5, kr: 8, ax: 8, ay: 96, aw: 370, ah: 344 }
+    : { kx: 8, ky: 540, kw: 38, kh: 64, kg: 6, kr: 8, ax: 8, ay: 166, aw: 434, ah: 362 };
+  const HUD = LAND
+    ? { nm: [448, 22, 236], clk: [392, 46, 260, 16], tr: [392, 74], sc: [786, 22], mu: [700, 74],
+        w1: [392, 102, 130, 40], w2: [532, 102, 150, 40] }
+    : { nm: [14, 66, 300], clk: [14, 84, 200, 14], tr: [226, 91], sc: [436, 26], mu: [404, 91],
+        w1: [14, 118, 205, 38], w2: [229, 118, 205, 38] };
+  const keys = [];
+  KB.forEach((row, r) => {
+    const unit = L.kw, gap = L.kg, wide = unit * 1.5 + gap * 0.5;
+    const rowW = [...row].reduce((a, ch) => a + (ch === '>' || ch === '<' ? wide : unit), 0) + gap * (row.length - 1);
+    const fullW = unit * 10 + gap * 9; let x = L.kx + (fullW - rowW) / 2;
+    for (const ch of row) { const w = ch === '>' || ch === '<' ? wide : unit; keys.push({ ch, r, x, y: L.ky + r * (L.kh + L.kr), w, h: L.kh }); x += w + gap; }
+  });
+  const kbRow = (r) => keys.filter((q) => q.r === r);
+  /* Evaluación de un intento contra una solución (verde 2 · amarillo 1 · gris 0), con el
+   * recuento correcto de letras repetidas. */
+  function ev(g, s) {
+    const res = [0, 0, 0, 0, 0], cnt = {};
+    for (let i = 0; i < 5; i++) { if (g[i] === s[i]) res[i] = 2; else cnt[s[i]] = (cnt[s[i]] || 0) + 1; }
+    for (let i = 0; i < 5; i++) if (res[i] !== 2 && cnt[g[i]] > 0) { res[i] = 1; cnt[g[i]]--; }
+    return res;
+  }
+  const S = { lv: 1, P: null, ri: 0, bs: [], cur: '', left: 0, clock: 0, wild: 0, used: 0, chain: 0,
+    score: 0, phase: 'tip', pt: 0, revT: 0, msg: '', msgT: 0, shakeT: 0, popT: [0, 0, 0, 0, 0],
+    dis: {}, cur0: { r: 0, i: 0 }, showCur: false, tip: 0 };
+  const P = () => S.P;
+  const say = (m) => { S.msg = m; S.msgT = 1.8; };
+  const alive = () => S.bs.filter((b) => !b.done);
+
+  function load(n) {
+    S.lv = Math.max(1, Math.min(PDDLV.L.length, n | 0));
+    S.P = PDDLV.of(S.lv, k.dif);
+    S.ri = 0; S.chain = 0; S.score = 0; S.used = 0; S.wild = S.P.wild;
+    S.clock = S.P.time * k.D.time; S.phase = 'tip'; S.pt = 0; S.msg = ''; S.msgT = 0; S.dis = {};
+    startRound();
+  }
+  function startRound() {
+    const ws = S.P.r[S.ri];
+    S.bs = ws.map((w) => ({ sol: w, solN: norm(w), rows: [], done: false, hint: [null, null, null, null, null] }));
+    S.left = S.P.tries; S.cur = ''; S.revT = 0; S.popT = [0, 0, 0, 0, 0]; S.dis = {};
+  }
+  function keyState(ch) {
+    let best = null;
+    for (const b of S.bs) {
+      if (b.done) continue;
+      for (const r of b.rows) for (let i = 0; i < 5; i++) if (r.g[i] === ch) best = Math.max(best == null ? -1 : best, r.res[i]);
+      for (let i = 0; i < 5; i++) if (b.hint[i] === ch) best = 2;
+    }
+    if (best == null && S.dis[ch]) return 0;
+    return best;
+  }
+  function typeL(ch) { if (S.phase !== 'play' || S.cur.length >= 5) return; S.cur += ch; S.popT[S.cur.length - 1] = 0.12; k.sfx('click'); }
+  function del() { if (S.phase !== 'play' || !S.cur) return; S.cur = S.cur.slice(0, -1); k.sfx('pop'); }
+  function submit() {
+    if (S.phase !== 'play') return;
+    if (S.cur.length < 5) { say('Faltan letras'); S.shakeT = 0.4; k.sfx('hurt'); return; }
+    if (!VALID.has(S.cur)) { say('No está en la lista'); S.shakeT = 0.4; k.sfx('hurt'); return; }
+    for (const b of S.bs) if (!b.done) b.rows.push({ g: S.cur, res: ev(S.cur, b.solN) });
+    S.cur = ''; S.left--; S.phase = 'reveal'; S.revT = 0; k.sfx('start');
+  }
+  function afterReveal() {
+    let solved = 0;
+    for (const b of S.bs) {
+      if (b.done) { solved++; continue; }
+      const last = b.rows[b.rows.length - 1];
+      if (last && last.g === b.solN) { b.done = true; solved++; k.sfx('coin'); k.chime(); k.burst(W / 2, H / 2, '#7cf7a0', 16, 180); }
+    }
+    if (solved === S.bs.length) return roundWon();
+    if (S.left <= 0) return fail('Sin intentos');
+    S.phase = 'play';
+  }
+  function roundWon() {
+    const g = PDDLV.roundPts(S.bs.length, S.left, S.chain);
+    S.score += g; S.chain++;
+    k.reward('+' + g, '#7cf7a0'); k.sfx('win'); k.hitstop(0.06);
+    if (S.chain >= 2) k.combo(S.chain, W / 2, LAND ? 200 : 300);
+    S.phase = 'won'; S.pt = 0;
+  }
+  function nextRound() {
+    if (S.ri >= S.P.r.length - 1) return finishLv();
+    S.ri++; startRound(); S.phase = 'play';
+  }
+  function finishLv() {
+    const bonus = S.P.time ? PDDLV.timePts(S.clock) : 0;
+    const pts = S.score + bonus;
+    k.best(CFG.id, pts);
+    const two = pts >= S.P.g2, three = two && S.used === 0;
+    const stars = 1 + (two ? 1 : 0) + (three ? 1 : 0);
+    const falta = three ? 'Reto bordado: sin gastar un solo comodín.' : two ? 'Para la 3.ª estrella: terminarlo sin comodines.' : `Para la 2.ª estrella: ${S.P.g2} puntos (te faltan ${S.P.g2 - pts}).`;
+    k.levelDone(pts, `${pts} puntos${bonus ? ` (${bonus} por el reloj)` : ''}<br>${falta}`, { stars });
+    S.phase = 'end';
+  }
+  function fail(why) {
+    S.phase = 'end';
+    const sols = S.bs.map((b) => b.sol.toUpperCase()).join(' y ');
+    k.lose(CFG.id, S.score, why, `Reto ${S.lv} · ${S.P.name} · era ${sols}`);
+  }
+  function useWild(kind) {
+    if (S.phase !== 'play') return;
+    if (S.wild <= 0) { say('Sin comodines'); return; }
+    if (kind === 0) {
+      const b = alive()[0]; if (!b) return;
+      const free = []; for (let i = 0; i < 5; i++) if (!b.hint[i] && !b.rows.some((r) => r.res[i] === 2)) free.push(i);
+      if (!free.length) { say('Ya lo sabes todo'); return; }
+      const i = k.pick(free); b.hint[i] = b.solN[i];
+      say('Pista: letra ' + (i + 1)); k.sfx('coin');
+    } else {
+      const used = {}; for (const b of alive()) for (const ch of b.solN) used[ch] = 1;
+      const pool = [...ALPHA].filter((ch) => !used[ch] && !S.dis[ch] && keyState(ch) == null);
+      if (!pool.length) { say('No queda nada que tachar'); return; }
+      k.shuffle(pool).slice(0, 3).forEach((ch) => { S.dis[ch] = 1; });
+      say('Tres letras descartadas'); k.sfx('pop');
+    }
+    S.wild--; S.used++;
+  }
+  function press(ch) { if (ch === '>') submit(); else if (ch === '<') del(); else typeL(ch); }
+  function onKey(e) {
+    if (!e.isTrusted || k.st !== 'play' || k.paused || !SOL) return false;
+    const key = e.key || '';
+    if (S.phase === 'tip' || S.phase === 'won') { if (key === 'Enter' || key === ' ') { S.pt = 99; return true; } return false; }
+    if (S.phase !== 'play') return false;
+    if (key.length === 1 && /[a-zñáéíóúü]/i.test(key)) { typeL(norm(key)); S.showCur = false; return true; }
+    if (key === 'Backspace') { del(); return true; }
+    if (key === 'Enter') { submit(); return true; }
+    if (key === '1') { useWild(0); return true; }
+    if (key === '2') { useWild(1); return true; }
+    return false;
+  }
+  function update(dt) {
+    if (!SOL) return;
+    if (!S.P) load(k.lv);
+    S.msgT = Math.max(0, S.msgT - dt); S.shakeT = Math.max(0, S.shakeT - dt);
+    for (let i = 0; i < 5; i++) S.popT[i] = Math.max(0, S.popT[i] - dt);
+    S.pt += dt;
+    if (S.phase === 'tip') { if (S.pt > 2.8 || (S.pt > 0.4 && (k.hit.has('a') || k.ptr.hit))) { S.phase = 'play'; S.pt = 0; } return; }
+    if (S.phase === 'won') { if (S.pt > 1.2 || (S.pt > 0.4 && (k.hit.has('a') || k.ptr.hit))) nextRound(); return; }
+    if (S.phase === 'reveal') {
+      const prev = S.revT; S.revT += dt;
+      for (let i = 0; i < 5; i++) { const tt = i * 0.24 + 0.12; if (prev < tt && S.revT >= tt) { const b = alive()[0]; const v = b ? b.rows[b.rows.length - 1].res[i] : 0; k.sfx(v === 2 ? 'coin' : v === 1 ? 'pop' : 'click'); } }
+      if (S.revT > 5 * 0.24 + 0.18) afterReveal();
+      return;
+    }
+    if (S.phase !== 'play') return;
+    if (S.P.time) { S.clock = Math.max(0, S.clock - dt); if (S.clock <= 0) return fail('Se acabó el tiempo'); }
+    if (k.ptr.hit) {
+      if (inR(HUD.w1, k.ptr.x, k.ptr.y)) { useWild(0); return; }
+      if (inR(HUD.w2, k.ptr.x, k.ptr.y)) { useWild(1); return; }
+      const q = keys.find((kk) => inR([kk.x - 2, kk.y - 3, kk.w + 4, kk.h + 6], k.ptr.x, k.ptr.y));
+      if (q) { press(q.ch); S.showCur = false; }
+    }
+    const cr = S.cur0, mv = (dr, di) => {
+      S.showCur = true; let r = cr.r + dr;
+      r = (r + 3) % 3; const row = kbRow(r);
+      if (dr) { const cx = kbRow(cr.r)[Math.min(cr.i, kbRow(cr.r).length - 1)], mx = cx.x + cx.w / 2; let bi = 0, bd = 1e9; row.forEach((q, j) => { const d = Math.abs(q.x + q.w / 2 - mx); if (d < bd) { bd = d; bi = j; } }); cr.i = bi; }
+      else cr.i = (cr.i + di + row.length) % row.length;
+      cr.r = r; k.sfx('click');
+    };
+    if (k.hit.has('up')) mv(-1, 0); if (k.hit.has('down')) mv(1, 0); if (k.hit.has('left')) mv(0, -1); if (k.hit.has('right')) mv(0, 1);
+    if (k.hit.has('a')) { if (S.showCur) press(kbRow(cr.r)[cr.i].ch); else if (S.cur.length === 5) submit(); else { S.showCur = true; k.sfx('click'); } }
+    if (k.hit.has('b')) del();
+  }
+  /* ------------------------------- Dibujo ------------------------------- */
+  function geo() {
+    const nb = S.bs.length, rows = S.P.tries, gapB = nb > 1 ? 12 : 0;
+    const bw = (L.aw - gapB * (nb - 1)) / nb;
+    const ts = Math.floor(Math.min(bw / 5.48, L.ah / (1.12 * rows - 0.12)));
+    const gp = Math.max(2, Math.round(ts * 0.12));
+    const gw = ts * 5 + gp * 4, gh = ts * rows + gp * (rows - 1);
+    const y0 = L.ay + Math.max(0, (L.ah - gh) / 2);
+    return { nb, rows, ts, gp, gw, gh, y0, x0: (i) => L.ax + i * (bw + gapB) + (bw - gw) / 2 };
+  }
+  function drawBoards() {
+    const g = geo();
+    S.bs.forEach((b, bi) => {
+      const x0 = g.x0(bi);
+      for (let r = 0; r < g.rows; r++) {
+        const sh = S.shakeT > 0 && r === b.rows.length && S.phase === 'play' ? Math.sin(S.shakeT * 60) * 8 * (S.shakeT / 0.4) : 0;
+        for (let i = 0; i < 5; i++) {
+          const x = x0 + i * (g.ts + g.gp) + sh, y = g.y0 + r * (g.ts + g.gp);
+          let ch = '', stt = -1, sy = 1;
+          if (r < b.rows.length) {
+            const row = b.rows[r]; ch = row.g[i]; stt = row.res[i];
+            if (r === b.rows.length - 1 && S.phase === 'reveal') { const p = (S.revT - i * 0.24) / 0.24; if (p < 0) stt = 3; else if (p < 1) { sy = Math.abs(Math.cos(Math.PI * p)); if (p < 0.5) stt = 3; } }
+          } else if (r === b.rows.length && !b.done && S.phase !== 'reveal') {
+            ch = S.cur[i] || ''; stt = ch ? 3 : -1;
+          }
+          const pop = S.popT[i] > 0 && r === b.rows.length ? 1 + S.popT[i] : 1;
+          if (pop !== 1) { c.save(); c.translate(x + g.ts / 2, y + g.ts / 2); c.scale(pop, pop); c.translate(-x - g.ts / 2, -y - g.ts / 2); tile(x, y, g.ts, ch, stt, sy); c.restore(); }
+          else tile(x, y, g.ts, ch, stt, sy);
+          /* pista del comodín: letra fantasma verde en su casilla mientras no la escribas */
+          if (!b.done && r === b.rows.length && b.hint[i] && !S.cur[i] && S.phase === 'play') {
+            c.save(); c.globalAlpha = 0.5; c.font = FONT(Math.round(g.ts * 0.56), 900); c.textAlign = 'center'; c.textBaseline = 'middle';
+            c.fillStyle = '#7cf7a0'; c.fillText(b.hint[i], x + g.ts / 2, y + g.ts / 2 + 2); c.restore();
+          }
+        }
+      }
+      if (b.done) { c.save(); c.globalAlpha = 0.9; outlined(b.sol.toUpperCase(), x0 + g.gw / 2, g.y0 + g.gh + 14, Math.min(22, Math.round(g.ts * 0.5)), '#7cf7a0', 'center', 4); c.restore(); }
+    });
+  }
+  function drawKeys() {
+    const cr = S.cur0;
+    keys.forEach((q) => {
+      const st = q.ch === '>' || q.ch === '<' ? null : keyState(q.ch);
+      const fill = st == null ? '#8d86c9' : st === 0 ? '#3b3d52' : TCOL[st];
+      const pressed = k.ptr.down && inR([q.x, q.y, q.w, q.h], k.ptr.x, k.ptr.y) && S.phase === 'play';
+      panel(q.x, q.y + (pressed ? 3 : 0), q.w, q.h, 9, q.ch === '>' ? '#6e62f5' : q.ch === '<' ? '#c0587a' : fill, { drop: pressed ? 1 : 4, lw: 2.5 });
+      if (q.ch === '>') txt('ENVIAR', q.x + q.w / 2, q.y + q.h / 2 + (pressed ? 3 : 0), fitSize('ENVIAR', q.w - 6, 16, 10, 900), '#fff', 'center', 900);
+      else if (q.ch === '<') { const cx = q.x + q.w / 2, cy = q.y + q.h / 2 + (pressed ? 3 : 0); c.save(); c.fillStyle = '#fff'; c.strokeStyle = OUT; c.lineWidth = 2; c.beginPath(); c.moveTo(cx - 16, cy); c.lineTo(cx - 7, cy - 10); c.lineTo(cx + 15, cy - 10); c.lineTo(cx + 15, cy + 10); c.lineTo(cx - 7, cy + 10); c.closePath(); c.fill(); c.stroke(); c.strokeStyle = '#c0587a'; c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(cx - 2, cy - 5); c.lineTo(cx + 8, cy + 5); c.moveTo(cx + 8, cy - 5); c.lineTo(cx - 2, cy + 5); c.stroke(); c.restore(); }
+      else outlined(q.ch, q.x + q.w / 2, q.y + q.h / 2 + (pressed ? 3 : 0), 22, '#fff', 'center', 4);
+    });
+    if (S.showCur && S.phase === 'play') { const q = kbRow(cr.r)[cr.i]; if (q) { c.save(); ART.rr(c, q.x - 4, q.y - 4, q.w + 8, q.h + 8, 11); c.strokeStyle = ART.alpha('#ffd166', 0.32); c.lineWidth = 9; c.stroke(); c.strokeStyle = '#ffd166'; c.lineWidth = 4; c.stroke(); c.restore(); } }
+  }
+  function star(x, y, r, on) {
+    c.save(); c.translate(x, y); c.beginPath();
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 ? r * 0.46 : r; c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+    c.closePath(); c.fillStyle = on ? '#ffd166' : 'rgba(255,255,255,.18)'; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke(); c.restore();
+  }
+  function wildBtn(r, lab, sub, on) {
+    panel(r[0], r[1], r[2], r[3], 12, on ? '#4a3f9e' : '#2a2548', { drop: 3 });
+    outlined(lab, r[0] + r[2] / 2, r[1] + r[3] / 2 - 6, 18, on ? '#fff' : 'rgba(255,255,255,.45)', 'center', 4);
+    txt(sub, r[0] + r[2] / 2, r[1] + r[3] - 11, 12, on ? '#cfc8ff' : 'rgba(255,255,255,.3)', 'center', 700);
+  }
+  function drawHUD() {
+    const p = S.P;
+    const nm = `Reto ${S.lv}/${PDDLV.L.length} · ${p.name}`;
+    outlined(nm, HUD.nm[0], HUD.nm[1], fitSize(nm, HUD.nm[2], LAND ? 18 : 16, 11, 900), '#ffd166', 'left', 5);
+    outlined(String(S.score), HUD.sc[0], HUD.sc[1], LAND ? 22 : 20, '#fff', 'right', 5);
+    if (p.time) {
+      const fr = S.clock / (p.time * k.D.time), col = fr > 0.5 ? '#6fd66f' : fr > 0.25 ? '#ffc94a' : '#ff6b6b';
+      panel(HUD.clk[0], HUD.clk[1], HUD.clk[2], HUD.clk[3], HUD.clk[3] / 2, '#15112e', { drop: 2 });
+      if (fr > 0) { c.save(); ART.rr(c, HUD.clk[0] + 3, HUD.clk[1] + 3, Math.max(5, (HUD.clk[2] - 6) * Math.min(1, fr)), HUD.clk[3] - 6, (HUD.clk[3] - 6) / 2); c.fillStyle = col; c.fill(); c.restore(); }
+      const s = Math.ceil(S.clock);
+      txt(`${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`, HUD.clk[0] + HUD.clk[2] - 22, HUD.clk[1] + HUD.clk[3] / 2, 12, '#fff', 'center', 900);
+    } else txt('sin reloj', HUD.clk[0] + 30, HUD.clk[1] + HUD.clk[3] / 2, 13, '#8f89bd', 'center', 700);
+    const chain = PDDLV.mult(S.chain);
+    txt(`Intentos ${S.left}`, HUD.tr[0], HUD.tr[1], 15, S.left <= 1 ? '#ff9a9a' : '#e8e3ff', 'left', 800);
+    if (p.r.length > 1) txt(`Palabra ${S.ri + 1}/${p.r.length}`, HUD.tr[0], HUD.tr[1] + 18, 13, '#b8b0ff', 'left', 700);
+    txt('×' + String(chain).replace('.', ','), HUD.mu[0], HUD.mu[1], 17, chain > 1 ? '#ffd166' : '#6f6a99', 'center', 900);
+    wildBtn(HUD.w1, 'Pista', S.wild + (S.wild === 1 ? ' comodín' : ' comodines'), S.wild > 0 && S.phase === 'play');
+    wildBtn(HUD.w2, 'Descarte', S.wild + (S.wild === 1 ? ' comodín' : ' comodines'), S.wild > 0 && S.phase === 'play');
+    const two = S.score >= p.g2, sx = LAND ? 700 : 330, sy = LAND ? 22 : 26;
+    [1, 2, 3].forEach((n, i) => star(sx + i * 20, sy, 8, n === 1 || (n === 2 && two) || (n === 3 && two && S.used === 0)));
+  }
+  function draw() {
+    c.drawImage(backdrop('#232a52', '#0f1228', 12), 0, 0);
+    if (!SOL || !S.P) { outlined(LOADERR ? 'Sin diccionario' : 'Cargando…', W / 2, H / 2, 26, '#fff'); return; }
+    drawHUD(); drawBoards(); drawKeys();
+    if (S.phase === 'tip' || S.phase === 'won') {
+      const bw = LAND ? 350 : 400, bh = LAND ? 190 : 210, bx = LAND ? L.ax + (L.aw - bw) / 2 : (W - bw) / 2, by = LAND ? L.ay + (L.ah - bh) / 2 : L.ay + 70;
+      c.fillStyle = 'rgba(8,6,24,.62)'; c.fillRect(0, 0, W, H);
+      panel(bx, by, bw, bh, 18, '#2c2766', { lw: 4 });
+      if (S.phase === 'tip') {
+        outlined(S.P.name, bx + bw / 2, by + 40, fitSize(S.P.name, bw - 40, 27, 15, 900), '#ffd166', 'center', 6);
+        const ls = []; { c.font = FONT(17, 700); let cu = ''; for (const wd of S.P.tip.split(' ')) { const tt = cu ? cu + ' ' + wd : wd; if (c.measureText(tt).width > bw - 48 && cu) { ls.push(cu); cu = wd; } else cu = tt; } if (cu) ls.push(cu); }
+        ls.forEach((ln, i) => txt(ln, bx + bw / 2, by + 78 + i * 24, 17, '#e8e3ff', 'center', 700));
+        txt(`${S.P.tries} intentos · ${S.P.r.length > 1 ? S.P.r.length + ' palabras' : S.bs.length > 1 ? S.bs.length + ' a la vez' : '1 palabra'}${S.P.wild ? ' · ' + S.P.wild + ' comodines' : ''}`, bx + bw / 2, by + bh - 46, 15, '#b8b0ff', 'center', 800);
+        txt('Toca para empezar', bx + bw / 2, by + bh - 22, 14, '#8f89bd', 'center', 700);
+      } else {
+        outlined('¡Resuelto!', bx + bw / 2, by + 48, 30, '#7cf7a0', 'center', 6);
+        txt(S.bs.map((b) => b.sol.toUpperCase()).join(' · '), bx + bw / 2, by + 88, 22, '#fff', 'center', 900);
+        txt(`Cadena ×${String(PDDLV.mult(S.chain)).replace('.', ',')} · ${S.score} puntos`, bx + bw / 2, by + 122, 17, '#ffd166', 'center', 800);
+        txt(S.ri < S.P.r.length - 1 ? 'Siguiente palabra…' : 'Fin del reto', bx + bw / 2, by + bh - 26, 15, '#b8b0ff', 'center', 700);
+      }
+    }
+    if (S.msgT > 0 && S.msg) {
+      c.save(); c.globalAlpha = Math.min(1, S.msgT * 3);
+      c.font = FONT(19, 900); const mw = c.measureText(S.msg).width + 36, mx = LAND ? L.ax + L.aw / 2 : W / 2, my = LAND ? 70 : 528;
+      panel(mx - mw / 2, my - 19, mw, 38, 19, '#f4f0ff', { drop: 3, lw: 3 });
+      txt(S.msg, mx, my + 1, 19, OUT, 'center', 900); c.restore();
+    }
+  }
+  /* ganchos de prueba (Playwright) */
+  window.__pdd = { st: () => S, type: (w) => { S.cur = norm(w).slice(0, 5); }, submit, wild: useWild, load, geo };
+  return { st: () => S, reset: () => load(k.lv), update, draw, onKey,
+    intro: 'Veinte retos escritos a mano: reloj, intentos contados, comodines, dobles a la vez y cadenas de palabras. La Palabra del Día de hoy sigue en el «Modo diario» del menú.' };
+})() : null;
+
+/* ---------- Arranque ----------
+ * Palabra del Día fuera del modo tele juega los 20 RETOS a mano de pddlv.js (módulo QD). El
+ * «Modo diario» del menú devuelve la palabra del día de siempre (módulo D), y el resto de modos
+ * del motor (ahorcado, sopa, rosco, anagramas, letras que caen) no miran nada de esto. */
+const BASE = MODE === 'hang' ? HG : MODE === 'sopa' ? SP : MODE === 'abc' ? AB : MODE === 'ana' ? AN : MODE === 'caen' ? CN : D;
+const DLV = !!(MODE === 'daily' && CFG.id === 'palabra-del-dia' && typeof PDDLV !== 'undefined' && QD);
+let FREE = false, wantFree = false;
+const pick = () => (DLV && !FREE && !k.party ? QD : BASE);
+let M = pick(); window.__m = M;
+const swap = () => { const n = pick(); if (n !== M) { M = n; window.__m = M; } };
+if (DLV) {
+  k.levels(PDDLV.L.length);
+  k.onLevel = () => { FREE = wantFree; wantFree = false; swap(); M.reset(); };
+  k.onDif = () => { if (k.st !== 'play' && !FREE) QD.reset(); };
+  /* Botón «Modo diario» añadido al menú del kit (el kit ignora los data-m que no conoce). */
+  const ovd = document.getElementById('ov');
+  const addFree = () => {
+    if (k.st !== 'ready' || k.paused || k.party) return;
+    const m = ovd.querySelector('.card .menu'); if (!m || !m.querySelector('[data-m="play"]') || m.querySelector('[data-m="free"]')) return;
+    const b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-m', 'free'); b.textContent = 'Modo diario'; m.appendChild(b);
+  };
+  new MutationObserver(addFree).observe(ovd, { childList: true, subtree: true });
+  ovd.addEventListener('pointerdown', (e) => { const t = e.target && e.target.closest && e.target.closest('[data-m="free"]'); if (!t) return; wantFree = true; k.goLevel(k.lv); });
+  addFree();
+}
 /* Teclado físico: las letras (incluida P, que el kit usa para pausar) se capturan antes que el kit mientras se juega. */
 addEventListener('keydown', (e) => { if (M.onKey(e)) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
 M.reset();
 k.show(CFG.title, M.intro);
-k.run((dt) => { if (!k.gate(M.reset)) return; M.update(dt); }, () => M.draw());
+k.run((dt) => { swap(); if (!k.gate(M.reset)) return; M.update(dt); }, () => M.draw());
 addEventListener('resize', () => { clearTimeout(window.__ot); window.__ot = setTimeout(() => { if ((innerWidth >= innerHeight * 0.98) !== LAND && (k.st !== 'play' || MODE === 'daily')) location.reload(); }, 400); });
