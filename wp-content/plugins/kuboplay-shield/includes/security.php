@@ -18,6 +18,7 @@
 defined( 'ABSPATH' ) || exit;
 
 require_once __DIR__ . '/security-rules.php';
+require_once __DIR__ . '/detect.php';
 
 final class KP_Shield_Security {
 
@@ -82,6 +83,10 @@ final class KP_Shield_Security {
 		self::$zone = self::zone();
 
 		// Se ejecutan ya, en plugins_loaded: cortan antes de montar la consulta y el tema.
+		// El motor de detección va primero: la lista negra se resuelve sin tocar nada más.
+		if ( class_exists( 'KP_Shield_Detect' ) ) {
+			KP_Shield_Detect::boot( self::$path, self::$zone, self::skip( 'detect' ) );
+		}
 		self::firewall();
 		self::rate_limit();
 
@@ -186,6 +191,11 @@ final class KP_Shield_Security {
 		if ( ! KP_Shield::opt( 'rl_on' ) || 'admin' === self::$zone || self::skip( 'rate' ) ) {
 			return;
 		}
+		// Con el motor de detección encendido manda su cubo de fichas (ritmo continuo,
+		// sin el salto de la ventana fija) y este contador de respaldo no se usa.
+		if ( class_exists( 'KP_Shield_Detect' ) && KP_Shield_Detect::active() ) {
+			return;
+		}
 
 		$win = max( 5, (int) KP_Shield::opt( 'rl_window' ) );
 		$max = (int) KP_Shield::opt( 'rl_max' );
@@ -210,6 +220,11 @@ final class KP_Shield_Security {
 			$win - ( time() % $win ),
 			__( 'Demasiadas peticiones. Prueba otra vez en unos segundos.', 'kuboplay-shield' )
 		);
+	}
+
+	/** Igual que deny(), pero accesible desde el motor de detección. */
+	public static function stop( $code, $retry, $msg ) {
+		self::deny( $code, $retry, $msg );
 	}
 
 	/** Corta la petición sin montar el tema ni la consulta. */
@@ -640,6 +655,11 @@ final class KP_Shield_Security {
 
 	private static function block( $motivo ) {
 		self::log( $motivo );
+		// El cortafuegos también alimenta la reputación: quien prueba un patrón de ataque
+		// suele probar veinte más, y así el segundo ya le sale más caro.
+		if ( class_exists( 'KP_Shield_Detect' ) ) {
+			KP_Shield_Detect::penalize( 'fw' );
+		}
 		self::deny( 403, 0, __( 'Petición bloqueada.', 'kuboplay-shield' ) );
 	}
 
