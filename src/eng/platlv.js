@@ -10,34 +10,38 @@
  *   a     anilla de gancho sobre la posición actual
  *   e     enemigo que patrulla el último tramo llano
  *   c     cuatro monedas en arco sobre lo último colocado
+ *   C     reguero de monedas a ras de suelo sobre el último tramo (nunca detrás de un hueco)
+ *   G     gema del nivel: alta, a la vista y vale 250 (solo pixel-dash la usa hoy)
  *   k     punto de control
  *   B     zona de jefe (14 casillas llanas); la bandera solo aparece al derrotarlo
  *
  * La bandera se coloca sola al final. Ningún nivel usa el azar: el que diseñamos es el que se juega.
  */
 const PLATLV = {
-  /* ---- pixel-dash: correr, saltar, pisar. 20 niveles, jefe en el 20. ---- */
+  /* ---- pixel-dash: correr, saltar, pisar. 20 niveles, jefe en el 20.
+     Ritmo de recompensa (docs/GANCHO.md §A2): nunca se corre más de ~3 s sin algo que recoger,
+     por eso casi cada tramo lleva su reguero (C) o su arco (c), y de la 3 en adelante una gema. ---- */
   'pixel-dash': [
-    'f12 c f10',                                        /* 1  correr y llegar */
-    'f10 c g2 f10',                                     /* 2  el primer hueco */
-    'f8 g2 f6 c g3 f8',                                 /* 3  tres huecos */
-    'f8 u2 f6 c f6',                                    /* 4  subir un escalón */
-    'f8 u3 f5 d3 c f8',                                 /* 5  subir y bajar */
-    'f8 g3 p3 c g3 f8',                                 /* 6  plataforma en el aire */
-    'f14 e c f10',                                      /* 7  el primer enemigo */
-    'f10 e g2 f8 c f6',                                 /* 8  enemigo y hueco */
-    'f8 x3 c f10',                                      /* 9  el primer pincho */
-    'f8 x2 f4 x3 c f8',                                 /* 10 pinchos seguidos */
-    'f10 e f4 e c f8',                                  /* 11 dos enemigos */
-    'f8 g2 p3 c g2 p3 c g2 f8',                         /* 12 saltos de plataforma */
-    'f6 u2 f4 u2 f4 u2 c f8 d4 f6',                     /* 13 escalera arriba */
-    'f8 g3 f4 g4 f4 c g3 f8',                           /* 14 huecos anchos */
-    'f8 e x3 f4 e c f8',                                /* 15 pinchos y enemigos */
-    'f6 u3 f4 e u3 f4 c d6 f8',                         /* 16 subida vigilada */
-    'f8 u4 f4 x3 f4 d4 c f8',                           /* 17 bajada con pinchos */
-    'f8 e g3 x3 g2 p3 c e f8',                          /* 18 de todo un poco */
-    'f8 e g3 f6 k c u3 f4 x3 g3 e f6 d3 f8',            /* 19 largo, con punto de control */
-    'f10 c k g3 f6 e B'                                 /* 20 el jefe */
+    'f10 C f6 c f8',                                        /* 1  correr y llegar */
+    'f8 C g2 c f8 C f6',                                    /* 2  el primer hueco */
+    'f8 C g2 f6 c g3 G f8 C',                               /* 3  tres huecos */
+    'f8 C u2 f6 c f6 C d2 f6',                              /* 4  subir un escalón */
+    'f8 C u3 f5 c d3 f8 C G f6',                            /* 5  subir y bajar */
+    'f8 C g3 p3 c g3 f8 C G f6',                            /* 6  plataforma en el aire */
+    'f10 C e c f8 C f8',                                    /* 7  el primer enemigo */
+    'f10 C e g2 c f8 C G f8',                               /* 8  enemigo y hueco */
+    'f8 C x3 f6 c G f8 C',                                  /* 9  el primer pincho */
+    'f8 C x2 f5 c x3 f6 C G f8',                            /* 10 pinchos seguidos */
+    'f10 C e f5 e c f8 C G f6',                             /* 11 dos enemigos */
+    'f8 C g2 p3 c g2 p3 c g2 f8 C G',                       /* 12 saltos de plataforma */
+    'f6 C u2 f4 u2 f4 c u2 f6 C G d6 f8 C',                 /* 13 escalera arriba */
+    'f8 C g3 f5 C g4 f5 c g3 f8 C G',                       /* 14 huecos anchos */
+    'f8 C e x3 f5 e c f8 C G f6',                           /* 15 pinchos y enemigos */
+    'f6 C u3 f5 e u3 f5 c G d6 f8 C',                       /* 16 subida vigilada */
+    'f8 C u4 f5 x3 f5 c d4 f8 C G f6',                      /* 17 bajada con pinchos */
+    'f8 C e g3 x3 g2 p3 c e f8 C G f6',                     /* 18 de todo un poco */
+    'f8 C e g3 f6 k c u3 f5 x3 g3 e f6 C d3 f8 G C f6',     /* 19 largo, con punto de control */
+    'f10 C k g3 f6 C e G f6 B'                              /* 20 el jefe */
   ],
   /* ---- castle-knight: espada y guardias. 20 niveles, jefe en el 20. ---- */
   'castle-knight': [
