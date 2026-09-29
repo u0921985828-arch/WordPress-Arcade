@@ -7,6 +7,10 @@
  *           oleada 3: 'bowl' (Bolos Humanos) | 'bull' (Toro Mecánico) | 'egg' (Huevo en la Cuchara) | 'photo' (Foto de Grupo) |
  *           'relay' (Relevo de Cubos, cooperativo) | 'hotair' (Globo de Todos, cooperativo) | 'witch' (Tren de la Bruja) | 'mole' (Topo Burlón) | 'roulette' (Ruleta de Minijuegos: 10 rondas al azar con los anteriores
  *           y 4 minijuegos propios: Cuenta Globos, Flechas de Memoria, Reloj a Ciegas y Diana Oscilante).
+ * Campaña en solitario (docs/VARA.md, tablas en src/eng/partylv.js): SOLO 'tira-y-afloja' y
+ * 'ruleta-de-minijuegos', y SOLO fuera del modo tele. 20 niveles escritos a mano con estrellas,
+ * progreso por dificultad y final cerrado. En la tele (k.party) no se usa: allí manda el mando y
+ * el equilibrio de siempre queda intacto, igual que en los otros ~25 modos de este motor.
  * Cada minijuego es un objeto { name, help, update(dt), draw(), done, rank } — rank[p] = nº de jugadores que quedaron
  * estrictamente por delante (los empates comparten puesto) o null si la ronda no cuenta. El marco pone presentación,
  * cuenta atrás, marcador, resultado de la ronda, la ruleta y el podio final. Solo joystick + A/B (modo tele).
@@ -187,7 +191,8 @@ function mk(w, h, draw) { const cv = document.createElement('canvas'); cv.width 
 
 /* ---------------- Jugadores, CPU y entrada ---------------- */
 let LV = 0; try { LV = clamp(+localStorage.getItem('cpu:' + ID) || 0, 0, 11); } catch (e) { /* sin almacenamiento */ }
-const SK = () => -0.3 + clamp(LV + k.D.cpu, -1.5, 11) * 0.1;   /* k.D.cpu: nivel de las CPU, sin tocar lo guardado */ /* 1.23: más fácil (antes LV/5: 0…1; ahora −0,3…0,8, media subida por victoria) */
+let SKO = null;   /* campaña en solitario de la ruleta: pericia escrita a mano en PARTYLV */
+const SK = () => (SKO == null ? -0.3 + clamp(LV + k.D.cpu, -1.5, 11) * 0.1 : SKO);   /* k.D.cpu: nivel de las CPU, sin tocar lo guardado */ /* 1.23: más fácil (antes LV/5: 0…1; ahora −0,3…0,8, media subida por victoria) */
 let demo = true, t = 0;
 const CNAME = ['roja', 'azul', 'amarilla', 'verde'];
 const cpu = (p) => demo || !k.human(p);
@@ -499,39 +504,91 @@ function mgMash() {
 /* =====================================================================================
  * 4. TIRA Y AFLOJA — 2 contra 2 (J1+J3 contra J2+J4). A justo en el compás = tirón; fuera de compás = resbalón.
  * ===================================================================================== */
-function mgTug() {
-  const L = 124, m = { name: 'Tira y Afloja', help: 'J1 y J3 contra J2 y J4. Pulsa A justo cuando el aro se cierra sobre el nudo. Fuera de compás resbalas hacia el barro.', done: false, rank: null };
+function mgTug(o) {
+  /* D = ficha del nivel (PARTYLV.tug) cuando se juega la campaña en solitario de
+     «Tira y Afloja». Con D nulo (modo tele, ruleta y el juego suelto de siempre) el
+     minijuego se comporta exactamente igual que antes: misma física, mismo equilibrio. */
+  const D = (o && o.lv) || null;
+  const L = 124, m = { name: D ? D.n : 'Tira y Afloja', help: D ? D.tip : 'J1 y J3 contra J2 y J4. Pulsa A justo cuando el aro se cierra sobre el nudo. Fuera de compás resbalas hacia el barro.', done: false, rank: null };
   const team = (p) => p % 2, dir = (p) => (team(p) ? 1 : -1);
   const ps = [0, 1, 2, 3].map((p) => ({ p, stun: 0, lastB: -9, next: null, flash: 0 }));
-  let X = 0, V = 0, ph = 0, T = 0, P = 0.64, over = false, endT = 0, win = -1, beatF = 0, lastB = 0, drops = [];
+  let X = 0, V = 0, ph = 0, T = 0, P = D ? D.p0 : 0.64, over = false, endT = 0, win = -1, beatF = 0, lastB = 0, drops = [];
   const px = (p) => 400 + dir(p) * (108 + (p < 2 ? 0 : 60)) + X;
-  const plan = (b) => ({ b, at: b + clamp(gauss() * lerp(0.085, 0.038, SK()) / P, -0.4, 0.4), miss: Math.random() < lerp(0.12, 0.03, SK()) });
+  /* ---- campaña: verbos que se van sumando nivel a nivel (silencios, ráfagas, lluvia,
+         viento y embestidas). Nada de esto existe fuera de la campaña. ---- */
+  const DUR = D ? D.dur : 32;
+  const SC = D ? 0.6 : 1;   /* campaña: mismas proporciones, duelo estirado a 40–70 s (VARA §1) */
+  const RVD = [0.86, 1, 1.12];                        /* la dificultad mueve el margen, no la ruta */
+  const RV = D ? (1.2 + 2.8 * D.sk) * RVD[k.dif] : 0; /* tirón continuo del equipo rival (px/s) */
+  let f = D || {}, burst = 0, burstT = D && D.dbl ? D.dbl[0] : 0, sgB = -1, sgT = D && D.surge ? D.surge : 0, sgHold = false, bossPh = -1, slips = 0, rain = [];
+  function phase() {
+    if (!D) return;
+    if (!D.boss) { f = D; return; }
+    const q = T / DUR, i = q < 0.34 ? 0 : q < 0.68 ? 1 : 2;
+    if (i !== bossPh) {
+      bossPh = i; f = [{ surge: 7 }, { rest: 4, dbl: [8, 4] }, { rain: 1, wind: 8, surge: 6.5, rest: 4 }][i];
+      burstT = f.dbl ? 2.5 : 0; sgT = f.surge || 0; burst = 0;
+      k.float(['Fase 1: fuerza bruta', 'Fase 2: compás roto', 'Fase 3: tormenta'][i], 400, 196, '#ffd166');
+      k.sfx('start'); k.shake(5);
+    }
+  }
+  const isRest = (b) => !!(f.rest && ((b % f.rest) + f.rest) % f.rest === f.rest - 1);
+  const w0 = () => (f.rain ? 0.055 : 0.08), w1 = () => (f.rain ? 0.115 : 0.16);
+  const skOf = (p) => (D ? (team(p) === 0 ? D.sm : D.sk) : SK());
+  const plan = (p, b) => ({ b, at: b + clamp(gauss() * lerp(0.085, 0.038, skOf(p)) / P, -0.4, 0.4), miss: Math.random() < lerp(0.12, 0.03, skOf(p)), rest: isRest(b) });
   function press(q) {
     if (q.stun > 0 || over) return;
     const b = Math.round(ph), e = (ph - b) * P;
     if (q.lastB === b) return slip(q, '¡Doble!');
     q.lastB = b;
-    const ae = Math.abs(e); if (ae > 0.16) return slip(q, '¡Resbalón!');
-    const pull = ae < 0.08 ? 1 : 0.55; V += dir(q.p) * pull * 30; q.flash = 0.25;
-    if (!cpu(q.p)) { k.float(ae < 0.08 ? '¡Justo!' : 'Bien', px(q.p), 250, ae < 0.08 ? '#7cf7a0' : '#ffd166'); k.sfx(ae < 0.08 ? 'coin' : 'pop'); }
+    if (D && isRest(b)) return slip(q, '¡Silencio!');
+    const ae = Math.abs(e); if (ae > (D ? w1() : 0.16)) return slip(q, '¡Resbalón!');
+    const perf = ae < (D ? w0() : 0.08), pull = perf ? 1 : 0.55;
+    if (D) {   /* campaña: la cuerda se mueve por tirones; el equipo rival tira solo (RV) */
+      if (team(q.p) === 0) X -= pull * (cpu(q.p) ? 2.4 : 3.6) * SC;
+      if (sgB === b && !cpu(q.p) && perf) { sgHold = true; X -= 3.4 * SC; k.float('¡Aguantas!', px(q.p), 214, '#ffd166'); k.punch(0.05); k.chime(); }
+    } else { V += dir(q.p) * pull * 30; }
+    q.flash = 0.25;
+    if (!cpu(q.p)) { k.float(perf ? '¡Justo!' : 'Bien', px(q.p), 250, perf ? '#7cf7a0' : '#ffd166'); k.sfx(perf ? 'coin' : 'pop'); }
   }
-  function slip(q, why) { q.stun = 0.4; V -= dir(q.p) * 20; k.float(why, px(q.p), 250, '#ff8a8a'); if (!cpu(q.p)) k.sfx('hurt'); k.burst(px(q.p), 372, '#7a5230', 6, 90); }
+  function slip(q, why) {
+    q.stun = 0.4;
+    if (D) { X += (team(q.p) === 0 ? (f.rain ? 3.4 : 2.4) : -1.6) * SC; if (!cpu(q.p)) { slips++; k.chainReset(); } } else V -= dir(q.p) * 20;
+    k.float(why, px(q.p), 250, '#ff8a8a'); if (!cpu(q.p)) k.sfx('hurt'); k.burst(px(q.p), 372, '#7a5230', 6, 90);
+  }
   m.update = (dt) => {
-    T += dt; P = lerp(0.64, 0.42, ease(T / 26)); ph += dt / P;
+    T += dt; phase();
+    if (D) {
+      if (f.dbl) { burstT -= dt; if (burst > 0) { if ((burst -= dt) <= 0) { burst = 0; burstT = f.dbl[0]; } } else if (burstT <= 0) { burst = f.dbl[1]; k.float('¡RÁFAGA!', 400, 176, '#ff9ad5'); k.sfx('start'); } }
+      if (f.surge) { sgT -= dt; if (sgT <= 0 && sgB < 0) { sgB = Math.floor(ph) + 3; sgHold = false; } }
+      if (sgB >= 0 && ph > sgB + 0.55) { if (!sgHold) { X += 8 * SC; k.float('¡Embestida!', 400, 206, '#ff8a8a'); k.shake(6); k.sfx('hit'); } sgB = -1; sgT = f.surge || 0; }
+      if (f.wind) X += f.wind * dt * 0.18 * SC;
+      P = lerp(D.p0, D.p1, ease(T / DUR));
+      ph += dt / P * (burst > 0 ? 2 : 1);
+    } else { P = lerp(0.64, 0.42, ease(T / 26)); ph += dt / P; }
     if (Math.floor(ph) !== lastB) { lastB = Math.floor(ph); beatF = 1; if (!over) k.sfx('tick'); }
     beatF = Math.max(0, beatF - dt * 4);
     for (const q of ps) {
       q.stun -= dt; q.flash -= dt;
       if (over) continue;
-      if (cpu(q.p)) { if (!q.next || q.next.at < ph - 0.5) q.next = plan(Math.floor(ph) + 1); if (ph >= q.next.at) { if (!q.next.miss) press(q); q.next = plan(q.next.b + 1); } }
-      else if (A(q.p)) press(q);
+      if (cpu(q.p)) {
+        if (!q.next || q.next.at < ph - 0.5) q.next = plan(q.p, Math.floor(ph) + 1);
+        if (ph >= q.next.at) { const go = q.next.rest ? Math.random() < lerp(0.16, 0.03, skOf(q.p)) : !q.next.miss; if (go) press(q); q.next = plan(q.p, q.next.b + 1); }
+      } else if (A(q.p)) press(q);
     }
-    V *= Math.exp(-2.4 * dt); X += V * dt;
-    if (!over) { if (X <= -L) win = 0; else if (X >= L) win = 1; else if (T > 32) win = X < 0 ? 0 : X > 0 ? 1 : k.ri(0, 1);
-      if (win >= 0) { over = true; endT = 1.8; m.rank = ps.map((q) => (team(q.p) === win ? 0 : 2)); k.sfx('explode'); k.shake(6); k.burst(400, 380, '#6b4a2f', 30, 260); } }
-    if (over) { V = (win ? 1 : -1) * 70; if ((endT -= dt) <= 0) m.done = true; }
+    if (D) { if (!isRest(Math.floor(ph))) X += RV * SC * dt; V = 0; } else { V *= Math.exp(-2.4 * dt); X += V * dt; }
+    if (D) m.tel = { ph, P, X, T, rest: isRest(Math.floor(ph) + 1), burst: burst > 0, sg: sgB, slips };   /* telemetría del bot de pruebas */
+    if (!over) { if (X <= -L) win = 0; else if (X >= L) win = 1; else if (T > DUR) win = X < 0 ? 0 : X > 0 ? 1 : k.ri(0, 1);
+      if (win >= 0) { over = true; endT = 1.8; m.rank = ps.map((q) => (team(q.p) === win ? 0 : 2));
+        if (D) { m.cwin = win === 0; m.ctime = T; m.cslip = slips; }
+        k.sfx('explode'); k.shake(6); k.burst(400, 380, '#6b4a2f', 30, 260); } }
+    if (over) { if (D) X += (win ? 1 : -1) * 70 * dt; else { V = (win ? 1 : -1) * 70; } if ((endT -= dt) <= 0) m.done = true; }
     for (let i = drops.length - 1; i >= 0; i--) if ((drops[i].t -= dt) <= 0) drops.splice(i, 1);
     if (Math.random() < dt * 3) drops.push({ x: 400 + k.rnd(-60, 60), t: 0.6 });
+    if (D && f.rain) {
+      for (let i = rain.length - 1; i >= 0; i--) { const r = rain[i]; r.y += 620 * dt; if (r.y > 400) { rain[i] = rain[rain.length - 1]; rain.pop(); } }
+      for (let i = 0; i < 3; i++) rain.push({ x: k.rnd(0, W), y: k.rnd(-40, 0) });
+    } else if (rain.length) rain.length = 0;
   };
   m.draw = () => {
     ART.background(c, TH.jungle, W, 380, 0, 0, t); ground(370, '#5ab04f', '#3c8a3a');
@@ -544,19 +601,28 @@ function mgTug() {
     c.strokeStyle = '#d8b27a'; c.lineWidth = 6.5; c.stroke(); c.strokeStyle = '#a07a45'; c.setLineDash([6, 8]); c.lineWidth = 3; c.stroke(); c.setLineDash([]);
     c.beginPath(); c.moveTo(400 + X - 8, ry + 2); c.lineTo(400 + X + 8, ry + 2); c.lineTo(400 + X, ry + 26); c.closePath(); ART.fillOut(c, '#ff5a5f', 2.2);
     for (const q of ps) {
-      const x = px(q.p), f = -dir(q.p), lean = dir(q.p) * (0.28 + (q.flash > 0 ? 0.12 : 0));
-      c.save(); c.translate(x, 372); c.rotate(lean); guy(q.p, 0, 0, 1.6, { face: f, state: q.stun > 0 ? 'fall' : 'idle' }); c.restore();
+      const x = px(q.p), fc = -dir(q.p), lean = dir(q.p) * (0.28 + (q.flash > 0 ? 0.12 : 0));
+      c.save(); c.translate(x, 372); c.rotate(lean); guy(q.p, 0, 0, 1.6, { face: fc, state: q.stun > 0 ? 'fall' : 'idle' }); c.restore();
       tagDraw(q.p, x, 278);
     }
     // compás: aro que se cierra sobre el nudo
     const fr = ph - Math.floor(ph), cx = 400, cy = 118;
+    const rest = D && isRest(Math.round(ph + 0.5)), sg = D && sgB >= 0 && sgB <= Math.floor(ph) + 1;
     panel(cx - 120, cy - 64, 240, 128, 22, 'rgba(26,21,48,.55)', 2.5);
-    c.beginPath(); c.arc(cx, cy, 24, 0, TAU); ART.fillOut(c, beatF > 0.5 ? '#ffe6a0' : '#ffd166', 3);
-    label('A', cx, cy + 1, 22, '#fff', 'center', 4);
-    c.strokeStyle = '#fff'; c.lineWidth = 5; c.globalAlpha = 0.35 + 0.65 * fr; c.beginPath(); c.arc(cx, cy, 24 + 36 * (1 - fr), 0, TAU); c.stroke(); c.globalAlpha = 1;
+    c.beginPath(); c.arc(cx, cy, 24, 0, TAU); ART.fillOut(c, rest ? '#ff6b6b' : sg ? '#ffb020' : beatF > 0.5 ? '#ffe6a0' : '#ffd166', 3);
+    label(rest ? '—' : 'A', cx, cy + 1, 22, '#fff', 'center', 4);
+    c.strokeStyle = rest ? '#ff9a9a' : sg ? '#ffd166' : '#fff'; c.lineWidth = 5; c.globalAlpha = 0.35 + 0.65 * fr; c.beginPath(); c.arc(cx, cy, 24 + 36 * (1 - fr), 0, TAU); c.stroke(); c.globalAlpha = 1;
     if (beatF > 0) { c.strokeStyle = `rgba(255,209,102,${beatF})`; c.lineWidth = 4; c.beginPath(); c.arc(cx, cy, 28 + (1 - beatF) * 14, 0, TAU); c.stroke(); }
     label(`${tag(0)} + ${tag(2)}`, 150, 118, 24, col(0)); label(`${tag(1)} + ${tag(3)}`, 650, 118, 24, col(1));
-    label(`${Math.max(0, Math.ceil(32 - T))} s`, 400, 430, 20, '#fff');
+    if (D) {
+      for (const r of rain) { c.strokeStyle = 'rgba(180,210,255,.55)'; c.lineWidth = 2; c.beginPath(); c.moveTo(r.x, r.y); c.lineTo(r.x - 4, r.y + 14); c.stroke(); }
+      if (burst > 0) label('¡RÁFAGA!', cx, 42, 22, '#ff9ad5');
+      else if (sg) label('¡EMBESTIDA!', cx, 42, 22, '#ffb020');
+      else if (rest) label('SILENCIO', cx, 42, 20, '#ff9a9a');
+      if (D.boss && bossPh >= 0) label(`El Gigante · fase ${bossPh + 1} de 3`, cx, 200, 20, '#ffd166');
+      label(`${Math.max(0, Math.ceil(DUR - T))} s`, 400, 430, 20, '#fff');
+      label(`Resbalones: ${slips}`, 784, 430, 18, slips ? '#ff8a8a' : '#c9c3ef', 'right');
+    } else label(`${Math.max(0, Math.ceil(32 - T))} s`, 400, 430, 20, '#fff');
   };
   return m;
 }
@@ -2455,30 +2521,57 @@ const MG = { anvil: mgAnvil, duel: mgDuel, mash: mgMash, tug: mgTug, balloons: m
   bowl: mgBowl, bull: mgBull, egg: mgEgg, photo: mgPhoto, relay: mgRelay, hotair: mgHotair, witch: mgWitch, mole: mgMole };
 const COOP = { relay: 1, hotair: 1 }; /* oleada 3: dos minijuegos cooperativos con resultado de equipo */
 const KEYS = ['anvil', 'duel', 'mash', 'tug', 'balloons', 'arrows', 'clock', 'needle'], /* casillas de la ruleta (fijas) */ SHORT = { anvil: 'Yunques', duel: 'Duelo', mash: 'Carrera', tug: 'Cuerda', balloons: 'Globos', arrows: 'Flechas', clock: 'Reloj', needle: 'Diana' };
-const NAMES = { anvil: 'Lluvia de Yunques', duel: 'Duelo del Oeste', mash: 'Carrera Machacabotones', tug: 'Tira y Afloja', balloons: 'Cuenta Globos', arrows: 'Flechas de Memoria', clock: 'Reloj a Ciegas', needle: 'Diana Oscilante' };
+Object.assign(SHORT, { pump: 'Globos', simon: 'Semáforo', rope: 'Comba', fish: 'Pesca', statue: 'Estatuas', sheep: 'Ovejas', sack: 'Sacos', pie: 'Tartas', derby: 'Caballitos', bowl: 'Bolos', bull: 'Toro', egg: 'Huevo', photo: 'Foto', witch: 'Bruja', mole: 'Topo' });
+const NAMES = { anvil: 'Lluvia de Yunques', duel: 'Duelo del Oeste', mash: 'Carrera Machacabotones', tug: 'Tira y Afloja', balloons: 'Cuenta Globos', arrows: 'Flechas de Memoria', clock: 'Reloj a Ciegas', needle: 'Diana Oscilante',
+  pump: 'Globos a Presión', simon: 'Memoria de Semáforo', rope: 'Salta la Comba', fish: 'Pesca Rápida', statue: 'Estatuas Musicales', sheep: 'Cuenta Ovejas', sack: 'Carrera de Sacos',
+  pie: 'Tartas al Blanco', derby: 'Caballitos de Feria', bowl: 'Bolos Humanos', bull: 'Toro Mecánico', egg: 'Huevo en la Cuchara', photo: 'Foto de Grupo', witch: 'Tren de la Bruja', mole: 'Topo Burlón' };
 const WCOL = ['#6e62f5', '#ff5a5f', '#3fb6ea', '#ffd166', '#5fbf45', '#ff9ad5', '#f0842a', '#34b574'];
 const RULE = { anvil: { rounds: 3, pts: [3, 2, 1, 0] }, mash: { rounds: 3, pts: [3, 2, 1, 0] }, duel: { to: 5, pts: [1, 0, 0, 0] }, tug: { to: 2, pts: [1, 0, 0, 0] }, roulette: { rounds: 10, pts: [3, 2, 1, 0] },
   /* modos largos (rondas de ~1 min): dos rondas para que la partida dure lo mismo que las demás */
   egg: { rounds: 2, pts: [3, 2, 1, 0] }, relay: { rounds: 2, pts: [3, 2, 1, 0] }, hotair: { rounds: 2, pts: [3, 2, 1, 0] }, witch: { rounds: 2, pts: [3, 2, 1, 0] } }[MODE] || { rounds: 3, pts: [3, 2, 1, 0] };
+/* ---------------- Campaña en solitario (docs/VARA.md) ----------------
+   Tabla de 20 niveles escritos a mano en partylv.js. Solo para los dos juegos del encargo y
+   solo fuera del modo tele: CAMP() devuelve null en la tele y el marco vuelve al de siempre. */
+const CTAB = (typeof PARTYLV !== 'undefined' && !k.party && (
+  (MODE === 'tug' && ID === 'tira-y-afloja') ? PARTYLV.tug :
+  (MODE === 'roulette' && ID === 'ruleta-de-minijuegos') ? PARTYLV.roul : null)) || null;
+const CAMP = () => (CTAB && !k.party ? CTAB[clamp(k.lv, 1, CTAB.length) - 1] : null);
+let CD = null, cWon = 0, cStk = [0, 0, 0, 0], cBonus = 0;
+if (CTAB) k.levels(CTAB.length);
 let G = null, gKey = MODE === 'roulette' ? 'anvil' : MODE, score = [0, 0, 0, 0], round = 0, seq = null, phase = 'intro', phT = 0, res = null, live = false, wRot = 0, wFrom = 0, wTo = 0;
 const matchN = () => round;
 function makeSeq() { const s = k.shuffle(KEYS.slice()); while (s.length < 10) { const x = k.pick(KEYS); if (x !== s[s.length - 1]) s.push(x); } return s; }
-function reset() { demo = false; score = [0, 0, 0, 0]; round = 0; seq = MODE === 'roulette' ? makeSeq() : null; if (seq) toBoard(); else nextRound(); }
-function nextRound() { round++; gKey = seq ? seq[round - 1] : MODE; G = MG[gKey]({ roul: !!seq }); phase = 'intro'; phT = 2.2; }
-function toBoard() { phase = 'board'; phT = 3.4; const i = KEYS.indexOf(seq[round]); wFrom = wRot % TAU; wTo = -(i + 0.5) * TAU / 8 - TAU * 4; }
-const over = () => (RULE.to ? Math.max(...score) >= RULE.to : round >= RULE.rounds);
+function reset() {
+  demo = false; score = [0, 0, 0, 0]; round = 0; cWon = 0; cStk = [0, 0, 0, 0]; cBonus = 0;
+  CD = CAMP(); SKO = CD && MODE === 'roulette' ? CD.sk : null;
+  seq = CD ? (MODE === 'roulette' ? CD.g.slice() : null) : MODE === 'roulette' ? makeSeq() : null;
+  if (seq) toBoard(); else nextRound();
+}
+const nRounds = () => (CD ? (seq ? seq.length : 1) : RULE.rounds);
+const wheelKeys = () => (CD && seq ? seq : KEYS);
+function nextRound() { round++; gKey = seq ? seq[round - 1] : MODE; G = MG[gKey]({ roul: !!seq, lv: CD && MODE === 'tug' ? CD : null }); phase = 'intro'; phT = 2.2; }
+function toBoard() { phase = 'board'; phT = 3.4; const ws = wheelKeys(), n = ws.length, i = CD ? Math.min(round, n - 1) : ws.indexOf(seq[round]); wFrom = wRot % TAU; wTo = -(i + 0.5) * TAU / n - TAU * 4; }
+const over = () => (CD ? round >= nRounds() : RULE.to ? Math.max(...score) >= RULE.to : round >= RULE.rounds);
 function finishRound() {
   const r = G.rank, pts = [0, 0, 0, 0];
   if (r) for (let p = 0; p < 4; p++) pts[p] = RULE.pts[r[p]] || 0;
-  for (let p = 0; p < 4; p++) score[p] += pts[p];
+  if (!CD || !r) for (let p = 0; p < 4; p++) score[p] += pts[p];
+  let bon = '';
+  if (CD && r) {
+    if (CD.x2 && round >= nRounds()) { for (let p = 0; p < 4; p++) pts[p] *= 2; bon = ' · ¡ronda doble!'; }
+    if (CD.chain) for (let p = 0; p < 4; p++) { if (r[p] === 0) cStk[p]++; else cStk[p] = 0; if (cStk[p] >= 2) { cStk[p] = 0; pts[p] += 1; if (p === 0) { cBonus++; bon += ' · ¡cadena +1!'; } } }
+    if (r[0] === 0) { cWon++; k.chime(); } else k.chainReset();
+    for (let p = 0; p < 4; p++) score[p] += pts[p];
+  }
   const w = r ? [0, 1, 2, 3].filter((p) => r[p] === 0) : [];
   let head = !r ? 'Ronda nula' : COOP[gKey] ? (G.teamHead || '¡Equipo!') : gKey === 'tug' ? teamHead(w[0] % 2) : w.length === 1 ? winTxt(w[0]) : w.length === 4 ? '¡Empate total!' : '¡Empate!';
-  res = { pts, w, head }; phase = 'result'; phT = 2.6;
+  res = { pts, w, head, bon }; phase = 'result'; phT = 2.6;
   if (w.some((p) => !cpu(p))) k.sfx('win'); else if (r) k.sfx('lose');
   if (w.length) k.confetti(col(w[0]), 50);
 }
 function endMatch() {
   live = false;
+  if (CD) return campEnd();
   const rows = [0, 1, 2, 3].map((p) => ({ p, score: score[p], name: nm(p) })), top = Math.max(...score), low = Math.min(...score);
   const hs = [0, 1, 2, 3].filter((p) => !cpu(p));
   if (hs.some((p) => score[p] === top)) LV = Math.min(11, LV + 1); else if (hs.length && hs.every((p) => score[p] === low)) LV = Math.max(0, LV - 1);
@@ -2488,6 +2581,24 @@ function endMatch() {
   if (MODE === 'tug') head = teamHead(winners[0] % 2);
   else if (winners.length === 1) head = winTxt(winners[0]);
   k.podium(rows, { head, noTie: MODE === 'tug', fmt: (s) => (MODE === 'tug' ? `${s} ${s === 1 ? 'ronda' : 'rondas'}` : `${s} ${s === 1 ? 'punto' : 'puntos'}`) });
+}
+/* Fin de nivel de la campaña: 1★ superarlo · 2★ el objetivo escrito a mano para esa dificultad
+   · 3★ ese objetivo más la condición de maestría (sin resbalar / ganar todas las rondas). */
+function campEnd() {
+  const d = clamp(k.dif | 0, 0, 2);
+  if (MODE === 'tug') {
+    const g = G, tm = CD.t2[d], tt = Math.round(g.ctime || 0);
+    if (!g.cwin) { k.lose(ID, 0, 'Al barro', `El lazo se fue al otro lado en el nivel ${k.lv}. ${CD.tip}`); return; }
+    const okT = tt <= tm, st = okT ? (g.cslip === 0 ? 3 : 2) : 1;
+    const falta = st === 3 ? '¡Duelo bordado!' : st === 2 ? `Gánalo sin un solo resbalón para la 3ª estrella (has tenido ${g.cslip}).` : `Gánalo en ${tm} s o menos para la 2ª estrella.`;
+    k.levelDone(Math.max(1, 200 - tt * 2), `${CD.n} · ${tt} s · ${g.cslip} ${g.cslip === 1 ? 'resbalón' : 'resbalones'}.<br>${falta}`, { stars: st });
+    return;
+  }
+  const me = score[0], top = Math.max(...score), n = nRounds();
+  if (me < top) { k.lose(ID, me, 'Se te escapa la tanda', `${me} ${me === 1 ? 'punto' : 'puntos'} frente a ${top}. Hay que quedar primero para pasar de nivel.`); return; }
+  const goal = CD.goal[d], okG = me >= goal, st = okG ? (cWon >= n ? 3 : 2) : 1;
+  const falta = st === 3 ? '¡Tanda bordada!' : st === 2 ? `Gana las ${n} rondas para la 3ª estrella (has ganado ${cWon}).` : `Llega a ${goal} puntos para la 2ª estrella.`;
+  k.levelDone(me, `${CD.n} · ${me} ${me === 1 ? 'punto' : 'puntos'} · ${cWon} de ${n} rondas ganadas.<br>${falta}`, { stars: st });
 }
 function teamHead(tm) { return !k.party && !demo && tm === 0 ? '¡Gana tu equipo!' : `¡Gana el equipo ${tm ? 'azul' : 'rojo'}!`; }
 function adBreak() { try { if (parent !== window) parent.postMessage({ type: 'arcade:adbreak' }, '*'); } catch (e) { /* sin padre */ } }
@@ -2500,7 +2611,7 @@ k.run((dt) => {
   if (!live) { live = true; reset(); }
   if (phase === 'intro') { if ((phT -= dt) <= 0) { phase = 'play'; k.count(3); } return; }
   if (phase === 'play') { if (k.counting()) return; G.update(dt); if (G.done) finishRound(); return; }
-  if (phase === 'result') { G.update(dt); if ((phT -= dt) <= 0) { if (over()) endMatch(); else if (seq) { if (round % 3 === 0) adBreak(); toBoard(); } else nextRound(); } return; }
+  if (phase === 'result') { G.update(dt); if ((phT -= dt) <= 0) { if (over()) endMatch(); else if (seq) { if (!CD && round % 3 === 0) adBreak(); toBoard(); } else nextRound(); } return; }
   if (phase === 'board') { phT -= dt; const q = 1 - (1 - clamp((3.4 - phT) / 2.5, 0, 1)) ** 3; wRot = wFrom + (wTo - wFrom) * q; if (phT <= 0) nextRound(); }
 }, () => {
   const board = MODE === 'roulette' && (k.st === 'ready' || phase === 'board');
@@ -2512,7 +2623,7 @@ k.run((dt) => {
     if (phase === 'result' && res) {
       panel(200, 150, 400, 110, 20, 'rgba(26,21,48,.88)', 4);
       label(res.head, 400, 188, 32, res.w.length === 1 ? col(res.w[0]) : '#ffd166');
-      label(res.pts.some((x) => x) ? [0, 1, 2, 3].filter((p) => res.pts[p]).map((p) => `${tag(p)} +${res.pts[p]}`).join('   ') : 'Nadie suma', 400, 232, 20, '#fff');
+      label((res.pts.some((x) => x) ? [0, 1, 2, 3].filter((p) => res.pts[p]).map((p) => `${tag(p)} +${res.pts[p]}`).join('   ') : 'Nadie suma') + (res.bon || ''), 400, 232, 20, '#fff');
     }
   }
 });
@@ -2525,13 +2636,15 @@ function hud() {
     label(String(score[p]), x + 176, y + 20, 24, '#fff', 'right');
     const lead = Math.max(...score); if (lead > 0 && score[p] === lead) star(x + 84, y + 19, 10);
   }
+  if (CD && MODE === 'roulette') label(`Nivel ${k.lv} · objetivo ${CD.goal[clamp(k.dif | 0, 0, 2)]} pts`, 400, 60, 19, '#c9c3ef');
 }
 function banner() {
   const small = phase === 'play';
   const y = small ? 400 : 190, h = small ? 58 : 150;
   panel(90, y - h / 2, 620, h, 22, 'rgba(26,21,48,.9)', 4);
   if (small) { c.font = FONT(18, 700); wrap(G.help, 400, y, 580, 22, '#fff'); return; }
-  const sub = seq ? `Ronda ${round} de ${RULE.rounds}` : RULE.to ? `${MODE === 'tug' ? 'Ronda' : 'Duelo'} ${round} · gana quien llegue a ${RULE.to}` : `Ronda ${round} de ${RULE.rounds}`;
+  const sub = CD ? (MODE === 'tug' ? `Nivel ${k.lv} de ${CTAB.length} · gana en ${CD.t2[clamp(k.dif | 0, 0, 2)]} s para la 2ª estrella` : `Nivel ${k.lv} de ${CTAB.length} · ronda ${round} de ${nRounds()}`)
+    : seq ? `Ronda ${round} de ${RULE.rounds}` : RULE.to ? `${MODE === 'tug' ? 'Ronda' : 'Duelo'} ${round} · gana quien llegue a ${RULE.to}` : `Ronda ${round} de ${RULE.rounds}`;
   label(sub, 400, y - 48, 20, '#ffd166');
   label(G.name, 400, y - 18, 34, '#fff'); /* hueco para que la ayuda no toque el título */
   c.font = FONT(19, 700); wrap(G.help, 400, y + 36, 580, 23, '#e8e3ff');
@@ -2545,18 +2658,20 @@ function wrap(s, x, y, maxW, lh, fill) {
 }
 function drawBoard() {
   c.fillStyle = 'rgba(12,9,32,.72)'; c.fillRect(0, 0, W, H);
-  const cx = 590, cy = 250, R = 160, seg = TAU / 8;
-  for (let i = 0; i < 8; i++) {
+  const ws = wheelKeys(), NW = ws.length;
+  const cx = 590, cy = 250, R = 160, seg = TAU / NW;
+  for (let i = 0; i < NW; i++) {
     const a0 = wRot + i * seg - Math.PI / 2;
-    c.beginPath(); c.moveTo(cx, cy); c.arc(cx, cy, R, a0, a0 + seg); c.closePath(); c.fillStyle = WCOL[i]; c.fill(); c.strokeStyle = OUT; c.lineWidth = 3; c.stroke();
-    const am = a0 + seg / 2, flip = Math.cos(am) < 0; c.save(); c.translate(cx, cy); c.rotate(flip ? am + Math.PI : am); label(SHORT[KEYS[i]], flip ? -R * 0.6 : R * 0.6, 0, 18, '#fff', 'center', 4); c.restore();
+    c.beginPath(); c.moveTo(cx, cy); c.arc(cx, cy, R, a0, a0 + seg); c.closePath(); c.fillStyle = WCOL[i % WCOL.length]; c.fill(); c.strokeStyle = OUT; c.lineWidth = 3; c.stroke();
+    const am = a0 + seg / 2, flip = Math.cos(am) < 0; c.save(); c.translate(cx, cy); c.rotate(flip ? am + Math.PI : am); label(SHORT[ws[i]] || NAMES[ws[i]] || ws[i], flip ? -R * 0.6 : R * 0.6, 0, 18, '#fff', 'center', 4); c.restore();
   }
   c.beginPath(); c.arc(cx, cy, R, 0, TAU); c.lineWidth = 6; c.strokeStyle = OUT; c.stroke();
   c.beginPath(); c.arc(cx, cy, 24, 0, TAU); ART.fillOut(c, '#f5f1e6', 3); star(cx, cy, 13);
   c.beginPath(); c.moveTo(cx - 16, cy - R - 20); c.lineTo(cx + 16, cy - R - 20); c.lineTo(cx, cy - R + 10); c.closePath(); ART.fillOut(c, '#fff', 3);
   if (k.st === 'ready') { label('Ruleta de Minijuegos', 200, 150, 30, '#fff'); for (let i = 0; i < 8; i++) label(SHORT[KEYS[i]], 110 + (i % 2) * 180, 205 + Math.floor(i / 2) * 44, 22, WCOL[i]); return; }
-  label(`Ronda ${round + 1} de ${RULE.rounds}`, 200, 78, 26, '#ffd166');
+  label(CD ? `Nivel ${k.lv} · ronda ${round + 1} de ${nRounds()}` : `Ronda ${round + 1} de ${RULE.rounds}`, 200, 78, 26, '#ffd166');
+  if (CD) label(`${CD.n} · objetivo ${CD.goal[clamp(k.dif | 0, 0, 2)]} pts`, 200, 106, 19, '#c9c3ef');
   const order = [0, 1, 2, 3].sort((a, b) => score[b] - score[a]), mx = Math.max(1, ...score);
-  order.forEach((p, i) => { const y = 130 + i * 58; panel(30, y - 22, 340, 46, 12, 'rgba(26,21,48,.9)', 2.5); tagDraw(p, 70, y + 1); if (score[p]) { ART.rr(c, 110, y - 9, 190 * score[p] / mx, 18, 8); ART.fillOut(c, col(p), 2); } label(String(score[p]), 356, y + 1, 24, '#fff', 'right'); });
+  order.forEach((p, i) => { const y = (CD ? 146 : 130) + i * 58; panel(30, y - 22, 340, 46, 12, 'rgba(26,21,48,.9)', 2.5); tagDraw(p, 70, y + 1); if (score[p]) { ART.rr(c, 110, y - 9, 190 * score[p] / mx, 18, 8); ART.fillOut(c, col(p), 2); } label(String(score[p]), 356, y + 1, 24, '#fff', 'right'); });
   if (phT < 1 && seq && seq[round]) { panel(400, 390, 380, 50, 14, 'rgba(26,21,48,.92)', 3); label('Siguiente: ' + NAMES[seq[round]], 590, 415, 22, '#fff'); }
 }
