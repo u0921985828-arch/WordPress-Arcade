@@ -1,7 +1,16 @@
 /* Match-3. CFG.mode: 'moves' | 'time'
  * Gemas facetadas con forma y color distintos (accesible), intercambio animado, retirada con destello,
  * caída con rebote, cascadas en combo con texto y partículas, pista tras unos segundos quieto y control con teclado. */
-const W = 480, H = 640, OUT = ART.OUT, k = Kit({ w: W, h: H, title: CFG.title, bg: '#1d1538' }), c = k.ctx, N = 8, S = 56, OX = 16, OY = 146;
+const W = 480, H = 640, OUT = ART.OUT;
+/* jewel-swap (plan Friv, tanda 4): 20 tableros escritos a mano en SWAPLV (src/eng/swaplv.js),
+   con reglas puras en M3, progreso por dificultad y final de verdad. Todo lo nuevo va detrás
+   de HAND: jewel-tide (modo 'time') y cualquier otro juego del motor siguen exactamente igual. */
+const HAND = (CFG.mode === 'moves' && typeof SWAPLV !== 'undefined' && SWAPLV[CFG.id]) || null;
+const k = Kit({
+  w: W, h: H, title: CFG.title, bg: '#1d1538',
+  fluid: HAND ? { min: 0.42, max: 2.8, maxW: 1180, maxH: 1000 } : false,
+  help: HAND ? 'Intercambia dos gemas vecinas (deslizando o tocando las dos) para alinear tres o más. Cada nivel pide algo distinto: recoger gemas de un color, bajar los cofres hasta el suelo, romper todo el hielo, quitar la gelatina o liberar a los animalillos. Tienes un número de movimientos: se gasta uno por intercambio. Cuatro en línea dan un RAYO que limpia su fila o su columna, una L o una T dan una BOMBA de 3×3 y cinco en línea dan un COMODÍN. Junta dos especiales para fusionarlos.' : ''
+}), c = k.ctx, N = 8, S = 56, OX = 16, OY = 146;
 /* ---------- R5 §8 «pieza única» + cartoon de estudio (helpers locales) ----------
    uni(): contornea TODAS las partes y luego las rellena → solo sobrevive la silueta exterior.
    celp(): 3 tonos de borde duro (cel shading) recortados a la silueta, sin degradados.
@@ -103,14 +112,14 @@ function label(s, x, y, size, col, align, base) { c.font = `800 ${size}px ui-rou
 function small(s, x, y, col, align) { c.font = '800 11px ui-rounded,"Trebuchet MS",sans-serif'; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.fillStyle = col || '#c9b8f0'; c.fillText(s, x, y); }
 
 const intro = () => TIMED ? `Haz todas las combinaciones que puedas en ${Math.round(TMAX())} segundos. Desliza o toca dos gemas vecinas.` : `Consigue los puntos objetivo en ${MOVES()} movimientos. Desliza o toca dos gemas vecinas.`;
-k.onDif = () => { if (k.st !== 'play') { reset(); k.show(CFG.title, intro()); } };
-reset(); k.show(CFG.title, intro());
+if (!HAND) k.onDif = () => { if (k.st !== 'play') { reset(); k.show(CFG.title, intro()); } };
+if (!HAND) { reset(); k.show(CFG.title, intro()); }
 let drag = null;
 function trySwap(a, bb) {
   if (!bb || bb[0] < 0 || bb[1] < 0 || bb[0] >= N || bb[1] >= N) return;
   swap(a[0], a[1], bb[0], bb[1]); swapA = { a, b: bb, t: 0, back: false }; if (!TIMED) moves--; sel = null; idle = 0; hint = null; k.sfx('click');
 }
-k.run((dt) => {
+if (!HAND) k.run((dt) => {
   let settling = false;
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (off[y][x] > 0 || vel[y][x]) { settling = true;
     vel[y][x] += 2600 * dt; off[y][x] -= vel[y][x] * dt;
@@ -168,3 +177,394 @@ k.run((dt) => {
   if (comboT > 0) { const a = Math.min(1, comboT / 0.3), sc = 1 + Math.max(0, comboT - 0.9) * 2; c.globalAlpha = a; label(comboTxt, W / 2, OY + N * S / 2 - 40, 38 * sc, '#ff9ad5', 'center', 'middle'); label(`Combo x${combo}`, W / 2, OY + N * S / 2, 20, '#fff', 'center', 'middle'); c.globalAlpha = 1; }
   if (lvlT > 0) { c.globalAlpha = Math.min(1, lvlT / 0.3); label(`¡Nivel ${level}!`, W / 2, OY + N * S / 2 + 50, 40, '#ffd23d', 'center', 'middle'); label(MOVES() + ' movimientos', W / 2, OY + N * S / 2 + 86, 18, '#fff', 'center', 'middle'); c.globalAlpha = 1; }
 });
+
+/* ================== jewel-swap: 20 niveles a mano (plan Friv, F3, tanda 4) ==================
+   Las reglas viven en M3 (src/eng/swaplv.js) y están verificadas con un simulador en Node.
+   Aquí solo se dibuja y se anima: el motor pide un paso (M3.step) y cada paso se convierte en
+   una animación. Nada de este bloque se ejecuta sin HAND, así que jewel-tide queda intacto. */
+if (HAND) (function () {
+  const LV = HAND, NLV = LV.length;
+  const E = M3.EMPTY, CH = M3.CHEST, CG = M3.CAGE, WD = M3.WILD;
+  let LS = null, CS = 40, BX = 0, BY = 0, TOPH = 104, PX = 0, PY = 0, PW = 0, PH = 0, side = false;
+  let bgL = null, A = null, idleOn = false, selL = null, curL = [0, 0], kbdL = false;
+  let dragL = null, queuedL = null, pops = [], fx = null, cmbT = 0, cmbTxt = '', hintL = null, idleT = 0;
+  let starsL = 0, noteT = 0, noteTxt = '';
+
+  const dk = () => (k.dif === 1 ? '' : k.dif === 0 ? '@f' : '@d');
+  const stKey = () => 'swst:' + CFG.id + ':' + k.lv + dk();
+  const getStars = (i) => { try { return +(localStorage.getItem('swst:' + CFG.id + ':' + i + dk()) || 0); } catch (e) { return 0; } };
+  /* fácil regala movimientos y quita un color; difícil recorta el margen */
+  const mvOf = (lv) => Math.max(6, Math.round(lv.mv * (k.dif === 0 ? 1.3 : k.dif === 2 ? 0.85 : 1)));
+  const colsOf = (lv) => (k.dif === 0 ? Math.max(4, (lv.cols || 6) - 1) : (lv.cols || 6));
+  const OBJN = { chest: 'Cofres', ice: 'Hielo', jelly: 'Gelatina', animal: 'Animalillos', score: 'Puntos' };
+  const CN = ['rojas', 'amarillas', 'verdes', 'azules', 'moradas', 'naranjas'];
+  const objName = (o) => (o.t === 'color' ? 'Gemas ' + (CN[o.v] || '') : OBJN[o.t] || o.t);
+  const ease = (t) => 1 - Math.pow(1 - t, 3);
+  function rrp(g, x, y, w, h, r) { g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+
+  /* ---------------- sprites cacheados (§8: una sola silueta por objeto) ---------------- */
+  const spCv = {};
+  function spSpr(v, sp) {
+    const key = v + ':' + sp; if (spCv[key]) return spCv[key];
+    const cv = document.createElement('canvas'); cv.width = cv.height = S * 2;
+    const g = cv.getContext('2d'); g.scale(2, 2); g.translate(S / 2, S / 2);
+    if (sp === M3.WSP) {
+      const body = (h) => { h.moveTo(0, -23); for (let i = 1; i < 8; i++) { const a = -Math.PI / 2 + i * 6.2832 / 8; h.lineTo(Math.cos(a) * 23, Math.sin(a) * 23); } h.closePath(); };
+      contact(g, 0, 22, 17, 4.6, 0.32);
+      uni(g, [[body, '#ffffff']], 1.6);
+      inpath(g, [[body, '#fff']], (h) => {
+        for (let i = 0; i < 6; i++) { h.fillStyle = GEM[i]; h.beginPath(); h.moveTo(0, 0); h.arc(0, 0, 26, -1.5708 + i * 1.0472, -1.5708 + (i + 1) * 1.0472); h.closePath(); h.fill(); }
+        h.fillStyle = 'rgba(255,255,255,.55)'; h.beginPath(); h.arc(0, 0, 8, 0, 6.2832); h.fill();
+      });
+      spec(g, -8, -11, 5, 3, -0.6, 0.8);
+      return (spCv[key] = cv);
+    }
+    g.drawImage(gemSprite(v), -S / 2, -S / 2, S, S);
+    const mk = (fn) => { g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = ART.OUT; g.lineWidth = 3.2; g.beginPath(); fn(g); g.stroke(); g.beginPath(); fn(g); g.fillStyle = '#fff7d8'; g.fill(); };
+    if (sp === M3.RH) mk((h) => { h.moveTo(-15, -4.5); h.lineTo(10, -4.5); h.lineTo(10, -9); h.lineTo(18, 0); h.lineTo(10, 9); h.lineTo(10, 4.5); h.lineTo(-15, 4.5); h.lineTo(-15, 9); h.lineTo(-23, 0); h.lineTo(-15, -9); h.closePath(); });
+    else if (sp === M3.RV) mk((h) => { h.moveTo(-4.5, -15); h.lineTo(-4.5, 10); h.lineTo(-9, 10); h.lineTo(0, 18); h.lineTo(9, 10); h.lineTo(4.5, 10); h.lineTo(4.5, -15); h.lineTo(9, -15); h.lineTo(0, -23); h.lineTo(-9, -15); h.closePath(); });
+    else if (sp === M3.BOMB) {
+      mk((h) => { h.arc(0, 3, 13, 0, 6.2832); h.moveTo(3, -9); h.lineTo(7, -18); h.lineTo(11, -15); h.lineTo(7, -7); h.closePath(); });
+      g.fillStyle = ART.dark('#fff7d8', 0.4); g.beginPath(); g.arc(0, 5, 8, 0.2, 2.6); g.fill();
+      g.fillStyle = '#ff9a3d'; g.beginPath(); g.arc(9.5, -18.5, 3.2, 0, 6.2832); g.fill();
+    }
+    return (spCv[key] = cv);
+  }
+  let chCv = null, cgCv = null, icCv = null, jlCv = null;
+  function chestSpr() {
+    if (chCv) return chCv;
+    const cv = document.createElement('canvas'); cv.width = cv.height = S * 2; const g = cv.getContext('2d'); g.scale(2, 2); g.translate(S / 2, S / 2);
+    const body = (h) => rrp(h, -21, -16, 42, 33, 6);
+    contact(g, 0, 19, 17, 4.4, 0.32);
+    uni(g, [[body, '#d08f44']], 1.7);
+    inpath(g, [[body, '#d08f44']], (h) => {
+      h.fillStyle = ART.lite('#d08f44', 0.22); h.fillRect(-23, -18, 46, 12);
+      h.fillStyle = ART.dark('#d08f44', 0.3); h.fillRect(-23, -6, 46, 6);
+      h.fillStyle = ART.dark('#d08f44', 0.16); h.fillRect(-23, 8, 46, 12);
+      h.fillStyle = '#ffd23d'; h.beginPath(); rrp(h, -7, -7, 14, 15, 3); h.fill();
+      h.fillStyle = ART.dark('#ffd23d', 0.45); h.beginPath(); h.arc(0, -1, 2.6, 0, 6.2832); h.fill(); h.fillRect(-1.2, -1, 2.4, 6);
+    });
+    spec(g, -11, -11, 6, 2.6, -0.5, 0.5);
+    return (chCv = cv);
+  }
+  function cageSpr() {
+    if (cgCv) return cgCv;
+    const cv = document.createElement('canvas'); cv.width = cv.height = S * 2; const g = cv.getContext('2d'); g.scale(2, 2); g.translate(S / 2, S / 2);
+    const body = (h) => { h.moveTo(-19, 18); h.lineTo(-19, -4); h.arcTo(-19, -20, 0, -20, 16); h.arcTo(19, -20, 19, -4, 16); h.lineTo(19, 18); h.closePath(); };
+    contact(g, 0, 20, 17, 4.2, 0.32);
+    uni(g, [[body, '#9aa7c9']], 1.7);
+    inpath(g, [[body, '#9aa7c9']], (h) => {
+      h.fillStyle = '#4a3a70'; h.fillRect(-20, -8, 40, 24);
+      h.fillStyle = '#ffd08a'; h.beginPath(); h.ellipse(0, 7, 10, 8, 0, 0, 6.2832); h.fill();
+      h.fillStyle = ART.OUT; h.beginPath(); h.ellipse(-3.6, 5, 1.8, 2.1, 0, 0, 6.2832); h.fill(); h.beginPath(); h.ellipse(3.6, 5, 1.8, 2.1, 0, 0, 6.2832); h.fill();
+      h.fillStyle = ART.dark('#9aa7c9', 0.3); for (let i = -2; i <= 2; i++) h.fillRect(i * 8 - 1.6, -20, 3.2, 40);
+      h.fillStyle = ART.dark('#9aa7c9', 0.18); h.fillRect(-20, 13, 40, 7);
+    });
+    spec(g, -9, -12, 5.4, 2.4, -0.5, 0.45);
+    return (cgCv = cv);
+  }
+  function iceIco() {
+    if (icCv) return icCv;
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d'); g.translate(32, 32);
+    const body = (h) => { for (let i = 0; i < 6; i++) { const a = i * 1.0472; h.moveTo(0, 0); h.lineTo(Math.cos(a) * 26, Math.sin(a) * 26); h.lineTo(Math.cos(a + 0.42) * 12, Math.sin(a + 0.42) * 12); h.closePath(); } };
+    uni(g, [[body, '#bfeaff']], 2.6);
+    return (icCv = cv);
+  }
+  function jellyIco() {
+    if (jlCv) return jlCv;
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d'); g.translate(32, 32);
+    const body = (h) => { h.moveTo(-24, 16); h.bezierCurveTo(-26, -14, -10, -24, 0, -24); h.bezierCurveTo(12, -24, 26, -12, 24, 16); h.closePath(); };
+    uni(g, [[body, '#ff8ad0']], 2.6);
+    inpath(g, [[body, '#ff8ad0']], (h) => { h.fillStyle = 'rgba(255,255,255,.4)'; h.beginPath(); h.ellipse(-8, -8, 7, 5, -0.5, 0, 6.2832); h.fill(); });
+    return (jlCv = cv);
+  }
+
+  /* ---------------- nivel y disposición ---------------- */
+  function load(i) {
+    const lv = LV[i - 1];
+    LS = M3.make(lv, { colors: colsOf(lv), moves: mvOf(lv) });
+    M3.settle(LS, 4000);
+    fx = LS.c.map((r) => r.map(() => 0));
+    A = null; idleOn = true; selL = null; hintL = null; idleT = 0; pops = []; cmbT = 0; noteT = 0; starsL = 0;
+    curL = [Math.min(LS.w - 1, LS.w >> 1), Math.min(LS.h - 1, LS.h >> 1)]; kbdL = false; dragL = null; queuedL = null;
+    layout();
+  }
+  function layout() {
+    if (!LS) return;
+    const topFree = 56;                      /* el reproductor pone su botón de pausa arriba al centro */
+    const cs = Math.min((k.H - topFree - 44) / LS.h, (k.W - 380) / LS.w, 86);
+    side = k.W >= 760 && k.W - cs * LS.w >= 260 && cs >= 34;
+    if (side) {
+      CS = Math.max(22, Math.floor(cs));
+      const bw = CS * LS.w; PW = Math.max(230, Math.min(340, Math.floor(k.W - bw - 60)));
+      const tot = bw + PW + 26; PX = Math.round((k.W - tot) / 2);
+      BX = Math.round(PX + PW + 26); BY = Math.round(topFree + (k.H - topFree - CS * LS.h) / 2);
+      PH = Math.min(k.H - topFree - 16, 238 + 37 * LS.obj.length);
+      PY = Math.round(Math.max(topFree + 8, BY + (CS * LS.h - PH) / 2));
+      TOPH = topFree;
+    } else {
+      TOPH = 102;
+      const availW = k.W - 20, availH = k.H - TOPH - 36;
+      CS = Math.max(18, Math.floor(Math.min(availW / LS.w, availH / LS.h, 80)));
+      BX = Math.round((k.W - CS * LS.w) / 2); BY = Math.round(TOPH + (availH - CS * LS.h) / 2);
+      PW = 0; PX = 0;
+    }
+    bgL = null;
+  }
+  function makeBg() {
+    const sc = (k.W > 900 || k.H > 900) ? 1 : CDPR;
+    const cv = document.createElement('canvas'); cv.width = Math.ceil(k.W * sc); cv.height = Math.ceil(k.H * sc);
+    const g = cv.getContext('2d'); g.scale(sc, sc);
+    const gr = g.createLinearGradient(0, 0, 0, k.H); gr.addColorStop(0, '#3b2468'); gr.addColorStop(0.6, '#241645'); gr.addColorStop(1, '#170f2e');
+    g.fillStyle = gr; g.fillRect(0, 0, k.W, k.H);
+    g.strokeStyle = 'rgba(255,255,255,.04)'; g.lineWidth = 2;
+    for (let i = -k.H; i < k.W; i += 28) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + k.H, k.H); g.stroke(); }
+    if (LS) {
+      const r = Math.max(4, CS * 0.15);
+      for (let y = 0; y < LS.h; y++) for (let x = 0; x < LS.w; x++) { if (LS.bl[y][x]) continue; g.fillStyle = 'rgba(0,0,0,.34)'; g.fillRect(BX + x * CS - 4, BY + y * CS + 2, CS + 8, CS + 8); }
+      for (let y = 0; y < LS.h; y++) for (let x = 0; x < LS.w; x++) { if (LS.bl[y][x]) continue; g.fillStyle = '#5a4390'; g.fillRect(BX + x * CS - 4, BY + y * CS - 4, CS + 8, CS + 8); }
+      for (let y = 0; y < LS.h; y++) for (let x = 0; x < LS.w; x++) { if (LS.bl[y][x]) continue; g.fillStyle = '#2a1d4f'; g.fillRect(BX + x * CS, BY + y * CS, CS, CS); }
+      for (let y = 0; y < LS.h; y++) for (let x = 0; x < LS.w; x++) { if (LS.bl[y][x]) continue; g.fillStyle = (x + y) % 2 ? '#33265e' : '#2c2154'; ART.rr(g, BX + x * CS + 1.5, BY + y * CS + 1.5, CS - 3, CS - 3, r); g.fill(); }
+    }
+    if (side) { g.fillStyle = 'rgba(0,0,0,.3)'; ART.rr(g, PX, PY + 6, PW, PH, 18); g.fill(); ART.rr(g, PX, PY, PW, PH, 18); ART.fillOut(g, '#33265e', 3); }
+    return cv;
+  }
+
+  /* ---------------- animación: cada paso del motor es un fotograma largo ---------------- */
+  function fallFx(prev) {
+    for (let y = 0; y < LS.h; y++) for (let x = 0; x < LS.w; x++) fx[y][x] = 0;
+    for (let x = 0; x < LS.w; x++) {
+      const t = LS.top[x], b = LS.bot[x]; if (t < 0) continue;
+      const old = []; for (let y = b; y >= t; y--) if (prev[y][x] !== E) old.push(y);
+      let j = 0;
+      for (let y = b; y >= t; y--) {
+        if (LS.c[y][x] === E) continue;
+        const oy = j < old.length ? old[j] : (t - 1 - (j - old.length));
+        fx[y][x] = (oy - y) * CS; j++;
+      }
+    }
+  }
+  const cxp = (x) => BX + x * CS + CS / 2, cyp = (y) => BY + y * CS + CS / 2;
+  function stepOnce() {
+    const prev = LS.c.map((r) => r.slice()), psp = LS.sp.map((r) => r.slice());
+    const ev = M3.step(LS);
+    if (ev.t === 'idle') { idleOn = true; return; }
+    if (ev.t === 'win') { lwin(); return; }
+    if (ev.t === 'lose') { llose(); return; }
+    if (ev.t === 'clear') {
+      pops = [];
+      for (let q = 0; q < ev.cells.length; q++) { const i = ev.cells[q], y = (i / LS.w) | 0, x = i % LS.w; pops.push({ x: x, y: y, v: prev[y][x], sp: psp[y][x], kind: 'gem' }); }
+      for (let q = 0; q < ev.freed.length; q++) { const i = ev.freed[q], y = (i / LS.w) | 0, x = i % LS.w; pops.push({ x: x, y: y, v: 0, sp: 0, kind: 'cage' }); }
+      let sx = 0, sy = 0, n = 0;
+      for (let q = 0; q < pops.length && q < 14; q++) { const p = pops[q]; k.burst(cxp(p.x), cyp(p.y), p.kind === 'cage' ? '#ffd23d' : (GEM[p.v] || '#fff'), 6, 130); }
+      for (let q = 0; q < pops.length; q++) { sx += cxp(pops[q].x); sy += cyp(pops[q].y); n++; }
+      if (n) k.float('+' + ev.pts, sx / n, sy / n, ev.combo > 1 ? '#fff38a' : '#fff');
+      if (ev.big || pops.length >= 7) { k.flash('rgba(255,255,255,.2)'); k.shake(4); }
+      if (ev.combo > 1) { cmbTxt = ev.combo >= 5 ? '¡Increíble!' : ev.combo >= 4 ? '¡Fantástico!' : ev.combo === 3 ? '¡Genial!' : '¡Bien!'; cmbT = 1.1; }
+      if (ev.freed.length) k.sfx('win'); else k.sfx(ev.combo > 1 ? 'coin' : 'pop');
+      navigator.vibrate && navigator.vibrate(12);
+      A = { t: 'clear', time: 0, dur: 0.2 }; return;
+    }
+    if (ev.t === 'chest') {
+      pops = ev.cells.map((i) => ({ x: i % LS.w, y: (i / LS.w) | 0, v: 0, sp: 0, kind: 'chest' }));
+      for (let q = 0; q < pops.length; q++) { const p = pops[q]; k.burst(cxp(p.x), cyp(p.y), '#ffd23d', 16, 150); k.float('+300', cxp(p.x), cyp(p.y) - CS * 0.5, '#ffd23d'); }
+      k.sfx('coin'); k.shake(5);
+      A = { t: 'chest', time: 0, dur: 0.34 }; return;
+    }
+    if (ev.t === 'fall') { fallFx(prev); A = { t: 'fall', time: 0, dur: 0.17 }; return; }
+    if (ev.t === 'shuffle') { noteTxt = 'Sin jugadas: barajo el tablero'; noteT = 1.6; k.sfx('explode'); A = { t: 'shuffle', time: 0, dur: 0.4 }; return; }
+    A = { t: 'wait', time: 0, dur: 0.05 };
+  }
+  function lwin() {
+    starsL = M3.stars(LS);
+    try { if (starsL > getStars(k.lv)) localStorage.setItem(stKey(), String(starsL)); } catch (e) { }
+    k.best(CFG.id, LS.score); k.sfx('win'); k.confetti();
+    const lv = LV[k.lv - 1], ss = '★★★'.slice(0, starsL) + '☆☆☆'.slice(0, 3 - starsL);
+    k.levelDone(LS.score, lv.n + ' · ' + ss + '<br>' + LS.score + ' puntos · ' + LS.mv + ' movimiento' + (LS.mv === 1 ? '' : 's') + ' de sobra');
+  }
+  function llose() {
+    const miss = LS.obj.filter((o) => o.got < o.n).map((o) => objName(o) + ' ' + o.got + '/' + o.n).join(' · ');
+    k.lose(CFG.id, LS.score, 'Sin movimientos', 'Nivel ' + k.lv + '/' + NLV + (miss ? ' · falta ' + miss : ''));
+  }
+
+  /* ---------------- entrada ---------------- */
+  const inB = (p) => !!p && p[0] >= 0 && p[1] >= 0 && p[0] < LS.w && p[1] < LS.h && !LS.bl[p[1]][p[0]];
+  const cellAt = (X, Y) => [Math.floor((X - BX) / CS), Math.floor((Y - BY) / CS)];
+  function tryMove(a, bb) {
+    if (!inB(a) || !inB(bb)) return;
+    if (Math.abs(a[0] - bb[0]) + Math.abs(a[1] - bb[1]) !== 1) return;
+    selL = null; hintL = null; idleT = 0;
+    if (M3.valid(LS, a[0], a[1], bb[0], bb[1])) { A = { t: 'swap', time: 0, dur: 0.16, a: a, b: bb }; k.sfx('click'); }
+    else { A = { t: 'bad', time: 0, dur: 0.3, a: a, b: bb }; k.sfx('hit'); }
+  }
+  function afterAnim(a) {
+    pops = [];
+    if (a.t === 'swap') { M3.doSwap(LS, a.a[0], a.a[1], a.b[0], a.b[1]); idleOn = false; }
+  }
+
+  function reset() { load(k.lv || 1); }
+  k.onSize = () => { layout(); };
+  k.onDif = () => { if (k.st !== 'play') reset(); };
+  k.levels(NLV, { start: (i) => { load(i); if (k.st === 'play') k.st = 'over'; } });
+  reset();
+  k.show(CFG.title, 'Alinea tres o más gemas. Cada nivel pide algo distinto y tiene los movimientos contados. ' + NLV + ' niveles, hasta tres estrellas en cada uno.');
+
+  k.run((dt) => {
+    if (cmbT > 0) cmbT -= dt; if (noteT > 0) noteT -= dt;
+    if (!k.gate(reset)) return;
+    if (A) { A.time += dt; if (A.time >= A.dur) { const a = A; A = null; afterAnim(a); } return; }
+    if (!idleOn) { stepOnce(); return; }
+    /* ---- inactivo: manda el jugador ---- */
+    if (k.ptr.hit) { const s0 = cellAt(k.ptr.sx, k.ptr.sy); dragL = inB(s0) ? { s0: s0, done: false } : null; kbdL = false; }
+    const dx = k.ptr.x - k.ptr.sx, dy = k.ptr.y - k.ptr.sy, far = Math.hypot(dx, dy) > Math.max(14, CS * 0.35);
+    if (dragL && !dragL.done && (k.ptr.down || k.ptr.up) && far) {
+      dragL.done = true;
+      queuedL = [dragL.s0, Math.abs(dx) > Math.abs(dy) ? [dragL.s0[0] + Math.sign(dx), dragL.s0[1]] : [dragL.s0[0], dragL.s0[1] + Math.sign(dy)]];
+    }
+    if (queuedL) { const q = queuedL; queuedL = null; tryMove(q[0], q[1]); return; }
+    if (dragL && !dragL.done && k.ptr.up) {
+      const s0 = dragL.s0;
+      if (selL && Math.abs(selL[0] - s0[0]) + Math.abs(selL[1] - s0[1]) === 1) tryMove(selL, s0);
+      else { selL = selL && selL[0] === s0[0] && selL[1] === s0[1] ? null : s0; k.sfx('click'); }
+    }
+    if (k.ptr.up) dragL = null;
+    const DV = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] };
+    for (const d in DV) if (k.hit.has(d)) {
+      kbdL = true; const nx = [k.clamp(curL[0] + DV[d][0], 0, LS.w - 1), k.clamp(curL[1] + DV[d][1], 0, LS.h - 1)];
+      if (selL) { tryMove(selL, [selL[0] + DV[d][0], selL[1] + DV[d][1]]); curL = nx; return; }
+      curL = nx;
+    }
+    if (k.hit.has('a')) { kbdL = true; selL = selL ? null : [curL[0], curL[1]]; k.sfx('click'); }
+    idleT += dt; if (idleT > (k.dif === 0 ? 3 : k.dif === 2 ? 7 : 5) && !hintL) hintL = M3.findMove(LS);
+  }, () => {
+    if (!LS) return;
+    if (!bgL) bgL = makeBg();
+    c.drawImage(bgL, 0, 0, k.W, k.H);
+    const t = performance.now() / 1000;
+    const e = A ? ease(Math.min(1, A.time / A.dur)) : 0;
+    const sh = A && A.t === 'shuffle' ? Math.sin(Math.min(1, A.time / A.dur) * Math.PI) : 0;
+    /* gelatina bajo las gemas */
+    for (let y = 0; y < LS.h; y++) for (let x = 0; x < LS.w; x++) {
+      if (LS.bl[y][x] || LS.jl[y][x] <= 0) continue;
+      const X = BX + x * CS, Y = BY + y * CS;
+      c.fillStyle = LS.jl[y][x] > 1 ? 'rgba(178,72,232,.62)' : 'rgba(255,124,196,.5)';
+      ART.rr(c, X + 2, Y + 2, CS - 4, CS - 4, Math.max(4, CS * 0.16)); c.fill();
+      if (LS.jl[y][x] > 1) { c.fillStyle = 'rgba(255,255,255,.16)'; ART.rr(c, X + 6, Y + 6, CS - 12, CS - 12, Math.max(3, CS * 0.12)); c.fill(); }
+    }
+    const drawPiece = (v, sp, X, Y, sc) => {
+      const d = CS * sc;
+      if (v === CH) c.drawImage(chestSpr(), X - d / 2, Y - d / 2, d, d);
+      else if (v === CG) c.drawImage(cageSpr(), X - d / 2, Y - d / 2, d, d);
+      else if (v === WD) c.drawImage(spSpr(0, M3.WSP), X - d / 2, Y - d / 2, d, d);
+      else if (v >= 0) c.drawImage(sp ? spSpr(v, sp) : gemSprite(v), X - d / 2, Y - d / 2, d, d);
+    };
+    const swapPos = (x, y) => {
+      if (!A || (A.t !== 'swap' && A.t !== 'bad')) return null;
+      const p = Math.min(1, A.time / A.dur), f = A.t === 'bad' ? Math.sin(p * Math.PI) * 0.55 : (p < 0.5 ? 2 * p * p : 1 - 2 * (1 - p) * (1 - p));
+      const a = A.a, bb = A.b;
+      if (x === a[0] && y === a[1]) return [cxp(a[0]) + (cxp(bb[0]) - cxp(a[0])) * f, cyp(a[1]) + (cyp(bb[1]) - cyp(a[1])) * f];
+      if (x === bb[0] && y === bb[1]) return [cxp(bb[0]) + (cxp(a[0]) - cxp(bb[0])) * f, cyp(bb[1]) + (cyp(a[1]) - cyp(bb[1])) * f];
+      return null;
+    };
+    for (let y = 0; y < LS.h; y++) for (let x = 0; x < LS.w; x++) {
+      if (LS.bl[y][x]) continue;
+      const v = LS.c[y][x]; if (v === E) continue;
+      let X = cxp(x), Y = cyp(y);
+      if (A && A.t === 'fall' && fx[y] && fx[y][x]) Y += fx[y][x] * (1 - e);
+      const sp2 = swapPos(x, y); if (sp2) { X = sp2[0]; Y = sp2[1]; }
+      if (sh) { X += Math.sin((x * 3 + y * 5) * 1.7) * sh * CS * 0.22; Y += Math.cos((x * 5 + y * 3) * 1.3) * sh * CS * 0.22; }
+      let s = 1;
+      if (selL && selL[0] === x && selL[1] === y) s = 1.1 + Math.sin(t * 8) * 0.04;
+      else if (hintL && ((hintL[0] === x && hintL[1] === y) || (hintL[2] === x && hintL[3] === y))) s = 1 + Math.abs(Math.sin(t * 5)) * 0.12;
+      drawPiece(v, LS.sp[y][x], X, Y, s);
+      if (LS.ice[y][x] > 0) {
+        const bx = BX + x * CS, by = BY + y * CS, r = Math.max(4, CS * 0.15);
+        c.fillStyle = 'rgba(200,238,255,.5)'; ART.rr(c, bx + 1.5, by + 1.5, CS - 3, CS - 3, r); c.fill();
+        c.fillStyle = 'rgba(255,255,255,.45)'; c.beginPath();
+        c.moveTo(bx + 4, by + CS * 0.62); c.lineTo(bx + CS * 0.44, by + 4); c.lineTo(bx + CS * 0.68, by + 4); c.lineTo(bx + 4, by + CS - 5); c.closePath(); c.fill();
+        c.lineWidth = 2; c.strokeStyle = 'rgba(26,21,48,.35)'; ART.rr(c, bx + 1.5, by + 1.5, CS - 3, CS - 3, r); c.stroke();
+      }
+    }
+    if (A && (A.t === 'clear' || A.t === 'chest')) {
+      const p = Math.min(1, A.time / A.dur);
+      for (let q = 0; q < pops.length; q++) {
+        const o = pops[q], sc = 1 + 0.3 * Math.sin(p * Math.PI) - p * 0.95; if (sc <= 0) continue;
+        const X = cxp(o.x), Y = cyp(o.y) - (o.kind === 'chest' ? p * CS * 0.5 : 0);
+        if (o.kind === 'chest') c.drawImage(chestSpr(), X - CS * sc / 2, Y - CS * sc / 2, CS * sc, CS * sc);
+        else if (o.kind === 'cage') c.drawImage(cageSpr(), X - CS * sc / 2, Y - CS * sc / 2, CS * sc, CS * sc);
+        else drawPiece(o.v, o.sp, X, Y, sc);
+        c.globalAlpha = Math.sin(p * Math.PI) * 0.75; c.fillStyle = '#fff'; c.beginPath(); c.arc(X, Y, CS * 0.36 * sc + 3, 0, 6.283); c.fill(); c.globalAlpha = 1;
+      }
+    }
+    for (const p of [selL, kbdL ? curL : null]) if (p && !LS.bl[p[1]][p[0]]) {
+      c.lineWidth = 3; c.strokeStyle = p === selL ? '#fff' : 'rgba(255,255,255,.5)';
+      ART.rr(c, BX + p[0] * CS + 2, BY + p[1] * CS + 2, CS - 4, CS - 4, Math.max(4, CS * 0.16));
+      if (p === selL) { c.fillStyle = 'rgba(255,255,255,.18)'; c.fill(); }
+      c.stroke();
+    }
+    if (cmbT > 0) {
+      const al = Math.min(1, cmbT / 0.3), sc = 1 + Math.max(0, cmbT - 0.9) * 2;
+      c.globalAlpha = al; label(cmbTxt, BX + CS * LS.w / 2, BY + CS * LS.h / 2 - 22, Math.round(Math.min(40, CS * 0.78) * sc), '#ff9ad5', 'center', 'middle'); c.globalAlpha = 1;
+    }
+    if (noteT > 0) { c.globalAlpha = Math.min(1, noteT / 0.4); label(noteTxt, BX + CS * LS.w / 2, BY + CS * LS.h / 2, Math.max(13, Math.min(20, CS * 0.4)), '#fff38a', 'center', 'middle'); c.globalAlpha = 1; }
+    hud();
+  });
+
+  /* ---------------- marcador ---------------- */
+  function ico(o, X, Y, d) {
+    if (o.t === 'color') c.drawImage(gemSprite(Math.min(LS.nc - 1, o.v)), X - d / 2, Y - d / 2, d, d);
+    else if (o.t === 'chest') c.drawImage(chestSpr(), X - d / 2, Y - d / 2, d, d);
+    else if (o.t === 'animal') c.drawImage(cageSpr(), X - d / 2, Y - d / 2, d, d);
+    else if (o.t === 'ice') c.drawImage(iceIco(), X - d / 2, Y - d / 2, d, d);
+    else c.drawImage(jellyIco(), X - d / 2, Y - d / 2, d, d);
+  }
+  const chipTxt = (o) => (o.got >= o.n ? '¡Ya!' : o.got + '/' + o.n);
+  function chipW(o, h) { c.font = '800 ' + Math.round(h * 0.46) + 'px ui-rounded,"Trebuchet MS",sans-serif'; return h * 0.95 + c.measureText(chipTxt(o)).width + h * 0.42; }
+  function chip(x, y, w, h, o) {
+    const ok = o.got >= o.n;
+    c.fillStyle = ok ? 'rgba(74,214,140,.24)' : 'rgba(0,0,0,.36)';
+    ART.rr(c, x, y, w, h, h / 2); c.fill();
+    c.lineWidth = 2; c.strokeStyle = ok ? '#68e0a0' : 'rgba(255,255,255,.2)'; c.stroke();
+    ico(o, x + h * 0.52, y + h / 2, h * 0.78);
+    label(chipTxt(o), x + h * 0.95, y + h / 2 + 1, Math.round(h * 0.46), ok ? '#c8ffe2' : '#fff', 'left', 'middle');
+  }
+  function wrap(txt, x, y, w, lh) {
+    const words = String(txt || '').split(' '); let line = '', yy = y;
+    for (let i = 0; i < words.length; i++) {
+      const tst = line ? line + ' ' + words[i] : words[i];
+      if (c.measureText(tst).width > w && line) { c.fillText(line, x, yy); yy += lh; line = words[i]; if (yy > k.H - lh - 6) return; } else line = tst;
+    }
+    if (line) c.fillText(line, x, yy);
+  }
+  function hud() {
+    const stx = M3.stars(LS), ss = '★★★'.slice(0, stx) + '☆☆☆'.slice(0, 3 - stx);
+    if (side) {
+      const x = PX + 18; let y = PY + 16;
+      small('NIVEL', x, y); label(k.lv + '/' + NLV, x, y + 13, 24, '#fff'); y += 48;
+      small('MOVIMIENTOS', x, y); label(String(LS.mv), x, y + 13, 28, LS.mv <= 5 ? '#ff6b7a' : '#ffd23d'); y += 52;
+      small('OBJETIVOS', x, y); y += 17;
+      const h = 30;
+      for (let i = 0; i < LS.obj.length; i++) { chip(x, y, Math.min(PW - 36, chipW(LS.obj[i], h) + 8), h, LS.obj[i]); y += h + 7; }
+      y += 8; small('PUNTOS', x, y); label(String(LS.score), x, y + 13, 22, '#fff');
+      label(ss, x + PW - 36, y + 18, 18, '#ffd23d', 'right', 'middle'); y += 44;
+      if (PY + PH - y > 30) { c.font = '600 12px ui-rounded,"Trebuchet MS",sans-serif'; c.textAlign = 'left'; c.textBaseline = 'top'; c.fillStyle = '#b6a6e0'; wrap(LV[k.lv - 1].i, x, y, PW - 36, 15); }
+      return;
+    }
+    /* franja superior: izquierda y derecha; el centro se deja libre para el botón de pausa */
+    small('NIVEL', 14, 10); label(k.lv + '/' + NLV, 14, 22, 24, '#fff');
+    small('MOVIMIENTOS', k.W - 14, 10, '#c9b8f0', 'right'); label(String(LS.mv), k.W - 14, 22, 26, LS.mv <= 5 ? '#ff6b7a' : '#ffd23d', 'right');
+    const h = k.W < 400 ? 26 : 30, ws = LS.obj.map((o) => chipW(o, h) + 6);
+    let tot = 0; for (let i = 0; i < ws.length; i++) tot += ws[i];
+    tot += (ws.length - 1) * 6;
+    let sx2 = Math.max(6, (k.W - tot) / 2), gap = 6;
+    if (tot > k.W - 12) {
+      gap = 3; const base = tot - (ws.length - 1) * 6, sc = (k.W - 12 - (ws.length - 1) * gap) / base;
+      for (let i = 0; i < ws.length; i++) ws[i] = Math.max(h * 1.5, ws[i] * sc);
+      sx2 = 6;
+    }
+    for (let i = 0; i < LS.obj.length; i++) { chip(sx2, TOPH - h - 10, ws[i], h, LS.obj[i]); sx2 += ws[i] + gap; }
+    const by2 = BY + CS * LS.h + 8;
+    if (by2 < k.H - 16) { small('PUNTOS ' + LS.score, 14, by2); label(ss, k.W - 14, by2 + 6, 17, '#ffd23d', 'right', 'middle'); }
+  }
+  window.LG = { get S() { return LS; }, get busy() { return !!A || !idleOn; }, load: load, move: tryMove, M3: M3, LV: LV };
+})();
