@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Kuboplay Shield
  * Description: Seguridad (límite de peticiones, blindaje del login, cabeceras) y rendimiento (caché de página, carga ligera) para el portal.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: Kuboplay
  * License: GPLv2 or later
  * Text Domain: kuboplay-shield
@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
 
 final class KP_Shield {
 
-	const VERSION = '1.0.0';
+	const VERSION = '1.1.0';
 	const OPT     = 'kp_shield';
 
 	/** Valores por defecto de todos los ajustes. Cada módulo añade los suyos. */
@@ -26,13 +26,24 @@ final class KP_Shield {
 		);
 	}
 
+	/**
+	 * Ajustes ya mezclados con los valores por defecto.
+	 *
+	 * No se congela hasta que TODOS los módulos han arrancado (algunos declaran
+	 * sus valores por defecto dentro de su propio `boot()`): si se guardase en
+	 * la primera llamada, los módulos que llegan después se quedarían sin sus
+	 * valores por defecto y parecerían apagados.
+	 */
 	public static function opts() {
 		static $o = null;
-		if ( null === $o ) {
+		if ( null === $o || ! self::$ready ) {
 			$o = wp_parse_args( (array) get_option( self::OPT, array() ), self::defaults() );
 		}
 		return $o;
 	}
+
+	/** Se pone a true cuando boot() ha cargado todos los módulos. */
+	private static $ready = false;
 
 	public static function opt( $key, $fallback = null ) {
 		$o = self::opts();
@@ -96,6 +107,7 @@ final class KP_Shield {
 			}
 		}
 		do_action( 'kp_shield_boot' );
+		self::$ready = true;
 	}
 }
 
