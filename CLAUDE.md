@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **278 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2, 50 de la oleada 3, 13 de la oleada 4 y 15 de la oleada 5 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.39.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.40.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -169,6 +169,13 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
   - `golf.js`/`pool.js`/`bowling.js` + `golflv.js`/`poollv.js`/`bowllv.js` (**mini-golf-3d**, **pool-break**, **bolera-del-barrio**): 20 hoyos con molinos, cintas, rampas, tubos e imanes; 20 desafíos de mesa con bolas prohibidas y troneras tapadas; 20 retos con bolos trucados y aceite. Paso fijo de física (1/180, 1/480 y 1/360 s).
   - `cards.js` + `cardlv.js` (**klondike-solitaire**, **freecell**): 20 retos por juego con reparto fijo, cartel de escuela, objetivos de movimientos y tiempo y reto diario; se mantienen robo 1 y el supermovimiento.
   - `logic.js` + `sudlv.js` (**sudoku-zen**): tableros 4×4/6×6/9×9 con notas, deshacer, pista limitada y cartel de técnica. `nonogram.js` + `piclv.js` (**pixel-picross-xl**): 20 dibujos con autocruces, fallo al pintar en vacío y cadena de líneas. Los 40 con **solución única y sin adivinar verificada por resolutor propio** en Node.
+
+- **Tanda 6 de los 40 (1.40.0)**: doce juegos más a la vara de `docs/VARA.md`, con 20 retos escritos a mano cada uno, menú de niveles, progreso y estrellas por dificultad y final cerrado. Todo acotado por `CFG.id`, así que los juegos hermanos de cada motor quedan idénticos.
+  - `src/eng/partylv.js` — ruleta-de-minijuegos y tira-y-afloja (`party.js`).
+  - `src/eng/patalv.js`, `src/eng/bomlv.js`, `src/eng/brawlv.js` — patata-explosiva (`arena.js`), petardo-plaza (`bomber.js`) y gladiadores-de-juguete (`brawl.js`).
+  - `src/eng/prilv.js`, `src/eng/parlv.js` — balon-prisionero (`teamball.js`) y parchis-de-la-plaza (`tablero.js`). En el parchís, las vallas pasan a «no se puede parar en ellas» (antes cerraban el paso y una ficha devuelta a casa quedaba encerrada para siempre en los retos 15, 18, 19 y 20).
+  - `src/eng/trivlv.js`, `src/eng/pddlv.js`, `src/eng/dnclv.js` — trivia-de-sobremesa (`trivia.js`), palabra-del-dia (`palabras.js`) y flechas-de-baile (`rhythm.js`).
+  - Correcciones de verificación: `poollv.js` contaba falta al meter la bola correcta (el orden se calculaba después de retirarla), y los tiempos de estrella de `roadlv.js` eran un 14–35 % demasiado generosos; ambos ajustados con datos reales de bot.
 
 ## Kuboplay Shield (plugin aparte, `wp-content/plugins/kuboplay-shield`, v1.0.0)
 Segundo plugin, independiente del arcade: seguridad + rendimiento, con panel propio en español. Guía para el usuario: `docs/SEGURIDAD.md` (Cloudflare gratis paso a paso, qué hace y qué no, cómo recuperar el acceso desde IONOS).
