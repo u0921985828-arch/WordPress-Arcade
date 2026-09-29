@@ -2,10 +2,14 @@
  * | 'party' (Minigolf Party: 1–4 por turnos en horizontal, molinos, cintas y rampas sobre estanques; ver partyMain al final)
  * 9 hoyos, par 3, máximo 8 golpes por hoyo. Arrastra hacia atrás (desde cualquier punto) o flechas + A. Vista previa del primer tramo del tiro. */
 const M = CFG.mode, PARTY = M === 'party', OUT = ART.OUT, R2 = 6.2832, W = PARTY ? 640 : 360, H = PARTY ? 360 : 640, T = PARTY ? 29 : 30, COLS = PARTY ? 22 : 12, ROWS = PARTY ? 11 : 20, OY = PARTY ? 40 : 22, MAXS0 = PARTY ? 6 : 8, PAR = 3;
+/* mini-golf-3d (plan Friv · la vara): 20 hoyos escritos a mano en GOLFLV (src/eng/golflv.js).
+ * Todo lo nuevo va detrás de HAND: Putt Island y Minigolf Party no lo miran y quedan idénticos. */
+const HAND = M === 'walls' && CFG.id === 'mini-golf-3d' && typeof GOLFLV !== 'undefined' ? GOLFLV : null;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: M === 'island' ? '#1d6fb3' : '#23402b' }), c = k.ctx;
 /* Dificultad seleccionable: en normal life=0, rate=1 y cpu=0 → todo queda igual que siempre. */
 const MAXS = MAXS0 + k.D.life, DC = k.D.cpu;
 const TOPR = 2; // primera fila jugable: la franja superior queda libre para el marcador (la bandera no se tapa)
+let HH = null; // hoyo a mano en curso (GOLFLV.build)
 let grid, ball, hole, tee, holeN, strokes, total, pars, aiming, sunkT, lastPos, bumpers, sand, card, state, stT, course, kAng, kPow, kb, t = 0, msg, msgT, lastBump = 0;
 function genHole() {
   for (let tries = 0; tries < 100; tries++) {
@@ -92,6 +96,7 @@ function buildCourse() {
   // arena
   for (const s of sand) { const [x, y] = s.split(',').map(Number); ART.rr(g, x * T + 2, y * T + 2, T - 4, T - 4, 9); ART.fillOut(g, '#ecd28a', 2); g.fillStyle = '#d0b066'; for (let i = 0; i < 6; i++) g.fillRect(x * T + 6 + hr(x + i, y) * 18, y * T + 6 + hr(y + i, x) * 18, 2, 2); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(x * T + 7, y * T + 5, T - 14, 2); }
   if (PARTY) partyCourse(g);
+  if (HAND && HH) handCourse(g);
   g.restore();
   // tee: alfombrilla
   ART.rr(g, tee[0] - 16, tee[1] - 12, 32, 24, 5); ART.fillOut(g, '#2f7d3a', 2); g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 1.5; g.setLineDash([3, 3]); ART.rr(g, tee[0] - 12, tee[1] - 8, 24, 16, 3); g.stroke(); g.setLineDash([]);
@@ -129,7 +134,7 @@ function bump(v) { if (v > 60 && t - lastBump > 0.06) { lastBump = t; k.sfx('cli
 function shoot(a, p) { ball.vx = Math.cos(a) * p * 900; ball.vy = Math.sin(a) * p * 900; strokes++; lastPos = [ball.x, ball.y]; state = 'roll'; k.sfx(p > 0.7 ? 'shoot' : 'click'); k.burst(ball.x, ball.y + OY + 4, '#b6f0a0', 5, 50); }
 function endHole(n, txt, col) { strokes = n; card[holeN - 1] = n; total += n; pars += PAR; state = 'sink'; stT = 1.6; msg = txt; msgT = 1.6; if (col) k.float(txt, W / 2, 250, col); }
 function holeName(n) { return n === 1 ? '¡Hoyo en uno!' : n === PAR - 2 ? '¡Eagle!' : n === PAR - 1 ? '¡Birdie!' : n === PAR ? 'Par' : n === PAR + 1 ? 'Bogey' : `+${n - PAR}`; }
-if (!PARTY) { reset(); k.show(CFG.title, M === 'island' ? 'Arrastra hacia atrás para golpear (o ← → apuntar, ↑ ↓ fuerza, A golpear). Si cae al agua: +1 golpe. 9 hoyos, par 3, máximo 8 golpes.' : 'Arrastra hacia atrás para apuntar y golpear (o ← → apuntar, ↑ ↓ fuerza, A golpear). Rebota en las paredes. 9 hoyos, par 3, máximo 8 golpes.');
+if (!PARTY && !HAND) { reset(); k.show(CFG.title, M === 'island' ? 'Arrastra hacia atrás para golpear (o ← → apuntar, ↑ ↓ fuerza, A golpear). Si cae al agua: +1 golpe. 9 hoyos, par 3, máximo 8 golpes.' : 'Arrastra hacia atrás para apuntar y golpear (o ← → apuntar, ↑ ↓ fuerza, A golpear). Rebota en las paredes. 9 hoyos, par 3, máximo 8 golpes.');
 k.run((dt) => {
   t += dt; msgT -= dt; for (const o of bumpers) o.p = Math.max(0, o.p - dt * 4);
   if (!k.gate(reset)) return;
@@ -220,6 +225,15 @@ function drawGuide(b, aimA, aimP) {
     c.restore(); }
 }
 function label(s, x, y, size, col, align) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top'; c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y); }
+function fitLabel(s, x, y, size, col, maxW) { // encoge la letra y, si aún no cabe, recorta con «…»
+  let sz = size;
+  for (; sz > 7; sz--) { c.font = `800 ${sz}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; if (c.measureText(s).width <= maxW) break; }
+  c.font = `800 ${sz}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
+  let t = s;
+  while (t.length > 4 && c.measureText(t + '…').width > maxW) t = t.slice(0, -1);
+  if (t !== s) t += '…';
+  label(t, x, y, sz, col);
+}
 function panel(x, y, w, h) { ART.rr(c, x, y, w, h, 10); c.fillStyle = 'rgba(26,21,48,.72)'; c.fill(); c.lineWidth = 2; c.strokeStyle = 'rgba(255,255,255,.14)'; c.stroke(); }
 
 /* ¿la puntuación supera el récord guardado? (se consulta antes de que k.best lo actualice; mismo aviso que k.end) */
@@ -428,4 +442,164 @@ function partyMain() {
   k.show(CFG.title, 'Minigolf por turnos para 1–4: nueve hoyos locos con molinos, cintas y rampas sobre estanques. Joystick ← → gira la flecha (↑ ↓ ajuste fino); mantén A y suelta cuando la fuerza sea la justa. Si caes al agua, +1 golpe. Gana quien sume menos golpes.');
   k.run(update, draw);
 }
-if (PARTY) partyMain();
+if (PARTY) partyMain(); else if (HAND) handMain();
+
+/* ================= Mini Golf 3D · 20 hoyos a mano (HAND, plan Friv · la vara) =================
+ * La tabla y la física viven en src/eng/golflv.js (zona pura, verificable desde Node). Aquí solo
+ * se dibuja y se enlaza con el menú de niveles, las estrellas y el marcador de kit.js.
+ * Estrellas: 1★ terminar dentro del máximo · 2★ hacer el par · 3★ birdie (o mejor) y sin agua. */
+function handCourse(g) {
+  const T2 = T, R = ROWS, C = COLS;
+  // agua
+  for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) { if (HH.g[y][x] !== 2) continue; const px = x * T2, py = y * T2;
+    g.fillStyle = '#8c8676'; g.fillRect(px, py, T2, T2);
+    ART.rr(g, px + 1, py + 1, T2 - 2, T2 - 2, 7); const gr = g.createLinearGradient(0, py, 0, py + T2); gr.addColorStop(0, '#2372c0'); gr.addColorStop(1, '#3b9be6'); g.fillStyle = gr; g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.45)'; g.lineWidth = 1.5; g.beginPath(); g.arc(px + 9 + hr(x, y) * 8, py + 10 + hr(y, x) * 8, 4, 3.6, 5.8); g.stroke(); g.beginPath(); g.arc(px + 19, py + 21, 3, 3.6, 5.8); g.stroke(); }
+  // barro pegajoso
+  for (const kk in HH.glue) { const [x, y] = kk.split(',').map(Number), px = x * T2, py = y * T2;
+    ART.rr(g, px + 1, py + 1, T2 - 2, T2 - 2, 8); ART.fillOut(g, '#6b4a24', 2);
+    g.fillStyle = '#54381a'; for (let i = 0; i < 7; i++) { g.beginPath(); g.ellipse(px + 6 + hr(x + i, y) * 18, py + 6 + hr(y + i, x) * 18, 3.4, 2.2, 0, 0, R2); g.fill(); }
+    g.fillStyle = 'rgba(255,230,190,.16)'; g.beginPath(); g.ellipse(px + 11, py + 9, 6, 3, -0.5, 0, R2); g.fill(); }
+  // rampas de salto
+  for (const kk in HH.ramps) { const [x, y] = kk.split(',').map(Number), px = x * T2, py = y * T2;
+    const gr = g.createLinearGradient(px, 0, px + T2, 0); gr.addColorStop(0, '#9a5f2e'); gr.addColorStop(1, '#e7a862');
+    ART.rr(g, px + 1, py + 1, T2 - 2, T2 - 2, 4); g.fillStyle = gr; g.fill(); g.lineWidth = 2; g.strokeStyle = OUT; g.stroke();
+    g.fillStyle = 'rgba(255,240,210,.45)'; for (let i = 0; i < 3; i++) g.fillRect(px + 4 + i * 8, py + 3, 2, T2 - 6);
+    g.fillStyle = '#fff'; g.strokeStyle = OUT; g.lineWidth = 1.5; g.beginPath(); g.moveTo(px + 9, py + 8); g.lineTo(px + 20, py + T2 / 2); g.lineTo(px + 9, py + T2 - 8); g.lineTo(px + 13, py + T2 / 2); g.closePath(); g.fill(); g.stroke(); }
+  // bocas de tubo (cada pareja con su color)
+  const TC = ['#6e62f5', '#ff8a3d', '#31c4a8', '#e05aa8'];
+  for (const kk in HH.tubes) { const [x, y] = kk.split(',').map(Number), px = (x + 0.5) * T2, py = (y + 0.5) * T2, col = TC[(HH.tubes[kk].c - 1) % 4];
+    g.beginPath(); cp(g, px, py, 12); ART.fillOut(g, ART.dark(col, 0.35), 2.5);
+    g.beginPath(); cp(g, px, py, 8.5); g.fillStyle = col; g.fill();
+    g.beginPath(); cp(g, px, py, 5); g.fillStyle = '#120f22'; g.fill();
+    g.fillStyle = 'rgba(255,255,255,.55)'; g.beginPath(); g.ellipse(px - 3.5, py - 4.5, 3, 1.8, -0.6, 0, R2); g.fill(); }
+  // placa del imán
+  for (const m of HH.mag) { g.beginPath(); cp(g, m.x, m.y, 13); ART.fillOut(g, '#2b58b8', 2.5);
+    g.beginPath(); cp(g, m.x, m.y, 7); g.fillStyle = '#9fc4ff'; g.fill();
+    g.fillStyle = 'rgba(255,255,255,.5)'; g.beginPath(); g.ellipse(m.x - 3.5, m.y - 4.5, 3.4, 2, -0.6, 0, R2); g.fill(); }
+}
+function handMain() {
+  const LVN = HAND.LV.length;
+  let accH = 0, tmH = 0;
+  let stateH = 'aim', stT = 0, strokes = 0, water = 0, lastP = [0, 0], aim2 = false, kA = 0, kP = 0.5, kb2 = false, tipT = 0, best2 = 0, msgH = '', msgHT = 0;
+  const par = () => HH.par, maxS = () => HH.max;
+  function load(i) {
+    HH = HAND.build(i, k.dif);
+    grid = HH.g; tee = HH.tee; hole = HH.hole; bumpers = HH.bump; holeN = i;
+    sand = new Set(Object.keys(HH.sand));
+    buildCourse();
+    ball = HAND.newBall(HH); ball.s = 1; ball.a = 1; ball.ev = [];
+    lastP = [ball.x, ball.y]; strokes = 0; water = 0; stateH = 'aim'; tipT = 4.2; msgHT = 0;
+    kA = Math.atan2(hole[1] - ball.y, hole[0] - ball.x); kP = 0.5;
+  }
+  function reset2() { load(k.lv); }
+  k.levels(LVN, { start: (i) => { load(i); if (k.st === 'play') k.st = 'over'; } });
+  load(k.lv);
+  k.bot = { shoot: (ang, p) => { if (stateH === 'aim') shootH(ang, p); }, st: () => stateH, H: () => HH, ball: () => ball }; // gancho de pruebas (Playwright)
+  k.show(CFG.title, `20 hoyos hechos a mano: molinos, cintas, rampas, imanes, tubos y agua. Par por hoyo y estrellas por bajar del par.`);
+  function shootH(a, p) {
+    ball.vx = Math.cos(a) * p * 900; ball.vy = Math.sin(a) * p * 900; strokes++; lastP = [ball.x, ball.y];
+    stateH = 'roll'; accH = 0; tmH = t; k.sfx(p > 0.7 ? 'shoot' : 'click'); k.burst(ball.x, ball.y + OY + 4, '#b6f0a0', 5, 50);
+  }
+  function evs() { for (const [s, v] of ball.ev) {
+      if (s === 'bump') bump(v); else if (s === 'pop') { const o = bumpers[v]; if (o) { o.p = 1; k.sfx('pop'); k.burst(o.x, o.y + OY, '#ffc2cf', 6, 80); } }
+      else if (s === 'tube') { k.sfx('coin'); k.burst(ball.x, ball.y + OY, '#a097ff', 10, 90); }
+      else if (s === 'ramp') k.sfx('jump'); else if (s === 'land') { k.sfx('hit'); k.burst(ball.x, ball.y + OY + 4, '#d8f5c8', 6, 60); }
+      else if (s === 'mill' && t - lastBump > 0.08) { lastBump = t; k.sfx('hit'); k.shake(1.5); }
+      else if (s === 'lip') { k.sfx('click'); k.float('¡Se asoma!', hole[0], hole[1] - 16, '#ffd166'); } }
+    ball.ev.length = 0; }
+  function finish() {
+    const n = strokes, p = par();
+    const stars = n <= p - 1 && water === 0 ? 3 : n <= p ? 2 : 1;
+    const pts = Math.max(50, 100 + (maxS() - n) * 60 + (water ? 0 : 40));
+    best2 = k.best(CFG.id, k.starsTotal() * 10);
+    const falta = stars === 3 ? '¡Bordado!' : stars === 2 ? `3★: birdie (${p - 1} golpes) sin agua` : `2★: el par (${p} golpes)`;
+    k.levelDone(pts, `${HH.name} · ${n} golpe${n === 1 ? '' : 's'} (par ${p})${water ? ` · ${water} al agua` : ''}<br>${falta}`, { stars });
+  }
+  k.run((dt) => {
+    t += dt; msgHT -= dt; tipT -= dt; for (const o of bumpers) o.p = Math.max(0, o.p - dt * 4);
+    if (!k.gate(reset2)) return;
+    if (stateH === 'sink') { ball.s = Math.max(0, ball.s - dt * 4); stT -= dt; if (stT <= 0) finish(); return; }
+    if (stateH === 'splash') { stT -= dt; if (stT <= 0) { ball.x = lastP[0]; ball.y = lastP[1]; ball.vx = ball.vy = 0; ball.air = 0; ball.a = 1; k.sfx('pop'); k.burst(ball.x, ball.y + OY, '#fff', 8, 60);
+        if (strokes >= maxS()) return fail(); stateH = 'aim'; } return; }
+    if (stateH === 'aim') {
+      if (k.ptr.hit) aim2 = true;
+      if (aim2 && k.ptr.down) { const dx = k.ptr.sx - k.ptr.x, dy = k.ptr.sy - k.ptr.y; if (Math.hypot(dx, dy) > 8) { kA = Math.atan2(dy, dx); kP = Math.min(1, Math.hypot(dx, dy) / 150); } }
+      if (aim2 && k.ptr.up) { aim2 = false; const dx = k.ptr.sx - k.ptr.x, dy = k.ptr.sy - k.ptr.y, p = Math.min(1, Math.hypot(dx, dy) / 150); if (p > 0.05) shootH(Math.atan2(dy, dx), p); }
+      if (k.held.has('left')) { kA -= 1.8 * dt; kb2 = true; } if (k.held.has('right')) { kA += 1.8 * dt; kb2 = true; }
+      if (k.held.has('up')) { kP = Math.min(1, kP + 0.7 * dt); kb2 = true; } if (k.held.has('down')) { kP = Math.max(0.08, kP - 0.7 * dt); kb2 = true; }
+      if (k.hit.has('a')) shootH(kA, kP);
+      return;
+    }
+    // paso fijo de 1/180 s: la bola se comporta igual a 30 o a 144 fps y la guía no miente
+    accH = Math.min(accH + dt, 0.3);
+    while (accH >= 1 / 180) { accH -= 1 / 180; tmH += 1 / 180; const r = HAND.step(HH, ball, 1 / 180, tmH, true); evs();
+      if (r === 'water') { strokes++; water++; stateH = 'splash'; stT = 0.8; ball.a = 0; ball.vx = ball.vy = 0; ball.air = 0; ball.splash = [ball.x, ball.y];
+        navigator.vibrate && navigator.vibrate(60); k.sfx('hurt'); k.burst(ball.x, ball.y + OY, '#bfe8ff', 18, 140); k.float('+1 agua', ball.x, ball.y - 10, '#bfe8ff'); return; }
+      if (r === 'hole') { ball.x = hole[0]; ball.y = hole[1]; ball.vx = ball.vy = 0; ball.air = 0; stateH = 'sink'; stT = 1.15;
+        const n = strokes, p = par(); msgH = n === 1 ? '¡Hoyo en uno!' : n < p ? '¡Birdie!' : n === p ? 'Par' : `+${n - p}`; msgHT = 1.5;
+        k.sfx(n <= p ? 'win' : 'coin'); if (n <= p) { k.confetti(); k.reward(msgH, '#ffd166'); } k.punch(0.06); k.hitstop(0.06);
+        k.burst(hole[0], hole[1] + OY, '#fff6a8', 16, 120); navigator.vibrate && navigator.vibrate(30); return; } }
+    if (!(ball.air > 0) && Math.hypot(ball.vx, ball.vy) < 5) { ball.vx = ball.vy = 0;
+      if (strokes >= maxS()) return fail();
+      stateH = 'aim'; kA = Math.atan2(hole[1] - ball.y, hole[0] - ball.x); }
+  }, () => {
+    k.clear(); c.drawImage(course, 0, OY, W, ROWS * T);
+    c.save(); c.translate(0, OY);
+    drawBeltsH(); drawMagH(); drawCup(); drawBumpers(); drawMillsH();
+    if (ball.splash && stateH === 'splash') { const e = 1 - stT / 0.8; c.strokeStyle = `rgba(255,255,255,${1 - e})`; c.lineWidth = 3; c.beginPath(); c.ellipse(ball.splash[0], ball.splash[1], 6 + e * 26, 4 + e * 16, 0, 0, R2); c.stroke(); }
+    drawBall(ball, stateH);
+    drawFlag(Math.hypot(ball.x - hole[0], ball.y - hole[1]) < 50 && stateH !== 'sink');
+    if (stateH === 'aim') { let a = null, p = 0;
+      if (aim2 && k.ptr.down) { const dx = k.ptr.sx - k.ptr.x, dy = k.ptr.sy - k.ptr.y; p = Math.min(1, Math.hypot(dx, dy) / 150); if (p > 0.05) a = Math.atan2(dy, dx); }
+      else if (kb2) { a = kA; p = kP; }
+      if (a !== null) drawGuideH(a, p);
+    }
+    c.restore();
+    // HUD
+    // los dos paneles se quedan en los extremos: el centro de arriba es del botón de pausa del reproductor
+    panel(8, 6, 118, 42); label(`Hoyo ${k.lv}/${LVN}`, 16, 11, 16); fitLabel(`Par ${par()} · máx ${maxS()}`, 16, 31, 11, '#b8f0a8', 102);
+    panel(W - 100, 6, 92, 42); label(`${strokes}`, W - 16, 8, 22, strokes >= maxS() - 1 ? '#ff9a9a' : '#f2d15c', 'right'); label('golpes', W - 16, 33, 11, '#e6e1ff', 'right');
+    if (HH.wind) drawWind();
+    // barra inferior: nombre y consejo
+    panel(8, H - 38, W - 16, 34);
+    fitLabel(HH.name, 16, H - 34, 15, '#fff', W - 96);
+    const st = k.starsOf(k.lv); label('★★★'.slice(0, st) + '☆☆☆'.slice(0, 3 - st), W - 16, H - 34, 15, '#f2d15c', 'right');
+    fitLabel(tipT > 0 ? HH.tip : (water ? `${water} al agua` : 'Birdie sin agua = 3 estrellas'), 16, H - 17, 10, tipT > 0 ? '#ffe9a8' : 'rgba(255,255,255,.6)', W - 66);
+    if (msgHT > 0) { const e = Math.min(1, (1.5 - msgHT) / 0.18), s = 0.6 + 0.4 * e + Math.sin(Math.min(1, e) * Math.PI) * 0.15; c.save(); c.translate(W / 2, 300); c.scale(s, s); c.globalAlpha = Math.min(1, msgHT / 0.3); label(msgH, 0, -20, 34, msgH.startsWith('¡') ? '#f2d15c' : '#fff', 'center'); c.restore(); c.globalAlpha = 1; }
+  });
+  function fail() { stateH = 'aim'; k.lose(CFG.id, 0, 'Sin golpes', `${HH.name} · máximo ${maxS()} golpes`); }
+  function drawBeltsH() { for (const kk in HH.belts) { const d = HH.belts[kk], [x, y] = kk.split(',').map(Number), px = x * T, py = y * T;
+      c.save(); c.beginPath(); c.rect(px, py, T, T); c.clip(); c.fillStyle = '#4a4f63'; c.fillRect(px, py, T, T);
+      c.fillStyle = '#3a3e50'; if (d[1]) { c.fillRect(px, py, 3, T); c.fillRect(px + T - 3, py, 3, T); } else { c.fillRect(px, py, T, 3); c.fillRect(px, py + T - 3, T, 3); }
+      const o = ((t * 40) % 12 + 12) % 12; c.strokeStyle = '#f2d15c'; c.lineWidth = 3; c.lineCap = 'round';
+      if (d[1]) { const s = d[1]; for (let yy = py - 12 + o * s; yy < py + T + 12; yy += 12) { c.beginPath(); c.moveTo(px + 7, yy - s * 4); c.lineTo(px + T / 2, yy + s * 2); c.lineTo(px + T - 7, yy - s * 4); c.stroke(); } }
+      else { const s = d[0]; for (let xx = px - 12 + o * s; xx < px + T + 12; xx += 12) { c.beginPath(); c.moveTo(xx - s * 4, py + 7); c.lineTo(xx + s * 2, py + T / 2); c.lineTo(xx - s * 4, py + T - 7); c.stroke(); } }
+      c.restore(); c.strokeStyle = 'rgba(26,21,48,.6)'; c.lineWidth = 1; c.strokeRect(px + 0.5, py + 0.5, T - 1, T - 1); } }
+  function drawMagH() { for (const m of HH.mag) { const ph = (t * 0.9) % 1; c.strokeStyle = `rgba(120,180,255,${0.45 * (1 - ph)})`; c.lineWidth = 2.5;
+      c.beginPath(); c.arc(m.x, m.y, 12 + ph * (m.r - 12), 0, R2); c.stroke();
+      c.beginPath(); c.arc(m.x, m.y, 12 + ((ph + 0.5) % 1) * (m.r - 12), 0, R2); c.strokeStyle = `rgba(120,180,255,${0.45 * (1 - (ph + 0.5) % 1)})`; c.stroke(); } }
+  function drawMillsH() { for (const m of HH.mills) { const ang = m.a0 + m.sp * t;
+      c.fillStyle = 'rgba(0,0,0,.22)'; c.beginPath(); c.arc(m.x + 4, m.y + 6, 12, 0, R2); c.fill();
+      for (let i = 0; i < 4; i++) { c.save(); c.translate(m.x, m.y); c.rotate(ang + i * Math.PI / 2);
+        c.fillStyle = 'rgba(0,0,0,.18)'; c.fillRect(8, 2, m.L - 8, 8);
+        ART.rr(c, 6, -5, m.L - 6, 10, 3); ART.fillOut(c, '#f4efe2', 2); c.strokeStyle = '#9a6a3a'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(8, 0); c.lineTo(m.L - 2, 0); for (let s = 14; s < m.L - 2; s += 9) { c.moveTo(s, -5); c.lineTo(s, 5); } c.stroke(); c.restore(); }
+      c.beginPath(); c.arc(m.x, m.y, 10, 0, R2); ART.fillOut(c, '#d9534f', 2.5); c.beginPath(); c.arc(m.x, m.y, 4, 0, R2); ART.fillOut(c, '#ffd166', 1.5); } }
+  function drawWind() { const [wx, wy] = HH.wind, a = Math.atan2(wy, wx), s = Math.min(1, Math.hypot(wx, wy) / 70);
+    c.save(); c.translate(W / 2, 27); panel(-34, -21, 68, 42); c.rotate(a);
+    c.fillStyle = '#5ce1e6'; c.strokeStyle = OUT; c.lineWidth = 2; c.beginPath();
+    c.moveTo(-16, -4); c.lineTo(6, -4); c.lineTo(6, -9); c.lineTo(18, 0); c.lineTo(6, 9); c.lineTo(6, 4); c.lineTo(-16, 4); c.closePath(); c.fill(); c.stroke(); c.restore();
+    label(s > 0.75 ? 'viento fuerte' : 'viento', W / 2, 32, 9, '#bfe8ff', 'center'); }
+  function drawGuideH(a, p) {
+    const col = `hsl(${120 - p * 120} 90% 60%)`, sim = HAND.newBall(HH, ball.x, ball.y); sim.vx = Math.cos(a) * p * 900; sim.vy = Math.sin(a) * p * 900;
+    let bounces = 0, tm = t;
+    for (let i = 0; i < 90; i++) { let r = null; for (let j = 0; j < 3; j++) { tm += 1 / 180; r = HAND.step(HH, sim, 1 / 180, tm, false) || r; }
+      if (r === 'bounce') bounces++; if (r === 'water' || r === 'hole' || bounces > 1 || Math.hypot(sim.vx, sim.vy) < 5) break;
+      if (i % 4 === 0) { c.globalAlpha = 0.95 * (1 - i / 110); c.beginPath(); c.arc(sim.x, sim.y, Math.max(1.5, 3.6 - i / 50), 0, R2); ART.fillOut(c, '#fff', 1.2); } }
+    c.globalAlpha = 1; c.strokeStyle = OUT; c.lineWidth = 7; c.beginPath(); c.arc(ball.x, ball.y, 17, -Math.PI / 2, -Math.PI / 2 + p * R2); c.stroke(); c.strokeStyle = col; c.lineWidth = 4; c.stroke();
+    c.save(); c.translate(ball.x, ball.y); c.rotate(a); const pull = 12 + p * 26;
+    const head = (q) => rp(q, -pull - 8, -7, 7, 14, 2), shaft = bone([[-pull - 5, -2], [-pull - 60, 18]], [2.2, 1.6]);
+    uni(c, [[shaft, '#9aa2b5'], [head, '#c7ccd8']], 1.15);
+    c.restore();
+  }
+}

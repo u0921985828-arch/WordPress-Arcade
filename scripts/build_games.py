@@ -11,7 +11,7 @@ import catalog as cat
 GAMES_DIR = ROOT / 'wp-content/mu-plugins/arcade-core/games'
 ENG_DIR = ROOT / 'src/eng'
 # Todos los motores cargan antes la librería de arte común (ART, src/eng/art.js)
-DEPS = {'esquinas': ['art', 'esqrul'], 'triangulos': ['art', 'triorul'], 'fichas': ['art', 'fichasrul'], 'logica2': ['art', 'l2gen'], 'platformer': ['art', 'platlv'], 'platform': ['art', 'barlv'], 'runner': ['art', 'runlv'], 'shooter': ['art', 'shoolv'], 'maze': ['art', 'mazelv'], 'topdown': ['art', 'dunlv'], 'snake': ['art', 'snakelv'], 'g2048': ['art', 'g2048lv'], 'sokoban': ['art', 'soklv'], 'burbujas': ['art', 'burblv'], 'columnas': ['art', 'collv'], 'match3': ['art', 'swaplv'], 'logic': ['art', 'minelv'], 'paddle': ['art', 'hockeylv'], 'td': ['art', 'tdlv'], 'teamball': ['art', 'futlv'], 'road': ['art', 'roadlv'], 'racer2d': ['art', 'kartlv'], 'mahjong': ['art', 'mahlv'], 'poly': ['art', 'polylv']}
+DEPS = {'esquinas': ['art', 'esqrul'], 'triangulos': ['art', 'triorul'], 'fichas': ['art', 'fichasrul'], 'logica2': ['art', 'l2gen'], 'platformer': ['art', 'platlv'], 'platform': ['art', 'barlv'], 'runner': ['art', 'runlv'], 'shooter': ['art', 'shoolv'], 'maze': ['art', 'mazelv'], 'topdown': ['art', 'dunlv'], 'snake': ['art', 'snakelv'], 'g2048': ['art', 'g2048lv'], 'sokoban': ['art', 'soklv'], 'burbujas': ['art', 'burblv'], 'columnas': ['art', 'collv'], 'match3': ['art', 'swaplv'], 'logic': ['art', 'minelv'], 'paddle': ['art', 'hockeylv'], 'td': ['art', 'tdlv'], 'teamball': ['art', 'futlv'], 'road': ['art', 'roadlv'], 'racer2d': ['art', 'kartlv'], 'mahjong': ['art', 'mahlv'], 'poly': ['art', 'polylv'], 'golf': ['art', 'golflv'], 'pool': ['art', 'poollv'], 'bowling': ['art', 'bowllv']}
 deps_of = lambda e: DEPS.get(e, ['art'])
 STANDALONE = {'tetra-drop', 'tetra-drop-marathon'}
 
@@ -86,7 +86,7 @@ G = {
  'low-poly-rally': ('road', dict(mode='race', theme='rally', help='Mantén pulsado para acelerar y arrastra a los lados para girar (o flechas). 3 vueltas contra 6 rivales.')),
  'neon-drift': ('road', dict(mode='race', theme='neon', help='Acelera y gira fuerte para derrapar. Pisa las flechas cian para un turbo. 3 vueltas.')),
  'canyon-kart': ('road', dict(mode='race', theme='canyon', help='↑ acelerar, ← → girar, ↓ frenar. Salirte de la pista frena mucho. Usa los turbos. 3 vueltas.')),
- 'mini-golf-3d': ('golf', dict(mode='walls')), 'putt-island': ('golf', dict(mode='island')),
+ 'mini-golf-3d': ('golf', dict(mode='walls', help='Arrastra hacia atrás desde la bola para apuntar y medir la fuerza (o ← → apuntar, ↑ ↓ fuerza, A golpear). 20 hoyos a mano con molinos, cintas, rampas, tubos, imanes y agua: haz el par para 2 estrellas y baja del par sin mojarte para las 3.')), 'putt-island': ('golf', dict(mode='island')),
  'iso-maze': ('maze', dict(mode='iso', help='Desliza, arrastra o usa las flechas para moverte. Recoge las 3 llaves y sal por la baldosa verde antes de que se acabe el tiempo.')),
  'crystal-labyrinth': ('raycast', dict()),
  'iso-dungeon-explorer': ('maze', dict(mode='dungeon', iso=['#2b2233', '#b07a55', '#7a4f35', '#5f3c28'], help='Flechas o arrastra para moverte; A o toca para dar un tajo a los monstruos vecinos. Recoge las 3 llaves y sal.')),
@@ -96,7 +96,7 @@ G = {
  'planet-hopper': ('planet', dict()),
  # ---------- Deportes ----------
  'penalty-flick': ('penalty', dict()), 'hoop-arc': ('hoop', dict()), 'rhythm-tap': ('rhythm', dict()), 'bowling-flick': ('bowling', dict(hud='bl')),
- 'pool-break': ('pool', dict()), 'darts-pro': ('darts', dict()), 'air-hockey': ('paddle', dict(mode='hockey')), 'ping-pong-reflex': ('paddle', dict(mode='pong')),
+ 'pool-break': ('pool', dict(help='Arrastra hacia atrás y suelta para tirar (o ← → apuntar, ↑ ↓ fuerza, A tirar). 20 desafíos de mesa colocados a mano: cumple el objetivo sin pasarte de tiros. Meter la blanca cuesta un tiro.')), 'darts-pro': ('darts', dict()), 'air-hockey': ('paddle', dict(mode='hockey')), 'ping-pong-reflex': ('paddle', dict(mode='pong')),
  'home-run-derby': ('homerun', dict()), 'reflex-grid': ('whack', dict()),
 }
 

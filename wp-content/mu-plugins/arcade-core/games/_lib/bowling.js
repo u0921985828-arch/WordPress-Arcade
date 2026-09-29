@@ -3,6 +3,10 @@
  * Teclado: ← → colocar, ↑ ↓ ángulo, A lanzar. 10 frames con puntuación oficial (strike, spare y décimo frame con bolas extra). */
 const TURN = CFG.mode === 'turnos', OUT = ART.OUT, R2 = 6.2832, W = TURN ? 640 : 360, H = TURN ? 360 : 640, PCX = W / 2;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: '#1a1230' }), c = k.ctx;
+/* Bolera del Barrio en solitario: los 20 retos escritos a mano (bowllv.js). En cuanto llega una sala
+ * del modo tele HB pasa a false y se juega la partida por turnos de siempre, sin cambiar nada. */
+const HANDB = TURN && CFG.id === 'bolera-del-barrio' && typeof BOWLLV !== 'undefined' ? BOWLLV : null;
+let HB = !!HANDB;
 /* Dificultad seleccionable: NOISE = 1 en normal → la pista se comporta exactamente igual que siempre. */
 const NOISE = 1 + k.D.cpu * 0.35;
 const LANE_W = 62, GUT = 13, LANE_L = 1800, PIT = 1660, BR = 11, PR = 6, PH = 38, F = 520, HY = TURN ? 66 : 96, BASE = TURN ? 352 : 610, SC = TURN ? 1.7 : 2.45, PS = 2.6;
@@ -10,27 +14,30 @@ let pins, ball, frames, frame, roll, state, standing, msg, msgT, msgC, aimX, aim
 let PL = [], seats = [], cur = 0, pw = 0, pwOn = false, pwT = 0, hookS = 0, introT = 0, aimT = 0, plan = null, lvlB = 0; // modo por turnos
 function rackPins() { pins = []; const rows = [[0], [-1, 1], [-2, 0, 2], [-3, -1, 1, 3]]; let id = 0; rows.forEach((r, i) => r.forEach((x) => pins.push({ id: id++, x: x * 15, y: 1500 + i * 26, vx: 0, vy: 0, down: false, gone: false, tilt: 0, fd: x ? Math.sign(x) : k.pick([-1, 1]), wob: 0, a: 1 }))); }
 function setBall() { ball = { x: aimX || 0, y: 30, vx: 0, vy: 0, hook: 0, rolling: false, gutter: false, rot: 0, a: 1 }; state = 'aim'; path = []; }
-function reset() { frames = []; frame = 0; roll = 0; aimX = 0; aimA = 0; cam = 0; kb = false; standing = 10; strikes = 0; spares = 0; rackPins(); setBall(); msg = ''; msgT = 0; if (TURN) resetT(); }
+function reset() { frames = []; frame = 0; roll = 0; aimX = 0; aimA = 0; cam = 0; kb = false; standing = 10; strikes = 0; spares = 0; rackPins(); setBall(); msg = ''; msgT = 0; if (HB) resetH(); else if (TURN) resetT(); }
 function score() { const r = frames.flat(); let s = 0, i = 0; const out = []; for (let f = 0; f < 10; f++) { if (r[i] === undefined) break; if (r[i] === 10) { if (r[i + 2] === undefined) break; s += 10 + r[i + 1] + r[i + 2]; i++; } else { if (r[i + 1] === undefined) break; if (r[i] + r[i + 1] === 10) { if (r[i + 2] === undefined) break; s += 10 + r[i + 2]; } else s += r[i] + r[i + 1]; i += 2; } out.push(s); } return out; }
 /* ---------- Proyección en perspectiva con cámara ---------- */
 const P = (x, y, z) => { const cm = Number.isFinite(cam) ? cam : 0; const s = F / (F + Math.max(-F * 0.6, y - cm)); return [PCX + x * s * SC, HY + (BASE - HY) * s - (z || 0) * s * SC, s]; };
 /* ---------- Sprites cacheados a 2× ---------- */
 function sprite(w, h, fn) { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const g = cv.getContext('2d'); g.scale(2, 2); fn(g); return cv; }
 function buildSprites() {
-  pinSpr = sprite(40, 104, (g) => { const cx = 20, b = 102, u = PS; // perfil del bolo (unidades → px)
-    const prof = (g2) => { g2.beginPath(); g2.moveTo(cx - 3.2 * u, b); g2.bezierCurveTo(cx - 6.6 * u, b - 6 * u, cx - 6.4 * u, b - 13 * u, cx - 4.2 * u, b - 19 * u); g2.bezierCurveTo(cx - 2.2 * u, b - 24 * u, cx - 2 * u, b - 26 * u, cx - 3.4 * u, b - 31 * u); g2.bezierCurveTo(cx - 4.2 * u, b - 35 * u, cx - 2 * u, b - 38.4 * u, cx, b - 38.4 * u); g2.bezierCurveTo(cx + 2 * u, b - 38.4 * u, cx + 4.2 * u, b - 35 * u, cx + 3.4 * u, b - 31 * u); g2.bezierCurveTo(cx + 2 * u, b - 26 * u, cx + 2.2 * u, b - 24 * u, cx + 4.2 * u, b - 19 * u); g2.bezierCurveTo(cx + 6.4 * u, b - 13 * u, cx + 6.6 * u, b - 6 * u, cx + 3.2 * u, b); g2.closePath(); };
-    prof(g); const gr = g.createLinearGradient(cx - 17, 0, cx + 17, 0); gr.addColorStop(0, '#dcd9e6'); gr.addColorStop(0.35, '#ffffff'); gr.addColorStop(1, '#b9b4c8'); g.fillStyle = gr; g.fill();
-    g.save(); prof(g); g.clip(); g.fillStyle = '#e0303f'; g.fillRect(0, b - 27.2 * u, 40, 1.3 * u); g.fillRect(0, b - 25 * u, 40, 1.3 * u); g.fillStyle = 'rgba(255,255,255,.9)'; g.fillRect(cx - 9, b - 34 * u, 3, 40); g.restore();
-    prof(g); g.lineWidth = 2.5; g.strokeStyle = OUT; g.stroke(); });
-  ballSpr = sprite(64, 64, (g) => { const r = BR * PS; g.beginPath(); g.arc(32, 32, r, 0, R2); const gr = g.createRadialGradient(24, 22, 3, 32, 32, r); gr.addColorStop(0, '#8fb0ff'); gr.addColorStop(0.45, '#3a5fd6'); gr.addColorStop(1, '#1d2a78'); g.fillStyle = gr; g.fill();
-    g.save(); g.clip(); g.strokeStyle = 'rgba(190,120,255,.45)'; g.lineWidth = 4; for (let i = 0; i < 4; i++) { g.beginPath(); g.moveTo(0, 12 + i * 14); g.bezierCurveTo(20, i * 14, 40, 30 + i * 10, 64, 18 + i * 14); g.stroke(); } g.restore();
-    g.beginPath(); g.arc(32, 32, r, 0, R2); g.lineWidth = 2.5; g.strokeStyle = OUT; g.stroke(); g.fillStyle = 'rgba(255,255,255,.75)'; g.beginPath(); g.ellipse(22, 20, 7, 4.5, -0.6, 0, R2); g.fill(); });
+  pinSpr = mkPin('#dcd9e6', '#ffffff', '#b9b4c8', '#e0303f');
+  ballSpr = mkBall();
 }
+function mkPin(cA, cB, cC, cS) { return sprite(40, 104, (g) => { const cx = 20, b = 102, u = PS; // perfil del bolo (unidades → px)
+    const prof = (g2) => { g2.beginPath(); g2.moveTo(cx - 3.2 * u, b); g2.bezierCurveTo(cx - 6.6 * u, b - 6 * u, cx - 6.4 * u, b - 13 * u, cx - 4.2 * u, b - 19 * u); g2.bezierCurveTo(cx - 2.2 * u, b - 24 * u, cx - 2 * u, b - 26 * u, cx - 3.4 * u, b - 31 * u); g2.bezierCurveTo(cx - 4.2 * u, b - 35 * u, cx - 2 * u, b - 38.4 * u, cx, b - 38.4 * u); g2.bezierCurveTo(cx + 2 * u, b - 38.4 * u, cx + 4.2 * u, b - 35 * u, cx + 3.4 * u, b - 31 * u); g2.bezierCurveTo(cx + 2 * u, b - 26 * u, cx + 2.2 * u, b - 24 * u, cx + 4.2 * u, b - 19 * u); g2.bezierCurveTo(cx + 6.4 * u, b - 13 * u, cx + 6.6 * u, b - 6 * u, cx + 3.2 * u, b); g2.closePath(); };
+    prof(g); const gr = g.createLinearGradient(cx - 17, 0, cx + 17, 0); gr.addColorStop(0, cA); gr.addColorStop(0.35, cB); gr.addColorStop(1, cC); g.fillStyle = gr; g.fill();
+    g.save(); prof(g); g.clip(); g.fillStyle = cS; g.fillRect(0, b - 27.2 * u, 40, 1.3 * u); g.fillRect(0, b - 25 * u, 40, 1.3 * u); g.fillStyle = 'rgba(255,255,255,.9)'; g.fillRect(cx - 9, b - 34 * u, 3, 40); g.restore();
+    prof(g); g.lineWidth = 2.5; g.strokeStyle = OUT; g.stroke(); }); }
+function mkBall() { return sprite(64, 64, (g) => { const r = BR * PS; g.beginPath(); g.arc(32, 32, r, 0, R2); const gr = g.createRadialGradient(24, 22, 3, 32, 32, r); gr.addColorStop(0, '#8fb0ff'); gr.addColorStop(0.45, '#3a5fd6'); gr.addColorStop(1, '#1d2a78'); g.fillStyle = gr; g.fill();
+    g.save(); g.clip(); g.strokeStyle = 'rgba(190,120,255,.45)'; g.lineWidth = 4; for (let i = 0; i < 4; i++) { g.beginPath(); g.moveTo(0, 12 + i * 14); g.bezierCurveTo(20, i * 14, 40, 30 + i * 10, 64, 18 + i * 14); g.stroke(); } g.restore();
+    g.beginPath(); g.arc(32, 32, r, 0, R2); g.lineWidth = 2.5; g.strokeStyle = OUT; g.stroke(); g.fillStyle = 'rgba(255,255,255,.75)'; g.beginPath(); g.ellipse(22, 20, 7, 4.5, -0.6, 0, R2); g.fill(); }); }
 buildSprites(); reset();
-if (TURN) k.show(CFG.title, 'Bolos por turnos para 1–4 con marcador oficial. Joystick ← → coloca la bola, ↑ ↓ elige el efecto y mantén A: suelta cuando la barra de fuerza esté en verde. En el móvil también puedes arrastrar y deslizar hacia arriba.'); else k.show(CFG.title, 'Arrastra la bola a los lados para colocarla y desliza hacia arriba para lanzar: cuanto más rápido, más fuerte; un desliz curvo le da efecto. Teclado: ← → colocar, ↑ ↓ ángulo, A lanzar. 10 frames con puntuación oficial.');
+if (HB) k.show(CFG.title, '20 retos de bolera escritos a mano: bolos de hierro y de goma, azules intocables, pista encerada y partidas con marcador oficial. ← → coloca la bola, ↑ ↓ el efecto y mantén A para la fuerza.'); else if (TURN) k.show(CFG.title, 'Bolos por turnos para 1–4 con marcador oficial. Joystick ← → coloca la bola, ↑ ↓ elige el efecto y mantén A: suelta cuando la barra de fuerza esté en verde. En el móvil también puedes arrastrar y deslizar hacia arriba.'); else k.show(CFG.title, 'Arrastra la bola a los lados para colocarla y desliza hacia arriba para lanzar: cuanto más rápido, más fuerte; un desliz curvo le da efecto. Teclado: ← → colocar, ↑ ↓ ángulo, A lanzar. 10 frames con puntuación oficial.');
 function launch(vy, ang, hook) { ball.vy = vy; ball.vx = Math.tan(ang) * vy + k.rnd(-9, 9) * NOISE; /* la pista nunca es perfecta (1.23: ±12→±9; NOISE = 1 en normal) */ ball.hook = hook; ball.rolling = true; state = 'roll'; k.sfx('shoot'); k.shake(2); }
 k.run((dt) => {
   t += dt; msgT -= dt; if (!k.gate(reset)) return;
+  if (HB) return updH(dt);
   if (TURN && turnAim(dt)) return;
   if (state === 'aim') { cam += (0 - cam) * Math.min(1, dt * 5);
     const bs = P(ball.x, ball.y)[2];
@@ -117,6 +124,7 @@ function draw() {
   // muro del fondo (tapa del foso) con neón
   { const a = P(-LANE_W - GUT - 26, 1720), b = P(LANE_W + GUT + 26, 1720), hh = 60 * a[2] * SC; ART.rr(c, a[0], a[1] - hh, b[0] - a[0], hh, 6 * a[2]); ART.fillOut(c, '#2a1f4d', 2); c.fillStyle = '#6e62f5'; c.fillRect(a[0] + 4, a[1] - hh * 0.35, b[0] - a[0] - 8, Math.max(1.5, 4 * a[2])); c.fillStyle = '#ff5fa2'; c.fillRect(a[0] + 4, a[1] - hh * 0.25, b[0] - a[0] - 8, Math.max(1, 2 * a[2]));
     c.font = `900 ${Math.max(6, 18 * a[2] * SC / 2.4)}px ui-rounded,system-ui,sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#f2d15c'; c.fillText('ARCADE BOWL', (a[0] + b[0]) / 2, a[1] - hh * 0.65); }
+  if (HB) oilH();
   // objetos ordenados por profundidad
   const objs = pins.filter((p) => !p.gone || p.a > 0).map((p) => ({ o: p, y: p.y })); if (ball.a > 0) objs.push({ o: ball, y: ball.y, b: 1 }); objs.sort((u, v) => v.y - u.y);
   for (const { o, b } of objs) {
@@ -126,10 +134,10 @@ function draw() {
       continue; }
     const [x, y, s] = P(o.x, o.y), sc = s * SC / PS; c.globalAlpha = o.a;
     if (!o.gone) { c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(x, y, 7 * s * SC, 2.4 * s * SC, 0, 0, R2); c.fill(); }
-    c.save(); c.translate(x, y); const tilt = o.tilt * (Math.PI / 2) * o.fd + Math.sin(t * 30) * o.wob * 0.08; c.rotate(tilt); if (o.down) c.translate(0, o.tilt * 4 * s * SC); c.drawImage(pinSpr, -20 * sc, -102 * sc, 40 * sc, 104 * sc); c.restore(); c.globalAlpha = 1;
+    c.save(); c.translate(x, y); const tilt = o.tilt * (Math.PI / 2) * o.fd + Math.sin(t * 30) * o.wob * 0.08; c.rotate(tilt); if (o.down) c.translate(0, o.tilt * 4 * s * SC); c.drawImage(o.ty && o.ty !== 'n' ? sprOf(o.ty) : pinSpr, -20 * sc, -102 * sc, 40 * sc, 104 * sc); c.restore(); c.globalAlpha = 1;
   }
   // guía de lanzamiento
-  if (TURN) guideT();
+  if (HB) guideH(); else if (TURN) guideT();
   else if (state === 'aim') { const [bx, by, bs] = P(ball.x, ball.y); let ang = aimA; if (k.ptr.down && !path.moving) { const dx = k.ptr.x - k.ptr.sx, dy = k.ptr.sy - k.ptr.y; if (dy > 20) ang = k.clamp(Math.atan2(dx, dy) * 0.28, -0.12, 0.12); }
     if (kb || (k.ptr.down && !path.moving)) { c.fillStyle = 'rgba(255,255,255,.75)'; for (let i = 1; i < 16; i++) { const yy = ball.y + i * 90, [x, y, s] = P(ball.x + Math.tan(ang) * i * 90, yy); if (yy > 1480) break; c.globalAlpha = 1 - i / 16; c.beginPath(); c.arc(x, y, 3 * s * SC / 2, 0, R2); c.fill(); } c.globalAlpha = 1; }
     if (!k.ptr.down && !kb) { const e = (t % 1.5) / 1.5; c.globalAlpha = 1 - e; c.strokeStyle = '#fff'; c.lineWidth = 3; c.lineCap = 'round'; const yy = by - 40 - e * 90; c.beginPath(); c.moveTo(bx, by - 40); c.lineTo(bx, yy); c.moveTo(bx - 8, yy + 9); c.lineTo(bx, yy); c.lineTo(bx + 8, yy + 9); c.stroke(); c.globalAlpha = 1;
@@ -137,6 +145,7 @@ function draw() {
   hud();
 }
 function hud() {
+  if (HB) return hudH();
   if (TURN) return hudT();
   const sc = score(); ART.rr(c, 4, 4, W - 8, 56, 8); c.fillStyle = 'rgba(12,8,24,.85)'; c.fill(); c.lineWidth = 2; c.strokeStyle = '#6e62f5'; c.stroke();
   for (let f = 0; f < 10; f++) { const w = f === 9 ? 46 : 32.5, x = 8 + f * 33.7, cur = f === frame && k.st === 'play'; ART.rr(c, x, 8, w - 2, 48, 5); c.fillStyle = cur ? 'rgba(242,209,92,.22)' : 'rgba(255,255,255,.07)'; c.fill(); if (cur) { c.strokeStyle = '#f2d15c'; c.lineWidth = 1.5; c.stroke(); }
@@ -165,7 +174,7 @@ function resetT() { seats = k.players(nPl()); PL = seats.map((q) => ({ p: q.p, f
 function loadT(i) { cur = i; const q = PL[i]; frames = q.frames; strikes = q.st; spares = q.sp; aimX = q.ax; hookS = q.hk; roll = 0; rackPins(); standing = 10; setBall(); state = 'intro'; introT = 1.2; pw = 0; pwOn = false; aimT = 0; plan = null; }
 function saveT() { const q = PL[cur]; q.st = strikes; q.sp = spares; q.ax = aimX; q.hk = hookS; }
 function nextPlayer() { saveT(); let n = cur + 1; if (n >= PL.length) { n = 0; frame++; } if (frame >= 10) return finishT(); loadT(n); }
-k.onParty = () => { if (!TURN) return; if (k.st === 'ready' || !PL.length) resetT(); else seats = k.players(PL.length); }; // antes de empezar se recuentan las plazas
+k.onParty = () => { if (!TURN) return; if (HB) { HB = false; k.st = 'ready'; reset(); return; } if (k.st === 'ready' || !PL.length) resetT(); else seats = k.players(PL.length); }; // antes de empezar se recuentan las plazas
 const nmB = (i) => (seats[i].cpu ? 'CPU' : String(seats[i].name).slice(0, 8));
 function scoreOf(fr) { const sv = frames; frames = fr; const r = score(); frames = sv; return r; }
 function finishT() { k.st = 'over'; state = 'done'; const rows = PL.map((q, i) => ({ p: q.p, score: scoreOf(q.frames).pop() || 0 })); const hum = seats.filter((q) => !q.cpu);
@@ -224,4 +233,197 @@ function hudT() {
   if (state === 'intro' && k.st === 'play') { const e = Math.min(1, (1.2 - introT) / 0.2); c.save(); c.translate(PCX, 190); c.scale(0.7 + 0.3 * e, 0.7 + 0.3 * e); c.globalAlpha = Math.min(1, introT / 0.25); ART.rr(c, -140, -34, 280, 68, 16); c.fillStyle = 'rgba(26,21,48,.85)'; c.fill(); c.lineWidth = 3; c.strokeStyle = col; c.stroke();
     label(`Turno de ${nmB(cur)}`, 0, -28, 26, col, 'center'); label(`Frame ${frame + 1}`, 0, 4, 18, '#fff', 'center'); c.restore(); c.globalAlpha = 1; }
   if (msgT > 0) { const e = Math.min(1, (1.3 - msgT) / 0.16), s = 0.5 + 0.5 * e + Math.sin(e * Math.PI) * 0.25; c.save(); c.translate(PCX, 190); c.scale(s, s); c.globalAlpha = Math.min(1, msgT / 0.3); label(msg, 0, -22, msg.length > 8 ? 32 : 40, msgC, 'center'); c.restore(); c.globalAlpha = 1; }
+}
+
+/* ================= Los 20 retos de Bolera del Barrio (1 jugador) =================
+ * Toda la campaña vive aquí y solo se enciende con CFG.id === 'bolera-del-barrio' y HB === true
+ * (en solitario). La tabla, la física de los bolos trucados, el aceite y el marcador están en
+ * bowllv.js (zona pura), así que lo que se juega es exactamente lo que verifica Node.
+ * Bowling Flick y la partida por turnos del modo tele no pasan por ninguna línea de este bloque. */
+/* var (no let) a propósito: reset() se ejecuta al cargar el fichero, antes de estas líneas. */
+var HH = null, stH = 'aim', waitH = 0, usedH = 0, frH = [], fiH = 0, stdH = 10, pwH = 0, pwUpH = true,
+    pwOnH = false, hkH = 0, tipH = 0, endH = false, evH = [], pathH = null, dnH = 0, lvH = 1, modeH = 'keep';
+var SPRH = {}, accB = 0;
+function sprOf(ty) {
+  if (!SPRH[ty]) SPRH[ty] = ty === 'h' ? mkPin('#8f96a8', '#d9dfea', '#575d70', '#343a4d')
+    : ty === 'r' ? mkPin('#8fc96a', '#d8f4b2', '#5f9a37', '#2e6a1e')
+    : ty === 'b' ? mkPin('#7fb0ff', '#d2e6ff', '#4a6fd0', '#1f3a86') : pinSpr;
+  return SPRH[ty];
+}
+var LVNB = HANDB ? HANDB.RE.length : 0;
+function resetH() { loadH(k.lv || 1); }
+function rackH() { pins = HANDB.rack(HH); stdH = HANDB.standing(pins).length; }
+function ballH() { ball = HANDB.newBall(aimX); ball.ty = 0; state = stH = 'aim'; pwH = 0; pwOnH = false; pathH = null; }
+function loadH(i) {
+  HH = HANDB.build(i, k.dif); lvH = i; usedH = 0; frH = []; fiH = 0; endH = false; tipH = 5.5;
+  aimX = 0; hkH = 0; cam = 0; kb = false; msg = ''; msgT = 0; strikes = 0; spares = 0;
+  rackH(); ballH();
+}
+if (HANDB) {
+  k.levels(LVNB, { start: (i) => { loadH(i); if (k.st === 'play') k.st = 'over'; } });
+  loadH(k.lv || 1);
+}
+if (HANDB) k.bot = { shoot: (x, hk, p) => { if (stH !== 'aim') return; aimX = x; ball.x = x; hkH = hk; launchH(p); }, st: () => stH, H: () => HH, pins: () => pins }; // gancho de pruebas (Playwright)
+function tgtH() { return HANDB.standing(pins).filter((p) => HH.goal !== 'precision' || p.ty !== 'b'); }
+function blueDown() { return pins.some((p) => p.ty === 'b' && (p.down || p.gone)); }
+function launchH(p) {
+  pwOnH = false; accB = 0; HANDB.launch(HH, ball, 700 + p * 1000, 0, hkH * 45);
+  if (p > 0.9 && HH.noise) ball.vx += k.rnd(-1, 1) * (p - 0.9) * 300;
+  state = stH = 'roll'; k.sfx('shoot'); k.shake(2);
+}
+function aimH(dt) {
+  cam += (0 - cam) * Math.min(1, dt * 5);
+  const bs = P(ball.x, ball.y)[2];
+  if (k.ptr.hit) { pathH = []; dnH = t; }
+  if (k.ptr.down && pathH) { pathH.push([k.ptr.x, k.ptr.y]);
+    const dx = k.ptr.x - k.ptr.sx, dy = k.ptr.y - k.ptr.sy;
+    if (k.ptr.sy > H * 0.6 && Math.abs(dy) < 26 && Math.abs(dx) > 6) { aimX = k.clamp((k.ptr.x - PCX) / (bs * SC), -LANE_W + BR, LANE_W - BR); ball.x = aimX; pathH.moving = true; } }
+  if (k.ptr.up && pathH) { const dx = k.ptr.x - k.ptr.sx, dy = k.ptr.sy - k.ptr.y;
+    if (dy > 50 && !pathH.moving) { const L = Math.hypot(dx, dy), dur = Math.max(0.06, t - dnH); let dev = 0;
+      for (const [x, y] of pathH) { const d = ((x - k.ptr.sx) * -dy - (y - k.ptr.sy) * dx) / L; if (Math.abs(d) > Math.abs(dev)) dev = d; }
+      hkH = k.clamp(dev * 0.09, -3, 3); launchH(k.clamp(L / dur / 1900, 0.18, 1)); }
+    pathH = null; }
+  if (k.held.has('left')) { aimX = Math.max(-LANE_W + BR, aimX - 70 * dt); ball.x = aimX; kb = true; }
+  if (k.held.has('right')) { aimX = Math.min(LANE_W - BR, aimX + 70 * dt); ball.x = aimX; kb = true; }
+  if (k.hit.has('up')) { hkH = k.clamp(hkH - 1, -3, 3); kb = true; k.sfx('click'); }
+  if (k.hit.has('down')) { hkH = k.clamp(hkH + 1, -3, 3); kb = true; k.sfx('click'); }
+  if (k.held.has('a')) { if (!pwOnH) { pwOnH = true; pwH = 0; pwUpH = true; }
+    pwH += (pwUpH ? 1 : -1) * dt * 1.35; if (pwH >= 1) { pwH = 1; pwUpH = false; } if (pwH <= 0.05) { pwH = 0.05; pwUpH = true; } }
+  else if (pwOnH) launchH(pwH);
+}
+function updH(dt) {
+  tipH -= dt;
+  if (stH === 'aim') return aimH(dt);
+  // paso fijo de 1/360 s (el mismo que usa BOWLLV.roll): la tirada sale igual a 30 o a 144 fps
+  accB = Math.min(accB + dt, 0.25);
+  while (accB >= 1 / 360) { accB -= 1 / 360; HANDB.step(HH, ball, pins, 1 / 360, evH); }
+  for (const e of evH) { if (e[0] === 'gutter') { k.sfx('hurt'); msg = 'Canal'; msgC = '#ff9a9a'; msgT = 1; }
+    else if (e[0] === 'knock') { const p = e[1]; if (!p.fs) { p.fs = 1; if (Math.abs(p.vx) > 3) p.fd = Math.sign(p.vx); }
+      k.sfx(e[2] > 400 ? 'explode' : 'hit'); if (p.ty === 'b') { k.shake(5); k.flash('rgba(255,90,90,.3)'); } } }
+  evH.length = 0;
+  for (const p of pins) { if (p.down) p.tilt = Math.min(1, p.tilt + dt * 4.5); p.wob = Math.max(0, p.wob - dt * 1.5); }
+  const tc = stH === 'roll' && ball.rolling ? k.clamp(ball.y - 340, 0, 1080) : cam;
+  cam += (tc - cam) * Math.min(1, dt * 4);
+  if (stH === 'roll' && !ball.rolling) { let mv = false;
+    for (const p of pins) if (p.down && !p.gone && Math.hypot(p.vx, p.vy) > 6) { mv = true; break; }
+    if (!mv) { stH = state = 'settle'; waitH = 0.7; } }
+  if (stH === 'settle') { waitH -= dt; if (waitH <= 0) resolveH(); }
+  if (stH === 'sweep') { waitH -= dt; for (const p of pins) if (p.down || p.gone) p.a = Math.max(0, p.a - dt * 3);
+    if (waitH <= 0) nextH(); }
+}
+function resolveH() {
+  const up = HANDB.standing(pins).length, pts = stdH - up;
+  if (HH.goal === 'score') {
+    const cf = frH[fiH] = frH[fiH] || []; cf.push(pts);
+    const last = fiH === HH.frames - 1, strike = pts === 10 && stdH === 10, spare = !strike && stdH < 10 && up === 0;
+    msg = strike ? '¡STRIKE!' : spare ? '¡SPARE!' : pts === 0 ? (ball.gutter ? 'Canal' : 'Cero') : `${pts} ${pts === 1 ? 'bolo' : 'bolos'}`;
+    msgC = strike || spare ? '#f2d15c' : '#fff'; msgT = 1.3;
+    if (strike) { strikes++; k.sfx('win'); k.confetti(); k.shake(6); k.flash('rgba(255,240,180,.35)'); }
+    else if (spare) { spares++; k.sfx('coin'); k.burst(PCX, 150, '#f2d15c', 22, 190); } else if (pts > 0) k.sfx('pop');
+    if (!last) modeH = cf[0] === 10 || cf.length === 2 ? 'next' : 'keep';
+    else if (cf.length === 3) modeH = 'end';
+    else if (cf.length === 1) modeH = cf[0] === 10 ? 'rerack' : 'keep';
+    else { const a = cf[0], b = cf[1]; modeH = a === 10 ? (b === 10 ? 'rerack' : 'keep') : a + b === 10 ? 'rerack' : 'end'; }
+  } else {
+    usedH++;
+    msg = pts === 0 ? (ball.gutter ? 'Canal' : 'Cero') : `${pts} ${pts === 1 ? 'bolo' : 'bolos'}`; msgC = '#fff'; msgT = 1.1;
+    if (pts > 0) k.sfx('pop');
+    if (HH.goal === 'precision' && blueDown()) modeH = 'fail';
+    else if (tgtH().length === 0) modeH = 'win';
+    else modeH = usedH >= HH.balls ? 'fail' : 'keep';
+  }
+  stH = state = 'sweep'; waitH = 0.85; stdH = up;
+}
+function nextH() {
+  if (modeH === 'win') return winH();
+  if (modeH === 'fail') return failH();
+  if (modeH === 'end') { const sc = HANDB.score(frH, HH.frames), pts = sc.length ? sc[sc.length - 1] : 0;
+    return pts >= HH.t1 ? winH(pts) : failH(pts); }
+  if (modeH === 'next') { fiH++; rackH(); }
+  else if (modeH === 'rerack') rackH();
+  else { pins = pins.filter((p) => !(p.down || p.gone)); pins.forEach((p) => { p.vx = p.vy = 0; }); stdH = pins.length; }
+  ballH();
+}
+function faltaH(st, pts) {
+  if (st >= 3) return '¡Reto redondo!';
+  if (HH.goal === 'score') return st === 2 ? `Para 3 estrellas: ${HH.t3} puntos (te faltan ${HH.t3 - pts})` : `Para 2 estrellas: ${HH.t2} puntos`;
+  return st === 2 ? `Para 3 estrellas: hazlo en ${HH.s3} ${HH.s3 === 1 ? 'bola' : 'bolas'}` : `Para 2 estrellas: hazlo en ${HH.par} bolas`;
+}
+function winH(pts) {
+  if (endH) return; endH = true; stH = state = 'done';
+  const sc = HH.goal === 'score' ? (pts || 0) : 0, st = HANDB.stars(HH, usedH, sc);
+  const detail = HH.goal === 'score' ? `${sc} puntos · ${strikes} strikes · ${spares} spares`
+    : `${usedH} ${usedH === 1 ? 'bola' : 'bolas'}${HH.goal === 'precision' ? ' · azules en pie' : ''}`;
+  k.levelDone(HH.goal === 'score' ? sc * 10 : (HH.balls - usedH + 1) * 250, `${HH.name} · ${detail}<br>${faltaH(st, sc)}`, { stars: st });
+}
+function failH(pts) {
+  if (endH) return; endH = true; stH = state = 'done';
+  const why = HH.goal === 'precision' && blueDown() ? 'Ha caído un bolo azul'
+    : HH.goal === 'score' ? `${pts || 0} puntos · hacían falta ${HH.t1}` : 'Se acabaron las bolas';
+  k.lose(CFG.id, 0, 'Reto fallido', `${HH.name} · ${why}`);
+}
+/* ---------- Pintado propio del reto ---------- */
+function oilH() {
+  if (!HH || !HH.oil) return;
+  for (const [y0, y1, m] of HH.oil) { if (m === 1) continue;
+    const a = P(-LANE_W, y0), b = P(LANE_W, y1);
+    c.fillStyle = m > 1 ? 'rgba(110,98,245,.16)' : 'rgba(255,255,255,.16)';
+    c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(P(LANE_W, y0)[0], a[1]); c.lineTo(b[0], b[1]); c.lineTo(P(-LANE_W, y1)[0], b[1]); c.closePath(); c.fill(); }
+}
+function guideH() {
+  if (stH !== 'aim') return;
+  const [bx, by] = P(ball.x, ball.y);
+  c.fillStyle = 'rgba(255,255,255,.7)';
+  let px = ball.x, vx = 0;
+  for (let i = 1; i < 18; i++) { const yy = ball.y + i * 85; if (yy > 1480) break;
+    if (yy > 750) vx += hkH * 45 * HANDB.oilAt(HH, yy) * 0.085;
+    px += vx * 0.085;
+    const [x, y, s] = P(k.clamp(px, -LANE_W, LANE_W), yy);
+    c.globalAlpha = 1 - i / 18; c.beginPath(); c.arc(x, y, 3 * s * SC / 2, 0, R2); c.fill(); }
+  c.globalAlpha = 1;
+  // barra de fuerza
+  const bw = 16, bh = 150, bxp = W - 34, byp = 110;
+  ART.rr(c, bxp, byp, bw, bh, 6); c.fillStyle = 'rgba(12,8,24,.8)'; c.fill(); c.lineWidth = 2; c.strokeStyle = '#6e62f5'; c.stroke();
+  const gz = c.createLinearGradient(0, byp, 0, byp + bh); gz.addColorStop(0, '#ff5f5f'); gz.addColorStop(0.16, '#f2d15c'); gz.addColorStop(0.5, '#7ee08a'); gz.addColorStop(1, '#5b8cff');
+  c.save(); ART.rr(c, bxp + 3, byp + 3, bw - 6, bh - 6, 4); c.clip(); c.fillStyle = gz; c.fillRect(bxp, byp + bh - bh * pwH, bw, bh * pwH); c.restore();
+  label('A', bxp + bw / 2, byp + bh + 4, 11, '#e6e1ff', 'center');
+  // efecto
+  label(`Efecto ${hkH > 0 ? '→' : hkH < 0 ? '←' : '·'}${Math.abs(hkH) || ''}`, W - 100, byp - 22, 12, '#a097ff');
+  if (!kb && !k.ptr.down) { const e = (t % 1.5) / 1.5; c.globalAlpha = 1 - e; c.strokeStyle = '#fff'; c.lineWidth = 3; c.lineCap = 'round';
+    const yy = by - 34 - e * 70; c.beginPath(); c.moveTo(bx, by - 34); c.lineTo(bx, yy); c.moveTo(bx - 8, yy + 9); c.lineTo(bx, yy); c.lineTo(bx + 8, yy + 9); c.stroke(); c.globalAlpha = 1; }
+}
+function hudH() {
+  if (!HH) return;
+  const goal = HH.goal === 'score' ? `Objetivo: ${HH.t1} puntos en ${HH.frames} ${HH.frames === 1 ? 'entrada' : 'entradas'}`
+    : HH.goal === 'precision' ? 'Tumba los rojos y deja los azules en pie' : 'Tíralos todos';
+  const sc = HH.goal === 'score' ? HANDB.score(frH, HH.frames) : null, pts = sc && sc.length ? sc[sc.length - 1] : 0;
+  const st2 = HH.goal === 'score' ? `Entrada ${Math.min(HH.frames, fiH + 1)}/${HH.frames} · ${pts} puntos`
+    : `Bolas: ${Math.max(0, HH.balls - usedH)} de ${HH.balls}`;
+  c.font = '700 11px ui-rounded,system-ui,sans-serif';
+  const wBox = Math.max(230, Math.min(W - 12, 36 + c.measureText(goal).width));
+  ART.rr(c, 6, 6, wBox, 58, 9); c.fillStyle = 'rgba(12,8,24,.85)'; c.fill(); c.lineWidth = 2; c.strokeStyle = '#6e62f5'; c.stroke();
+  label(`Reto ${lvH}/${LVNB} · ${HH.name}`, 14, 11, 14, '#f2d15c');
+  label(goal, 14, 29, 11, '#cfc7ff');
+  label(st2, 14, 45, 12, '#fff');
+  const got = k.starsOf ? k.starsOf(lvH) : 0;
+  for (let i = 0; i < 3; i++) { const sx = wBox - 16 - (2 - i) * 17; c.font = '900 14px ui-rounded,system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = i < got ? '#f2d15c' : 'rgba(255,255,255,.18)'; c.fillText('★', sx, 20); }
+  // marcador compacto de las partidas
+  if (HH.goal === 'score') { const n = HH.frames, bw = Math.min(34, (W - 24) / n);
+    ART.rr(c, 8, H - 34, n * bw + 8, 28, 7); c.fillStyle = 'rgba(12,8,24,.8)'; c.fill();
+    for (let f = 0; f < n; f++) { const x = 12 + f * bw, cur = f === fiH && k.st === 'play';
+      ART.rr(c, x, H - 31, bw - 3, 22, 4); c.fillStyle = cur ? 'rgba(242,209,92,.22)' : 'rgba(255,255,255,.07)'; c.fill();
+      const cf = frH[f]; if (!cf) continue;
+      const mk = cf.map((v, i) => (i === 0 ? (v === 10 ? 'X' : v || '-') : cf[i - 1] + v === 10 && cf[i - 1] !== 10 ? '/' : v === 10 ? 'X' : v || '-')).join('');
+      label(String(mk), x + (bw - 3) / 2, H - 27, 11, '#fff', 'center');
+      if (sc[f] !== undefined) label(String(sc[f]), x + (bw - 3) / 2, H - 15, 9, '#f2d15c', 'center'); } }
+  if (tipH > 0 && HH.tip) { c.globalAlpha = Math.min(1, tipH); const y = H - (HH.goal === 'score' ? 62 : 34);
+    c.font = '700 12px ui-rounded,system-ui,sans-serif'; const w2 = Math.min(W - 24, c.measureText(HH.tip).width + 20);
+    ART.rr(c, (W - w2) / 2, y, w2, 24, 8); c.fillStyle = 'rgba(12,8,24,.86)'; c.fill();
+    c.fillStyle = '#e6e1ff'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    let s2 = HH.tip; while (c.measureText(s2).width > w2 - 16 && s2.length > 8) s2 = s2.slice(0, -2);
+    c.fillText(s2 === HH.tip ? s2 : s2 + '…', W / 2, y + 12); c.globalAlpha = 1; }
+  if (msgT > 0) { const e = Math.min(1, (1.3 - msgT) / 0.16), s3 = 0.5 + 0.5 * e + Math.sin(e * Math.PI) * 0.25;
+    c.save(); c.translate(W / 2, 170); c.scale(s3, s3); c.globalAlpha = Math.min(1, msgT / 0.3);
+    label(msg, 0, -20, msg.length > 8 ? 28 : 38, msgC, 'center'); c.restore(); c.globalAlpha = 1; }
 }
