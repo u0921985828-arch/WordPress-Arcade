@@ -8,8 +8,10 @@ const LAND = innerWidth > innerHeight;
 /* Niveles a mano (plan Friv, tanda 3): SOLO el modo classic, que carga tetralv.js.
  * El maratón no lo carga (HAND queda null) y todo lo nuevo queda desactivado: juega igual que siempre. */
 const HAND = (MODE === 'classic' && typeof TETRALV !== 'undefined' && TETRALV['tetra-drop']) || null;
+const NEW = !!HAND;   // todo el gancho nuevo (docs/GANCHO.md) vive detrás de esta bandera: el maratón no lo ve
 const HELP = 'Arrastra la pieza para moverla, tócala para girarla, desliza abajo para dejarla caer y arriba para guardarla en la reserva. '
   + 'Cada uno de los 20 niveles tiene su objetivo: líneas, dobles, triples, tetris, T-giros o limpiar toda la basura. '
+  + 'Las estrellas van por piezas gastadas: superarlo da 1, hacerlo con pocas piezas da 2 y bordarlo da 3. '
   + 'Teclado: ← → mover · ↓ bajar · ↑ o Espacio girar · Z girar al revés · X caída · C reserva.';
 window.CFG = Object.assign({ id: 'tetra-' + MODE }, window.CFG || {}, LAND ? { hud: 'tr' } : {}, HAND ? { help: HELP } : {});
 const W = LAND ? 640 : 360, H = LAND ? 360 : 640;
@@ -23,12 +25,12 @@ const LOCK = 0.5, MAXRESET = 15, CLR = 0.34, DAS = 0.16, ARR = 0.045;
 const P = LAND ? {
   S: 17, BX: 235, BY: 10, STEP: 20, m1: 16, m2: 12,
   score: { x: 20, y: 10, w: 195, h: 52 }, hold: { x: 115, y: 70, w: 100, h: 86 }, stats: { x: 20, y: 70, w: 88, h: 86 },
-  next: { x: 425, y: 10, w: 100, h: 172 }, chips: { x: 20, y: 168, w: 195, row: true },
-  obj: { x: 20, y: 222, w: 195, h: 56 },
+  next: { x: 425, y: 10, w: 100, h: 172 }, chips: { x: 20, y: NEW ? 158 : 168, w: 195, row: true },
+  obj: { x: 20, y: 210, w: 195, h: 68 },
 } : {
   S: 27, BX: 8, BY: 50, STEP: 26, m1: 14, m2: 11,
-  score: null, hold: { x: 286, y: 230, w: 66, h: 76 }, stats: { x: 286, y: 314, w: 66, h: 118 },
-  next: { x: 286, y: 50, w: 66, h: 172 }, chips: { x: 286, y: 442, w: 66, row: false },
+  score: null, hold: { x: 286, y: 230, w: 66, h: 76 }, stats: { x: 286, y: 314, w: 66, h: NEW ? 146 : 118 },
+  next: { x: 286, y: 50, w: 66, h: 172 }, chips: { x: 286, y: NEW ? 468 : 442, w: 66, row: false },
   obj: null,   // en vertical el objetivo va dentro del panel de estadísticas
 };
 const { S, BX, BY } = P, BW = COLS * S, BH = ROWS * S;
@@ -51,6 +53,8 @@ let bestV = 0, fallT, lockT, resets, lowest, lastRot, lastKick, clearing, clearT
 let vis = { x: 0, y: 0 }, trails = [], pops = [], lockFx = null, rowFx = null, shown = 0, holdPop = 0, qAnim = 0, lvlFx = 0, G = null, dasDir = 0, dasT = 0, time = 0;
 /* Niveles a mano: LV = nivel en curso (null en maratón), contadores del objetivo y basura que sube. */
 let LV = null, nDbl = 0, nTri = 0, nTet = 0, nTsp = 0, garb0 = 0, risesLeft = 0, riseT = 0, banT = 0;
+/* Gancho (docs/GANCHO.md): piezas colocadas (criterio de estrellas), avisos y efectos. */
+let pieces = 0, lastRem = -1, goalFx = 0, pulseT = 0, dang = 0, heartT = 0, riseAnim = 0, b2bN = 0, sweep = null, dust = [];
 const RAW = new Set();   // teclas extra (Z = girar al revés, C = reserva) que el kit no distingue
 addEventListener('keydown', (e) => { if (!e.repeat) RAW.add(e.code); });
 
@@ -120,6 +124,11 @@ function lockPiece() {
   const cells = ROT[cur.t][cur.r].map(([x, y]) => [cur.x + x, cur.y + y]), ts = tspinKind();
   if (cells.every(([, y]) => y < HID)) return die();   // bloqueada entera por encima del tablero
   for (const [x, y] of cells) if (y >= 0) board[y][x] = cur.t;
+  if (NEW) {   // cada pieza que se posa da su respuesta: polvo bajo la base y cuenta para las estrellas
+    pieces++;
+    const low = {}; for (const [x, y] of cells) low[x] = Math.max(low[x] ?? -99, y);
+    for (const x in low) k.burst(px(+x) + S / 2, py(low[x]) + S, COLORS[cur.t], 2, 55);
+  }
   lockFx = { cells, t: 0.2 };
   const full = []; for (let y = 0; y < R; y++) if (board[y].every(Boolean)) full.push(y);
   const cx = BX + (cur.x + 1.5) * S, cy = BY + (cur.y - HID + 0.5) * S;
@@ -139,11 +148,24 @@ function objInfo() {
   const got = { lines, dbl: nDbl, tri: nTri, tet: nTet, tsp: nTsp }[key];
   return { key, name: OBJN[key], cur: Math.min(o[key], got), max: o[key] };
 }
+/* Cuánto falta, en palabras del objetivo (para el HUD y para la casi-victoria al perder). */
+const OBJ1 = { lines: ['línea', 'líneas'], dbl: ['doble', 'dobles'], tri: ['triple', 'triples'], tet: ['tetris', 'tetris'], tsp: ['T-giro', 'T-giros'], clean: ['fila de basura', 'filas de basura'] };
+function remTxt(i, rem) { const w = OBJ1[i.key]; return rem === 1 ? `1 ${w[0]}` : `${rem} ${w[1]}`; }
 const goalDone = () => { if (!LV) return false; const i = objInfo(); return i.key === 'clean' ? (risesLeft <= 0 && garbRows() === 0) : i.cur >= i.max; };
+/* Estrellas (docs/GANCHO.md §A6): un criterio único y visible en todo momento — las piezas
+ * que has tenido que gastar. 1 = superado · 2 = dentro del cupo · 3 = bordado. */
+const s2Of = () => (LV && LV.s2) || 999, s3Of = () => (LV && LV.s3) || 999;
+const starsNow = () => (pieces <= s3Of() ? 3 : pieces <= s2Of() ? 2 : 1);
+function nextTxt() {
+  if (!HAND || k.lv >= HAND.length) return '';
+  const o = HAND[k.lv].o, key = Object.keys(o)[0];
+  return `<br>Siguiente: ${key === 'clean' ? 'limpiar la basura' : `${o[key]} ${OBJ1[key][o[key] === 1 ? 0 : 1]}`}`;
+}
 function levelWin() {
   cur = null; clearing = null; dying = false; ended = true;
   k.best('tetra-' + MODE, score);
-  k.levelDone(score, `Objetivo cumplido · Puntos: ${score} · Líneas: ${lines}`);
+  const st = starsNow();
+  k.levelDone(score, `${pieces} piezas · ${score} puntos${st < 3 ? ` · ★★★ con ${s3Of()} piezas o menos` : ''}${nextTxt()}`, { stars: st });
 }
 /* Siguiente pieza, salvo que el objetivo ya esté cumplido (en maratón goalDone() es siempre falso). */
 function advance() { if (goalDone()) return levelWin(); nextPiece(); }
@@ -154,6 +176,7 @@ function pushGarbage() {
   board.shift(); board.push(Array.from({ length: COLS }, (_, x) => (x === hole ? null : 'G')));
   if (cur) { cur.y--; vis.y--; lowest = cur.y; if (!fits(cur.t, cur.r, cur.x, cur.y)) return die(); }
   k.sfx('hurt'); k.shake(3); k.flash('rgba(255,90,106,.18)');
+  if (NEW) { riseAnim = 1; k.reward('¡SUBE BASURA!', '#ff5a6a'); }
 }
 function riseTick(dt) {
   if (!LV || !LV.rise || risesLeft <= 0) return;
@@ -178,10 +201,27 @@ function scoreLock(full, ts, cx, cy) {
   } else combo = -1;
   score += pts;
   // textos y efectos
-  if (name) pop(name, n === 4 ? '#f7d046' : ts ? '#d49bff' : '#fff', n === 4 ? 30 : 22);
-  if (isB2B) pop('BACK-TO-BACK', '#7ff0ff', 15);
-  if (combo > 0) pop('COMBO ×' + combo, '#ffb35c', 17);
-  if (pc) { pop('¡TABLERO LIMPIO!', '#7cf7a0', 18); k.confetti(); }
+  if (NEW) {
+    if (n > 0) {
+      isB2B ? b2bN++ : (b2bN = hard ? 1 : 0);
+      sweep = { p: 0 }; pulseT = Math.min(1, pulseT + 0.25 + n * 0.12); goalFx = 1;
+      k.hitstop(n >= 2 || ts ? 0.05 : 0.03);
+      if (n === 4 || ts === 'full') k.punch(n === 4 ? 0.075 : 0.055);
+      // cadena: cada línea seguida sube de tono; al fallar se reinicia
+      if (combo > 0) k.combo(combo + 1, cx, cy - S); else k.chime(0);
+      const head = n === 4 ? '¡TETRIS!' : ts ? (ts === 'full' ? '¡T-GIRO!' : '¡MINI T-GIRO!') : null;
+      if (pc) k.reward('¡TABLERO LIMPIO!', '#7cf7a0');
+      else if (b2bN >= 2) k.reward('¡B2B ×' + b2bN + '!', '#7ff0ff');
+      else if (head) k.reward(head, n === 4 ? '#f7d046' : '#d49bff');
+      else if (combo >= 3) k.reward('¡CADENA ×' + (combo + 1) + '!', '#ffb35c');
+      if (name && !head) pop(name, '#fff', 20);
+    } else { b2bN = 0; k.chainReset(); }
+  } else {
+    if (name) pop(name, n === 4 ? '#f7d046' : ts ? '#d49bff' : '#fff', n === 4 ? 30 : 22);
+    if (isB2B) pop('BACK-TO-BACK', '#7ff0ff', 15);
+    if (combo > 0) pop('COMBO ×' + combo, '#ffb35c', 17);
+  }
+  if (pc) { if (!NEW) pop('¡TABLERO LIMPIO!', '#7cf7a0', 18); k.confetti(); }
   if (pts) k.float('+' + pts, cx, cy, n === 4 ? '#f7d046' : '#fff');
   if (n === 4) { k.sfx('win'); k.shake(7); k.flash('rgba(255,255,255,.35)'); }
   else if (n) { k.sfx('coin'); k.shake(1 + n * 1.5); if (ts) k.sfx('pop'); }
@@ -226,6 +266,7 @@ function reset() {
   bag = []; queue = [fromBag(), fromBag(), fromBag()]; hold = null;
   score = 0; shown = 0; lines = 0; level = LV ? Math.max(1, Math.ceil(k.lv / 2)) : START; combo = -1; b2b = false;
   clearing = null; dying = false; ended = false; won = false; trails = []; pops = []; lockFx = null; rowFx = null; G = null; dasDir = 0;
+  pieces = 0; lastRem = -1; goalFx = 0; pulseT = 0; dang = 0; heartT = 0; riseAnim = 0; b2bN = 0; sweep = null; k.chainReset();
   bestV = k.best('tetra-' + MODE, 0); nextPiece(); qAnim = 0;
 }
 
@@ -293,6 +334,22 @@ function effects(dt) {
   for (const b of BTN) b.pt = Math.max(0, b.pt - dt);
   holdPop = Math.max(0, holdPop - dt * 5); qAnim = Math.max(0, qAnim - dt * 7); lvlFx = Math.max(0, lvlFx - dt * 1.2);
   if (banT > 0 && k.st === 'play') banT -= dt;
+  if (!NEW) return;
+  goalFx = Math.max(0, goalFx - dt * 1.6); pulseT = Math.max(0, pulseT - dt * 2.2); riseAnim = Math.max(0, riseAnim - dt * 5.5);
+  if (sweep) { sweep.p += dt / (CLR * 0.8); if (sweep.p >= 1) sweep = null; }
+  // peligro: cuanto más sube la pila, más avisa la pantalla (y late un latido por segundo)
+  let top = R; for (let y = HID; y < R; y++) if (board[y].some(Boolean)) { top = y; break; }
+  const hgt = R - top, want = k.st === 'play' && !dying ? Math.max(0, Math.min(1, (hgt - 13) / 6)) : 0;
+  dang += (want - dang) * Math.min(1, dt * 3.5);
+  if (want > 0.2 && k.st === 'play') { heartT -= dt; if (heartT <= 0) { heartT = 1.35 - want * 0.55; k.sfx('hit'); } } else heartT = 0;
+  // «falta 1»: el aviso más importante del juego, una sola vez por nivel
+  if (LV && k.st === 'play' && !ended) {
+    const i = objInfo(), rem = Math.max(0, i.max - i.cur);
+    if (rem !== lastRem) {
+      if (rem === 1 && lastRem > 1) { k.reward('¡FALTA 1!', '#7cf7a0'); k.chime(7); }
+      lastRem = rem;
+    }
+  }
 }
 
 /* ---------- Dibujo: utilidades y cachés ---------- */
@@ -310,7 +367,7 @@ function small(g, s, x, y, align, col) { g.font = '800 9.5px ui-rounded,"Trebuch
 
 // Bloque con relieve y contorno, cacheado por color y tamaño (a 2×)
 const SPR = {};
-function block(col, s) {
+function blockOld(col, s) {
   const key = col + '|' + s; if (SPR[key]) return SPR[key];
   const cv = document.createElement('canvas'); cv.width = cv.height = Math.ceil(s * 2); const g = cv.getContext('2d'); g.scale(2, 2);
   const lw = Math.max(1.3, s * 0.075), r = s * 0.2, i = lw / 2, e = s * 0.17;
@@ -324,14 +381,145 @@ function block(col, s) {
   rr(g, i, i, s - lw, s - lw, r); g.lineWidth = lw; g.strokeStyle = OUT; g.stroke();
   return (SPR[key] = cv);
 }
+/* Ley de la pieza única (docs/REMASTER.md §8): la pieza se lee como UNA cosa, no como cuatro
+ * cajas apiladas. Cada casilla se cachea con una máscara de vecinos (1 arriba, 2 derecha,
+ * 4 abajo, 8 izquierda): por los lados unidos el trazado se sale del recuadro, así que su
+ * contorno cae fuera del sprite y las casillas se funden en una sola silueta con un solo
+ * relleno y un solo contorno. Las juntas internas se leen por sombra propia, nunca por línea. */
+function blockM(col, s, m) {
+  const key = col + '|' + s + '|' + m; if (SPR[key]) return SPR[key];
+  const cv = document.createElement('canvas'); cv.width = cv.height = Math.ceil(s * 2); const g = cv.getContext('2d'); g.scale(2, 2);
+  const lw = Math.max(1.4, s * 0.085), r = Math.max(2, s * 0.24), i = lw / 2;
+  const U = m & 1, RT = m & 2, D = m & 4, L = m & 8;
+  const x0 = L ? -lw * 2 : i, y0 = U ? -lw * 2 : i, x1 = RT ? s + lw * 2 : s - i, y1 = D ? s + lw * 2 : s - i;
+  const aTL = (!U && !L) ? r : 0, aTR = (!U && !RT) ? r : 0, aBR = (!D && !RT) ? r : 0, aBL = (!D && !L) ? r : 0;
+  const path = () => {
+    g.beginPath(); g.moveTo(x0 + aTL, y0); g.lineTo(x1 - aTR, y0);
+    if (aTR) g.arcTo(x1, y0, x1, y0 + aTR, aTR); g.lineTo(x1, y1 - aBR);
+    if (aBR) g.arcTo(x1, y1, x1 - aBR, y1, aBR); g.lineTo(x0 + aBL, y1);
+    if (aBL) g.arcTo(x0, y1, x0, y1 - aBL, aBL); g.lineTo(x0, y0 + aTL);
+    if (aTL) g.arcTo(x0, y0, x0 + aTL, y0, aTL); g.closePath();
+  };
+  path(); g.fillStyle = col; g.fill();
+  g.save(); g.clip();
+  // cel shading de 3 tonos con borde duro (luz arriba-izquierda)
+  g.fillStyle = shade(col, 0.2); g.fillRect(x0, y0, x1 - x0, (y1 - y0) * 0.44);
+  g.fillStyle = shade(col, -0.3); g.beginPath();
+  g.moveTo(x1, y0 + (y1 - y0) * 0.6); g.lineTo(x1, y1); g.lineTo(x0, y1); g.lineTo(x0, y1 - (y1 - y0) * 0.22); g.closePath(); g.fill();
+  // junta interna: sombra propia hacia los vecinos de arriba y de la izquierda
+  g.fillStyle = 'rgba(26,21,48,.17)';
+  if (U) g.fillRect(x0, 0, x1 - x0, Math.max(1, s * 0.055));
+  if (L) g.fillRect(0, y0, Math.max(1, s * 0.055), y1 - y0);
+  // luz de borde en los lados abiertos y óvalo especular solo si la casilla ve el cielo
+  g.fillStyle = 'rgba(255,255,255,.32)';
+  if (!U) g.fillRect(i + r * 0.4, i + lw * 0.5, s - lw - r * 0.8, Math.max(1, s * 0.05));
+  if (!L) g.fillRect(i + lw * 0.5, i + r * 0.4, Math.max(1, s * 0.05), s - lw - r * 0.8);
+  if (!U && !L) { g.fillStyle = 'rgba(255,255,255,.5)'; rr(g, s * 0.2, s * 0.17, s * 0.3, s * 0.1, s * 0.05); g.fill(); }
+  g.restore();
+  path(); g.lineWidth = lw; g.strokeStyle = OUT; g.lineJoin = 'round'; g.stroke();
+  return (SPR[key] = cv);
+}
+const block = (col, s) => (NEW ? blockM(col, s, 0) : blockOld(col, s));
+/* Fantasma: misma silueta única, hueca y legible sobre cualquier fondo. */
+const GSPR = {};
+function ghostM(col, s, m) {
+  const key = col + '|' + s + '|' + m; if (GSPR[key]) return GSPR[key];
+  const cv = document.createElement('canvas'); cv.width = cv.height = Math.ceil(s * 2); const g = cv.getContext('2d'); g.scale(2, 2);
+  const lw = Math.max(1.6, s * 0.1), r = Math.max(2, s * 0.24), i = lw / 2;
+  const U = m & 1, RT = m & 2, D = m & 4, L = m & 8;
+  const x0 = L ? -lw * 2 : i, y0 = U ? -lw * 2 : i, x1 = RT ? s + lw * 2 : s - i, y1 = D ? s + lw * 2 : s - i;
+  const aTL = (!U && !L) ? r : 0, aTR = (!U && !RT) ? r : 0, aBR = (!D && !RT) ? r : 0, aBL = (!D && !L) ? r : 0;
+  g.beginPath(); g.moveTo(x0 + aTL, y0); g.lineTo(x1 - aTR, y0);
+  if (aTR) g.arcTo(x1, y0, x1, y0 + aTR, aTR); g.lineTo(x1, y1 - aBR);
+  if (aBR) g.arcTo(x1, y1, x1 - aBR, y1, aBR); g.lineTo(x0 + aBL, y1);
+  if (aBL) g.arcTo(x0, y1, x0, y1 - aBL, aBL); g.lineTo(x0, y0 + aTL);
+  if (aTL) g.arcTo(x0, y0, x0 + aTL, y0, aTL); g.closePath();
+  g.fillStyle = shade(col, -0.62); g.fill();
+  g.globalAlpha = 0.9; g.lineWidth = lw; g.strokeStyle = col; g.lineJoin = 'round'; g.stroke();
+  return (GSPR[key] = cv);
+}
+/* Máscaras de vecino de cada pieza y rotación (una vez, no por frame). */
+const PMASK = {};
+for (const t in ROT) PMASK[t] = ROT[t].map((cells) => {
+  const has = (x, y) => cells.some(([a, b]) => a === x && b === y);
+  return cells.map(([x, y]) => (has(x, y - 1) ? 1 : 0) | (has(x + 1, y) ? 2 : 0) | (has(x, y + 1) ? 4 : 0) | (has(x - 1, y) ? 8 : 0));
+});
+const maskAt = (x, y) => {
+  const t = board[y][x];
+  return (y > 0 && board[y - 1][x] === t ? 1 : 0) | (x < COLS - 1 && board[y][x + 1] === t ? 2 : 0)
+    | (y < R - 1 && board[y + 1][x] === t ? 4 : 0) | (x > 0 && board[y][x - 1] === t ? 8 : 0);
+};
+/* Sprites auxiliares cacheados (nunca se crean gradientes dentro del bucle). */
+const AUX = {};
+const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+function radialSpr(col) {
+  if (AUX['r' + col]) return AUX['r' + col];
+  const d = 256, cv = document.createElement('canvas'); cv.width = cv.height = d; const g = cv.getContext('2d');
+  const gr = g.createRadialGradient(d / 2, d / 2, 4, d / 2, d / 2, d / 2);
+  gr.addColorStop(0, rgba(col, 1)); gr.addColorStop(0.45, rgba(col, 0.42)); gr.addColorStop(1, rgba(col, 0));
+  g.fillStyle = gr; g.fillRect(0, 0, d, d);
+  return (AUX['r' + col] = cv);
+}
+function trailSpr(col) {
+  if (AUX['t' + col]) return AUX['t' + col];
+  const cv = document.createElement('canvas'); cv.width = 4; cv.height = 96; const g = cv.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 0, 96); gr.addColorStop(0, rgba(col, 0)); gr.addColorStop(1, rgba(col, 1));
+  g.fillStyle = gr; g.fillRect(0, 0, 4, 96);
+  return (AUX['t' + col] = cv);
+}
+function sweepSpr() {
+  if (AUX.sw) return AUX.sw;
+  const w2 = 96, h2 = 8, cv = document.createElement('canvas'); cv.width = w2; cv.height = h2; const g = cv.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, w2, 0);
+  gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.55, 'rgba(255,255,255,.85)');
+  gr.addColorStop(0.72, '#fff'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, w2, h2);
+  return (AUX.sw = cv);
+}
+function vigSpr() {
+  if (AUX.vg) return AUX.vg;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+  const gr = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.24, W / 2, H / 2, Math.max(W, H) * 0.66);
+  gr.addColorStop(0, 'rgba(255,60,86,0)'); gr.addColorStop(0.6, 'rgba(255,60,86,.24)'); gr.addColorStop(1, 'rgba(255,40,70,.62)');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  return (AUX.vg = cv);
+}
 function panel(g, p, title) {
   g.fillStyle = 'rgba(0,0,0,.3)'; rr(g, p.x, p.y + 3, p.w, p.h, 10); g.fill();
   rr(g, p.x, p.y, p.w, p.h, 10); fillOut(g, '#1a1740', 2.5);
   g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = 1; rr(g, p.x + 3, p.y + 3, p.w - 6, p.h - 6, 7); g.stroke();
   if (title) small(g, title, p.x + (p.w < 120 ? p.w / 2 : 10), p.y + 7, p.w < 120 ? 'center' : 'left');
 }
-// Escena estática (fondo, pozo del tablero, paneles) cacheada a 2×
-const STATIC = (() => {
+function cvs2(w2, h2) { const cv = document.createElement('canvas'); cv.width = Math.ceil(w2 * 2); cv.height = Math.ceil(h2 * 2); const g = cv.getContext('2d'); g.scale(2, 2); return [cv, g]; }
+/* Pozo y paneles (idénticos en los dos modos; en el nuevo van en una capa aparte con fondo transparente). */
+function paintWell(g) {
+  const F = 4;
+  g.fillStyle = 'rgba(0,0,0,.4)'; rr(g, BX - F, BY - F + 5, BW + 2 * F, BH + 2 * F, 10); g.fill();
+  rr(g, BX - F, BY - F, BW + 2 * F, BH + 2 * F, 10); fillOut(g, '#2e2866', 2.5);
+  let gr = g.createLinearGradient(0, BY, 0, BY + BH); gr.addColorStop(0, '#16133a'); gr.addColorStop(1, '#0a091c'); g.fillStyle = gr; g.fillRect(BX, BY, BW, BH);
+  for (let x = 0; x < COLS; x += 2) { g.fillStyle = 'rgba(255,255,255,.02)'; g.fillRect(BX + x * S, BY, S, BH); }
+  if (NEW) {   // profundidad: el pozo se oscurece hacia arriba y por los lados, como un hueco de verdad
+    gr = g.createLinearGradient(0, BY, 0, BY + S * 4); gr.addColorStop(0, 'rgba(0,0,0,.5)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(BX, BY, BW, S * 4);
+    gr = g.createLinearGradient(BX, 0, BX + S * 1.6, 0); gr.addColorStop(0, 'rgba(0,0,0,.34)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(BX, BY, S * 1.6, BH);
+    gr = g.createLinearGradient(BX + BW, 0, BX + BW - S * 1.6, 0); gr.addColorStop(0, 'rgba(0,0,0,.34)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(BX + BW - S * 1.6, BY, S * 1.6, BH);
+  }
+  g.strokeStyle = 'rgba(255,255,255,.05)'; g.lineWidth = 1; g.beginPath();
+  for (let x = 1; x < COLS; x++) { g.moveTo(BX + x * S + 0.5, BY); g.lineTo(BX + x * S + 0.5, BY + BH); }
+  for (let y = 1; y < ROWS; y++) { g.moveTo(BX, BY + y * S + 0.5); g.lineTo(BX + BW, BY + y * S + 0.5); }
+  g.stroke();
+  g.strokeStyle = OUT; g.lineWidth = 2; g.strokeRect(BX - 1, BY - 1, BW + 2, BH + 2);
+  g.strokeStyle = 'rgba(255,255,255,.14)'; g.lineWidth = 1.2; rr(g, BX - F + 2.5, BY - F + 2.5, BW + 2 * F - 5, BH + 2 * F - 5, 8); g.stroke();
+}
+function paintPanels(g) {
+  panel(g, P.next, 'SIGUIENTE'); panel(g, P.hold, 'RESERVA'); panel(g, P.stats, '');
+  if (P.score) panel(g, P.score, '');
+  if (HAND && P.obj) panel(g, P.obj, '');
+}
+// Escena estática (fondo, pozo del tablero, paneles) cacheada a 2×. Modo maratón: exactamente como siempre.
+const STATIC = NEW ? null : (() => {
   const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2; const g = cv.getContext('2d'); g.scale(2, 2);
   let gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#231c52'); gr.addColorStop(1, '#0c0a20'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
   // textura: siluetas de piezas muy tenues
@@ -344,23 +532,65 @@ const STATIC = (() => {
   }
   gr = g.createRadialGradient(BX + BW / 2, BY + BH / 2, 20, BX + BW / 2, BY + BH / 2, BH * 0.75);
   gr.addColorStop(0, 'rgba(110,98,245,.22)'); gr.addColorStop(1, 'rgba(110,98,245,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
-  // pozo
-  const F = LAND ? 4 : 4;
-  g.fillStyle = 'rgba(0,0,0,.4)'; rr(g, BX - F, BY - F + 5, BW + 2 * F, BH + 2 * F, 10); g.fill();
-  rr(g, BX - F, BY - F, BW + 2 * F, BH + 2 * F, 10); fillOut(g, '#2e2866', 2.5);
-  gr = g.createLinearGradient(0, BY, 0, BY + BH); gr.addColorStop(0, '#16133a'); gr.addColorStop(1, '#0a091c'); g.fillStyle = gr; g.fillRect(BX, BY, BW, BH);
-  for (let x = 0; x < COLS; x += 2) { g.fillStyle = 'rgba(255,255,255,.02)'; g.fillRect(BX + x * S, BY, S, BH); }
-  g.strokeStyle = 'rgba(255,255,255,.05)'; g.lineWidth = 1; g.beginPath();
-  for (let x = 1; x < COLS; x++) { g.moveTo(BX + x * S + 0.5, BY); g.lineTo(BX + x * S + 0.5, BY + BH); }
-  for (let y = 1; y < ROWS; y++) { g.moveTo(BX, BY + y * S + 0.5); g.lineTo(BX + BW, BY + y * S + 0.5); }
-  g.stroke();
-  g.strokeStyle = OUT; g.lineWidth = 2; g.strokeRect(BX - 1, BY - 1, BW + 2, BH + 2);
-  g.strokeStyle = 'rgba(255,255,255,.14)'; g.lineWidth = 1.2; rr(g, BX - F + 2.5, BY - F + 2.5, BW + 2 * F - 5, BH + 2 * F - 5, 8); g.stroke();
-  panel(g, P.next, 'SIGUIENTE'); panel(g, P.hold, 'RESERVA'); panel(g, P.stats, '');
-  if (P.score) panel(g, P.score, '');
-  if (HAND && P.obj) panel(g, P.obj, '');
+  paintWell(g); paintPanels(g);
   return cv;
 })();
+/* Fondo vivo (docs/GANCHO.md §B9): dos capas de siluetas que suben a distinta velocidad
+ * (paralaje real) sobre un degradado horneado, más un halo que respira y late al hacer líneas.
+ * Todo son drawImage de lienzos cacheados: ni un gradiente ni una silueta se crean por frame. */
+function driftLayer(sc, alpha, n) {
+  const [cv, g] = cvs2(W, H);
+  let sd = sc * 977 + 13; const rn = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
+  const keys = Object.keys(SHAPES);
+  for (let i = 0; i < n; i++) {
+    const t = keys[i % 7], r = Math.floor(rn() * 4), sz = sc * (0.7 + rn() * 0.7), x = rn() * W, y = rn() * H, a = alpha * (0.5 + rn() * 0.5);
+    for (let w2 = -1; w2 <= 1; w2++) {   // repetido arriba y abajo para que la capa case al repetirse
+      g.fillStyle = `rgba(160,151,255,${a})`; g.strokeStyle = `rgba(200,195,255,${a * 1.4})`; g.lineWidth = 1;
+      for (const [cx, cy] of ROT[t][r]) { rr(g, x + cx * sz, y + cy * sz + w2 * H, sz - 1.5, sz - 1.5, sz * 0.24); g.fill(); g.stroke(); }
+    }
+  }
+  return cv;
+}
+/* Una sola imagen horneada: degradado + capa lejana de siluetas + pozo + paneles.
+ * Cuesta lo mismo que el fondo de siempre (un drawImage); lo único vivo es la capa cercana. */
+const LY = NEW ? (() => {
+  const [base, gb] = cvs2(W, H);
+  const gr = gb.createLinearGradient(0, 0, W * 0.4, H); gr.addColorStop(0, '#2a2160'); gr.addColorStop(0.55, '#171243'); gr.addColorStop(1, '#0a0819');
+  gb.fillStyle = gr; gb.fillRect(0, 0, W, H);
+  gb.globalAlpha = 0.85; gb.drawImage(driftLayer(26, 0.085, 20), 0, 0, W, H); gb.globalAlpha = 1;
+  const hl = gb.createRadialGradient(BX + BW / 2, BY + BH / 2, 20, BX + BW / 2, BY + BH / 2, BH * 0.75);
+  hl.addColorStop(0, 'rgba(110,98,245,.20)'); hl.addColorStop(1, 'rgba(110,98,245,0)'); gb.fillStyle = hl; gb.fillRect(0, 0, W, H);
+  paintWell(gb); paintPanels(gb);
+  return { base, dr: driftLayer(13, 0.075, 26) };
+})() : null;
+const LVCOL = ['#6e62f5', '#4f7cff', '#45d6ea', '#5fdc6e', '#f7d046', '#ff9a3c', '#ff5a6a', '#b36cf0'];
+/* Huecos opacos (pozo, paneles y botones, con margen para sus sombras): la capa viva solo se
+ * pinta en el margen que se ve, no debajo de lo que la tapa. Recorte par-impar, un solo clip. */
+const HOLES = NEW ? (() => {
+  const E = 6, h = [[BX - E, BY - E, BW + 2 * E, BH + 2 * E]];
+  for (const q of [P.next, P.hold, P.stats, P.score, P.obj]) if (q) h.push([q.x - E, q.y - E, q.w + 2 * E, q.h + 2 * E]);
+  for (const b of BTN) h.push([b.x - E, b.y - E, b.w + 2 * E, b.h + 2 * E + 4]);
+  return h;
+})() : null;
+function drawBack() {
+  c.drawImage(LY.base, 0, 0, W, H);
+  c.save();
+  c.beginPath(); c.rect(0, 0, W, H);
+  for (const [x, y, w2, h2] of HOLES) c.rect(x, y, w2, h2);
+  c.clip('evenodd');
+  const o = (time * 21) % H;
+  c.globalAlpha = 0.85;
+  c.drawImage(LY.dr, 0, o - H, W, H); c.drawImage(LY.dr, 0, o, W, H);
+  c.globalAlpha = 1;
+  // halo del pozo: late con cada línea y toma el color del tramo de niveles (solo mientras late)
+  if (pulseT > 0.015) {
+    const col = LVCOL[Math.min(LVCOL.length - 1, Math.floor((k.lv - 1) / 2.6))], d = BH * 1.6;
+    c.globalAlpha = Math.min(0.55, pulseT * 0.55);
+    c.drawImage(radialSpr(col), BX + BW / 2 - d / 2, BY + BH / 2 - d / 2, d, d);
+    c.globalAlpha = 1;
+  }
+  c.restore();
+}
 
 /* ---------- Dibujo por capas ---------- */
 const px = (x) => BX + x * S, py = (y) => BY + (y - HID) * S;
@@ -368,49 +598,65 @@ const eob = (t) => 1 + 2.7 * Math.pow(t - 1, 3) + 1.7 * Math.pow(t - 1, 2);   //
 
 function mini(t, cx, cy, m, alpha, sc) {
   const cells = ROT[t][0], xs = cells.map((p) => p[0]), ys = cells.map((p) => p[1]);
-  const w = (Math.max(...xs) - Math.min(...xs) + 1) * m, h = (Math.max(...ys) - Math.min(...ys) + 1) * m, spr = block(COLORS[t], m);
+  const x0 = Math.min(...xs), y0 = Math.min(...ys);
+  const w = (Math.max(...xs) - x0 + 1) * m, h = (Math.max(...ys) - y0 + 1) * m, col = COLORS[t], ms = NEW ? PMASK[t][0] : null;
   c.save(); c.globalAlpha = alpha; c.translate(cx, cy); if (sc) c.scale(sc, sc);
-  for (const [x, y] of cells) c.drawImage(spr, (x - Math.min(...xs)) * m - w / 2, (y - Math.min(...ys)) * m - h / 2, m, m);
+  cells.forEach(([x, y], i) => c.drawImage(NEW ? blockM(col, m, ms[i]) : block(col, m), (x - x0) * m - w / 2, (y - y0) * m - h / 2, m, m));
   c.restore();
 }
 function drawBoard() {
   c.save(); c.beginPath(); c.rect(BX, BY, BW, BH); c.clip();
   const p = clearing ? 1 - clearT / CLR : 0, e = rowFx ? Math.pow(rowFx.t / 0.14, 2) : 0;
   const grey = dying ? Math.min(ROWS, Math.floor((dieT / 0.75) * ROWS)) : 0;
+  const ry = NEW ? riseAnim * S : 0;   // la basura que sube entra deslizándose, no de golpe
   for (let y = HID; y < R; y++) {
-    const oy = rowFx ? -rowFx.shift[y] * S * e : 0, clr = clearing && clearing.includes(y);
+    const oy = (rowFx ? -rowFx.shift[y] * S * e : 0) + ry, clr = clearing && clearing.includes(y);
     for (let x = 0; x < COLS; x++) {
       const t = board[y][x]; if (!t) continue;
       const col = R - 1 - y < grey ? '#5b5775' : COLORS[t];
+      const spr = NEW ? blockM(col, S, R - 1 - y < grey ? 0 : maskAt(x, y)) : block(col, S);
       if (clr) {   // se encoge desde el centro hacia fuera con destello
         const q = Math.min(1, Math.max(0, (p - Math.abs(x - 4.5) / 4.5 * 0.35) / 0.55)); if (q >= 1) continue;
-        const s2 = S * (1 - q); c.drawImage(block(col, S), px(x) + (S - s2) / 2, py(y) + (S - s2) / 2, s2, s2);
+        const s2 = S * (1 - q); c.drawImage(spr, px(x) + (S - s2) / 2, py(y) + (S - s2) / 2, s2, s2);
         c.globalAlpha = 0.25 + 0.6 * q; c.fillStyle = '#fff'; rr(c, px(x) + (S - s2) / 2, py(y) + (S - s2) / 2, s2, s2, s2 * 0.2); c.fill(); c.globalAlpha = 1;
-      } else c.drawImage(block(col, S), px(x), py(y) + oy, S, S);
+      } else c.drawImage(spr, px(x), py(y) + oy, S, S);
     }
     if (clr && p < 0.45) { c.globalAlpha = (1 - p / 0.45) * 0.85; c.fillStyle = '#fff'; c.fillRect(BX, py(y) + S * 0.1, BW, S * 0.8); c.globalAlpha = 1; }
   }
+  // barrido de luz que recorre cada fila que se borra
+  if (NEW && sweep && clearing) {
+    const sw = sweepSpr(), wdt = S * 3.4, xx = BX - wdt + (BW + wdt * 2) * sweep.p;
+    for (const y of clearing) c.drawImage(sw, xx, py(y) + S * 0.06, wdt, S * 0.88);
+  }
   // estelas de caída dura
   for (const t of trails) for (const [x, y0, y1] of t.cols) {
-    const top = py(y0), bot = py(y1) + S, gr = c.createLinearGradient(0, top, 0, bot);
-    gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(1, t.col); c.globalAlpha = (t.t / 0.24) * 0.45; c.fillStyle = gr;
-    c.fillRect(px(x) + S * 0.12, top, S * 0.76, bot - top); c.globalAlpha = 1;
+    const top = py(y0), bot = py(y1) + S; c.globalAlpha = (t.t / 0.24) * 0.45;
+    if (NEW) c.drawImage(trailSpr(t.col), px(x) + S * 0.12, top, S * 0.76, bot - top);
+    else { const gr = c.createLinearGradient(0, top, 0, bot); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(1, t.col); c.fillStyle = gr; c.fillRect(px(x) + S * 0.12, top, S * 0.76, bot - top); }
+    c.globalAlpha = 1;
   }
   if (cur && !dying) {
-    // pieza fantasma
-    const gy = ghostY(), col = COLORS[cur.t];
-    if (gy > cur.y) for (const [cx, cy] of ROT[cur.t][cur.r]) {
+    const gy = ghostY(), col = COLORS[cur.t], cells = ROT[cur.t][cur.r], ms = NEW ? PMASK[cur.t][cur.r] : null;
+    // pieza fantasma: misma silueta única, hueca
+    if (gy > cur.y) cells.forEach(([cx, cy], i) => {
+      if (NEW) { c.globalAlpha = 0.6; c.drawImage(ghostM(col, S, ms[i]), px(cur.x + cx), py(gy + cy), S, S); c.globalAlpha = 1; return; }
       const x = px(cur.x + cx) + 2, y = py(gy + cy) + 2; rr(c, x, y, S - 4, S - 4, S * 0.18);
       c.globalAlpha = 0.16; c.fillStyle = col; c.fill(); c.globalAlpha = 0.75; c.lineWidth = 2; c.strokeStyle = col; c.stroke(); c.globalAlpha = 1;
-    }
+    });
     // pieza actual (posición interpolada) con aviso del bloqueo
-    const spr = block(col, S), warn = grounded() ? Math.min(1, lockT / LOCK) : 0;
-    for (const [cx, cy] of ROT[cur.t][cur.r]) {
-      const x = BX + (vis.x + cx) * S, y = BY + (vis.y + cy - HID) * S; c.drawImage(spr, x, y, S, S);
+    const warn = grounded() ? Math.min(1, lockT / LOCK) : 0;
+    cells.forEach(([cx, cy], i) => {
+      const x = BX + (vis.x + cx) * S, y = BY + (vis.y + cy - HID) * S;
+      c.drawImage(NEW ? blockM(col, S, ms[i]) : block(col, S), x, y, S, S);
       if (warn > 0) { c.globalAlpha = warn * 0.35; c.fillStyle = OUT; rr(c, x + 1, y + 1, S - 2, S - 2, S * 0.2); c.fill(); c.globalAlpha = 1; }
-    }
+    });
   }
   if (lockFx) for (const [x, y] of lockFx.cells) { c.globalAlpha = (lockFx.t / 0.2) * 0.7; c.fillStyle = '#fff'; rr(c, px(x) + 1, py(y) + 1, S - 2, S - 2, S * 0.2); c.fill(); c.globalAlpha = 1; }
+  // aviso de que sube basura (nivel 20): franja que late bajo la pila
+  if (NEW && LV && LV.rise && risesLeft > 0 && riseT < 3) {
+    const a = (0.2 + 0.28 * Math.sin(time * 12)) * Math.min(1, (3 - riseT) / 1.2);
+    c.globalAlpha = a; c.fillStyle = '#ff5a6a'; c.fillRect(BX, BY + BH - S * 0.9, BW, S * 0.9); c.globalAlpha = 1;
+  }
   c.restore();
   // marco en peligro (pila alta) o al subir de nivel
   let danger = false; for (let y = HID; y < HID + 4 && !danger; y++) if (board[y].some(Boolean)) danger = true;
@@ -419,26 +665,53 @@ function drawBoard() {
     rr(c, BX - 3, BY - 3, BW + 6, BH + 6, 8); c.stroke(); c.globalAlpha = 1;
   }
 }
+/* Peligro (docs/GANCHO.md §B): la pantalla entera avisa antes de que sea tarde. */
+function drawDanger() {
+  if (dang <= 0.01) return;
+  c.globalAlpha = Math.min(0.85, dang * (0.55 + 0.25 * Math.sin(time * 8)));
+  c.drawImage(vigSpr(), 0, 0, W, H); c.globalAlpha = 1;
+}
 /* HUD de los niveles a mano: «Nivel n/20» y el objetivo con su barra, dentro de los paneles
  * (vertical: el de estadísticas; horizontal: estadísticas + panel propio bajo los chips). */
+function star(x, y, r, on) {
+  c.beginPath();
+  for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr2 = i % 2 ? r * 0.44 : r; c[i ? 'lineTo' : 'moveTo'](x + Math.cos(a) * rr2, y + Math.sin(a) * rr2); }
+  c.closePath(); c.fillStyle = on ? '#ffd166' : 'rgba(255,255,255,.13)'; c.fill();
+  c.lineWidth = 1.4; c.strokeStyle = on ? OUT : 'rgba(26,21,48,.5)'; c.lineJoin = 'round'; c.stroke();
+}
+function stars3(cx, y, r, got) { for (let i = 0; i < 3; i++) star(cx + (i - 1) * r * 2.3, y, r, i < got); }
+/* Barra de progreso con el pulso del último acierto. */
+function goalBar(x, y, w, h, pct) {
+  rr(c, x, y, w, h, h / 2); fillOut(c, '#0c0a20', 1.5);
+  if (pct > 0) {
+    rr(c, x + 1, y + 1, Math.max(h - 2, (w - 2) * pct), h - 2, (h - 2) / 2);
+    c.fillStyle = pct >= 1 ? '#7cf7a0' : goalFx > 0 ? '#fff' : ACC; c.fill();
+  }
+}
 function drawGoal() {
   const i = objInfo(), st = P.stats, cx = st.x + st.w / 2, pct = i.max ? Math.min(1, i.cur / i.max) : 0;
+  const rem = Math.max(0, i.max - i.cur), got = starsNow(), blink = rem === 1 && Math.sin(time * 7) > 0;
+  const remS = rem === 0 ? '¡YA ESTÁ!' : rem === 1 ? '¡FALTA 1!' : 'Faltan ' + rem;
+  const remC = rem === 0 ? '#7cf7a0' : rem === 1 ? (blink ? '#fff' : '#ffd166') : '#c9c3ff';
   if (LAND) {
     small(c, 'NIVEL', cx, st.y + 7); label(`${k.lv}/${HAND.length}`, cx, st.y + 19, 18, '#fff', 'center');
     small(c, 'LÍNEAS', cx, st.y + 49); label(String(lines), cx, st.y + 61, 18, '#fff', 'center');
     const o = P.obj;
-    small(c, 'OBJETIVO', o.x + 10, o.y + 7, 'left');
-    label(i.name, o.x + 10, o.y + 20, 16, '#fff', 'left');
-    label(`${i.cur}/${i.max}`, o.x + o.w - 10, o.y + 18, 20, pct >= 1 ? '#7cf7a0' : '#c9c3ff', 'right');
-    rr(c, o.x + 10, o.y + 42, o.w - 20, 8, 4); fillOut(c, '#0c0a20', 1.5);
-    if (pct > 0) { rr(c, o.x + 11, o.y + 43, (o.w - 22) * pct, 6, 3); c.fillStyle = pct >= 1 ? '#7cf7a0' : ACC; c.fill(); }
+    small(c, 'OBJETIVO', o.x + 10, o.y + 6, 'left');
+    small(c, `PIEZAS ${pieces}`, o.x + o.w - 10, o.y + 6, 'right');
+    label(i.name, o.x + 10, o.y + 17, 16, '#fff', 'left');
+    label(`${i.cur}/${i.max}`, o.x + o.w - 10, o.y + 15, 20, pct >= 1 ? '#7cf7a0' : '#c9c3ff', 'right');
+    goalBar(o.x + 10, o.y + 38, o.w - 20, 9, pct);
+    label(remS, o.x + 10, o.y + 52, 12, remC, 'left');
+    stars3(o.x + o.w - 30, o.y + 57, 7, got);
   } else {
-    small(c, 'NIVEL', cx, st.y + 7); label(`${k.lv}/${HAND.length}`, cx, st.y + 18, 17, '#fff', 'center');
-    small(c, 'OBJETIVO', cx, st.y + 42); label(i.name, cx, st.y + 53, 12, '#fff', 'center');
-    label(`${i.cur}/${i.max}`, cx, st.y + 70, 18, pct >= 1 ? '#7cf7a0' : '#c9c3ff', 'center');
-    const bx = st.x + 8, bw = st.w - 16, by = st.y + st.h - 18;
-    rr(c, bx, by, bw, 8, 4); fillOut(c, '#0c0a20', 1.5);
-    if (pct > 0) { rr(c, bx + 1, by + 1, (bw - 2) * pct, 6, 3); c.fillStyle = pct >= 1 ? '#7cf7a0' : ACC; c.fill(); }
+    small(c, 'NIVEL', cx, st.y + 6); label(`${k.lv}/${HAND.length}`, cx, st.y + 17, 17, '#fff', 'center');
+    small(c, 'OBJETIVO', cx, st.y + 40); label(i.name, cx, st.y + 51, 12, '#fff', 'center');
+    label(`${i.cur}/${i.max}`, cx, st.y + 66, 18, pct >= 1 ? '#7cf7a0' : '#c9c3ff', 'center');
+    goalBar(st.x + 8, st.y + 89, st.w - 16, 9, pct);
+    small(c, remS, cx, st.y + 102, 'center', remC);
+    small(c, `${pieces} PIEZAS`, cx, st.y + 117, 'center');
+    stars3(cx, st.y + 134, 7, got);
   }
 }
 /* Cartel del objetivo al empezar el nivel (5 s, se desvanece). */
@@ -454,7 +727,9 @@ function drawBanner() {
   if (ln) ls.push(ln);
   // siempre centrado sobre el TABLERO: así no tapa los paneles laterales ni en vertical ni en horizontal
   const cb = BX + BW / 2;
-  const i = objInfo(), bh = 26 + ls.length * lh + 8, bx = cb - bw / 2, by = LAND ? 8 : BY + 6;
+  const i = objInfo(), bh = 26 + ls.length * lh + 8, bx = cb - bw / 2;
+  // el cartel del nivel se queda en el tercio alto del pozo: no tapa la zona donde aparece la pieza
+  const by = NEW ? BY + BH * 0.3 : (LAND ? 8 : BY + 6);
   c.save(); c.globalAlpha = a;
   rr(c, bx, by, bw, bh, 12); fillOut(c, 'rgba(12,10,32,.93)', 2.5);
   label(`NIVEL ${k.lv}/${HAND.length} · ${i.name.toUpperCase()} ${i.max}`, cb, by + 8, 12, '#a99fff', 'center');
@@ -541,7 +816,7 @@ function drawButtons() {
   }
 }
 function drawPops() {
-  let y = BY + BH * 0.3;
+  let y = BY + BH * (NEW ? 0.52 : 0.3);
   for (const p of pops) {
     const age = p.max - p.t, sc = 0.4 + 0.6 * eob(Math.min(1, age / 0.22));
     c.save(); c.globalAlpha = Math.min(1, p.t / 0.35); c.translate(BX + BW / 2, y - age * 14); c.scale(sc, sc);
@@ -556,14 +831,23 @@ addEventListener('resize', () => { flip = (innerWidth > innerHeight) !== LAND; }
 if (HAND) k.levels(HAND.length, { start: () => reset() });   // el progreso lo guarda kit.js por dificultad
 reset();
 k.show(document.title, HAND
-  ? '20 niveles a mano, cada uno con su objetivo: líneas, dobles, triples, tetris, T-giros o limpiar toda la basura. Al final, la basura sube sola.'
+  ? '20 niveles a mano, cada uno con su objetivo: líneas, dobles, triples, tetris, T-giros o limpiar toda la basura. Gana estrellas gastando menos piezas. Al final, la basura sube sola.'
   : ((MODE === 'marathon' ? 'Llega a 150 líneas empezando en nivel 5. ' : 'Completa líneas para borrarlas; cada 10 líneas sube el nivel. ')
     + 'Arrastra para mover, toca para girar, desliza abajo para dejar caer y arriba para guardar. Teclado: ← → mover · ↓ bajar · ↑/Espacio girar · Z al revés · X caída · C reserva'));
 k.run((dt) => {
   const raw = new Set(RAW); RAW.clear();
   effects(dt);
   if (!k.gate(reset)) return;
-  if (dying) { dieT += dt; if (dieT > 0.95 && !ended) { ended = true; const i = LV && objInfo(); k.lose('tetra-' + MODE, score, 'Fin de partida', i ? `Nivel ${k.lv} · ${i.name} ${i.cur}/${i.max}` : `Líneas: ${lines} · Nivel ${level}`); } return; }
+  if (dying) {
+    dieT += dt;
+    if (dieT > 0.95 && !ended) {
+      ended = true; const i = LV && objInfo();
+      // casi-victoria (docs/GANCHO.md §A4): perder tiene que doler y dar ganas
+      const near = i ? (i.cur >= i.max ? '¡Lo tenías!' : `Te faltaba${i.max - i.cur === 1 ? '' : 'n'} ${remTxt(i, i.max - i.cur)}`) : '';
+      k.lose('tetra-' + MODE, score, 'Fin de partida', i ? `${near} · Nivel ${k.lv} · ${i.cur}/${i.max} · ${pieces} piezas` : `Líneas: ${lines} · Nivel ${level}`);
+    }
+    return;
+  }
   if (clearing) { clearT -= dt; if (clearT <= 0) finishClear(); if (k.ptr.up) G = null; return; }
   riseTick(dt);
   if (!cur) return;
@@ -572,6 +856,7 @@ k.run((dt) => {
   if (cur && !clearing && !dying && k.st === 'play') gravity(dt);
 }, () => {
   if (flip && k.st !== 'play') location.reload();
-  c.drawImage(STATIC, 0, 0, W, H);
+  if (NEW) drawBack(); else c.drawImage(STATIC, 0, 0, W, H);
   drawBoard(); drawPanels(); drawButtons(); drawPops(); drawBanner();
+  if (NEW) drawDanger();
 });
