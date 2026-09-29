@@ -74,6 +74,7 @@ final class KP_Perf {
 		if ( self::on( 'perf_cache' ) ) {
 			add_action( 'template_redirect', array( __CLASS__, 'serve_or_buffer' ), 0 );
 			add_action( 'admin_init', array( __CLASS__, 'sync_dropin' ) );
+			add_action( 'kp_shield_saved', array( __CLASS__, 'sync_dropin' ), 20 );
 			foreach ( array( 'save_post', 'deleted_post', 'trashed_post', 'untrashed_post' ) as $h ) {
 				add_action( $h, array( __CLASS__, 'purge_post' ), 10, 1 );
 			}
@@ -143,6 +144,10 @@ final class KP_Perf {
 			'mobile' => KP_Shield::opt( 'perf_cache_mob' ) ? 1 : 0,
 			'never'  => array_values( (array) apply_filters( 'kp_shield_cache_never', array() ) ),
 			'salt'   => (string) get_option( 'kp_shield_cache_salt', '' ),
+			// Una página servida de caché no pasa por `send_headers`: el drop-in repite
+			// aquí las cabeceras de seguridad para que no se pierdan en los HIT.
+			'hdr'    => ( class_exists( 'KP_Shield_Security' ) && KP_Shield::opt( 'sec_on' ) && KP_Shield::opt( 'hdr_on' ) )
+				? KP_Shield_Security::header_list() : array(),
 		);
 	}
 

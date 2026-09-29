@@ -530,26 +530,41 @@ final class KP_Shield_Security {
 		if ( headers_sent() ) {
 			return;
 		}
-		header( 'X-Content-Type-Options: nosniff' );
-		header( 'Referrer-Policy: strict-origin-when-cross-origin' );
+		foreach ( self::header_list() as $h ) {
+			header( $h );
+		}
+	}
+
+	/**
+	 * Las cabeceras de seguridad como lista de textos «Nombre: valor».
+	 *
+	 * Se usa también desde el drop-in de caché: una página servida de caché no
+	 * llega a `send_headers`, así que el módulo de rendimiento guarda esta lista
+	 * en su config.php y la repite tal cual.
+	 */
+	public static function header_list() {
+		$out = array(
+			'X-Content-Type-Options: nosniff',
+			'Referrer-Policy: strict-origin-when-cross-origin',
+		);
 
 		// Los juegos van en un iframe del propio sitio y /tele/ y /mando/ son páginas normales:
 		// 'self' los deja funcionar y evita que nos incrusten desde fuera.
-		$anc = (string) apply_filters( 'kp_shield_frame_ancestors', "'self'" );
-		header( 'X-Frame-Options: SAMEORIGIN' );
-		header( "Content-Security-Policy: frame-ancestors $anc" );
+		$anc   = (string) apply_filters( 'kp_shield_frame_ancestors', "'self'" );
+		$out[] = 'X-Frame-Options: SAMEORIGIN';
+		$out[] = "Content-Security-Policy: frame-ancestors $anc";
 
 		// Pantalla completa, mando y acelerómetro hacen falta dentro del propio sitio.
-		$pp = apply_filters(
+		$out[] = 'Permissions-Policy: ' . apply_filters(
 			'kp_shield_permissions_policy',
 			'accelerometer=(self), gyroscope=(self), gamepad=(self), fullscreen=(self), '
 			. 'screen-wake-lock=(self), geolocation=(), camera=(), microphone=(), payment=(), usb=()'
 		);
-		header( 'Permissions-Policy: ' . $pp );
 
 		if ( KP_Shield::opt( 'hdr_hsts' ) && is_ssl() ) {
-			header( 'Strict-Transport-Security: max-age=15552000; includeSubDomains' );
+			$out[] = 'Strict-Transport-Security: max-age=15552000; includeSubDomains';
 		}
+		return $out;
 	}
 
 	/* ---------------------------------------------------- 5. cortafuegos */

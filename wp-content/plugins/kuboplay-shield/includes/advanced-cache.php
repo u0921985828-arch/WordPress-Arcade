@@ -66,6 +66,14 @@ function kp_cache_serve() {
 	header( 'Cache-Control: public, max-age=0, s-maxage=' . max( 0, $ttl ) . ', must-revalidate' );
 	header( 'Vary: Accept-Encoding, Cookie' );
 
+	if ( ! empty( $cfg['hdr'] ) && is_array( $cfg['hdr'] ) ) {
+		foreach ( $cfg['hdr'] as $h ) {
+			if ( is_string( $h ) && false === strpos( $h, "\n" ) && false === strpos( $h, "\r" ) ) {
+				header( $h );
+			}
+		}
+	}
+
 	if ( ! empty( $cfg['cond'] ) ) {
 		header( 'ETag: ' . $etag );
 		header( 'Last-Modified: ' . $gmt );
