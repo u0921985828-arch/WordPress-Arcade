@@ -70,4 +70,5 @@ gladiadores-de-juguete · balon-prisionero · parchis-de-la-plaza
   - Tanda 1 (1.32.1): pixel-dash, castle-knight, barrel-climb, spike-run.
   - Tanda 2 (1.35.0): pixel-invaders, starfall-defender, dungeon-micro, maze-muncher.
   - Tanda 3 (1.36.0): tetra-drop, serpent-grid, 2048-classic, sokoban-warehouse.
+  - Tanda 4 (1.37.0): burbujas-arcoiris, columnas-de-joyas, jewel-swap, mine-sweep.
 - **F4** Portada: la portada muestra solo los 40; el resto queda en «más juegos».
