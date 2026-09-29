@@ -20,6 +20,17 @@ let map, MW, p, enemies, coins, anchors, decos, flag, check, checks = [], inv = 
    ningún cambio: las variables valen 0/[] y las ramas están cerradas por `if (PD)`. */
 const PD = CFG.id === 'pixel-dash';
 let gems = [], rings = [], chain = 0, chainT = 0, mult = 1, died = false, pickGot = 0, lvPick = 0;
+/* Verbos nuevos de pixel-dash: losas que se desmoronan, ascensores, montacargas, bloques a
+   compás (plats), sierras sobre raíl (saws), muelles (springs) y el muro que avanza (wall).
+   Nada de esto se crea fuera de PD: los otros siete juegos ven arrays vacíos. */
+let plats = [], saws = [], springs = [], wall = null, waves = [], rocks = [], bs = null;
+let lvT = 0, tgt = 0, lvName = '', lvTip = '', pdWarn = 0, wallGrd = null, wallGrdW = 0;
+/* Compás: cada bloque está encendido el 66 % del ciclo y las dos fases van a medio ciclo, así
+   que siempre hay un solape en el que las dos están: se cruza a saltitos, no de milagro. */
+const QPER = 1.9, QON = 0.66;
+const qPh = (b) => { let d = (t % QPER) / QPER - b.ph * 0.5; if (d < 0) d += 1; return d; };
+const qOn = (b) => qPh(b) < QON;
+const qLeft = (b) => (QON - qPh(b)) * QPER;   /* segundos que le quedan encendido */
 const mulOf = (n) => (n >= 16 ? 5 : n >= 10 ? 4 : n >= 6 ? 3 : n >= 3 ? 2 : 1);
 /* Partículas y textos de kit.js se pintan en coordenadas de pantalla: en un juego con cámara
    hay que restarle el desplazamiento o salen pegados al borde. */
@@ -32,7 +43,7 @@ function chainUp(x, y) {
 }
 function chainBreak() { if (chain >= 3) flo('¡Cadena rota!', p.x + 11, p.y - 12, '#ff8a9a'); chain = 0; mult = 1; chainT = 0; k.chainReset(); }
 const toGo = () => Math.max(1, Math.round((flag.x - p.x - 11) / T));
-const starNeed = () => Math.max(1, Math.ceil(lvPick * 0.75));
+const tim = (s) => { s = Math.max(0, Math.round(s)); return s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s} s`; };
 function label(s, x, y, size, col, align) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top';
   c.lineJoin = 'round'; c.lineWidth = size / 5 + 2; c.strokeStyle = ART.OUT; c.strokeText(s, x, y); c.fillStyle = col || '#fff'; c.fillText(s, x, y);
@@ -44,12 +55,20 @@ const tileAt = (x, y) => { const tx = Math.floor(x / T), ty = Math.floor(y / T);
 const HAND = (typeof PLATLV !== 'undefined' && PLATLV[CFG.id]) || null;
 let boss = null;
 const TW = (tk) => { const n = +tk.slice(1) || 0; const c0 = tk[0];
-  return c0 === 'f' || c0 === 'g' || c0 === 'x' || c0 === 'p' ? n : c0 === 'u' || c0 === 'd' ? 4 : c0 === 'w' ? 8 : c0 === 'B' ? 14 : 0; };
+  return c0 === 'f' || c0 === 'g' || c0 === 'x' || c0 === 'p' || c0 === 'P' || c0 === 'm' || c0 === 'M' || c0 === 'V' || c0 === 'q' || c0 === 's' ? n
+    : c0 === 'u' || c0 === 'd' ? 4 : c0 === 'w' ? 8 : c0 === 'B' ? (PD ? 18 : 14) : 0; };
+/* La tira puede venir suelta (los demás juegos) o dentro de un objeto con nombre, consejo y
+   tiempos objetivo (pixel-dash). Se lee igual en los dos casos. */
+const lvRow = (n0) => HAND[k.clamp(n0, 1, HAND.length) - 1];
 function genHand(n0) {
-  const toks = HAND[k.clamp(n0, 1, HAND.length) - 1].split(' ').filter(Boolean);
+  const row = lvRow(n0), str = typeof row === 'string' ? row : row.s;
+  lvName = typeof row === 'string' ? '' : row.n || ''; lvTip = typeof row === 'string' ? '' : row.tip || '';
+  tgt = typeof row === 'string' || !row.t ? 0 : row.t[k.dif] || row.t[1] || 0;
+  const toks = str.split(' ').filter(Boolean);
   MW = 4 + toks.reduce((a, t) => a + TW(t), 0) + 9;
   map = Array.from({ length: MH }, () => Array(MW).fill(0));
   enemies = []; coins = []; anchors = []; decos = []; gems = []; boss = null;
+  plats = []; saws = []; springs = []; waves = []; rocks = []; wall = null; bs = null;
   const col = (cx0, hh) => { for (let y = MH - hh; y < MH; y++) if (cx0 >= 0 && cx0 < MW) map[y][cx0] = 1; };
   let x = 0, h = 3, sx = 0, sw = 4, top = 3;   /* sx/sw/top: lo último colocado (para «e» y «c») */
   const flat = (n) => { sx = x; sw = n; top = h; for (let i = 0; i < n; i++) col(x + i, h); x += n; };
@@ -64,18 +83,42 @@ function genHand(n0) {
     else if (c0 === 'x') { flat(n); for (let i = 1; i < n - 1; i++) map[MH - h - 1][sx + i] = 3; }
     else if (c0 === 'p') { sx = x; sw = n; top = h + 4; const py = MH - h - 5; for (let i = 0; i < n; i++) if (map[py]) map[py][x + i] = 2; x += n; }
     else if (c0 === 'w') { const nh = h + 5; for (let i = 0; i < 5; i++) col(x + i, h); for (let y = MH - nh - 1; y < MH - h - 3; y++) map[y][x + 1] = 1; x += 5; h = nh; flat(3); }
+    /* ---- piezas nuevas de pixel-dash (nunca aparecen en las tiras de los otros juegos) ---- */
+    else if (PD && c0 === 'm') { sx = x; sw = n; top = h;   /* grieta con losas que se desmoronan */
+      for (let i = 0; i < n; i++) plats.push({ kd: 'm', x: (x + i) * T, y: (MH - h) * T, w: T, h: 15, st: 0, tm: 0, sh: 0 }); x += n; }
+    else if (PD && c0 === 'M') { sx = x; sw = n; top = h;   /* ascensor de ida y vuelta */
+      plats.push({ kd: 'M', x: x * T, y: (MH - h) * T, w: 3 * T, h: 15, a: x * T, b: (x + n - 3) * T, sp: 96, d: 1, dx: 0, dy: 0 }); x += n; }
+    else if (PD && c0 === 'V') { sx = x; sw = n; top = h;   /* montacargas: sube 5 casillas */
+      plats.push({ kd: 'V', x: x * T, y: (MH - h) * T, w: 3 * T, h: 15, a: (MH - h - 5) * T, b: (MH - h) * T, sp: 72, d: -1, dx: 0, dy: 0 }); x += n; }
+    else if (PD && c0 === 'q') { sx = x; sw = n; top = h;   /* bloques a compás, fases alternas */
+      for (let i = 0; i < n; i += 2) plats.push({ kd: 'q', x: (x + i) * T, y: (MH - h) * T, w: Math.min(2, n - i) * T, h: 15, ph: (i / 2) & 1 }); x += n; }
+    else if (PD && c0 === 's') { flat(n);                   /* sierra sobre raíl a ras de suelo */
+      saws.push({ x: (sx + 0.6) * T, y: (MH - h) * T - 17, a: sx * T + 20, b: (sx + n) * T - 20, sp: (122 + 34 * lv01) * k.D.spd, d: 1, r: 17 }); }
+    else if (PD && c0 === '^') springs.push({ x: (sx + sw / 2) * T, y: (MH - top) * T, t: 0 });
+    else if (PD && c0 === 'P') { sx = x; sw = n; top = h + 6; const py = MH - h - 7;  /* repisa alta */
+      for (let i = 0; i < n; i++) if (map[py]) map[py][x + i] = 2; x += n; }
+    else if (PD && c0 === 'E') enemies.push({ x: (sx + Math.max(1, sw - 3)) * T, y: (MH - top) * T - 24, w: 26, h: 24, vy: 0, ground: false, wall: 0,
+      vx: 0, sp: (104 + 28 * lv01) * k.D.spd, min: sx * T, max: (sx + sw) * T - 26, alive: true, chase: 1, see: 0, face: -1 });
+    else if (PD && c0 === 'W') wall = { x: 0, sp: (128 + 26 * n) * (0.86 + 0.14 * k.D.spd), n };
     else if (c0 === 'a') anchors.push({ x: x * T, y: (MH - h - 6) * T });
     else if (c0 === 'e') enemies.push({ x: (sx + 1) * T, y: (MH - top) * T - 24, w: 26, h: 24, vx: (46 + 26 * lv01) * k.D.spd, min: sx * T, max: (sx + sw) * T - 26, alive: true, fly: TH.enemy === 'bird' });
     else if (c0 === 'c') for (let i = 0; i < 4; i++) coins.push({ x: (sx + sw * (i + 0.5) / 4) * T, y: (MH - top - 1) * T - 8 - Math.sin((i + 0.5) / 4 * Math.PI) * 30 });
     /* C: reguero de monedas a ras de suelo sobre el último tramo (recompensa continua al correr) */
-    else if (c0 === 'C') { const nc = k.clamp(Math.round(sw / 1.5), 2, 8); for (let i = 0; i < nc; i++) coins.push({ x: (sx + sw * (i + 0.5) / nc) * T, y: (MH - top) * T - 20 }); }
+    /* En pixel-dash la ruta llana da poco: el reguero de suelo se queda en 2-4 monedas y el
+       grueso del tesoro va en las repisas, las grietas y los compases (riesgo = premio). */
+    else if (c0 === 'C') { const nc = PD ? k.clamp(Math.round(sw / 3.4), 2, 4) : k.clamp(Math.round(sw / 1.5), 2, 8); for (let i = 0; i < nc; i++) coins.push({ x: (sx + sw * (i + 0.5) / nc) * T, y: (MH - top) * T - 20 }); }
     /* G: gema del nivel, alta y a la vista: vale 250 y sube la cadena de golpe */
     else if (c0 === 'G') gems.push({ x: (sx + sw / 2) * T, y: (MH - top) * T - 76 });
     else if (c0 === 'k') checks.push({ x: x * T, y: (MH - h) * T, on: false });
-    else if (c0 === 'B') { flat(14); boss = { x: (x - 8) * T, y: (MH - h) * T - 54, w: 54, h: 54, vx: 100 * k.D.spd, min: (x - 13) * T, max: (x - 2) * T - 54, hp: 3, iv: 0, face: -1, alive: true }; }
+    else if (c0 === 'B') {
+      if (PD) { flat(18);   /* el Coloso: arena llana de 18 casillas y tres fases telegrafiadas */
+        bs = { x: (x - 7) * T, y: (MH - h) * T - 64, w: 64, h: 64, gy: (MH - h) * T - 64, hp: 6, ph: 1, st: 'wait', tm: 1.1, nx: 'charge',
+          vx: 0, iv: 0, face: -1, alive: true, sq: 0, min: (x - 17) * T, max: (x - 2) * T - 64 }; }
+      else { flat(14); boss = { x: (x - 8) * T, y: (MH - h) * T - 54, w: 54, h: 54, vx: 100 * k.D.spd, min: (x - 13) * T, max: (x - 2) * T - 54, hp: 3, iv: 0, face: -1, alive: true }; }
+    }
   }
   for (let i = 0; i < 9; i++) col(x + i, h);
-  flag = { x: (x + 4) * T, y: (MH - h) * T, hidden: !!boss };
+  flag = { x: (x + 4) * T, y: (MH - h) * T, hidden: !!(boss || bs) };
   spawn = { x: 1.5 * T, y: (MH - 3) * T - 40 };
   for (let i = 0; i < 3; i++) if (!enemies.length || i < 1) decos.push({ x: (1.5 + i * 1.2) * T, y: (MH - 3) * T });
 }
@@ -122,15 +165,22 @@ function gen() {
 function groundY(o) { const tx = Math.floor((o.x + o.w / 2) / T); for (let ty = Math.max(0, Math.floor((o.y + o.h - 1) / T)); ty < MH; ty++) { const v = map[ty] && map[ty][tx]; if (v === 1 || v === 2 || v === 3) return ty * T; } return null; }
 function mkP(s) { return { x: s.x, y: s.y, vx: 0, vy: 0, w: 22, h: 30, face: 1, ground: false, state: 'idle', wall: 0 }; }
 function build() { check = null; checks = []; inv = 0; go = 0; gen(); p = mkP(spawn); t = 0; rope = null; dashT = 0; dashCd = 0; swordT = 0; jumpBuf = 0; coyote = 0; dead = 0; intro = 1.6; landSq = 0; cx = 0; cy = camY(MH * T - H);
-  if (PD) { lvPick = coins.length + gems.length; pickGot = 0; chain = 0; chainT = 0; mult = 1; died = false; rings.length = 0; k.chainReset(); } }
-function reset() { if (RACE) return raceNew(); level = HAND ? k.lv : 1; lives = 4 + k.D.life; score = 0; coinsGot = 0; build(); }
-function die() { if (dead || inv > 0) return; dead = 1.1; p.vy = -600; k.sfx('hurt'); k.shake(8); k.flash('rgba(255,60,80,.35)');
+  if (PD) { lvPick = coins.length + gems.length; pickGot = 0; chain = 0; chainT = 0; mult = 1; died = false; rings.length = 0; k.chainReset();
+    lvT = 0; pdWarn = 0; if (wall) wall.x = spawn.x - 430; } }
+/* Muerte barata (docs/GANCHO.md §A5): en pixel-dash se reaparece en el punto de control al
+   momento y el cupo de intentos es generoso; perder cuesta tiempo, no la partida. */
+function reset() { if (RACE) return raceNew(); level = HAND ? k.lv : 1; lives = (PD ? 9 : 4) + k.D.life; score = 0; coinsGot = 0; build(); }
+function die() { if (dead || inv > 0) return; dead = PD ? 0.65 : 1.1; p.vy = -600; k.sfx('hurt'); k.shake(8); k.flash('rgba(255,60,80,.35)');
   if (PD) { k.hitstop(0.06); k.punch(0.06); bur(p.x + 11, p.y + 15, '#ff5f7a', 14, 150); if (!died) { died = true; flo('★ perdida', p.x + 11, p.y - 16, '#ff8a9a'); } chainBreak(); } }
 function respawn() { lives--;
   /* Casi-victoria: al perder se dice cuánto faltaba, no se deja en «has perdido» a secas. */
   if (lives <= 0) return k.lose(CFG.id, score, 'Sin vidas', PD ? `Te faltaban ${toGo()} m para la bandera · ${pickGot}/${lvPick} tesoros` : `Nivel ${level} · ${coinsGot} moneda${coinsGot === 1 ? '' : 's'}`);
   if (PD) flo(`Te faltan ${toGo()} m`, p.x + 11, p.y - 30, '#ffd166');
-  const s = check && check.on ? { x: check.x, y: check.y - 40 } : spawn; p = mkP(s); rope = null; dead = 0; dashT = 0; inv = 1.6 / k.D.dmg; }
+  const s = check && check.on ? { x: check.x, y: check.y - 40 } : spawn; p = mkP(s); rope = null; dead = 0; dashT = 0; inv = 1.6 / k.D.dmg;
+  /* El muro vuelve detrás del punto de control: reintentar no es reintentar ya perdido. */
+  if (PD) { if (wall) wall.x = s.x - 430; waves.length = 0; rocks.length = 0;
+    for (const b of plats) if (b.kd === 'm') { b.st = 0; b.tm = 0; b.sh = 0; }
+    if (bs && bs.alive && p.x > bs.min - 200) { bs.st = 'wait'; bs.tm = 1.4; bs.x = k.clamp(bs.x, bs.min, bs.max); bs.y = bs.gy; bs.vx = 0; } } }
 /* subpasos: a pocos FPS (dt hasta 0,05 s) una caída a 1100 px/s recorre 55 px y atravesaría tablones de 1 casilla */
 function collide(o, dt) {
   const n = Math.min(4, Math.ceil(Math.max(Math.abs(o.vx), Math.abs(o.vy)) * dt / 20)) || 1;
@@ -147,6 +197,123 @@ function collide1(o, dt) {
     if (o.vy >= 0 && (tb === 1 || (tb === 2 && oldB <= Math.floor((o.y + o.h) / T) * T + 2))) { o.y = Math.floor((o.y + o.h) / T) * T - o.h; if (!was && o.vy > 300) { if (o === p) landSq = 0.18; else o.sq = 0.18; k.burst(o.x + o.w / 2, o.y + o.h, '#fff', 6, 70); } o.vy = 0; o.ground = true; }
     else if (o.vy < 0 && tt === 1) { o.y = Math.floor(o.y / T) * T + T; o.vy = 0; }
   }
+}
+/* ---------- Verbos nuevos de pixel-dash: física ------------------------------------------
+   Las piezas móviles NO están en el mapa de casillas: son entidades y se resuelven aparte,
+   así el colisionador de siempre (y con él los otros siete juegos) queda intacto. */
+const pSolid = (b) => (b.kd === 'm' ? b.st !== 2 : b.kd === 'q' ? qOn(b) : true);
+function updPlats(dt) {
+  for (const b of plats) {
+    b.dx = 0; b.dy = 0;
+    if (b.kd === 'm') {
+      if (b.st === 1) { b.tm -= dt; if (b.tm <= 0) { b.st = 2; b.tm = 3; bur(b.x + T / 2, b.y + 8, TH.plank, 7, 100); k.sfx('pop'); } }
+      else if (b.st === 2) { b.tm -= dt; if (b.tm <= 0) { b.st = 0; bur(b.x + T / 2, b.y + 8, '#fff', 4, 50); } }
+    } else if (b.kd === 'M') { const v = b.sp * k.D.spd * b.d * dt; b.x += v; b.dx = v;
+      if (b.x <= b.a) { b.x = b.a; b.d = 1; } else if (b.x >= b.b) { b.x = b.b; b.d = -1; } }
+    else if (b.kd === 'V') { const v = b.sp * k.D.spd * b.d * dt; b.y += v; b.dy = v;
+      if (b.y <= b.a) { b.y = b.a; b.d = 1; } else if (b.y >= b.b) { b.y = b.b; b.d = -1; } }
+  }
+}
+/* Aterrizaje sobre las piezas móviles (solo por arriba, como los tablones) y muelles. */
+function ridePlats(pb0) {
+  for (const b of plats) {
+    if (!pSolid(b)) continue;
+    const py0 = b.y - (b.dy || 0);
+    if (p.vy >= -1 && p.x + p.w - 5 > b.x && p.x + 5 < b.x + b.w && pb0 <= py0 + 9 && p.y + p.h >= b.y - 0.5) {
+      p.y = b.y - p.h; p.vy = 0; p.ground = true;
+      if (b.dx) { const nx = p.x + b.dx; if (tileAt(nx, p.y + 6) !== 1 && tileAt(nx + p.w, p.y + 6) !== 1) p.x = nx; }
+      if (b.kd === 'm' && b.st === 0) { b.st = 1; b.tm = 0.45; k.sfx('click'); }
+    }
+  }
+  for (const s of springs) if (s.t <= 0 && p.vy >= 0 && Math.abs(p.x + 11 - s.x) < 30 && pb0 <= s.y + 7 && p.y + p.h >= s.y - 2) {
+    p.y = s.y - p.h; p.vy = -1330; p.ground = false; s.t = 0.36;
+    k.sfx('jump'); k.punch(0.04); bur(s.x, s.y - 6, '#a8e4ff', 12, 150); flo('¡Arriba!', s.x, s.y - 40, '#a8e4ff');
+  }
+}
+/* Perseguidor: te ve, avisa («!») y va a por ti saltando huecos y escalones. Se pisa igual. */
+function updChaser(e, dt) {
+  const d = p.x - e.x, far = Math.abs(d) > 430;
+  if (e.see <= 0 && !far && !dead) { e.see = 0.001; e.warn = 0.75; k.sfx('pop'); }
+  if (e.warn > 0) { e.warn -= dt; e.vx = 0; }
+  else if (far) e.vx *= 0.9;
+  else { e.face = d > 0 ? 1 : -1; e.vx = e.face * e.sp; }
+  e.vy = Math.min(e.vy + G * dt, FALL);
+  const fx = e.x + (e.vx > 0 ? e.w + 6 : -6);
+  if (e.ground && e.vx) {                       /* salta bordes y escalones, no se cae solo */
+    const hole = tileAt(fx, e.y + e.h + 6) !== 1 && tileAt(fx, e.y + e.h + T) !== 1;
+    if (hole || tileAt(fx, e.y + e.h - 6) === 1) e.vy = -700;
+  }
+  collide(e, dt);
+  if (e.see > 0) e.see += dt;
+}
+/* Sierras, muelles, muro que avanza, ondas y rocas del jefe. Devuelve true si mata. */
+function updPD(dt) {
+  if (k.st === 'play') lvT += dt;
+  for (const s of springs) if (s.t > 0) s.t -= dt;
+  for (const w of saws) {
+    w.x += w.sp * w.d * dt;
+    if (w.x <= w.a) { w.x = w.a; w.d = 1; } else if (w.x >= w.b) { w.x = w.b; w.d = -1; }
+    if (Math.abs(w.x - p.x - 11) < w.r + 8 && Math.abs(w.y - p.y - 16) < w.r + 13) { die(); return true; }
+  }
+  for (let i = waves.length - 1; i >= 0; i--) { const v = waves[i];
+    v.x += v.d * 300 * k.D.spd * dt; v.t -= dt;
+    if (v.t <= 0) { waves[i] = waves[waves.length - 1]; waves.pop(); continue; }
+    if (Math.abs(v.x - p.x - 11) < 24 && p.y + p.h > v.gy - 30 && p.y + p.h <= v.gy + 8) { die(); return true; }
+  }
+  for (let i = rocks.length - 1; i >= 0; i--) { const r = rocks[i];
+    if (r.w > 0) { r.w -= dt; continue; }
+    r.vy = Math.min(r.vy + 1800 * dt, 900); r.y += r.vy * dt;
+    if (Math.abs(r.x - p.x - 11) < 22 && Math.abs(r.y - p.y - 16) < 24) { die(); return true; }
+    if (r.y >= r.gy) { bur(r.x, r.gy, '#6b5a8f', 9, 120); k.shake(3); rocks[i] = rocks[rocks.length - 1]; rocks.pop(); }
+  }
+  if (wall) {
+    if (intro <= 0 && k.st === 'play') wall.x += wall.sp * dt;
+    pdWarn = k.clamp(1 - (p.x - wall.x) / 380, 0, 1);
+    if (p.x - wall.x < 26) { inv = 0; die(); return true; }
+  }
+  if (bs && bs.alive && updBoss(dt)) return true;
+  return false;
+}
+/* El Coloso (nivel 20): tres fases, cada ataque con su aviso. Solo es vulnerable aturdido. */
+function updBoss(dt) {
+  const b = bs; b.iv -= dt; b.sq = Math.max(0, b.sq - dt);
+  if (Math.abs(p.x - b.x) > 620 && b.st === 'wait') { b.tm = 0.8; return false; }
+  b.tm -= dt;
+  if (b.st === 'wait') {
+    b.face = p.x < b.x ? -1 : 1; b.x = k.clamp(b.x + b.face * 46 * dt, b.min, b.max);
+    if (b.tm <= 0) { const opts = b.ph === 1 ? ['charge'] : b.ph === 2 ? ['charge', 'slam'] : ['charge', 'slam', 'rocks'];
+      b.pick = ((b.pick | 0) + 1) % opts.length; b.nx = opts[b.pick];
+      b.st = 'tell'; b.tm = (b.ph === 3 ? 0.62 : 0.82) / k.D.spd; k.sfx('click'); bur(b.x + 32, b.y + b.h, '#c9bfff', 6, 70); }
+  } else if (b.st === 'tell') {
+    if (b.tm <= 0) {
+      if (b.nx === 'charge') { b.st = 'charge'; b.vx = b.face * (320 + 62 * b.ph) * k.D.spd; b.tm = 2.6; k.sfx('shoot'); }
+      else if (b.nx === 'slam') { b.st = 'slam'; b.vy = -850; b.vx = k.clamp(p.x - b.x, -230, 230) * 0.9; b.tm = 3; k.sfx('jump'); }
+      else { b.st = 'rocks'; b.tm = 1.25; k.sfx('shoot');
+        for (let i = 0; i < 4; i++) rocks.push({ x: k.clamp(p.x + 11 + (i - 1.5) * 84, b.min, b.max + 64), y: b.gy - 300, gy: b.gy + 60, vy: 0, w: 0.72 }); }
+    }
+  } else if (b.st === 'charge') {
+    b.x += b.vx * dt;
+    if (b.x <= b.min || b.x >= b.max || b.tm <= 0) { b.x = k.clamp(b.x, b.min, b.max); b.st = 'stun'; b.tm = 1.45 - 0.14 * b.ph;
+      b.sq = 0.3; k.shake(7); k.sfx('hit'); bur(b.x + 32, b.y + b.h, '#8a7fb0', 12, 150); }
+  } else if (b.st === 'slam') {
+    b.vy += 2100 * dt; b.y += b.vy * dt; b.x = k.clamp(b.x + b.vx * dt, b.min, b.max);
+    if (b.y >= b.gy) { b.y = b.gy; b.vy = 0; b.st = 'stun'; b.tm = 1.3 - 0.1 * b.ph; b.sq = 0.3;
+      k.shake(9); k.punch(0.06); k.sfx('explode'); bur(b.x + 32, b.y + b.h, '#8a7fb0', 16, 180);
+      waves.push({ x: b.x + 32, d: -1, t: 2.6, gy: b.gy + 64 }); waves.push({ x: b.x + 32, d: 1, t: 2.6, gy: b.gy + 64 }); }
+  } else if (b.st === 'rocks') { if (b.tm <= 0) { b.st = 'stun'; b.tm = 1.1; } }
+  else if (b.st === 'stun') { if (b.tm <= 0) { b.st = 'wait'; b.tm = 0.95; } }
+  const hit = p.x + p.w > b.x + 10 && p.x < b.x + b.w - 10 && p.y + p.h > b.y + 12 && p.y < b.y + b.h - 4;
+  if (hit && b.st === 'stun' && b.iv <= 0 && p.vy > 0 && p.y + p.h - b.y < 34) {
+    b.hp--; b.iv = 0.8; p.vy = -700; const np = b.hp > 4 ? 1 : b.hp > 2 ? 2 : 3;
+    k.hitstop(0.07); k.punch(0.07); k.shake(6); k.sfx('hit'); score += 300;
+    ring(b.x + 32, b.y + 24, '#ff5f7a', 46); bur(b.x + 32, b.y + 22, '#ff5f7a', 22, 200); chainUp(b.x + 32, b.y);
+    if (b.hp <= 0) { b.alive = false; flag.hidden = false; k.sfx('win'); k.confetti(); k.reward('¡VENCIDO!', '#ffd166'); flo('¡El Coloso cae!', b.x + 32, b.y, '#ffc928'); }
+    else { if (np !== b.ph) { b.ph = np; k.reward(`¡FASE ${np}!`, '#ff8a9a'); k.flash('rgba(255,120,150,.3)'); b.st = 'wait'; b.tm = 1.1; }
+      else k.reward(`¡${b.hp} MÁS!`, '#ffd166'); }
+    return false;
+  }
+  if (hit && b.st !== 'stun' && b.iv <= 0) { die(); return true; }
+  return false;
 }
 function upd(dt) {
   if (!k.gate(reset)) return;
@@ -175,12 +342,15 @@ function upd(dt) {
   else if (jumpBuf > 0 && A.wall && !p.ground && (tileAt(p.x - 3, p.y + 15) === 1 || tileAt(p.x + p.w + 3, p.y + 15) === 1)) { const s = tileAt(p.x - 3, p.y + 15) === 1 ? 1 : -1; p.vy = -780; p.vx = s * 380; p.face = s; jumpBuf = 0; k.sfx('jump'); k.burst(p.x + (s > 0 ? 0 : 22), p.y + 15, '#fff', 6, 70); }
   if (!JH && p.vy < -CUT && !rope && !A.swing) p.vy = -CUT;
   if (rope) { const dx = p.x + 11 - rope.a.x, dy = p.y + 15 - rope.a.y, d = Math.hypot(dx, dy); if (d > rope.len) { const nx = dx / d, ny = dy / d, vd = p.vx * nx + p.vy * ny; if (vd > 0) { p.vx -= vd * nx; p.vy -= vd * ny; } p.x = rope.a.x + nx * rope.len - 11; p.y = rope.a.y + ny * rope.len - 15; } rope.len = Math.max(60, rope.len - 50 * dt); }
+  const pb0 = p.y + p.h;
+  if (PD) updPlats(dt);
   collide(p, dt);
+  if (PD) { ridePlats(pb0); if (updPD(dt)) return; }
   p.state = !p.ground ? (sliding ? 'wall' : p.vy < 0 ? 'jump' : 'fall') : Math.abs(p.vx) > 30 ? 'run' : 'idle';
   // enemigos
-  for (const e of enemies) if (e.alive) { e.x += e.vx * dt; if (e.x < e.min || e.x > e.max) { e.vx *= -1; e.x = k.clamp(e.x, e.min, e.max);
+  for (const e of enemies) if (e.alive) { if (PD && e.chase) updChaser(e, dt); else { e.x += e.vx * dt; if (e.x < e.min || e.x > e.max) { e.vx *= -1; e.x = k.clamp(e.x, e.min, e.max);
       /* Remate: al darse la vuelta se aplasta un instante y levanta polvo (nada cambia de golpe). */
-      if (PD) { e.tn = 0.2; bur(e.x + 13, e.y + 24, TH.foe, 3, 45); } }
+      if (PD) { e.tn = 0.2; bur(e.x + 13, e.y + 24, TH.foe, 3, 45); } } }
     if (PD && e.tn > 0) e.tn = Math.max(0, e.tn - dt);
     const ey = e.fly ? e.y - 20 + Math.sin(t * 2 + e.min) * 16 : e.y, hit = p.x + p.w > e.x + 6 && p.x < e.x + e.w - 6 && p.y + p.h > ey + 7 && p.y < ey + e.h - 2;
     if (swordT > 0 && Math.abs(e.x + 13 - (p.x + 11 + p.face * 22)) < 30 && Math.abs(ey + 12 - p.y - 15) < 28) { e.alive = false; score += 100; k.burst(e.x + 13, ey + 12, '#fff', 16); k.float('+100', e.x + 13, ey); k.sfx('hit'); continue; }
@@ -220,9 +390,15 @@ function upd(dt) {
     else { k.sfx('coin'); k.float('¡Punto de control!', q.x, q.y - 70, '#7cf7a0'); } }
   if (!flag.hidden && p.x > flag.x - 10) {
     score += 500 * level + coinsGot * 5;
-    if (PD) { let st = 1; if (pickGot >= starNeed()) st++; if (!died) st++;
+    /* Estrellas: 1 terminar · 2 dentro del tiempo objetivo · 3 además todos los tesoros y
+       sin recibir un golpe. Los tesoros que faltan están siempre en la ruta arriesgada. */
+    if (PD) { const fast = !tgt || lvT <= tgt, all = pickGot >= lvPick;
+      const st = fast ? (all && !died ? 3 : 2) : 1;
       k.reward('¡META!', '#ffd166'); k.punch(0.08); k.shake(5); bur(flag.x + 8, flag.y - 70, '#ffd166', 26, 210);
-      return k.levelDone(score, `${pickGot}/${lvPick} tesoros · ${died ? 'te han dado' : 'sin un rasguño'} · ${lives} vida${lives === 1 ? '' : 's'}`, { stars: st }); }
+      const det = [`${tim(lvT)}${tgt ? ` / objetivo ${tim(tgt)}` : ''}`, `${pickGot}/${lvPick} tesoros`, died ? 'te han dado' : 'sin un rasguño'];
+      const fal = []; if (!fast) fal.push(`acabar en ${tim(tgt)}`); if (!all) fal.push('todos los tesoros'); if (died) fal.push('sin recibir daño');
+      const nxt = fal.length ? `<br>Para 3★ te falta: ${fal.join(', ')}` : '';
+      return k.levelDone(score, det.join(' · ') + nxt, { stars: st }); }
     if (HAND) return k.levelDone(score, `${coinsGot} moneda${coinsGot === 1 ? '' : 's'} · ${lives} vida${lives === 1 ? '' : 's'}`);
     k.sfx('win'); k.confetti(); level++; const s = score, lv = lives, cg = coinsGot; build(); score = s; lives = lv; coinsGot = cg; return; }
   cx += (k.clamp(p.x - W * 0.38 + p.vx * 0.25, 0, Math.max(0, MW * T - W)) - cx) * Math.min(1, dt * 6);
@@ -269,6 +445,76 @@ function beaconSprite() {
   g.fillStyle = gr; g.beginPath(); g.moveTo(12, 220); g.lineTo(44, 220); g.lineTo(33, 0); g.lineTo(23, 0); g.closePath(); g.fill();
   beaconCv = r[0]; return beaconCv;
 }
+/* ---- Sprites de los verbos nuevos. Todos se hornean una vez (REMASTER §8: cada objeto es un
+   trazado continuo, relleno una vez y contorneado una vez; el detalle interior va recortado). ---- */
+let pdSpr = null;
+function pdSprites() {
+  if (pdSpr) return pdSpr;
+  const O = ART.OUT, s = {};
+  /* losa agrietada: una sola pieza de piedra con la grieta pintada dentro (sin contorno propio) */
+  { const r = mkCv(T, 16), g = r[1]; const P = new Path2D();
+    P.moveTo(1.5, 4); P.quadraticCurveTo(T / 2, 0.5, T - 1.5, 4); P.lineTo(T - 2.5, 12.5);
+    P.quadraticCurveTo(T / 2, 15.5, 2.5, 12.5); P.closePath();
+    g.fillStyle = '#9a7048'; g.fill(P); g.lineWidth = 2.2; g.lineJoin = 'round'; g.strokeStyle = O; g.stroke(P);
+    g.save(); g.clip(P);
+    g.fillStyle = 'rgba(255,255,255,.26)'; g.fillRect(0, 2, T, 3.5);
+    g.fillStyle = 'rgba(40,22,10,.34)'; g.fillRect(0, 10, T, 6);
+    g.strokeStyle = 'rgba(40,22,10,.6)'; g.lineWidth = 1.6; g.beginPath();
+    g.moveTo(9, 2); g.lineTo(13, 8); g.lineTo(10, 14); g.moveTo(22, 3); g.lineTo(19, 9); g.lineTo(24, 14); g.stroke();
+    g.restore(); s.crack = r[0]; }
+  /* plataforma móvil: cuerpo único de metal con luz arriba y sombra abajo */
+  { const w2 = 3 * T, r = mkCv(w2, 18), g = r[1]; const P = new Path2D();
+    P.moveTo(3, 2); P.lineTo(w2 - 3, 2); P.quadraticCurveTo(w2 - 1, 2, w2 - 2, 6);
+    P.lineTo(w2 - 8, 15); P.quadraticCurveTo(w2 - 10, 17, w2 - 13, 17); P.lineTo(13, 17);
+    P.quadraticCurveTo(10, 17, 8, 15); P.lineTo(2, 6); P.quadraticCurveTo(1, 2, 3, 2); P.closePath();
+    g.fillStyle = '#7f8ba8'; g.fill(P); g.lineWidth = 2.4; g.lineJoin = 'round'; g.strokeStyle = O; g.stroke(P);
+    g.save(); g.clip(P);
+    g.fillStyle = 'rgba(255,255,255,.34)'; g.fillRect(0, 1, w2, 4);
+    g.fillStyle = 'rgba(20,16,40,.3)'; g.fillRect(0, 10, w2, 8);
+    g.fillStyle = '#ffc928'; for (let i = 0; i < 5; i++) g.fillRect(10 + i * 18, 5.5, 9, 3);
+    g.restore(); s.plat = r[0]; }
+  /* bloque a compás: un cubo de energía, una pieza */
+  { const w2 = 2 * T, r = mkCv(w2, 18), g = r[1]; const P = new Path2D();
+    P.moveTo(4, 2); P.lineTo(w2 - 4, 2); P.quadraticCurveTo(w2 - 1, 2, w2 - 3, 9);
+    P.lineTo(w2 - 6, 16); P.lineTo(6, 16); P.lineTo(3, 9); P.quadraticCurveTo(1, 2, 4, 2); P.closePath();
+    g.fillStyle = '#6f63d8'; g.fill(P); g.lineWidth = 2.4; g.lineJoin = 'round'; g.strokeStyle = O; g.stroke(P);
+    g.save(); g.clip(P);
+    g.fillStyle = 'rgba(200,214,255,.55)'; g.fillRect(0, 1, w2, 4);
+    g.fillStyle = 'rgba(20,16,40,.28)'; g.fillRect(0, 10, w2, 8);
+    g.fillStyle = 'rgba(255,255,255,.7)'; g.fillRect(w2 / 2 - 8, 6, 16, 2.4);
+    g.restore(); s.beat = r[0]; }
+  /* sierra: disco dentado en una sola pieza, con el eje pintado dentro */
+  { const R2 = 19, r = mkCv(R2 * 2 + 4, R2 * 2 + 4), g = r[1]; g.translate(R2 + 2, R2 + 2);
+    const P = new Path2D();
+    for (let i = 0; i < 40; i++) { const a = i / 40 * 6.283, rr = 17 - (i % 4 < 2 ? 0 : 4.5);
+      if (i) P.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); else P.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+    P.closePath();
+    g.fillStyle = '#c3ccdd'; g.fill(P); g.lineWidth = 2; g.lineJoin = 'round'; g.strokeStyle = O; g.stroke(P);
+    g.save(); g.clip(P);
+    g.fillStyle = 'rgba(255,255,255,.5)'; g.beginPath(); g.arc(-4, -5, 11, 0, 6.283); g.fill();
+    g.fillStyle = 'rgba(30,26,56,.34)'; g.beginPath(); g.arc(4, 6, 12, 0, 6.283); g.fill();
+    g.fillStyle = '#6b7590'; g.beginPath(); g.arc(0, 0, 5.2, 0, 6.283); g.fill();
+    g.restore(); s.saw = r[0]; }
+  /* muelle: cuerpo único con la espiral dibujada dentro */
+  { const r = mkCv(52, 30), g = r[1]; const P = new Path2D();
+    P.moveTo(7, 28); P.lineTo(9, 13); P.quadraticCurveTo(10, 6, 26, 6); P.quadraticCurveTo(42, 6, 43, 13);
+    P.lineTo(45, 28); P.closePath();
+    g.fillStyle = '#4fb6e8'; g.fill(P); g.lineWidth = 2.6; g.lineJoin = 'round'; g.strokeStyle = O; g.stroke(P);
+    g.save(); g.clip(P);
+    g.fillStyle = 'rgba(255,255,255,.45)'; g.fillRect(0, 4, 52, 6);
+    g.fillStyle = 'rgba(12,44,72,.32)'; for (let i = 0; i < 3; i++) g.fillRect(0, 14 + i * 5, 52, 2.6);
+    g.restore(); s.spring = r[0]; }
+  /* roca del jefe: un canto rodado, una pieza */
+  { const r = mkCv(40, 40), g = r[1]; g.translate(20, 20); const P = new Path2D();
+    const pts = [[0, -16], [12, -11], [16, 2], [8, 15], [-6, 16], [-15, 5], [-13, -8]];
+    P.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) P.lineTo(pts[i][0], pts[i][1]); P.closePath();
+    g.fillStyle = '#7a6c9c'; g.fill(P); g.lineWidth = 2.4; g.lineJoin = 'round'; g.strokeStyle = O; g.stroke(P);
+    g.save(); g.clip(P);
+    g.fillStyle = 'rgba(255,255,255,.3)'; g.beginPath(); g.arc(-5, -7, 11, 0, 6.283); g.fill();
+    g.fillStyle = 'rgba(24,18,48,.34)'; g.beginPath(); g.arc(6, 8, 13, 0, 6.283); g.fill();
+    g.restore(); s.rock = r[0]; }
+  pdSpr = s; return s;
+}
 function star(x, y, r, on) {
   c.beginPath();
   for (let q = 0; q < 10; q++) { const a = -Math.PI / 2 + q * Math.PI / 5, rr2 = q % 2 ? r * 0.46 : r; c.lineTo(x + Math.cos(a) * rr2, y + Math.sin(a) * rr2); }
@@ -292,6 +538,73 @@ function pdSky() {
     c.beginPath(); c.moveTo(bx - 7, by + fl); c.lineTo(bx, by); c.lineTo(bx + 7, by + fl); c.stroke();
   }
 }
+/* ---- Pintado de los verbos nuevos, en coordenadas de mundo (dentro de la cámara) ---- */
+function drwPD() {
+  const S = pdSprites(), L = cx - 60, R2 = cx + W + 60;
+  /* raíles de las sierras: el peligro se ve venir desde lejos */
+  c.lineWidth = 3; c.strokeStyle = 'rgba(26,21,48,.5)'; c.lineCap = 'round';
+  for (const w of saws) if (w.b > L && w.a < R2) { c.beginPath(); c.moveTo(w.a, w.y); c.lineTo(w.b, w.y); c.stroke(); }
+  for (const b of plats) {
+    if (b.x + b.w < L || b.x > R2) continue;
+    if (b.kd === 'm') {
+      if (b.st === 2) { c.globalAlpha = 0.22; c.drawImage(S.crack, b.x, b.y, T, 16); c.globalAlpha = 1; continue; }
+      const sh = b.st === 1 ? Math.sin(b.tm * 62) * 2.2 : 0;   /* aviso: tiembla antes de caer */
+      c.save(); c.translate(b.x + sh, b.y); if (b.st === 1) { c.globalAlpha = 0.55 + 0.45 * Math.sin(b.tm * 42); }
+      c.drawImage(S.crack, 0, 0, T, 16); c.restore(); c.globalAlpha = 1;
+    } else if (b.kd === 'q') {
+      const on = qOn(b), fd = qLeft(b);
+      if (!on) { c.globalAlpha = qPh(b) > 0.86 ? 0.3 + 0.3 * Math.sin(t * 34) : 0.16;   /* aviso de que vuelve */
+        c.drawImage(S.beat, b.x, b.y, b.w, 18); c.globalAlpha = 1; continue; }
+      c.globalAlpha = fd < 0.45 ? 0.55 + 0.45 * Math.sin(t * 34) : 1;
+      c.drawImage(S.beat, b.x, b.y, b.w, 18); c.globalAlpha = 1;
+    } else { c.drawImage(S.plat, b.x, b.y - 1, b.w, 18);
+      /* sombra de contacto bajo el ascensor: se lee a qué altura va */
+      c.globalAlpha = 0.18; c.fillStyle = ART.OUT; c.fillRect(b.x + 6, b.y + 17, b.w - 12, 3); c.globalAlpha = 1; }
+  }
+  for (const s of springs) if (s.x > L && s.x < R2) { const q = s.t > 0 ? Math.sin((s.t / 0.36) * Math.PI) : 0;
+    c.save(); c.translate(s.x, s.y); c.scale(1 + q * 0.2, 1 - q * 0.45); c.drawImage(S.spring, -26, -28, 52, 30); c.restore(); }
+  for (const w of saws) if (w.x > L && w.x < R2) { c.save(); c.translate(w.x, w.y); c.rotate(t * 9 * w.d); c.drawImage(S.saw, -21, -21, 42, 42); c.restore(); }
+  /* aviso del perseguidor: «!» antes de arrancar */
+  for (const e of enemies) if (e.alive && e.warn > 0 && e.x > L && e.x < R2) {
+    const q = Math.min(1, (0.75 - e.warn) * 8); c.save(); c.translate(e.x + 13, e.y - 16 - q * 6); c.scale(q, q);
+    label('!', 0, -10, 26, '#ff5f7a', 'center'); c.restore(); }
+  if (bs && bs.alive && bs.x > L - 140 && bs.x < R2 + 140) drwBoss(S);
+  for (const v of waves) { const q = k.clamp(v.t / 2.6, 0, 1);
+    c.globalAlpha = 0.35 + 0.45 * q; c.fillStyle = '#c9bfff';
+    c.beginPath(); c.moveTo(v.x - 20, v.gy); c.lineTo(v.x, v.gy - 26 - 6 * Math.sin(t * 20)); c.lineTo(v.x + 20, v.gy); c.closePath(); c.fill();
+    c.globalAlpha = 1; }
+  for (const r of rocks) {
+    if (r.w > 0) { const q = 1 - r.w / 0.72;   /* telegrafía: la sombra crece en el suelo */
+      c.globalAlpha = 0.2 + 0.5 * q; c.fillStyle = '#ff5f7a';
+      c.beginPath(); c.ellipse(r.x, r.gy - 2, 16 + 8 * q, 5 + 2 * q, 0, 0, 6.283); c.fill(); c.globalAlpha = 1; continue; }
+    c.save(); c.translate(r.x, r.y); c.rotate(r.y * 0.01); c.drawImage(S.rock, -20, -20, 40, 40); c.restore();
+  }
+  if (wall) {                                   /* muro de sombra que avanza desde atrás */
+    const x1 = wall.x, x0 = Math.min(x1 - 40, cx - 80), y1 = MH * T + 200;
+    c.fillStyle = 'rgba(18,12,40,.93)'; c.fillRect(x0, -400, x1 - x0, y1 + 400);
+    c.fillStyle = '#4a3a86';
+    for (let y = -400; y < y1; y += 28) { const w2 = 10 + 7 * Math.sin(y * 0.09 + t * 5);
+      c.beginPath(); c.moveTo(x1, y); c.lineTo(x1 + w2, y + 14); c.lineTo(x1, y + 28); c.closePath(); c.fill(); }
+    c.fillStyle = 'rgba(160,151,255,.4)'; c.fillRect(x1 - 4, -400, 4, y1 + 400);
+  }
+}
+function drwBoss(S) {
+  const b = bs, tell = b.st === 'tell', stun = b.st === 'stun';
+  const sq = b.sq > 0 ? Math.sin((b.sq / 0.3) * Math.PI) * 0.18 : tell ? -0.12 * Math.sin((1 - b.tm) * 9) : 0;
+  c.save(); c.translate(b.x + b.w / 2, b.y + b.h); c.scale(1 + sq, 1 - sq); c.translate(-(b.x + b.w / 2), -(b.y + b.h));
+  if (b.iv > 0 && Math.floor(t * 20) % 2) c.globalAlpha = 0.5;
+  ART.enemy(c, TH.enemy === 'bird' ? 'knight' : TH.enemy, b.x, b.y, b.w, b.h, { t, face: b.face || -1, big: 1 });
+  c.globalAlpha = 1; c.restore();
+  if (tell) { const q = k.clamp(1 - b.tm / 0.9, 0, 1);   /* aviso: «!» y aro que se cierra */
+    c.strokeStyle = '#ff5f7a'; c.lineWidth = 3; c.globalAlpha = 0.85;
+    c.beginPath(); c.arc(b.x + b.w / 2, b.y + b.h / 2, 70 - q * 34, 0, 6.283); c.stroke(); c.globalAlpha = 1;
+    label('!', b.x + b.w / 2, b.y - 34, 28, '#ff5f7a', 'center'); }
+  if (stun) { c.fillStyle = '#ffd166';           /* aturdido: estrellitas y flecha de «pisa aquí» */
+    for (let i = 0; i < 3; i++) { const a = t * 6 + i * 2.1; c.beginPath(); c.arc(b.x + b.w / 2 + Math.cos(a) * 20, b.y - 12 + Math.sin(a) * 6, 3.2, 0, 6.283); c.fill(); }
+    const dy = Math.sin(t * 7) * 4; c.beginPath();
+    c.moveTo(b.x + b.w / 2, b.y - 26 + dy); c.lineTo(b.x + b.w / 2 - 10, b.y - 42 + dy); c.lineTo(b.x + b.w / 2 + 10, b.y - 42 + dy); c.closePath();
+    ART.fillOut(c, '#7cf7a0', 2); }
+}
 function drw() {
   ART.background(c, TH, W, H, cx, cy, t);
   /* Modo fluido: si la pantalla es más alta que el mapa, el subsuelo continúa hasta el borde. */
@@ -303,6 +616,7 @@ function drw() {
   for (let y = 0; y < MH; y++) for (let x = x0; x < x1; x++) { const v = map[y][x]; if (!v) continue;
     if (v === 1) ART.tile(c, TH, 'ground', x * T, y * T, T, { top: !map[y - 1] || map[y - 1][x] !== 1, left: x > 0 && map[y][x - 1] !== 1, right: x < MW - 1 && map[y][x + 1] !== 1 });
     else ART.tile(c, TH, v === 2 ? 'plank' : 'spike', x * T, y * T, T, {}); }
+  if (PD) drwPD();
   for (const a of anchors) ART.anchor(c, a.x, a.y, t);
   for (const q of checks) ART.flag(c, q.x, q.y, t, q.on ? '#7cf7a0' : '#8a86b5', 60);
   /* Faro de la meta: se ve desde lejos, así la bandera nunca es una sorpresa. */
@@ -346,17 +660,19 @@ function drw() {
   /* Pantalla estrecha (móvil en vertical): las monedas bajan a una segunda fila para no
      meterse bajo los botones de pausa y sonido, que van centrados arriba. */
   const nar = W < 560, hx = nar ? 20 : 22;
-  for (let i = 0; i < 4 + k.D.life; i++) ART.heart(c, hx + i * 24, 22, 1.25, i < lives);
-  const cX = nar ? hx + 8 : hx + (4 + k.D.life) * 24 + 12, cY = nar ? 50 : 22;
+  /* Con 9 intentos no caben nueve corazones: en pixel-dash va uno con su cuenta. */
+  if (PD) { ART.heart(c, hx, 22, 1.25, lives > 0); label(`× ${lives}`, hx + 13, 13, 17, lives <= 2 ? '#ff8a9a' : '#fff'); }
+  else for (let i = 0; i < 4 + k.D.life; i++) ART.heart(c, hx + i * 24, 22, 1.25, i < lives);
+  const cX = PD ? (nar ? hx + 8 : hx + 62) : nar ? hx + 8 : hx + (4 + k.D.life) * 24 + 12, cY = nar ? 50 : 22;
   ART.coin(c, cX, cY, 0, 8); label(PD ? `× ${pickGot}/${lvPick}` : `× ${coinsGot}`, cX + 12, cY - 9, 17, '#fff');
   label(`${score}`, W - 12, 8, 22, '#fff', 'right');
   label(HAND ? `Nivel ${level}/${HAND.length}` : `Nivel ${level}`, W - 12, 34, 13, '#ffc928', 'right');
   if (PD) {
     /* Estrellas en vivo: empiezas con las tres y se apagan si las pierdes. Se ve todo el rato
        qué te falta (tesoros) y qué te juegas (no recibir un golpe). */
-    const sy = 62, need = starNeed();
-    for (let i = 0; i < 3; i++) star(W - 18 - (2 - i) * 20, sy, 8, i === 0 ? true : i === 1 ? pickGot >= need : !died);
-    label(`${pickGot}/${need}`, W - 68, sy - 8, 12, pickGot >= need ? '#7cf7a0' : '#cfc8ea', 'right');
+    const sy = 62, fast = !tgt || lvT <= tgt, all = pickGot >= lvPick;
+    for (let i = 0; i < 3; i++) star(W - 18 - (2 - i) * 20, sy, 8, i === 0 ? true : i === 1 ? fast : fast && all && !died);
+    if (tgt) label(tim(Math.max(0, tgt - lvT)), W - 68, sy - 8, 13, fast ? (tgt - lvT < 8 ? '#ffd166' : '#7cf7a0') : '#ff8a9a', 'right');
     /* Cadena y multiplicador, con la barra que se vacía: engancha y duele perderla. */
     if (chain >= 2) {
       const cw = 128, cbx = (W - cw) / 2, cby = H - 54, cc = mult >= 5 ? '#ff5fa2' : mult >= 4 ? '#ffd166' : mult >= 3 ? '#7cf7a0' : '#a097ff';
@@ -373,13 +689,35 @@ function drw() {
     c.beginPath(); c.arc(mbx + mbw * pr, mby + 4, 6, 0, 6.283); ART.fillOut(c, TH.hero, 2);
     c.beginPath(); c.moveTo(mbx + mbw + 6, mby + 10); c.lineTo(mbx + mbw + 6, mby - 9); c.lineTo(mbx + mbw + 16, mby - 5); c.lineTo(mbx + mbw + 6, mby - 1); c.closePath(); ART.fillOut(c, flag.hidden ? '#8a86b5' : '#ff5f7a', 2);
     label(flag.hidden ? '¡Al jefe!' : `${toGo()} m`, W - 20, mby - 22, 13, '#ffe9a8', 'right');
+    /* Amenaza: el borde izquierdo se tiñe según lo cerca que viene el muro (nunca sorprende). */
+    if (wall && pdWarn > 0.02) {
+      if (!wallGrd || wallGrdW !== W) { wallGrdW = W; wallGrd = c.createLinearGradient(0, 0, W * 0.45, 0);
+        wallGrd.addColorStop(0, 'rgba(58,26,96,.75)'); wallGrd.addColorStop(1, 'rgba(58,26,96,0)'); }
+      c.globalAlpha = pdWarn; c.fillStyle = wallGrd; c.fillRect(0, 0, W * 0.45, H); c.globalAlpha = 1;
+      if (pdWarn > 0.5) label('¡EL MURO!', 18, H / 2 - 10, 16, '#ff8a9a'); }
   }
   /* Barra del jefe: solo mientras sigue en pie, centrada arriba y sin pisar el marcador. */
   if (boss && boss.alive && p.x > boss.min - 320) { const bw2 = Math.min(220, W - 180), bx2 = (W - bw2) / 2, by2 = (PD || nar) ? 76 : 14; /* PD: bajo los botones de pausa/sonido del reproductor */
     ART.rr(c, bx2 - 3, by2 - 3, bw2 + 6, 16, 8); c.fillStyle = 'rgba(26,21,48,.75)'; c.fill();
     c.fillStyle = '#ff5f7a'; c.fillRect(bx2, by2, bw2 * k.clamp(boss.hp / 3, 0, 1), 10);
     label('Jefe', bx2 + bw2 / 2, by2 + 16, 12, '#ffd7df', 'center'); }
-  if (intro > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, intro); ART.rr(c, W / 2 - 110, H / 2 - 38, 220, 64, 18); c.fillStyle = 'rgba(26,21,48,.8)'; c.fill(); label(`Nivel ${level}`, W / 2, H / 2 - 30, 30, '#fff', 'center'); label(CFG.title, W / 2, H / 2 + 4, 14, '#ffc928', 'center'); c.globalAlpha = 1; }
+  /* Barra del Coloso: una casilla por impacto y la fase en curso. */
+  if (PD && bs && bs.alive && p.x > bs.min - 420) { const bw2 = Math.min(230, W - 170), bx2 = (W - bw2) / 2, by2 = 76, seg = bw2 / 6;
+    ART.rr(c, bx2 - 4, by2 - 4, bw2 + 8, 18, 9); c.fillStyle = 'rgba(26,21,48,.8)'; c.fill();
+    for (let i = 0; i < 6; i++) { c.fillStyle = i < bs.hp ? (bs.ph === 3 ? '#ff5f7a' : bs.ph === 2 ? '#ffa15f' : '#ffd166') : 'rgba(255,255,255,.12)';
+      c.fillRect(bx2 + i * seg + 1.5, by2, seg - 3, 10); }
+    label(`El Coloso · fase ${bs.ph}`, bx2 + bw2 / 2, by2 + 15, 12, '#ffd7df', 'center'); }
+  if (intro > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, intro);
+    const iw = PD && lvName ? Math.min(W - 24, Math.max(260, lvTip.length * 7 + 40)) : 220, ih = PD && lvName ? 92 : 64;
+    ART.rr(c, W / 2 - iw / 2, H / 2 - 38, iw, ih, 18); c.fillStyle = 'rgba(26,21,48,.85)'; c.fill();
+    label(PD && lvName ? `${level}. ${lvName}` : `Nivel ${level}`, W / 2, H / 2 - 30, PD && lvName ? 24 : 30, '#fff', 'center');
+    if (PD && lvName) { /* el consejo encoge hasta caber: en 360 px de ancho no se sale nunca */
+      let ts = 12; const fnt = (n) => `800 ${n}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
+      c.font = fnt(ts); while (ts > 8 && c.measureText(lvTip).width > iw - 22) { ts--; c.font = fnt(ts); }
+      label(lvTip, W / 2, H / 2 - 2 + (12 - ts) / 2, ts, '#cfc8ea', 'center');
+      if (tgt) label(`Objetivo 2★: ${tim(tgt)}`, W / 2, H / 2 + 22, 13, '#ffc928', 'center'); }
+    else label(CFG.title, W / 2, H / 2 + 4, 14, '#ffc928', 'center');
+    c.globalAlpha = 1; }
   gfx();
 }
 /* ---------- Remaster R1: capas para el compositor WebGL2 de kit.js ----------
@@ -399,6 +737,12 @@ function gfx() {
     g.fillStyle = '#c4c4c4';
     for (const a of anchors) { g.beginPath(); g.arc(a.x, a.y, 9, 0, 6.283); g.fill(); }
     for (const co of coins) if (!co.got && co.x > cx - 20 && co.x < cx + W + 20) { g.beginPath(); g.arc(co.x, co.y, 9, 0, 6.283); g.fill(); }
+    if (PD) { g.fillStyle = '#b0b0b0';
+      for (const b of plats) if (pSolid(b) && b.x + b.w > cx - 40 && b.x < cx + W + 40) g.fillRect(b.x, b.y, b.w, 16);
+      g.fillStyle = '#c8c8c8';
+      for (const w of saws) if (w.x > cx - 40 && w.x < cx + W + 40) { g.beginPath(); g.arc(w.x, w.y, 17, 0, 6.283); g.fill(); }
+      for (const s of springs) if (s.x > cx - 40 && s.x < cx + W + 40) g.fillRect(s.x - 24, s.y - 24, 48, 24);
+      if (bs && bs.alive) g.fillRect(bs.x + 4, bs.y + 4, bs.w - 8, bs.h - 4); }
     g.fillStyle = '#d2d2d2';
     for (const e of enemies) if (e.alive && e.x > cx - 40 && e.x < cx + W + 40) g.fillRect(e.x - 3, e.fly ? e.y - 20 : e.y, e.w + 6, e.h);
     g.fillStyle = '#f0f0f0'; if (!dead) g.fillRect(p.x + 2, p.y + 1, 18, p.h - 1); // cuerpo compacto del cartoon: la caja de relieve cubre la nueva silueta
@@ -410,6 +754,10 @@ function gfx() {
     for (const co of coins) if (!co.got && co.x > cx - 20 && co.x < cx + W + 20) ART.glow(g, co.x, co.y, 15, '#ffd23d', 0.9);
     for (const gm of gems) if (!gm.got && gm.x > cx - 40 && gm.x < cx + W + 40) ART.glow(g, gm.x, gm.y, 26, '#7cf7a0', 0.95);
     ART.glow(g, flag.x + 8, flag.y - 78, 24, '#ff7f96', 0.55);
+    if (PD) { for (const b of plats) if (b.kd === 'q' && qOn(b) && b.x + b.w > cx - 40 && b.x < cx + W + 40) ART.glow(g, b.x + b.w / 2, b.y + 8, 26, '#9c8cff', 0.5);
+      for (const s of springs) if (s.x > cx - 40 && s.x < cx + W + 40) ART.glow(g, s.x, s.y - 14, 22, '#a8e4ff', 0.5);
+      for (const r of rocks) if (r.w > 0) ART.glow(g, r.x, r.gy - 4, 20, '#ff5f7a', 0.5);
+      if (bs && bs.alive && bs.st === 'tell') ART.glow(g, bs.x + 32, bs.y + 30, 48, '#ff5f7a', 0.6); }
     for (const q of checks) if (q.on) ART.glow(g, q.x + 8, q.y - 44, 20, '#7cf7a0', 0.6);
     if (dashT > 0) ART.glow(g, p.x + 11 - p.face * 14, p.y + 14, 34, '#a8e4ff', 0.8);
     if (swordT > 0) ART.glow(g, p.x + 11 + p.face * 26, p.y + 12, 28, '#ffffff', 0.85);
@@ -547,7 +895,7 @@ function raceDraw() {
 }
 k.onParty = () => { if (!RACE) return; if (k.st !== 'play' || !R) { reset(); return; } const pl = k.players(4); for (const r of R.rs) { r.cpu = pl[r.pl].cpu; r.name = r.cpu ? 'CPU' : pl[r.pl].name; } };
 /* Niveles diseñados a mano (plan Friv): progreso guardado por dificultad en kit.js. */
-if (HAND) k.levels(HAND.length, { start: (i) => { level = i; lives = 4 + k.D.life; score = 0; coinsGot = 0; build(); } });
+if (HAND) k.levels(HAND.length, { start: (i) => { level = i; lives = (PD ? 9 : 4) + k.D.life; score = 0; coinsGot = 0; build(); } });
 reset(); k.show(CFG.title, CFG.help);
 /* si el jugador cambia de nivel en la pantalla de inicio, la partida se prepara de nuevo con los valores de k.D */
 k.onDif = () => { if (k.st !== 'play') reset(); };

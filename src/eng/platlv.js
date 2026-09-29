@@ -13,35 +13,75 @@
  *   C     reguero de monedas a ras de suelo sobre el último tramo (nunca detrás de un hueco)
  *   G     gema del nivel: alta, a la vista y vale 250 (solo pixel-dash la usa hoy)
  *   k     punto de control
- *   B     zona de jefe (14 casillas llanas); la bandera solo aparece al derrotarlo
+ *   B     zona de jefe; la bandera solo aparece al derrotarlo
  *
+ * ---- Piezas nuevas, solo de pixel-dash: dan verbos que se acumulan ----
+ *   m<n>  GRIETA: hueco de n casillas puenteado por losas que se desmoronan 0,45 s después
+ *         de pisarlas y vuelven a los 3 s. Se cruza sin pararse.
+ *   M<n>  ASCENSOR: hueco de n con una plataforma de 3 que va y viene. Hay que esperarla y
+ *         montarse; te lleva consigo.
+ *   V<n>  MONTACARGAS: hueco de n con una plataforma que sube y baja 5 casillas. Sirve para
+ *         subir escalones de 5, que el salto normal no alcanza: se escribe `V4 u5`.
+ *   q<n>  COMPÁS: hueco de n cruzado por bloques que aparecen y desaparecen a ritmo, en dos
+ *         fases alternas; parpadean 0,45 s antes de irse.
+ *   s<n>  SIERRA: tramo llano de n con una sierra que recorre un raíl a ras de suelo. El raíl
+ *         va pintado de extremo a extremo, así que el peligro nunca sorprende.
+ *   ^     MUELLE en el centro del último tramo: lanza muy alto (para alcanzar las P).
+ *   P<n>  REPISA ALTA de n tablones, 6 casillas sobre el suelo: la ruta arriesgada. Solo se
+ *         llega con muelle, y lo que se recoge ahí es lo que da la tercera estrella.
+ *   E     PERSEGUIDOR: enemigo que te ve, avisa con «!» y va a por ti saltando huecos.
+ *   W<n>  AMENAZA: muro de sombra que avanza desde atrás durante todo el nivel (1 lento,
+ *         2 medio, 3 rápido). Se escribe al principio de la tira.
+ *
+ * Los niveles de pixel-dash son objetos { n: nombre, s: tira, tip: consejo, t: [fácil, normal,
+ * difícil] segundos objetivo de la 2ª estrella }. Los demás juegos siguen con tiras sueltas.
  * La bandera se coloca sola al final. Ningún nivel usa el azar: el que diseñamos es el que se juega.
  */
 const PLATLV = {
-  /* ---- pixel-dash: correr, saltar, pisar. 20 niveles, jefe en el 20.
-     Ritmo de recompensa (docs/GANCHO.md §A2): nunca se corre más de ~3 s sin algo que recoger,
-     por eso casi cada tramo lleva su reguero (C) o su arco (c), y de la 3 en adelante una gema. ---- */
+  /* ---- pixel-dash: 20 niveles largos, con verbos que se acumulan, presión y tesoros en la
+     ruta arriesgada. 1-4 enseñan · 5-9 combinan de dos en dos · 10-14 exigen · 15-19 lo
+     mezclan todo · 20 el Coloso, con tres fases telegrafiadas. ---- */
   'pixel-dash': [
-    'f10 C f6 c f8',                                        /* 1  correr y llegar */
-    'f8 C g2 c f8 C f6',                                    /* 2  el primer hueco */
-    'f8 C g2 f6 c g3 G f8 C',                               /* 3  tres huecos */
-    'f8 C u2 f6 c f6 C d2 f6',                              /* 4  subir un escalón */
-    'f8 C u3 f5 c d3 f8 C G f6',                            /* 5  subir y bajar */
-    'f8 C g3 p3 c g3 f8 C G f6',                            /* 6  plataforma en el aire */
-    'f10 C e c f8 C f8',                                    /* 7  el primer enemigo */
-    'f10 C e g2 c f8 C G f8',                               /* 8  enemigo y hueco */
-    'f8 C x3 f6 c G f8 C',                                  /* 9  el primer pincho */
-    'f8 C x2 f5 c x3 f6 C G f8',                            /* 10 pinchos seguidos */
-    'f10 C e f5 e c f8 C G f6',                             /* 11 dos enemigos */
-    'f8 C g2 p3 c g2 p3 c g2 f8 C G',                       /* 12 saltos de plataforma */
-    'f6 C u2 f4 u2 f4 c u2 f6 C G d6 f8 C',                 /* 13 escalera arriba */
-    'f8 C g3 f5 C g4 f5 c g3 f8 C G',                       /* 14 huecos anchos */
-    'f8 C e x3 f5 e c f8 C G f6',                           /* 15 pinchos y enemigos */
-    'f6 C u3 f5 e u3 f5 c G d6 f8 C',                       /* 16 subida vigilada */
-    'f8 C u4 f5 x3 f5 c d4 f8 C G f6',                      /* 17 bajada con pinchos */
-    'f8 C e g3 x3 g2 p3 c e f8 C G f6',                     /* 18 de todo un poco */
-    'f8 C e g3 f6 k c u3 f5 x3 g3 e f6 C d3 f8 G C f6',     /* 19 largo, con punto de control */
-    'f10 C k g3 f6 C e G f6 B'                              /* 20 el jefe */
+    { n: 'Primeros pasos', tip: 'Mantén ↑ pulsado para saltar más alto.', t: [40, 33, 29],
+      s: 'f14 C f10 g2 f12 c f10 g2 f12 C f10 g3 f14 c f12 u2 f10 C f12 d2 f14 c f12 G f10' },
+    { n: 'Grietas', tip: 'Las losas agrietadas se caen: no te pares encima.', t: [46, 38, 33],
+      s: 'f12 C f8 m3 f8 c f8 m4 f8 C f10 m3 f6 m3 f8 c G f10 m5 f8 C f12 m4 f10 c f8' },
+    { n: 'El ascensor', tip: 'Espera a la plataforma en el borde; te lleva consigo.', t: [64, 55, 48],
+      s: 'f12 C f8 M5 f8 c f8 M6 f10 C k f10 V4 u5 f8 c G f10 M6 f8 C f10 d5 f10 M5 f10 c f8' },
+    { n: 'Dientes', tip: 'La sierra sigue su raíl: salta cuando se aleje.', t: [48, 40, 35],
+      s: 'f12 C f10 s8 f10 c f10 s10 f8 C f10 s8 g2 f10 c G f10 s12 f10 C f10 s8 f12' },
+    { n: 'Muelles', tip: 'El muelle sube a la repisa: ahí están los tesoros.', t: [47, 39, 34],
+      s: 'f12 C f10 ^ P4 c f8 g3 f10 C f8 ^ P5 c G f8 g3 f10 m4 f8 C f10 ^ P4 c f10 g4 f12 C f10' },
+    { n: 'Compás', tip: 'Los bloques parpadean antes de irse. Cruza al ritmo.', t: [62, 52, 45],
+      s: 'f12 C f10 q6 f10 c f10 q8 f10 C k f10 q6 f8 m3 f8 c G f10 q8 f10 C f10 q6 f12' },
+    { n: 'Te ha visto', tip: 'El perseguidor avisa con «!»: písalo en la cabeza.', t: [52, 44, 38],
+      s: 'f12 C f12 E f10 c f10 g2 f12 E f10 C k f10 s8 f10 E c f10 G f10 m4 f10 E f12 C f10' },
+    { n: 'La sombra', tip: 'El muro no perdona la duda: sigue corriendo.', t: [46, 39, 34],
+      s: 'W1 f14 C f10 g2 f12 c f10 m4 f10 C k f12 g3 f12 c f10 m5 f12 C f10 g2 f12 c G f14' },
+    { n: 'Sierra y grieta', tip: 'Cruza la grieta cuando la sierra vaya de vuelta.', t: [68, 60, 56],
+      s: 'f12 C f10 s8 m4 f10 c f10 m4 s8 f10 C k f10 s10 f8 m5 f10 c G f10 m4 f8 s8 f12 C f10' },
+    { n: 'Puente roto', tip: 'Del ascensor al compás sin tocar el suelo.', t: [72, 61, 53],
+      s: 'f12 C f10 M7 f10 c f10 q8 f10 C k f10 M8 f8 q6 f10 c G f10 M7 f10 q8 f12 C f10' },
+    { n: 'No mires atrás', tip: 'Con el muro detrás, las sierras se pasan por arriba.', t: [55, 46, 40],
+      s: 'W2 f14 C f10 s8 f10 c f10 g2 f10 s10 f10 C k f12 s8 m4 f10 c G f10 s10 f10 g3 f12 C f12' },
+    { n: 'Salto de fe', tip: 'Cada muelle tiene su repisa: no te dejes ninguna.', t: [56, 47, 41],
+      s: 'f12 C f10 ^ P5 c f8 g3 f10 ^ P6 c G f8 m4 f10 C k f10 ^ P5 c f8 g4 f12 ^ P4 c f10 G f12 C f10' },
+    { n: 'Marea', tip: 'El compás manda: entra en el bloque en cuanto aparezca.', t: [64, 54, 47],
+      s: 'W2 f14 C f10 q6 f10 c f10 q8 f10 C k f12 q6 m4 f10 c G f10 q8 f10 m5 f12 C f10 q6 f12' },
+    { n: 'Trampa doble', tip: 'Pisa al perseguidor y usa el rebote para pasar la sierra.', t: [56, 47, 41],
+      s: 'f12 C f10 E s8 f10 c f10 m4 E f10 C k f10 s10 m5 f10 c G f10 E f10 m4 s8 f12 C f10' },
+    { n: 'Cuerda floja', tip: 'El montacargas sube cinco casillas: nada más lo hace.', t: [84, 74, 68],
+      s: 'f12 C f10 M7 f10 c f10 V4 u5 f8 s8 f10 C k f10 M8 f10 c G f10 d5 f10 M7 f10 s8 f12 C f10' },
+    { n: 'Persecución', tip: 'Con el muro cerca, no vuelvas atrás a por nada.', t: [58, 49, 43],
+      s: 'W2 f14 C f10 E f10 c f10 m4 f10 E f10 C k f12 m5 f10 E f10 c G f10 m4 f10 E f12 C f10' },
+    { n: 'Ruinas', tip: 'Todo lo aprendido, sin prisa pero sin pausa.', t: [70, 59, 51],
+      s: 'f12 C f10 m4 s8 f10 ^ P5 c f8 q6 f10 C k f10 M7 f10 E f10 c G f10 q8 m4 f10 s8 f12 C f10' },
+    { n: 'Derrumbe', tip: 'Grietas y compás con el muro encima: fíate del ritmo.', t: [60, 50, 44],
+      s: 'W3 f14 C f10 m4 f10 q6 f10 c f10 m5 f10 C k f12 q8 f10 m4 f10 c G f10 q6 f10 m5 f12 C f12' },
+    { n: 'La huida', tip: 'Dos puntos de control. Corre y no mires atrás.', t: [66, 56, 49],
+      s: 'W3 f14 C f10 s8 f10 m4 f10 c q6 f10 E f10 C k f12 m5 f10 s10 c G f10 q8 f10 m4 f12 C k f10 s8 f12' },
+    { n: 'El Coloso', tip: 'Se prepara antes de cada ataque: golpéalo cuando se aturda.', t: [110, 95, 84],
+      s: 'f14 C f10 m4 f10 c f10 s8 f10 C k f12 q6 f10 G f10 E f10 C k f10 B' }
   ],
   /* ---- castle-knight: espada y guardias. 20 niveles, jefe en el 20. ---- */
   'castle-knight': [
