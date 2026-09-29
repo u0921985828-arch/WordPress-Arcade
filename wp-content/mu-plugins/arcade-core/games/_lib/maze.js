@@ -35,11 +35,20 @@ function within(g, path, fn) { g.save(); g.globalCompositeOperation = 'source-at
 function clipIn(g, path, fn) { g.save(); g.beginPath(); path(g); g.clip(); fn(g); g.restore(); }
 
 const W = 480, H = 520, TOP = 40;
+/* Come-cocos (docs/GANCHO.md): franja de marcador más alta, porque enseña la meta
+   (puntos que faltan, fruta, bolas, estrellas) y no solo la puntuación. */
+const MUN = M === 'muncher', MTOP = MUN ? 58 : TOP;
 const k = Kit({ w: W, h: H, title: CFG.title, bg: CFG.bg || '#0d0f24' }), c = k.ctx;
 const D = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }, OPP = { up: 'down', down: 'up', left: 'right', right: 'left' }, DIRS = ['up', 'left', 'down', 'right'];
 let invT = 0, g, N, S, BX, BY, pl, foes, items, drops, rocks, score, lives, level, fright, exitC, need, swordT, t = 0, ready, dying, clearT, freeze, msg, msgT, lvT;
 let boardCv, flashCv, dirtCv, floorCv, blockCv, bgCv, vigCv, dirty, fruit, eaten, left, chain, home, homeMap, cam, torches, dragged, dmapF, dmapC, best;
 let fruitAt, dots;   /* casilla por la que asoma la fruta y puntos del nivel (come-cocos) */
+/* --- Gancho del come-cocos (docs/GANCHO.md) ------------------------------------------
+   dch  puntos comidos seguidos · dchT ventana que queda · mult multiplicador visible
+   nodie/frGot/frSeen  criterios de las 3 estrellas · alertT aviso antes de perseguir
+   motes polvo del fondo · pops anillos al comer · rew rótulo de la última recompensa */
+let dch = 0, dchT = 0, mult = 1, dchBest = 0, nodie = true, frGot = 0, frSeen = 0, alertT = 0, scWas = false;
+let motes = [], pops = [], lightCv, starHint = 0, powLeft = 0, huntT = 0, totN = 1;
 
 /* ---------- Utilidades ---------- */
 function mkCv(w, h, draw) { const cv = document.createElement('canvas'); cv.width = Math.ceil(w * 2); cv.height = Math.ceil(h * 2); const b = cv.getContext('2d'); b.scale(2, 2); draw(b); return cv; }
@@ -102,7 +111,7 @@ function build() {
   items = []; foes = []; drops = []; rocks = []; fright = 0; chain = 0; freeze = 0; dying = 0; clearT = 0; lvT = 0; boardCv = flashCv = floorCv = null; dirty = true; fruit = null; eaten = 0;
   if (GEM) return buildGem();
   if (M === 'muncher') buildMuncher(); else if (M === 'digger') buildDigger(); else buildIso();
-  left = items.length;
+  left = items.length; totN = Math.max(1, left);
 }
 function reset() { if (GEM) return resetGem(); score = 0; lives = 4 + k.D.life; level = HAND ? k.lv : 1; swordT = 0; invT = 0; best = k.best(CFG.id, 0); build(); }
 
@@ -152,7 +161,7 @@ function handMuncher() {
   return [px, py, fx, fy];
 }
 function buildMuncher() {
-  N = 19; S = 25; BX = (W - N * S) / 2; BY = TOP + 2; const h = (N - 1) / 2;
+  N = 19; S = 24; BX = (W - N * S) / 2; BY = MTOP + 2; const h = (N - 1) / 2;
   let px = h, py = N - 2;
   if (HAND) { const p = handMuncher(); px = p[0]; py = p[1]; fruitAt = [p[2], p[3]]; }
   else {
@@ -166,6 +175,11 @@ function buildMuncher() {
   pl = ent(px, py, 7.2); pl.dir = null;
   const nf = LV ? Math.max(1, Math.min(4, LV.n)) : 4;
   foes = [[h, h - 1], [h, h], [h - 1, h], [h + 1, h]].slice(0, nf).map(([x, y], i) => { const f = ent(x, y, 4.6); f.id = i; return f; });
+  powLeft = items.filter((q) => q.t === 'power').length;
+  dch = 0; dchT = 0; mult = 1; dchBest = 0; nodie = true; frGot = 0; frSeen = 0; alertT = 0; huntT = 0; scWas = true;
+  pops.length = 0; starHint = 3.4;
+  /* polvo del fondo: posiciones fijas por nivel, se mueven con el reloj (sin estado que actualizar) */
+  motes = []; for (let i = 0; i < 22; i++) motes.push({ x: rnd(i * 3.1 + level) * W, y: rnd(i * 7.7 + level) * (H - MTOP) + MTOP, r: 0.9 + rnd(i * 5.3) * 1.8, sp: 6 + rnd(i * 2.9) * 12, ph: rnd(i * 1.7) * 6.283 });
   homeReset(); ready = 1.6;
 }
 function homeReset() {
@@ -201,29 +215,70 @@ function ghostPick(f) {
   return bd;
 }
 const cellX = (x) => BX + (x + 0.5) * S, cellY = (y) => BY + (y + 0.5) * S;
+/* Anillo corto al comer: la recompensa de cada bocado se ve, no solo se oye. */
+const DCHW = 0.85;   // ventana de la cadena: si tardas más de 0,85 s en el siguiente punto, se rompe
+function pop(x, y, col, r) { if (pops.length < 26) pops.push({ x, y, col, r: r || 13, t: 0.26, m: 0.26 }); }
+function multOf(n) { return Math.min(5, 1 + Math.floor(n / 10)); }
 function eatAt(x, y) {
   const it = items.find((q) => !q.got && q.x === x && q.y === y);
   if (it) {
     it.got = true; left--;
+    const cx = cellX(x), cy = cellY(y);
     if (it.t === 'dot') {
-      score += 10; eaten++; if (eaten % 2) k.sfx('pop');
+      /* Cadena: cada punto seguido sube el tono y, cada 10, el multiplicador (GANCHO §A3). */
+      const was = mult; dch++; dchT = DCHW; dchBest = Math.max(dchBest, dch); mult = multOf(dch);
+      score += 10 * mult; eaten++;
+      k.chime(Math.min(10, Math.floor(dch / 3)));
+      pop(cx, cy, mult > 1 ? '#ffd23d' : '#ffe2b0', 11);
+      if (mult > was) { k.combo(mult, cx, cy - 12); k.punch(0.035); k.burst(cx, cy, '#ffd23d', 8, 110); if (mult === 5) k.reward('¡CADENA X5!', '#ffd23d'); }
       const a = LV ? Math.round(dots * 0.35) : 70, b = LV ? Math.round(dots * 0.7) : 150;
-      if (eaten === a || eaten === b) fruit = { x: fruitAt[0], y: fruitAt[1], t: 10 };
+      if (eaten === a || eaten === b) { fruit = { x: fruitAt[0], y: fruitAt[1], t: 10, a: 0 }; frSeen++; k.sfx('start'); }
     } else {
-      score += 50; fright = (LV ? LV.fr : Math.max(2.5, 8.5 - (level - 1) * 0.6)) * k.D.time; chain = 0; k.sfx('coin'); k.burst(cellX(x), cellY(y), '#fff3d6', 14, 140);
+      score += 50 * mult; powLeft = Math.max(0, powLeft - 1);
+      fright = (LV ? LV.fr : Math.max(2.5, 8.5 - (level - 1) * 0.6)) * k.D.time; huntT = fright; chain = 0;
+      k.sfx('coin'); k.reward('¡A CAZAR!', '#8fd3ff'); k.punch(0.06); k.hitstop(0.05); k.flash('rgba(90,140,255,.28)');
+      k.burst(cx, cy, '#fff3d6', 16, 150); pop(cx, cy, '#8fd3ff', 30);
       for (const f of foes) if (f.mode !== 'eyes') { if (f.mode === 'go' && !f.scared) reverse(f); f.scared = true; }
     }
-    if (left <= 0) { clearT = 1.8; score += 300 * level; k.sfx('win'); k.confetti(); msg = '¡Nivel superado!'; msgT = 1.8; }
+    if (left <= 0) {
+      clearT = 1.8; score += 300 * level; k.sfx('win'); k.confetti(); k.punch(0.1); k.flash('rgba(255,255,255,.3)');
+      k.reward('¡LABERINTO LIMPIO!', '#7cf7a0'); msg = '¡Nivel superado!'; msgT = 1.8;
+    }
   }
-  if (fruit && fruit.x === x && fruit.y === y) { const v = LV ? LV.fruit.v : [100, 300, 500, 700, 1000][Math.min(4, level - 1)]; score += v; k.float(`+${v}`, cellX(x), cellY(y) - 10, '#ff7a8a'); k.sfx('coin'); k.burst(cellX(x), cellY(y), '#ff4d5e', 12); fruit = null; }
+  if (fruit && fruit.x === x && fruit.y === y) {
+    const v = LV ? LV.fruit.v : [100, 300, 500, 700, 1000][Math.min(4, level - 1)];
+    score += v; frGot++;
+    k.float(`+${v}`, cellX(x), cellY(y) - 10, '#ff7a8a'); k.sfx('coin'); k.burst(cellX(x), cellY(y), '#ff4d5e', 18, 170);
+    k.reward(frGot >= 2 ? `¡LAS DOS FRUTAS! +${v}` : `¡FRUTA! +${v}`, '#ff7a8a'); k.hitstop(0.05); k.punch(0.06);
+    pop(cellX(x), cellY(y), '#ff7a8a', 34); fruit = null;
+  }
 }
-function die() { dying = 1.5; fright = 0; foes.forEach((f) => { f.scared = false; }); k.sfx('hurt'); k.shake(6); }
+function die() {
+  dying = 1.5; fright = 0; foes.forEach((f) => { f.scared = false; });
+  k.sfx('hurt'); k.shake(6);
+  if (MUN) { nodie = false; dch = 0; dchT = 0; mult = 1; k.chainReset(); if (left > 0) { msg = left <= 12 ? `¡Te quedaban solo ${left} puntos!` : `Te quedaban ${left} puntos`; msgT = 1.5; } }
+}
+/* Segundo en el que arranca la próxima persecución (o null): sirve para avisar antes. */
+function nextChase() {
+  if (!LV) return lvT < 6 ? 6 : lvT < 32 ? 32 : null;
+  for (let i = 0; i < LV.sc.length; i += 2) if (lvT < LV.sc[i]) return LV.sc[i];
+  return null;
+}
 function updMuncher(dt) {
   const want = k.swipe || DIRS.find((d) => k.hit.has(d)) || heldDir();
   if (want) { if (pl.dir && want === OPP[pl.dir]) reverse(pl); pl.next = want; }
-  invT -= dt; lvT += dt; if (fruit && (fruit.t -= dt) <= 0) fruit = null;
+  invT -= dt; lvT += dt; if (starHint > 0) starHint -= dt;
+  if (fruit) { fruit.a += dt; if ((fruit.t -= dt) <= 0) fruit = null; }
+  /* Cadena de bocados: se rompe sola si tardas demasiado en el siguiente punto. */
+  if (dchT > 0 && (dchT -= dt) <= 0 && dch > 0) { dch = 0; mult = 1; k.chainReset(); }
   if (mstep(pl, dt, (e) => { for (const d of [e.next, e.dir]) if (d && mwalk(e.x + D[d][0], e.y + D[d][1])) return d; return null; })) eatAt(pl.px, pl.py);
+  for (let i = pops.length - 1; i >= 0; i--) if ((pops[i].t -= dt) <= 0) { pops[i] = pops[pops.length - 1]; pops.pop(); }
   if (clearT > 0) return;
+  /* Aviso: 1,1 s antes de que los fantasmas dejen de rondar y se lancen a por ti. */
+  const nc = nextChase(); alertT = nc !== null && nc - lvT < 1.1 && scatterOn() ? nc - lvT : 0;
+  const sc = scatterOn();
+  if (scWas && !sc && fright <= 0) { msg = '¡Te persiguen!'; msgT = 1.1; k.sfx('hit'); k.shake(3); }
+  scWas = sc;
   if (fright > 0 && (fright -= dt) <= 0) foes.forEach((f) => { f.scared = false; });
   const base = (LV ? LV.spd : Math.min(5.8, 3.3 + level * 0.2)) * k.D.spd; // 1.23: más fácil (antes 4,4→6,8). k.D.spd por nivel de dificultad
   for (const f of foes) {
@@ -231,8 +286,12 @@ function updMuncher(dt) {
     else { f.sp = f.mode === 'eyes' ? 12 : base * (f.scared ? 0.55 : 1); mstep(f, dt, ghostPick); }
     if (f.mode === 'eyes' || Math.hypot(f.fx - pl.fx, f.fy - pl.fy) > 0.51) continue;
     if (f.scared) {
+      /* Cada fantasma de la misma bola vale el doble que el anterior: 200-400-800-1600. */
       chain++; const v = 200 * 2 ** Math.min(3, chain - 1); score += v; f.mode = 'eyes'; f.scared = false; freeze = 0.45;
-      k.float(`+${v}`, cellX(f.fx), cellY(f.fy) - 8, '#8fd3ff'); k.burst(cellX(f.fx), cellY(f.fy), '#3d5afe', 16); k.sfx('coin');
+      const gx = cellX(f.fx), gy = cellY(f.fy);
+      k.float(`+${v}`, gx, gy - 8, '#8fd3ff'); k.burst(gx, gy, GCOL[f.id], 18, 170); k.burst(gx, gy, '#3d5afe', 12);
+      pop(gx, gy, '#8fd3ff', 30); k.sfx('coin'); k.hitstop(0.06); k.punch(0.06); k.shake(3);
+      k.reward(chain >= foes.length ? `¡TODOS! +${v}` : `FANTASMA x${chain} +${v}`, '#8fd3ff');
     } else if (invT <= 0) return die();
   }
 }
@@ -379,12 +438,23 @@ k.run((dt) => {
   if (M === 'muncher') updMuncher(dt); else if (M === 'digger') updDigger(dt); else updIso(dt);
 }, draw);
 /* Nivel a mano superado: kit.js desbloquea el siguiente y ofrece Siguiente / Niveles. */
-function handDone() { clearT = 0; k.best(CFG.id, score); k.levelDone(score, `${score} puntos · ${lives} vida${lives === 1 ? '' : 's'}`); }
+/* Estrellas del come-cocos (docs/GANCHO.md §A6): 1 superar · 2 sin que te pillen ·
+   3 además las dos frutas del nivel. Se enseñan en el marcador durante la partida. */
+function starsNow() { return 1 + (nodie ? 1 : 0) + (frGot >= 2 ? 1 : 0); }
+function handDone() {
+  clearT = 0; k.best(CFG.id, score);
+  if (!MUN) return k.levelDone(score, `${score} puntos · ${lives} vida${lives === 1 ? '' : 's'}`);
+  const st = starsNow();
+  const falta = st === 3 ? '' : ` · falta: ${!nodie ? 'terminar sin que te pillen' : 'coger las dos frutas'}`;
+  k.levelDone(score, `${score} puntos · frutas ${frGot}/2${falta}`, { stars: st });
+}
 function afterDeath() {
   if (DG) return k.lose(CFG.id, score, 'Derrotado', `Nivel ${level}`);
-  lives--; if (lives <= 0) return k.lose(CFG.id, score, 'Atrapado', `Nivel ${level}`);
+  lives--;
+  /* Casi-victoria: al perder se dice cuánto faltaba (GANCHO §A4). */
+  if (lives <= 0) return k.lose(CFG.id, score, 'Atrapado', MUN ? `Nivel ${level} · te quedaban ${left} punto${left === 1 ? '' : 's'} de ${totN}` : `Nivel ${level}`);
   respawnEnt(pl); pl.halt = false; ready = 1.6; invT = 0;
-  if (M === 'muncher') { fright = 0; fruit = null; homeReset(); lvT = 0; }
+  if (M === 'muncher') { fright = 0; fruit = null; homeReset(); lvT = 0; scWas = true; alertT = 0; }
   else foes.forEach((f) => { respawnEnt(f); f.gh = false; f.ghost = 0; f.gcd = k.rnd(5, 9); });
 }
 
@@ -397,40 +467,115 @@ function draw() {
 function hudScore() { label(`${score}`, 12, 6, 20, '#fff'); label(`Récord ${Math.max(best || 0, score)}`, 13, 28, 10, 'rgba(255,255,255,.7)'); }
 
 /* ---------- Come-cocos ---------- */
+/* El laberinto entero se hornea una vez por nivel (fondo, suelo, muros con luz, casa,
+   túneles y viñeta). En partida es un único drawImage: todo lo de aquí sale gratis. */
 function renderMaze(col, hi, sh) {
   return mkCv(W, H, (b) => {
-    const gr = b.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#161a3d'); gr.addColorStop(1, '#090b1c'); b.fillStyle = gr; b.fillRect(0, 0, W, H);
-    b.fillStyle = 'rgba(255,255,255,.035)'; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (!g[y][x] && (x + y) % 2) b.fillRect(BX + x * S, BY + y * S, S, S);
-    const h = (N - 1) / 2; ART.rr(b, BX + (h - 2) * S + 3, BY + (h - 1) * S + 3, 5 * S - 6, 3 * S - 6, 10); b.fillStyle = 'rgba(255,154,213,.08)'; b.fill(); b.setLineDash([5, 5]); b.strokeStyle = 'rgba(255,154,213,.35)'; b.lineWidth = 2; b.stroke(); b.setLineDash([]);
+    const gr = b.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#1b2050'); gr.addColorStop(0.55, '#111536'); gr.addColorStop(1, '#070915'); b.fillStyle = gr; b.fillRect(0, 0, W, H);
+    /* nebulosas del fondo: profundidad sin coste en partida */
+    for (const [nx, ny, nr, nc] of [[90, 140, 190, 'rgba(110,98,245,.16)'], [400, 380, 220, 'rgba(255,111,181,.10)'], [240, 520, 240, 'rgba(79,216,232,.08)']]) {
+      const q = b.createRadialGradient(nx, ny, 0, nx, ny, nr); q.addColorStop(0, nc); q.addColorStop(1, 'rgba(0,0,0,0)'); b.fillStyle = q; b.fillRect(nx - nr, ny - nr, nr * 2, nr * 2);
+    }
+    for (let i = 0; i < 90; i++) { const sx = rnd(i * 2.3) * W, sy = MTOP + rnd(i * 5.1) * (H - MTOP), sr = 0.5 + rnd(i * 9.4) * 1.1; b.fillStyle = `rgba(255,255,255,${(0.05 + rnd(i * 3.7) * 0.13).toFixed(3)})`; b.beginPath(); b.arc(sx, sy, sr, 0, R2); b.fill(); }
+    /* suelo: losas alternas con luz arriba-izquierda */
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (!g[y][x]) {
+      const px = BX + x * S, py = BY + y * S;
+      b.fillStyle = (x + y) % 2 ? 'rgba(255,255,255,.045)' : 'rgba(255,255,255,.018)'; b.fillRect(px, py, S, S);
+      b.fillStyle = 'rgba(255,255,255,.05)'; b.fillRect(px, py, S, 1); b.fillRect(px, py, 1, S);
+    }
+    const h = (N - 1) / 2, hx = BX + (h - 2) * S, hy = BY + (h - 1) * S, hw = 5 * S, hh = 3 * S;
+    /* casa de los fantasmas: una sola pieza con su puerta (REMASTER §8) */
+    ART.rr(b, hx + 3, hy + 3, hw - 6, hh - 6, 10); b.fillStyle = 'rgba(255,154,213,.10)'; b.fill();
+    b.strokeStyle = 'rgba(255,154,213,.32)'; b.lineWidth = 2; b.stroke();
+    ART.rr(b, hx + hw / 2 - S * 0.8, hy + 1, S * 1.6, 6, 3); b.fillStyle = '#ff9ad5'; b.fill();
+    b.fillStyle = 'rgba(26,21,48,.55)'; for (let i = -1; i <= 1; i++) { b.beginPath(); b.arc(hx + hw / 2 + i * S * 0.6, hy + 4, 1.4, 0, R2); b.fill(); }
     const wl = (x, y) => inside(x, y) && g[y][x] === 1;
     const path = () => { b.beginPath(); for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (wl(x, y)) { const cx = BX + (x + 0.5) * S, cy = BY + (y + 0.5) * S; b.moveTo(cx, cy); b.lineTo(cx + 0.01, cy); if (wl(x + 1, y)) { b.moveTo(cx, cy); b.lineTo(cx + S, cy); } if (wl(x, y + 1)) { b.moveTo(cx, cy); b.lineTo(cx, cy + S); } } };
     b.lineCap = b.lineJoin = 'round';
-    path(); b.strokeStyle = 'rgba(0,0,0,.35)'; b.lineWidth = S * 0.66; b.save(); b.translate(2, 3); path(); b.stroke(); b.restore();
+    b.globalAlpha = 0.22; path(); b.strokeStyle = col; b.lineWidth = S * 0.95; b.stroke();            // halo
+    b.globalAlpha = 0.3; path(); b.strokeStyle = col; b.lineWidth = S * 0.72; b.stroke(); b.globalAlpha = 1;
+    b.save(); b.translate(2, 3); path(); b.strokeStyle = 'rgba(0,0,0,.4)'; b.lineWidth = S * 0.66; b.stroke(); b.restore();
     path(); b.strokeStyle = OUT; b.lineWidth = S * 0.6; b.stroke(); b.strokeStyle = col; b.lineWidth = S * 0.42; b.stroke();
-    b.save(); b.translate(S * 0.05, S * 0.06); path(); b.globalAlpha = 0.5; b.strokeStyle = sh; b.lineWidth = S * 0.2; b.stroke(); b.restore();
-    b.save(); b.translate(-S * 0.07, -S * 0.07); path(); b.globalAlpha = 0.75; b.strokeStyle = hi; b.lineWidth = S * 0.09; b.stroke(); b.restore();
+    b.save(); b.translate(S * 0.05, S * 0.06); path(); b.globalAlpha = 0.55; b.strokeStyle = sh; b.lineWidth = S * 0.2; b.stroke(); b.restore();
+    b.save(); b.translate(-S * 0.07, -S * 0.07); path(); b.globalAlpha = 0.8; b.strokeStyle = hi; b.lineWidth = S * 0.1; b.stroke(); b.restore();
+    b.save(); b.translate(-S * 0.1, -S * 0.12); path(); b.globalAlpha = 0.45; b.strokeStyle = '#ffffff'; b.lineWidth = S * 0.045; b.stroke(); b.restore();
+    /* bocas de túnel: se leen como puertas, con flechas hacia fuera */
+    for (const key in TUNR) {
+      const ty = +key, cy = BY + (ty + 0.5) * S;
+      for (const s of [-1, 1]) {
+        const ex = s < 0 ? BX : BX + N * S;
+        b.save(); b.translate(ex, cy); b.scale(s, 1); b.globalAlpha = 0.85;
+        b.beginPath(); b.moveTo(2, -S * 0.5); b.quadraticCurveTo(-10, 0, 2, S * 0.5); b.strokeStyle = hi; b.lineWidth = 3; b.stroke();
+        b.globalAlpha = 0.55; b.fillStyle = '#ffffff';
+        for (let i = 0; i < 3; i++) { b.beginPath(); b.moveTo(-3 - i * 6, -5); b.lineTo(-8 - i * 6, 0); b.lineTo(-3 - i * 6, 5); b.lineTo(-5 - i * 6, 0); b.closePath(); b.globalAlpha = 0.5 - i * 0.14; b.fill(); }
+        b.restore();
+      }
+    }
+    b.globalAlpha = 1;
+    const vg = b.createRadialGradient(W / 2, (MTOP + H) / 2, 150, W / 2, (MTOP + H) / 2, 360);
+    vg.addColorStop(0, 'rgba(4,3,12,0)'); vg.addColorStop(1, 'rgba(4,3,12,.55)'); b.fillStyle = vg; b.fillRect(0, 0, W, H);
   });
 }
 let dotCv, powCv;
-function drawPac(x, y, r, dir, mouth) {
+/* Luz cálida del héroe (sprite cacheado, un solo blit por frame). */
+function lightSpr() { return lightCv || (lightCv = mkCv(96, 96, (b) => { const q = b.createRadialGradient(48, 48, 2, 48, 48, 48); q.addColorStop(0, 'rgba(255,220,140,.30)'); q.addColorStop(0.5, 'rgba(255,190,110,.10)'); q.addColorStop(1, 'rgba(255,190,110,0)'); b.fillStyle = q; b.fillRect(0, 0, 96, 96); })); }
+/* mood: 0 normal · 1 con bola grande (decidido) · 2 fantasma cerca (asustado) */
+function drawPac(x, y, r, dir, mouth, mood) {
   c.save(); c.translate(x, y); c.rotate({ right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 }[dir || 'right']); if (dir === 'left') c.scale(1, -1);
-  c.beginPath(); c.moveTo(-r * 0.2, 0); c.arc(0, 0, r, mouth, R2 - mouth); c.closePath(); ART.fillOut(c, '#ffd23d', 2.2);
+  c.beginPath(); c.moveTo(-r * 0.2, 0); c.arc(0, 0, r, mouth, R2 - mouth); c.closePath(); ART.fillOut(c, mood === 1 ? '#ffe066' : '#ffd23d', 2.2);
   c.strokeStyle = 'rgba(255,255,255,.6)'; c.lineWidth = r * 0.16; c.lineCap = 'round'; c.beginPath(); c.arc(0, 0, r * 0.66, -2.5, -1.75); c.stroke();
-  if (mouth < 2) { c.fillStyle = OUT; c.beginPath(); c.arc(r * 0.1, -r * 0.5, r * 0.14, 0, R2); c.fill(); }
+  c.fillStyle = AL(OUT, 0.16); c.beginPath(); c.arc(r * 0.18, r * 0.32, r * 0.72, 0, R2); c.fill();   // sombra propia, sin trazo
+  if (mouth < 2) {
+    const ey = -r * 0.5, ex = r * 0.1;
+    if (mood === 2) { c.fillStyle = '#fff'; c.beginPath(); c.arc(ex, ey, r * 0.24, 0, R2); c.fill(); c.fillStyle = OUT; c.beginPath(); c.arc(ex - r * 0.05, ey, r * 0.13, 0, R2); c.fill(); }
+    else { c.fillStyle = OUT; c.beginPath(); c.arc(ex, ey, r * 0.14, 0, R2); c.fill(); }
+    /* ceja: decidida con bola grande, alta cuando hay peligro */
+    c.strokeStyle = OUT; c.lineWidth = Math.max(1.2, r * 0.13); c.lineCap = 'round'; c.beginPath();
+    if (mood === 1) { c.moveTo(ex - r * 0.3, ey - r * 0.28); c.lineTo(ex + r * 0.26, ey - r * 0.5); }
+    else if (mood === 2) { c.moveTo(ex - r * 0.3, ey - r * 0.56); c.lineTo(ex + r * 0.26, ey - r * 0.44); }
+    else { c.moveTo(ex - r * 0.28, ey - r * 0.42); c.lineTo(ex + r * 0.24, ey - r * 0.42); }
+    c.stroke();
+  }
   c.restore();
 }
 function drawGhost(f, x, y, r) {
-  const d = D[f.dir || 'down'];
-  if (f.mode !== 'eyes') {
+  const d = D[f.dir || 'down'], eaten0 = f.mode === 'eyes';
+  const bob = eaten0 ? 0 : Math.sin(t * 9 + f.id * 1.7) * r * 0.07;
+  const shiv = f.scared ? Math.sin(t * 34 + f.id) * r * 0.07 : (alertT > 0 && f.mode === 'go' ? Math.sin(t * 40 + f.id * 2) * r * 0.09 : 0);
+  x += shiv; y += bob;
+  if (!eaten0) { c.fillStyle = 'rgba(0,0,0,.28)'; c.beginPath(); c.ellipse(x, y + r * 1.02, r * 0.72, r * 0.2, 0, 0, R2); c.fill(); }
+  /* hacia dónde mira: al jugador si te persigue, a donde va si ronda o está asustado */
+  let lx = d[0], ly = d[1];
+  if (!f.scared && !eaten0 && f.mode === 'go' && !scatterOn()) { const vx = pl.fx - f.fx, vy = pl.fy - f.fy, m = Math.hypot(vx, vy) || 1; lx = vx / m; ly = vy / m; }
+  if (f.scared) { lx = -d[0] * 0.4; ly = -d[1] * 0.4; }
+  if (!eaten0) {
     const blink = fright < 2 && Math.floor(fright * 5) % 2, col = f.scared ? (blink ? '#f2f2ff' : '#3d5afe') : GCOL[f.id], ph = Math.floor(t * 8 + f.id) % 2;
+    const sq = f.scared ? 1 - Math.sin(t * 12 + f.id) * 0.05 : 1;   // asustado: encoge y se estira
+    c.save(); c.translate(x, y); c.scale(1 / sq, sq); c.translate(-x, -y);
     c.beginPath(); c.moveTo(x - r, y + r * 0.85); c.lineTo(x - r, y - r * 0.1); c.arc(x, y - r * 0.1, r, Math.PI, 0); c.lineTo(x + r, y + r * 0.85);
     for (let i = 1; i <= 6; i++) c.lineTo(x + r - i * r / 3, y + r * 0.85 - ((i + ph) % 2 ? r * 0.3 : 0));
-    c.closePath(); ART.fillOut(c, col, 2); c.fillStyle = 'rgba(255,255,255,.3)'; c.beginPath(); c.ellipse(x - r * 0.45, y - r * 0.5, r * 0.18, r * 0.3, -0.4, 0, R2); c.fill();
-    if (f.scared) { const fc = blink ? '#ff4d5e' : '#ffe2c4'; c.fillStyle = fc; c.fillRect(x - r * 0.45, y - r * 0.3, r * 0.22, r * 0.26); c.fillRect(x + r * 0.23, y - r * 0.3, r * 0.22, r * 0.26);
-      c.strokeStyle = fc; c.lineWidth = 1.6; c.beginPath(); for (let i = 0; i <= 6; i++) c.lineTo(x - r * 0.6 + i * r * 0.2, y + r * 0.32 + (i % 2 ? -r * 0.12 : 0)); c.stroke(); return; }
+    c.closePath(); ART.fillOut(c, col, 2);
+    c.fillStyle = 'rgba(255,255,255,.28)'; c.beginPath(); c.ellipse(x - r * 0.45, y - r * 0.5, r * 0.18, r * 0.3, -0.4, 0, R2); c.fill();
+    c.fillStyle = AL(OUT, 0.18); c.beginPath(); c.ellipse(x + r * 0.42, y + r * 0.1, r * 0.5, r * 0.6, 0, 0, R2); c.fill();
+    c.restore();
+    if (f.scared) { /* miedo de verdad: ojos muy abiertos y boca temblona */
+      const fc = blink ? '#ff4d5e' : '#ffe2c4';
+      for (const s of [-1, 1]) { const ex = x + s * r * 0.34, ey = y - r * 0.24; c.fillStyle = '#fff'; c.beginPath(); c.arc(ex, ey, r * 0.2, 0, R2); c.fill(); c.fillStyle = fc; c.beginPath(); c.arc(ex, ey, r * 0.11, 0, R2); c.fill(); }
+      c.strokeStyle = fc; c.lineWidth = 1.8; c.lineJoin = 'round'; c.beginPath(); for (let i = 0; i <= 6; i++) c.lineTo(x - r * 0.6 + i * r * 0.2, y + r * 0.34 + (i % 2 ? -r * 0.12 : 0)); c.stroke();
+      return;
+    }
   }
-  for (const s of [-1, 1]) { const ex = x + s * r * 0.38, ey = y - r * 0.18; c.beginPath(); c.ellipse(ex, ey, r * 0.28, r * 0.35, 0, 0, R2); c.fillStyle = '#fff'; c.fill(); if (f.mode === 'eyes') { c.lineWidth = 1.5; c.strokeStyle = OUT; c.stroke(); }
-    c.fillStyle = '#1d2a8a'; c.beginPath(); c.arc(ex + d[0] * r * 0.13, ey + d[1] * r * 0.15, r * 0.15, 0, R2); c.fill(); }
+  const wide = alertT > 0 && f.mode === 'go' ? 1.18 : 1;
+  for (const s of [-1, 1]) { const ex = x + s * r * 0.38, ey = y - r * 0.18; c.beginPath(); c.ellipse(ex, ey, r * 0.28 * wide, r * 0.35 * wide, 0, 0, R2); c.fillStyle = '#fff'; c.fill(); if (eaten0) { c.lineWidth = 1.5; c.strokeStyle = OUT; c.stroke(); }
+    c.fillStyle = '#1d2a8a'; c.beginPath(); c.arc(ex + lx * r * 0.13, ey + ly * r * 0.15, r * 0.15, 0, R2); c.fill(); }
+  /* anticipación: antes de lanzarse a por ti, se les enciende un «!» */
+  if (!eaten0 && alertT > 0 && f.mode === 'go') {
+    const a = Math.min(1, (1.1 - alertT) * 2.2), sy = y - r * 1.5 - Math.sin(t * 18) * 2;
+    c.globalAlpha = a; c.fillStyle = '#ffd23d'; c.strokeStyle = OUT; c.lineWidth = 2.6; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x, sy - r * 0.5); c.lineTo(x, sy + r * 0.12); c.stroke(); c.beginPath(); c.arc(x, sy + r * 0.38, 1.9, 0, R2); c.stroke();
+    c.beginPath(); c.moveTo(x, sy - r * 0.5); c.lineTo(x, sy + r * 0.12); c.strokeStyle = '#ffd23d'; c.lineWidth = 1.4; c.stroke(); c.beginPath(); c.arc(x, sy + r * 0.38, 1.4, 0, R2); c.fill();
+    c.globalAlpha = 1;
+  }
 }
 function drawCherryIn(c, x, y) {
   c.strokeStyle = OUT; c.lineWidth = 4; c.lineCap = 'round'; c.beginPath(); c.moveTo(x - 5, y + 2); c.quadraticCurveTo(x - 2, y - 8, x + 4, y - 10); c.moveTo(x + 5, y + 3); c.quadraticCurveTo(x + 4, y - 4, x + 4, y - 10); c.stroke();
@@ -497,19 +642,121 @@ function drawMuncher() {
   if (!dotCv) { dotCv = mkCv(10, 10, (b) => { b.beginPath(); b.arc(5, 5, 3, 0, R2); b.fillStyle = '#ffe2b0'; b.fill(); b.lineWidth = 1; b.strokeStyle = 'rgba(26,21,48,.8)'; b.stroke(); });
     powCv = mkCv(32, 32, (b) => { const gr = b.createRadialGradient(16, 16, 3, 16, 16, 16); gr.addColorStop(0, 'rgba(255,240,200,.7)'); gr.addColorStop(1, 'rgba(255,240,200,0)'); b.fillStyle = gr; b.fillRect(0, 0, 32, 32); b.beginPath(); b.arc(16, 16, 7, 0, R2); ART.fillOut(b, '#fff3d6', 2); b.fillStyle = '#fff'; b.beginPath(); b.arc(13.5, 13.5, 2.2, 0, R2); b.fill(); }); }
   c.drawImage(clearT > 0 && Math.floor(clearT * 7) % 2 ? flashCv : boardCv, 0, 0, W, H);
+  /* fondo vivo: polvo que sube por la sala (posiciones fijas, movimiento por reloj) */
+  c.fillStyle = 'rgba(190,200,255,.16)'; c.beginPath();
+  for (const m of motes) { const my = MTOP + ((m.y - MTOP - t * m.sp) % (H - MTOP) + (H - MTOP)) % (H - MTOP), mx = m.x + Math.sin(t * 0.7 + m.ph) * 7; c.moveTo(mx + m.r, my); c.arc(mx, my, m.r, 0, R2); }
+  c.fill();
+  /* farol del héroe: un solo blit cacheado */
+  if (lives > 0 && dying <= 0) { const ls = fright > 0 ? 170 : 140; c.drawImage(lightSpr(), cellX(pl.fx) - ls / 2, cellY(pl.fy) - ls / 2, ls, ls); }
   for (const it of items) if (!it.got) { const x = cellX(it.x), y = cellY(it.y); if (it.t === 'dot') c.drawImage(dotCv, x - 5, y - 5, 10, 10); else { const s = 30 * (1 + Math.sin(t * 7) * 0.14); c.drawImage(powCv, x - s / 2, y - s / 2, s, s); } }
-  if (fruit && (fruit.t > 2 || Math.floor(t * 8) % 2)) c.drawImage(fruitSpr(LV ? LV.fruit.k : 'cereza'), cellX(fruit.x) - 17, cellY(fruit.y) - 18 + Math.sin(t * 4) * 1.5, 34, 36);
+  /* anillos de recompensa: cada bocado deja su marca */
+  for (const q of pops) { const u = 1 - q.t / q.m; c.globalAlpha = (1 - u) * 0.75; c.strokeStyle = q.col; c.lineWidth = 2.4 * (1 - u) + 0.6; c.beginPath(); c.arc(q.x, q.y, 3 + u * q.r, 0, R2); c.stroke(); }
+  c.globalAlpha = 1;
+  if (fruit && (fruit.t > 2 || Math.floor(t * 8) % 2)) {
+    const fx0 = cellX(fruit.x), fy0 = cellY(fruit.y) + Math.sin(t * 4) * 1.5;
+    const e = Math.min(1, fruit.a / 0.3), sc0 = e < 1 ? (e < 0.65 ? e / 0.65 * 1.15 : 1.15 - (e - 0.65) / 0.35 * 0.15) : 1;   // entra 0 → 1,15 → 1
+    c.globalAlpha = 0.5 + Math.sin(t * 5) * 0.16; c.strokeStyle = '#ff9ad5'; c.lineWidth = 2; c.beginPath(); c.arc(fx0, fy0, 16 + Math.sin(t * 5) * 2.5, 0, R2); c.stroke(); c.globalAlpha = 1;
+    c.save(); c.translate(fx0, fy0); c.scale(sc0, sc0); c.drawImage(fruitSpr(LV ? LV.fruit.k : 'cereza'), -17, -18, 34, 36); c.restore();
+  }
   if (clearT <= 0) for (const f of foes) drawGhost(f, cellX(f.fx), cellY(f.fy), S * 0.43);
   if (lives > 0 && !(invT > 0 && ready <= 0 && Math.floor(t * 10) % 2)) {
     let mouth = pl.dir ? 0.06 + Math.abs(Math.sin(t * 15)) * 0.62 : 0.4, dir = pl.dir || pl.last || 'right';
     if (dying > 0) { const p = Math.min(1, (1.5 - dying) / 1.1); mouth = 0.3 + p * 2.84; dir = 'up'; }
-    if (dying <= 0 || dying > 0.3) drawPac(cellX(pl.fx), cellY(pl.fy), S * 0.45 * (dying > 0 ? Math.min(1, dying / 0.4 + 0.2) : 1), dir, mouth);
+    let mood = fright > 0 ? 1 : 0;
+    if (!mood) for (const f of foes) if (f.mode === 'go' && Math.hypot(f.fx - pl.fx, f.fy - pl.fy) < 3.2) { mood = 2; break; }
+    if (dying > 0) mood = 2;
+    if (dying <= 0 || dying > 0.3) drawPac(cellX(pl.fx), cellY(pl.fy), S * 0.45 * (dying > 0 ? Math.min(1, dying / 0.4 + 0.2) : 1), dir, mouth, mood);
     if (pl.dir) pl.last = pl.dir;
+    /* multiplicador de la cadena, pegado al héroe: se ve sin apartar la vista */
+    if (mult > 1 && dying <= 0) {
+      const bx = cellX(pl.fx), by = cellY(pl.fy) - S * 0.86, a = Math.max(0.35, Math.min(1, dchT / DCHW));
+      c.globalAlpha = 0.55 + a * 0.45; label(`x${mult}`, bx, by - 8, 14, mult >= 4 ? '#ff5fa2' : mult >= 3 ? '#7cf7a0' : '#ffd23d', 'center'); c.globalAlpha = 1;
+    }
   }
-  hudScore();
-  for (let i = 0; i < Math.max(0, lives); i++) drawPac(W - 18 - i * 22, 16, 8, 'left', 0.5);
-  label(HAND ? `Nivel ${level}/${HAND.length}` : `Nivel ${level}`, W - 10, 28, 10, 'rgba(255,255,255,.8)', 'right');
-  if (ready > 0 && k.st === 'play') label('¡Listo!', W / 2, cellY(home[1] + 2) - 11, 20, '#ffd23d', 'center');
+  hudMuncher();
+  if (ready > 0 && k.st === 'play') {
+    label('¡Listo!', W / 2, cellY(home[1] + 2) - 11, 20, '#ffd23d', 'center');
+    if (LV && LV.tip) label(LV.tip, W / 2, cellY(home[1] + 2) + 14, 11, '#cfd4ff', 'center');
+  }
+  /* el criterio de las estrellas se enseña al empezar el nivel */
+  if (starHint > 0 && k.st === 'play') {
+    const s1 = '★ terminar · ★ sin que te pillen · ★ las 2 frutas';
+    c.globalAlpha = Math.min(1, starHint * 1.4);
+    c.font = '800 11px ui-rounded,"Trebuchet MS",system-ui,sans-serif';
+    const mw = c.measureText(s1).width + 22;
+    ART.rr(c, W / 2 - mw / 2, H - 21, mw, 21, 9); c.fillStyle = 'rgba(12,10,28,.9)'; c.fill();
+    label(s1, W / 2, H - 16, 11, '#ffd9a0', 'center'); c.globalAlpha = 1;
+  }
+}
+/* Marcador del come-cocos: la meta siempre a la vista (GANCHO §A1).
+   Se pinta en un lienzo aparte y solo se repinta cuando cambia algún dato,
+   así el marcador no cuesta nada por fotograma (medido: 1,74 → 0,05 ms). */
+function hlabel(b, s, x, y, size, col, align) {
+  b.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; b.textAlign = align || 'left'; b.textBaseline = 'top';
+  b.lineJoin = 'round'; b.lineWidth = size / 5 + 2; b.strokeStyle = OUT; b.strokeText(s, x, y); b.fillStyle = col || '#fff'; b.fillText(s, x, y);
+}
+function star(b, x, y, r, on, cross) {
+  b.beginPath();
+  for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.46 : r; b.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+  b.closePath(); b.fillStyle = on ? '#ffd23d' : 'rgba(255,255,255,.14)'; b.fill(); b.lineWidth = 1.4; b.strokeStyle = on ? OUT : 'rgba(255,255,255,.3)'; b.stroke();
+  if (cross) { b.strokeStyle = '#ff5a6e'; b.lineWidth = 2; b.beginPath(); b.moveTo(x - r * 0.8, y - r * 0.8); b.lineTo(x + r * 0.8, y + r * 0.8); b.stroke(); }
+}
+let pacIconCv = null;
+function pacIcon() {
+  return pacIconCv || (pacIconCv = mkCv(17, 17, (b) => {
+    const r = 6.5, x = 8.5, y = 8.5, m = 0.5;   // pieza única: tarta con la boca recortada
+    const path = (q) => { q.moveTo(x - Math.cos(m) * 1, y); q.arc(x, y, r, Math.PI + m, Math.PI - m); q.closePath(); };
+    unite(b, [[path, '#ffd23d']], 1.3);
+    within(b, path, (q) => { q.fillStyle = AL(OUT, 0.16); q.beginPath(); q.arc(x, y + r * 0.55, r, 0, R2); q.fill(); });
+    b.fillStyle = OUT; b.beginPath(); b.arc(x - 1.4, y - 2.6, 1.15, 0, R2); b.fill();
+  }));
+}
+let hudCv = null, hudB = null, hudKey = '';
+function hudPaint(b) {
+  b.clearRect(0, 0, W, MTOP);
+  const done = totN - left, u = Math.max(0, Math.min(1, done / totN));
+  b.fillStyle = 'rgba(10,9,26,.55)'; b.fillRect(0, 0, W, MTOP);
+  b.fillStyle = 'rgba(255,255,255,.07)'; b.fillRect(0, MTOP - 1, W, 1);
+  /* fila 1: puntuación y nivel (las vidas se pintan encima, en vivo) */
+  hlabel(b, `${score}`, 10, 1, 18, '#fff');
+  b.font = '800 18px ui-rounded,"Trebuchet MS",system-ui,sans-serif';
+  const lvx = 23 + b.measureText(`${score}`).width;
+  for (let i = 0; i < Math.max(0, Math.min(6, lives)); i++) b.drawImage(pacIcon(), lvx + i * 16 - 8.5, 3, 17, 17);
+  hlabel(b, HAND ? `Nivel ${level}/${HAND.length}` : `Nivel ${level}`, W - 10, 2, 12, 'rgba(255,255,255,.92)', 'right');
+  /* fila 2: barra de puntos que faltan, fruta, bolas grandes y estrellas */
+  const by = 31, bh = 13, bx = 10, bw = 118;
+  hlabel(b, 'PUNTOS', bx, by - 11, 9, 'rgba(255,255,255,.55)');
+  ART.rr(b, bx, by, bw, bh, 6); b.fillStyle = 'rgba(255,255,255,.12)'; b.fill();
+  if (u > 0) { ART.rr(b, bx + 1.5, by + 1.5, Math.max(4, (bw - 3) * u), bh - 3, 5); b.fillStyle = left <= 10 ? '#7cf7a0' : '#6e62f5'; b.fill(); }
+  hlabel(b, `Faltan ${left}`, bx + bw / 2, by + 1, 10, left <= 10 ? '#bfffd4' : '#fff', 'center');
+  hlabel(b, `Récord ${Math.max(best || 0, score)}`, bx, by + bh + 2, 9, 'rgba(255,255,255,.6)');
+  /* fruta: cuánto falta para la siguiente y cuántas llevas */
+  const a1 = LV ? Math.round(dots * 0.35) : 70, b1 = LV ? Math.round(dots * 0.7) : 150;
+  const nx = frSeen === 0 ? a1 : frSeen === 1 ? b1 : 0, fx1 = 150;
+  hlabel(b, fruit ? '¡AHORA!' : nx ? `en ${Math.max(0, nx - eaten)}` : 'FRUTA', fx1 - 11, by - 11, 9, fruit ? '#ffd23d' : 'rgba(255,255,255,.55)');
+  b.save(); b.translate(fx1, by + 7); b.scale(0.58, 0.58); b.drawImage(fruitSpr(LV ? LV.fruit.k : 'cereza'), -17, -18, 34, 36); b.restore();
+  hlabel(b, `${frGot}/2`, fx1 + 12, by + 2, 11, frGot >= 2 ? '#7cf7a0' : '#fff');
+  /* bolas grandes que quedan */
+  const px1 = 310;
+  hlabel(b, 'BOLAS', px1 - 9, by - 11, 9, 'rgba(255,255,255,.55)');
+  b.drawImage(powCv, px1 - 9, by, 18, 18);
+  hlabel(b, `x${powLeft}`, px1 + 11, by + 2, 11, powLeft ? '#fff' : 'rgba(255,255,255,.4)');
+  /* estrellas del nivel, en vivo */
+  const sx1 = 380;
+  hlabel(b, 'ESTRELLAS', sx1 - 10, by - 11, 9, 'rgba(255,255,255,.55)');
+  star(b, sx1, by + 8, 8, left <= 0); star(b, sx1 + 24, by + 8, 8, nodie, !nodie); star(b, sx1 + 48, by + 8, 8, frGot >= 2);
+}
+function hudMuncher() {
+  if (!hudCv) { hudCv = document.createElement('canvas'); hudCv.width = Math.ceil(W * 2); hudCv.height = Math.ceil(MTOP * 2); hudB = hudCv.getContext('2d'); hudB.scale(2, 2); hudKey = ''; }
+  const key = `${score}|${lives}|${left}|${frGot}|${frSeen}|${eaten}|${powLeft}|${nodie}|${level}|${fruit ? 1 : 0}|${best}`;
+  if (key !== hudKey) { hudKey = key; hudPaint(hudB); }
+  c.drawImage(hudCv, 0, 0, W, MTOP);
+  /* caza en marcha: barra azul de cuenta atrás bajo el marcador */
+  if (fright > 0 && huntT > 0) {
+    const fu = Math.max(0, fright / huntT);
+    c.fillStyle = 'rgba(61,90,254,.35)'; c.fillRect(0, MTOP - 4, W, 4);
+    c.fillStyle = fright < 2 && Math.floor(fright * 5) % 2 ? '#fff' : '#8fd3ff'; c.fillRect(0, MTOP - 4, W * fu, 4);
+  }
 }
 
 /* ---------- Excavador ---------- */

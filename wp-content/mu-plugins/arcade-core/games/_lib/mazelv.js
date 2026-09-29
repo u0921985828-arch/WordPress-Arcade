@@ -22,13 +22,18 @@
  *   sc     cambios dispersión/persecución en segundos: [fin 1ª dispersión, fin 1ª persecución, …]
  *   fr     segundos de fantasmas comestibles tras morder una bola grande
  *   fruit  fruta del nivel: k = dibujo, v = puntos
+ *   tip    consejo que se enseña al empezar el nivel (una línea, sin tecnicismos)
+ *
+ * ESTRELLAS (docs/GANCHO.md §A6), iguales en los 20 para que se entiendan a la primera:
+ *   ★ terminar el laberinto · ★ terminarlo sin que te pillen · ★ coger las dos frutas.
+ * Se guardan por dificultad (kit.js) y se ven en vivo en el marcador.
  *
  * Todo se multiplica luego por la dificultad elegida (k.D).
  */
 const MAZELV = {
   'maze-muncher': [
     /* ---- 1-5: sin túneles, 2-3 fantasmas, cuatro bolas grandes. Se aprende a moverse. ---- */
-    { /*  1 */ n: 2, spd: 3.0, rel: [0.8, 4.0], sc: [10, 30, 42], fr: 9.0, fruit: { k: 'cereza', v: 100 }, m: [
+    { /*  1 */ tip: 'Cómete todos los puntos sin que te pillen.', n: 2, spd: 3.0, rel: [0.8, 4.0], sc: [10, 30, 42], fr: 9.0, fruit: { k: 'cereza', v: 100 }, m: [
       '##########',
       '#.........',
       '#.###.###.',
@@ -48,7 +53,7 @@ const MAZELV = {
       '#.###.###.',
       '#........P',
       '##########'] },
-    { /*  2 */ n: 2, spd: 3.2, rel: [0.7, 3.4], sc: [9, 29, 40], fr: 8.5, fruit: { k: 'cereza', v: 100 }, m: [
+    { /*  2 */ tip: 'Si no dejas de comer, sube el multiplicador.', n: 2, spd: 3.2, rel: [0.7, 3.4], sc: [9, 29, 40], fr: 8.5, fruit: { k: 'cereza', v: 100 }, m: [
       '##########',
       '#.........',
       '#.###.#.#.',
@@ -68,7 +73,7 @@ const MAZELV = {
       '#.#.#.#.#.',
       '#........P',
       '##########'] },
-    { /*  3 */ n: 3, spd: 3.3, rel: [0.7, 2.6, 7.0], sc: [9, 28, 39], fr: 8.0, fruit: { k: 'fresa', v: 200 }, m: [
+    { /*  3 */ tip: 'Tres fantasmas: no te metas donde no puedas salir.', n: 3, spd: 3.3, rel: [0.7, 2.6, 7.0], sc: [9, 28, 39], fr: 8.0, fruit: { k: 'fresa', v: 200 }, m: [
       '##########',
       '#.........',
       '#.#.###.#.',
@@ -88,7 +93,7 @@ const MAZELV = {
       '#.#.###.#.',
       '#........P',
       '##########'] },
-    { /*  4 */ n: 3, spd: 3.5, rel: [0.6, 2.4, 6.0], sc: [8, 27, 38], fr: 7.5, fruit: { k: 'fresa', v: 300 }, m: [
+    { /*  4 */ tip: 'La fruta asoma a mitad de laberinto. Vigílala.', n: 3, spd: 3.5, rel: [0.6, 2.4, 6.0], sc: [8, 27, 38], fr: 7.5, fruit: { k: 'fresa', v: 300 }, m: [
       '##########',
       '#.........',
       '#.#####.#.',
@@ -108,7 +113,7 @@ const MAZELV = {
       '#.#####.#.',
       '#........P',
       '##########'] },
-    { /*  5 */ n: 3, spd: 3.7, rel: [0.6, 2.2, 5.5], sc: [8, 27, 37], fr: 7.0, fruit: { k: 'naranja', v: 400 }, m: [
+    { /*  5 */ tip: 'Muerde una bola grande y el cazador eres tú.', n: 3, spd: 3.7, rel: [0.6, 2.2, 5.5], sc: [8, 27, 37], fr: 7.0, fruit: { k: 'naranja', v: 400 }, m: [
       '##########',
       '#.........',
       '#.###.###.',
@@ -129,7 +134,7 @@ const MAZELV = {
       '#........P',
       '##########'] },
     /* ---- 6-10: llegan los túneles laterales y el cuarto fantasma. ---- */
-    { /*  6 */ n: 3, spd: 3.8, rel: [0.6, 2.0, 5.0], sc: [8, 26, 36], fr: 7.0, fruit: { k: 'naranja', v: 500 }, m: [
+    { /*  6 */ tip: 'Nuevo: los túneles de los lados salen por el otro extremo.', n: 3, spd: 3.8, rel: [0.6, 2.0, 5.0], sc: [8, 26, 36], fr: 7.0, fruit: { k: 'naranja', v: 500 }, m: [
       '##########',
       '#.........',
       '#.###.###.',
@@ -149,7 +154,7 @@ const MAZELV = {
       '#.###.###.',
       '#........P',
       '##########'] },
-    { /*  7 */ n: 3, spd: 4.0, rel: [0.5, 1.9, 4.6], sc: [7, 26, 35], fr: 6.5, fruit: { k: 'manzana', v: 600 }, m: [
+    { /*  7 */ tip: 'Usa el túnel cuando te acorralen.', n: 3, spd: 4.0, rel: [0.5, 1.9, 4.6], sc: [7, 26, 35], fr: 6.5, fruit: { k: 'manzana', v: 600 }, m: [
       '##########',
       '#.........',
       '#.#.###.#.',
@@ -169,7 +174,7 @@ const MAZELV = {
       '#.#.###.#.',
       '#........P',
       '##########'] },
-    { /*  8 */ n: 4, spd: 4.1, rel: [0.5, 1.8, 4.2, 8.0], sc: [7, 26, 35], fr: 6.5, fruit: { k: 'manzana', v: 700 }, m: [
+    { /*  8 */ tip: 'Cuatro fantasmas y dos túneles para escapar.', n: 4, spd: 4.1, rel: [0.5, 1.8, 4.2, 8.0], sc: [7, 26, 35], fr: 6.5, fruit: { k: 'manzana', v: 700 }, m: [
       '##########',
       '#.........',
       '#.###.###.',
@@ -189,7 +194,7 @@ const MAZELV = {
       '#.###.###.',
       '#........P',
       '##########'] },
-    { /*  9 */ n: 4, spd: 4.3, rel: [0.5, 1.7, 4.0, 7.5], sc: [7, 25, 34], fr: 6.0, fruit: { k: 'melon', v: 800 }, m: [
+    { /*  9 */ tip: 'Hay tres bolas grandes: guárdate una para el final.', n: 4, spd: 4.3, rel: [0.5, 1.7, 4.0, 7.5], sc: [7, 25, 34], fr: 6.0, fruit: { k: 'melon', v: 800 }, m: [
       '##########',
       '#.........',
       '#.#####.#.',
@@ -209,7 +214,7 @@ const MAZELV = {
       '#.#####.#.',
       '#........P',
       '##########'] },
-    { /* 10 */ n: 4, spd: 4.4, rel: [0.5, 1.6, 3.8, 7.0], sc: [7, 25, 34], fr: 6.0, fruit: { k: 'melon', v: 1000 }, m: [
+    { /* 10 */ tip: 'Cómete los cuatro con una sola bola: 3000 puntos.', n: 4, spd: 4.4, rel: [0.5, 1.6, 3.8, 7.0], sc: [7, 25, 34], fr: 6.0, fruit: { k: 'melon', v: 1000 }, m: [
       '##########',
       '#.........',
       '#.#.#.#.#.',
@@ -230,7 +235,7 @@ const MAZELV = {
       '#........P',
       '##########'] },
     /* ---- 11-15: laberinto abierto, salas grandes y solo tres bolas grandes. ---- */
-    { /* 11 */ n: 4, spd: 4.5, rel: [0.5, 1.5, 3.5, 6.5], sc: [6, 25, 33], fr: 5.5, fruit: { k: 'uvas', v: 1200 }, m: [
+    { /* 11 */ tip: 'Salas grandes: te ven venir de lejos.', n: 4, spd: 4.5, rel: [0.5, 1.5, 3.5, 6.5], sc: [6, 25, 33], fr: 5.5, fruit: { k: 'uvas', v: 1200 }, m: [
       '##########',
       '#.........',
       '#.#.#.#.#o',
@@ -250,7 +255,7 @@ const MAZELV = {
       '#.#.#.#.#.',
       '#........P',
       '##########'] },
-    { /* 12 */ n: 4, spd: 4.6, rel: [0.5, 1.5, 3.4, 6.2], sc: [6, 24, 33], fr: 5.5, fruit: { k: 'uvas', v: 1400 }, m: [
+    { /* 12 */ tip: 'Menos muros, más carreras. No pierdas de vista al rojo.', n: 4, spd: 4.6, rel: [0.5, 1.5, 3.4, 6.2], sc: [6, 24, 33], fr: 5.5, fruit: { k: 'uvas', v: 1400 }, m: [
       '##########',
       '#.........',
       '#.###.#.#o',
@@ -270,7 +275,7 @@ const MAZELV = {
       '#.###.#.#.',
       '#........P',
       '##########'] },
-    { /* 13 */ n: 4, spd: 4.8, rel: [0.4, 1.4, 3.2, 6.0], sc: [6, 24, 32], fr: 5.0, fruit: { k: 'uvas', v: 1600 }, m: [
+    { /* 13 */ tip: 'Cuando los fantasmas parpadean, se acaba la caza.', n: 4, spd: 4.8, rel: [0.4, 1.4, 3.2, 6.0], sc: [6, 24, 32], fr: 5.0, fruit: { k: 'uvas', v: 1600 }, m: [
       '##########',
       '#.........',
       '#.#.###.#o',
@@ -290,7 +295,7 @@ const MAZELV = {
       '#.#.###.#.',
       '#........P',
       '##########'] },
-    { /* 14 */ n: 4, spd: 4.9, rel: [0.4, 1.4, 3.0, 5.8], sc: [6, 24, 32], fr: 5.0, fruit: { k: 'platano', v: 2000 }, m: [
+    { /* 14 */ tip: 'Antes de lanzarse a por ti se les enciende un «!».', n: 4, spd: 4.9, rel: [0.4, 1.4, 3.0, 5.8], sc: [6, 24, 32], fr: 5.0, fruit: { k: 'platano', v: 2000 }, m: [
       '##########',
       '#.........',
       '#.#.#.###o',
@@ -310,7 +315,7 @@ const MAZELV = {
       '#.#.#.###.',
       '#........P',
       '##########'] },
-    { /* 15 */ n: 4, spd: 5.0, rel: [0.4, 1.3, 2.9, 5.5], sc: [5, 24, 31], fr: 5.0, fruit: { k: 'platano', v: 2400 }, m: [
+    { /* 15 */ tip: 'El plátano vale 2400: no lo dejes escapar.', n: 4, spd: 5.0, rel: [0.4, 1.3, 2.9, 5.5], sc: [5, 24, 31], fr: 5.0, fruit: { k: 'platano', v: 2400 }, m: [
       '##########',
       '#.........',
       '#.#####.#o',
@@ -331,7 +336,7 @@ const MAZELV = {
       '#........P',
       '##########'] },
     /* ---- 16-20: cuatro fantasmas rápidos, dos bolas (una sola en el 20) y plantas cerradas. ---- */
-    { /* 16 */ n: 4, spd: 5.1, rel: [0.4, 1.2, 2.8, 5.2], sc: [5, 23, 31], fr: 4.5, fruit: { k: 'sandia', v: 2600 }, m: [
+    { /* 16 */ tip: 'A partir de aquí solo hay dos bolas grandes.', n: 4, spd: 5.1, rel: [0.4, 1.2, 2.8, 5.2], sc: [5, 23, 31], fr: 4.5, fruit: { k: 'sandia', v: 2600 }, m: [
       '##########',
       '#.........',
       '#.###.###.',
@@ -351,7 +356,7 @@ const MAZELV = {
       '#.###.###.',
       '#........P',
       '##########'] },
-    { /* 17 */ n: 4, spd: 5.3, rel: [0.4, 1.2, 2.6, 5.0], sc: [5, 23, 30], fr: 4.5, fruit: { k: 'sandia', v: 2800 }, m: [
+    { /* 17 */ tip: 'Rápidos y con pocos escondites. Ve de frente.', n: 4, spd: 5.3, rel: [0.4, 1.2, 2.6, 5.0], sc: [5, 23, 30], fr: 4.5, fruit: { k: 'sandia', v: 2800 }, m: [
       '##########',
       '#.........',
       '#.#.###.#.',
@@ -371,7 +376,7 @@ const MAZELV = {
       '#.#.###.#.',
       '#........P',
       '##########'] },
-    { /* 18 */ n: 4, spd: 5.4, rel: [0.4, 1.1, 2.5, 4.8], sc: [5, 23, 30], fr: 4.0, fruit: { k: 'sandia', v: 3000 }, m: [
+    { /* 18 */ tip: 'Encadena puntos: con x5 el laberinto vale el doble.', n: 4, spd: 5.4, rel: [0.4, 1.1, 2.5, 4.8], sc: [5, 23, 30], fr: 4.0, fruit: { k: 'sandia', v: 3000 }, m: [
       '##########',
       '#.........',
       '#.#####.#.',
@@ -391,7 +396,7 @@ const MAZELV = {
       '#.#####.#.',
       '#........P',
       '##########'] },
-    { /* 19 */ n: 4, spd: 5.6, rel: [0.4, 1.1, 2.4, 4.6], sc: [5, 22, 30], fr: 4.0, fruit: { k: 'sandia', v: 4000 }, m: [
+    { /* 19 */ tip: 'Casi el final. La sandía vale 4000.', n: 4, spd: 5.6, rel: [0.4, 1.1, 2.4, 4.6], sc: [5, 22, 30], fr: 4.0, fruit: { k: 'sandia', v: 4000 }, m: [
       '##########',
       '#.........',
       '#.###.###.',
@@ -411,7 +416,7 @@ const MAZELV = {
       '#.###.###.',
       '#........P',
       '##########'] },
-    { /* 20 */ n: 4, spd: 5.8, rel: [0.3, 1.0, 2.2, 4.2], sc: [4, 22, 29], fr: 3.5, fruit: { k: 'sandia', v: 5000 }, m: [
+    { /* 20 */ tip: 'Una sola bola grande y los cuatro a tope. Suerte.', n: 4, spd: 5.8, rel: [0.3, 1.0, 2.2, 4.2], sc: [4, 22, 29], fr: 3.5, fruit: { k: 'sandia', v: 5000 }, m: [
       '##########',
       '#.........',
       '#.###.###o',
