@@ -1,0 +1,151 @@
+/* Kuboplay Shield — panel de ajustes. Mínimo, coherente con el escritorio de WordPress. */
+
+.kps-wrap { max-width: 900px; }
+.kps-wrap * { box-sizing: border-box; }
+
+.kps-title { display: flex; align-items: center; gap: 8px; }
+.kps-title .dashicons { color: #6e62f5; font-size: 26px; width: 26px; height: 26px; }
+
+/* Tarjeta de estado */
+.kps-card {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-left: 4px solid #6e62f5;
+	border-radius: 6px;
+	padding: 14px 16px 6px;
+	margin: 16px 0 22px;
+}
+.kps-card h2 { margin: 0 0 12px; font-size: 15px; }
+
+.kps-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: 10px;
+}
+.kps-box {
+	background: #f6f7f7;
+	border: 1px solid #e0e0e2;
+	border-radius: 6px;
+	padding: 10px 12px;
+	min-width: 0;
+}
+.kps-box.is-off { background: #fcf2f2; border-color: #f0c8c8; }
+.kps-box-v {
+	display: block;
+	font-size: 18px;
+	font-weight: 600;
+	line-height: 1.25;
+	color: #1d2327;
+	overflow-wrap: anywhere;
+}
+.kps-box.is-off .kps-box-v { color: #a02b2b; }
+.kps-box-l { display: block; font-size: 12px; color: #646970; margin-top: 2px; }
+
+/* Avisos */
+.kps-notice {
+	border-radius: 5px;
+	padding: 9px 12px;
+	margin: 10px 0 0;
+	font-size: 13px;
+	line-height: 1.5;
+}
+.kps-warn { background: #fcf9e8; border: 1px solid #f0e0a0; color: #614708; }
+.kps-info { background: #f0f6fc; border: 1px solid #c9dcf0; color: #1f3d5c; }
+.kps-ok   { background: #edfaef; border: 1px solid #b7e3bf; color: #1c5a2a; }
+
+.kps-note {
+	background: #fcf9e8;
+	border: 1px solid #f0e0a0;
+	border-left: 4px solid #dba617;
+	border-radius: 0 6px 6px 0;
+	padding: 12px 14px;
+	margin: 16px 0;
+	font-size: 13px;
+	line-height: 1.6;
+}
+.kps-note em { display: block; margin-top: 6px; color: #614708; }
+
+.kps-tabs { margin-top: 4px; }
+
+/* Campos */
+.kps-fields {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-top: 0;
+	border-radius: 0 0 6px 6px;
+	padding: 4px 16px;
+}
+.kps-field { padding: 16px 0; border-bottom: 1px solid #f0f0f1; }
+.kps-field:last-child { border-bottom: 0; }
+
+.kps-desc { margin: 8px 0 0; color: #646970; font-size: 13px; line-height: 1.55; max-width: 62ch; }
+.kps-lab { display: block; font-weight: 600; margin-bottom: 6px; }
+.kps-input { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.kps-input input { max-width: 100%; }
+.kps-suffix { color: #646970; font-size: 13px; }
+
+.kps-prev { margin: 8px 0 0; font-size: 13px; }
+.kps-prev code { background: #f0f0f1; padding: 3px 6px; border-radius: 4px; overflow-wrap: anywhere; }
+
+.kps-confirm {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	margin-top: 10px;
+	background: #fcf9e8;
+	border: 1px solid #f0e0a0;
+	border-radius: 5px;
+	padding: 9px 12px;
+	font-size: 13px;
+	line-height: 1.5;
+}
+.kps-confirm input { margin: 2px 0 0; flex: 0 0 auto; }
+
+/* Interruptor */
+.kps-sw { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.kps-sw input { position: absolute; opacity: 0; width: 0; height: 0; }
+.kps-sw-track {
+	flex: 0 0 auto;
+	width: 46px;
+	height: 26px;
+	border-radius: 13px;
+	background: #c3c4c7;
+	position: relative;
+	transition: background .15s ease;
+}
+.kps-sw-dot {
+	position: absolute;
+	top: 3px;
+	left: 3px;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	background: #fff;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, .3);
+	transition: transform .15s ease;
+}
+.kps-sw input:checked + .kps-sw-track { background: #6e62f5; }
+.kps-sw input:checked + .kps-sw-track .kps-sw-dot { transform: translateX(20px); }
+.kps-sw input:focus-visible + .kps-sw-track { outline: 2px solid #2271b1; outline-offset: 2px; }
+.kps-sw-label { font-weight: 600; }
+
+.kps-empty { color: #646970; padding: 18px 0; }
+
+.kps-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 0; }
+.kps-actions .button { margin: 0; }
+.kps-actions .button.kps-reset { color: #a02b2b; border-color: #d4a0a0; }
+.kps-actions .button.kps-reset:hover { color: #7a1f1f; border-color: #a02b2b; background: #fcf2f2; }
+
+.kps-foot { color: #8c8f94; font-size: 12px; margin-top: 18px; }
+
+/* Móvil */
+@media screen and (max-width: 782px) {
+	.kps-wrap { max-width: 100%; }
+	.kps-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+	.kps-box-v { font-size: 16px; }
+	.kps-fields { padding: 4px 12px; }
+	.kps-actions { flex-direction: column; align-items: stretch; }
+	.kps-actions .button { width: 100%; text-align: center; }
+	.kps-actions .button-hero { font-size: 15px; }
+	.kps-tabs .nav-tab { margin-left: 0; margin-right: 4px; }
+}
