@@ -24,7 +24,7 @@ const k = Kit({
    Una casilla es {c, rock, hp, cr, mark, pop, off}: c 0..5 color, -1 arcoíris, -2 bomba. */
 const CDIRS = [[1, 0], [0, 1], [1, 1], [1, -1]];
 const ORTHO = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-const isGem = (g) => !!g && g.c >= 0 && !g.rock && !g.cr;
+const isGem = (g) => !!g && g.c >= 0 && !g.rock && !g.cr && !g.ice;
 function mkF(pre) {
   const F = []; for (let y = 0; y < ROWS; y++) F.push(new Array(COLS).fill(null));
   if (pre && pre.length) {
@@ -35,6 +35,7 @@ function mkF(pre) {
       else if (ch === '@') F[y][x] = { c: -3, rock: 1, hp: 2, off: 0, pop: 0 };
       else if (ch === 'D') F[y][x] = { c: -4, cr: 1, off: 0, pop: 0 };
       else if (ch >= '1' && ch <= '6') F[y][x] = { c: +ch - 1, off: 0, pop: 0 };
+      else if ('abcdef'.indexOf(ch) >= 0) F[y][x] = { c: 'abcdef'.indexOf(ch), ice: 1, off: 0, pop: 0 };
     }
   }
   return F;
@@ -53,18 +54,20 @@ function findMatches(F) {
   }
   return any;
 }
-/* las piedras pegadas (en cruz) a algo que estalla pierden un punto de dureza */
+/* Lo que toca (en cruz) algo que estalla: las piedras pierden dureza y el hielo se descongela.
+   Devuelve {rock, ice} para que el juego y el simulador cuenten lo mismo. */
 function hitRocks(F) {
-  const hit = [];
+  const hit = [], thaw = [];
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
-    const g = F[y][x]; if (!g || !g.rock || g.mark) continue;
+    const g = F[y][x]; if (!g || g.mark || (!g.rock && !g.ice)) continue;
     for (let d = 0; d < 4; d++) {
       const b = F[y + ORTHO[d][1]] && F[y + ORTHO[d][1]][x + ORTHO[d][0]];
-      if (b && b.mark && !b.rock) { hit.push(g); break; }
+      if (b && b.mark && !b.rock) { (g.rock ? hit : thaw).push(g); break; }
     }
   }
   for (let i = 0; i < hit.length; i++) { hit[i].hp--; hit[i].fx = 1; if (hit[i].hp <= 0) hit[i].mark = 1; }
-  return hit.length;
+  for (let i = 0; i < thaw.length; i++) { thaw[i].ice = 0; thaw[i].fx = 1; }
+  return { rock: hit.length, ice: thaw.length };
 }
 /* bomba: revienta las 8 casillas de alrededor y la suya (los cristales aguantan) */
 function blast(F, x, y) {
@@ -72,15 +75,34 @@ function blast(F, x, y) {
   for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
     const b = F[y + dy] && F[y + dy][x + dx]; if (!b || b.cr) continue;
     if (b.rock) b.hp = 0;
-    b.mark = 1; n++;
+    b.ice = 0; b.mark = 1; n++;
   }
   return n;
 }
 /* arcoíris: limpia todas las joyas del color indicado (y las demás arcoíris) */
 function wild(F, col) {
   let n = 0;
-  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) { const g = F[y][x]; if (g && !g.rock && !g.cr && (g.c === col || g.c === -1)) { g.mark = 1; n++; } }
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) { const g = F[y][x]; if (g && !g.rock && !g.cr && !g.ice && (g.c === col || g.c === -1)) { g.mark = 1; n++; } }
   return n;
+}
+/* rayo (pieza especial de la tanda 7): limpia la fila y la columna donde aterriza; los cristales
+   aguantan, las piedras se rompen de golpe y el hielo se lleva la capa por delante. */
+function ray(F, x, y) {
+  let n = 0;
+  for (let i = 0; i < COLS; i++) { const b = F[y] && F[y][i]; if (!b || b.cr || b.mark) continue; if (b.rock) b.hp = 0; b.ice = 0; b.mark = 1; n++; }
+  for (let j = 0; j < ROWS; j++) { const b = F[j] && F[j][x]; if (!b || b.cr || b.mark) continue; if (b.rock) b.hp = 0; b.ice = 0; b.mark = 1; n++; }
+  return n;
+}
+/* el suelo sube (niveles con `rise`): todo el pozo se desplaza una fila y entra una fila nueva
+   de joyas del nivel con un hueco. Devuelve 1 si algo se sale por arriba (pozo desbordado). */
+function riseRow(F, cols, rnd, CSz) {
+  let over = 0;
+  for (let x = 0; x < COLS; x++) if (F[0][x]) over = 1;
+  if (over) return 1;
+  for (let y = 0; y < ROWS - 1; y++) for (let x = 0; x < COLS; x++) { F[y][x] = F[y + 1][x]; if (F[y][x]) F[y][x].off = -(CSz || 1); }
+  const gap = Math.floor(rnd() * COLS);
+  for (let x = 0; x < COLS; x++) F[ROWS - 1][x] = x === gap ? null : { c: Math.floor(rnd() * cols), off: -(CSz || 1), pop: 0 };
+  return 0;
 }
 function anyMark(F) { for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (F[y][x] && F[y][x].mark) return true; return false; }
 /* saca lo marcado y devuelve la lista de casillas limpiadas */
@@ -100,7 +122,7 @@ function gravity(F, CSz) {
 /* cristales que ya tocan el suelo (columna a columna) */
 function floorCrystals(F) { const o = []; for (let x = 0; x < COLS; x++) { const g = F[ROWS - 1][x]; if (g && g.cr) o.push(x); } return o; }
 const landRowOn = (F, x) => { let y = ROWS - 1; while (y >= 0 && F[y][x]) y--; return y; };
-if (typeof module !== 'undefined' && module.exports) module.exports = { COLS: COLS, ROWS: ROWS, mkF: mkF, findMatches: findMatches, hitRocks: hitRocks, blast: blast, wild: wild, anyMark: anyMark, takeMarked: takeMarked, gravity: gravity, floorCrystals: floorCrystals, landRowOn: landRowOn, isGem: isGem };
+if (typeof module !== 'undefined' && module.exports) module.exports = { COLS: COLS, ROWS: ROWS, mkF: mkF, findMatches: findMatches, hitRocks: hitRocks, blast: blast, wild: wild, ray: ray, riseRow: riseRow, anyMark: anyMark, takeMarked: takeMarked, gravity: gravity, floorCrystals: floorCrystals, landRowOn: landRowOn, isGem: isGem };
 /* </LV> -------------------------------------------------------------------------------------- */
 
 /* ---------- R5 §8 «pieza única» + cartoon de estudio (helpers locales) ----------
@@ -129,13 +151,16 @@ const GEM = [
 ];
 let F, piece, next, fall, score, level, cleared, chain, phase, phT, t, over, msg, msgT, hard, bgCv;
 let LV = null, drops = 0, done = false, nGems = 0, nCol = 0, nChain = 0, nRock = 0, nCry = 0, bannerT = 0, lost = '';
+/* Tanda 7 (vara de docs/VARA.md): hielo, rayo, suelo que sube, cuenta atrás, cadenas profundas,
+   salvavidas a partir del nivel 11 y estrellas 1/2/3 por nivel y dificultad. */
+let nIce = 0, nDeep = 0, nBig = 0, life = 0, lifeUsed = 0, tLeft = 0, riseIn = 0, stars = 1, deepMax = 0, rescueT = 0;
 const spr = [];
 
 /* ---------- disposición (fluida con niveles a mano) ---------- */
 let CS = 34, X0 = 0, Y0 = 96, PX = 0, PGY = 0, POY = 0, PH = 0, sidePanel = false, TOPB = 66, BOTB = 52;
 const PW = 150;
 function layout() {
-  TOPB = HAND ? (k.W < 420 ? 62 : 68) : 96;
+  TOPB = HAND ? (k.W < 420 ? 80 : 84) : 96;
   sidePanel = HAND ? k.W >= 560 : false;
   /* sin panel lateral la franja baja lleva objetivo y «Siguiente»; el botón de pausa de kit
      (CFG.hud 'bl') ocupa los 44 px de abajo a la izquierda, así que la franja se agranda. */
@@ -148,10 +173,13 @@ function layout() {
   Y0 = Math.round(TOPB + Math.max(0, (avH - ROWS * CS) / 2));
   /* panel lateral: rótulo + 3 joyas + objetivo (hasta 3 líneas) */
   const gh = CS * 0.8;
-  PGY = Y0 + 34; POY = PGY + gh * 2 + gh * 0.7 + 18; PH = POY + 22 + 3 * 19 + 12 - (Y0 - 10);
+  PGY = Y0 + 34; POY = PGY + gh * 2 + gh * 0.7 + 18; PH = POY + 22 + 3 * 19 + 62 - (Y0 - 10);
   buildSprites(); bgCv = null;
 }
 const cx = (x) => X0 + x * CS + CS / 2, cy = (y) => Y0 + y * CS + CS / 2;
+/* cadena en curso: se mantiene visible un momento tras el último estallido (§A3) */
+let multV = 1, multT = 0;
+const mult = () => (multT > 0 ? multV : 1);
 function off(w, h, draw) { const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.ceil(w * 2)); cv.height = Math.max(1, Math.ceil(h * 2)); const g = cv.getContext('2d'); g.scale(2, 2); draw(g); return cv; }
 function label(s, x, y, size, col, align) {
   c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; c.textAlign = align || 'left'; c.textBaseline = 'top';
@@ -165,6 +193,20 @@ function fitSize(s, size, max) {
   return z;
 }
 
+/* barra de progreso y fila de tres estrellas (marcador; §A1 y §A6 de GANCHO.md) */
+function bar(x, y, w2, h2, v, col) {
+  ART.rr(c, x, y, w2, h2, h2 / 2); c.fillStyle = 'rgba(12,8,28,.55)'; c.fill(); c.lineWidth = 2; c.strokeStyle = 'rgba(255,255,255,.18)'; c.stroke();
+  const ww = Math.max(0, Math.min(1, v)) * (w2 - 4);
+  if (ww > 1) { ART.rr(c, x + 2, y + 2, ww, h2 - 4, (h2 - 4) / 2); c.fillStyle = col; c.fill(); }
+}
+function starRow(x, y, n, sz) {
+  for (let i = 0; i < 3; i++) {
+    c.beginPath();
+    for (let q = 0; q < 10; q++) { const a = -1.5708 + q * TAU / 10, rr = q % 2 ? sz * 0.42 : sz; c[q ? 'lineTo' : 'moveTo'](x + i * sz * 2.4 + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+    c.closePath(); c.lineWidth = 2.2; c.lineJoin = 'round'; c.strokeStyle = OUT; c.stroke();
+    c.fillStyle = i < n ? '#ffd166' : 'rgba(255,255,255,.16)'; c.fill();
+  }
+}
 /* ---------- gemas, piedras y cristales cacheados ---------- */
 function gemPath(g, s, r) {
   g.beginPath();
@@ -255,11 +297,49 @@ function crystalSprite() {
     spec(g, -r * 0.22, -r * 0.42, r * 0.18, r * 0.34, -0.2, 0.7);
   });
 }
+/* rayo: una sola silueta de relámpago con tres tonos de borde duro (R5 §8) */
+function raySprite() {
+  const r = CS * 0.46, S = CS + 6, base = '#7cf7ff';
+  return off(S, S, (g) => {
+    g.translate(S / 2, S / 2);
+    contact(g, 1, r * 0.8, r * 0.7, r * 0.2, 0.3);
+    const body = (h) => {
+      h.moveTo(r * 0.12, -r * 1.0); h.lineTo(-r * 0.74, r * 0.12); h.lineTo(-r * 0.12, r * 0.12);
+      h.lineTo(-r * 0.4, r * 1.0); h.lineTo(r * 0.76, -r * 0.16); h.lineTo(r * 0.1, -r * 0.16); h.closePath();
+    };
+    const parts = [[body, base]];
+    uni(g, parts, 1.6);
+    celp(g, parts, base, r * 0.34, r * 0.34);
+    spec(g, -r * 0.18, -r * 0.34, r * 0.16, r * 0.26, -0.4, 0.75);
+  });
+}
+/* joya helada: la gema del color dentro de un bloque de hielo de una pieza */
+function iceSprite(i) {
+  const o = GEM[i], r = CS * 0.44, S = CS + 6;
+  return off(S, S, (g) => {
+    g.translate(S / 2, S / 2);
+    contact(g, 1, r * 0.8, r * 0.85, r * 0.22, 0.3);
+    const body = (h) => { ART.rr(h, -r * 0.92, -r * 0.92, r * 1.84, r * 1.84, r * 0.3); };
+    const parts = [[body, '#bfe9ff']];
+    uni(g, parts, 1.6);
+    celp(g, parts, '#bfe9ff', r * 0.34, r * 0.34);
+    inpath(g, parts, (h) => {
+      h.globalAlpha = 0.72; h.translate(0, 0); h.fillStyle = o.c;
+      gemPath(h, o.s, r * 0.58); h.fill();
+      h.globalAlpha = 1;
+      h.strokeStyle = 'rgba(255,255,255,.6)'; h.lineWidth = Math.max(1.4, r * 0.12); h.lineCap = 'round';
+      h.beginPath(); h.moveTo(-r * 0.6, -r * 0.2); h.lineTo(-r * 0.1, -r * 0.7); h.stroke();
+      h.beginPath(); h.moveTo(r * 0.2, r * 0.55); h.lineTo(r * 0.62, r * 0.1); h.stroke();
+    });
+    spec(g, -r * 0.4, -r * 0.5, r * 0.2, r * 0.12, -0.5, 0.6);
+  });
+}
 function buildSprites() {
   spr.length = 0;
   for (let i = 0; i < GEM.length; i++) spr.push(gemSprite(i));
-  spr.rain = rainbowSprite(); spr.bomb = bombSprite();
+  spr.rain = rainbowSprite(); spr.bomb = bombSprite(); spr.ray = raySprite();
   spr.rock = rockSprite(false); spr.rockH = rockSprite(true); spr.cry = crystalSprite();
+  spr.ice = []; for (let i = 0; i < GEM.length; i++) spr.ice.push(iceSprite(i));
 }
 function renderBg() {
   return off(k.W, k.H, (g) => {
@@ -284,21 +364,50 @@ function renderBg() {
 const colorsNow = () => HAND ? LV.cols : k.clamp(Math.min(GEM.length, level < 4 ? 4 : level < 7 ? 5 : 6) + (k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0), 3, GEM.length);
 const free = (x, y) => x >= 0 && x < COLS && y < ROWS && (y < 0 || !F[y][x]);
 const limNow = () => !HAND || !LV.lim ? 0 : Math.max(8, Math.round(LV.lim * (k.dif === 0 ? 1.35 : k.dif === 2 ? 0.9 : 1)));
+/* ★★/★★★: en los niveles de aguante se mide «joyas limpiadas» (más es mejor) y en el resto
+   «columnas soltadas» (menos es mejor). Los dos márgenes se escalan con la dificultad igual que
+   el límite, así exigir lo mismo cuesta lo mismo en fácil y en difícil. */
+const upPar = () => !!(LV && LV.go && LV.go.surv != null);
+function parNow() {
+  const p = LV.par || [LV.lim || 30, Math.round((LV.lim || 30) * 0.8)];
+  const f = upPar() ? (k.dif === 0 ? 0.8 : k.dif === 2 ? 1.12 : 1) : (k.dif === 0 ? 1.35 : k.dif === 2 ? 0.9 : 1);
+  return [Math.max(1, Math.round(p[0] * f)), Math.max(1, Math.round(p[1] * f))];
+}
+const mastNow = () => Math.max(1, (LV.mast || 1) + (k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0));
+const timeNow = () => !LV.time ? 0 : Math.round(LV.time * (k.dif === 0 ? 1.3 : k.dif === 2 ? 0.85 : 1));
+const riseNow = () => !LV.rise ? 0 : Math.max(4, LV.rise + (k.dif === 0 ? 3 : k.dif === 2 ? -1 : 0));
+/* Salvavidas: desde el nivel 11 el pozo lleno no acaba la partida la primera vez — se vacían
+   las dos filas de abajo y se sigue, pero se pierde la tercera estrella (§7 de VARA). */
+const lifeStart = () => (k.lv >= 11 ? 1 : 0) + (k.dif === 0 ? 1 : 0);
 function newPiece() {
   const nc = colorsNow(), g = [];
   for (let i = 0; i < 3; i++) g.push(k.ri(0, nc - 1));
   if (HAND) {
     const pr = (LV.rain || 0) + (k.dif === 0 ? 0.05 : k.dif === 2 ? -0.02 : 0), pb = (LV.bomb || 0) + (k.dif === 0 ? 0.04 : 0);
+    const py = (LV.ray || 0) + (k.dif === 0 ? 0.03 : 0);
     const r = Math.random();
     if (pr > 0 && r < pr) g[k.ri(0, 2)] = -1;
     else if (pb > 0 && r < pr + pb) g[k.ri(0, 2)] = -2;
+    else if (py > 0 && r < pr + pb + py) g[k.ri(0, 2)] = -5;
   } else if (level >= 3 && Math.random() < 0.06) g[k.ri(0, 2)] = -1;   /* comodín ocasional del modo libre */
   return g;
 }
 function spawn() {
   piece = { x: Math.floor(COLS / 2), y: 0, g: next || newPiece(), off: 0 };
   next = newPiece(); fall = 0; hard = false;
-  if (!free(piece.x, 0)) { over = 0.001; k.sfx('hurt'); k.shake(8); }
+  if (!free(piece.x, 0)) fill();
+}
+/* Pozo lleno: salvavidas si queda, si no fin de nivel. */
+function fill() {
+  if (HAND && life > 0) {
+    life--; lifeUsed = 1; rescueT = 1.2;
+    for (let y = ROWS - 2; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (F[y][x] && !F[y][x].cr) { k.burst(cx(x), cy(y), '#ffd166', 7, 120); F[y][x] = null; }
+    gravity(F, CS);
+    msg = '¡Salvavidas!'; msgT = 1.6; k.sfx('win'); k.flash('rgba(255,209,102,.22)'); k.shake(6); k.punch(0.05);
+    if (piece) piece.y = 0;
+    return;
+  }
+  over = 0.001; k.sfx('hurt'); k.shake(8);
 }
 function startLevel() {
   LV = HAND[Math.max(0, Math.min(HAND.length - 1, (k.lv || 1) - 1))];
@@ -306,6 +415,9 @@ function startLevel() {
   F = mkF(LV.pre); gravity(F, CS);
   score = 0; cleared = 0; chain = 0; phase = 'fall'; phT = 0; t = 0; over = 0; msg = ''; msgT = 0; next = null;
   drops = 0; done = false; nGems = 0; nCol = 0; nChain = 0; nRock = 0; nCry = 0; lost = ''; bannerT = 2.6;
+  multV = 1; multT = 0;
+  nIce = 0; nDeep = 0; nBig = 0; lifeUsed = 0; life = lifeStart(); tLeft = timeNow(); riseIn = riseNow(); stars = 1; deepMax = 0; rescueT = 0;
+  k.chainReset();
   spawn();
 }
 function reset() {
@@ -327,7 +439,7 @@ function rotate() { if (phase !== 'fall' || over || done) return; piece.g = [pie
 function lock() {
   const y = Math.floor(piece.y);
   for (let i = 0; i < 3; i++) { const ry = y - i; if (ry < 0) { over = 0.001; k.sfx('hurt'); k.shake(8); return; } F[ry][piece.x] = { c: piece.g[i], pop: 0, off: 0 }; }
-  k.sfx('hit'); drops++;
+  k.sfx('hit'); drops++; if (HAND && LV.rise) riseIn--;
   /* piezas especiales: arcoíris limpia un color entero, bomba revienta su entorno */
   for (let i = 0; i < 3; i++) {
     const ry = y - i, g = F[ry] && F[ry][piece.x]; if (!g) continue;
@@ -340,7 +452,10 @@ function lock() {
       g.mark = 1;
       if (wild(F, col)) { msg = '¡Arcoíris!'; msgT = 1.3; k.sfx('win'); k.flash('rgba(255,255,255,.18)'); }
     } else if (g.c === -2) {
-      blast(F, piece.x, ry); msg = '¡Bomba!'; msgT = 1.2; k.sfx('explode'); k.shake(5);
+      blast(F, piece.x, ry); msg = '¡Bomba!'; msgT = 1.2; k.sfx('explode'); k.shake(5); k.hitstop(0.05); k.punch(0.05);
+    } else if (g.c === -5) {
+      g.mark = 1; ray(F, piece.x, ry); msg = '¡Rayo!'; msgT = 1.3; k.sfx('explode'); k.shake(6); k.hitstop(0.06); k.punch(0.06);
+      k.reward('¡RAYO!', '#7cf7ff'); k.flash('rgba(124,247,255,.2)');
     }
   }
   chain = 0; phase = 'check'; phT = 0;
@@ -357,10 +472,20 @@ function resolveMarks() {
   chain++;
   const pts = (gems * 10 + rocks * 25) * chain * (1 + Math.floor(level / 4));
   score += pts; cleared += gems; nGems += gems; nRock += rocks; nCol += colHit;
-  if (chain >= 2 && chain === 2) nChain++;
-  k.float('+' + pts + (chain > 1 ? '  x' + chain : ''), sx / cells.length, sy / cells.length - 14, chain > 1 ? '#a8cf3f' : '#fff');
+  if (chain === 2) nChain++;
+  if (chain === 3) nDeep++;
+  if (gems >= 5) nBig++;
+  if (chain > deepMax) deepMax = chain;
+  multV = chain; multT = 2.2;
+  const mx = sx / cells.length, my = sy / cells.length;
+  k.float('+' + pts, mx, my - 14, chain > 1 ? '#a8cf3f' : '#fff');
   k.sfx(chain > 1 ? 'coin' : 'pop');
-  if (chain > 1) { msg = 'Cadena x' + chain; msgT = 1.3; k.shake(2); }
+  /* Gancho (§B7 de docs/GANCHO.md): la nota sube con la cadena y el golpe crece con ella. */
+  k.chime(chain - 1);
+  if (chain > 1) { msg = 'Cadena x' + chain; msgT = 1.3; k.shake(2); k.combo(chain, mx, my - 40); k.hitstop(0.035 + Math.min(0.05, chain * 0.01)); }
+  if (chain >= 3) { k.punch(0.04 + Math.min(0.06, chain * 0.012)); k.shake(3 + chain); }
+  if (chain >= 4) { k.reward('¡CADENA x' + chain + '!', '#ffd166'); k.flash('rgba(255,220,120,.2)'); }
+  else if (gems >= 7) { k.reward('¡RACIMO x' + gems + '!', '#7cf7a0'); k.hitstop(0.04); }
   if (!HAND) {
     const lv = Math.min(12, 1 + Math.floor(cleared / 22));
     if (lv > level) { level = lv; msg = 'Nivel ' + level; msgT = 1.6; k.sfx('win'); k.flash('rgba(255,255,255,.2)'); }
@@ -375,7 +500,8 @@ function collectCrystals() {
     k.burst(cx(x), cy(ROWS - 1), '#7cf7e0', 18, 160); k.float('¡Cristal!', cx(x), cy(ROWS - 1) - 18, '#7cf7e0');
     F[ROWS - 1][x] = null; nCry++; score += 120;
   }
-  k.sfx('coin'); k.flash('rgba(124,247,224,.18)');
+  k.sfx('coin'); k.flash('rgba(124,247,224,.18)'); k.hitstop(0.05); k.punch(0.05);
+  k.reward(xs.length > 1 ? '¡' + xs.length + ' CRISTALES!' : '¡CRISTAL!', '#7cf7e0');
   return xs.length;
 }
 /* ---------- objetivo ---------- */
@@ -386,6 +512,8 @@ function goalLeft() {
   if (g.combo != null) o.push(['Cadenas', Math.min(nChain, g.combo), g.combo]);
   if (g.cry != null) o.push(['Cristales', Math.min(nCry, g.cry), g.cry]);
   if (g.rock != null) o.push(['Piedras', Math.min(nRock, g.rock), g.rock]);
+  if (g.ice != null) o.push(['Hielo', Math.min(nIce, g.ice), g.ice]);
+  if (g.big != null) o.push(['Racimos', Math.min(nBig, g.big), g.big]);
   if (g.surv != null) o.push(['Columnas', Math.min(drops, g.surv), g.surv]);
   return o;
 }
@@ -396,13 +524,45 @@ function goalMet() {
   if (g.combo != null && nChain < g.combo) return false;
   if (g.cry != null && nCry < g.cry) return false;
   if (g.rock != null && nRock < g.rock) return false;
+  if (g.ice != null && nIce < g.ice) return false;
+  if (g.big != null && nBig < g.big) return false;
   if (g.surv != null && drops < g.surv) return false;
   return true;
 }
+/* Progreso del objetivo en una sola cifra 0..1 (barra del marcador, §A1 de GANCHO.md). */
+function goalFrac() {
+  const o = goalLeft(); if (!o.length) return 0;
+  let a = 0, b = 0; for (let i = 0; i < o.length; i++) { a += o[i][1]; b += o[i][2]; }
+  return b ? a / b : 0;
+}
+/* Qué falta cuando se pierde (§A4 «casi-victoria»). */
+function missText() {
+  const o = goalLeft(), q = [];
+  for (let i = 0; i < o.length; i++) if (o[i][1] < o[i][2]) q.push(`${o[i][2] - o[i][1]} de ${o[i][0].toLowerCase()}`);
+  return q.length ? 'Te faltaba ' + q.join(' y ') : 'Ya lo tenías';
+}
+/* ★ superar · ★★ el margen del nivel · ★★★ el margen bordado + maestría (cadenas y sin salvavidas). */
+function starsNow() {
+  const p = parNow(), up = upPar(), v = up ? nGems : drops;
+  let st = 1;
+  if (up ? v >= p[0] : v <= p[0]) st = 2;
+  if ((up ? v >= p[1] : v <= p[1]) && nChain >= mastNow() && !lifeUsed) st = 3;
+  return st;
+}
+function starHint() {
+  const p = parNow(), up = upPar(), v = up ? nGems : drops, st = starsNow();
+  if (st >= 3) return '¡Bordado!';
+  if (st === 2) return lifeUsed ? '★★★ sin salvavidas' : nChain < mastNow() ? `★★★ con ${mastNow() - nChain} cadena${mastNow() - nChain === 1 ? '' : 's'} más` : up ? `★★★ con ${p[1]} joyas` : `★★★ en ${p[1]} columnas`;
+  return up ? `★★ con ${p[0]} joyas` : `★★ en ${p[0]} columnas`;
+}
 function doneLevel() {
   if (done) return;
-  done = true; k.best(ID, score);
-  k.levelDone(score, `Nivel ${level}/${HAND.length} · ${score} puntos · ${nGems} joyas`);
+  done = true; stars = starsNow(); k.best(ID, score);
+  const p = parNow(), up = upPar();
+  const line = up ? `${nGems} joyas` : `${drops} columnas`;
+  const falta = stars < 3 ? ` · ${starHint()}` : '';
+  k.reward('¡OBJETIVO!', '#7cf7a0');
+  k.levelDone(score, `${line} · ${score} puntos · cadena más larga x${Math.max(1, deepMax)}${falta}`, { stars });
 }
 function checkGoal() {
   if (!HAND || done || over) return;
@@ -412,14 +572,20 @@ function checkGoal() {
 }
 
 function update(dt) {
-  t += dt; msgT = Math.max(0, msgT - dt); bannerT = Math.max(0, bannerT - dt);
-  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) { const g = F && F[y][x]; if (!g) continue; g.off = Math.max(0, (g.off || 0) - dt * 900); if (g.mark) g.pop += dt; if (g.fx) g.fx = Math.max(0, g.fx - dt * 2.4); }
+  t += dt; msgT = Math.max(0, msgT - dt); bannerT = Math.max(0, bannerT - dt); rescueT = Math.max(0, rescueT - dt); multT = Math.max(0, multT - dt);
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) { const g = F && F[y][x]; if (!g) continue; const o0 = g.off || 0; g.off = o0 > 0 ? Math.max(0, o0 - dt * 900) : Math.min(0, o0 + dt * 900); if (g.mark) g.pop += dt; if (g.fx) g.fx = Math.max(0, g.fx - dt * 2.4); }
   if (!k.gate(reset)) return;
   if (done) return;
   if (over) {
     over += dt;
-    if (over > 1.2) k.lose(ID, score, lost || 'El pozo se llenó', HAND ? `Nivel ${level}/${HAND.length} · ${nGems} joyas` : `Nivel ${level} · ${cleared} gemas`);
+    if (over > 1.2) k.lose(ID, score, lost || 'El pozo se llenó', HAND ? `${missText()} · nivel ${level}/${HAND.length}` : `Nivel ${level} · ${cleared} gemas`);
     return;
+  }
+  /* Cuenta atrás de los niveles con reloj (presión real, §3 de VARA). */
+  if (HAND && LV.time) {
+    tLeft -= dt;
+    if (tLeft <= 0) { tLeft = 0; lost = 'Se acabó el tiempo'; over = 0.001; k.sfx('lose'); k.shake(8); return; }
+    if (tLeft < 10 && Math.floor(tLeft + dt) !== Math.floor(tLeft)) k.sfx('hurt');
   }
   if (phase === 'fall') {
     if (k.hit.has('left')) move(-1);
@@ -443,9 +609,25 @@ function update(dt) {
   } else if (phase === 'check') {
     let any = anyMark(F);
     if (findMatches(F)) any = true;
-    if (any) { hitRocks(F); phase = 'flash'; phT = 0; }
+    if (any) { const h = hitRocks(F); if (h.ice) { nIce += h.ice; k.sfx('pop'); } phase = 'flash'; phT = 0; }
     else if (collectCrystals()) { phase = 'gravity'; phT = 0; gravity(F, CS); }
-    else { checkGoal(); if (!done && !over) { phase = 'fall'; spawn(); } }
+    else {
+      if (!chain) k.chainReset();
+      checkGoal();
+      if (!done && !over) {
+        /* el suelo sube cada `rise` columnas: se avisa una columna antes (§2, nada castiga sin telegrafiar) */
+        if (HAND && LV.rise) {
+          if (riseIn <= 0) {
+            riseIn = riseNow();
+            if (riseRow(F, LV.cols, Math.random, CS)) { lost = 'El pozo se desbordó'; over = 0.001; k.sfx('hurt'); k.shake(9); return; }
+            msg = '¡Sube el suelo!'; msgT = 1.4; k.sfx('hit'); k.shake(5);
+            phase = 'check'; phT = 0; return;
+          }
+          if (riseIn === 1) { msg = 'Sube el suelo…'; msgT = 1.1; }
+        }
+        phase = 'fall'; spawn();
+      }
+    }
   } else if (phase === 'flash') {
     phT += dt; if (phT > 0.28) { resolveMarks(); phase = 'gravity'; phT = 0; gravity(F, CS); }
   } else if (phase === 'gravity') {
@@ -454,7 +636,7 @@ function update(dt) {
 }
 
 /* ---------- pintado ---------- */
-function sprOf(g) { return g.rock ? (g.hp > 1 ? spr.rockH : spr.rock) : g.cr ? spr.cry : g.c === -1 ? spr.rain : g.c === -2 ? spr.bomb : spr[g.c]; }
+function sprOf(g) { return g.rock ? (g.hp > 1 ? spr.rockH : spr.rock) : g.cr ? spr.cry : g.ice ? spr.ice[g.c] : g.c === -1 ? spr.rain : g.c === -2 ? spr.bomb : g.c === -5 ? spr.ray : spr[g.c]; }
 function drawCell(x, y, g, s, alphaV) {
   const cv = sprOf(g), S = (CS + 6) * (s || 1);
   if (alphaV != null) c.globalAlpha = alphaV;
@@ -462,24 +644,34 @@ function drawCell(x, y, g, s, alphaV) {
   c.globalAlpha = 1;
 }
 function drawPieceGem(x, y, col, s) {
-  const cv = col === -1 ? spr.rain : col === -2 ? spr.bomb : spr[col], S = (CS + 6) * (s || 1);
+  const cv = col === -1 ? spr.rain : col === -2 ? spr.bomb : col === -5 ? spr.ray : spr[col], S = (CS + 6) * (s || 1);
   c.drawImage(cv, x - S / 2, y - S / 2, S, S);
 }
 function hud() {
   const L = k.ex(12), R = k.ex2(12), narrow = k.W < 400;
   if (HAND) {
-    const t1 = `Nivel ${level}/${HAND.length}`;
-    label(t1, L, k.ey(8), narrow ? 17 : 20, '#fff');
-    const nm = fitSize(LV.name, narrow ? 12 : 14, k.W * 0.42);
-    label(LV.name, L, k.ey(narrow ? 28 : 32), nm, '#cfc8ff');
-    label(String(score), R, k.ey(8), narrow ? 17 : 20, '#ffc94d', 'right');
+    label(`Nivel ${level}/${HAND.length}`, L, k.ey(2), narrow ? 16 : 19, '#fff');
+    const nm = fitSize(LV.name, narrow ? 12 : 13, k.W * 0.4);
+    label(LV.name, L, k.ey(narrow ? 22 : 25), nm, '#cfc8ff');
+    label(String(score), R, k.ey(2), narrow ? 16 : 19, '#ffc94d', 'right');
     const lim = limNow();
     const sub = lim ? `Columnas ${Math.max(0, lim - drops)}` : `${drops} columnas`;
-    label(sub, R, k.ey(narrow ? 28 : 32), narrow ? 12 : 13, lim && lim - drops <= 5 ? '#ff8a8a' : 'rgba(255,255,255,.7)', 'right');
-    /* objetivo: en la franja baja (el centro de arriba lo usa el botón de pausa del reproductor) */
-    const parts = goalLeft().map((o) => `${o[0]} ${o[1]}/${o[2]}`);
-    const gt = parts.join('  ·  ');
+    label(sub, R, k.ey(narrow ? 22 : 25), narrow ? 11 : 12, lim && lim - drops <= 5 ? '#ff8a8a' : 'rgba(255,255,255,.7)', 'right');
     if (!sidePanel) {
+      /* fila 3: barra de objetivo a la izquierda y las tres estrellas a la derecha.
+         El centro de arriba se deja libre: ahí pone el reproductor su botón de pausa. */
+      const bw = Math.min(124, k.W * 0.34);
+      bar(L, k.ey(42), bw, 10, goalFrac(), '#a8cf3f');
+      starRow(R - 2 - 2 * 7 * 2.4, k.ey(47), starsNow(), 7);
+      /* fila 4: lo que falta para la estrella siguiente y el reloj / salvavidas */
+      label(starHint(), L, k.ey(58), narrow ? 11 : 12, 'rgba(255,255,255,.66)');
+      const rr = [];
+      if (LV.time) rr.push(`${Math.ceil(tLeft)} s`);
+      if (life > 0) rr.push('Salvavidas ' + life);
+      if (rr.length) label(rr.join(' · '), R, k.ey(58), narrow ? 12 : 13, LV.time && tLeft < 12 ? '#ff8a8a' : '#ffd166', 'right');
+      if (mult() > 1) label('Cadena x' + mult(), L + bw + 8, k.ey(40), narrow ? 12 : 13, mult() >= 4 ? '#ff5fa2' : '#ffd166');
+      /* objetivo en la franja baja */
+      const gt = goalLeft().map((o) => `${o[0]} ${o[1]}/${o[2]}`).join('  ·  ');
       const gs = fitSize(gt, narrow ? 13 : 15, k.W - 24);
       label(gt, k.W / 2, Math.min(k.ey2(52), Y0 + ROWS * CS + 16), gs, '#a8cf3f', 'center');
     }
@@ -499,6 +691,14 @@ function nextBox() {
     const rows = goalLeft();
     label('Objetivo', px, POY, 13, 'rgba(255,255,255,.75)', 'center');
     for (let i = 0; i < rows.length; i++) label(`${rows[i][0]} ${rows[i][1]}/${rows[i][2]}`, px, POY + 22 + i * 19, 13, '#a8cf3f', 'center');
+    const by = POY + 22 + rows.length * 19 + 6;
+    bar(PX + 14, by, PW - 28, 11, goalFrac(), '#a8cf3f');
+    starRow(px - 9 * 2.4, by + 26, starsNow(), 9);
+    const hs = fitSize(starHint(), 11, PW - 16);
+    label(starHint(), px, by + 40, hs, 'rgba(255,255,255,.7)', 'center');
+    if (LV.time) label(`${Math.ceil(tLeft)} s`, px, by + 56, 15, tLeft < 12 ? '#ff8a8a' : '#ffd166', 'center');
+    else if (life > 0) label('Salvavidas ' + life, px, by + 56, 12, '#ffd166', 'center');
+    if (mult() > 1) label('Cadena x' + mult(), px, by + 74, 14, mult() >= 4 ? '#ff5fa2' : '#ffd166', 'center');
   } else if (HAND) {
     /* abajo a la DERECHA: abajo a la izquierda están los botones de pausa y sonido de kit */
     const by = k.ey2(26), gw = Math.min(28, CS * 0.68), xr = k.ex2(10);
@@ -557,7 +757,15 @@ k.onDif = () => { if (k.st !== 'play') reset(); };
    lo consuma y no reinicie encima de la tarjeta de nivel superado. */
 if (HAND) k.levels(HAND.length, { start: () => { startLevel(); if (k.st === 'play') k.st = 'over'; } });
 reset();
-window.__co = { get F() { return F; }, get piece() { return piece; }, get score() { return score; }, get level() { return level; }, get phase() { return phase; }, get LV() { return LV; }, get drops() { return drops; }, get nGems() { return nGems; }, get nCol() { return nCol; }, get nChain() { return nChain; }, get nRock() { return nRock; }, get nCry() { return nCry; } };
+window.__co = {
+  get F() { return F; }, get piece() { return piece; }, get score() { return score; }, get level() { return level; },
+  get phase() { return phase; }, get LV() { return LV; }, get drops() { return drops; }, get nGems() { return nGems; },
+  get nCol() { return nCol; }, get nChain() { return nChain; }, get nRock() { return nRock; }, get nCry() { return nCry; },
+  get nIce() { return nIce; }, get nDeep() { return nDeep; }, get nBig() { return nBig; }, get done() { return done; }, get over() { return over; },
+  get stars() { return stars; }, get par() { return parNow(); }, get mast() { return mastNow(); }, get lim() { return limNow(); },
+  get tLeft() { return tLeft; }, get life() { return life; }, get next() { return next; }, get goal() { return goalLeft(); },
+  move: move, rotate: rotate, drop: () => { hard = true; },
+};
 k.show(CFG.title || 'Columnas de Joyas', HAND
   ? '20 pozos dibujados a mano. Cada uno pide algo distinto: limpiar un color, bajar los cristales al suelo, romper piedras, encadenar combos o aguantar el chaparrón.'
   : 'Cae una columna de tres gemas. Muévela a los lados, tócala para rotar los colores y deslízala hacia abajo para soltarla. Tres iguales en línea (también en diagonal) desaparecen y lo de arriba cae: así se encadenan combos.<br>Toca para jugar');
