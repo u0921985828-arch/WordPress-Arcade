@@ -276,7 +276,8 @@ function eightGame() {
     for (let i = sinking.length - 1; i >= 0; i--) { const s = sinking[i]; s.t += dt * 4; s.x += (s.px - s.x) * Math.min(1, dt * 14); s.y += (s.py - s.y) * Math.min(1, dt * 14); if (s.t >= 1) sinking.splice(i, 1); }
     if (!k.gate(reset)) return;
     if (endT > 0) { endT -= dt; physics(dt); if (endT <= 0) finish(); return; }
-    if (bannerT > 0) { bannerT -= dt; if (bannerT > 0) return; }
+    /* 1.47: el cartel de turno se pasa con un toque o A */
+    if (bannerT > 0) { if (k.skip() && bannerT > 0.3) bannerT = 0.3; bannerT -= dt; if (bannerT > 0) return; }
     const cue = cueB();
     if (phase === 'roll') {
       if (strike) { strike.t += dt; if (strike.t >= 0.12) { cue.vx = Math.cos(strike.a) * strike.p * 1500; cue.vy = Math.sin(strike.a) * strike.p * 1500; k.sfx(strike.p > 0.7 ? 'shoot' : 'hit'); if (strike.p > 0.8) k.shake(3); strike = null; } return; }

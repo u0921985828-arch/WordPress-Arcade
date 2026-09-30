@@ -154,7 +154,7 @@ function update(dt) {
   }
   // tu pala: arrastrar (sigue al dedo) o teclas
   const P = pad.p, oy = P.y;
-  if (k.ptr.down) { const [, fy] = F(k.ptr.x, k.ptr.y); P.y += (fy - P.y) * Math.min(1, dt * 22); }
+  if (k.ptr.down) { const [, fy] = F(k.ptr.x, k.ptr.y); P.y += (fy - P.y) * Math.min(1, dt * 34); }
   const kd = (k.held.has('down') || (PORT && k.held.has('right')) ? 1 : 0) - (k.held.has('up') || (PORT && k.held.has('left')) ? 1 : 0);
   P.y += kd * 440 * dt;
   // IA

@@ -674,7 +674,7 @@ function updPlayers(dt) {
     if (FUEGO) blockWalls(p);
     if (L > 0.08) { p.fx = dx; p.fy = dy; p.walk += dt * 9 * (base / 158); }
     /* separación entre compañeros */
-    for (const o of ps) if (o !== p && !o.down) { const ax = p.x - o.x, ay = p.y - o.y, d = hyp(ax, ay); if (d < 26 && d > 0.01) { p.x += (ax / d) * (26 - d) * 0.5; p.y += (ay / d) * (26 - d) * 0.5; } }
+    for (const o of ps) if (o !== p && !o.down) { const ax = p.x - o.x, ay = p.y - o.y, d = hyp(ax, ay); if (d < 26 && d > 0.01) { const sf = Math.min(1, dt * 30); p.x += (ax / d) * (26 - d) * sf; p.y += (ay / d) * (26 - d) * sf; } }
     if (FUEGO) updFireman(p, dt);
     else autoFire(p, dt);
   }

@@ -108,7 +108,7 @@ k.run((dt) => {
   if (!k.gate(reset)) return;
   banner -= dt;
   const pw = wide > 0 ? 100 : 64; wide -= dt; pwD += (pw - pwD) * Math.min(1, dt * 10);
-  if (k.ptr.down) pad += (k.ptr.x - pad) * Math.min(1, dt * 20);
+  if (k.ptr.down) pad += (k.ptr.x - pad) * Math.min(1, dt * 34);
   if (k.held.has('left')) pad -= 420 * dt; if (k.held.has('right')) pad += 420 * dt;
   pad = k.clamp(pad, WL + pw / 2, WR - pw / 2);
   for (const br of bricks) br.fl = Math.max(0, br.fl - dt);

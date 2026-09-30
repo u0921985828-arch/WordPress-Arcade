@@ -1342,7 +1342,7 @@ if (typeof window !== 'undefined' && window.Kit && window.CFG) (() => {
       if (wait) { if (!list.some((q) => q[2] !== id && q[3] && q[1].z > tg.z)) { /* en el mazo */ } }
       const up = a.f > 0 ? a.up : a.up, sx = a.f > 0 ? Math.max(0.04, Math.abs(Math.cos((1 - a.f) * Math.PI))) : 1;
       const isF = fh && fh.id === id, isH = hv && hv.id === id && hv.v;
-      const lift = tg.hand && (isF || isH) ? -12 : 0; a.lift += (lift - a.lift) * 0.3;
+      const lift = tg.hand && (isF || isH) ? -12 : 0; a.lift += (lift - a.lift) * (1 - Math.pow(0.7, k.dt * 60));
       card(id, a.x, a.y + a.lift, a.w, a.r, up, { sx, dim: tg.dim || tg.loose, hl: isF ? '#ffd166' : tg.fresh ? '#7cf7a0' : tg.meld >= 0 && tg.hand ? null : null, tag: tg.tag, tagc: '#ff5a5f' });
       if (tg.hand && tg.meld >= 0 && !(a.f > 0)) { c.fillStyle = ['#7cf7a0', '#ffd166', '#5ce1e6', '#ff9ad5'][tg.meld % 4]; ART.rr(c, a.x - a.w / 2 + 6, a.y + a.lift + CH / 2 + 3, a.w - 12, 5, 2.5); c.fill(); }
     }

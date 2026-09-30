@@ -80,7 +80,7 @@ function land() { const { x, y } = fly; fly = null; const [pts, lbl, dbl] = scor
   if (turn.length >= 3) turnT = 1; }
 k.run((dt) => {
   t += dt; msgT -= dt; for (const d of thrown) d.s = Math.min(1, d.s + dt * 8); if (!k.gate(reset)) return;
-  if (turnT > 0) { turnT -= dt; if (turnT < 0.4) for (const d of thrown) d.a = Math.max(0, turnT / 0.4); if (turnT <= 0) { total3.push(turnStart - left); turn = []; turnStart = left; thrown = []; } }
+  if (turnT > 0) { /* 1.47: el fin de turno se pasa con un toque o A */ if (k.skip() && turnT > 0.4) turnT = 0.4; turnT -= dt; if (turnT < 0.4) for (const d of thrown) d.a = Math.max(0, turnT / 0.4); if (turnT <= 0) { total3.push(turnStart - left); turn = []; turnStart = left; thrown = []; } }
   if (fly) { fly.t += dt * 5; if (fly.t >= 1) land(); }
   const aDown = k.held.has('a'); if (k.held.has('left')) { aim.bx -= 120 * dt; kb = true; } if (k.held.has('right')) { aim.bx += 120 * dt; kb = true; } if (k.held.has('up')) { aim.by -= 120 * dt; kb = true; } if (k.held.has('down')) { aim.by += 120 * dt; kb = true; }
   hold = k.ptr.down || aDown; holdT = hold ? holdT + dt : 0;
@@ -245,7 +245,7 @@ function cricketGame() {
     if (!k.gate(reset)) return;
     if (endT > 0) { endT -= dt; if (endT <= 0) finish(); return; }
     if (bannerT > 0) { bannerT -= dt; if (seats[cur].cpu && bannerT <= 0) cpuStart(); return; }
-    if (turnT > 0) { turnT -= dt; if (turnT < 0.4) for (const d of thrown) d.a = Math.max(0, turnT / 0.4); if (turnT <= 0) nextTurn(); return; }
+    if (turnT > 0) { /* 1.47: el fin de turno se pasa con un toque o A */ if (k.skip() && turnT > 0.4) turnT = 0.4; turnT -= dt; if (turnT < 0.4) for (const d of thrown) d.a = Math.max(0, turnT / 0.4); if (turnT <= 0) nextTurn(); return; }
     if (fly) { fly.t += dt * 5; if (fly.t >= 1) land(); return; }
     const hu = !seats[cur].cpu, p = seats[cur].p, local = hu && !k.party && p === 0;
     let aDown = false;

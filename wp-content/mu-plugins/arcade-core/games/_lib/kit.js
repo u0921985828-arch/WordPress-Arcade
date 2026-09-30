@@ -629,6 +629,12 @@ void main(){
     k.confetti = (col, n) => { const cols = col ? [col, col, '#fff', col, '#ffd166'] : ['#f2d15c', '#ff5fa2', '#5ce1e6', '#7cf7a0', '#b98cff']; for (let i = 0; i < (n || 70) && parts.length < 600; i++) { const q = part(); q.x = Math.random() * w; q.y = -10 - Math.random() * 40; q.vx = (Math.random() - 0.5) * 80; q.vy = 80 + Math.random() * 160; q.life = 1.6 + Math.random(); q.max = 2.6; q.col = cols[i % 5]; q.r = 2 + Math.random() * 3; q.conf = true; parts.push(q); } };
     /* ---------- Gancho (docs/GANCHO.md) ----------------------------------------------
        Reacciones cortas y baratas que cualquier motor puede pedir sin reimplementarlas. */
+    /* 1.47: dt del último fotograma, para el suavizado que se hace al dibujar (cámaras, cartas que
+       se levantan…). Sin esto esos suavizados van por fotograma y en una tele a 25 fps arrastran. */
+    k.dt = 1 / 60;
+    /* 1.47: «pasar» un descanso (celebración de gol, bola asentándose, fin de turno). Es un toque o A,
+       de cualquier mando en el modo tele. Los juegos lo usan solo en los tramos sin control. */
+    k.skip = () => k.ptr.hit || k.hit.has('a') || PADS.some((q) => q && q.hit.has('a'));
     k.hitstop = (sec) => { hsT = Math.min(0.14, Math.max(hsT, sec || 0.05)); };
     k.punch = (a) => { punchA = Math.max(punchA, Math.min(0.22, a || 0.05)); };
     k.reward = (txt, col) => { rwd = { txt: String(txt), col: col || '#ffd166', t: 0.95 }; };
@@ -912,6 +918,7 @@ void main(){
         const dtr = Math.min(0.05, (t - last) / 1000); qStep((t - last) || 16.7); last = t;
         /* Hit-stop: la acción se congela unas centésimas al impactar (el dibujo y los efectos siguen). */
         let dt = dtr; if (hsT > 0 && !k.paused) { hsT -= dtr; dt = 0; }
+        k.dt = dtr;
         poll();
         if (k.paused) { if (k.ptr.hit || k.hit.has('a') || k.hit.has('pause') || PADS.some((q) => q && q.hit.has('a'))) { setPause(false); if (k.ptr.down) k._skipUp = true; } }
         else { if (k.hit.has('pause') && k.st === 'play') setPause(true); else { stWatch(); update(dt); stWatch(); } }

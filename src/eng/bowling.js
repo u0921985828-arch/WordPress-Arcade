@@ -71,7 +71,8 @@ k.run((dt) => {
   for (const p of pins) { if (p.down && !p.fs && Math.hypot(p.vx, p.vy) > 5) { p.fs = 1; if (Math.abs(p.vx) > 3) p.fd = Math.sign(p.vx); } if (p.down) p.tilt = Math.min(1, p.tilt + dt * 4.5); p.wob = Math.max(0, p.wob - dt * 1.5); }
   // cámara: sigue a la bola hacia los bolos
   const tc = state === 'roll' && ball.rolling ? k.clamp(ball.y - 340, 0, 1080) : state === 'settle' || state === 'sweep' ? cam : 0; cam += (tc - cam) * Math.min(1, dt * 4);
-  if (state === 'settle') { ball.wait -= dt; if (ball.wait <= 0) evaluate(); }
+  /* 1.47: el descanso se puede pasar con un toque o A, dejando 0,3 s para que remate la jugada. */ 
+  if (state === 'settle') { if (k.skip() && ball.wait > 0.3) ball.wait = 0.3; ball.wait -= dt; if (ball.wait <= 0) evaluate(); }
   if (state === 'sweep') { sweepT -= dt; for (const p of pins) if (p.down || p.gone) p.a = Math.max(0, p.a - dt * 3); if (sweepT <= 0) next(); }
 }, draw);
 function knock(p, v) { p.down = true; if (v > 20) { k.sfx(v > 400 ? 'explode' : 'hit'); } }

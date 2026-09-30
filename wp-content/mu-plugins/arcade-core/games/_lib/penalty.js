@@ -299,6 +299,7 @@ if (!VS) k.run((dt) => {
   if (state === 'fly' || state === 'after') { keeper.delay -= dt; if (keeper.delay <= 0 && keeper.dive < 1) { keeper.dive = Math.min(1, keeper.dive + dt * 3.4); keeper.x += (keeper.tx - keeper.x) * Math.min(1, dt * 7); keeper.a += (keeper.ta - keeper.a) * Math.min(1, dt * 9); } }
   if (state === 'fly') { const r = flyStep(dt); if (r) result(r); }
   else if (state === 'after') { const b = ball; afterMove(dt);
+    /* 1.47: el descanso se puede pasar con un toque o A, dejando 0,3 s para que remate la jugada. */ if (k.skip() && b.wait > 0.3) b.wait = 0.3;
     b.wait -= dt; if (b.wait <= 0) { if (misses >= MISS) return k.lose(CFG.id, pts, 'Fin de la tanda', `${goals} goles de ${shots}`); setup(); } }
 }, () => {
   backdrop();
@@ -541,7 +542,7 @@ function vsMain() {
       if (readT >= 0 && state === 'fly') { readT -= dt; if (readT < 0) { let z = zoneOf(kp); if (!z.x && !z.y && tapZ) z = tapZ; kz = z; dive(z, 0.02); } }
       keeper.delay -= dt; if (keeper.delay <= 0 && keeper.dive < 1) { keeper.dive = Math.min(1, keeper.dive + dt * 3.4); keeper.x += (keeper.tx - keeper.x) * Math.min(1, dt * 7); keeper.a += (keeper.ta - keeper.a) * Math.min(1, dt * 9); } }
     if (state === 'fly') { const r = flyStep(dt); if (r) vsResult(r); }
-    else if (state === 'after') { afterMove(dt); ball.wait -= dt; if (ball.wait <= 0) { const w = decided(); if (w >= 0) finish(w); else nextKick(); } }
+    else if (state === 'after') { afterMove(dt); if (k.skip() && ball.wait > 0.3) ball.wait = 0.3; ball.wait -= dt; if (ball.wait <= 0) { const w = decided(); if (w >= 0) finish(w); else nextKick(); } }
   }, () => {
     backdrop();
     drawGoalBack(); if (state === 'after' && ball.res === 'goal') drawBall();

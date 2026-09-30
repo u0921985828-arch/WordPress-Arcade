@@ -1230,7 +1230,7 @@ function fusion() {
       b.age += dt;
       if (SOLAR) { const dx = CEN.x - b.x, dy = CEN.y - b.y, d = Math.hypot(dx, dy) || 1; b.vx += dx / d * GS * dt; b.vy += dy / d * GS * dt; }
       else b.vy += G0 * dt;
-      b.vx *= 0.999; b.vy *= 0.999;
+      const dg = Math.pow(0.999, dt * 60); b.vx *= dg; b.vy *= dg;
       b.x += b.vx * dt; b.y += b.vy * dt;
       clampIn(b);
     }

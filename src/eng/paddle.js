@@ -259,7 +259,7 @@ k.run((dt) => {
   const lvl = Math.max(0.15, 0.35 + CPU * 0.02 + Math.min(0.32, (sMe + sAi) * (HK ? 0.026 : 0.016)) - (sAi - sMe >= 2 ? 0.1 : 0) + DC * 0.09); // 1.23: más fácil (base 0,5→0,35, +0,04→+0,02 por victoria)
   me.px = me.x; me.py = me.y; ai.px = ai.x; ai.py = ai.y;
   const botHum = k.party ? HUM(0) : true;
-  if (k.ptr.down && (botHum || !k.party)) { const qx = LAND ? k.ptr.y : (k.ptr.x - OXT) / SCL, qy = LAND ? 640 - k.ptr.x : (k.ptr.y - TOP) / SCL; me.x += (qx - me.x) * Math.min(1, dt * 25); if (HK) me.y += (qy - me.y) * Math.min(1, dt * 25); }
+  if (k.ptr.down && (botHum || !k.party)) { const qx = LAND ? k.ptr.y : (k.ptr.x - OXT) / SCL, qy = LAND ? 640 - k.ptr.x : (k.ptr.y - TOP) / SCL; me.x += (qx - me.x) * Math.min(1, dt * 38); if (HK) me.y += (qy - me.y) * Math.min(1, dt * 38); }
   const held = (i) => { const p = SLOT[i]; if (!k.party) return i ? null : k.held; if (!HUM(i)) return null; const S = new Set(k.pad(p).held); if (p === 0) for (const x of k.held) S.add(x); return S; };
   const drive = (m, S) => { const q = keyset(S); if (q.l) m.x -= 400 * dt; if (q.r) m.x += 400 * dt; if (HK) { if (q.u) m.y -= 400 * dt; if (q.d) m.y += 400 * dt; } };
   /* IA (arriba: la de siempre; abajo: la misma reflejada, para quien se va del mando) */
@@ -276,6 +276,8 @@ k.run((dt) => {
   if (!HK && k.party && serveT > 0) { /* modo tele: quien saca pulsa A (o toca); saque automático a los 5 s */
     const si = server ? 0 : 1, hs = SLOT[si];
     if (HUM(si)) { serveWait += dt; if (k.pad(hs).hit.has('a') || (hs === 0 && k.hit.has('a')) || (server && k.ptr.hit)) serveT = 0.001; else if (serveT < 0.4 && serveWait < 5) serveHold = true; } }
+  /* 1.47: a solas también se puede sacar ya (toque o A), dejando 0,15 s para colocarse. */
+  if (!k.party && serveT > 0.15 && k.skip()) serveT = 0.15;
   if (serveT > 0) { if (!serveHold) serveT -= dt; if (!HK) { const p = server ? me : ai; puck.x = p.x; } return; }
   const steps = 4, h = dt / steps, WX0 = HK ? RAIL : TX0, WX1 = HK ? 360 - RAIL : TX1;
   for (let s = 0; s < steps; s++) { puck.x += puck.vx * h; puck.y += puck.vy * h; if (HK) { puck.vx *= 1 - 0.25 * h; puck.vy *= 1 - 0.25 * h; }
@@ -489,7 +491,7 @@ function paddleX() {
       tm += dt; if (serveT <= 0) calm += dt; const L = lvl(), noHum = !PL4.some((s) => !s.out && k.human(s.p));
       for (const s of PL4) { if (s.out) continue; s.pc = s.c;
         if (k.human(s.p)) { const d = k.pdir(s.p), hz = SD[s.i].hz; const m = hz ? d.x : d.y || (s.i === 2 ? d.x : -d.x); s.c += m * 380 * dt;
-          if (!k.party && s.p === 0 && k.ptr.down) { const tx = k.ptr.x - OX; s.c += (tx - s.c) * Math.min(1, dt * 22); } }
+          if (!k.party && s.p === 0 && k.ptr.down) { const tx = k.ptr.x - OX; s.c += (tx - s.c) * Math.min(1, dt * 34); } }
         else { const pr = predict(s.i), sp = 150 + 240 * L; let tgt = B / 2;
           if (pr && pr.t < 0.5 + L * 1.2) tgt = pr.a + s.err; else s.err = k.rnd(-1, 1) * ((1 - L) * 48 + Math.min(70, Math.max(0, calm - (noHum ? 6 : 20)) * 4)); // sin goles un buen rato: la CPU se cansa y falla más
           s.c += clamp(tgt - s.c, -sp * dt, sp * dt); }

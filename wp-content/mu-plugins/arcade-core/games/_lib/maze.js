@@ -1015,7 +1015,7 @@ const scr = (x, y) => [W / 2 - cam.x + PX(x, y), (TOP + H) / 2 + 14 - cam.y + PY
 function drawIso() {
   if (!floorCv) floorCv = renderFloor();
   if (!glowCv) glowCv = mkCv(80, 80, (b) => { const gr = b.createRadialGradient(40, 40, 2, 40, 40, 40); gr.addColorStop(0, 'rgba(255,190,90,.4)'); gr.addColorStop(1, 'rgba(255,150,60,0)'); b.fillStyle = gr; b.fillRect(0, 0, 80, 80); });
-  const tx = PX(pl.fx, pl.fy), ty = PY(pl.fx, pl.fy); cam.x += (tx - cam.x) * 0.15; cam.y += (ty - cam.y) * 0.15;
+  const tx = PX(pl.fx, pl.fy), ty = PY(pl.fx, pl.fy), cf = 1 - Math.pow(0.85, k.dt * 60); cam.x += (tx - cam.x) * cf; cam.y += (ty - cam.y) * cf;
   c.drawImage(bgCv, 0, 0, W, H);
   const [ox, oy] = scr(0, 0); c.drawImage(floorCv, ox - N * TW / 2, oy - TH / 2, N * TW, N * TH + 8);
   // entidades por casilla de dibujo (la de mayor profundidad entre origen y destino)

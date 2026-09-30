@@ -806,7 +806,7 @@ if (M !== 'coop') k.run((dt) => {
   const sp = 270, free = M !== 'invaders', ox = p.x;
   if (k.held.has('left')) p.x -= sp * dt; if (k.held.has('right')) p.x += sp * dt;
   if (free && k.held.has('up')) p.y -= sp * dt; if (free && k.held.has('down')) p.y += sp * dt;
-  if (k.ptr.down) { p.x += (k.ptr.x - p.x) * Math.min(1, dt * 14); if (free) p.y += (k.ptr.y - 70 - p.y) * Math.min(1, dt * 14); }
+  if (k.ptr.down) { p.x += (k.ptr.x - p.x) * Math.min(1, dt * 24); if (free) p.y += (k.ptr.y - 70 - p.y) * Math.min(1, dt * 24); }
   p.x = k.clamp(p.x, 16, W - 16); p.y = k.clamp(p.y, free ? H * 0.4 : H - 40, H - 30); p.tilt += (((p.x - ox) / Math.max(dt, 0.001)) / 300 - p.tilt) * Math.min(1, dt * 10);
   cool -= dt; inv -= dt; shield -= dt;
   const auto = M !== 'invaders' || k.ptr.down, rate = M === 'bullethell' ? 0.09 : M === 'invaders' ? 0.45 : 0.18;
@@ -1048,7 +1048,7 @@ if (M === 'coop') {
       let ix = 0, iy = 0, fire = false; const ox = s.x;
       if (s.cpu) { const a = allyInput(s, o, dt); ix = a.x; iy = a.y; fire = a.fire; }
       else { const d = k.pdir(s.p); ix = d.x; iy = d.y; fire = k.pheld(s.p, 'a');
-        if (s.p === 0 && k.ptr.down) { s.x += (k.ptr.x - s.x) * Math.min(1, dt * 12); s.y += (k.ptr.y - 60 - s.y) * Math.min(1, dt * 12); fire = true; } }
+        if (s.p === 0 && k.ptr.down) { s.x += (k.ptr.x - s.x) * Math.min(1, dt * 22); s.y += (k.ptr.y - 60 - s.y) * Math.min(1, dt * 22); fire = true; } }
       const m = ix && iy ? 0.7071 : 1; s.x += ix * sp * m * dt; s.y += iy * sp * m * dt;
       s.x = k.clamp(s.x, 16, W - 16); s.y = k.clamp(s.y, TOP, BOT); s.tilt += (((s.x - ox) / Math.max(dt, 0.001)) / 300 - s.tilt) * Math.min(1, dt * 10);
       if (fire && s.cool <= 0 && shots.filter((q) => q.o === i).length < 3) { s.cool = 0.32; shots.push({ x: s.x, y: s.y - 16, vx: 0, o: i }); k.sfx('shoot'); }
