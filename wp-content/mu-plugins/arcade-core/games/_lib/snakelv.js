@@ -1,7 +1,9 @@
-/* Tableros a mano de serpent-grid (plan Friv, F3 · tanda 3). 20 niveles dibujados uno a uno:
- * ninguno se genera al azar y todos están verificados (BFS) — el tablero es conexo, no hay
- * callejones sin salida (toda casilla libre tiene al menos dos vecinas libres) y el objetivo
- * (llaves y puerta) siempre se puede alcanzar.
+/* Tableros a mano de serpent-grid (plan Friv · tanda 7, vara de docs/VARA.md). 20 niveles
+ * dibujados uno a uno: ninguno se genera al azar y todos están verificados por
+ * scripts/check_snakelv.js (BFS) — el tablero es conexo, no hay callejones sin salida (toda
+ * casilla libre tiene al menos dos vecinas libres), el objetivo es alcanzable y todo eso se
+ * comprueba TAMBIÉN girado 90° (vertical) y en el peor caso, dando por hundido todo el
+ * suelo frágil a la vez.
  *
  * TABLERO — 17 columnas × 13 filas. En vertical el motor gira el tablero 90° (13×17), así que
  * el mismo dibujo se juega igual en móvil tumbado o de pie.
@@ -9,26 +11,44 @@
  *   #  muro                 .  suelo
  *   S  salida de la serpiente (mira hacia `d`)
  *   K  llave                E  puerta (cerrada hasta cumplir el objetivo)
+ *   G  GEMA fija: no se mueve, suma 120 y hace falta llevarse TODAS para la 3.ª estrella
+ *   ~  SUELO FRÁGIL: al pasar por encima se hunde y queda como muro (avisa agrietándose)
+ *   P  BICHO DE RONDA: recorre su carril de pared a pared y mata al tocarlo (carril a la vista)
+ *   C  CAZADOR: persigue la cabeza por el camino más corto, pero va más lento que tú
  *
  * PARÁMETROS de cada nivel:
  *   name   rótulo del nivel
  *   tip    lo que enseña (se lee al empezar, una sola frase)
  *   spd    casillas por segundo al empezar
  *   ac     casillas por segundo que se gana por cada manzana comida
- *   go     objetivo: {eat: manzanas, len: longitud, keys: true (todas), exit: true (ir a la puerta)}
+ *   go     objetivo: {eat: manzanas, len: longitud, keys: true (todas), gems: true (todas),
+ *          exit: true (ir a la puerta)}
  *   sp     frutas especiales que pueden salir: 'gold' (dorada), 'berry' (arándano, frena),
  *          'shrink' (encoger), 'freeze' (congelar), 'dash' (acelerón)
  *   wrap   túneles: '' ninguno, 'x' laterales, 'y' arriba y abajo, 'xy' los cuatro
  *   d      dirección inicial ('right' en todos: siempre hay pista libre por delante)
  *   th     tema (0 pradera, 1 desierto, 2 nieve, 3 crepúsculo, 4 selva)
+ *   tl     RELOJ del nivel en segundos (se multiplica por k.D.time). Sin `tl`, sin prisa.
+ *   pv     velocidad de los bichos de ronda en casillas/s (por defecto 2,2; ×k.D.spd)
+ *   cv     velocidad del cazador en casillas/s (por defecto 1,6; ×k.D.spd)
+ *   t2     segundos como mucho para la 2.ª estrella, [fácil, normal, difícil]
+ *   t3     segundos como mucho para la 3.ª estrella, [fácil, normal, difícil]
+ *            (la 3.ª pide ADEMÁS haberse llevado todas las gemas del tablero)
+ *
+ * VERBOS DE UNO EN UNO (vara §2): 1 girar · 2 dorada · 3 rocas · 4 GEMAS · 5 arándano ·
+ * 6 túneles laterales · 7 SUELO FRÁGIL · 8 llaves y puerta · 9 RELOJ · 10 encoger ·
+ * 11 BICHO DE RONDA · 12 congelar · 13 cuatro túneles · 14 CAZADOR · 15 acelerón ·
+ * 16 salas con boca única · 17 rejilla con reloj · 18 bichos y frágil juntos ·
+ * 19 carrera con cazador y reloj · 20 el nido del Prisma: todo a la vez.
  *
  * Todo se multiplica luego por la dificultad elegida (k.D).
  */
 const SNAKELV = {
   'serpent-grid': [
-    /* ---- 1-5: se aprende a girar, la dorada, las columnas, el arándano y los túneles ---- */
-    { /*  1 */ name: 'Primeros bocados', tip: 'Come 6 manzanas. Desliza o usa las flechas para girar.',
-      spd: 3.2, ac: 0.05, go: { eat: 6 }, sp: [], wrap: '', d: 'right', th: 0, m: [
+    /* ---- 1-5: girar, la dorada, las rocas, las gemas y el arándano ---- */
+    { /*  1 */ name: 'Primeros bocados', tip: 'Come 12 manzanas. Desliza o usa las flechas para girar.',
+      spd: 3.2, ac: 0.045, go: { eat: 12 }, sp: [], wrap: '', d: 'right', th: 0,
+      t2: [72, 62, 56], t3: [56, 48, 43], m: [
         '.................',
         '.................',
         '.................',
@@ -42,8 +62,9 @@ const SNAKELV = {
         '.................',
         '.................',
         '.................'] },
-    { /*  2 */ name: 'Manzana dorada', tip: 'La manzana dorada vale más, pero dura poco.',
-      spd: 3.4, ac: 0.05, go: { eat: 8 }, sp: ['gold'], wrap: '', d: 'right', th: 0, m: [
+    { /*  2 */ name: 'Manzana dorada', tip: 'La manzana dorada vale más, pero se va sola: ve a por ella.',
+      spd: 3.4, ac: 0.045, go: { eat: 14 }, sp: ['gold'], wrap: '', d: 'right', th: 0,
+      t2: [78, 68, 61], t3: [60, 52, 47], m: [
         '.................',
         '.................',
         '.................',
@@ -57,8 +78,9 @@ const SNAKELV = {
         '.................',
         '.................',
         '.................'] },
-    { /*  3 */ name: 'Entre columnas', tip: 'Las piedras no se pueden morder: rodéalas.',
-      spd: 3.6, ac: 0.05, go: { eat: 8 }, sp: ['gold'], wrap: '', d: 'right', th: 1, m: [
+    { /*  3 */ name: 'Entre columnas', tip: 'Las piedras no se pueden morder: rodéalas sin quedarte sin salida.',
+      spd: 3.6, ac: 0.05, go: { eat: 14 }, sp: ['gold'], wrap: '', d: 'right', th: 1,
+      t2: [76, 66, 59], t3: [58, 50, 45], m: [
         '.................',
         '.................',
         '..#..#..#..#..#..',
@@ -72,9 +94,10 @@ const SNAKELV = {
         '.................',
         '.................',
         '..#..#..#..#..#..'] },
-    { /*  4 */ name: 'Arándanos', tip: 'El arándano azul te frena unos segundos: úsalo para girar con calma.',
-      spd: 3.8, ac: 0.06, go: { eat: 10 }, sp: ['gold', 'berry'], wrap: '', d: 'right', th: 1, m: [
-        '.................',
+    { /*  4 */ name: 'Las gemas', tip: 'Las gemas violetas no se mueven y están en las esquinas: hacen falta las tres para la tercera estrella.',
+      spd: 3.7, ac: 0.05, go: { eat: 14 }, sp: ['gold'], wrap: '', d: 'right', th: 1,
+      t2: [82, 72, 65], t3: [64, 56, 50], m: [
+        'G...............G',
         '.................',
         '..####.....####..',
         '.................',
@@ -86,135 +109,144 @@ const SNAKELV = {
         '.................',
         '..####.....####..',
         '.................',
-        '.................'] },
-    { /*  5 */ name: 'Túneles', tip: 'Los laterales están abiertos: sal por un lado y entra por el otro.',
-      spd: 4.0, ac: 0.06, go: { eat: 10 }, sp: ['gold', 'berry'], wrap: 'x', d: 'right', th: 2, m: [
+        '........G........'] },
+    { /*  5 */ name: 'Arándanos', tip: 'El arándano azul te frena unos segundos: úsalo para girar con calma.',
+      spd: 3.9, ac: 0.055, go: { eat: 16 }, sp: ['gold', 'berry'], wrap: '', d: 'right', th: 2,
+      t2: [86, 75, 67], t3: [67, 58, 52], m: [
         '.................',
         '.......###.......',
         '.................',
         '..###.......###..',
+        '.......G.........',
+        '.................',
+        '...S.............',
+        '.................',
+        '.........G.......',
+        '..###.......###..',
+        '.................',
+        '.......###.......',
+        '.................'] },
+    /* ---- 6-10: túneles, suelo frágil, llaves, reloj y encoger ---- */
+    { /*  6 */ name: 'Túneles', tip: 'Los laterales están abiertos: sal por un lado y entra por el otro.',
+      spd: 4.0, ac: 0.055, go: { eat: 16 }, sp: ['gold', 'berry'], wrap: 'x', d: 'right', th: 2,
+      t2: [84, 73, 66], t3: [65, 57, 51], m: [
+        '.................',
+        '..###.......###..',
+        '.................',
+        'G.....#####.....G',
         '.................',
         '.................',
         '...S.............',
         '.................',
         '.................',
-        '..###.......###..',
+        'G.....#####.....G',
         '.................',
-        '.......###.......',
+        '..###.......###..',
         '.................'] },
-    /* ---- 6-10: llaves, puerta, encoger y pasillos ---- */
-    { /*  6 */ name: 'Las llaves', tip: 'Recoge las dos llaves y la puerta del centro se abrirá.',
-      spd: 3.8, ac: 0.05, go: { keys: true, exit: true }, sp: ['gold'], wrap: '', d: 'right', th: 2, m: [
+    { /*  7 */ name: 'Suelo frágil', tip: 'Las baldosas rayadas se hunden al pasar por encima: no las gastes sin pensar.',
+      spd: 4.0, ac: 0.055, go: { eat: 16 }, sp: ['gold', 'berry'], wrap: '', d: 'right', th: 3,
+      t2: [88, 77, 69], t3: [69, 60, 54], m: [
+        '.................',
+        '..~~~.....~~~....',
+        '.................',
+        '..#...........#..',
+        '...S.............',
+        '..#....~~~....#..',
+        '....G.......G....',
+        '..#....~~~....#..',
+        '.................',
+        '..#...........#..',
+        '.................',
+        '..~~~.....~~~....',
+        '.................'] },
+    { /*  8 */ name: 'Las llaves', tip: 'Come 8 manzanas y recoge las tres llaves: entonces se abre la puerta del centro.',
+      spd: 4.1, ac: 0.05, go: { eat: 8, keys: true, exit: true }, sp: ['gold', 'berry'], wrap: '', d: 'right', th: 3,
+      t2: [80, 70, 63], t3: [62, 54, 48], m: [
         '.................',
         '..K...........K..',
         '.................',
         '....#.....#......',
         '...S.............',
         '.................',
-        '.........E.......',
+        '....G....E....G..',
         '.................',
         '.................',
         '....#.....#......',
         '.................',
-        '.................',
+        '........K........',
         '.................'] },
-    { /*  7 */ name: 'Cerrojo doble', tip: 'Tres llaves y un muro por medio. Piensa el camino antes de girar.',
-      spd: 4.0, ac: 0.05, go: { keys: true, exit: true }, sp: ['gold', 'berry'], wrap: '', d: 'right', th: 3, m: [
+    { /*  9 */ name: 'Contrarreloj', tip: 'Ahora corre el reloj: 75 segundos para comer 16. Sin vueltas de más.',
+      spd: 4.2, ac: 0.055, go: { eat: 16 }, sp: ['gold', 'dash'], wrap: 'x', d: 'right', th: 4, tl: 75,
+      t2: [70, 62, 56], t3: [56, 49, 44], m: [
         '.................',
-        '..K....#....K....',
-        '.......#.........',
-        '..###..#..###....',
-        '.......#.........',
+        '..####.....####..',
+        '.................',
         '...S.............',
-        '.......E.........',
+        '....#.......#....',
+        '....#...G...#....',
         '.................',
-        '.......#.........',
-        '..###..#..###....',
-        '.......#.........',
-        '..K....#.........',
+        '....#...G...#....',
+        '....#.......#....',
+        '.................',
+        '..####.....####..',
+        '.................',
         '.................'] },
-    { /*  8 */ name: 'Encoger', tip: 'La gota verde te quita cuatro trozos de cola. Guárdala para cuando aprietes.',
-      spd: 4.2, ac: 0.06, go: { eat: 12 }, sp: ['gold', 'shrink'], wrap: '', d: 'right', th: 3, m: [
+    { /* 10 */ name: 'Encoger', tip: 'La gota verde te quita cuatro trozos de cola. Guárdala para cuando aprietes.',
+      spd: 4.3, ac: 0.06, go: { eat: 18 }, sp: ['gold', 'shrink'], wrap: '', d: 'right', th: 4,
+      t2: [92, 80, 72], t3: [72, 63, 56], m: [
         '.................',
         '..####...####....',
         '.................',
         '...S.............',
         '..#...#####...#..',
         '..#...........#..',
-        '..#...........#..',
+        '..#..G.....G..#..',
         '..#...........#..',
         '..#...#####...#..',
         '.................',
         '.................',
         '..####...####....',
         '.................'] },
-    { /*  9 */ name: 'Creciendo', tip: 'Come hasta tener 16 de largo y cruza entonces la puerta.',
-      spd: 4.0, ac: 0.05, go: { len: 16, exit: true }, sp: ['gold', 'berry'], wrap: '', d: 'right', th: 4, m: [
+    /* ---- 11-15: bicho de ronda, congelar, cuatro túneles, cazador y acelerón ---- */
+    { /* 11 */ name: 'Bichos de ronda', tip: 'Los bichos van y vuelven por su carril, siempre igual: cuenta el paso y cruza detrás.',
+      spd: 4.2, ac: 0.055, go: { eat: 16 }, sp: ['gold', 'shrink'], wrap: '', d: 'right', th: 2, pv: 2.0,
+      t2: [92, 80, 72], t3: [72, 63, 56], m: [
         '.................',
-        '..####.....####..',
-        '.................',
-        '...S.............',
-        '....#.......#....',
-        '....#.......#....',
-        '....#...E...#....',
-        '....#.......#....',
-        '....#.......#....',
-        '.................',
-        '..####.....####..',
-        '.................',
-        '.................'] },
-    { /* 10 */ name: 'Pasillos', tip: 'Cinco pasillos y dos túneles. No te metas donde no quepas.',
-      spd: 4.4, ac: 0.06, go: { eat: 12 }, sp: ['gold', 'shrink'], wrap: 'x', d: 'right', th: 4, m: [
-        '.................',
-        '.###.###.###.###.',
-        '.................',
-        '.###.###.###.###.',
-        '.................',
-        '...S.............',
-        '.###.###.###.###.',
-        '.................',
-        '.###.###.###.###.',
-        '.................',
-        '.###.###.###.###.',
-        '.................',
-        '.................'] },
-    /* ---- 11-15: congelar, cuatro llaves, túneles dobles y acelerón ---- */
-    { /* 11 */ name: 'Hielo', tip: 'El copo te deja quieto dos segundos y medio: aprovecha para colocarte.',
-      spd: 4.6, ac: 0.06, go: { eat: 12 }, sp: ['gold', 'freeze', 'shrink'], wrap: '', d: 'right', th: 2, m: [
-        '.................',
-        '..#.#.#.#.#.#.#..',
+        '.P...............',
         '.................',
         '.###.........###.',
         '.................',
-        '..#.#.#.#.#.#.#..',
+        '.P...............',
         '...S.............',
-        '..#.#.#.#.#.#.#..',
         '.................',
+        '....G.......G....',
         '.###.........###.',
         '.................',
-        '..#.#.#.#.#.#.#..',
+        '.P...............',
         '.................'] },
-    { /* 12 */ name: 'Cuatro llaves', tip: 'Cuatro esquinas, cuatro llaves. La puerta está en el centro.',
-      spd: 4.4, ac: 0.05, go: { keys: true, exit: true }, sp: ['gold', 'freeze'], wrap: '', d: 'right', th: 0, m: [
+    { /* 12 */ name: 'Hielo', tip: 'El copo te deja quieto dos segundos y medio: aprovecha para colocarte.',
+      spd: 4.5, ac: 0.06, go: { eat: 12, keys: true, exit: true }, sp: ['gold', 'freeze', 'shrink'], wrap: '', d: 'right', th: 2, pv: 2.1,
+      t2: [90, 78, 70], t3: [70, 61, 55], m: [
         '.................',
         '.K.............K.',
         '.................',
         '...###.....###...',
         '...S.............',
-        '..#...........#..',
-        '........E........',
+        '..#....G.G....#..',
+        '.P......E........',
         '..#...........#..',
         '.................',
         '...###.....###...',
         '.................',
         '.K.............K.',
         '.................'] },
-    { /* 13 */ name: 'Doble túnel', tip: 'Ahora los cuatro lados están abiertos. Crece hasta 18 y sal por la puerta.',
-      spd: 4.6, ac: 0.06, go: { len: 18, exit: true }, sp: ['gold', 'shrink'], wrap: 'xy', d: 'right', th: 3, m: [
+    { /* 13 */ name: 'Doble túnel', tip: 'Ahora los cuatro lados están abiertos. Crece hasta 20 y sal por la puerta.',
+      spd: 4.6, ac: 0.06, go: { len: 20, exit: true }, sp: ['gold', 'shrink'], wrap: 'xy', d: 'right', th: 3,
+      t2: [88, 77, 69], t3: [69, 60, 54], m: [
         '.................',
         '....#########....',
         '....#.......#....',
-        '....#.......#....',
+        '....#..G.G..#....',
         '.................',
         '.S.......E.......',
         '.................',
@@ -224,59 +256,63 @@ const SNAKELV = {
         '....#.......#....',
         '....#########....',
         '.................'] },
-    { /* 14 */ name: 'Espinas', tip: 'Muchas piedras sueltas: mira dos casillas por delante.',
-      spd: 4.8, ac: 0.06, go: { eat: 14 }, sp: ['gold', 'freeze', 'shrink'], wrap: '', d: 'right', th: 1, m: [
+    { /* 14 */ name: 'El cazador', tip: 'El cazador rojo te sigue por el camino más corto, pero es más lento: no te dejes acorralar.',
+      spd: 4.6, ac: 0.06, go: { eat: 18 }, sp: ['gold', 'shrink', 'freeze'], wrap: 'x', d: 'right', th: 1, cv: 1.5,
+      t2: [96, 84, 75], t3: [75, 65, 58], m: [
         '.................',
         '..#.#.#.#.#.#.#..',
-        '..#.#.#.#.#.#.#..',
         '.................',
-        '.#.#.#.#.#.#.#.#.',
-        '.#.#.#.#.#.#.#.#.',
-        '...S.............',
-        '.#.#.#.#.#.#.#.#.',
-        '.#.#.#.#.#.#.#.#.',
+        '.###.........###.',
         '.................',
         '..#.#.#.#.#.#.#..',
+        '...S.........C...',
         '..#.#.#.#.#.#.#..',
+        '.................',
+        '.###....G....###.',
+        '.................',
+        '..#.#.#G#.#.#.#..',
         '.................'] },
-    { /* 15 */ name: 'Acelerón', tip: 'El rayo naranja te lanza a toda velocidad cuatro segundos. Da muchos puntos.',
-      spd: 4.8, ac: 0.05, go: { keys: true, exit: true }, sp: ['gold', 'dash', 'shrink'], wrap: '', d: 'right', th: 4, m: [
+    { /* 15 */ name: 'Acelerón', tip: 'El rayo naranja te lanza cuatro segundos a toda velocidad. Da puntos, pero girar cuesta.',
+      spd: 4.7, ac: 0.055, go: { eat: 12, keys: true, exit: true }, sp: ['gold', 'dash', 'shrink'], wrap: '', d: 'right', th: 4, pv: 2.2,
+      t2: [94, 82, 74], t3: [73, 64, 57], m: [
         '.................',
         '....#.......#....',
         '....#.......#....',
         '...S.............',
-        '..K.#.......#.K..',
+        '..K.#...G...#.K..',
         '....#.......#....',
-        '....#...#...#....',
+        '.P..#...#...#....',
         '....#.......#....',
         '..K.#...E...#.K..',
         '.................',
-        '....#.......#....',
+        '....#...G...#....',
         '....#.......#....',
         '.................'] },
-    /* ---- 16-20: salas, rejilla, cinco llaves, carrera y el nido ---- */
-    { /* 16 */ name: 'Las salas', tip: 'Cuatro salas con una sola boca. Entrar es fácil; salir, menos.',
-      spd: 5.0, ac: 0.06, go: { len: 20, exit: true }, sp: ['gold', 'shrink', 'freeze'], wrap: '', d: 'right', th: 0, m: [
+    /* ---- 16-20: salas, rejilla con reloj, mezclas y el nido ---- */
+    { /* 16 */ name: 'Las salas', tip: 'Cuatro salas con una sola boca y una gema dentro. Entrar es fácil; salir, menos.',
+      spd: 5.0, ac: 0.06, go: { len: 18, exit: true }, sp: ['gold', 'shrink', 'freeze'], wrap: '', d: 'right', th: 0,
+      t2: [98, 85, 77], t3: [76, 66, 59], m: [
         '.................',
         '..#####...#####..',
+        '..#.G.#...#.G.#..',
         '..#...#...#...#..',
         '..#...#...#...#..',
-        '..##.##...##.##..',
         '.................',
         '...S....E........',
         '.................',
-        '..##.##...##.##..',
         '..#...#...#...#..',
         '..#...#...#...#..',
+        '..#.G.#...#.G.#..',
         '..#####...#####..',
         '.................'] },
-    { /* 17 */ name: 'Rejilla', tip: 'Arriba y abajo hay túnel. Come 16 sin quedarte encerrado.',
-      spd: 5.2, ac: 0.06, go: { eat: 16 }, sp: ['gold', 'dash', 'shrink'], wrap: 'y', d: 'right', th: 2, m: [
+    { /* 17 */ name: 'Rejilla', tip: 'Arriba y abajo hay túnel y corre el reloj: 80 segundos para comer 18.',
+      spd: 5.0, ac: 0.06, go: { eat: 18 }, sp: ['gold', 'dash', 'shrink'], wrap: 'y', d: 'right', th: 2, tl: 80,
+      t2: [74, 66, 59], t3: [60, 52, 47], m: [
         '.................',
         '.#.#.#.#.#.#.#.#.',
         '.................',
         '.#.#.#.#.#.#.#.#.',
-        '.................',
+        '.......G.G.......',
         '.#.#.#.#.#.#.#.#.',
         '...S.............',
         '.#.#.#.#.#.#.#.#.',
@@ -285,47 +321,51 @@ const SNAKELV = {
         '.................',
         '.#.#.#.#.#.#.#.#.',
         '.................'] },
-    { /* 18 */ name: 'Cinco llaves', tip: 'La quinta llave está en el patio del centro. Entra con sitio para salir.',
-      spd: 5.2, ac: 0.05, go: { keys: true, exit: true }, sp: ['gold', 'freeze', 'shrink'], wrap: 'x', d: 'right', th: 3, m: [
+    { /* 18 */ name: 'Ronda y baldosas', tip: 'Bichos de ronda sobre suelo frágil: cada baldosa que gastes te cierra una salida.',
+      spd: 5.0, ac: 0.055, go: { eat: 14, keys: true, exit: true }, sp: ['gold', 'freeze', 'shrink'], wrap: 'x', d: 'right', th: 3, pv: 2.3,
+      t2: [100, 87, 78], t3: [78, 68, 61], m: [
         '..K...........K..',
         '.................',
         '..#####...#####..',
-        '..#...........#..',
+        '..#..~~...~~..#..',
         '...S...........E.',
-        '.....#.....#.....',
+        '.P...#.....#.....',
         '.....#..K..#.....',
-        '.....#.....#.....',
-        '..#...........#..',
+        '.P...#.....#.....',
+        '..#..~~...~~..#..',
         '..#...........#..',
         '..#####...#####..',
-        '.................',
+        '..G...........G..',
         '..K...........K..'] },
-    { /* 19 */ name: 'Carrera', tip: 'Rápido y largo: 24 de cuerpo antes de cruzar. Los túneles son tu amigo.',
-      spd: 5.6, ac: 0.07, go: { len: 24, exit: true }, sp: ['gold', 'dash', 'shrink', 'freeze'], wrap: 'x', d: 'right', th: 1, m: [
+    { /* 19 */ name: 'Carrera', tip: 'Rápido, largo y con el cazador detrás: 26 de cuerpo antes de cruzar, y el reloj corre.',
+      spd: 5.4, ac: 0.07, go: { len: 26, exit: true }, sp: ['gold', 'dash', 'shrink', 'freeze'], wrap: 'x', d: 'right', th: 1, tl: 110, cv: 1.7,
+      t2: [100, 90, 82], t3: [82, 72, 65], m: [
         '.................',
         '.###.###.###.###.',
         '.................',
-        '.................',
+        '......G.G........',
         '.###.###.###.###.',
         '.S...............',
-        '........E........',
+        '........E.....C..',
         '.................',
         '.###.###.###.###.',
         '.................',
-        '.................',
+        '.......G.G.......',
         '.###.###.###.###.',
         '.................'] },
-    { /* 20 */ name: 'El nido del Prisma', tip: 'Remate: cuatro llaves, 22 de cuerpo y la puerta del nido. Suerte.',
-      spd: 6.0, ac: 0.07, go: { keys: true, len: 22, exit: true }, sp: ['gold', 'dash', 'shrink', 'freeze'], wrap: 'xy', d: 'right', th: 3, m: [
+    { /* 20 */ name: 'El nido del Prisma', tip: 'Remate: cuatro llaves, 20 de cuerpo, bichos, cazador, suelo frágil y reloj. Suerte.',
+      spd: 5.2, ac: 0.065, go: { keys: true, len: 20, exit: true }, sp: ['gold', 'dash', 'shrink', 'freeze'],
+      wrap: 'xy', d: 'right', th: 3, tl: 170, pv: 2.2, cv: 1.35,
+      t2: [140, 125, 112], t3: [115, 100, 90], m: [
         '..K...........K..',
         '.#.###.###.###.#.',
         '.................',
         '.###..#####..###.',
         '...S.............',
-        '....#.......#....',
-        '....#...E...#....',
-        '....#.......#....',
-        '.................',
+        '.P..#...G...#....',
+        '....#...E...#..C.',
+        '.P..#...G...#....',
+        '.....~~...~~.....',
         '.###..#####..###.',
         '.................',
         '.#.###.###.###.#.',

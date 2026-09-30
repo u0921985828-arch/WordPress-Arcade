@@ -69,6 +69,11 @@ const SK = { body: '#ffb13d', dark: '#e0762a', light: '#ffe39a' };
 let snake, prev, dir, queue, foods, rocks, score, level, eaten, acc, step, t, grow, bulges, dying, combo, lastEat, slowT, bannerT, floorCv, rockCv, th, anchor, swiped, eatenTotal;
 /* estado de los niveles a mano */
 let LV = null, keys = [], keysTot = 0, keysGot = 0, door = null, doorOpen = false, doneLv = false;
+/* tanda 7 (solo los niveles a mano de serpent-grid): gemas fijas, suelo frágil, bichos de
+   ronda, cazador y reloj de nivel. Con HAND a null nada de esto se toca. */
+let gems = [], gemsTot = 0, gemsGot = 0, frag = [], bugs = [], hunts = [];
+let clock = 0, clockMax = 0, clkWarn = 0, timeOut = false;
+const PAX = PORT ? 1 : 0;   /* el carril de los bichos gira con el tablero: fila en horizontal, columna en vertical */
 let wrapX = false, wrapY = false, freezeT = 0, dashT = 0, spT = 0, bannerTxt = '';
 try { const o = +localStorage.getItem('serpent-grid-best') || 0; if (o) k.best(ID, o); } catch (e) { /* sin almacenamiento */ }
 
@@ -76,6 +81,8 @@ try { const o = +localStorage.getItem('serpent-grid-best') || 0; if (o) k.best(I
 const cx = (x) => X0 + x * CS + CS / 2, cy = (y) => Y0 + y * CS + CS / 2;
 const rockAt = (x, y) => rocks.some((r) => r.x === x && r.y === y);
 const onSnake = (x, y) => snake.some((s) => s.x === x && s.y === y);
+const sunkAt = (x, y) => frag.some((f) => f.x === x && f.y === y && f.st >= 2);
+const solid = (x, y) => rockAt(x, y) || sunkAt(x, y);   /* sin suelo frágil, es rockAt a secas */
 function off(w, h, draw) { const cv = document.createElement('canvas'); cv.width = w * 2; cv.height = h * 2; const g = cv.getContext('2d'); g.scale(2, 2); draw(g); return cv; }
 const rnd = (q) => { const x = Math.sin(q * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 
@@ -192,7 +199,13 @@ function spawnFood(kind, life) {
   const [x, y] = k.pick(free); foods.push({ x, y, kind, life: life || 0, max: life || 0, pop: 0 });
 }
 /* casillas ocupadas por llaves o por la puerta (solo en los niveles a mano) */
-function busy(x, y) { return !!(door && door.x === x && door.y === y) || keys.some((q) => !q.got && q.x === x && q.y === y); }
+function busy(x, y) {
+  if (door && door.x === x && door.y === y) return true;
+  if (keys.some((q) => !q.got && q.x === x && q.y === y)) return true;
+  if (gems.some((q) => !q.got && q.x === x && q.y === y)) return true;
+  if (sunkAt(x, y) || bugs.some((b) => b.x === x && b.y === y) || hunts.some((h) => h.x === x && h.y === y)) return true;
+  return false;
+}
 
 /* ================= Niveles a mano (serpent-grid) ================= */
 const RCW = { right: 'down', down: 'left', left: 'up', up: 'right' };   /* al girar el tablero 90° */
@@ -207,6 +220,7 @@ function buildHand() {
   wrapX = wr.indexOf('x') >= 0; wrapY = wr.indexOf('y') >= 0;
   th = THM[(LV.th == null ? level - 1 : LV.th) % THM.length];
   rocks = []; keys = []; door = null; doorOpen = false; keysGot = 0;
+  gems = []; gemsGot = 0; frag = []; bugs = []; hunts = [];
   let st = null;
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
     const ch = m[y][x];
@@ -214,8 +228,12 @@ function buildHand() {
     else if (ch === 'K') keys.push({ x, y, got: false });
     else if (ch === 'E') door = { x, y };
     else if (ch === 'S') st = [x, y];
+    else if (ch === 'G') gems.push({ x, y, got: false });
+    else if (ch === '~') frag.push({ x, y, st: 0, ct: 0, pop: 0 });
+    else if (ch === 'P') bugs.push({ x, y, px: x, py: y, dir: 1, acc: 0, v: LV.pv || 2.2 });
+    else if (ch === 'C') hunts.push({ x, y, px: x, py: y, acc: 0, v: LV.cv || 1.6 });
   }
-  keysTot = keys.length;
+  keysTot = keys.length; gemsTot = gems.length;
   dir = PORT ? RCW[LV.d || 'right'] : (LV.d || 'right');
   const d = DIRS[dir]; st = st || [2, 2];
   snake = [];
@@ -239,10 +257,28 @@ function checkGoal() {
   if (g.exit) { if (!doorOpen) { doorOpen = true; bannerTxt = '¡La puerta se abre!'; bannerT = 2; k.sfx('win'); k.flash('rgba(124,247,160,.22)'); if (door) k.burst(cx(door.x), cy(door.y), '#7cf7a0', 18, 150); } return; }
   doneLevel();
 }
+/* 1 estrella terminar · 2 hacerlo dentro del tiempo escrito a mano para esa dificultad ·
+   3 ese tiempo más apretado Y haberse llevado todas las gemas del tablero. */
+const perDif = (v) => (Array.isArray(v) ? (v[k.dif] != null ? v[k.dif] : v[1]) : v);
+const lim2 = () => perDif(LV && LV.t2) || 999, lim3 = () => perDif(LV && LV.t3) || 999;
+const gemsAll = () => gemsTot === 0 || gemsGot >= gemsTot;
 function doneLevel() {
   if (doneLv) return;
   doneLv = true; k.best(ID, score);
-  k.levelDone(score, `Nivel ${level}/${HAND.length} · ${score} puntos · longitud ${snake.length}`);
+  const secs = t, l2 = lim2(), l3 = lim3();
+  const stars = secs <= l3 && gemsAll() ? 3 : secs <= l2 ? 2 : 1;
+  const det = [`${secs.toFixed(1)} s (2★ con ${l2} s)`, `${score} puntos`];
+  if (gemsTot) det.push(`Gemas ${gemsGot}/${gemsTot}`);
+  const fal = [];
+  if (secs > l3) fal.push(`bajar de ${l3} s`);
+  if (!gemsAll()) fal.push('llevarte todas las gemas');
+  k.levelDone(score, det.join(' · ') + (stars < 3 ? ` · Para 3★ te falta: ${fal.join(' y ')}` : ''), { stars });
+}
+function takeGem(q) {
+  q.got = true; gemsGot++; score += 120;
+  k.sfx('coin'); k.chime(gemsGot); k.burst(cx(q.x), cy(q.y), '#c9a3ff', 20, 170);
+  k.float(gemsGot >= gemsTot ? '¡Todas las gemas!' : `Gema ${gemsGot}/${gemsTot}  +120`, cx(q.x), cy(q.y) - 16, '#d7b8ff');
+  if (gemsGot >= gemsTot) k.reward('¡TODAS LAS GEMAS!', '#d7b8ff');
 }
 function takeKey(q) {
   q.got = true; keysGot++; score += 30;
@@ -258,6 +294,8 @@ function goalText() {
   if (g.len) p.push(`Longitud ${Math.min(snake.length, g.len)}/${g.len}`);
   if (g.keys) p.push(`Llaves ${keysGot}/${keysTot}`);
   if (g.exit) p.push(doorOpen ? '¡A la puerta!' : 'Puerta cerrada');
+  if (gemsTot) p.push(`Gemas ${gemsGot}/${gemsTot}`);
+  if (clockMax) p.push(`${Math.ceil(clock)} s`);
   if (freezeT > 0) p.push('Congelado');
   else if (dashT > 0) p.push('Acelerón');
   else if (slowT > 0) p.push('Lento');
@@ -300,6 +338,187 @@ function tunnelMarks() {
   if (wrapY) for (let i = 1; i < COLS; i += 3) { tri(X0 + i * CS + CS / 2, Y0 - 6, -1.5708); tri(X0 + i * CS + CS / 2, Y0 + bh + 6, 1.5708); }
 }
 
+/* ================= verbos nuevos (tanda 7, solo serpent-grid) ================= */
+/* --- arte cacheado: gema, baldosa frágil, bicho de ronda y cazador ---
+   Ley de la pieza única (docs/REMASTER.md §8): cada bicho es UN trazo continuo, relleno una
+   vez y contorneado una vez; lo de dentro se lee por sombra propia y por un solo brillo. */
+let gemCv = null, fragCv = null, crackCv = null, bugCv = null, huntCv = null;
+function renderGem() {
+  return off(CS + 8, CS + 8, (g) => {
+    g.translate((CS + 8) / 2, (CS + 8) / 2); const s = CS / 24; g.scale(s, s);
+    g.fillStyle = 'rgba(12,10,26,.26)'; g.beginPath(); g.ellipse(0, 10, 9, 3.2, 0, 0, R2); g.fill();
+    const gp = (q) => { q.moveTo(0, -11); q.lineTo(9, -3.5); q.lineTo(5.5, 9); q.lineTo(-5.5, 9); q.lineTo(-9, -3.5); q.closePath(); };
+    unite(g, [[gp, '#b07cf5']], 1.7);
+    within(g, gp, (q) => {
+      q.fillStyle = PDK('#b07cf5', 0.3); q.beginPath(); q.moveTo(0, -11); q.lineTo(9, -3.5); q.lineTo(5.5, 9); q.lineTo(0, 9); q.closePath(); q.fill();
+      q.fillStyle = PLT('#b07cf5', 0.42); q.beginPath(); q.moveTo(0, -11); q.lineTo(-4.2, -2); q.lineTo(0, 2); q.lineTo(4.2, -2); q.closePath(); q.fill();
+    });
+    spec(g, -3.4, -5.4, 1.9, 1.1, -0.7, 0.62);
+  });
+}
+function renderFrag(broken) {
+  return off(CS, CS, (g) => {
+    const r = 3, w = CS - 3;
+    ART.rr(g, 1.5, 1.5, w, w, r); g.fillStyle = broken ? 'rgba(26,21,48,.5)' : 'rgba(26,21,48,.3)'; g.fill();
+    g.strokeStyle = broken ? 'rgba(255,140,120,.85)' : 'rgba(255,255,255,.4)'; g.lineWidth = 1.6;
+    ART.rr(g, 1.5, 1.5, w, w, r); g.stroke();
+    g.lineWidth = 1.3; g.lineCap = 'round';
+    g.beginPath();
+    if (broken) { g.moveTo(CS * 0.2, CS * 0.16); g.lineTo(CS * 0.48, CS * 0.5); g.lineTo(CS * 0.3, CS * 0.84); g.moveTo(CS * 0.48, CS * 0.5); g.lineTo(CS * 0.84, CS * 0.42); g.moveTo(CS * 0.48, CS * 0.5); g.lineTo(CS * 0.7, CS * 0.84); }
+    else { for (let i = 1; i < 3; i++) { g.moveTo(CS * 0.16, CS * (i / 3)); g.lineTo(CS * 0.84, CS * (i / 3)); } }
+    g.stroke();
+  });
+}
+function renderBug() {
+  return off(CS + 10, CS + 10, (g) => {
+    g.translate((CS + 10) / 2, (CS + 10) / 2); const s = CS / 24; g.scale(s, s);
+    g.fillStyle = 'rgba(12,10,26,.28)'; g.beginPath(); g.ellipse(0, 9.5, 9.5, 3.2, 0, 0, R2); g.fill();
+    /* una sola silueta: cuerpo + las seis patas + las antenas en el mismo trazado */
+    const bp = (q) => {
+      q.moveTo(8.6, 0); q.ellipse(0, 0.6, 8.6, 7.2, 0, 0, R2);
+      for (const sx of [-1, 1]) { q.moveTo(sx * 5, -4.4); q.lineTo(sx * 10.6, -8.4); q.lineTo(sx * 9, -8.6); q.lineTo(sx * 4.2, -5.4); q.closePath(); }
+      for (const sy of [-3.4, 0.6, 4.6]) for (const sx of [-1, 1]) { q.moveTo(sx * 6.6, sy - 1); q.lineTo(sx * 11.4, sy + 1.6); q.lineTo(sx * 6.6, sy + 1.8); q.closePath(); }
+    };
+    unite(g, [[bp, '#ff6f5e']], 1.7);
+    within(g, bp, (q) => {
+      q.fillStyle = PDK('#ff6f5e', 0.3); q.beginPath(); q.ellipse(0, 4.6, 9, 4.4, 0, 0, R2); q.fill();
+      q.fillStyle = PAL(PZO, 0.55); q.fillRect(-1.1, -7, 2.2, 14);
+    });
+    /* ojos: párpado superior recto, mirada de aviso */
+    g.fillStyle = '#fff'; for (const sx of [-3.4, 3.4]) { g.beginPath(); g.ellipse(sx, -2.6, 2.5, 2.3, 0, 0, R2); g.fill(); }
+    g.fillStyle = PZO; for (const sx of [-3.4, 3.4]) { g.beginPath(); g.arc(sx, -2.2, 1.25, 0, R2); g.fill(); g.fillRect(sx - 2.7, -5.2, 5.4, 1.7); }
+    spec(g, -3.6, -5.6, 2.4, 1.2, -0.5, 0.42);
+  });
+}
+function renderHunt() {
+  return off(CS + 10, CS + 10, (g) => {
+    g.translate((CS + 10) / 2, (CS + 10) / 2); const s = CS / 24; g.scale(s, s);
+    g.fillStyle = 'rgba(12,10,26,.3)'; g.beginPath(); g.ellipse(0, 10, 10, 3.4, 0, 0, R2); g.fill();
+    /* cabeza con dos cuernos y mandíbula: un único contorno */
+    const hp = (q) => {
+      q.moveTo(-9, 2); q.bezierCurveTo(-9.6, -6, -5, -10.4, 0, -10.4); q.bezierCurveTo(5, -10.4, 9.6, -6, 9, 2);
+      q.lineTo(6.4, 9.4); q.lineTo(3, 6.4); q.lineTo(0, 9.8); q.lineTo(-3, 6.4); q.lineTo(-6.4, 9.4); q.closePath();
+      for (const sx of [-1, 1]) { q.moveTo(sx * 7.2, -6.6); q.lineTo(sx * 11.6, -12.2); q.lineTo(sx * 8.6, -11.4); q.lineTo(sx * 5.4, -8.4); q.closePath(); }
+    };
+    unite(g, [[hp, '#e8434f']], 1.8);
+    within(g, hp, (q) => {
+      q.fillStyle = PDK('#e8434f', 0.32); q.beginPath(); q.moveTo(-11, 2.6); q.lineTo(11, 2.6); q.lineTo(11, 11); q.lineTo(-11, 11); q.closePath(); q.fill();
+      q.fillStyle = PLT('#e8434f', 0.3); q.beginPath(); q.ellipse(-2.6, -6.2, 5, 3, -0.4, 0, R2); q.fill();
+    });
+    g.fillStyle = '#ffe9a8'; for (const sx of [-3.8, 3.8]) { g.beginPath(); g.ellipse(sx, -2.4, 2.8, 2.4, 0, 0, R2); g.fill(); }
+    g.fillStyle = PZO; for (const sx of [-3.8, 3.8]) { g.beginPath(); g.ellipse(sx, -2, 1.3, 1.7, 0, 0, R2); g.fill(); g.fillRect(sx - 3, -5.2, 6, 1.9); }
+    g.strokeStyle = PZO; g.lineWidth = 1.5; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(-6.2, -6.8); g.lineTo(-1.6, -5); g.moveTo(6.2, -6.8); g.lineTo(1.6, -5); g.stroke();   /* cejas */
+  });
+}
+function renderHandArt() { gemCv = renderGem(); fragCv = renderFrag(false); crackCv = renderFrag(true); bugCv = renderBug(); huntCv = renderHunt(); }
+
+/* --- suelo frágil: se agrieta al pisarlo y se hunde cuando la serpiente ya no está encima --- */
+function fragTick(dt) {
+  for (const f of frag) {
+    f.pop = Math.min(1, f.pop + dt * 3);
+    if (f.st !== 1) continue;
+    f.ct -= dt;
+    if (f.ct <= 0 && !onSnake(f.x, f.y)) {
+      f.st = 2; k.sfx('hit'); k.shake(3);
+      k.burst(cx(f.x), cy(f.y), '#ffb08a', 12, 120);
+      for (let i = foods.length - 1; i >= 0; i--) if (foods[i].x === f.x && foods[i].y === f.y) foods.splice(i, 1);
+      if (!foods.some((q) => q.kind === 'apple')) spawnFood('apple');
+    }
+  }
+}
+function stepOnFrag(x, y) {
+  const f = frag.find((q) => q.x === x && q.y === y);
+  if (!f || f.st !== 0) return;
+  f.st = 1; f.ct = 0.55; k.sfx('click'); k.float('¡Se hunde!', cx(x), cy(y) - 16, '#ffb08a');
+}
+
+/* --- bichos de ronda: van y vuelven por su carril, siempre al mismo ritmo (se puede contar) --- */
+function moveBug(b) {
+  b.px = b.x; b.py = b.y;
+  let nx = b.x + (PAX === 0 ? b.dir : 0), ny = b.y + (PAX === 1 ? b.dir : 0);
+  if (wrapX && PAX === 0) nx = (nx + COLS) % COLS;
+  if (wrapY && PAX === 1) ny = (ny + ROWS) % ROWS;
+  if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS || solid(nx, ny)) { b.dir = -b.dir; return; }
+  b.x = nx; b.y = ny;
+  if (snake[0].x === b.x && snake[0].y === b.y) die();
+}
+/* --- cazador: persigue la cabeza por el camino más corto, pero siempre más lento que tú --- */
+function huntStep(h) {
+  const tx = snake[0].x, ty = snake[0].y;
+  const blk = (x, y) => solid(x, y) || snake.some((q, i) => i > 0 && q.x === x && q.y === y);
+  const seen = new Set(), from = new Map(), q = [[tx, ty]];
+  seen.add(tx + ',' + ty);
+  while (q.length) {
+    const [x, y] = q.shift();
+    for (const d of Object.values(DIRS)) {
+      let nx = x + d[0], ny = y + d[1];
+      if (wrapX) nx = (nx + COLS) % COLS;
+      if (wrapY) ny = (ny + ROWS) % ROWS;
+      if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) continue;
+      const kk = nx + ',' + ny;
+      if (seen.has(kk) || blk(nx, ny)) continue;
+      seen.add(kk); from.set(kk, [x, y]);
+      if (nx === h.x && ny === h.y) return from.get(kk);
+      q.push([nx, ny]);
+    }
+  }
+  return null;
+}
+function moveHunt(h) {
+  h.px = h.x; h.py = h.y;
+  const st = huntStep(h);
+  if (!st) return;
+  h.x = st[0]; h.y = st[1];
+  if (snake[0].x === h.x && snake[0].y === h.y) die();
+}
+function enemiesTick(dt) {
+  for (const b of bugs) { const sp = 1 / (b.v * k.D.spd); b.acc += dt; let n = 0; while (b.acc >= sp && n++ < 4) { b.acc -= sp; moveBug(b); if (dying > 0) return; } }
+  for (const h of hunts) { const sp = 1 / (h.v * k.D.spd); h.acc += dt; let n = 0; while (h.acc >= sp && n++ < 4) { h.acc -= sp; moveHunt(h); if (dying > 0) return; } }
+}
+const enemyAt = (x, y) => bugs.some((b) => b.x === x && b.y === y) || hunts.some((h) => h.x === x && h.y === y);
+/* --- reloj del nivel --- */
+function clockTick(dt) {
+  if (!clockMax || doneLv || dying > 0) return;
+  clock -= dt;
+  if (clock <= 10 && !clkWarn) { clkWarn = 1; k.reward('¡10 SEGUNDOS!', '#ff9a6a'); k.sfx('hurt'); }
+  if (clock <= 0) { clock = 0; timeOut = true; die(); }
+}
+/* --- dibujo de todo lo nuevo (carriles, baldosas, gemas, bichos) --- */
+function drawHandExtras() {
+  /* carril de cada bicho, para que la amenaza se vea venir */
+  c.strokeStyle = 'rgba(255,140,110,.28)'; c.lineWidth = 3; c.setLineDash([5, 6]);
+  for (const b of bugs) {
+    c.beginPath();
+    if (PAX === 0) { c.moveTo(X0, cy(b.y)); c.lineTo(X0 + COLS * CS, cy(b.y)); }
+    else { c.moveTo(cx(b.x), Y0); c.lineTo(cx(b.x), Y0 + ROWS * CS); }
+    c.stroke();
+  }
+  c.setLineDash([]);
+  for (const f of frag) {
+    if (f.st >= 2) continue;
+    const a = f.st === 1 ? 0.55 + 0.45 * Math.abs(Math.sin(t * 9)) : 1;
+    c.globalAlpha = a; c.drawImage(f.st === 1 ? crackCv : fragCv, X0 + f.x * CS, Y0 + f.y * CS, CS, CS); c.globalAlpha = 1;
+  }
+  for (const q of gems) if (!q.got) c.drawImage(gemCv, cx(q.x) - (CS + 8) / 2, cy(q.y) - (CS + 8) / 2 + Math.sin(t * 3.4 + q.x) * 1.6, CS + 8, CS + 8);
+}
+function drawEnemies() {
+  const f = Math.min(1, acc / Math.max(0.001, step));
+  for (const b of bugs) {
+    const ex = nearC(b.x, b.px, COLS, wrapX && PAX === 0), ey = nearC(b.y, b.py, ROWS, wrapY && PAX === 1);
+    const px = cx(b.px + (ex - b.px) * Math.min(1, b.acc * b.v * k.D.spd)), py = cy(b.py + (ey - b.py) * Math.min(1, b.acc * b.v * k.D.spd));
+    c.save(); c.translate(px, py); c.rotate(Math.sin(t * 12) * 0.08);
+    c.drawImage(bugCv, -(CS + 10) / 2, -(CS + 10) / 2, CS + 10, CS + 10); c.restore();
+  }
+  for (const h of hunts) {
+    const ex = nearC(h.x, h.px, COLS, wrapX), ey = nearC(h.y, h.py, ROWS, wrapY), q = Math.min(1, h.acc * h.v * k.D.spd);
+    const px = cx(h.px + (ex - h.px) * q), py = cy(h.py + (ey - h.py) * q);
+    c.save(); c.translate(px, py + Math.sin(t * 6) * 1.2);
+    c.drawImage(huntCv, -(CS + 10) / 2, -(CS + 10) / 2, CS + 10, CS + 10); c.restore();
+  }
+  void f;
+}
+
 function reset() {
   if (HAND) return resetHand();
   level = 1; score = 0; eaten = 0; eatenTotal = 0; t = 0; combo = 0; lastEat = -9; slowT = 0; dying = 0; bulges = []; queue = []; grow = 0; bannerT = 0;
@@ -313,9 +532,13 @@ function reset() {
 function resetHand() {
   level = k.lv || 1; score = 0; eaten = 0; eatenTotal = 0; t = 0; combo = 0; lastEat = -9;
   slowT = 0; freezeT = 0; dashT = 0; dying = 0; doneLv = false; foods = [];
+  clock = 0; clockMax = 0; clkWarn = 0; timeOut = false;
   buildHand();
+  renderHandArt();
+  if (LV.tl) { clockMax = LV.tl * k.D.time; clock = clockMax; }   /* en fácil hay más reloj */
   step = 1 / ((LV.spd || 3.4) * k.D.spd); acc = step * 0.999;
   spT = k.rnd(7, 11); bannerT = 2.4;
+  k.chainReset();
   spawnFood('apple');
 }
 
@@ -378,7 +601,8 @@ function tick() {
   if (wrapY) ny = (ny + ROWS) % ROWS;
   const tailMoves = grow === 0, self = snake.some((s, i) => s.x === nx && s.y === ny && !(tailMoves && i === snake.length - 1));
   const shut = !!door && !doorOpen && door.x === nx && door.y === ny;
-  if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS || rockAt(nx, ny) || shut || self) return die();
+  if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS || solid(nx, ny) || shut || self) return die();
+  if (HAND && enemyAt(nx, ny)) return die();
   const old = snake.map((s) => ({ x: s.x, y: s.y }));
   snake.unshift({ x: nx, y: ny });
   if (grow > 0) { grow--; old.push({ ...old[old.length - 1] }); } else snake.pop();
@@ -388,6 +612,9 @@ function tick() {
   if (HAND) {
     const q = keys.find((r) => !r.got && r.x === nx && r.y === ny);
     if (q) takeKey(q);
+    const gm = gems.find((r) => !r.got && r.x === nx && r.y === ny);
+    if (gm) takeGem(gm);
+    stepOnFrag(nx, ny);
     if (door && doorOpen && door.x === nx && door.y === ny) { k.sfx('win'); return doneLevel(); }
   }
 }
@@ -395,7 +622,7 @@ function update(dt) {
   t += dt; bannerT = Math.max(0, bannerT - dt);
   for (const r of rocks) r.pop = Math.min(1, r.pop + dt * 3);
   for (const f of foods) f.pop = Math.min(1, f.pop + dt * 4);
-  if (dying > 0) { dying -= dt; if (dying <= 0) k.lose(ID, score, 'Fin', HAND ? `Nivel ${level}/${HAND.length} · ${goalText()}` : `Nivel ${level} · Longitud ${snake.length}`); return; }
+  if (dying > 0) { dying -= dt; if (dying <= 0) k.lose(ID, score, timeOut ? '¡Se acabó el tiempo!' : 'Fin', HAND ? `Nivel ${level}/${HAND.length} · ${goalText()}` : `Nivel ${level} · Longitud ${snake.length}`); return; }
   input();
   for (let i = foods.length - 1; i >= 0; i--) { const f = foods[i]; if (f.max && (f.life -= dt) <= 0) { k.burst(cx(f.x), cy(f.y), '#fff', 8, 80); foods.splice(i, 1); } }
   slowT = Math.max(0, slowT - dt);
@@ -407,7 +634,12 @@ function update(dt) {
       spT -= dt;
       if (spT <= 0) { if (foods.some((f) => f.kind !== 'apple')) spT = 3; else { spawnFood(k.pick(LV.sp), 8); spT = k.rnd(9, 14); } }
     }
+    fragTick(dt);
+    /* el copo congela TODO (también bichos y cazador): así no es una trampa */
     if (freezeT > 0) { freezeT -= dt; acc = 0; for (const b of bulges) b.d += dt / step; return; }
+    clockTick(dt);
+    enemiesTick(dt);
+    if (dying > 0) return;
   } else {
     /* velocidad continua por manzanas comidas: 4,5 casillas/s al empezar → 11,5 hacia la manzana 64 (nivel 9) */
     const dq = Math.min(1, eatenTotal / 96); // 1.23: más fácil (antes 4,5 → 11,5 en 64 manzanas)
@@ -515,6 +747,7 @@ function draw() {
   for (const r of rocks) { if (r.pop <= 0) continue; const s = r.pop < 1 ? 1 + Math.sin(r.pop * Math.PI) * 0.3 : 1, sz = (CS + 8) * s * Math.min(1, r.pop * 2); c.drawImage(rockCv, cx(r.x) - sz / 2, cy(r.y) - sz / 2 + 1, sz, sz); }
   if (HAND) {
     if (wrapX || wrapY) tunnelMarks();
+    drawHandExtras();
     if (door) doorArt(cx(door.x), cy(door.y), CS / 24, doorOpen);
     for (const q of keys) if (!q.got) keyArt(cx(q.x), cy(q.y) + Math.sin(t * 4 + q.x) * 1.5, CS / 24);
   }
@@ -526,6 +759,7 @@ function draw() {
     if (f.kind === 'gold') sparkle(x + 8 * Math.cos(t * 3), y - 8 + 4 * Math.sin(t * 3), 0.6 + 0.4 * Math.abs(Math.sin(t * 6)));
   }
   drawSnake();
+  if (HAND) drawEnemies();
   // marcador: puntos arriba a la izquierda, nivel y progreso arriba a la derecha (centro libre para pausa/sonido)
   const hy = PORT ? 16 : 8;
   apple(20, hy + 13, 0.9, 'apple'); label(`${score}`, 36, hy + 2, 22, '#fff');
@@ -535,11 +769,15 @@ function draw() {
        el centro de la franja superior queda libre para los botones del reproductor. */
     label(`Nivel ${level}/${HAND.length}`, rx, hy - 2, 15, '#fff', 'right');
     label(LV.name, rx, hy + 18, 11, 'rgba(255,255,255,.7)', 'right');
-    const oy = Y0 + ROWS * CS + (PORT ? 14 : 6), fs = PORT ? 15 : 13, txt = goalText();
+    const oy = Y0 + ROWS * CS + (PORT ? 14 : 6), txt = goalText();
+    /* el objetivo puede llevar ya manzanas, gemas, reloj y el efecto en curso: encoge antes de desbordar */
+    let fs = PORT ? 15 : 13;
     c.font = `800 ${fs}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
-    const mw = c.measureText(txt).width + 26;
+    while (fs > 9 && c.measureText(txt).width + 26 > W - 16) { fs -= 1; c.font = `800 ${fs}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; }
+    const mw = Math.min(W - 8, c.measureText(txt).width + 26);
     ART.rr(c, W / 2 - mw / 2, oy - 4, mw, fs + 12, 9); c.fillStyle = 'rgba(26,21,48,.6)'; c.fill();
-    label(txt, W / 2, oy, fs, doorOpen ? '#7cf7a0' : '#fff', 'center');
+    const urge = clockMax && clock <= 10 && Math.floor(t * 4) % 2 === 0;
+    label(txt, W / 2, oy, fs, urge ? '#ff9a6a' : doorOpen ? '#7cf7a0' : '#fff', 'center');
     if (PORT) label(`Récord ${Math.max(k.best(ID, 0), score)}`, 14, hy + 30, 11, 'rgba(255,255,255,.7)');
   } else {
     label(`Nivel ${level}`, rx, hy - 2, 15, '#fff', 'right');
@@ -576,7 +814,7 @@ if (HAND) k.levels(HAND.length, { start: () => reset() });
 reset();
 k.onDif = () => { if (k.st !== 'play') reset(); };
 k.show(CFG.title || 'Serpent Grid', HAND
-  ? '20 tableros dibujados a mano. Cada uno pide algo distinto: comer manzanas, recoger todas las llaves o crecer hasta cruzar la puerta. Desliza, toca a un lado de la cabeza o usa las flechas.'
+  ? '20 tableros dibujados a mano. Cada uno pide algo distinto: comer manzanas, recoger todas las llaves o crecer hasta cruzar la puerta. Cuidado con las baldosas rayadas (se hunden al pisarlas), con los bichos que rondan su carril y con el cazador rojo. Las gemas violetas hacen falta para la tercera estrella. Desliza, toca a un lado de la cabeza o usa las flechas.'
   : 'Come manzanas para crecer. Las doradas valen más y los arándanos te frenan. Cada 8 manzanas, nivel nuevo con rocas. Desliza, toca a un lado de la cabeza o usa las flechas.<br>Toca para empezar');
 k.run((dt) => { if (!k.gate(reset)) { t += dt; for (const f of foods) f.pop = Math.min(1, f.pop + dt * 4); return; } update(dt); }, draw);
 addEventListener('resize', () => { clearTimeout(window.__ot); window.__ot = setTimeout(() => { if ((innerHeight > innerWidth) !== PORT && k.st !== 'play') location.reload(); }, 400); });

@@ -18,7 +18,7 @@ STANDALONE = {'tetra-drop', 'tetra-drop-marathon'}
 SW = 'Desliza o usa las flechas'
 G = {
  # ---------- Arcade ----------
- 'serpent-grid': ('snake', dict(help='Desliza o usa las flechas para girar; toca a un lado de la cabeza para girar hacia allí. Come para crecer y no choques.')),
+ 'serpent-grid': ('snake', dict(help='Desliza o usa las flechas para girar; toca a un lado de la cabeza para girar hacia allí. 20 tableros a mano: come manzanas, recoge las llaves o crece hasta cruzar la puerta. Las baldosas rayadas se hunden al pisarlas, los bichos rojos rondan siempre su carril y el cazador te sigue (pero es más lento). Las gemas violetas dan puntos y hacen falta todas para la tercera estrella; en los niveles con reloj, corre.')),
  'neon-paddle': ('neonpong', dict(help='Arrastra o usa las flechas para mover tu pala. Mueve la pala al golpear para dar efecto. Gana a 7 y pasa al siguiente rival.')),
  'rock-belt': ('rocks', dict(help='Joystick a la izquierda para girar y acelerar; toca la derecha para disparar. Botón morado: hiperespacio.')),
  'starfall-defender': ('shooter', dict(mode='vertical', help='Arrastra para mover la nave; dispara sola. Esquiva las balas enemigas.')),
