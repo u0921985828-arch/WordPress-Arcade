@@ -18,6 +18,17 @@
     } catch (e) { /* nada */ }
     return v || '';
   }
+  /* 1.48: el pulgar manda de dos maneras distintas y cada persona prefiere una. 'j' = joystick
+     flotante (aparece donde apoyas el pulgar), 'd' = cruceta fija en el centro de la zona. Se cambia
+     con el interruptor de abajo y se recuerda en este móvil. */
+  function padMode(v) {
+    try {
+      if (v === undefined) return localStorage.getItem('arcade:pad:dir') === 'd' ? 'd' : 'j';
+      localStorage.setItem('arcade:pad:dir', v);
+    } catch (e) { /* nada */ }
+    return v || 'j';
+  }
+
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
   function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   function store(k, v) { try { if (v === undefined) return sessionStorage.getItem(k); if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch (e) { return null; } return null; }
@@ -66,7 +77,8 @@
       '<header class="pd-top"><button type="button" class="pd-me" data-me>··</button><span class="pd-title" data-title></span>' +
         '<button type="button" class="pd-menu" data-menu>Menú</button>' +
         '<button type="button" class="pd-help" data-help hidden aria-label="Cómo se juega">?</button></header>' +
-      '<div class="pd-zones"><div class="pd-l" data-l></div><div class="pd-r" data-r></div></div>' +
+      '<div class="pd-zones"><div class="pd-l" data-l></div><div class="pd-r" data-r></div>' +
+        '<button type="button" class="pd-swap" data-swap hidden></button></div>' +
       '<div class="pd-priv" data-priv></div>' +
       '<div class="pd-rot" data-rot><div class="pd-card">' +
         '<svg viewBox="0 0 64 64" fill="none" stroke="#a097ff" stroke-width="4" stroke-linejoin="round">' +
@@ -75,7 +87,7 @@
         '<button type="button" class="pd-btn" data-keep>Seguir en vertical</button></div></div>' +
       '<div class="pd-over" data-over></div>' +
     '</div>';
-  var ui = { rot: $('[data-rot]'), priv: $('[data-priv]'), me: $('[data-me]'), title: $('[data-title]'), l: $('[data-l]'), r: $('[data-r]'), over: $('[data-over]'), menu: $('[data-menu]'), help: $('[data-help]') };
+  var ui = { swap: $('[data-swap]'), rot: $('[data-rot]'), priv: $('[data-priv]'), me: $('[data-me]'), title: $('[data-title]'), l: $('[data-l]'), r: $('[data-r]'), over: $('[data-over]'), menu: $('[data-menu]'), help: $('[data-help]') };
 
   function overlay(html) {
     ui.over.innerHTML = html ? '<div class="pd-card">' + html + '</div>' : '';
@@ -218,45 +230,59 @@
     var onlyH = spec.d === 'h', hasStick = !!spec.d;
     var btns = [['a', spec.a || 'A']];
     if (spec.b) btns.unshift(['b', spec.b]);
-    ui.l.innerHTML = hasStick ? '<div class="pd-stick' + (onlyH ? ' h' : '') + '"><i></i></div><span class="pd-zhint">' + (onlyH ? '← →' : 'Mueve') + '</span>' : '';
+    var dp = padMode() === 'd';
+    ui.l.innerHTML = !hasStick ? '' :
+      (dp ? '<div class="pd-dpad' + (onlyH ? ' h' : '') + '"><b><s></s></b>' +
+              ['up', 'down', 'left', 'right'].map(function (d) { return '<i data-d="' + d + '"></i>'; }).join('') + '</div>'
+          : '<div class="pd-stick' + (onlyH ? ' h' : '') + '"><i></i></div>') +
+      '<span class="pd-zhint">' + (onlyH ? '← →' : 'Mueve') + '</span>';
+    ui.swap.hidden = !hasStick;
+    ui.swap.textContent = (dp ? '✛ Cruceta' : '○ Joystick') + ' ⇄';
+    ui.swap.title = 'Cambiar a ' + (dp ? 'joystick' : 'cruceta');
     ui.r.innerHTML = '<div class="pd-btns n' + btns.length + '">' + btns.map(function (b) {
       return '<span class="pd-b' + (b[1].length > 1 ? ' lbl' : '') + '" data-b="' + b[0] + '">' + esc(b[1]) + '</span>';
     }).join('') + '</div>';
     document.body.classList.toggle('pd-nostick', !hasStick);
-    if (hasStick) stick(onlyH);
+    if (hasStick) stick(onlyH, dp);
     buttons(hasStick ? [ui.r] : [ui.r, ui.l]);
   }
 
   function on(elm, ev, fn) { elm.addEventListener(ev, fn, { passive: false }); zoneAc.push(function () { elm.removeEventListener(ev, fn, { passive: false }); }); }
 
-  // Joystick flotante: aparece donde apoyas el pulgar y la base sigue al dedo.
-  function stick(onlyH) {
-    var zl = ui.l, st = $('.pd-stick', zl), knob = st.firstChild, id = null, cx = 0, cy = 0, dirs = [], zb = null, sw = 0, sh = 0, oct = 98;
+  /* Joystick flotante (aparece donde apoyas el pulgar y la base sigue al dedo) o cruceta fija en el
+     centro de la zona. En los dos casos toda la zona izquierda es táctil: en la cruceta la dirección se
+     mide desde su centro, así que no hace falta acertarle encima. */
+  function stick(onlyH, dp) {
+    var zl = ui.l, st = $(dp ? '.pd-dpad' : '.pd-stick', zl), knob = dp ? null : st.firstChild,
+      arms = dp ? [].slice.call(st.querySelectorAll('i')) : [],
+      id = null, cx = 0, cy = 0, dirs = [], zb = null, sw = 0, sh = 0, oct = 98;
     // Medidas leídas una vez por toque: leerlas en cada pointermove forzaba un reflow.
     function apply(next) {
       dirs.forEach(function (d) { if (next.indexOf(d) < 0) key(d, false); });
       next.forEach(function (d) { if (dirs.indexOf(d) < 0) key(d, true); });
       if (next.length && !dirs.length) buzz(6);
       dirs = next;
+      if (dp) arms.forEach(function (a) { a.classList.toggle('on', next.indexOf(a.dataset.d) >= 0); });
     }
     function place(x, y) {
       var z = zb, r = sw / 2, rh = sh / 2;
+      if (dp) { cx = z.left + z.width / 2; cy = z.top + z.height / 2 + z.height * 0.02; return; }
       cx = Math.max(z.left + r * 0.6, Math.min(z.right - r * 0.6, x));
       cy = Math.max(z.top + rh * 0.6, Math.min(z.bottom - rh * 0.6, y));
       st.style.left = cx - z.left + 'px'; st.style.top = cy - z.top + 'px';
     }
     function track(x, y) {
-      var R = sw * 0.36, dx = x - cx, dy = onlyH ? 0 : y - cy, m = Math.sqrt(dx * dx + dy * dy);
-      if (m > R * 1.25) {
+      var R = sw * (dp ? 0.3 : 0.36), dx = x - cx, dy = onlyH ? 0 : y - cy, m = Math.sqrt(dx * dx + dy * dy);
+      if (!dp && m > R * 1.25) {
         var z = zb, k = (m - R * 1.25) / m;
         cx += dx * k; cy += dy * k;
         st.style.left = cx - z.left + 'px'; st.style.top = cy - z.top + 'px';
         dx = x - cx; dy = onlyH ? 0 : y - cy;
       }
       var d = Math.sqrt(dx * dx + dy * dy), s = d > R ? R / d : 1;
-      knob.style.transform = 'translate(' + dx * s + 'px,' + dy * s + 'px)';
+      if (!dp) knob.style.transform = 'translate(' + dx * s + 'px,' + dy * s + 'px)';
       var o = 99;
-      if (d >= R * 0.3) {
+      if (d >= R * (dp ? 0.38 : 0.3)) {
         if (onlyH) o = dx < 0 ? 9 : 10;
         else {
           var ag = Math.atan2(dy, dx); o = Math.round(ag / (Math.PI / 4));
@@ -275,7 +301,10 @@
       if (onlyH) return apply([dx < 0 ? 'left' : 'right']);
       apply(OCT[o].slice());
     }
-    function reset() { id = null; oct = 98; apply([]); st.classList.remove('live'); knob.style.transform = ''; st.style.left = st.style.top = ''; }
+    function reset() {
+      id = null; oct = 98; apply([]); st.classList.remove('live');
+      if (!dp) { knob.style.transform = ''; st.style.left = st.style.top = ''; }
+    }
     on(zl, 'pointerdown', function (e) {
       e.preventDefault();
       if (id !== null) return;
@@ -330,13 +359,20 @@
     });
   }
 
+  /* El interruptor de abajo cambia entre joystick y cruceta sin salir de la partida. */
+  ui.swap.addEventListener('click', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    padMode(padMode() === 'd' ? 'j' : 'd'); buzz(12); build(S.spec);
+  });
+  ui.swap.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+
   ui.menu.addEventListener('pointerdown', function (e) { e.preventDefault(); ui.menu.classList.add('on'); buzz(10); key('menu', true); });
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { ui.menu.addEventListener(ev, function () { ui.menu.classList.remove('on'); key('menu', false); }); });
   document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   // iOS Safari ignora user-scalable=no: se bloquean a mano pellizco, doble toque y arrastre de la página
   // (salvo en la tarjeta del código, donde hay que poder escribir, y en el panel privado: sin esto el toque
   // no genera «click» y no se podía elegir carta/respuesta ni desplazar la lista).
-  function inForm(e) { var c = e.target.closest ? e.target : null; return c && ((ui.over.classList.contains('show') && c.closest('.pd-card')) || c.closest('.pd-priv.show')); }
+  function inForm(e) { var c = e.target.closest ? e.target : null; return c && ((ui.over.classList.contains('show') && c.closest('.pd-card')) || c.closest('.pd-priv.show') || c.closest('.pd-swap')); }
   ['gesturestart', 'gesturechange', 'dblclick'].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); }, { passive: false }); });
   ['touchstart', 'touchmove'].forEach(function (ev) {
     document.addEventListener(ev, function (e) { if (!inForm(e) && e.cancelable) e.preventDefault(); }, { passive: false });

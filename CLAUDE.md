@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **278 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2, 50 de la oleada 3, 13 de la oleada 4 y 15 de la oleada 5 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.47.1** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.48.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -276,6 +276,12 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
   - **Tamaño**: joystick y botones crecen en todas las orientaciones y dejan de encogerse donde antes se encogían (el bloque de vertical y el de apaisado bajo de 1.46.1 iban justo al revés). Medido en apaisado 844×390: joystick 132 → **195 px** (+48 %), botones 78 → **121 px** de diámetro (+55 %); en vertical 390×844, 156 → 172 y 82 → **113 px**. Ninguno se sale de su zona en los tres tamaños.
   - **Reparto de la zona de botones**: con A y B ya no van en diagonal, sino en **dos franjas a todo lo ancho** (B arriba, A abajo, con línea de puntos entre ellas). A ciegas el límite es una sola línea horizontal y cada franja entera pertenece a un botón.
   - **Margen de error**: en el reparto, A gana la franja dudosa (es el botón que usan todos los juegos) y, con el dedo ya apoyado, cambiar de botón pide un margen a escala del botón (0,35 × diámetro): un pulgar que tiembla en el límite no alterna A/B, y hacen falta 17–30 px de recorrido real para cambiar. El joystick estrena **histéresis angular de 7°**: para salir de un octante hay que pasarse de 29°, no de los 22,5 del reparto. Simulado: un temblor en el límite pasa de 8 cambios de dirección a 1, y un giro franco de 0° a 90° sigue dando derecha → derecha+abajo → abajo.
+
+- **Cruceta o joystick, y botones en fila (1.48.0)**: el mando estrena **dos formas de mover** y un interruptor para cambiar entre ellas sin salir de la partida.
+  - **Cruceta fija** (`.pd-dpad`): una cruz de una pieza (recorte del borde y otro dentro, sin costuras) en el centro de la zona izquierda, con los cuatro brazos que se encienden al pulsar. **Toda la zona sigue siendo táctil**: la dirección se mide desde el centro de la cruz, así que no hay que acertarle encima; zona muerta más ancha que en el joystick (0,38 R frente a 0,3) para poder apoyar el pulgar en reposo. Mantiene las 8 direcciones y la histéresis angular de 7° de 1.47.1.
+  - **Interruptor** `.pd-swap` abajo al centro, entre las dos zonas (donde no descansa ningún pulgar): «○ Joystick ⇄» / «✛ Cruceta ⇄». La elección se guarda en el móvil (`arcade:pad:dir`) y vale para todas las partidas. Solo sale en los juegos que llevan dirección.
+  - **A y B en fila** con el móvil tumbado (B a la izquierda, A a la derecha, misma altura, separador de puntos vertical), que es como cae el pulgar; en vertical no caben uno al lado del otro y se quedan apilados como en 1.47.1. Medido: separación entre centros 194 px con botones de 121 en 844×390 y 170/112 en 740×360, ninguno se sale de su zona.
+  - Verificado con Playwright a 844×390, 740×360 y 390×844: el interruptor cambia de mando en caliente y la cruceta da derecha, abajo, abajo+derecha, nada en reposo y izquierda desde el otro extremo de la zona.
 
 ## Kuboplay Shield (plugin aparte, `wp-content/plugins/kuboplay-shield`, v1.1.2)
 Segundo plugin, independiente del arcade: seguridad + rendimiento, con panel propio en español. Guía para el usuario: `docs/SEGURIDAD.md` (Cloudflare gratis paso a paso, qué hace y qué no, cómo recuperar el acceso desde IONOS).

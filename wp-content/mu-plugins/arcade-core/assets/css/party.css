@@ -124,6 +124,30 @@ body.pt-pad{position:fixed;top:0;right:0;bottom:0;left:0;overscroll-behavior:non
 .pd-stick.live{opacity:1;transition:none}
 .pd-stick i{position:absolute;left:50%;top:50%;width:calc(var(--stick) * .44);height:calc(var(--stick) * .44);margin:calc(var(--stick) * -.22) 0 0 calc(var(--stick) * -.22);border-radius:50%;background:#3a4160;border:3px solid var(--ink);box-shadow:inset 0 3px 0 rgba(255,255,255,.2),0 4px 0 var(--ink)}
 .pd-stick.live i{background:var(--pc)}
+/* 1.48: cruceta fija, alternativa al joystick. Una sola cruz (recorte en el borde y otro dentro, sin
+   costuras) con cuatro brazos que se encienden. Toda la zona sigue siendo táctil: la dirección se mide
+   desde el centro de la cruz, no hace falta acertarle encima. */
+.pd-dpad{position:absolute;left:50%;top:54%;width:var(--stick);height:var(--stick);margin:calc(var(--stick) / -2) 0 0 calc(var(--stick) / -2);opacity:.62;transition:opacity .15s;pointer-events:none}
+.pd-dpad.live{opacity:1;transition:none}
+.pd-dpad b,.pd-dpad s{position:absolute;top:0;right:0;bottom:0;left:0;display:block;
+  -webkit-clip-path:polygon(34% 0,66% 0,66% 34%,100% 34%,100% 66%,66% 66%,66% 100%,34% 100%,34% 66%,0 66%,0 34%,34% 34%);
+  clip-path:polygon(34% 0,66% 0,66% 34%,100% 34%,100% 66%,66% 66%,66% 100%,34% 100%,34% 66%,0 66%,0 34%,34% 34%)}
+.pd-dpad b{background:var(--ink)}
+.pd-dpad s{top:4px;right:4px;bottom:4px;left:4px;background:linear-gradient(180deg,#464e70,#333a55)}
+.pd-dpad i{position:absolute;border-radius:10px;background:var(--pc);opacity:0;transition:opacity .06s}
+.pd-dpad i.on{opacity:.95}
+.pd-dpad i[data-d=up]{left:37%;top:5%;width:26%;height:27%}
+.pd-dpad i[data-d=down]{left:37%;bottom:5%;width:26%;height:27%}
+.pd-dpad i[data-d=left]{top:37%;left:5%;height:26%;width:27%}
+.pd-dpad i[data-d=right]{top:37%;right:5%;height:26%;width:27%}
+.pd-dpad.h i[data-d=up],.pd-dpad.h i[data-d=down]{display:none}
+.pd-dpad.h b,.pd-dpad.h s{-webkit-clip-path:none;clip-path:none;border-radius:999px}
+.pd-dpad.h{height:calc(var(--stick) * .42);margin-top:calc(var(--stick) * -.21)}
+/* Interruptor joystick / cruceta: abajo, entre las dos zonas, donde no descansa ningún pulgar. */
+.pd-swap{position:absolute;left:50%;bottom:calc(6px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:2;
+  height:34px;padding:0 14px;border-radius:12px;border:2px solid var(--ink);background:rgba(28,33,50,.92);color:var(--mut);
+  font:800 .82rem var(--fr);box-shadow:0 2px 0 var(--ink);touch-action:manipulation}
+.pd-swap[hidden]{display:none}
 .pd-btns{position:absolute;top:0;right:0;bottom:0;left:0;pointer-events:none}
 .pd-b{position:absolute;display:grid;place-items:center;width:var(--abtn);height:var(--abtn);margin:calc(var(--abtn) / -2) 0 0 calc(var(--abtn) / -2);border-radius:50%;border:4px solid var(--ink);background:#3a4160;color:#fff;
   font:900 2.1rem var(--fr);text-shadow:0 2px 0 rgba(26,21,48,.6);box-shadow:inset 0 4px 0 rgba(255,255,255,.2),0 7px 0 var(--ink);transition:transform .05s,box-shadow .05s}
@@ -136,6 +160,13 @@ body.pt-pad{position:fixed;top:0;right:0;bottom:0;left:0;overscroll-behavior:non
 .pd-btns.n2 .pd-b[data-b=a]{left:50%;top:75%}
 .pd-btns.n2 .pd-b[data-b=b]{left:50%;top:25%}
 .pd-btns.n2::before{content:"";position:absolute;left:8%;right:8%;top:50%;border-top:2px dashed rgba(255,255,255,.07)}
+/* Con el móvil tumbado los dos botones van en fila (B a la izquierda, A a la derecha), que es como cae
+   el pulgar; en vertical no caben uno al lado del otro y se quedan apilados. */
+@media (orientation:landscape){
+  .pd-btns.n2 .pd-b[data-b=a]{left:73%;top:54%}
+  .pd-btns.n2 .pd-b[data-b=b]{left:27%;top:54%}
+  .pd-btns.n2::before{left:50%;right:auto;top:10%;bottom:10%;border-top:0;border-left:2px dashed rgba(255,255,255,.07)}
+}
 .pd-b.on{transform:translateY(5px);box-shadow:inset 0 3px 0 rgba(255,255,255,.2),0 1px 0 var(--ink);filter:brightness(1.15)}
 .pd-over{position:absolute;top:0;right:0;bottom:0;left:0;z-index:5;display:none;place-items:center;padding:16px;background:rgba(8,10,15,.9);touch-action:auto}
 .pd-over.show{display:grid}
