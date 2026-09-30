@@ -116,19 +116,35 @@ body.pt-pad{position:fixed;top:0;right:0;bottom:0;left:0;overscroll-behavior:non
 .pd-zones{position:relative;flex:1;display:flex;gap:10px;min-height:0;padding:10px 10px 0}
 /* Estructura de mando: cada pulgar tiene su empuñadura, un panel propio con su relieve, en vez de
    media pantalla lisa partida por una línea de puntos. */
-.pd-l,.pd-r{position:relative;flex:1;min-width:0;touch-action:none;border-radius:26px;
-  background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.015));
-  box-shadow:inset 0 0 0 2px rgba(255,255,255,.055),inset 0 3px 0 rgba(255,255,255,.05),0 2px 0 rgba(0,0,0,.35)}
+.pd-l,.pd-r{position:relative;flex:1;min-width:0;touch-action:none;
+  background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.02) 42%,rgba(0,0,0,.12)),
+    color-mix(in srgb,var(--pc) 13%,#1b2032);
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.07),inset 0 4px 0 rgba(255,255,255,.08),
+    inset 0 -14px 26px rgba(0,0,0,.34),0 3px 0 rgba(0,0,0,.45)}
+.pd-l{border-radius:38px 14px 14px 38px}
+.pd-r{border-radius:14px 38px 38px 14px}
+/* Raíl del borde interior: la pieza por la que un Joy-Con se engancha a la consola. */
+.pd-l::after,.pd-r::after{content:"";position:absolute;top:13%;bottom:13%;width:6px;border-radius:4px;
+  background:linear-gradient(180deg,rgba(255,255,255,.26),rgba(255,255,255,.05));pointer-events:none}
+.pd-l::after{right:7px}
+.pd-r::after{left:7px}
 /* Franja de abajo, igual que la de arriba: el interruptor va ahí y no roba sitio a los controles. */
 .pd-bot{position:relative;display:flex;align-items:center;justify-content:center;height:var(--bot);flex:none;
   padding-bottom:env(safe-area-inset-bottom);border-top:3px solid var(--ink);background:rgba(0,0,0,.25)}
 .pd-zhint{position:absolute;left:0;right:0;bottom:12px;text-align:center;color:rgba(255,255,255,.22);font:700 .8rem var(--fr);pointer-events:none}
 .pd-stick{position:absolute;left:50%;top:50%;width:var(--stick);height:var(--stick);margin:calc(var(--stick) / -2) 0 0 calc(var(--stick) / -2);border-radius:50%;
-  background:radial-gradient(circle,rgba(0,0,0,.2) 0 40%,rgba(255,255,255,.06) 41%);border:3px solid var(--ink);box-shadow:inset 0 0 0 2px rgba(255,255,255,.1);opacity:.55;transition:opacity .15s;pointer-events:none}
+  background:radial-gradient(circle at 50% 36%,rgba(0,0,0,.42) 0 40%,rgba(0,0,0,.24) 41% 72%,rgba(255,255,255,.07) 73%);
+  border:3px solid var(--ink);box-shadow:inset 0 8px 16px rgba(0,0,0,.5),0 1px 0 rgba(255,255,255,.06);
+  opacity:.62;transition:opacity .15s;pointer-events:none}
 .pd-stick.h{height:calc(var(--stick) * .5);margin-top:calc(var(--stick) / -4);border-radius:999px}
 .pd-stick.live{opacity:1;transition:none}
-.pd-stick i{position:absolute;left:50%;top:50%;width:calc(var(--stick) * .44);height:calc(var(--stick) * .44);margin:calc(var(--stick) * -.22) 0 0 calc(var(--stick) * -.22);border-radius:50%;background:#3a4160;border:3px solid var(--ink);box-shadow:inset 0 3px 0 rgba(255,255,255,.2),0 4px 0 var(--ink)}
-.pd-stick.live i{background:var(--pc)}
+.pd-stick i{position:absolute;left:50%;top:50%;width:calc(var(--stick) * .46);height:calc(var(--stick) * .46);margin:calc(var(--stick) * -.23) 0 0 calc(var(--stick) * -.23);border-radius:50%;
+  background:radial-gradient(circle at 38% 28%,#5d6688,#333a58 68%);border:3px solid var(--ink);
+  box-shadow:inset 0 3px 0 rgba(255,255,255,.22),inset 0 -8px 12px rgba(0,0,0,.45),0 5px 0 var(--ink)}
+/* Reborde de la seta, como el anillo estriado de la palanca de un mando. */
+.pd-stick i::before{content:"";position:absolute;top:13%;right:13%;bottom:13%;left:13%;border-radius:50%;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.12),inset 0 2px 6px rgba(0,0,0,.4)}
+.pd-stick.live i{background:radial-gradient(circle at 38% 28%,color-mix(in srgb,var(--pc) 70%,#fff),var(--pc) 70%)}
 /* 1.48: cruceta fija, alternativa al joystick. Una sola cruz (recorte en el borde y otro dentro, sin
    costuras) con cuatro brazos que se encienden. Toda la zona sigue siendo táctil: la dirección se mide
    desde el centro de la cruz, no hace falta acertarle encima. */
@@ -139,8 +155,21 @@ body.pt-pad{position:fixed;top:0;right:0;bottom:0;left:0;overscroll-behavior:non
   clip-path:polygon(34% 0,66% 0,66% 34%,100% 34%,100% 66%,66% 66%,66% 100%,34% 100%,34% 66%,0 66%,0 34%,34% 34%)}
 .pd-dpad b{background:var(--ink)}
 .pd-dpad s{top:4px;right:4px;bottom:4px;left:4px;background:linear-gradient(180deg,#464e70,#333a55)}
-.pd-dpad i{position:absolute;border-radius:10px;background:var(--pc);opacity:0;transition:opacity .06s}
-.pd-dpad i.on{opacity:.95}
+.pd-dpad::before{content:"";position:absolute;top:0;right:0;bottom:0;left:0;border-radius:24px;
+  background:rgba(0,0,0,.24);box-shadow:inset 0 5px 12px rgba(0,0,0,.42)}
+.pd-dpad i{position:absolute;border-radius:10px;background:transparent;transition:background .06s}
+.pd-dpad i.on{background:var(--pc)}
+/* Flechas dibujadas con bordes: se ven siempre, el brazo se enciende al pulsar. */
+.pd-dpad i::after{content:"";position:absolute;left:50%;top:50%;width:0;height:0;transform:translate(-50%,-50%);border:10px solid transparent}
+.pd-dpad i[data-d=up]::after{border-bottom-color:rgba(255,255,255,.42);margin-top:-5px}
+.pd-dpad i[data-d=down]::after{border-top-color:rgba(255,255,255,.42);margin-top:5px}
+.pd-dpad i[data-d=left]::after{border-right-color:rgba(255,255,255,.42);margin-left:-5px}
+.pd-dpad i[data-d=right]::after{border-left-color:rgba(255,255,255,.42);margin-left:5px}
+.pd-dpad i.on::after{border-bottom-color:transparent;border-top-color:transparent;border-left-color:transparent;border-right-color:transparent}
+.pd-dpad i[data-d=up].on::after{border-bottom-color:rgba(26,21,48,.8)}
+.pd-dpad i[data-d=down].on::after{border-top-color:rgba(26,21,48,.8)}
+.pd-dpad i[data-d=left].on::after{border-right-color:rgba(26,21,48,.8)}
+.pd-dpad i[data-d=right].on::after{border-left-color:rgba(26,21,48,.8)}
 .pd-dpad i[data-d=up]{left:37%;top:5%;width:26%;height:27%}
 .pd-dpad i[data-d=down]{left:37%;bottom:5%;width:26%;height:27%}
 .pd-dpad i[data-d=left]{top:37%;left:5%;height:26%;width:27%}
@@ -155,7 +184,9 @@ body.pt-pad{position:fixed;top:0;right:0;bottom:0;left:0;overscroll-behavior:non
 .pd-swap[hidden]{display:none}
 .pd-btns{position:absolute;top:0;right:0;bottom:0;left:0;pointer-events:none}
 .pd-b{position:absolute;display:grid;place-items:center;width:var(--abtn);height:var(--abtn);margin:calc(var(--abtn) / -2) 0 0 calc(var(--abtn) / -2);border-radius:50%;border:4px solid var(--ink);background:#3a4160;color:#fff;
-  font:900 2.1rem var(--fr);text-shadow:0 2px 0 rgba(26,21,48,.6);box-shadow:inset 0 4px 0 rgba(255,255,255,.2),0 7px 0 var(--ink);transition:transform .05s,box-shadow .05s}
+  font:900 2.1rem var(--fr);text-shadow:0 2px 0 rgba(26,21,48,.6);
+  box-shadow:inset 0 4px 0 rgba(255,255,255,.2),inset 0 -10px 14px rgba(0,0,0,.28),0 7px 0 var(--ink),0 0 0 8px rgba(0,0,0,.26);
+  transition:transform .05s,box-shadow .05s}
 .pd-b.lbl{font:800 1.05rem/1.15 var(--fr);text-align:center;padding:6px}
 .pd-b[data-b=a]{background:var(--pc);color:var(--ink);text-shadow:0 1px 0 rgba(255,255,255,.3)}
 .pd-btns.n1 .pd-b{left:50%;top:50%}
@@ -170,7 +201,7 @@ body.pt-pad{position:fixed;top:0;right:0;bottom:0;left:0;overscroll-behavior:non
   .pd-btns.n2 .pd-b[data-b=a]{left:73%;top:50%}
   .pd-btns.n2 .pd-b[data-b=b]{left:27%;top:50%}
 }
-.pd-b.on{transform:translateY(5px);box-shadow:inset 0 3px 0 rgba(255,255,255,.2),0 1px 0 var(--ink);filter:brightness(1.15)}
+.pd-b.on{transform:translateY(5px);box-shadow:inset 0 3px 0 rgba(255,255,255,.2),0 1px 0 var(--ink),0 0 0 8px rgba(0,0,0,.26);filter:brightness(1.15)}
 .pd-over{position:absolute;top:0;right:0;bottom:0;left:0;z-index:5;display:none;place-items:center;padding:16px;background:rgba(8,10,15,.9);touch-action:auto}
 .pd-over.show{display:grid}
 .pd-card{width:min(24rem,100%);max-height:100%;overflow:auto;display:flex;flex-direction:column;align-items:center;gap:10px;padding:22px 20px;text-align:center;border-radius:22px;background:linear-gradient(180deg,#1d2233,#151926);border:3px solid var(--ink);box-shadow:0 6px 0 var(--ink);animation:pt-pop .2s ease-out}
@@ -187,7 +218,7 @@ body.pt-pad{position:fixed;top:0;right:0;bottom:0;left:0;overscroll-behavior:non
 .pd-btn{height:54px;padding:0 18px;border-radius:14px;border:3px solid var(--ink);background:var(--acc);color:#fff;font:800 1rem var(--fr);box-shadow:inset 0 2px 0 rgba(255,255,255,.22),0 4px 0 var(--ink)}
 .pd-spin{width:40px;height:40px;border-radius:50%;border:4px solid #394058;border-top-color:var(--pc);animation:pt-spin .9s linear infinite}
 @media (orientation:portrait){
-  .pd{--stick:clamp(140px,44vmin,210px);--abtn:clamp(92px,29vmin,140px)}
+  .pd{--stick:clamp(132px,41vmin,200px);--abtn:clamp(92px,29vmin,140px)}
   .pd-title{padding-right:0;display:none}
 }
 

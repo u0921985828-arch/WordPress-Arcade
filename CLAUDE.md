@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **278 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2, 50 de la oleada 3, 13 de la oleada 4 y 15 de la oleada 5 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.48.2** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.49.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -284,6 +284,13 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
   - Verificado con Playwright a 844×390, 740×360 y 390×844: el interruptor cambia de mando en caliente y la cruceta da derecha, abajo, abajo+derecha, nada en reposo y izquierda desde el otro extremo de la zona.
 
 - **Estructura de mando (1.48.1)**: el interruptor de 1.48.0 flotaba encima de la zona de juego. Ahora el mando tiene **franja de abajo propia** (`.pd-bot`, `--bot` 48 px / 40 en apaisado bajo), igual que la de arriba con el botón Menú, y el interruptor va dentro con la misma piel de botón de barra: no roba sitio a los controles ni se pisa con el pulgar. Las dos mitades pasan a ser **dos empuñaduras**: panel redondeado con relieve y separación de 10 px, en vez de media pantalla lisa partida por una línea de puntos (quitada también la de los botones, que ya no hace falta). El panel privado (mano de cartas, cuadro de dibujo) se queda por encima de la franja de abajo. **1.48.2**: joystick, cruceta y botones quedan **centrados exactos** en su empuñadura (los desplazamientos de 52–54 % venían de cuando la zona llegaba al borde de la pantalla); medido: 0 px de desvío en los dos ejes a 844×390 y 390×844.
+
+- **El mando parece un mando (1.49.0)**: rediseño de `/mando/` con lenguaje de **Joy-Con**, todo en CSS (nada dibujado con imágenes, como el resto del proyecto).
+  - **Dos carcasas**: cada mitad es una empuñadura con el exterior muy redondeado (38 px) y el interior recto (14 px), teñida con el color del jugador (`color-mix` al 13 %), con luz de arriba, sombra interior abajo y **raíl** en el borde interior — la pieza por la que un Joy-Con se engancha a la consola.
+  - **Palanca**: pozo hundido de verdad (sombra interior de 8 px) y seta con relieve, anillo estriado y color del jugador al empujarla.
+  - **Cruceta**: placa hundida bajo la cruz y **flechas siempre visibles**, que se invierten a oscuro cuando el brazo se enciende.
+  - **Botones**: pozo oscuro alrededor (`0 0 0 8px`), sombra interior y el mismo salto al pulsar.
+  - Medido a 390×844, 844×390 y 740×360: nada desborda, la cruz deja 10 px de margen en el panel más estrecho y las direcciones siguen saliendo bien (derecha, arriba, abajo+derecha, nada en reposo).
 
 ## Kuboplay Shield (plugin aparte, `wp-content/plugins/kuboplay-shield`, v1.1.2)
 Segundo plugin, independiente del arcade: seguridad + rendimiento, con panel propio en español. Guía para el usuario: `docs/SEGURIDAD.md` (Cloudflare gratis paso a paso, qué hace y qué no, cómo recuperar el acceso desde IONOS).
