@@ -18,12 +18,18 @@ let map, MW, p, enemies, coins, anchors, decos, flag, check, checks = [], inv = 
 /* ---------- Gancho (docs/GANCHO.md) ------------------------------------------------------
    Todo lo que sigue es exclusivo de pixel-dash (PD). Los otros siete juegos del motor no ven
    ningún cambio: las variables valen 0/[] y las ramas están cerradas por `if (PD)`. */
-const PD = CFG.id === 'pixel-dash';
+/* castle-knight (1.40.2) reutiliza toda esta capa y añade sus tres verbos propios
+   (arquero, escudero con escudo y péndulo). Los otros seis juegos del motor no la ven. */
+const CK = CFG.id === 'castle-knight';
+const PD = CFG.id === 'pixel-dash' || CK;
+const BOSSN = CK ? 'El Alcaide' : 'El Coloso';
 let gems = [], rings = [], chain = 0, chainT = 0, mult = 1, died = false, pickGot = 0, lvPick = 0;
 /* Verbos nuevos de pixel-dash: losas que se desmoronan, ascensores, montacargas, bloques a
    compás (plats), sierras sobre raíl (saws), muelles (springs) y el muro que avanza (wall).
    Nada de esto se crea fuera de PD: los otros siete juegos ven arrays vacíos. */
 let plats = [], saws = [], springs = [], wall = null, waves = [], rocks = [], bs = null;
+/* Verbos propios de castle-knight: arqueros de almena, sus flechas y péndulos de maza. */
+let archers = [], arrows = [], pends = [];
 let lvT = 0, tgt = 0, lvName = '', lvTip = '', pdWarn = 0, wallGrd = null, wallGrdW = 0;
 /* Compás: cada bloque está encendido el 66 % del ciclo y las dos fases van a medio ciclo, así
    que siempre hay un solape en el que las dos están: se cruza a saltitos, no de milagro. */
@@ -69,6 +75,7 @@ function genHand(n0) {
   map = Array.from({ length: MH }, () => Array(MW).fill(0));
   enemies = []; coins = []; anchors = []; decos = []; gems = []; boss = null;
   plats = []; saws = []; springs = []; waves = []; rocks = []; wall = null; bs = null;
+  archers = []; arrows = []; pends = [];
   const col = (cx0, hh) => { for (let y = MH - hh; y < MH; y++) if (cx0 >= 0 && cx0 < MW) map[y][cx0] = 1; };
   let x = 0, h = 3, sx = 0, sw = 4, top = 3;   /* sx/sw/top: lo último colocado (para «e» y «c») */
   const flat = (n) => { sx = x; sw = n; top = h; for (let i = 0; i < n; i++) col(x + i, h); x += n; };
@@ -100,6 +107,18 @@ function genHand(n0) {
     else if (PD && c0 === 'E') enemies.push({ x: (sx + Math.max(1, sw - 3)) * T, y: (MH - top) * T - 24, w: 26, h: 24, vy: 0, ground: false, wall: 0,
       vx: 0, sp: (104 + 28 * lv01) * k.D.spd, min: sx * T, max: (sx + sw) * T - 26, alive: true, chase: 1, see: 0, face: -1 });
     else if (PD && c0 === 'W') wall = { x: 0, sp: (128 + 26 * n) * (0.86 + 0.14 * k.D.spd), n };
+    /* ---- verbos propios de castle-knight ---- */
+    /* A: ARQUERO de almena. Tensa el arco 0,6 s (aviso «!») y suelta una flecha a la altura de
+       la rodilla: se salta o se para con la espada. Se mata de pisotón o de tajo. */
+    else if (CK && c0 === 'A') archers.push({ x: (sx + Math.max(1, sw - 2)) * T, y: (MH - top) * T - 30, w: 24, h: 30,
+      alive: true, tm: 0.9 + (archers.length % 3) * 0.45, ph: 0, face: -1, per: (2.7 - 0.7 * lv01) / k.D.rate });
+    /* S: ESCUDERO. Patrulla con el escudo alto (el pisotón rebota); cada 2,4 s lo baja para
+       atacar, avisando 0,55 s antes: esa es la ventana para el tajo o el pisotón. */
+    else if (CK && c0 === 'S') enemies.push({ x: (sx + 1) * T, y: (MH - top) * T - 24, w: 26, h: 24,
+      vx: (36 + 16 * lv01) * k.D.spd, min: sx * T, max: (sx + sw) * T - 26, alive: true, sh: 1, open: 0, tell: 0, tm: 1.5 });
+    /* L: PÉNDULO de maza. La cadena se ve de arriba abajo, así que el barrido nunca sorprende. */
+    else if (CK && c0 === 'L') pends.push({ x: (sx + sw / 2) * T, y: (MH - top) * T - 150, len: 108, amp: 0.98,
+      ph: pends.length * 1.3, sp: (1.45 + 0.3 * lv01) * (0.88 + 0.12 * k.D.spd), r: 15, bx: 0, by: 0 });
     else if (c0 === 'a') anchors.push({ x: x * T, y: (MH - h - 6) * T });
     else if (c0 === 'e') enemies.push({ x: (sx + 1) * T, y: (MH - top) * T - 24, w: 26, h: 24, vx: (46 + 26 * lv01) * k.D.spd, min: sx * T, max: (sx + sw) * T - 26, alive: true, fly: TH.enemy === 'bird' });
     else if (c0 === 'c') for (let i = 0; i < 4; i++) coins.push({ x: (sx + sw * (i + 0.5) / 4) * T, y: (MH - top - 1) * T - 8 - Math.sin((i + 0.5) / 4 * Math.PI) * 30 });
@@ -179,6 +198,8 @@ function respawn() { lives--;
   const s = check && check.on ? { x: check.x, y: check.y - 40 } : spawn; p = mkP(s); rope = null; dead = 0; dashT = 0; inv = 1.6 / k.D.dmg;
   /* El muro vuelve detrás del punto de control: reintentar no es reintentar ya perdido. */
   if (PD) { if (wall) wall.x = s.x - 430; waves.length = 0; rocks.length = 0;
+    arrows.length = 0; for (const a of archers) { a.ph = 0; a.tm = 0.9; }
+
     for (const b of plats) if (b.kd === 'm') { b.st = 0; b.tm = 0; b.sh = 0; }
     if (bs && bs.alive && p.x > bs.min - 200) { bs.st = 'wait'; bs.tm = 1.4; bs.x = k.clamp(bs.x, bs.min, bs.max); bs.y = bs.gy; bs.vx = 0; } } }
 /* subpasos: a pocos FPS (dt hasta 0,05 s) una caída a 1100 px/s recorre 55 px y atravesaría tablones de 1 casilla */
@@ -246,6 +267,44 @@ function updChaser(e, dt) {
   collide(e, dt);
   if (e.see > 0) e.see += dt;
 }
+/* ---------- Verbos de castle-knight: arqueros, flechas y péndulos ------------------------
+   Devuelve true si algo mata. Todo telegrafiado: el arco se tensa, la cadena se ve entera. */
+function ckKill(a, pts, col) {
+  a.alive = false; chainUp(a.x + 12, a.y + 8); const g2 = pts * mult; score += g2;
+  k.hitstop(0.05); k.punch(0.045); k.sfx('hit');
+  bur(a.x + 12, a.y + 14, col, 18, 160); ring(a.x + 12, a.y + 14, col, 26); flo('+' + g2, a.x + 12, a.y - 4, mult > 1 ? '#ffd166' : '#fff');
+}
+function updCK(dt) {
+  for (const a of archers) {
+    if (!a.alive) continue;
+    const d = p.x + 11 - (a.x + 12); a.face = d > 0 ? 1 : -1;
+    if (a.ph > 0) { a.ph -= dt;
+      if (a.ph <= 0) { arrows.push({ x: a.x + 12 + a.face * 18, y: a.y + 19, vx: a.face * 300 * (0.86 + 0.14 * k.D.spd), t: 3.2 }); k.sfx('shoot'); } }
+    else { const near = Math.abs(d) < 470 && Math.abs(p.y - a.y) < 96 && !dead;
+      if (near) { a.tm -= dt; if (a.tm <= 0) { a.ph = 0.62 / k.D.spd; a.tm = a.per; k.sfx('click'); } } }
+    const hb = p.x + p.w > a.x + 4 && p.x < a.x + a.w - 4 && p.y + p.h > a.y + 6 && p.y < a.y + a.h - 2;
+    if (swordT > 0 && Math.abs(a.x + 12 - (p.x + 11 + p.face * 22)) < 34 && Math.abs(a.y + 15 - p.y - 15) < 32) { ckKill(a, 150, '#ffb26b'); continue; }
+    if (hb) { if (p.vy > 0 && p.y + p.h - a.y < 17) { ckKill(a, 150, '#ffb26b'); p.vy = -620; landSq = 0.24; } else { die(); return true; } }
+  }
+  for (let i = arrows.length - 1; i >= 0; i--) {
+    const q = arrows[i]; q.x += q.vx * dt; q.t -= dt;
+    const gone = q.t <= 0 || tileAt(q.x, q.y) === 1;
+    /* Parada con la espada: la recompensa difícil (25 puntos y cadena) de este verbo. */
+    if (!gone && swordT > 0 && Math.abs(q.x - (p.x + 11 + p.face * 20)) < 32 && Math.abs(q.y - p.y - 16) < 28) {
+      chainUp(q.x, q.y); const g2 = 25 * mult; score += g2; k.sfx('hit'); k.hitstop(0.04);
+      bur(q.x, q.y, '#ffe9a8', 10, 130); flo('¡Parada! +' + g2, q.x, q.y - 14, '#ffe9a8');
+      arrows[i] = arrows[arrows.length - 1]; arrows.pop(); continue;
+    }
+    if (!gone && Math.abs(q.x - p.x - 11) < 13 && q.y > p.y + 8 && q.y < p.y + p.h - 2) { die(); return true; }
+    if (gone) { arrows[i] = arrows[arrows.length - 1]; arrows.pop(); }
+  }
+  for (const q of pends) {
+    const an = Math.sin(t * q.sp + q.ph) * q.amp;
+    q.bx = q.x + Math.sin(an) * q.len; q.by = q.y + Math.cos(an) * q.len;
+    if (Math.abs(q.bx - p.x - 11) < q.r + 9 && Math.abs(q.by - p.y - 15) < q.r + 14) { die(); return true; }
+  }
+  return false;
+}
 /* Sierras, muelles, muro que avanza, ondas y rocas del jefe. Devuelve true si mata. */
 function updPD(dt) {
   if (k.st === 'play') lvT += dt;
@@ -255,6 +314,7 @@ function updPD(dt) {
     if (w.x <= w.a) { w.x = w.a; w.d = 1; } else if (w.x >= w.b) { w.x = w.b; w.d = -1; }
     if (Math.abs(w.x - p.x - 11) < w.r + 8 && Math.abs(w.y - p.y - 16) < w.r + 13) { die(); return true; }
   }
+  if (CK && updCK(dt)) return true;
   for (let i = waves.length - 1; i >= 0; i--) { const v = waves[i];
     v.x += v.d * 300 * k.D.spd * dt; v.t -= dt;
     if (v.t <= 0) { waves[i] = waves[waves.length - 1]; waves.pop(); continue; }
@@ -303,11 +363,13 @@ function updBoss(dt) {
   } else if (b.st === 'rocks') { if (b.tm <= 0) { b.st = 'stun'; b.tm = 1.1; } }
   else if (b.st === 'stun') { if (b.tm <= 0) { b.st = 'wait'; b.tm = 0.95; } }
   const hit = p.x + p.w > b.x + 10 && p.x < b.x + b.w - 10 && p.y + p.h > b.y + 12 && p.y < b.y + b.h - 4;
-  if (hit && b.st === 'stun' && b.iv <= 0 && p.vy > 0 && p.y + p.h - b.y < 34) {
-    b.hp--; b.iv = 0.8; p.vy = -700; const np = b.hp > 4 ? 1 : b.hp > 2 ? 2 : 3;
+  /* castle-knight: al Alcaide aturdido también se le entra con el tajo, no solo de pisotón. */
+  const swh = CK && swordT > 0 && Math.abs(b.x + 32 - (p.x + 11 + p.face * 26)) < 54 && Math.abs(b.y + 34 - p.y - 15) < 52;
+  if ((hit || swh) && b.st === 'stun' && b.iv <= 0 && (swh || (p.vy > 0 && p.y + p.h - b.y < 34))) {
+    b.hp--; b.iv = 0.8; if (!swh) p.vy = -700; const np = b.hp > 4 ? 1 : b.hp > 2 ? 2 : 3;
     k.hitstop(0.07); k.punch(0.07); k.shake(6); k.sfx('hit'); score += 300;
     ring(b.x + 32, b.y + 24, '#ff5f7a', 46); bur(b.x + 32, b.y + 22, '#ff5f7a', 22, 200); chainUp(b.x + 32, b.y);
-    if (b.hp <= 0) { b.alive = false; flag.hidden = false; k.sfx('win'); k.confetti(); k.reward('¡VENCIDO!', '#ffd166'); flo('¡El Coloso cae!', b.x + 32, b.y, '#ffc928'); }
+    if (b.hp <= 0) { b.alive = false; flag.hidden = false; k.sfx('win'); k.confetti(); k.reward('¡VENCIDO!', '#ffd166'); flo(`¡${BOSSN} cae!`, b.x + 32, b.y, '#ffc928'); }
     else { if (np !== b.ph) { b.ph = np; k.reward(`¡FASE ${np}!`, '#ff8a9a'); k.flash('rgba(255,120,150,.3)'); b.st = 'wait'; b.tm = 1.1; }
       else k.reward(`¡${b.hp} MÁS!`, '#ffd166'); }
     return false;
@@ -352,9 +414,21 @@ function upd(dt) {
       /* Remate: al darse la vuelta se aplasta un instante y levanta polvo (nada cambia de golpe). */
       if (PD) { e.tn = 0.2; bur(e.x + 13, e.y + 24, TH.foe, 3, 45); } } }
     if (PD && e.tn > 0) e.tn = Math.max(0, e.tn - dt);
+    /* Escudero (castle-knight): baja el escudo cada pocos segundos avisando antes. Con el escudo
+       alto el pisotón rebota y la espada no entra; con el escudo bajo cae de un golpe. */
+    if (e.sh) { if (e.open > 0) { e.open -= dt; e.vx = 0; }
+      else if (e.tell > 0) { e.tell -= dt; if (e.tell <= 0) { e.open = 0.95 / k.D.spd; k.sfx('click'); } }
+      else { if (!e.sp0) e.sp0 = Math.abs(e.vx) || 36; if (!e.vx) e.vx = e.sp0 * (p.x > e.x ? 1 : -1);
+        e.tm -= dt; if (e.tm <= 0) { e.tell = 0.55 / k.D.spd; e.tm = 2.5 / k.D.rate; } } }
+    const grd = !!(e.sh && e.open <= 0);
     const ey = e.fly ? e.y - 20 + Math.sin(t * 2 + e.min) * 16 : e.y, hit = p.x + p.w > e.x + 6 && p.x < e.x + e.w - 6 && p.y + p.h > ey + 7 && p.y < ey + e.h - 2;
-    if (swordT > 0 && Math.abs(e.x + 13 - (p.x + 11 + p.face * 22)) < 30 && Math.abs(ey + 12 - p.y - 15) < 28) { e.alive = false; score += 100; k.burst(e.x + 13, ey + 12, '#fff', 16); k.float('+100', e.x + 13, ey); k.sfx('hit'); continue; }
-    if (hit) { if ((p.vy > 0 && p.y + p.h - ey < 14) || dashT > 0) { e.alive = false; p.vy = -620;
+    if (!grd && swordT > 0 && Math.abs(e.x + 13 - (p.x + 11 + p.face * 22)) < 30 && Math.abs(ey + 12 - p.y - 15) < 28) { e.alive = false;
+      if (PD) { chainUp(e.x + 13, ey); const g2 = 100 * mult; score += g2; k.hitstop(0.05); k.punch(0.045);
+        bur(e.x + 13, ey + 12, TH.foe, 18, 160); ring(e.x + 13, ey + 12, TH.foe, 26); flo('+' + g2, e.x + 13, ey - 4, mult > 1 ? '#ffd166' : '#fff'); k.sfx('hit'); }
+      else { score += 100; k.burst(e.x + 13, ey + 12, '#fff', 16); k.float('+100', e.x + 13, ey); k.sfx('hit'); } continue; }
+    if (hit && grd) { if ((p.vy > 0 && p.y + p.h - ey < 14) || dashT > 0) { p.vy = -520; k.sfx('click'); k.shake(2);
+        bur(e.x + 13, ey + 4, '#a8c8ff', 8, 110); flo('¡Escudo!', e.x + 13, ey - 8, '#a8c8ff'); } else return die(); }
+    else if (hit) { if ((p.vy > 0 && p.y + p.h - ey < 14) || dashT > 0) { e.alive = false; p.vy = -620;
       if (PD) { chainUp(e.x + 13, ey); const g2 = 100 * mult; score += g2; k.hitstop(0.05); k.punch(0.045); landSq = 0.24;
         bur(e.x + 13, ey + 12, TH.foe, 18, 160); ring(e.x + 13, ey + 12, TH.foe, 26); flo('+' + g2, e.x + 13, ey - 4, mult > 1 ? '#ffd166' : '#fff'); k.sfx('hit'); }
       else { score += 100; k.burst(e.x + 13, ey + 12, '#fff', 16); k.float('+100', e.x + 13, ey); k.sfx('hit'); } } else return die(); } }
@@ -513,6 +587,39 @@ function pdSprites() {
     g.fillStyle = 'rgba(255,255,255,.3)'; g.beginPath(); g.arc(-5, -7, 11, 0, 6.283); g.fill();
     g.fillStyle = 'rgba(24,18,48,.34)'; g.beginPath(); g.arc(6, 8, 13, 0, 6.283); g.fill();
     g.restore(); s.rock = r[0]; }
+  if (CK) {
+    /* flecha: una sola pieza (astil, punta y plumas en un trazado continuo) */
+    { const r = mkCv(26, 8), g = r[1]; const P = new Path2D();
+      P.moveTo(26, 4); P.lineTo(18, 0.8); P.lineTo(18, 2.9); P.lineTo(7, 2.9); P.lineTo(3, 0.6);
+      P.lineTo(0.8, 1.1); P.lineTo(3.4, 4); P.lineTo(0.8, 6.9); P.lineTo(3, 7.4); P.lineTo(7, 5.1);
+      P.lineTo(18, 5.1); P.lineTo(18, 7.2); P.closePath();
+      g.fillStyle = '#d8c39a'; g.fill(P); g.lineWidth = 1.5; g.lineJoin = 'round'; g.strokeStyle = O; g.stroke(P);
+      g.save(); g.clip(P);
+      g.fillStyle = 'rgba(255,255,255,.34)'; g.fillRect(0, 0.5, 26, 2);
+      g.fillStyle = 'rgba(48,32,14,.34)'; g.fillRect(0, 5, 26, 3);
+      g.fillStyle = '#c3ccdd'; g.fillRect(17.5, 0, 9, 8);
+      g.restore(); s.arrow = r[0]; }
+    /* maza del péndulo: bola con púas, un trazado (las púas nacen de la silueta) */
+    { const r = mkCv(40, 40), g = r[1]; g.translate(20, 20); const P = new Path2D();
+      for (let i = 0; i < 24; i++) { const a = i / 24 * 6.283, rr = i % 2 ? 15.5 : 10.5;
+        if (i) P.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); else P.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+      P.closePath();
+      g.fillStyle = '#6b7590'; g.fill(P); g.lineWidth = 2.2; g.lineJoin = 'round'; g.strokeStyle = O; g.stroke(P);
+      g.save(); g.clip(P);
+      g.fillStyle = 'rgba(255,255,255,.34)'; g.beginPath(); g.arc(-4, -5, 9, 0, 6.283); g.fill();
+      g.fillStyle = 'rgba(20,16,40,.36)'; g.beginPath(); g.arc(5, 6, 11, 0, 6.283); g.fill();
+      g.restore(); s.mace = r[0]; }
+    /* escudo del escudero: una pieza con el blasón pintado dentro */
+    { const r = mkCv(20, 26), g = r[1]; const P = new Path2D();
+      P.moveTo(2, 3); P.quadraticCurveTo(10, 0.6, 18, 3); P.lineTo(17, 15);
+      P.quadraticCurveTo(15, 23, 10, 25.4); P.quadraticCurveTo(5, 23, 3, 15); P.closePath();
+      g.fillStyle = '#5b8cff'; g.fill(P); g.lineWidth = 2.2; g.lineJoin = 'round'; g.strokeStyle = O; g.stroke(P);
+      g.save(); g.clip(P);
+      g.fillStyle = 'rgba(255,255,255,.4)'; g.fillRect(0, 1, 20, 5);
+      g.fillStyle = 'rgba(14,26,66,.34)'; g.fillRect(0, 15, 20, 11);
+      g.fillStyle = '#ffd166'; g.fillRect(9, 5, 2.4, 14); g.fillRect(5, 10, 10, 2.4);
+      g.restore(); s.shield = r[0]; }
+  }
   pdSpr = s; return s;
 }
 function star(x, y, r, on) {
@@ -568,6 +675,31 @@ function drwPD() {
   for (const e of enemies) if (e.alive && e.warn > 0 && e.x > L && e.x < R2) {
     const q = Math.min(1, (0.75 - e.warn) * 8); c.save(); c.translate(e.x + 13, e.y - 16 - q * 6); c.scale(q, q);
     label('!', 0, -10, 26, '#ff5f7a', 'center'); c.restore(); }
+  if (CK) {
+    /* péndulos: la cadena entera a la vista (el barrido nunca sorprende) */
+    for (const q of pends) if (q.x > L - 150 && q.x < R2 + 150) {
+      c.strokeStyle = 'rgba(26,21,48,.8)'; c.lineWidth = 5; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(q.x, q.y); c.lineTo(q.bx, q.by); c.stroke();
+      c.strokeStyle = '#8a86b5'; c.lineWidth = 2.2; c.stroke();
+      c.beginPath(); c.arc(q.x, q.y, 5.5, 0, 6.283); ART.fillOut(c, '#7f8ba8', 2);
+      c.save(); c.translate(q.bx, q.by); c.rotate(t * 1.1); c.drawImage(S.mace, -20, -20, 40, 40); c.restore();
+    }
+    /* arqueros: arco tensado y línea de tiro mientras apuntan */
+    for (const a of archers) if (a.alive && a.x > L && a.x < R2) {
+      ART.enemy(c, 'knight', a.x, a.y + 5, a.w, a.h - 5, { t, face: a.face });
+      const q = a.ph > 0 ? k.clamp(1 - a.ph / 0.62, 0, 1) : 0, bx2 = a.x + 12 + a.face * 9;
+      c.lineCap = 'round'; c.lineWidth = 3; c.strokeStyle = a.ph > 0 ? '#ffd166' : '#b08a5a';
+      c.beginPath(); c.arc(bx2, a.y + 19, 11, a.face > 0 ? -1.15 : 2.0, a.face > 0 ? 1.15 : 4.28); c.stroke();
+      if (a.ph > 0) {
+        c.strokeStyle = 'rgba(255,209,102,.55)'; c.lineWidth = 2;
+        c.beginPath(); c.moveTo(bx2 + a.face * 10, a.y + 19); c.lineTo(bx2 + a.face * (14 + q * 96), a.y + 19); c.stroke();
+        label('!', a.x + 12, a.y - 24, 22, '#ff5f7a', 'center');
+      }
+    }
+    for (const q of arrows) if (q.x > L && q.x < R2) {
+      c.save(); c.translate(q.x, q.y); if (q.vx < 0) c.scale(-1, 1); c.drawImage(S.arrow, -13, -4, 26, 8); c.restore();
+    }
+  }
   if (bs && bs.alive && bs.x > L - 140 && bs.x < R2 + 140) drwBoss(S);
   for (const v of waves) { const q = k.clamp(v.t / 2.6, 0, 1);
     c.globalAlpha = 0.35 + 0.45 * q; c.fillStyle = '#c9bfff';
@@ -633,12 +765,21 @@ function drw() {
     ART.glow(c, gm.x, by2, 26, '#7cf7a0', 0.22 + 0.1 * Math.sin(t * 3));
     c.save(); c.translate(gm.x, by2); c.rotate(Math.sin(t * 1.6 + gm.x * 0.01) * 0.16);
     const s2 = 1 + 0.06 * Math.sin(t * 3.4); c.scale(s2, 1 / s2); c.drawImage(gemSprite(), -18, -18, 36, 36); c.restore(); }
+  const SK = CK ? pdSprites() : null;
   for (const e of enemies) if (e.alive && e.x > cx - 40 && e.x < cx + W + 40) {
     const ey2 = e.fly ? e.y - 20 + Math.sin(t * 2 + e.min) * 16 : e.y;
     if (PD && e.tn > 0) { const q2 = Math.sin((e.tn / 0.2) * Math.PI) * 0.16;
       c.save(); c.translate(e.x + e.w / 2, ey2 + e.h); c.scale(1 + q2, 1 - q2); c.translate(-(e.x + e.w / 2), -(ey2 + e.h));
       ART.enemy(c, TH.enemy, e.x, ey2, e.w, e.h, { t, face: e.vx > 0 ? 1 : -1 }); c.restore(); }
-    else ART.enemy(c, TH.enemy, e.x, ey2, e.w, e.h, { t, face: e.vx > 0 ? 1 : -1 }); }
+    else ART.enemy(c, TH.enemy, e.x, ey2, e.w, e.h, { t, face: e.vx > 0 ? 1 : -1 });
+    if (CK && e.sh) {
+      const fc = e.vx > 0 ? 1 : e.vx < 0 ? -1 : (p.x > e.x ? 1 : -1);
+      if (e.open > 0) { c.strokeStyle = '#ffe9a8'; c.lineWidth = 4; c.lineCap = 'round';   /* escudo abajo: ventana */
+        c.beginPath(); c.moveTo(e.x + 13 + fc * 6, ey2 + 6); c.lineTo(e.x + 13 + fc * 22, ey2 - 8); c.stroke(); }
+      else { c.save(); c.translate(e.x + 13 + fc * 11, ey2 + 13); if (fc > 0) c.scale(-1, 1);
+        c.drawImage(SK.shield, -10, -13, 20, 26); c.restore(); }
+      if (e.tell > 0 && Math.floor(t * 12) % 2) label('!', e.x + 13, ey2 - 26, 20, '#ffd166', 'center');
+    } }
   if (boss && boss.alive && Math.floor(boss.iv > 0 ? t * 12 : 0) % 2 === 0) ART.enemy(c, TH.enemy === 'bird' ? 'knight' : TH.enemy, boss.x, boss.y, boss.w, boss.h, { t, face: boss.face || -1, big: 1 });
   if (rope) { c.strokeStyle = ART.OUT; c.lineWidth = 4; c.beginPath(); c.moveTo(rope.a.x, rope.a.y); c.lineTo(p.x + 11, p.y + 12); c.stroke(); c.strokeStyle = '#e6d3a3'; c.lineWidth = 2; c.stroke(); }
   if (dashT > 0) { c.globalAlpha = 0.35; ART.hero(c, p.x + 11 - p.face * 18, p.y + p.h, HS, { face: p.face, state: 'run', t, col: TH.hero }); c.globalAlpha = 1; }
@@ -706,7 +847,7 @@ function drw() {
     ART.rr(c, bx2 - 4, by2 - 4, bw2 + 8, 18, 9); c.fillStyle = 'rgba(26,21,48,.8)'; c.fill();
     for (let i = 0; i < 6; i++) { c.fillStyle = i < bs.hp ? (bs.ph === 3 ? '#ff5f7a' : bs.ph === 2 ? '#ffa15f' : '#ffd166') : 'rgba(255,255,255,.12)';
       c.fillRect(bx2 + i * seg + 1.5, by2, seg - 3, 10); }
-    label(`El Coloso · fase ${bs.ph}`, bx2 + bw2 / 2, by2 + 15, 12, '#ffd7df', 'center'); }
+    label(`${BOSSN} · fase ${bs.ph}`, bx2 + bw2 / 2, by2 + 15, 12, '#ffd7df', 'center'); }
   if (intro > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, intro);
     const iw = PD && lvName ? Math.min(W - 24, Math.max(260, lvTip.length * 7 + 40)) : 220, ih = PD && lvName ? 92 : 64;
     ART.rr(c, W / 2 - iw / 2, H / 2 - 38, iw, ih, 18); c.fillStyle = 'rgba(26,21,48,.85)'; c.fill();
@@ -743,6 +884,10 @@ function gfx() {
       for (const w of saws) if (w.x > cx - 40 && w.x < cx + W + 40) { g.beginPath(); g.arc(w.x, w.y, 17, 0, 6.283); g.fill(); }
       for (const s of springs) if (s.x > cx - 40 && s.x < cx + W + 40) g.fillRect(s.x - 24, s.y - 24, 48, 24);
       if (bs && bs.alive) g.fillRect(bs.x + 4, bs.y + 4, bs.w - 8, bs.h - 4); }
+    if (CK) { g.fillStyle = '#bcbcbc';
+      for (const q of pends) if (q.bx > cx - 40 && q.bx < cx + W + 40) { g.beginPath(); g.arc(q.bx, q.by, 15, 0, 6.283); g.fill(); }
+      for (const a of archers) if (a.alive && a.x > cx - 40 && a.x < cx + W + 40) g.fillRect(a.x + 2, a.y + 4, a.w - 4, a.h - 4);
+      for (const q of arrows) if (q.x > cx - 40 && q.x < cx + W + 40) g.fillRect(q.x - 12, q.y - 3, 24, 6); }
     g.fillStyle = '#d2d2d2';
     for (const e of enemies) if (e.alive && e.x > cx - 40 && e.x < cx + W + 40) g.fillRect(e.x - 3, e.fly ? e.y - 20 : e.y, e.w + 6, e.h);
     g.fillStyle = '#f0f0f0'; if (!dead) g.fillRect(p.x + 2, p.y + 1, 18, p.h - 1); // cuerpo compacto del cartoon: la caja de relieve cubre la nueva silueta
@@ -758,6 +903,8 @@ function gfx() {
       for (const s of springs) if (s.x > cx - 40 && s.x < cx + W + 40) ART.glow(g, s.x, s.y - 14, 22, '#a8e4ff', 0.5);
       for (const r of rocks) if (r.w > 0) ART.glow(g, r.x, r.gy - 4, 20, '#ff5f7a', 0.5);
       if (bs && bs.alive && bs.st === 'tell') ART.glow(g, bs.x + 32, bs.y + 30, 48, '#ff5f7a', 0.6); }
+    if (CK) { for (const a of archers) if (a.alive && a.ph > 0 && a.x > cx - 40 && a.x < cx + W + 40) ART.glow(g, a.x + 12, a.y + 19, 22, '#ffd166', 0.6);
+      for (const q of arrows) if (q.x > cx - 40 && q.x < cx + W + 40) ART.glow(g, q.x, q.y, 14, '#ffe9a8', 0.5); }
     for (const q of checks) if (q.on) ART.glow(g, q.x + 8, q.y - 44, 20, '#7cf7a0', 0.6);
     if (dashT > 0) ART.glow(g, p.x + 11 - p.face * 14, p.y + 14, 34, '#a8e4ff', 0.8);
     if (swordT > 0) ART.glow(g, p.x + 11 + p.face * 26, p.y + 12, 28, '#ffffff', 0.85);

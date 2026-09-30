@@ -24,8 +24,127 @@ const floorDir = (j) => j === 0 ? 1 : j % 2 ? -1 : 1; // hacia dónde ruedan los
 /* Niveles a mano (plan Friv): si hay tabla, manda ella y no el azar. */
 const BLV = (typeof BARLV !== 'undefined' && BARLV[CFG.id]) || null;
 let LD = null;
+/* ---------- barrel-climb 1.40.2: torre por etapas, remaches, fuego, martillo,
+   aceite, trepadores, vigas agrietadas y El Capataz. Acotado por CFG.id: los otros
+   cuatro juegos de este motor no ven nada de esto. ---------- */
+const BC = CFG.id === 'barrel-climb';
+let LVD = null, STG = null, stage = 0, rivets = [], fires = [], climbers = [], cracks = [], oilF = [];
+let ham = null, hamT = 0, hamRe = 0, bossHP = 0, bossT = 0, bossFall = 0, chain = 0, chainT = 0;
+let lvT = 0, died = 0, missCo = 0, openT = 0, mult = 1;
+const rivLeft = () => rivets.reduce((n, r) => n + (r.got ? 0 : 1), 0);
+const pFloor = (o) => Math.round((MH - 1 - (o.y + o.h) / T) / 3);
+function bcGen() {
+  rivets = []; fires = []; climbers = []; cracks = []; oilF = LD.oil || []; ham = null; hamT = 0; hamRe = 0;
+  bossHP = LD.boss ? 3 : 0; bossT = 0; bossFall = 0; chain = 0; chainT = 0; openT = 0;
+  for (let i = 0; i < 5; i++) for (const cx of (LD.riv && LD.riv[i]) || []) rivets.push({ x: cx * T + T / 2, y: fyRow(i) * T - 7, f: i, got: false });
+  if (LD.ham) ham = { x: LD.ham[1] * T + T / 2, y: fyRow(LD.ham[0]) * T - 11, got: false };
+  for (const q of LD.clm || []) climbers.push({ x: q[1] * T, y: fyRow(q[0]) * T - 22, w: 16, h: 22, f: q[0], dir: q[2] || -1, lad: null, ph: climbers.length * 0.7 });
+  for (const q of LD.brk || []) { const row = fyRow(q[0]); for (let n = 0; n < (q[2] || 2); n++) cracks.push({ tx: q[1] + n, ty: row, x: (q[1] + n) * T, y: row * T, st: 0, fall: 0 }); }
+}
+function bcStages() { return STG ? STG.length : 1; }
+function bcSmash(b) {
+  b.dead = true; chain++; chainT = 2.4; mult = Math.min(5, 1 + Math.floor(chain / 2));
+  const pts = 150 * mult; score += pts; k.sfx('explode'); k.shake(4); k.hitstop(0.05); k.punch(0.4);
+  k.burst(b.x + 8, b.y + 8, '#ffb13d', 14, 200); k.float('+' + pts, b.x + 8, b.y - 14, '#ffd24d'); k.chime(chain);
+  if (chain >= 3) k.combo(chain, b.x + 8, b.y - 34);
+}
+function bcHit(txt) { died++; die('#ff6a4d'); if (txt) k.float(txt, p.x + 7, p.y - 16, '#ff9a5c'); }
+function bcUpd(dt) {
+  lvT += dt; chainT -= dt; if (chainT <= 0 && chain) { chain = 0; mult = 1; k.chainReset(); }
+  const pcx = p.x + p.w / 2, feet = p.y + p.h;
+  if (openT > 0) openT -= dt;
+  // remaches
+  for (const r of rivets) if (!r.got && Math.abs(r.x - pcx) < 15 && Math.abs(r.y - feet + 6) < 24) {
+    r.got = true; chain++; chainT = 2.4; mult = Math.min(5, 1 + Math.floor(chain / 2));
+    score += 60 * mult; k.sfx('pop'); k.chime(chain); k.burst(r.x, r.y, '#cfe4ff', 8, 110); k.float('+' + 60 * mult, r.x, r.y - 14, '#cfe4ff');
+    if (!rivLeft()) { openT = 2.2; k.sfx('win'); k.reward('¡Bandera abierta!', '#7cf7a0'); }
+  }
+  // martillo
+  if (ham && !ham.got && Math.abs(ham.x - pcx) < 16 && Math.abs(ham.y - feet + 8) < 26) { ham.got = true; hamT = 6; k.sfx('start'); k.reward('¡Martillo!', '#ffd24d'); k.burst(ham.x, ham.y, '#ffd24d', 12, 150); }
+  if (hamT > 0) hamT -= dt;
+  if (LD.boss) { hamRe -= dt; if (ham && ham.got && hamT <= 0 && hamRe <= 0) { ham.got = false; hamRe = 9; k.sfx('coin'); } }
+  // charcos de fuego
+  for (const f of fires) { f.t += dt; f.x += f.vx * dt; if (f.x < 8 || f.x > W - 62) f.vx *= -1; if (Math.abs(f.x - pcx) < 14 && Math.abs(fyRow(0) * T - feet) < 8) return bcHit('¡Fuego!'); }
+  // vigas agrietadas
+  for (const q of cracks) {
+    if (q.fall) { q.fall += dt; q.y += q.fall * 260 * dt; continue; }
+    const on = p.ground && Math.abs(feet - q.ty * T) < 3 && pcx > q.x - 4 && pcx < q.x + T + 4;
+    if (on) { q.st += dt; if (q.st > 0.55) { q.fall = 0.01; map[q.ty][q.tx] = 0; lvCv = null; k.sfx('hit'); k.shake(3); k.burst(q.x + T / 2, q.y + 6, '#c98a4a', 8, 90); } }
+    else q.st = Math.max(0, q.st - dt * 0.6);
+  }
+  // trepadores
+  for (const e of climbers) {
+    if (e.dead) { e.dt2 = (e.dt2 || 0) + dt; e.y += e.dt2 * 300 * dt; continue; }
+    if (e.lad) { e.y -= 52 * dt; if (e.y + e.h <= e.lad.y0) { e.y = e.lad.y0 - e.h; e.f++; e.lad = null; } }
+    else {
+      e.x += e.dir * (34 + 10 * (LD.spd - 62) / 80) * k.D.spd * dt;
+      if (e.x < 4) { e.x = 4; e.dir = 1; } if (e.x > W - 58) { e.x = W - 58; e.dir = -1; }
+      const py = pFloor(p);
+      if (py > e.f) for (const l of ladders) if (Math.abs(l.x - (e.x + e.w / 2)) < 7 && Math.abs(l.y1 - (e.y + e.h)) < 4) { e.lad = l; e.x = l.x - e.w / 2; break; }
+      if (py < e.f) e.dir = (pcx > e.x ? 1 : -1);
+    }
+    const near = Math.abs(e.x + e.w / 2 - pcx) < 14 && Math.abs(e.y + e.h - feet) < 22;
+    if (near) {
+      if (hamT > 0) { e.dead = 1; score += 200 * mult; chain++; chainT = 2.4; k.sfx('explode'); k.burst(e.x + 8, e.y + 10, '#a8cf3f', 12, 170); k.float('+' + 200 * mult, e.x + 8, e.y - 12, '#a8cf3f'); k.chime(chain); }
+      else if (!p.ground && p.vy > 60 && p.y + p.h < e.y + 12) { e.dead = 1; p.vy = -420; score += 120; k.sfx('pop'); k.burst(e.x + 8, e.y + 8, '#a8cf3f', 10, 140); }
+      else return bcHit('¡Trepador!');
+    }
+  }
+  // El Capataz
+  if (bossHP > 0) {
+    bossT -= dt; const bx = W - 50, by = fyRow(5) * T;
+    if (hamT > 0 && bossT <= 0 && Math.abs(pcx - bx) < 34 && Math.abs(feet - by) < 26) {
+      bossHP--; bossT = 1.6; k.sfx('hurt'); k.shake(9); k.hitstop(0.08); k.punch(0.8); k.flash('rgba(255,210,70,.3)');
+      k.burst(bx, by - 16, '#ffd24d', 20, 240); k.float('¡Toma!', bx - 10, by - 44, '#ffd24d');
+      if (bossHP > 0) { bT = 0.35; k.reward(bossHP + (bossHP === 1 ? ' golpe más' : ' golpes más'), '#ff9a5c'); }
+      else { bossFall = 0.01; openT = 3; k.sfx('win'); k.confetti(); k.reward('¡El Capataz cae!', '#7cf7a0'); for (const b of barrels) b.dead = true; }
+    }
+    if (bossHP <= 0) return false;
+  }
+  if (bossFall) bossFall += dt;
+  return false;
+}
+function bcWin() {
+  const b = Math.round(bonus / 100) * 100; score += 500 * level + b;
+  if (stage + 1 < bcStages()) { stage++; k.sfx('win'); k.float('¡Etapa ' + (stage + 1) + '!', flag.x + 24, flag.y - 40, '#7cf7a0'); genBarrels(); return; }
+  const tgt = (LVD && LVD.t && LVD.t[k.dif]) || 999, ok = lvT <= tgt;
+  const st = 1 + (ok ? 1 : 0) + (ok && missCo === 0 && died === 0 ? 1 : 0);
+  return k.levelDone(score, Math.round(lvT) + ' s · ' + got + ' moneda' + (got === 1 ? '' : 's'), { stars: st });
+}
+function hammerSpr(x, y, a) {
+  c.save(); c.translate(x, y); c.rotate(a);
+  const head = (g) => ART.rr(g, -3, -12, 15, 11, 3), hand = (g) => ART.rr(g, -12, -6.5, 14, 5, 2.4);
+  unite(c, [[hand, '#c98a4a'], [head, '#b9c2d2']], 1.15);
+  clipIn(c, head, (g) => { g.fillStyle = AL('#ffffff', 0.35); g.fillRect(-3, -12, 15, 3); g.fillStyle = AL(OUT, 0.24); g.fillRect(-3, -4.4, 15, 3.4); });
+  c.restore();
+}
+function bcDraw() {
+  for (const q of cracks) if (!q.fall && q.st > 0) { c.globalAlpha = 0.25 + 0.5 * Math.min(1, q.st / 0.55) * (0.6 + 0.4 * Math.sin(t * 30)); c.fillStyle = '#ffd24d'; c.fillRect(q.x, q.y, T, 12); c.globalAlpha = 1; }
+  for (const q of cracks) if (q.fall) { c.save(); c.translate(q.x + T / 2, q.y + 6); c.rotate(q.fall * 2); c.fillStyle = '#a52f3c'; ART.fillOut(c, '#a52f3c', 1.6); c.fillRect(-T / 2, -6, T, 12); c.restore(); }
+  for (const f of oilF) { const row = fyRow(f); c.globalAlpha = 0.5; c.fillStyle = '#2f2a5e'; c.fillRect(0, row * T - 2, W, 3); c.globalAlpha = 0.28 + 0.12 * Math.sin(t * 3); c.fillStyle = '#7cf7f7'; c.fillRect(0, row * T - 2, W, 1.6); c.globalAlpha = 1; }
+  for (const f of fires) { const h = 12 + Math.sin(f.t * 12) * 4, y = fyRow(0) * T;
+    const fl = (i) => (g) => { g.moveTo(f.x - 9 + i * 9, y); g.quadraticCurveTo(f.x - 4 + i * 9, y - h * 1.7, f.x + i * 9, y); g.closePath(); };
+    unite(c, [[fl(0), '#ff7a2d'], [fl(1), '#ffd23d'], [(g) => ART.rr(g, f.x - 12, y - 4, 24, 5, 2.4), '#5a2a12']], 1.1); }
+  for (const r of rivets) if (!r.got) { const bob = Math.sin(t * 4 + r.x) * 1.2;
+    const bolt = (g) => { g.moveTo(r.x - 5, r.y + bob - 4); g.lineTo(r.x + 5, r.y + bob - 4); g.lineTo(r.x + 6.5, r.y + bob + 1); g.lineTo(r.x, r.y + bob + 6); g.lineTo(r.x - 6.5, r.y + bob + 1); g.closePath(); };
+    unite(c, [[bolt, '#cfe4ff']], 1.1);
+    clipIn(c, bolt, (g) => { g.fillStyle = AL(OUT, 0.26); g.fillRect(r.x - 7, r.y + bob + 1, 14, 6); g.fillStyle = AL('#ffffff', 0.45); g.beginPath(); g.arc(r.x - 2, r.y + bob - 1, 1.8, 0, R2); g.fill(); }); }
+  if (ham && !ham.got) hammerSpr(ham.x - 4, ham.y + Math.sin(t * 5) * 2, -0.5);
+  for (const e of climbers) { c.save(); if (e.dead) { c.translate(e.x + 8, e.y + 11); c.scale(1, -1); c.translate(-e.x - 8, -e.y - 11); }
+    ART.enemy(c, 'slime', e.x, e.y, 16, 22, { t: t + e.ph, face: e.dir }); c.restore(); }
+  if (hamT > 0) hammerSpr(p.x + (p.face > 0 ? 13 : 1), p.y + 8, p.face > 0 ? -0.6 + Math.sin(t * 16) * 0.5 : 3.7 - Math.sin(t * 16) * 0.5);
+}
+function bcHud() {
+  const nr = rivLeft();
+  label(bossHP > 0 ? 'El Capataz vigila la bandera' : nr ? 'Remaches ' + (rivets.length - nr) + '/' + rivets.length : '¡Bandera abierta!', W - 92, 21, 12, bossHP > 0 ? '#ff9a5c' : nr ? '#cfe4ff' : '#7cf7a0', 'right');  // bajo Bonus, lejos de pausa/sonido
+  label('Etapa ' + (stage + 1) + '/' + bcStages() + (LVD && LVD.t ? '  ·  ' + Math.floor(lvT) + '/' + LVD.t[k.dif] + ' s' : ''), 8, 55, 11, lvT > (LVD && LVD.t ? LVD.t[k.dif] : 1e9) ? '#ff9a5c' : 'rgba(255,255,255,.85)');
+  if (hamT > 0) { c.fillStyle = 'rgba(26,21,48,.6)'; c.fillRect(W / 2 - 40, H - 16, 80, 7); c.fillStyle = '#ffd24d'; c.fillRect(W / 2 - 40, H - 16, 80 * Math.min(1, hamT / 6), 7); }
+  if (chain > 1) label('x' + mult, W / 2, 22, 15, '#ffd24d', 'center');
+  if (bossHP > 0) { c.fillStyle = 'rgba(26,21,48,.6)'; c.fillRect(W - 128, H - 26, 120, 9); c.fillStyle = '#ff6a4d'; c.fillRect(W - 128, H - 26, 120 * bossHP / 3, 9); label('El Capataz', W - 128, H - 40, 11, '#ff9a5c'); }
+}
 function genBarrels() {
   LD = BLV ? BLV[k.clamp(level, 1, BLV.length) - 1] : null;
+  if (BC && LD) { LVD = LD; STG = LD.st; LD = STG[k.clamp(stage, 0, STG.length - 1)]; }
   MW = 24; MH = 18; map = Array.from({ length: MH }, () => Array(MW).fill(0)); barrels = []; coins = []; enemies = []; ladders = []; fx = []; bT = 2; throwT = 0; drumT = 0; climbPh = 0;
   for (let x = 0; x < MW; x++) map[MH - 1][x] = 1;
   for (let i = 1; i <= 5; i++) { const y = fyRow(i); for (let x = 0; x < MW; x++) if (i % 2 ? x > 2 : x < MW - 3) map[y][x] = 2; }
@@ -42,6 +161,7 @@ function genBarrels() {
   for (let i = 0; i < 5; i++) for (let n = 0; n < 3; n++) { const cx = k.ri(i % 2 ? 4 : 1, i % 2 ? MW - 2 : MW - 5); if (i === 0 && cx > MW - 4) continue; coins.push({ x: cx * T + T / 2, y: fyRow(i) * T - 16 - (n === 1 ? 26 : 0) }); }
   }
   flag = { x: 7 * T, y: fyRow(5) * T };
+  if (BC) bcGen();
   p = mkP(4 * T, (MH - 1) * T - 26); bonus = 3000 + (level - 1) * 500; lvCv = null; intro = 1.5;
 }
 function cloudW(d) { return k.ri(Math.round(62 - d * 14), Math.round(84 - d * 22)); }
@@ -86,8 +206,8 @@ function build() { if (TEJ) return buildTej();
   t = 0; rope = null; dashT = 0; dashCd = 0; swordT = 0; jumpBuf = 0; coyote = 0; cam = 0; dead = 0; sq = 0; steer = 0; diffT = 0; if (M === 'barrels') genBarrels(); else genVert(); }
 let rec = 0;
 function reset() { if (TEJ) return resetTej();
-  try { rec = +localStorage.getItem(k.bkey(CFG.id)) || 0; } catch (e) { /* sin almacenamiento */ } level = BLV ? k.lv : 1; lives = 4 + k.D.life; score = 0; got = 0; build(); }
-if (BLV) k.levels(BLV.length, { start: (i) => { level = i; lives = 4 + k.D.life; score = 0; got = 0; build(); } });
+  try { rec = +localStorage.getItem(k.bkey(CFG.id)) || 0; } catch (e) { /* sin almacenamiento */ } level = BLV ? k.lv : 1; lives = 4 + k.D.life; score = 0; got = 0; if (BC) { stage = 0; lvT = 0; died = 0; missCo = 0; } build(); }
+if (BLV) k.levels(BLV.length, { start: (i) => { level = i; lives = 4 + k.D.life; score = 0; got = 0; if (BC) { stage = 0; lvT = 0; died = 0; missCo = 0; } build(); } });
 if (!TEJ) reset(); k.show(CFG.title, CFG.help);
 /* si el jugador cambia de nivel en la pantalla de inicio, la partida se prepara de nuevo con los valores de k.D */
 k.onDif = () => { if (k.st !== 'play') reset(); };
@@ -100,6 +220,7 @@ function die(col) {
 function finish() {
   if (M === 'barrels') {
     lives--; if (lives <= 0) return k.lose(CFG.id, score, 'Sin vidas', `Nivel ${level} · ${got} moneda${got === 1 ? "" : "s"}`);
+    if (BC) { dead = 0; got = 0; genBarrels(); intro = 1; return; }
     p = mkP(4 * T, (MH - 1) * T - 26); barrels = []; bT = 2; dead = 0; bonus = 3000 + (level - 1) * 500; intro = 1; return;
   }
   const m = Math.floor(height() / 3.2);
@@ -145,7 +266,8 @@ function upBarrels(dt, L, R, U, D, kx) {
     if (k.hit.has('a') && p.lad) { p.lad = null; p.vy = -380; p.vx = kx * 120; k.sfx('jump'); }
   } else {
     if (kx) p.face = kx;
-    p.vx += (kx * 125 - p.vx) * Math.min(1, dt * (p.ground ? 16 : 6));
+    const ac = BC && p.ground && oilF.indexOf(pFloor(p)) >= 0 ? 3.4 : (p.ground ? 16 : 6);
+    p.vx += (kx * 125 - p.vx) * Math.min(1, dt * ac);
     p.vy = Math.min(p.vy + 1500 * dt, 700);
     if (p.ground) coyote = COYOTE;
     if (jumpBuf > 0 && coyote > 0) { p.vy = -500; jumpBuf = 0; coyote = 0; k.sfx('jump'); sq = -0.2; k.burst(pcx, feet, 'rgba(255,255,255,.8)', 5, 60); }
@@ -155,6 +277,7 @@ function upBarrels(dt, L, R, U, D, kx) {
     p.state = !p.ground ? (p.vy < 0 ? 'jump' : 'fall') : Math.abs(p.vx) > 20 ? 'run' : 'idle';
   }
   if (intro > 0) return;
+  if (BC && bcUpd(dt)) return;
   // lanzador y barriles
   throwT -= dt; bT -= dt;
   /* Con niveles a mano el ritmo lo fija la tabla; en el nivel del jefe el lanzador se
@@ -172,18 +295,22 @@ function upBarrels(dt, L, R, U, D, kx) {
       b.x = k.clamp(b.x, 0, W - 16);
       const j = Math.round((MH - 1 - (b.y + 16) / T) / 3);
       if (b.ground && j > 0) for (const l of ladders) if (l.y0 === b.y + 16 && (bcx - l.x) * (b.x + 8 - l.x) <= 0 && !b.seen.has(l)) { b.seen.add(l); if (b.blue || Math.random() < (LD ? LD.hop : Math.min(0.55, 0.12 + (level - 1) * 0.05))) { b.lad = l; b.x = l.x - 8; } }
-      if (b.ground && j === 0 && b.x > W - 52) { b.dead = true; drumT = 0.6; k.burst(W - 30, H - T - 36, '#ffb13d', 10, 120); }
+      if (b.ground && j === 0 && b.x > W - 52) { b.dead = true; drumT = 0.6; k.burst(W - 30, H - T - 36, '#ffb13d', 10, 120);
+        if (BC && LD.fire && fires.length < LD.fire) fires.push({ x: W - 74, vx: -(14 + 5 * fires.length), t: 0 }); }
     }
-    if (Math.abs(b.x + 8 - (p.x + p.w / 2)) < 10 && Math.abs(b.y + 8 - (p.y + p.h / 2)) < 14.5) return die('#ffb13d');
-    if (!b.jumped && !p.ground && !p.lad && Math.abs(b.x + 8 - (p.x + p.w / 2)) < 12 && p.y + p.h < b.y + 2 && b.y - (p.y + p.h) < 46) { b.jumped = true; score += 100; k.sfx('coin'); k.float('+100', b.x + 8, b.y - 18, '#7cf7a0'); }
+    if (Math.abs(b.x + 8 - (p.x + p.w / 2)) < 10 && Math.abs(b.y + 8 - (p.y + p.h / 2)) < 14.5) { if (BC && hamT > 0) { bcSmash(b); continue; } if (BC) { bcHit(null); return; } return die('#ffb13d'); }
+    if (!b.jumped && !p.ground && !p.lad && Math.abs(b.x + 8 - (p.x + p.w / 2)) < 12 && p.y + p.h < b.y + 2 && b.y - (p.y + p.h) < 46) { b.jumped = true; if (BC) { chain++; chainT = 2.4; mult = Math.min(5, 1 + Math.floor(chain / 2)); score += 100 * mult; k.chime(chain); k.float('+' + 100 * mult, b.x + 8, b.y - 18, '#7cf7a0'); k.sfx('coin'); } else { score += 100; k.sfx('coin'); k.float('+100', b.x + 8, b.y - 18, '#7cf7a0'); } }
   }
   barrels = barrels.filter((b) => !b.dead);
   for (const co of coins) if (!co.got && Math.abs(co.x - p.x - p.w / 2) < 17 && Math.abs(co.y - p.y - p.h / 2) < 22) coinGet(co, 0);
   if (p.ground && Math.abs(p.y + p.h - flag.y) < 2 && Math.abs(p.x + p.w / 2 - flag.x) < 18) {
+    if (BC) { if (rivLeft() || bossHP > 0) { if (!openT) { openT = 0.9; k.sfx('hit'); k.float(bossHP > 0 ? '¡El Capataz manda!' : 'Faltan ' + rivLeft() + ' remache' + (rivLeft() === 1 ? '' : 's'), flag.x + 26, flag.y - 34, '#ff9a5c'); } }
+      else { missCo = coins.reduce((n, q) => n + (q.got ? 0 : 1), 0) + missCo; return bcWin(); } }
+    else {
     const b = Math.round(bonus / 100) * 100; score += 500 * level + b;
     if (BLV) return k.levelDone(score, `${got} moneda${got === 1 ? '' : 's'} · ${lives} vida${lives === 1 ? '' : 's'}`);
     k.sfx('win'); k.confetti(); k.float(`+${500 * level + b}`, flag.x + 30, flag.y - 40, '#ffc928');
-    level++; genBarrels();
+    level++; genBarrels(); }
   }
 }
 function upNinja(dt, J) {
@@ -465,8 +592,12 @@ function drawBarrels() {
   ART.background(c, TH, W, H, 0, 0, t);
   if (!lvCv) lvCv = renderBarrelLevel(); c.drawImage(lvCv, 0, 0, W, H);
   drum(W - 30, H - T);
-  thrower(W - 50, fyRow(5) * T);
-  ART.flag(c, flag.x, flag.y, t, '#7cf7a0', 32);
+  if (BC && bossFall) { c.save(); c.translate(W - 50, fyRow(5) * T + bossFall * bossFall * 300); c.rotate(bossFall * 2.2); c.translate(-(W - 50), -fyRow(5) * T); thrower(W - 50, fyRow(5) * T); c.restore(); }
+  else thrower(W - 50, fyRow(5) * T);
+  if (BC) { const open = !rivLeft() && bossHP <= 0; c.globalAlpha = open ? 1 : 0.45; ART.flag(c, flag.x, flag.y, t, open ? '#7cf7a0' : '#6b6f86', 32); c.globalAlpha = 1;
+    if (open && openT > 0) { c.globalAlpha = 0.35 + 0.35 * Math.sin(t * 9); c.fillStyle = '#7cf7a0'; c.beginPath(); c.arc(flag.x, flag.y - 16, 22, 0, R2); c.fill(); c.globalAlpha = 1; } }
+  else ART.flag(c, flag.x, flag.y, t, '#7cf7a0', 32);
+  if (BC) bcDraw();
   for (const co of coins) if (!co.got) ART.coin(c, co.x, co.y, t, 6.5);
   for (const b of barrels) barrel(b.x + 8, b.y + 8, b.a, b.blue);
   hero(p, 0.68);
@@ -475,7 +606,8 @@ function drawBarrels() {
   label(`${score}`, 8, 22, 16, '#fff');
   label(`Bonus ${Math.round(bonus / 100) * 100}`, W - 92, 5, 12, bonus < 1000 ? '#ff9a5c' : '#ffc928', 'right'); // lejos de pausa/sonido
   label(BLV ? `Nivel ${level}/${BLV.length}` : `Nivel ${level}`, 8, 42, 11, 'rgba(255,255,255,.9)');
-  if (intro > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, intro * 2); ART.rr(c, W / 2 - 100, H / 2 - 34, 200, 60, 16); ART.fillOut(c, 'rgba(26,21,48,.85)', 2); label(`Nivel ${level}`, W / 2, H / 2 - 26, 26, '#fff', 'center'); label('¡Llega a la bandera!', W / 2, H / 2 + 4, 13, '#ffc928', 'center'); c.globalAlpha = 1; }
+  if (BC) bcHud();
+  if (intro > 0 && k.st === 'play') { c.globalAlpha = Math.min(1, intro * 2); ART.rr(c, W / 2 - 100, H / 2 - 34, 200, 60, 16); ART.fillOut(c, 'rgba(26,21,48,.85)', 2); label(BC ? `Nivel ${level} · etapa ${stage + 1}` : `Nivel ${level}`, W / 2, H / 2 - 26, BC ? 19 : 26, '#fff', 'center'); label(BC && LVD && LVD.tip ? LVD.tip : '¡Llega a la bandera!', W / 2, H / 2 + 4, BC ? 12 : 13, '#ffc928', 'center'); c.globalAlpha = 1; }
 }
 function hud() {
   label(`${Math.floor(score)}`, 12, 10, 26, '#fff');

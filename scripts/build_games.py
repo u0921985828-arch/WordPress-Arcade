@@ -34,7 +34,7 @@ G = {
  'tunnel-digger': ('maze', dict(mode='digger', bg='#1a120b', help=f'{SW} para excavar. Recoge todas las gemas, evita a los bichos y tira rocas para aplastarlos.')),
  'cave-flyer': ('runner', dict(mode='cave', pal=['#5ce1e6', '#ff5fa2', '#3b2a55'], help='Mantén pulsado (o A) para subir y suelta para bajar. Disparas solo: dos impactos por mina. Recoge los cristales.')),
  'territory': ('gridmover', dict(mode='territory', help=f'{SW} para salir de tu zona y cerrar áreas. Si una chispa toca tu estela, pierdes. Conquista el 75 %.')),
- 'barrel-climb': ('platform', dict(mode='barrels', help='← → moverse, A saltar, ↑ ↓ en las escaleras (atraviesas las vigas desde abajo). Esquiva los barriles y llega a la bandera.')),
+ 'barrel-climb': ('platform', dict(mode='barrels', help='← → moverse, A saltar, ↑ ↓ en las escaleras (atraviesas las vigas desde abajo). Rompe los remaches de un martillazo, esquiva barriles y fuego, y sube a la bandera. 20 niveles con jefe final.')),
  'wing-tap': ('runner', dict(mode='flap', theme='meadow', help='Toca para aletear y pasa entre los troncos. Las monedas suman un punto extra.')),
  # ---------- Puzzle ----------
  '2048-classic': ('g2048', dict()), '2048-hex': ('g2048', dict(hex=True)),
@@ -53,7 +53,7 @@ G = {
  # ---------- Plataformas ----------
  'pixel-dash': ('platformer', dict(theme='meadow', spikes=0.2, enemies=0.35, help='← → correr, ↑/A saltar (mantén para saltar más). Pisa a los enemigos, esquiva los pinchos y llega a la bandera.')),
  'wall-jumper': ('platformer', dict(theme='snow', abil=dict(wall=True), spikes=0.08, enemies=0.25, help='← → correr, ↑/A saltar. Salta contra una pared en el aire para rebotar y subir por las chimeneas de hielo.')),
- 'spike-run': ('runner', dict(mode='jump', theme='jungle', help='Toca para saltar pinchos, cajas y fosos; mantén para saltar más alto. Cae sobre los slimes para eliminarlos.')),
+ 'spike-run': ('runner', dict(mode='jump', theme='jungle', help='Toca para saltar pinchos, cajas y fosos; mantén para saltar más alto. Cae sobre los bichos para eliminarlos. Bajo la PRENSA no se puede saltar: pasa corriendo. 20 niveles con puntos de control.')),
  'neon-runner': ('runner', dict(mode='double', theme='night', help='Toca para saltar y otra vez en el aire para el doble salto. Pisa a los fantasmas para eliminarlos.')),
  'dungeon-micro': ('topdown', dict(mode='dungeon', help='Muévete con flechas o arrastrando; disparas solo al enemigo más cercano. Limpia la sala, sal por la puerta y elige una mejora. Jefe cada 5 salas.')),
  'crypt-crawler': ('topdown', dict(mode='crypt', help='Muévete y acércate: tu espada golpea sola (o con A). Limpia la sala, sal por la puerta y elige una mejora. Jefe cada 5 salas.')),
@@ -63,7 +63,7 @@ G = {
  'rope-swing': ('platformer', dict(theme='sky', abil=dict(swing=True), enemies=0.25, help='Corres solo entre islas flotantes. Mantén pulsado para engancharte a la anilla y suelta para salir disparado.')),
  'gravity-flip': ('runner', dict(mode='gravity', theme='factory', help='Toca para invertir la gravedad (desde el suelo o el techo) y esquiva los pinchos.')),
  'cloud-hopper': ('platform', dict(mode='hopper', bg='#7ec8ff', pal=dict(sky='#7ec8ff', ground='#fff', top='#ffffff', p='#ff5fa2', spike='#f00', enemy='#fa0', coin='#f2d15c'), help='Rebotas solo. Mantén el lado izquierdo o derecho de la pantalla para moverte.')),
- 'castle-knight': ('platformer', dict(theme='castle', abil=dict(sword=True), enemies=0.55, spikes=0.06, help='← → andar, ↑/A saltar, B o toque: espada. Cruza el castillo y derrota a los guardias.')),
+ 'castle-knight': ('platformer', dict(theme='castle', abil=dict(sword=True), enemies=0.55, spikes=0.06, help='← → andar, ↑/A saltar, B o toque: espada. 20 niveles del castillo con arqueros, escuderos con escudo, mazas colgantes y el Alcaide de jefe final.')),
  'robo-rescue': ('platformer', dict(theme='factory', enemies=0.55, spikes=0.12, help='← → moverse, ↑/A saltar. Pisa a los robots, recoge monedas y llega a la salida de la fábrica.')),
  'shadow-dash': ('platformer', dict(theme='dusk', abil=dict(dash=True), enemies=0.45, spikes=0.1, help='← → correr, ↑/A saltar, B: sprint en sombra (cruza huecos largos y atraviesa enemigos).')),
  'bullet-rain': ('shooter', dict(mode='bullethell', bg='#12061c', help='Mueve la nave con el ratón, el dedo o las flechas. Tu punto de impacto es el centro. Derrota al jefe.')),

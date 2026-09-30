@@ -33,6 +33,18 @@
  *   W<n>  AMENAZA: muro de sombra que avanza desde atrás durante todo el nivel (1 lento,
  *         2 medio, 3 rápido). Se escribe al principio de la tira.
  *
+ * ---- Piezas nuevas, solo de castle-knight (tanda 7) ----
+ *   A     ARQUERO de almena sobre el último tramo llano: tensa el arco 0,6 s (aviso «!») y
+ *         suelta una flecha a la altura de la rodilla. Se salta, se para con el tajo o se
+ *         mata al arquero (pisotón o espada, 150 puntos).
+ *   S     ESCUDERO: patrulla el último tramo con el escudo alto (el pisotón rebota y la
+ *         espada no entra); cada 2,5 s lo baja para atacar y avisa 0,55 s antes.
+ *   L     PÉNDULO de maza colgado del techo sobre el centro del último tramo. La cadena se
+ *         dibuja entera de arriba abajo, así que el barrido nunca sorprende.
+ *
+ * Desde la tanda 7, castle-knight comparte con pixel-dash todas las piezas nuevas de 1.38
+ * (m, M, V, q, s, ^, P, E, W, G, k) y el jefe de tres fases de `B`.
+ *
  * Los niveles de pixel-dash son objetos { n: nombre, s: tira, tip: consejo, t: [fácil, normal,
  * difícil] segundos objetivo de la 2ª estrella }. Los demás juegos siguen con tiras sueltas.
  * La bandera se coloca sola al final. Ningún nivel usa el azar: el que diseñamos es el que se juega.
@@ -83,27 +95,51 @@ const PLATLV = {
     { n: 'El Coloso', tip: 'Se prepara antes de cada ataque: golpéalo cuando se aturda.', t: [110, 95, 84],
       s: 'f14 C f10 m4 f10 c f10 s8 f10 C k f12 q6 f10 G f10 E f10 C k f10 B' }
   ],
-  /* ---- castle-knight: espada y guardias. 20 niveles, jefe en el 20. ---- */
+  /* ---- castle-knight: 20 niveles largos escritos a mano (tanda 7). Verbos propios del
+     castillo: A arquero de almena, S escudero con escudo, L péndulo de maza; y los del motor
+     (grietas, ruedas de cuchillas, tornos, montacargas, losas encantadas, trampolín, bestia y
+     la marea de sombra). 1-3 enseñan lo básico · 4-14 añaden un verbo cada uno · 15-19 los
+     combinan · 20 El Alcaide, con tres fases telegrafiadas. ---- */
   'castle-knight': [
-    'f12 c f10',                                        /* 1  el patio */
-    'f12 e c f10',                                      /* 2  el primer guardia */
-    'f10 e f6 e c f8',                                  /* 3  dos guardias */
-    'f8 g2 f8 e c f8',                                  /* 4  foso y guardia */
-    'f8 u3 f6 e c d3 f8',                               /* 5  la muralla */
-    'f8 e g3 p3 c g3 e f8',                             /* 6  puente de tablones */
-    'f8 x3 f6 e c f8',                                  /* 7  las trampas */
-    'f10 e f4 e f4 e c f8',                             /* 8  la guardia */
-    'f6 u3 f4 e u3 f4 e c d6 f8',                       /* 9  la torre */
-    'f8 e x2 f4 e x2 c f8',                             /* 10 pasillo de trampas */
-    'f8 g3 f4 e g3 f4 c e f8',                          /* 11 las almenas */
-    'f8 u4 f4 e d4 f4 e c f8',                          /* 12 adarve */
-    'f8 e g2 p3 c g2 p3 e g2 f8',                       /* 13 los andamios */
-    'f8 x3 e f4 x3 e c f8',                             /* 14 sala de pinchos */
-    'f6 u2 f4 u2 e f4 u2 c f6 d6 e f8',                 /* 15 escalera de caracol */
-    'f8 e g4 f4 e g4 c f8',                             /* 16 el foso doble */
-    'f8 e u3 x3 f4 e d3 c f8',                          /* 17 la barbacana */
-    'f8 e f4 e f4 e x3 c f8',                           /* 18 la formación */
-    'f8 e g3 f6 k c u3 f4 e x3 g3 e f6 d3 f8',          /* 19 el asalto */
-    'f10 c k g3 f6 e B'                                 /* 20 el señor del castillo */
+    { n: 'El patio de armas', tip: 'B (o toca) para el tajo; también vale saltarles encima.', t: [69, 62, 56],
+      s: 'f18 C f14 e c f14 C f12 e f14 c f16 C f14 e c f14 G f16 C f16 e f12 c f18 C f14 e f14 c f16 C f14 e f12 c f14 G f16 C f16 e f14 c f14 C f16 e f12' },
+    { n: 'El foso seco', tip: 'Los fosos se cruzan corriendo: no frenes en el borde.', t: [78, 69, 63],
+      s: 'f16 C f12 g2 f12 c f10 e f12 C f12 g3 f12 c f14 g2 f10 e C f12 g3 f12 c f14 G f12 g2 f12 C f14 e f12 g3 f14 C f12 g2 f12 c f14 C f12 g3 f12 e c f14 g2 f12 C f14 g3 f12 c f16 C f12 g2 f14' },
+    { n: 'Almenas y escaleras', tip: 'El adarve sube y baja: encadena los escalones sin frenar.', t: [90, 79, 72],
+      s: 'f14 C f10 u2 f10 c f12 d2 f12 C f10 u2 f8 c f6 d2 f4 f12 C f12 u3 f10 e c f12 u2 f8 c f6 d2 f4 f12 d3 f12 C f14 u2 f10 G c f12 d2 f14 C f12 u2 f12 c f12 u2 f8 c f6 d2 f8 d2 f14 C f12 u3 f12 e c f12 u2 f8 c f6 d2 f8 d3 f14 C f12' },
+    { n: 'Los arqueros', tip: 'El arco se tensa y avisa: salta la flecha o párala con el tajo.', t: [70, 62, 56],
+      s: 'f14 C f12 A f14 c f12 C f12 A f12 e c f12 C f14 A f12 g2 f12 c G f12 A f14 C f12 e f12 A f14 c f12 C f12 A f14 c f12 C f12 A f12 e f12 c f14 A f12 C f12 c f12 A f14 C f12' },
+    { n: 'Losas carcomidas', tip: 'Las losas se desmoronan al pisarlas: cruza sin pararte.', t: [74, 65, 59],
+      s: 'f14 C f12 m3 f12 c f12 C f10 m4 f10 e c f12 C f12 m3 f8 m3 f12 c G f12 A f12 m4 f12 C f12 e f12 m5 f12 C f14 m3 f12 c f12 C f12 m4 f12 e c f12 m3 f10 m3 f12 C f12 c f12 m5 f14 C f12' },
+    { n: 'El escudero', tip: 'Con el escudo alto rebotas; espera a que lo baje y entra.', t: [76, 67, 61],
+      s: 'f14 C f12 S f14 c f12 C f12 S f12 k c f12 C f14 A f12 S f12 c f12 G f12 m4 f12 S f12 C f14 e f12 S f14 C f12 S f12 c f12 C f12 A f12 S f12 k c f12 m4 f12 S f12 C f14 c f12 S f14 C f12' },
+    { n: 'Ruedas de cuchillas', tip: 'La cuchilla sigue su raíl: pasa cuando se aleje.', t: [80, 71, 64],
+      s: 'f14 C f12 s8 f12 c f12 C f10 s10 f10 e c f12 k C f12 s8 f10 m4 f10 c G f12 A f12 s8 f12 C f12 s10 f12 C f12 s8 f12 c f12 C f12 s10 f10 e c f12 k s8 f12 m4 f12 C f12 c f12 s10 f14 C f12' },
+    { n: 'El péndulo', tip: 'La cadena se ve entera: cuenta el vaivén y cruza.', t: [72, 64, 58],
+      s: 'f14 C f12 L f12 c f12 C f12 L f12 k e c f12 C f12 L f10 m4 f10 c G f12 A f12 L f12 C f12 s8 f12 L f12 C f14 L f12 c f12 C f12 L f12 A f12 c f12 k L f10 m4 f10 C f12 c f12 L f14 C f12' },
+    { n: 'El torno', tip: 'Espera el torno en el borde; te lleva consigo.', t: [80, 71, 64],
+      s: 'f14 C f12 M6 f12 c f12 C f12 M7 f12 k e c f12 C f12 L f12 M6 f12 c G f12 A f12 M7 f12 C f12 m4 f12 M6 f12 C f14 M6 f12 c f12 C f12 M7 f12 e c f12 k L f12 M6 f12 C f12 c f12 M7 f14 C f12' },
+    { n: 'Losas encantadas', tip: 'Parpadean antes de irse: entra en cuanto aparezcan.', t: [85, 75, 68],
+      s: 'f14 C f12 q6 f12 c f12 C f12 q8 f12 k c f12 S f12 C f12 q6 f10 m4 f10 c G f12 A f12 q8 f12 C f12 L f12 q6 f12 C f14 q6 f12 c f12 C f12 q8 f12 S f12 c f12 k q6 f10 m4 f10 C f12 c f12 q8 f14 C f12' },
+    { n: 'El trampolín', tip: 'El trampolín sube al adarve alto: ahí está el tesoro.', t: [64, 57, 52],
+      s: 'f14 C f12 ^ P4 c f12 g2 f12 C f12 ^ P5 c G f12 k m4 f12 C f12 A f12 ^ P4 c f12 g3 f12 C f12 S f12 ^ P5 c G f12 C f14 ^ P4 c f12 C f12 g2 f12 ^ P5 c f12 k A f12 C f12 ^ P4 c f12 C f14' },
+    { n: 'El montacargas', tip: 'Cinco casillas solo las sube el montacargas.', t: [81, 72, 65],
+      s: 'f14 C f12 V4 u5 f12 c f12 d5 f12 C f12 M6 f12 k c f12 V4 u5 f12 A f12 c G f12 d5 f12 C f12 L f12 V4 u5 f10 c f12 d5 f12 C f14 V4 u5 f12 c f12 d5 f12 C f12 k M6 f12 c f12 V4 u5 f10 c f12 d5 f14 C f12' },
+    { n: 'La bestia', tip: 'Te ve y avisa con «!»: pisotón o tajo, pero no le des la espalda.', t: [76, 67, 61],
+      s: 'f14 C f12 E f14 c f12 C f12 E f12 k c f12 A f12 C f12 E f10 m4 f10 c G f12 S f12 E f12 C f12 s8 f12 E f14 C f12 E f14 c f12 C f12 E f12 A f12 c f12 k E f12 m4 f12 C f12 c f12 E f14 C f12' },
+    { n: 'La marea de sombra', tip: 'La sombra no perdona la duda: corre y no mires atrás.', t: [79, 70, 63],
+      s: 'W1 f16 C f12 g2 f12 c f12 m4 f12 C f12 k g3 f12 c f12 A f12 m5 f12 C f12 c f12 L f12 m4 f12 C G f14 g2 f14 C f12 g2 f14 c f12 m4 f12 C f12 k g3 f12 c f12 A f12 m5 f12 C f14 c f12 g2 f14 C f12' },
+    { n: 'Flechas y cadenas', tip: 'Con el arquero al fondo, el péndulo manda el paso.', t: [77, 68, 61],
+      s: 'f14 C f12 A f12 L f12 c f12 m4 f12 C f12 k A f12 L f10 s8 f10 c G f12 A f12 m5 f12 L f12 C f12 S f12 A f12 L f12 C f14 A f12 L f12 c f12 m4 f12 C f12 k A f12 L f10 s8 f10 c f12 L f12 C f14' },
+    { n: 'Sala de guardia', tip: 'Escudero, cuchilla y losas: una cosa a la vez.', t: [85, 75, 68],
+      s: 'f14 C f12 S f12 s8 f12 c f12 q6 f12 C f12 k S f12 A f12 s10 f10 c G f12 q8 f12 S f12 m4 f12 C f12 L f12 s8 f12 C f14 S f12 s8 f12 c f12 q6 f12 C f12 k S f12 A f12 s10 f10 c f12 q8 f14 C f12' },
+    { n: 'La torre del homenaje', tip: 'Arriba y abajo: el torno y el montacargas son la ruta.', t: [89, 78, 71],
+      s: 'f14 C f12 V4 u5 f12 A f12 c f12 M6 f12 C f12 k d5 f12 q6 f12 c G f12 V4 u5 f10 L f10 c f12 M7 f12 C f12 d5 f12 s8 f12 C f14 V4 u5 f12 A f12 c f12 M6 f12 C f12 k d5 f12 q6 f12 c f12 V4 u5 f10 c f12 d5 f14 C f12' },
+    { n: 'Huida por el adarve', tip: 'Grietas y cuchillas con la sombra encima: fíate del ritmo.', t: [84, 75, 67],
+      s: 'W2 f16 C f12 m4 f12 c f12 s8 f12 C f12 k m5 f12 A f12 c f12 s10 f12 C G f12 m4 f12 L f12 c f12 g3 f12 C f14 m4 f12 C f12 m4 f12 c f12 s8 f12 C f12 k m5 f12 A f12 c f12 s10 f12 C f12 m4 f14 C f12' },
+    { n: 'El asalto', tip: 'Dos puntos de control. Todo lo aprendido, sin pausa.', t: [95, 84, 76],
+      s: 'f14 C f12 A f12 S f12 c f12 m4 f12 L f12 C f12 k s8 f12 q6 f12 c G f12 M6 f12 E f12 C f12 ^ P5 c f12 k A f12 L f12 m4 f12 C f12 s8 f12 E f12 C f14 A f12 S f12 c f12 m4 f12 L f12 C f12 k s8 f12 q6 f12 c f12 M6 f12 E f12 C f14' },
+    { n: 'El Alcaide', tip: 'Se prepara antes de cada golpe: entra cuando se aturda.', t: [150, 126, 110],
+      s: 'f14 C f12 A f12 c f12 m4 f12 S f12 C f12 k L f12 s8 f12 c G f12 q6 f12 E f12 C f12 k A f12 S f12 c f12 L f12 m4 f12 C f12 s8 f12 q6 f12 c f12 E f12 M6 f12 C f12 k f10 B' }
   ]
 };

@@ -26,15 +26,37 @@ let p, obs, coins, holes, decos, cav, bullets, rings, t, cam, speed, bonus, got,
 /* Tramos a mano (plan Friv): con tabla no hay generación al azar; el nivel termina en bandera. */
 const RLV = (typeof RUNLV !== 'undefined' && RUNLV[CFG.id]) || null;
 let goal = 0, lvNum = 1, lvSpeed = 0;
+/* ---------- spike-run 1.40.2 (tanda 7): plataformas, rocas, muelles, prensas, gemas y
+   puntos de control. Acotado por CFG.id: los otros cuatro runners no ven nada de esto. ---------- */
+const SR = CFG.id === 'spike-run';
+let LVR = null, cks = [], ckX = 0, ckGot = 0, ckGem = 0, srL = 3, died2 = 0, gems = 0, gemN = 0, chain = 0, chainT = 0, mult = 1, ckT = 0;
+const srTgt = () => (LVR && LVR.co ? LVR.co[k.dif] : 0);
+/* La prensa es un techo bajo y el suelo no se detiene: para que nunca haya una muerte
+   injusta, mientras hay una prensa a menos de un salto de distancia el salto se bloquea
+   (y el muelle no dispara). El juego te sujeta al suelo; tú solo corres. */
+function pressNear(f) {
+  const nose = cam + PX + 18;
+  for (const q of obs) if (q.k === 'press' && q.x - nose < speed * 0.78 * (f || 1) && q.x + q.w > cam + PX) return q;
+  return null;
+}
+function srChain(x, y, base, col) {
+  chain++; chainT = 2.2; mult = Math.min(5, 1 + Math.floor(chain / 3));
+  const pts = base * mult; bonus += pts; k.chime(chain); k.float('+' + pts, x, y, col);
+  if (chain >= 4) k.combo(chain, x, y - 22);
+}
 function buildHand(n0) {
   lvNum = k.clamp(n0, 1, RLV.length);
-  lvSpeed = (V0 + (VMAX - V0) * ((lvNum - 1) / (RLV.length - 1)) * 0.92) * k.D.spd;
+  LVR = RLV[lvNum - 1]; if (SR) { cks = []; gemN = 0; }
+  /* La velocidad del suelo NO cambia con la dificultad: aquí decide la ruta (a menos velocidad,
+     el salto cubre menos suelo y un par de pinchos deja de poder saltarse). Los márgenes que sí
+     cambian son las vidas, el aviso de rocas y bichos y el objetivo de monedas. */
+  lvSpeed = (V0 + (VMAX - V0) * ((lvNum - 1) / (RLV.length - 1)) * 0.92) * (SR ? 1 : k.D.spd);
   /* Los respiros se escriben en casillas pero se juegan en tiempo: a más velocidad, más metros,
      para que el ritmo del diseño sea el mismo en el nivel 1 y en el 20. Y siempre hay pista de
      salida: nada mata en el primer segundo y medio. */
   const gs2 = Math.max(1, lvSpeed / 180);
   let x = 4 + Math.ceil(lvSpeed * 1.5 / T), last = { x: 4, n: 2 };
-  for (const tk of RLV[lvNum - 1].split(' ').filter(Boolean)) {
+  for (const tk of (typeof LVR === 'string' ? LVR : LVR.s).split(' ').filter(Boolean)) {
     const n = +tk.slice(1) || 1, c0 = tk[0];
     if (c0 === '.') x += Math.round(n * gs2);
     else if (c0 === 's') { spikes(x, n); last = { x, n }; x += n; }
@@ -43,9 +65,15 @@ function buildHand(n0) {
       last = { x, n }; x += n; }
     else if (c0 === 'h') { holes.push({ a: x, b: x + n }); last = { x, n }; x += n; }
     else if (c0 === 'f' || c0 === 'F') { const high = c0 === 'F';
-      obs.push({ k: 'foe', x: x * T, y: high ? FLOOR - 96 : FLOOR - 26, w: 28, h: 26, vx: (high ? -30 : -60) * (0.45 + lvNum / RLV.length * 0.55) * k.D.spd, kind: TH.enemy, ph: 0 });
+      obs.push({ k: 'foe', x: x * T, y: high ? FLOOR - 96 : FLOOR - 26, w: 28, h: 26, vx: (high ? -30 : -60) * (0.45 + lvNum / RLV.length * 0.55) * k.D.spd, kind: TH.enemy, ph: 0, x0: x * T, arm: 0 });
       last = { x, n: 2 }; x += 3; }
     else if (c0 === 'o') coinArc(last.x - 1, n, 78, FLOOR - 26);
+    else if (SR && c0 === 'p') { for (let i = 0; i < n; i++) obs.push({ k: 'plat', x: (x + i) * T, y: FLOOR - Math.round(2.3 * T) }); for (let i = 0; i < n; i++) coins.push({ x: (x + i + 0.5) * T, y: FLOOR - Math.round(2.3 * T) - 22 }); last = { x, n }; x += n; }
+    else if (SR && c0 === 'r') { obs.push({ k: 'roll', x: (x + 2) * T, y: FLOOR - 30, w: 30, h: 30, a: 0, vx: -(70 + lvNum * 4) * k.D.spd, x0: (x + 2) * T, arm: 0 }); last = { x, n: 2 }; x += 4; }
+    else if (SR && c0 === '^') { obs.push({ k: 'spring', x: x * T, y: FLOOR - 15, w: T, h: 15, sq: 0 }); last = { x, n: 1 }; x += 1; }
+    else if (SR && c0 === 'P') { obs.push({ k: 'press', x: x * T, w: n * T, y: FLOOR - 84, ph: (x % 7) / 7 }); last = { x, n }; x += n; }
+    else if (SR && c0 === 'G') { coins.push({ x: (x + 0.5) * T, y: FLOOR - Math.round(3.1 * T), gem: true }); gemN++; x += 1; }
+    else if (SR && c0 === 'k') { cks.push(x * T); x += 1; }
     if (Math.random() < 0) x += 0;   /* sin azar: la tira es la del diseño */
   }
   for (let i = 3; i < x; i += 7) decos.push({ x: i * T + 16, s: (i % 5) / 5 });
@@ -58,9 +86,15 @@ function reset() {
   nx = port ? W + 200 : cave ? W + 200 : 28;
   if (cave) for (let x = -40; x <= W + 60; x += 20) cav.push({ x, top: 60, bot: H - 60, cr: Math.random() < 0.1 });
   if (!port && !cave) for (let i = 1; i < 20; i += k.ri(3, 6)) decos.push({ x: i * T + 16, s: Math.random() });
-  if (RLV) { obs = []; coins = []; holes = []; decos = []; buildHand(k.lv); }
+  if (RLV) { obs = []; coins = []; holes = []; decos = []; buildHand(k.lv);
+    if (SR) { chain = 0; chainT = 0; mult = 1; ckT = 0;
+      if (!srRe) { srL = 3 + k.D.life; died2 = 0; gems = 0; ckX = 0; ckGot = 0; ckGem = 0; }
+      if (ckX) { cam = ckX; got = ckGot; gems = ckGem;
+        obs = obs.filter((q) => q.x > cam - 40); coins = coins.filter((q) => q.x > cam + 40); holes = holes.filter((h) => h.b * T > cam + 40); } } }
 }
-if (RLV) k.levels(RLV.length, { start: (i) => { lvNum = i; reset(); } });
+let srRe = 0;
+function srRespawn() { srRe = 1; reset(); srRe = 0; }
+if (RLV) k.levels(RLV.length, { start: (i) => { lvNum = i; if (SR) { srL = 3 + k.D.life; died2 = 0; gems = 0; ckX = 0; ckGot = 0; ckGem = 0; } reset(); } });
 reset(); k.show(CFG.title, CFG.help);
 /* si el jugador cambia de nivel en la pantalla de inicio, la partida se prepara de nuevo con los valores de k.D */
 k.onDif = () => { if (k.st !== 'play') reset(); };
@@ -74,6 +108,8 @@ function die() {
   k.burst(PX + p.w / 2, p.y + (port || cave ? 0 : p.h / 2), '#fff', 22, 240);
 }
 function finish() {
+  if (SR && RLV) { died2++; if (--srL > 0) { k.sfx('start'); return srRespawn(); }
+    return k.lose(CFG.id, total(), 'Sin vidas', `Nivel ${lvNum} · ${metres()} m · ${got} moneda${got === 1 ? '' : 's'}`); }
   const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`, extra = port ? `${pl(passed, 'tronco')} · ${pl(got, 'moneda')}` : cave ? `${metres()} m · ${pl(mines, 'mina')}` : `${metres()} m · ${pl(got, 'moneda')}`;
   k.lose(CFG.id, total(), 'Fin', extra);
 }
@@ -140,7 +176,13 @@ k.run((dt) => {
     /* Con tramos a mano la velocidad la marca el nivel, no la distancia recorrida. */
     speed = RLV ? lvSpeed : speedOf();
     if (!RLV) while (nx * T < cam + W + 120) pattern();
-    if (RLV && cam + PX > goal) { const sc = total(); return k.levelDone(sc, `${got} moneda${got === 1 ? '' : 's'}`); }
+    if (RLV && cam + PX > goal) { const sc = total();
+      if (SR) { const tg = srTgt(), ok = got >= tg, per = ok && gems >= gemN && died2 === 0;
+        return k.levelDone(sc, `${got}/${tg} monedas · ${gems}/${gemN} gema${gemN === 1 ? '' : 's'}`, { stars: 1 + (ok ? 1 : 0) + (per ? 1 : 0) }); }
+      return k.levelDone(sc, `${got} moneda${got === 1 ? '' : 's'}`); }
+    if (SR) { chainT -= dt; if (chainT <= 0 && chain) { chain = 0; mult = 1; k.chainReset(); }
+      if (ckT > 0) ckT -= dt;
+      while (cks.length && cam + PX > cks[0]) { ckX = cks.shift(); ckGot = got; ckGem = gems; ckT = 1.6; k.sfx('win'); k.reward('Punto de control', '#7cf7a0'); } }
     if (grav0) {
       coy = p.on ? COYOTE : coy - dt; buf = act() ? BUFFER : buf - dt;
       if (buf > 0 && coy > 0) { grav *= -1; buf = 0; coy = 0; p.on = false; k.sfx('jump'); rings.push({ x: PX + p.w / 2, y: p.y + p.h / 2, t: 0 }); }
@@ -151,14 +193,15 @@ k.run((dt) => {
       if (p.on && !was) { sq = 0.22; k.burst(PX + p.w / 2, grav > 0 ? FLOOR : CEIL, 'rgba(255,255,255,.7)', 5, 70); }
     } else {
       coy = p.on ? COYOTE : coy - dt; buf = act() ? BUFFER : buf - dt;
-      if (buf > 0 && coy > 0) { p.vy = -JUMP; jumps = 1; buf = 0; coy = 0; p.on = false; sq = -0.2; k.sfx('jump'); k.burst(PX + p.w / 2, p.y + p.h, 'rgba(255,255,255,.8)', 5, 80); }
+      if (buf > 0 && coy > 0 && SR && pressNear(1)) { buf = 0; }
+      else if (buf > 0 && coy > 0) { p.vy = -JUMP; jumps = 1; buf = 0; coy = 0; p.on = false; sq = -0.2; k.sfx('jump'); k.burst(PX + p.w / 2, p.y + p.h, 'rgba(255,255,255,.8)', 5, 80); }
       else if (dbl && act() && !p.on && jumps < 2) { p.vy = -JUMP2; jumps = 2; buf = 0; k.sfx('jump'); rings.push({ x: PX + p.w / 2, y: p.y + p.h, t: 0 }); }
       if (!held() && p.vy < -CUT) p.vy = -CUT;
       p.vy += G * dt;
       const feet = p.y + p.h; let sup = Infinity;
       if (feet <= FLOOR + 6 && (!holeAt(Math.floor((px + 3) / T)) || !holeAt(Math.floor((px + p.w - 3) / T)))) sup = FLOOR;
       else if (feet > FLOOR + 4 && !holeAt(Math.floor((px + p.w) / T))) return die();
-      for (const o of obs) if (o.k === 'crate' && o.x < px + p.w - 2 && o.x + T > px + 2 && o.y >= feet - 6) sup = Math.min(sup, o.y);
+      for (const o of obs) if ((o.k === 'crate' || o.k === 'plat') && o.x < px + p.w - 2 && o.x + T > px + 2 && o.y >= feet - 6) sup = Math.min(sup, o.y);
       const ny = p.y + p.vy * dt, was = p.on;
       if (p.vy >= 0 && ny + p.h >= sup) { p.y = sup - p.h; p.vy = 0; p.on = true; jumps = 0; if (!was) { sq = 0.25; k.burst(PX + p.w / 2, sup, 'rgba(255,255,255,.7)', 5, 70); } }
       else { p.y = ny; p.on = false; if (was && jumps === 0 && dbl) jumps = 1; }
@@ -171,6 +214,15 @@ k.run((dt) => {
   const hitBox = (x, y, w, h) => ox + bw > x && ox < x + w && by + bh > y && by < y + h;
   for (const o of obs) {
     if (o.dead) continue;
+    /* Bichos y rocas de spike-run: quietos fuera de pantalla hasta que el jugador se acerca.
+       Así el encuentro cae siempre en la casilla escrita (antes se desplazaban desde el
+       segundo 0 y en un nivel largo llegaban a cualquier sitio) y el margen —no la ruta—
+       es lo que cambia con la dificultad. */
+    if (SR && o.arm === 0) {
+      const lead = 210 + 30 * (2 - k.dif);
+      if (bx < o.x0 - lead) continue;
+      o.arm = 1; o.x = o.x0 + lead * Math.abs(o.vx) / speed;
+    }
     if (o.k === 'log') {
       o.top = k.clamp(o.gy + Math.sin(t * 1.6 + o.ph) * o.mv, 50, FLOOR - 60 - o.gap);
       if (!o.scored && o.x + 64 < bx - 12) { o.scored = true; passed++; k.sfx('coin'); }
@@ -184,6 +236,17 @@ k.run((dt) => {
         if (p.vy > 0 && p.y + p.h - fy < 14) { o.dead = true; p.vy = -460; jumps = dbl ? 1 : jumps; bonus += 10; k.burst(o.x - cam + 14, fy + 12, '#fff', 16); k.float('+10', o.x - cam + 14, fy - 8, '#ffc928'); k.sfx('hit'); }
         else return die();
       }
+    } else if (o.k === 'roll') {
+      o.x += o.vx * dt; o.a += dt * 6;
+      if (hitBox(o.x + 4, o.y + 4, o.w - 8, o.h - 8)) return die();
+    } else if (o.k === 'spring') {
+      if (o.sq > 0) o.sq -= dt * 3;
+      if (ox + bw > o.x && ox < o.x + o.w && p.vy >= 0 && by + bh >= o.y - 4 && by + bh < o.y + 20 && !pressNear(1.7)) {
+        p.vy = -960; p.on = false; jumps = 0; o.sq = 1; k.sfx('jump'); k.shake(2); rings.push({ x: PX + p.w / 2, y: o.y, t: 0 }); }
+    } else if (o.k === 'press') {
+      /* Prensa: techo bajo. No hay nada que esperar (el suelo no se detiene): se pasa por debajo
+         corriendo, y mata si estás en el aire. Determinista, nunca una muerte injusta. */
+      if (ox + bw > o.x + 3 && ox < o.x + o.w - 3 && by < o.y) return die();
     } else if (o.k === 'mine') {
       if (o.hit > 0) o.hit -= dt;
       for (const b of bullets) if (!b.dead && Math.abs(b.x - o.x) < 16 && Math.abs(b.y - o.y) < 16) { b.dead = true; o.hit = 0.1; if (--o.hp <= 0) { o.dead = true; mines++; bonus += 25; k.burst(o.x - cam, o.y, '#ff6b6b', 18, 220); k.burst(o.x - cam, o.y, '#ffc928', 8, 120); k.float('+25', o.x - cam, o.y - 14, '#ffc928'); k.sfx('explode'); k.shake(3); } else k.sfx('hit'); }
@@ -192,6 +255,7 @@ k.run((dt) => {
   }
   for (const co of coins) if (!co.got && Math.abs(co.x - (port || cave ? bx : bx + p.w / 2)) < 24 && Math.abs(co.y - (port || cave ? p.y : p.y + p.h / 2)) < 29) {
     co.got = true; got++; if (co.gem) bonus += 10; k.sfx('coin'); k.burst(co.x - cam, co.y, co.gem ? PAL[1] : '#ffc928', 7, 90);
+    if (SR) { if (co.gem) { gems++; k.reward('¡Gema!', PAL[1]); } srChain(co.x - cam, co.y - 16, co.gem ? 50 : 10, co.gem ? PAL[1] : '#ffc928'); }
   }
   obs = obs.filter((o) => !o.dead && o.x > cam - 120); coins = coins.filter((q) => !q.got && q.x > cam - 40);
   holes = holes.filter((h) => h.b * T > cam - 40); decos = decos.filter((d) => d.x > cam - 80); bullets = bullets.filter((b) => !b.dead && b.x < cam + W + 20);
@@ -363,6 +427,40 @@ function ground() {
     if (grav0) { c.save(); c.translate(0, CEIL); c.scale(1, -1); ART.tile(c, TH, 'ground', sx, 0, T, { top: true, flat: true }); ART.tile(c, TH, 'ground', sx, T, T, {}); c.restore(); }
   }
 }
+/* --- piezas propias de spike-run (una pieza, un trazo; §8 de REMASTER) --- */
+function srPlat(x, y) {
+  const pl = (g) => ART.rr(g, x, y, T, 13, 3);
+  unite(c, [[pl, '#c98a4a']], 1.15);
+  clipIn(c, pl, (g) => { g.fillStyle = AL('#ffffff', 0.3); g.fillRect(x, y, T, 3); g.fillStyle = AL(OUT, 0.24); g.fillRect(x, y + 8, T, 5); g.fillStyle = AL(OUT, 0.3); g.fillRect(x + T / 2 - 1, y, 2, 13); });
+}
+function srRoll(x, y, a) {
+  c.save(); c.translate(x + 15, y + 15); c.rotate(a);
+  const disc = (g) => g.arc(0, 0, 15, 0, 6.283);
+  unite(c, [[disc, '#8b8f9e']], 1.2);
+  clipIn(c, disc, (g) => { g.fillStyle = AL(OUT, 0.26); g.beginPath(); g.arc(4, 5, 11, 0, 6.283); g.fill(); g.fillStyle = AL('#ffffff', 0.3); g.beginPath(); g.arc(-5, -6, 4.5, 0, 6.283); g.fill(); g.fillStyle = AL(OUT, 0.22); g.fillRect(-15, -2, 8, 4); g.fillRect(7, -2, 8, 4); });
+  c.restore();
+}
+function srSpring(x, y, sq) {
+  const h = 15 - Math.max(0, sq) * 8, pad = (g) => ART.rr(g, x + 2, y + (15 - h), T - 4, h, 4);
+  unite(c, [[pad, '#a8cf3f']], 1.15);
+  clipIn(c, pad, (g) => { g.fillStyle = AL('#ffffff', 0.35); g.fillRect(x + 2, y + (15 - h), T - 4, 3); g.fillStyle = AL(OUT, 0.26); g.fillRect(x + 2, y + 15 - 4, T - 4, 4); });
+}
+function srPress(x, o) {
+  const bob = Math.sin(t * 6 + o.ph * 6.283) * 3, top = Math.max(0, CEIL - 30), bot = o.y + bob;
+  const blk = (g) => ART.rr(g, x + 2, top, o.w - 4, bot - top, 6);
+  unite(c, [[blk, '#6b6f86']], 1.2);
+  clipIn(c, blk, (g) => {
+    g.fillStyle = AL('#ffffff', 0.22); g.fillRect(x + 2, top, o.w - 4, 4);
+    g.fillStyle = AL(OUT, 0.32); g.fillRect(x + 2, bot - 12, o.w - 4, 12);
+    g.fillStyle = '#ff6a4d'; g.fillRect(x + 2, bot - 5, o.w - 4, 4);
+    g.fillStyle = AL(OUT, 0.3); for (let i = x + 8; i < x + o.w - 8; i += 14) g.fillRect(i, top, 4, bot - top - 14);
+  });
+}
+function srCheck(x, on) {
+  c.strokeStyle = on ? '#7cf7a0' : 'rgba(255,255,255,.5)'; c.lineWidth = 3; c.beginPath(); c.moveTo(x, FLOOR); c.lineTo(x, FLOOR - 56); c.stroke();
+  const fl = (g) => { g.moveTo(x + 2, FLOOR - 56); g.lineTo(x + 26, FLOOR - 48); g.lineTo(x + 2, FLOOR - 38); g.closePath(); };
+  unite(c, [[fl, on ? '#7cf7a0' : '#6b6f86']], 1.15);
+}
 function draw() {
   if (cave) caveBg(); else ART.background(c, TH, W, H, cam, 0, t);
   if (!port && !cave) for (const d of decos) { const i = Math.floor(d.x / T); if (!holeAt(i) && !grav0) ART.deco(c, TH, d.x - cam, FLOOR, T, d.s); }
@@ -376,7 +474,16 @@ function draw() {
     else if (o.k === 'crate') crate(Math.round(x), o.y);
     else if (o.k === 'foe') ART.enemy(c, o.kind, x, o.y + (o.y < FLOOR - 40 ? Math.sin(t * 3 + o.ph) * 10 : 0), o.w, o.h, { t: t + o.ph, face: -1 });
     else if (o.k === 'mine') mine(o, x);
+    else if (o.k === 'plat') srPlat(Math.round(x), o.y);
+    else if (o.k === 'roll') srRoll(x, o.y, o.a);
+    else if (o.k === 'spring') srSpring(x, o.y, o.sq);
+    else if (o.k === 'press') srPress(x, o);
   }
+  if (SR && RLV) { const pn = pressNear(1); if (pn) { c.globalAlpha = 0.5 + 0.3 * Math.sin(t * 10);
+    label('¡NO SALTES!', W / 2, FLOOR - 118, 17, '#ff9a5c', 'center'); c.globalAlpha = 1;
+    c.fillStyle = 'rgba(255,154,92,.18)'; c.fillRect(0, FLOOR - 4, W, 4); } }
+  if (SR) for (const cx of cks) { const x = cx - cam; if (x > -30 && x < W + 30) srCheck(x, false); }
+  if (SR && ckX && ckX - cam > -30 && ckX - cam < W + 30) srCheck(ckX - cam, true);
   for (const co of coins) { const x = co.x - cam; if (x > -20 && x < W + 20) co.gem ? gem(x, co.y) : ART.coin(c, x, co.y, t); }
   for (const b of bullets) { const x = b.x - cam; c.fillStyle = 'rgba(255,240,180,.3)'; ART.rr(c, x - 4, b.y - 4, 18, 8, 4); c.fill(); c.fillStyle = '#fff6c2'; ART.rr(c, x, b.y - 1.5, 11, 3, 1.5); c.fill(); }
   for (const r of rings) { c.globalAlpha = 1 - r.t / 0.35; c.strokeStyle = '#fff'; c.lineWidth = 3; c.beginPath(); c.ellipse(r.x, r.y, 8 + r.t * 90, 3 + r.t * 30, 0, 0, 6.283); c.stroke(); c.globalAlpha = 1; }
@@ -395,7 +502,11 @@ function draw() {
   if (port) { label(String(passed + got), W / 2, 58, 46, '#fff', 'center'); }
   else {
     if (cave) { mine({ y: 24, ph: 0, hp: 2, hit: 0 }, 24); label(`× ${mines}`, 44, 13, 18); }
-    else { ART.coin(c, 22, 24, 0, 9); label(`× ${got}`, 38, 13, 18); }
+    else { ART.coin(c, 22, 24, 0, 9); label(SR && srTgt() ? `${got}/${srTgt()}` : `× ${got}`, 38, 13, 18, SR && got >= srTgt() ? '#7cf7a0' : '#fff'); }
+    if (SR && RLV) { for (let i = 0; i < srL; i++) ART.heart(c, 24 + i * 20, 48, 1, true);
+      if (gemN) { gem(W / 2 - 22, 26); label(`${gems}/${gemN}`, W / 2 - 6, 16, 16, gems >= gemN ? '#7cf7a0' : '#fff'); }
+      if (chain > 2) label(`x${mult}`, W / 2, 46, 15, '#ffd24d', 'center');
+      if (ckT > 0) { c.globalAlpha = Math.min(1, ckT); label('Punto de control', W / 2, 74, 14, '#7cf7a0', 'center'); c.globalAlpha = 1; } }
     if (RLV) { const rest = Math.max(0, Math.ceil((goal - cam - PX) / T));
       label(`${rest} m`, W - 14, 12, 22, '#fff', 'right');
       label(`Nivel ${lvNum}/${RLV.length}`, W - 14, 38, 13, '#ffc928', 'right'); }
