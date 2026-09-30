@@ -75,6 +75,12 @@ final class Arcade_Party {
 		return $mp ? ( $mp[1] > 2 ? 'Hasta ' . $mp[1] . ' jugadores' : $mp[1] . ' jugadores' ) : '';
 	}
 
+	/** ¿Solo se puede jugar en el modo tele? (mínimo 2 jugadores: hacen falta mandos). */
+	public static function tv_only( $slug ) {
+		$mp = self::players( $slug );
+		return $mp && $mp[0] > 1;
+	}
+
 	public static function tv_url( $slug = '' ) {
 		$u = home_url( '/tele/' );
 		return $slug ? add_query_arg( 'g', rawurlencode( $slug ), $u ) : $u;

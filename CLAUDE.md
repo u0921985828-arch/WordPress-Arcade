@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **278 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2, 50 de la oleada 3, 13 de la oleada 4 y 15 de la oleada 5 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.41.1** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.41.2** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -203,6 +203,11 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
   - **maze-muncher**: no tenía objetivos de 2★ mal puestos — sencillamente **no los tiene** (`tg` no aparece en ninguno de los 20), así que ya funcionaba la regla de respaldo del motor: limpiar el laberinto sin que te pillen. No hace falta calibrar nada.
   - **dungeon-micro** (`src/eng/topdown.js`): en las salas sin tiempo medido la 2ª estrella pedía salir con como mucho 2/1/**0** golpes recibidos; en difícil obligaba a una sala perfecta para una estrella de paso. Ahora 4/3/2, y la 3ª sigue pidiendo eso más todo el botín.
 
+
+- **Juegos de tele bien etiquetados (1.41.2)**: 28 juegos son de **2 a 4 jugadores**, así que no se pueden jugar en el móvil a solas — necesitan el modo tele con un mando por persona. El portal los distinguía con la misma insignia «Multijugador» que los 130 que sí se juegan en solitario, y encima ofrecía el botón «Jugar» en la ficha.
+  - `Arcade_Party::tv_only($slug)` (mínimo de jugadores > 1) y `Arcade_Portal::mp_badge($post, $sm)` parten la insignia en dos: **«Solo en la tele»** (icono de tele, acento `#a097ff`) para esos 28 y «Multijugador» para los que también van solos; ambas con `title` explicativo. Vale igual en la tarjeta grande y en la compacta de «Similares».
+  - En la ficha de un juego de tele, en vez del reproductor sale un panel `.ax-tvonly`: «Este juego es solo para el modo tele», cuántos jugadores hacen falta, cómo se conectan los móviles con el código de 4 letras y el botón **Abrir en la tele**. El reproductor sigue accesible en un desplegable («Abrirlo igualmente en esta pantalla») para quien quiera mirarlo desde un ordenador.
+  - La línea de datos de la ficha pasa de «Hasta 4 jugadores en la tele» a «… **solo en la tele**» o «… **en la tele, o tú solo**» según el caso.
 
 ## Kuboplay Shield (plugin aparte, `wp-content/plugins/kuboplay-shield`, v1.1.2)
 Segundo plugin, independiente del arcade: seguridad + rendimiento, con panel propio en español. Guía para el usuario: `docs/SEGURIDAD.md` (Cloudflare gratis paso a paso, qué hace y qué no, cómo recuperar el acceso desde IONOS).

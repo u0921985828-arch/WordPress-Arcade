@@ -213,7 +213,7 @@ final class Arcade_Portal {
 			esc_attr( remove_accents( strtolower( get_the_title( $post ) ) ) ),
 			(int) get_post_meta( $post->ID, '_game_plays', true ),
 			(int) get_post_time( 'U', true, $post ),
-			self::mp( $post ) ? '<span class="ax-mpb">' . self::MP_ICO . 'Multijugador</span>' : ''
+			self::mp_badge( $post )
 		);
 	}
 
@@ -224,12 +224,34 @@ final class Arcade_Portal {
 		return class_exists( 'Arcade_Party' ) ? Arcade_Party::players_label( $post->post_name ) : '';
 	}
 
+	/** ¿El juego necesita el modo tele? (multijugador de 2 en adelante: no se puede en el móvil solo). */
+	public static function tv_only( $post ) {
+		return class_exists( 'Arcade_Party' ) && Arcade_Party::tv_only( $post->post_name );
+	}
+
+	/** Insignia de la tarjeta: «Solo en la tele» o «Multijugador» ('' si el juego es de un jugador). */
+	public static function mp_badge( $post, $sm = false ) {
+		if ( ! self::mp( $post ) ) {
+			return '';
+		}
+		$tv = self::tv_only( $post );
+		return sprintf( '<span class="ax-mpb%1$s%2$s" title="%3$s">%4$s%5$s</span>',
+			$sm ? ' sm' : '',
+			$tv ? ' tv' : '',
+			esc_attr( $tv ? 'Solo se juega en el modo tele, con los móviles de mando' : 'Se juega solo o hasta 4 en el modo tele' ),
+			$tv ? self::TV_ICO : self::MP_ICO,
+			$tv ? 'Solo en la tele' : 'Multijugador'
+		);
+	}
+
+	const TV_ICO = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><rect x="2.4" y="5" width="19.2" height="12.4" rx="2.2" fill="currentColor"/><path d="M8 20h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
 	/** Tarjeta compacta (lista lateral de similares). */
 	public static function mini( $post ) {
 		$l = self::LABELS[ self::genre_of( $post->ID ) ];
 		$t = Arcade_Core::thumb( $post->ID );
 		return sprintf( '<a class="ax-mini" href="%1$s" style="--c:%2$s"><span class="ax-mini-img">%3$s</span><span><b>%4$s</b><i><span class="ax-dot"></span>%5$s%6$s</i></span></a>',
-			esc_url( get_permalink( $post ) ), esc_attr( $l[1] ), $t ? '<img src="' . esc_url( $t ) . '" alt="" loading="lazy" decoding="async">' : '', esc_html( get_the_title( $post ) ), esc_html( $l[0] ), self::mp( $post ) ? '<span class="ax-mpb sm">' . self::MP_ICO . 'Multijugador</span>' : '' );
+			esc_url( get_permalink( $post ) ), esc_attr( $l[1] ), $t ? '<img src="' . esc_url( $t ) . '" alt="" loading="lazy" decoding="async">' : '', esc_html( get_the_title( $post ) ), esc_html( $l[0] ), self::mp_badge( $post, true ) );
 	}
 
 	/** Texto corto para destacados: la ayuda del juego o el extracto. */

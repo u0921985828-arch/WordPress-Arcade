@@ -74,12 +74,30 @@ if ( is_singular( 'game' ) ) :
 	<article class="ax-game" style="--c:<?php echo esc_attr( $l[1] ); ?>">
 		<div class="ax-game-g">
 			<div class="ax-game-main">
-				<div class="ax-stage"><?php echo Arcade_Core::player_html( $pid ); // phpcs:ignore ?></div>
+				<?php
+				$slug    = get_post_field( 'post_name', $pid );
+				$tv_only = class_exists( 'Arcade_Party' ) && Arcade_Party::tv_only( $slug );
+				if ( $tv_only ) :
+					$mpn  = Arcade_Party::players( $slug );
+					$mptx = $mpn[1] > $mpn[0] ? $mpn[0] . ' a ' . $mpn[1] . ' jugadores' : $mpn[0] . ' jugadores';
+					?>
+					<div class="ax-tvonly">
+						<?php echo $ico['tvbig']; // phpcs:ignore ?>
+						<h2>Este juego es solo para el modo tele</h2>
+						<p>Hacen falta <b><?php echo esc_html( $mptx ); ?></b>, cada uno con su móvil de mando. Abre el juego en la tele (o en cualquier pantalla grande) y los móviles se conectan con un código de 4 letras. <b>No se puede jugar solo desde el móvil.</b></p>
+						<a class="ax-tvonly-go" href="<?php echo esc_url( Arcade_Party::tv_url( $slug ) ); ?>"><?php echo $ico['tvbig']; // phpcs:ignore ?>Abrir en la tele</a>
+						<details class="ax-tvonly-any"><summary>Abrirlo igualmente en esta pantalla</summary>
+							<div class="ax-stage"><?php echo Arcade_Core::player_html( $pid ); // phpcs:ignore ?></div>
+						</details>
+					</div>
+				<?php else : ?>
+					<div class="ax-stage"><?php echo Arcade_Core::player_html( $pid ); // phpcs:ignore ?></div>
+				<?php endif; ?>
 				<div class="ax-gbar">
 					<div class="ax-gtitle">
 						<a class="ax-crumb" href="<?php echo esc_url( Arcade_Portal::genre_url( $g ) ); ?>"><span class="ax-dot"></span><?php echo esc_html( $l[0] ); ?></a>
 						<h1><?php the_title(); ?></h1>
-						<p class="ax-gmeta"><span data-ax-plays-wrap<?php echo $plays < 10 ? ' hidden' : ''; ?>><b data-ax-plays><?php echo esc_html( Arcade_Social::fmt( $plays ) ); ?></b> partidas</span><?php if ( $likes > 0 ) : ?><span><b><?php echo esc_html( Arcade_Social::fmt( $likes ) ); ?></b> me gusta</span><?php endif; ?><?php $mpl = Arcade_Portal::mp( get_post( $pid ) ); if ( $mpl ) : ?><span class="ax-mpl"><?php echo Arcade_Portal::MP_ICO; // phpcs:ignore ?><b><?php echo esc_html( $mpl ); ?></b> en la tele</span><?php endif; ?><span>Gratis · sin descargas</span></p>
+						<p class="ax-gmeta"><span data-ax-plays-wrap<?php echo $plays < 10 ? ' hidden' : ''; ?>><b data-ax-plays><?php echo esc_html( Arcade_Social::fmt( $plays ) ); ?></b> partidas</span><?php if ( $likes > 0 ) : ?><span><b><?php echo esc_html( Arcade_Social::fmt( $likes ) ); ?></b> me gusta</span><?php endif; ?><?php $mpl = Arcade_Portal::mp( get_post( $pid ) ); if ( $mpl ) : ?><span class="ax-mpl<?php echo $tv_only ? ' tv' : ''; ?>"><?php echo $tv_only ? Arcade_Portal::TV_ICO : Arcade_Portal::MP_ICO; // phpcs:ignore ?><b><?php echo esc_html( $mpl ); ?></b> <?php echo $tv_only ? 'solo en la tele' : 'en la tele, o tú solo'; ?></span><?php endif; ?><span>Gratis · sin descargas</span></p>
 					</div>
 					<div class="ax-actions">
 						<button type="button" class="ax-act" data-ax-like aria-label="Me gusta"><?php echo $ico['heart']; // phpcs:ignore ?><b data-n="<?php echo (int) $likes; ?>">Me gusta</b></button>
