@@ -81,6 +81,7 @@ body.party #ov .rec{font-size:clamp(13px,3vmin,30px);padding:1vmin 2vmin}
        Sin WebGL2 (o si falla la creación del contexto) se enseña el lienzo 2D tal cual, sin
        errores: los tres métodos existen siempre y no hacen nada. Con ?gfx=0 se desactiva. */
     const GXOFF = /[?&](gfx|nogl)=0/.test(location.search) || (window.CFG && window.CFG.gfx === false);
+    const QOFF = /[?&]adapt=0\b/.test(location.search); // QA: resolución fija para comparar
     const GX = GXOFF ? null : (function () {
       const glc = document.createElement('canvas');
       let gl = null;
@@ -369,7 +370,15 @@ void main(){
        Se pinta a 1280×720 como mucho y el televisor lo estira: a distancia de sofá no se
        nota, y son 2,25 veces menos píxeles. El puntero no se ve afectado (va por CSS). */
     const TVMODE = /[?&]party=1\b/.test(location.search), TVPX = 1280 * 720;
+    /* Resolución adaptativa. Una Smart TV barata no pinta 1280×720 a 60 fps ni con el juego más
+       sencillo: se queda en 5–20 fps y se ve a tirones. En vez de elegir un número fijo para todos
+       los aparatos, se mide el fotograma de verdad y se baja el lienzo hasta que quepa (el tamaño
+       en CSS no cambia: el televisor estira, se ve un poco menos fino y se juega fluido). Sube otra
+       vez si sobra presupuesto. Solo en la tele; en el móvil no se toca nada. */
+    let qual = 1;
+    const QS = [1, 0.82, 0.67, 0.55, 0.45];
     function fit() {
+      const oW = k.W, oH = k.H;
       let s = Math.min(innerWidth / w, innerHeight / h);
       let dpr = Math.min(2, devicePixelRatio || 1); // ×3 cuesta 2,25 veces más píxeles sin diferencia visible
       let cw = w * s, ch = h * s;
@@ -385,14 +394,47 @@ void main(){
       k.ox = (k.W - w) / 2; k.oy = (k.H - h) / 2;
       k.safe.x = k.ox; k.safe.y = k.oy;
       if (TVMODE && cw * ch * dpr * dpr > TVPX) dpr = Math.sqrt(TVPX / (cw * ch));
+      dpr *= qual;
       cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
       cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
       ctx.setTransform(s * dpr, 0, 0, s * dpr, 0, 0);
       if (gxOn) GX.resize(cw, ch, cv.width, cv.height, Math.max(2, cv.width >> 1), Math.max(2, cv.height >> 1));
-      if (k.onSize) try { k.onSize(k.W, k.H); } catch (e) {}
+      /* Al cambiar solo la resolución el tamaño lógico es el mismo: avisar al juego le haría
+         recomponer (y a alguno, regenerar el nivel) sin motivo. */
+      if (k.onSize && (k.W !== oW || k.H !== oH)) try { k.onSize(k.W, k.H); } catch (e) {}
     }
-    addEventListener('resize', () => { fit(); pDrawn = 0; }); fit();
-
+    addEventListener('resize', () => { qT = 0; qBad = 0; qW.length = 0; fit(); pDrawn = 0; }); fit();
+    /* Se mide lo que de verdad se ve mal: la proporción de fotogramas perdidos. `qVs` es el hueco
+       entre fotogramas propio del aparato (estimado con el quinto más rápido de cada ventana, no
+       con el mínimo, que es ruido de medida: hay televisores a 30 Hz y medirlos contra 16,7 ms
+       fijos los condenaría a la resolución mínima sin motivo). Si en una ventana de segundo y
+       medio más de un tercio de los fotogramas tarda vez y media lo normal, el aparato no llega y
+       se baja un escalón de resolución. La escalera es de un solo sentido: subir y bajar se vería
+       como un parpadeo de nitidez, y un tropiezo puntual no debe cambiar nada, así que hacen falta
+       dos ventanas seguidas (una sola si se pierden ocho de cada diez). */
+    let qi = 0, qT = 0, qBad = 0, qVs = 999, qWarm = 0, qWin = 0; const qW = [];
+    k.qual = 1;
+    function qStep(dtms) {
+      if (!TVMODE || QOFF || qi >= QS.length - 1) return;
+      if ((qWarm += dtms) < 1200) return; // el primer segundo carga el nivel: no cuenta
+      qW.push(dtms); qT += dtms;
+      if (qW.length < 10 || qT < 900) return;
+      const q2 = qW.slice().sort((a, b) => a - b);
+      const fast = Math.max(8, q2[Math.floor(q2.length * 0.2)]); if (fast < qVs) qVs = fast;
+      const lim = Math.max(20, qVs * 1.5);
+      let lost = 0; for (let i = 0; i < q2.length; i++) if (q2[i] > lim) lost++;
+      const r = lost / q2.length, med = q2[q2.length >> 1];
+      qW.length = 0; qT = 0;
+      if (++qWin <= 2) return; // las dos primeras ventanas solo estiman el refresco
+      if (r < 0.35) { qBad = 0; return; }
+      /* Más allá del segundo escalón hace falta que el fotograma MEDIO se pase, no solo la cola:
+         un aparato que va fino con algún tirón suelto no debe acabar en la resolución mínima. */
+      if (qi >= 2 && med < qVs * 2) { qBad = 0; return; }
+      if (r < 0.8 && ++qBad < 2) return;
+      qBad = 0; qi++;
+      if (r > 0.9 && qi < QS.length - 1) qi++; // si se pierde casi todo, dos escalones de golpe
+      qual = QS[qi]; k.qual = qual; fit(); pDrawn = 0;
+    }
     const MAP = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', Space: 'a', Enter: 'a', KeyZ: 'a', KeyX: 'b', ShiftLeft: 'b', ShiftRight: 'b', KeyP: 'pause', Escape: 'pause' };
     const press = (n, down) => { if (!n) return; if (down) { if (!k.held.has(n)) k.hit.add(n); k.held.add(n); } else k.held.delete(n); };
     const onKey = (e, down) => { const n = MAP[e.code]; if (n) { e.preventDefault && e.preventDefault(); press(n, down); } };
@@ -847,12 +889,15 @@ void main(){
       GOPT.t = rmo ? 0.5 : (t * 0.0017) % 977;
       /* Tres sondeos con gl.finish() (frames 15/35/65) para medir también el trabajo de GPU:
          si la mediana pasa de 6 ms, este aparato no da y se apaga el compositor. */
-      const probe = ++gxN === 15 || gxN === 35 || gxN === 65, t0 = performance.now();
+      const probe = ++gxN === 6 || gxN === 12 || gxN === 20, t0 = performance.now();
       if (!GX.frame(cv, GOPT)) { gxDrop(); return; }
       /* Tres lecturas seguidas en negro puro = el compositor no está pintando en este aparato. */
-      if (gxN === 8 || gxN === 12 || gxN === 16) { if (GX.probe() < 6) { if (++gxBlack >= 3) { gxDrop(); return; } } else gxBlack = 4e3; }
+      if (gxN === 4 || gxN === 8 || gxN === 14) { if (GX.probe() < 6) { if (++gxBlack >= 3) { gxDrop(); return; } } else gxBlack = 4e3; }
       if (probe) {
         GX.sync(); const ms = performance.now() - t0; gxProbe.push(ms); k.gfxSync = ms;
+        /* Un solo sondeo por encima de 12 ms ya dice que este aparato no da: esperar a los tres
+           serían segundos de tirones (a 5 fps el fotograma 65 llega a los trece segundos). */
+        if (ms > 12) { gxDrop(); return; }
         if (gxProbe.length === 3) { const m = gxProbe.slice().sort((a, b) => a - b)[1]; if (m > 6) { gxDrop(); return; } }
       } else gxMs += (performance.now() - t0 - gxMs) * 0.08;
       k.gfxMs = gxMs;
@@ -862,7 +907,7 @@ void main(){
       function frame(t) {
         if (k.paused && pDrawn > 1) { poll(); if (!k.ptr.hit && !k.hit.size && !PADS.some((q) => q && q.hit.size)) { last = t; k.ptr.up = false; k.swipe = null; k.tap = false; requestAnimationFrame(frame); return; } }
         pDrawn = k.paused ? pDrawn + 1 : 0;
-        const dtr = Math.min(0.05, (t - last) / 1000); last = t;
+        const dtr = Math.min(0.05, (t - last) / 1000); qStep((t - last) || 16.7); last = t;
         /* Hit-stop: la acción se congela unas centésimas al impactar (el dibujo y los efectos siguen). */
         let dt = dtr; if (hsT > 0 && !k.paused) { hsT -= dtr; dt = 0; }
         poll();
