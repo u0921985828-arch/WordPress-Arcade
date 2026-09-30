@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Kuboplay Shield
  * Description: Seguridad (límite de peticiones, blindaje del login, cabeceras) y rendimiento (caché de página, carga ligera) para el portal.
- * Version: 1.1.0
+ * Version: 1.1.1
  * Author: Kuboplay
  * License: GPLv2 or later
  * Text Domain: kuboplay-shield
@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
 
 final class KP_Shield {
 
-	const VERSION = '1.1.0';
+	const VERSION = '1.1.1';
 	const OPT     = 'kp_shield';
 
 	/** Valores por defecto de todos los ajustes. Cada módulo añade los suyos. */

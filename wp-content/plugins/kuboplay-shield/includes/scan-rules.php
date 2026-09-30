@@ -246,6 +246,19 @@ if ( ! function_exists( 'kp_shield_scan_map' ) ) {
 			// Drop-ins esperados en wp-content (los demás se avisan).
 			'dropins_ok' => array( 'advanced-cache.php', 'object-cache.php', 'db.php', 'maintenance.php', 'index.php' ),
 
+			// Ficheros y plugins que pone el hosting (IONOS) al crear la web. Usan
+			// código dinámico de forma legítima: se avisan, pero nunca como GRAVE.
+			'host_files' => array(
+				'it-api.php'                 => 'IONOS',
+				'ionos-assistant'            => 'IONOS',
+				'ionos-essentials'           => 'IONOS',
+				'ionos-marketplace'          => 'IONOS',
+				'ionos-performance'          => 'IONOS',
+				'one-time-login'             => 'IONOS',
+				'mu-plugin-loader.php'        => 'IONOS',
+				'wp-content/mu-plugins/ionos' => 'IONOS',
+			),
+
 			// Plugins propios: no están en el repositorio oficial y es correcto.
 			'own_slugs'  => array( 'kuboplay-shield', 'arcade-core' ),
 

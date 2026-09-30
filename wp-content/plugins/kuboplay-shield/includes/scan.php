@@ -404,14 +404,30 @@ final class KP_Shield_Scan {
 		}
 
 		$hits = self::content( $abs, $modo );
+
+		// ¿Es un fichero que pone el propio hosting? Entonces el código dinámico
+		// es esperable: se sigue informando, pero como aviso y con su explicación.
+		$prov = '';
+		if ( ! empty( $map['host_files'] ) ) {
+			foreach ( $map['host_files'] as $frag => $quien ) {
+				if ( false !== strpos( $rel, $frag ) ) {
+					$prov = $quien;
+					break;
+				}
+			}
+		}
+
 		foreach ( $hits as $h ) {
 			self::add(
 				$st,
-				$h['level'],
-				$h['titulo'],
-				$h['what'],
-				$h['risk'],
-				array(
+				$prov ? 'aviso' : $h['level'],
+				$h['titulo'] . ( $prov ? ' (lo pone ' . $prov . ')' : '' ),
+				$prov ? $h['what'] . ' Este fichero lo instala ' . $prov . ' con la web, no lo has puesto tú ni un intruso.' : $h['what'],
+				$prov ? 'Mientras el fichero no cambie de tamaño ni de fecha, no hay nada que hacer. Si cambia, este análisis te avisará.' : $h['risk'],
+				$prov ? array(
+					'No hay que hacer nada: es del panel de ' . $prov . '.',
+					'Si borras este fichero, puede que el panel de ' . $prov . ' deje de manejar la web.',
+				) : array(
 					'Mira el fichero antes de tocar nada: IONOS → Administrador de archivos → ' . $rel . ', línea ' . $h['line'] . '.',
 					'Si el fichero es de un plugin que tú instalaste y reconoces, no hagas nada: apúntalo y sigue.',
 					'Si no sabes de dónde sale, descárgalo (copia de seguridad) y bórralo; después mira si la web sigue bien.',
@@ -955,7 +971,14 @@ final class KP_Shield_Scan {
 			if ( ! in_array( $file, $activos, true ) && ! is_plugin_active_for_network( $file ) ) {
 				$off[] = $data['Name'];
 			}
-			if ( ! isset( $oficiales[ $file ] ) && ! in_array( $slug, $map['own_slugs'], true ) ) {
+			$del_host = false;
+			foreach ( (array) ( isset( $map['host_files'] ) ? $map['host_files'] : array() ) as $frag => $quien ) {
+				if ( false !== strpos( $file, $frag ) ) {
+					$del_host = true;
+					break;
+				}
+			}
+			if ( ! isset( $oficiales[ $file ] ) && ! in_array( $slug, $map['own_slugs'], true ) && ! $del_host ) {
 				$ajenos[] = $data['Name'];
 			}
 		}
