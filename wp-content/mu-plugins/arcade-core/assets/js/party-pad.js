@@ -266,7 +266,7 @@
     }
     function place(x, y) {
       var z = zb, r = sw / 2, rh = sh / 2;
-      if (dp) { cx = z.left + z.width / 2; cy = z.top + z.height / 2 + z.height * 0.02; return; }
+      if (dp) { cx = z.left + z.width / 2; cy = z.top + z.height / 2; return; }
       cx = Math.max(z.left + r * 0.6, Math.min(z.right - r * 0.6, x));
       cy = Math.max(z.top + rh * 0.6, Math.min(z.bottom - rh * 0.6, y));
       st.style.left = cx - z.left + 'px'; st.style.top = cy - z.top + 'px';
