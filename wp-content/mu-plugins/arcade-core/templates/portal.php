@@ -375,7 +375,7 @@ else :
 			<div class="ax-party-txt">
 				<span class="ax-kicker">Modo fiesta</span>
 				<h2 id="ax-party-h">Juega en la tele, tu móvil es el mando</h2>
-				<p>Hasta 4 jugadores en la misma pantalla, sin cuentas ni descargas. Abre esta web en el navegador de la tele y escanea el código con el móvil.</p>
+				<p>Hasta 4 jugadores en la misma pantalla, sin cuentas ni descargas: abre la web en la tele y escanea el código con el móvil.</p>
 				<div class="ax-cta">
 					<a class="ax-btn" href="<?php echo esc_url( $tv_url ); ?>"><?php echo $ico['tvbig']; // phpcs:ignore ?>Abrir en la tele</a>
 					<a class="ax-btn ghost ax-hascode" href="<?php echo esc_url( home_url( '/mando/' ) ); ?>"><?php echo $ico['phone']; // phpcs:ignore ?>Tengo un código</a>

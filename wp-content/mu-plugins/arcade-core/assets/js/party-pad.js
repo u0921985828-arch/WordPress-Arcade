@@ -82,7 +82,7 @@
       '<h1>Usa el móvil como mando</h1>' +
       (msg ? '<p class="bad">' + esc(msg) + '</p>' : '<p>Escribe el código que aparece en la tele o escanea su QR.</p>') +
       '<form data-form><input name="c" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" placeholder="ABCD" aria-label="Código de la sala" value="' + esc(code) + '"><button class="pd-btn" type="submit">Conectar</button></form>' +
-      '<input class="pd-name" name="n" maxlength="12" autocomplete="off" spellcheck="false" placeholder="Tu nombre (opcional)" aria-label="Tu nombre" value="' + esc(S.name) + '">' +
+      '<input class="pd-name" name="n" maxlength="12" autocomplete="off" spellcheck="false" placeholder="Tu nombre" aria-label="Tu nombre" value="' + esc(S.name) + '">' +
       '<p class="pd-small">En la tele u ordenador abre <b>' + esc(C.host ? C.host + '/tele' : (C.brand || 'Kuboplay')) + '</b></p>' +
       (IOS && !navigator.standalone ? '<p class="pd-small">En iPhone: gira el móvil en horizontal. Para quitar las barras de Safari, Compartir → «Añadir a pantalla de inicio».</p>' : ''));
     var f = $('[data-form]'), inp = f.c, nm = $('.pd-name');
