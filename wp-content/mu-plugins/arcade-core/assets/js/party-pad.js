@@ -255,7 +255,20 @@
       }
       var d = Math.sqrt(dx * dx + dy * dy), s = d > R ? R / d : 1;
       knob.style.transform = 'translate(' + dx * s + 'px,' + dy * s + 'px)';
-      var o = d < R * 0.3 ? 99 : onlyH ? (dx < 0 ? 9 : 10) : Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
+      var o = 99;
+      if (d >= R * 0.3) {
+        if (onlyH) o = dx < 0 ? 9 : 10;
+        else {
+          var ag = Math.atan2(dy, dx); o = Math.round(ag / (Math.PI / 4));
+          /* Histeresis de 7 grados: para dejar el octante actual hay que pasarse de 29 grados, no de los
+             22,5 del reparto. Sin esto el pulgar quieto en el limite alternaba entre dos direcciones. */
+          if (oct !== 98 && oct !== 99 && oct < 9) {
+            var df = Math.abs(ag - oct * (Math.PI / 4));
+            if (df > Math.PI) df = Math.PI * 2 - df;
+            if (df < (Math.PI / 4) * 0.66) o = oct;
+          }
+        }
+      }
       if (o === oct) return;
       oct = o;
       if (o === 99) return apply([]);
@@ -280,10 +293,22 @@
     var bs = [].slice.call(ui.r.querySelectorAll('.pd-b')), owner = {}, count = {};
     bs.forEach(function (b) { count[b.dataset.b] = 0; });
     var ctr = null; // centros leídos al apoyar el primer dedo (no en cada pointermove)
-    function nearest(x, y) {
-      if (!ctr) ctr = bs.map(function (b) { var r = b.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+    /* 1.47.1: se juega mirando la tele, no el mando. Dos correcciones de margen de error: A gana la
+       franja dudosa (es el botón que se usa en todos los juegos) y para cambiar de botón con el dedo ya
+       apoyado hace falta un 18 % de ventaja, así un pulgar que tiembla en el límite no alterna A/B. */
+    var hy = 0;
+    function nearest(x, y, cur) {
+      if (!ctr) {
+        ctr = bs.map(function (b) { var r = b.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+        hy = bs[0].getBoundingClientRect().width * 0.35; // margen para cambiar de boton, a escala del boton
+      }
       var best = null, bd = Infinity;
-      for (var i = 0; i < bs.length; i++) { var d = Math.hypot(x - ctr[i][0], y - ctr[i][1]); if (d < bd) { bd = d; best = bs[i]; } }
+      for (var i = 0; i < bs.length; i++) {
+        var d = Math.hypot(x - ctr[i][0], y - ctr[i][1]);
+        if (bs[i].dataset.b === 'a') d *= 0.86;
+        if (bs[i] === cur) d -= hy;
+        if (d < bd) { bd = d; best = bs[i]; }
+      }
       return best;
     }
     function press(b, down) {
@@ -292,7 +317,7 @@
       if (!down && c === 0) { key(n, false); b.classList.remove('on'); }
     }
     function set(e) {
-      var was = owner[e.pointerId], now = nearest(e.clientX, e.clientY);
+      var was = owner[e.pointerId], now = nearest(e.clientX, e.clientY, was);
       if (was === now) return;
       if (was) press(was, false);
       owner[e.pointerId] = now; press(now, true);

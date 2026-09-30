@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **278 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2, 50 de la oleada 3, 13 de la oleada 4 y 15 de la oleada 5 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.47.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.47.1** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -271,6 +271,11 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
   - **Descansos saltables**: `k.skip()` en kit (toque o A de cualquier mando) y regla nueva — ningún descanso pasa de 1,5 s y todos se pasan dejando 0,3 s para que remate la jugada. Aplicado a bolos (bola asentándose), penaltis, dardos (fin de turno), billar (cartel de turno) y al saque de ping pong / frontón / air hockey, que a solas no se podía adelantar. Verificado con Playwright: sin tocar 1,400 → 1,317; tocando, salta a 0,300.
   - **Sensibilidad del dedo**: el seguimiento `pos += (dedo - pos) · min(1, dt·K)` estaba calibrado con ratón. K sube en seis juegos (pala 25→38, cuatro 22→34, breakout 20→34, neon paddle 22→34, nave 14→24 y 12→22): el retardo para cubrir el 95 % del recorrido baja de 120–250 ms a 79–136 ms. No se pasa a seguimiento directo a propósito (el dedo taparía la pala y el temblor se trasladaría tal cual).
   - Nuevo en kit: `k.dt` (dt del último fotograma, para el suavizado que se hace al dibujar) y `k.skip()`.
+
+- **Controles del mando mucho más grandes (1.47.1)**: se juega mirando a la tele, no al móvil, así que el mando tiene que perdonar. Tres cambios en `party.css` y `party-pad.js`, medidos con Playwright a 844×390, 740×360 y 390×844.
+  - **Tamaño**: joystick y botones crecen en todas las orientaciones y dejan de encogerse donde antes se encogían (el bloque de vertical y el de apaisado bajo de 1.46.1 iban justo al revés). Medido en apaisado 844×390: joystick 132 → **195 px** (+48 %), botones 78 → **121 px** de diámetro (+55 %); en vertical 390×844, 156 → 172 y 82 → **113 px**. Ninguno se sale de su zona en los tres tamaños.
+  - **Reparto de la zona de botones**: con A y B ya no van en diagonal, sino en **dos franjas a todo lo ancho** (B arriba, A abajo, con línea de puntos entre ellas). A ciegas el límite es una sola línea horizontal y cada franja entera pertenece a un botón.
+  - **Margen de error**: en el reparto, A gana la franja dudosa (es el botón que usan todos los juegos) y, con el dedo ya apoyado, cambiar de botón pide un margen a escala del botón (0,35 × diámetro): un pulgar que tiembla en el límite no alterna A/B, y hacen falta 17–30 px de recorrido real para cambiar. El joystick estrena **histéresis angular de 7°**: para salir de un octante hay que pasarse de 29°, no de los 22,5 del reparto. Simulado: un temblor en el límite pasa de 8 cambios de dirección a 1, y un giro franco de 0° a 90° sigue dando derecha → derecha+abajo → abajo.
 
 ## Kuboplay Shield (plugin aparte, `wp-content/plugins/kuboplay-shield`, v1.1.2)
 Segundo plugin, independiente del arcade: seguridad + rendimiento, con panel propio en español. Guía para el usuario: `docs/SEGURIDAD.md` (Cloudflare gratis paso a paso, qué hace y qué no, cómo recuperar el acceso desde IONOS).
