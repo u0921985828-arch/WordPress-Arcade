@@ -142,6 +142,7 @@
     var init = { method: opt.method || 'GET', headers: {}, cache: 'no-store', credentials: 'omit' };
     if (opt.body) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(opt.body); }
     if (opt.keepalive) init.keepalive = true;
+    if (opt.signal) init.signal = opt.signal;
     // Con enlaces permanentes simples la API es ?rest_route=…: la consulta se añade con &.
     if (C.api.indexOf('?') >= 0) path = path.replace('?', '&');
     return fetch(C.api + path, init).then(function (r) {
@@ -818,7 +819,9 @@
   }
   function relayPeers() { return Object.keys(S.peers).filter(function (p) { return S.peers[p].relay; }); }
   function relaySoon(ms) {
-    if (S.rbusy) { S.rmore = true; return; }
+    // Si la petición en vuelo está esperando en el servidor (espera larga) y ahora hay algo que
+    // mandar, se corta: así la tele no se queda medio segundo callada con un mensaje en la mano.
+    if (S.rbusy) { S.rmore = true; if (!ms && S.rwait && S.rab) { try { S.rab.abort(); } catch (e) { /* nada */ } } return; }
     clearTimeout(S.rT); S.rT = setTimeout(relayPump, ms);
   }
   function relayPump() {
@@ -832,8 +835,14 @@
       if (pe.dc.q.length) { m[p] = sent[p] = pe.dc.q.splice(0, 40); }
     });
     function back() { Object.keys(sent).forEach(function (p) { var pe = S.peers[p]; if (pe && pe.relay && pe.rl === rl[p]) pe.dc.q = sent[p].concat(pe.dc.q); }); }
-    api('/' + S.code + '/hrelay', { method: 'POST', body: { k: S.k, a: a, m: m, rl: rl } }).then(function (r) {
-      S.rbusy = false;
+    /* Espera larga: si no llevamos nada que mandar, la petición se queda parada en el servidor
+       hasta que un mando escribe. Antes se preguntaba cada 80 ms y una tecla esperaba de media
+       medio hueco más el arranque de WordPress de la siguiente petición; ahora vuelve al instante. */
+    var wait = Object.keys(m).length ? 0 : document.hidden ? 0 : S.game ? 600 : 400;
+    S.rwait = !!wait;
+    S.rab = wait && window.AbortController ? new AbortController() : null;
+    api('/' + S.code + '/hrelay', { method: 'POST', body: { k: S.k, a: a, m: m, rl: rl, w: wait }, signal: S.rab && S.rab.signal }).then(function (r) {
+      S.rbusy = false; S.rwait = false; S.rab = null;
       if (r._status !== 200) { back(); relaySoon(r._status === 429 ? 3000 : 1000); return; }
       var inn = r['in'] || {};
       Object.keys(inn).forEach(function (p) {
@@ -847,8 +856,13 @@
       });
       var more = S.rmore || relayPeers().some(function (p) { return S.peers[p].dc.q.length; });
       // En partida se pregunta más a menudo (menos retardo del mando); en el lobby no hace falta.
-      relaySoon(more ? 0 : document.hidden ? 1000 : S.game ? 80 : 250);
-    }).catch(function () { S.rbusy = false; back(); relaySoon(1000); });
+      // Con espera larga el hueco sobra: la siguiente petición se queda esperando por sí sola.
+      relaySoon(more || wait ? 0 : document.hidden ? 1000 : S.game ? 80 : 250);
+    }).catch(function (e) {
+      S.rbusy = false; S.rwait = false; S.rab = null; back();
+      // Abortada a propósito porque hay algo que mandar: se reintenta ya, no es un fallo de red.
+      relaySoon(e && e.name === 'AbortError' ? 0 : 1000);
+    });
   }
 
   /* ============================================================== Sala */

@@ -29,6 +29,8 @@ final class Arcade_Party {
 	);
 	const RELAY_KEEP = 80;   // mensajes que se guardan por sentido (los lectores piden desde su último número)
 	const RELAY_MSG  = 6144; // bytes por mensaje
+	const RELAY_WAIT = 600;  // ms que la tele puede dejar la peticion esperando en el servidor (espera larga)
+	const RELAY_STEP = 35;   // ms entre miradas a la cola durante esa espera
 
 	public static function boot() {
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
@@ -796,7 +798,22 @@ final class Arcade_Party {
 		if ( $msgs ) {
 			self::relay_push( 'arcade_prin_' . $code . '_' . $p, $rl, $msgs );
 		}
-		return self::out( array( 'm' => self::relay_since( 'arcade_prout_' . $code . '_' . $p, $rl, (int) $req->get_param( 'a' ) ) ) );
+		$key = 'arcade_prout_' . $code . '_' . $p;
+		$a   = (int) $req->get_param( 'a' );
+		$out = self::relay_since( $key, $rl, $a );
+		// Espera larga, igual que en hrelay: si no hay nada de la tele, la petición aguarda aquí.
+		$w = self::wait_ms( $req );
+		if ( $w && ! $out ) {
+			$fin = microtime( true ) + $w / 1000;
+			while ( microtime( true ) < $fin ) {
+				usleep( self::RELAY_STEP * 1000 );
+				$out = self::relay_since( $key, $rl, $a );
+				if ( $out ) {
+					break;
+				}
+			}
+		}
+		return self::out( array( 'm' => $out ) );
 	}
 
 	/** POST /party/CODE/hrelay {k, rl:{p:…}, a:{p:n}, m:{p:[…]}} → la tele envía a sus mandos de respaldo y recoge. */
@@ -825,6 +842,46 @@ final class Arcade_Party {
 			}
 			$in[ $p ] = array( 'rl' => $rl, 'm' => self::relay_since( 'arcade_prin_' . $code . '_' . $p, $rl, (int) ( $as[ $p ] ?? 0 ) ) );
 		}
+		/*
+		 * Espera larga (1.43.1). Sin esto la tele preguntaba cada 80 ms: una tecla del mando
+		 * se quedaba esperando de media medio hueco MÁS el arranque completo de WordPress de la
+		 * siguiente petición. Ahora, si no hay nada que llevarse, la petición se queda en el
+		 * servidor hasta que llega algo (o hasta agotar $w) y vuelve en cuanto llega. Baja la
+		 * latencia y además baja de ~12 peticiones por segundo a ~2.
+		 */
+		$w = self::wait_ms( $req );
+		if ( $w && ! self::relay_any( $in ) ) {
+			$fin = microtime( true ) + $w / 1000;
+			while ( microtime( true ) < $fin ) {
+				usleep( self::RELAY_STEP * 1000 );
+				foreach ( $in as $p => $row ) {
+					$in[ $p ]['m'] = self::relay_since( 'arcade_prin_' . $code . '_' . $p, $row['rl'], (int) ( $as[ $p ] ?? 0 ) );
+				}
+				if ( self::relay_any( $in ) ) {
+					break;
+				}
+			}
+		}
 		return self::out( array( 'in' => (object) $in ) );
+	}
+
+	/**
+	 * Milisegundos que esta peticion puede quedarse esperando en el servidor. Cada espera ocupa un
+	 * proceso de PHP, asi que el hosting que vaya justo puede apagarlas con
+	 * add_filter( 'arcade_party_wait', '__return_zero' ).
+	 */
+	private static function wait_ms( WP_REST_Request $req ) {
+		$w = min( self::RELAY_WAIT, max( 0, (int) $req->get_param( 'w' ) ) );
+		return max( 0, (int) apply_filters( 'arcade_party_wait', $w, $req ) );
+	}
+
+	/** ¿Alguna cola trae algo? */
+	private static function relay_any( $in ) {
+		foreach ( $in as $row ) {
+			if ( ! empty( $row['m'] ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 }

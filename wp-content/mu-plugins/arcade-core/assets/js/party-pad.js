@@ -21,6 +21,7 @@
     opt = opt || {};
     var init = { method: opt.method || 'GET', headers: {}, cache: 'no-store', credentials: 'omit' };
     if (opt.body) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(opt.body); }
+    if (opt.signal) init.signal = opt.signal;
     // Con enlaces permanentes simples la API es ?rest_route=…: la consulta se añade con &.
     if (C.api.indexOf('?') >= 0) path = path.replace('?', '&');
     return fetch(C.api + path, init).then(function (r) {
@@ -431,7 +432,10 @@
   function relayStart(gen) {
     var dc = S.dc = { relay: true, readyState: 'open', q: [], a: 0, busy: false, t: 0, got: false,
       rl: Math.random().toString(36).slice(2, 10) + Date.now().toString(36),
-      send: function (str) { if (dc.readyState !== 'open') return; try { dc.q.push(JSON.parse(str)); } catch (e) { return; } if (dc.q.length > 200) dc.q.splice(0, dc.q.length - 200); if (!dc.busy) { clearTimeout(dc.t); dc.t = setTimeout(pump, 0); } },
+      send: function (str) { if (dc.readyState !== 'open') return; try { dc.q.push(JSON.parse(str)); } catch (e) { return; } if (dc.q.length > 200) dc.q.splice(0, dc.q.length - 200);
+        // Si la petición en vuelo está aguardando en el servidor, se corta: la tecla sale ya.
+        if (dc.busy) { if (dc.wait && dc.ab) { try { dc.ab.abort(); } catch (e) { /* nada */ } } return; }
+        clearTimeout(dc.t); dc.t = setTimeout(pump, 0); },
       close: function () { dc.readyState = 'closed'; clearTimeout(dc.t); }
     };
     wire(gen, dc);
@@ -444,8 +448,13 @@
       if (!live() || dc.busy) return;
       dc.busy = true;
       var m = dc.q.splice(0, 40);
-      api('/' + code + '/relay', { method: 'POST', body: { p: S.p, tok: S.tok, rl: dc.rl, a: dc.a, m: m } }).then(function (r) {
-        dc.busy = false;
+      /* Espera larga: sin nada que mandar, la petición se queda parada en el servidor hasta que la
+         tele escribe, en vez de preguntar cada 0,3 s. Lo que mande el mando la corta al instante. */
+      var wait = m.length || document.hidden ? 0 : 500;
+      dc.wait = !!wait;
+      dc.ab = wait && window.AbortController ? new AbortController() : null;
+      api('/' + code + '/relay', { method: 'POST', body: { p: S.p, tok: S.tok, rl: dc.rl, a: dc.a, m: m, w: wait }, signal: dc.ab && dc.ab.signal }).then(function (r) {
+        dc.busy = false; dc.wait = false; dc.ab = null;
         if (!live()) return;
         if (r._status === 409) { S.tok = ''; saveSeat(); connect(); return; }
         if (r._status === 404) { fail('La sala ha caducado. Mira el código nuevo en la tele.'); return; }
@@ -456,8 +465,11 @@
           if (!dc.got) { dc.got = true; dc.onopen(); }
           dc.onmessage({ data: JSON.stringify(x[1]) });
         });
-        again(dc.q.length ? 0 : document.hidden ? 2000 : 300);
-      }).catch(function () { dc.busy = false; dc.q = m.concat(dc.q); again(1000); });
+        again(dc.q.length || wait ? 0 : document.hidden ? 2000 : 300);
+      }).catch(function (e) {
+        dc.busy = false; dc.wait = false; dc.ab = null; dc.q = m.concat(dc.q);
+        again(e && e.name === 'AbortError' ? 0 : 1000);
+      });
     }
     pump();
     return null;
