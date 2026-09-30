@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **278 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2, 50 de la oleada 3, 13 de la oleada 4 y 15 de la oleada 5 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.45.1** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.45.2** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -245,6 +245,8 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
   - **El compositor de luces (WebGL) se apaga antes**: sondeaba en los fotogramas 15/35/65, que en un aparato a 5 fps son **trece segundos** de tirones antes de decidir. Ahora sondea en el 6/12/20 y se apaga con un solo sondeo por encima de 12 ms.
   - **Medido** (1280×720, freno ×6, 4 juegos, 14 s): pixel-dash 12,5 → 25,4 fps, tanques 13,0 → 24,0, mazmorra 13,0 → 26,6, estelas 18,6 → 22,9; el fotograma medio baja de 50 a 33 ms. Sin freno no hay regresión (30,0 → 32,1; 31,5 → 31,7; 28,8 → 33,2; 31,8 → 33,5).
   - De paso, `fit()` solo avisa al juego (`k.onSize`) cuando cambia el tamaño **lógico**: al cambiar solo la resolución algunos motores recomponían —y alguno regeneraba el nivel— sin motivo.
+
+- **Instalación en carpeta propia (1.45.2)**: `scripts/package.sh` acepta `FOLDER` (nombre de la carpeta del plugin) y `ZIPNAME`, y `SLIM=1` adelgaza solo la copia empaquetada (minifica los JS de `games/` con terser sin tocar los nombres globales y recomprime las miniaturas: 12 → 9,5 MB). Todas las rutas del plugin salen de `__DIR__` y `plugins_url( …, __FILE__ )`, así que el nombre de la carpeta da igual: `FOLDER=kuboplay-arcade` instala en limpio cuando el hosting dejó una carpeta `arcade-core` rota que el usuario no puede borrar. El único sitio que la tenía escrita a mano, el `_game_embed_url` de `sync_catalog()`, ya usa `plugins_url()`. Verificado en el WP local: portada, ficha, reproductor y `/tele/` sirviendo desde `plugins/kuboplay-arcade/`.
 
 ## Kuboplay Shield (plugin aparte, `wp-content/plugins/kuboplay-shield`, v1.1.2)
 Segundo plugin, independiente del arcade: seguridad + rendimiento, con panel propio en español. Guía para el usuario: `docs/SEGURIDAD.md` (Cloudflare gratis paso a paso, qué hace y qué no, cómo recuperar el acceso desde IONOS).

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Arcade Core
  * Description: CPT "game", taxonomías, meta de juego y reproductor lazy para el portal arcade.
- * Version:     1.45.1
+ * Version:     1.45.2
  * Author:      Arcade Team
  *
  * Instalar: copiar este archivo + la carpeta /arcade-core/ en wp-content/mu-plugins/.
@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
 
 final class Arcade_Core {
 
-	const VERSION      = '1.45.1';
+	const VERSION      = '1.45.2';
 	const ORIENTATIONS = array( 'portrait', 'landscape', 'auto' );
 	const RATIOS       = array( '16:9', '4:3', '1:1', 'fill' );
 	const ENGINES      = array( 'canvas', 'phaser', 'threejs', 'godot_web', 'construct' );
@@ -292,7 +292,7 @@ final class Arcade_Core {
 			}
 			++$count;
 			$inputs = array_values( array_intersect( self::INPUTS, (array) ( $g['inputs'] ?? array() ) ) );
-			update_post_meta( $pid, '_game_embed_url', '/wp-content/plugins/arcade-core/games/' . $slug . '/index.html' );
+			update_post_meta( $pid, '_game_embed_url', plugins_url( self::sub() . 'games/' . $slug . '/index.html', __FILE__ ) );
 			update_post_meta( $pid, '_game_orientation', in_array( $g['orient'] ?? '', self::ORIENTATIONS, true ) ? $g['orient'] : 'auto' );
 			update_post_meta( $pid, '_game_aspect_ratio', in_array( $g['aspect'] ?? '', self::RATIOS, true ) ? $g['aspect'] : 'fill' );
 			update_post_meta( $pid, '_game_tech_engine', 'canvas' );
