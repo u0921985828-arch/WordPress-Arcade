@@ -68,9 +68,14 @@
         '<button type="button" class="pd-help" data-help hidden aria-label="Cómo se juega">?</button></header>' +
       '<div class="pd-zones"><div class="pd-l" data-l></div><div class="pd-r" data-r></div></div>' +
       '<div class="pd-priv" data-priv></div>' +
+      '<div class="pd-rot" data-rot><div class="pd-card">' +
+        '<svg viewBox="0 0 64 64" fill="none" stroke="#a097ff" stroke-width="4" stroke-linejoin="round">' +
+          '<rect x="22" y="6" width="20" height="52" rx="5"/><path d="M28 50h8"/></svg>' +
+        '<h1>Gira el móvil</h1><p>El mando se juega en <b>horizontal</b>: cada pulgar tiene su mitad y se dibuja mucho mejor.</p>' +
+        '<button type="button" class="pd-btn" data-keep>Seguir en vertical</button></div></div>' +
       '<div class="pd-over" data-over></div>' +
     '</div>';
-  var ui = { priv: $('[data-priv]'), me: $('[data-me]'), title: $('[data-title]'), l: $('[data-l]'), r: $('[data-r]'), over: $('[data-over]'), menu: $('[data-menu]'), help: $('[data-help]') };
+  var ui = { rot: $('[data-rot]'), priv: $('[data-priv]'), me: $('[data-me]'), title: $('[data-title]'), l: $('[data-l]'), r: $('[data-r]'), over: $('[data-over]'), menu: $('[data-menu]'), help: $('[data-help]') };
 
   function overlay(html) {
     ui.over.innerHTML = html ? '<div class="pd-card">' + html + '</div>' : '';
@@ -312,6 +317,20 @@
     document.addEventListener(ev, function (e) { if (!inForm(e) && e.cancelable) e.preventDefault(); }, { passive: false });
   });
 
+  /* El mando se usa en horizontal (1.46.1). Donde el navegador deja (Android en pantalla completa) se
+     bloquea solo; donde no (iOS), se pide con el cartel .pd-rot, que se puede descartar. */
+  function lockLand() {
+    try {
+      var o = screen.orientation;
+      if (o && o.lock && document.fullscreenElement) o.lock('landscape').catch(function () {});
+    } catch (e) { /* nada */ }
+  }
+  if (localStorage.getItem('arcade:pad:vert') === '1') document.body.classList.add('pd-keep');
+  ui.rot.querySelector('[data-keep]').addEventListener('click', function () {
+    document.body.classList.add('pd-keep');
+    try { localStorage.setItem('arcade:pad:vert', '1'); } catch (e) { /* nada */ }
+  });
+
   // Pantalla completa (Android) y pantalla siempre encendida al primer toque.
   var lock = null;
   function wake() {
@@ -320,7 +339,7 @@
   document.addEventListener('pointerup', function first(e) {
     if (e.target.closest && e.target.closest('input,form')) return;
     var de = document.documentElement;
-    try { if (!document.fullscreenElement && de.requestFullscreen && matchMedia('(pointer:coarse)').matches) de.requestFullscreen({ navigationUI: 'hide' }).catch(function () {}); } catch (er) { /* nada */ }
+    try { if (!document.fullscreenElement && de.requestFullscreen && matchMedia('(pointer:coarse)').matches) de.requestFullscreen({ navigationUI: 'hide' }).then(lockLand).catch(function () {}); } catch (er) { /* nada */ }
     wake();
     document.removeEventListener('pointerup', first);
   });
@@ -444,6 +463,7 @@
     dc.onopen = function () {
       if (gen !== S.gen) return;
       S.open = true; S.retry = 0; S.rx = Date.now(); S.padSeq = -1; S.block = false; S.netFail = S.tvFail = 0;
+      document.body.classList.add('pd-live'); lockLand();
       overlay('');
       send({ t: 'hi', name: S.name });
       buzz(30);

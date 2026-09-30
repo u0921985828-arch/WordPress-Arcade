@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **278 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2, 50 de la oleada 3, 13 de la oleada 4 y 15 de la oleada 5 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.46.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.46.1** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -263,6 +263,8 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
   - `party-tv.js` lo reenvía como `arcade:pdraw {p,x,y,d}` (en 0..1) y **kit.js v28** lo entrega en `k.onDraw(p,x,y,d)`.
   - `pictos.js`: `k.onDraw` coloca el pincel donde toca el dedo en vez de arrastrarlo. Mientras el dedo dibuja, el joystick y A no tocan el pincel (`pen[p].fg`, con vuelta automática a los 2 s si se corta la conexión), así que el mando sigue valiendo de respaldo. Los colores, Deshacer, Borrar y Listo siguen debajo del cuadro.
   - Verificado con Playwright: 20 mensajes de trazo dan **un solo trazo continuo de 20 puntos** (antes habrían sido 20 trazos sueltos) en los dos juegos, y el cuadro del mando manda `dr` 1/2/0 con el dedo. Textos del catálogo actualizados.
+
+- **El mando se usa en horizontal (1.46.1)**: el mando es un mando — dos zonas, una por pulgar. En vertical el móvil es alto y estrecho, así que cada zona queda alta y flaca y el cuadro de dibujo sale pequeño. Ahora el mando pide horizontal: cartel **«Gira el móvil»** (`.pd-rot`, solo en vertical, solo con la sala ya conectada, con botón «Seguir en vertical» que se recuerda en `arcade:pad:vert`) y, donde el navegador deja (Android en pantalla completa), **bloqueo de orientación** con `screen.orientation.lock('landscape')` al entrar en pantalla completa y al abrirse el canal. En apaisado bajo (`max-height:520px`): barra superior de 52 → 42 px (variable `--top`, que ahora usan también `.pd-priv` y `.pd-priv.bar`), joystick y botones algo menores y **panel privado a dos columnas** — el cuadro de dibujo a la izquierda con todo el alto y los colores/Deshacer/Listo a la derecha, sin desplazar. Medido con Playwright: en 844×390 las zonas pasan de 196×792 a 423×348 y el panel de dibujo cabe entero (cuadro 330×330 + botones al lado); en 390×844 nada cambia salvo el cartel.
 
 ## Kuboplay Shield (plugin aparte, `wp-content/plugins/kuboplay-shield`, v1.1.2)
 Segundo plugin, independiente del arcade: seguridad + rendimiento, con panel propio en español. Guía para el usuario: `docs/SEGURIDAD.md` (Cloudflare gratis paso a paso, qué hace y qué no, cómo recuperar el acceso desde IONOS).
