@@ -364,9 +364,14 @@ void main(){
     const MAXW = (fo && fo.maxW) || 0, MAXH = (fo && fo.maxH) || 0;
     k.W = w; k.H = h; k.ox = 0; k.oy = 0;
     k.safe = { x: 0, y: 0, w, h };
+    /* En el modo tele el juego va a pantalla completa en un televisor: a 1080p el lienzo
+       llegaría a 2,07 Mpx por fotograma, que es lo que ahoga al navegador de una Smart TV.
+       Se pinta a 1280×720 como mucho y el televisor lo estira: a distancia de sofá no se
+       nota, y son 2,25 veces menos píxeles. El puntero no se ve afectado (va por CSS). */
+    const TVMODE = /[?&]party=1\b/.test(location.search), TVPX = 1280 * 720;
     function fit() {
       let s = Math.min(innerWidth / w, innerHeight / h);
-      const dpr = Math.min(2, devicePixelRatio || 1); // ×3 cuesta 2,25 veces más píxeles sin diferencia visible
+      let dpr = Math.min(2, devicePixelRatio || 1); // ×3 cuesta 2,25 veces más píxeles sin diferencia visible
       let cw = w * s, ch = h * s;
       if (fluid) {
         const ar = innerWidth / innerHeight;
@@ -379,6 +384,7 @@ void main(){
       k.W = cw / s; k.H = ch / s;
       k.ox = (k.W - w) / 2; k.oy = (k.H - h) / 2;
       k.safe.x = k.ox; k.safe.y = k.oy;
+      if (TVMODE && cw * ch * dpr * dpr > TVPX) dpr = Math.sqrt(TVPX / (cw * ch));
       cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
       cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
       ctx.setTransform(s * dpr, 0, 0, s * dpr, 0, 0);

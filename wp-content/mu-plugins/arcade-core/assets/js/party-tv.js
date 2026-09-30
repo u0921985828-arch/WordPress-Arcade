@@ -252,7 +252,9 @@
       S.sections.push({ title: mp.length ? 'Para un jugador' : 'Juegos', sub: 'Juega con el mando del móvil (J1)', games: solo });
       renderGrid();
       // kit.js y art.js los usan todos los juegos: se piden ya, en el lobby.
-      if (C.games) { prefetch(C.games + '_lib/kit.js?v=18'); prefetch(C.games + '_lib/art.js?v=9'); }
+      // Las versiones las pone build_games.py en party.json: escritas a mano se quedaban viejas
+      // (iban por v=18 y v=9) y el navegador descargaba URL que ningún juego pide.
+      if (C.games) (j.lib || []).forEach(function (u) { prefetch(C.games + u); });
     }).catch(function () { ui.grid.innerHTML = '<p class="pt-empty">No se pudo cargar la lista de juegos.</p>'; });
   }
 
@@ -620,10 +622,28 @@
     for (var p = 0; p < 4; p++) {
       var peer = S.peers[p], on = active(p), lost = peer && peer.open && peer.lost, wait = peer && !peer.open;
       h += '<div class="pt-pl' + (on ? ' on' : lost ? ' lost' : wait ? ' wait' : '') + '" style="--pc:' + COLORS[p] + '">' +
-        '<span class="pt-av">' + ICO.pad + '</span><b>J' + (p + 1) + '</b><span>' + (on ? (p === leader() ? 'Listo · elige' : 'Listo') : lost ? 'Sin señal' : wait ? 'Conectando…' : 'Libre') + '</span></div>';
+        '<span class="pt-av">' + ICO.pad + '</span><b>J' + (p + 1) + '</b><span>' + (on ? netLabel(peer, p) : lost ? 'Sin señal' : wait ? 'Conectando…' : 'Libre') + '</span></div>';
     }
     ui.players.innerHTML = h;
+    relayHint();
     renderGhud(false);
+  }
+
+  /* Estado de la conexión de cada mando: directo (móvil y tele hablan entre ellos) o por el
+     servidor (cada mensaje da la vuelta por WordPress: ahí es donde se nota el retraso). */
+  function netLabel(peer, p) {
+    var base = p === leader() ? 'Listo · elige' : 'Listo';
+    if (!peer) return base;
+    var ms = peer.ping | 0;
+    if (peer.rly || peer.relay) return base + ' · por el servidor' + (ms ? ' ' + ms + ' ms' : '');
+    return base + (ms ? ' · ' + ms + ' ms' : ' · directo');
+  }
+  var hintShown = 0;
+  function relayHint() {
+    var rly = Object.keys(S.peers).some(function (p) { return active(p) && (S.peers[p].rly || S.peers[p].relay); });
+    if (!rly || S.game || hintShown) return;
+    hintShown = 1;
+    toast('Un mando va por el servidor y eso da retraso. Pon los móviles en la misma wifi que la tele.');
   }
 
   function renderGhud(show) {
@@ -736,7 +756,12 @@
         if (typeof d.s === 'number') { if (peer.seq[d.k] != null && d.s <= peer.seq[d.k]) return; peer.seq[d.k] = d.s; }
         if (d.ts) { S.lat.push(Date.now() - d.ts); if (S.lat.length > 500) S.lat.shift(); }
         padKey(p, d.k, !!d.d, d.ts);
-      } else if (d.t === 'p') send(p, { t: 'P', ts: d.ts });
+      } else if (d.t === 'p') {
+        // El mando cuenta cómo va su conexión; se refresca la tarjeta solo cuando cambia de verdad.
+        var ms = d.ms | 0, rly = !!d.rl || !!peer.relay;
+        if (rly !== !!peer.rly || Math.abs(ms - (peer.ping || 0)) > 25) { peer.ping = ms; peer.rly = rly; if (!S.game) renderPlayers(); }
+        send(p, { t: 'P', ts: d.ts });
+      }
       else if (d.t === 'hi' && d.name) { peer.name = String(d.name).slice(0, 16); post(playersMsg()); }
       else if (d.t === 'pick' && S.game && !S.menu && !S.ad) post({ type: 'arcade:ppick', p: p, v: d.v });
     };

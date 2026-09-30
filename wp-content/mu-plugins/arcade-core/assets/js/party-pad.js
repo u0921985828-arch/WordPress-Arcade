@@ -270,7 +270,14 @@
 
   // Latido: 1 por segundo (la tele da por perdido un mando tras 3,5 s de silencio). Si la tele no
   // contesta en 7 s, el canal está muerto aunque el navegador no lo sepa: se vuelve a negociar.
-  function ping() { send({ t: 'p', ts: Date.now() }); }
+  // Junto al latido va lo que el mando sabe de su propia conexión: la mediana de ida y vuelta
+  // y si va por el servidor. La tele lo enseña en la tarjeta del jugador (ver renderPlayers).
+  function medRtt() {
+    if (!S.rtt.length) return 0;
+    var v = S.rtt.slice(-20).sort(function (x, y) { return x - y; });
+    return v[v.length >> 1] | 0;
+  }
+  function ping() { send({ t: 'p', ts: Date.now(), ms: medRtt(), rl: S.relay ? 1 : 0 }); }
   var tick = Date.now();
   setInterval(function () {
     var now = Date.now(), stalled = now - tick > 3000; // el navegador tuvo el JS parado (suspendido): margen

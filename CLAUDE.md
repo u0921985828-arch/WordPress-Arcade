@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **278 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2, 50 de la oleada 3, 13 de la oleada 4 y 15 de la oleada 5 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.42.1** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.43.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -219,6 +219,12 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
   - Alturas de página medidas: listado móvil 21 546 → 7 237 px, ficha móvil 3 668 → 2 217 px, portada móvil 7 877 → 5 372 px.
 
 - **El menú del mando manda (1.42.1)**: en los juegos de cartas y fichas del modo tele, el móvil enseña la mano privada a pantalla completa (`.pd-priv.show`), que tapaba el joystick y los botones. Al abrir el **menú** en la tele (o durante un anuncio), `padMsg()` manda `mn:1` y `party-pad.js` **esconde la mano y devuelve el mando** (`S.priv` se guarda, `drawPriv()` no pinta mientras `S.block`); al cerrar el menú vuelve la mano tal cual estaba. Verificado con Playwright: con la mano, el punto central del joystick lo ocupa `.pd-priv`; con el menú abierto lo ocupa `.pd-l`.
+
+- **Modo tele más ligero (1.43.0)**: en una Smart TV el juego iba a tirones. Tres arreglos medidos:
+  - **Lienzo capado en la tele** (`kit.js`, `?v=26`): con `?party=1` (que es como la tele abre siempre el juego) el lienzo se pinta a **1280×720 como mucho** en vez de a 1920×1080, y el televisor lo estira. Son **2,25 veces menos píxeles** por fotograma y a distancia de sofá no se nota. Medido con Playwright a ×6 de freno de CPU: pixel-dash 400 → 183 ms por fotograma, tank-duel 417 → 167 ms (**2,2× más rápido**). Fuera del modo tele no cambia nada (el móvil sigue con `dpr` hasta 2) y el puntero tampoco, porque va por CSS.
+  - **Precarga del lobby arreglada**: `/tele/` pedía `kit.js?v=18` y `art.js?v=9`, versiones de hace veinte entregas, así que descargaba dos URL que ningún juego usa y la precarga no servía de nada. Ahora las URL con su versión real las escribe `build_games.py` en `games/party.json` (`lib`) y `party-tv.js` las lee de ahí.
+  - **Estado de la conexión a la vista**: el mando manda con cada latido su mediana de ida y vuelta y si va por el servidor (`{t:'p',ms,rl}`); la tarjeta de cada jugador en el lobby dice «Listo · 45 ms» o «Listo · por el servidor 210 ms», y si algún mando va por el servidor sale un aviso: **pon los móviles en la misma wifi que la tele**. Con la tele en el router y cada móvil con sus datos, la conexión directa no se puede hacer y cada tecla da la vuelta por WordPress: ahí está el retraso, y no se arregla desde el código.
+- **La tarjeta señalada ya no tapa la de arriba (1.43.0)**: en el lobby de `/tele/`, `.pt-cell.on` crecía (×1,05–1,07) **y** se levantaba (`translateY`), más el aro de 0,5em, lo que sumaba más que el hueco de 1,1em de la rejilla y **tapaba el nombre del juego de la fila de arriba**. Quitado el `translateY` y subido el `row-gap` (1,9em normal, 2,3em en tele, 1,5em en móvil). Verificado con Playwright: el solape pasa de varios píxeles a **0**.
 
 ## Kuboplay Shield (plugin aparte, `wp-content/plugins/kuboplay-shield`, v1.1.2)
 Segundo plugin, independiente del arcade: seguridad + rendimiento, con panel propio en español. Guía para el usuario: `docs/SEGURIDAD.md` (Cloudflare gratis paso a paso, qué hace y qué no, cómo recuperar el acceso desde IONOS).
