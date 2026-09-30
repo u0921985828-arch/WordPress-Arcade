@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **278 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2, 50 de la oleada 3, 13 de la oleada 4 y 15 de la oleada 5 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.45.4** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.45.5** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -253,6 +253,8 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
 - **Aire de más y texto cortado (1.45.4)**: dos avisos del usuario sobre la pantalla del móvil.
   - **Bloque «Modo fiesta» de la portada**: medía 767 px de alto en 390×844, casi una pantalla entera para un anuncio. Menos relleno (22 → 16 px), titular desde 19 px, párrafo acortado a dos frases, ilustración de 250 → 190 px y los dos botones en **una sola fila** (`flex:1 1 0`, sin partir «Tengo un código»). Medido: 767 → **618 px** (−19 %), portada 5 362 → 5 209 px.
   - **Campo «Tu nombre» del mando**: `.pd-card input` (código de sala, `letter-spacing:.3em` y mayúsculas) ganaba en especificidad a `.pd-name`, así que el nombre salía con la letra separadísima y el texto se cortaba («TU NOMBRE (C»). Ahora la regla es `.pd-card input.pd-name` con espaciado normal, 1 rem y borde propio; el texto de ayuda pasa a «Tu nombre». Medido: el contenido cabe en el campo (308 px de 308).
+
+- **Fuera el anuncio decorativo (1.45.5)**: en el bloque «Modo fiesta» de la portada, la ilustración de la tele con los cuatro móviles dejaba poco aire arriba y un hueco grande abajo, y la línea «158 juegos para jugar juntos» repetía lo que ya dice el enlace «Ver los 158 juegos de tele». Quitadas las dos (`.ax-party-art` y `.ax-party-n`, con sus reglas de CSS); el bloque pasa a una sola columna en escritorio y el párrafo deja de limitarse a 52 caracteres. Medido: bloque 618 → **460 px** en 390×844 (−26 %), portada 5 209 → **5 051 px**; en 1280×860 el bloque baja de 606 a 464 px.
 
 ## Kuboplay Shield (plugin aparte, `wp-content/plugins/kuboplay-shield`, v1.1.2)
 Segundo plugin, independiente del arcade: seguridad + rendimiento, con panel propio en español. Guía para el usuario: `docs/SEGURIDAD.md` (Cloudflare gratis paso a paso, qué hace y qué no, cómo recuperar el acceso desde IONOS).

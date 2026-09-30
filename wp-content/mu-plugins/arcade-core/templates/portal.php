@@ -380,22 +380,7 @@ else :
 					<a class="ax-btn" href="<?php echo esc_url( $tv_url ); ?>"><?php echo $ico['tvbig']; // phpcs:ignore ?>Abrir en la tele</a>
 					<a class="ax-btn ghost ax-hascode" href="<?php echo esc_url( home_url( '/mando/' ) ); ?>"><?php echo $ico['phone']; // phpcs:ignore ?>Tengo un código</a>
 				</div>
-				<?php if ( $mpg ) : ?><p class="ax-party-n"><?php echo Arcade_Portal::MP_ICO; // phpcs:ignore ?><b><?php echo count( $mpg ); ?> juegos</b> para jugar juntos</p><?php endif; ?>
 			</div>
-			<svg class="ax-party-art" viewBox="0 0 320 200" role="img" aria-label="Una tele con un juego y cuatro móviles que hacen de mando">
-				<defs><linearGradient id="axpg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2a2466"/><stop offset="1" stop-color="#141a33"/></linearGradient></defs>
-				<rect x="40" y="10" width="240" height="140" rx="14" fill="#1a1530"/>
-				<rect x="50" y="20" width="220" height="120" rx="8" fill="url(#axpg)"/>
-				<path d="M160 26v108" stroke="rgba(255,255,255,.18)" stroke-width="2" stroke-dasharray="6 6"/>
-				<circle cx="160" cy="80" r="18" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="2"/>
-				<rect x="62" y="56" width="8" height="34" rx="4" fill="#ff5a5f"/><rect x="250" y="70" width="8" height="34" rx="4" fill="#3fb6ea"/>
-				<rect x="112" y="104" width="30" height="8" rx="4" fill="#ffd166"/><rect x="180" y="40" width="30" height="8" rx="4" fill="#5fbf45"/>
-				<circle cx="196" cy="92" r="7" fill="#fff"/><path d="M184 97l-14 6M182 90l-16 1" stroke="rgba(255,255,255,.35)" stroke-width="3" stroke-linecap="round"/>
-				<path d="M130 150h60l8 14h-76z" fill="#1a1530"/>
-				<g class="ax-pp"><?php foreach ( array( array( 36, '#ff5a5f', -8 ), array( 104, '#3fb6ea', 4 ), array( 190, '#ffd166', -4 ), array( 258, '#5fbf45', 8 ) ) as $ph ) : ?>
-					<g transform="translate(<?php echo (int) $ph[0]; ?> 150) rotate(<?php echo (int) $ph[2]; ?> 13 24)"><rect width="26" height="46" rx="6" fill="#1a1530"/><rect x="3" y="4" width="20" height="36" rx="3" fill="<?php echo esc_attr( $ph[1] ); ?>"/><path d="M8 20h6M11 17v6" stroke="#1a1530" stroke-width="2.4" stroke-linecap="round"/><circle cx="18" cy="26" r="2.6" fill="#1a1530"/></g>
-				<?php endforeach; ?></g>
-			</svg>
 			<?php
 			$pslugs = array_keys( $mpg );
 			shuffle( $pslugs );
