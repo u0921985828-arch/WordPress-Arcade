@@ -1,81 +1,161 @@
-/* Oleadas a mano de los matamarcianos (plan Friv, F3). Sin azar: lo escrito es lo que se juega.
+/* Oleadas a mano de los matamarcianos (plan Friv, tandas 2 y 7). Sin azar: lo escrito es lo que se juega.
  *
- * Cada oleada es un objeto. Solo `f` es obligatorio; el resto tiene valor por defecto.
+ * ============================== pixel-invaders ==============================
+ * Cada NIVEL es un objeto con varias OLAS (`ph`): al limpiar una entra la siguiente deslizándose
+ * desde arriba, así el nivel dura 40–70 s de verdad en vez de cruzarse en veinte segundos.
  *
- *   f    formación. Una cadena por fila, un carácter por casilla (columnas de 42 px,
- *        de 38 px si la fila llega a 10). La formación se centra sola en el lienzo.
- *          .  hueco
- *          a  raso     (10 pts, 1 impacto)
- *          b  medio    (20 pts, 1 impacto)
- *          c  cabeza   (30 pts, 1 impacto)
- *          d  blindado (40 pts, 2 impactos; lleva aro dorado)
- *          z  saltarín (50 pts, 1 impacto; se descuelga y baja en zigzag)
- *   y0   altura de la primera fila en px (58 por defecto)
- *   sp   velocidad lateral de la flota, 1 = la de siempre
- *   fr   cadencia de disparo de la flota, 1 = la de siempre
- *   dr   cuánto baja la flota al tocar un borde, en px (10 por defecto)
- *   bk   búnkeres, cuatro letras de izquierda a derecha:
- *          F  entero        h  medio derruido        -  sin búnker
- *   dv   segundos entre picados de los saltarines (0 = no pican)
- *   uf   OVNI: 0 ninguno · 1 de vez en cuando · 2 frecuente
- *   bs   jefe: { hp } — nave nodriza de tres fases con barra de vida propia
- *   m    rótulo que se anuncia al empezar la oleada (corto: cabe en el lienzo)
+ *   n    nombre del nivel (se anuncia al empezar)
+ *   tip  consejo corto del nivel
+ *   t    [fácil, normal, difícil] segundos objetivo de la 2ª estrella
+ *   ph   lista de olas; cada ola es { f, y0, sp, fr, dr, dv, bs }
+ *   uf   OVNIs de contrabando: lista de segundos de aparición. Son los TESOROS del nivel:
+ *        valen 150 puntos y hay que salir del hueco seguro a por ellos. La 3ª estrella pide
+ *        derribarlos todos, así que la recompensa nunca es gratis.
+ *   bk   búnkeres, cuatro letras de izquierda a derecha: F entero · h medio derruido · - ninguno
+ *   mt   segundos entre METEOROS (0 = ninguno). Caen tras 1,2 s de sombra de aviso, rompen
+ *        búnker y aguantan dos impactos (40 puntos).
+ *   ry   segundos entre RAYOS TRAZADORES (0 = ninguno). Marcan la columna 1,15 s antes; el
+ *        búnker los absorbe.
+ *   dv   segundos entre picados de los saltarines (se puede repetir por ola)
+ *   gc   segundos entre salvas de los artilleros (4,2 por defecto)
+ *   mc   segundos entre bombas de los minadores (3,4 por defecto)
+ *   cp   1 = punto de control entre olas (niveles de la segunda mitad). Al reintentar se
+ *        empieza en la última ola limpiada, pero el nivel solo puntúa 1★.
  *
- * Curva: la 1 no dispara casi y va lentísima; el fuego real empieza en la 3, los blindados
- * en la 5, los picados en la 6 y los búnkeres dejan de estar enteros a partir de la 7.
+ * Formación: una cadena por fila, un carácter por casilla (columnas de 42 px, de 38 px si la
+ * fila llega a 10). Se centra sola en el lienzo.
+ *   .  hueco
+ *   a  raso      (10 pts, 1 impacto)
+ *   b  medio     (20 pts, 1 impacto)
+ *   c  cabeza    (30 pts, 1 impacto)
+ *   d  blindado  (40 pts, 2 impactos; lleva aro dorado)
+ *   z  saltarín  (50 pts, 1 impacto; se descuelga y baja en zigzag)
+ *   e  ESCUDERO  (60 pts, 3 impactos): mientras vive, los bichos de las columnas DE AL LADO
+ *                son intocables (se marcan con un halo azul). Su propia columna queda expuesta:
+ *                por ahí se le derriba.
+ *   g  ARTILLERO (70 pts, 2 impactos): carga 0,95 s marcando la línea de tiro y suelta tres
+ *                plomos dirigidos.
+ *   h  ENJAMBRADOR (80 pts, 2 impactos): al morir suelta dos crías que bajan en zigzag.
+ *   m  MINADOR   (60 pts, 2 impactos): suelta bombas lentas que estallan en abanico al llegar
+ *                abajo. Se pueden disparar.
+ *
+ * Curva de verbos (uno por nivel, luego combinados): 1-3 escuela · 4 blindado · 5 saltarín ·
+ * 6 escudero · 7 artillero · 8 minador · 9 meteoros · 10 JEFE Crucero de Asalto ·
+ * 11 enjambrador · 12 rayo trazador · 13-19 combinaciones de dos y de tres · 20 JEFE Nave Nodriza.
  */
 const SHOOLV = {
   'pixel-invaders': [
-    /*  1 · llegar y disparar, sin prisa */
-    { f: ['bbbbb', 'aaaaa', 'aaaaa'], sp: 0.75, fr: 0.45, dr: 8, uf: 0, m: 'Primer contacto' },
-    /*  2 · más frente, primer OVNI */
-    { f: ['ccccccc', 'bbbbbbb', 'aaaaaaa', 'aaaaaaa'], sp: 0.9, fr: 0.6, dr: 9, m: 'Se acercan' },
-    /*  3 · la formación clásica al completo */
-    { f: ['ccccccccc', 'bbbbbbbbb', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1, fr: 0.75, m: 'Formación completa' },
-    /*  4 · pocas columnas y muy sueltas: hay que perseguirlas */
-    { f: ['c.c.c.c.c', 'b.b.b.b.b', 'a.a.a.a.a', 'a.a.a.a.a'], sp: 1.35, fr: 0.8, dr: 12, m: 'El peine' },
-    /*  5 · aparecen los blindados (dos impactos) */
-    { f: ['.d.d.d.d.', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.05, fr: 0.85, m: 'Blindados' },
-    /*  6 · aparecen los saltarines: se descuelgan y bajan en zigzag */
-    { f: ['..z...z..', '.bbbbbbb.', '.aaaaaaa.'], sp: 1.1, fr: 0.7, dv: 4.5, m: 'Picados' },
-    /*  7 · pocas filas, muchísima prisa */
-    { f: ['aaaaaaaaaa', 'aaaaaaaaaa'], sp: 1.75, fr: 0.8, dr: 14, uf: 2, bk: 'FhhF', m: 'Enjambre' },
-    /*  8 · bloque enorme y lento; los búnkeres ya vienen tocados */
-    { f: ['.d.....d.', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 0.85, fr: 0.95, dr: 9, bk: 'hFFh', m: 'La muralla' },
-    /*  9 · punta de lanza con saltarín en el vértice */
-    { f: ['....z....', '...ccc...', '..bbbbb..', '.bbbbbbb.', 'aaaaaaaaa'], sp: 1.1, fr: 0.85, dr: 11, dv: 5, m: 'La cuña' },
-    /* 10 · mitad del camino: tres blindados y OVNI a todas horas */
-    { f: ['d...d...d', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.05, fr: 1, dr: 11, uf: 2, m: 'Escolta acorazada' },
-    /* 11 · sin un solo búnker, pero son pocas y se pueden barrer */
-    { f: ['..z...z..', '.aa...aa.', '.aa...aa.'], sp: 1.9, fr: 0.9, dr: 13, dv: 4, bk: '----', m: 'Al descubierto' },
-    /* 12 · dos columnas de ataque y un pasillo central protegido */
-    { f: ['ccc...ccc', 'bbb...bbb', 'aaa...aaa', 'aaa...aaa'], sp: 1.25, fr: 1, dr: 12, bk: 'F--F', m: 'Dos frentes' },
-    /* 13 · lentas, pero disparan sin parar */
-    { f: ['bbbbbbbbb', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 0.95, fr: 1.6, m: 'Lluvia de fuego' },
-    /* 14 · cuatro saltarines turnándose */
-    { f: ['.z.z.z.z.', '.c.c.c.c.', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.1, fr: 0.95, dr: 11, dv: 3.2, m: 'Zigzag doble' },
-    /* 15 · reloj de arena: seis filas, empieza pegando alto */
-    { f: ['ccccccccc', '.bbbbbbb.', '..bbbbb..', '...aaa...', '..aaaaa..', '.aaaaaaa.'], sp: 1, fr: 1.05, bk: 'hhhh', m: 'Reloj de arena' },
-    /* 16 · una fila entera de blindados: hay que insistir */
-    { f: ['ddddddddd', 'ccccccccc', 'aaaaaaaaa'], sp: 1.05, fr: 1.15, dr: 11, uf: 2, m: 'Coraza pesada' },
-    /* 17 · pocas, rápidas y bajan a zancadas */
-    { f: ['.z..z..z.', '.bbbbbbb.', '.aaaaaaa.'], sp: 1.3, fr: 1, dr: 18, dv: 3.5, bk: 'F--F', m: 'Caída rápida' },
-    /* 18 · marea de diez columnas con saltarines en los extremos */
-    { f: ['zz......zz', 'bbbbbbbbbb', 'aaaaaaaaaa', 'aaaaaaaaaa'], sp: 1.15, fr: 1.15, dv: 3, uf: 2, m: 'La marea' },
-    /* 19 · todo a la vez, antes del jefe */
-    { f: ['d.d.d.d.d', 'ccccccccc', 'zbbbbbbbz', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.1, fr: 1.25, dr: 11, dv: 3, bk: 'hhhh', m: 'Última línea' },
-    /* 20 · la nave nodriza y su escolta */
-    { f: ['.c.c.c.c.', '.b.b.b.b.'], y0: 178, sp: 1.2, fr: 0.8, dr: 6, uf: 0, bs: { hp: 30 }, m: 'Nave nodriza' }
+    /*  1 */ { n: 'Primer contacto', tip: 'Mantén pulsado para disparar sin parar.', t: [58, 50, 44], uf: [16, 40], bk: 'FFFF',
+      ph: [{ f: ['bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 0.7, fr: 0.3, dr: 7 },
+           { f: ['ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 0.8, fr: 0.38, dr: 7 },
+           { f: ['ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 0.9, fr: 0.47, dr: 7 }] },
+
+    /*  2 */ { n: 'Contrabando', tip: 'Los OVNIs valen 150: sal del hueco y ve a por ellos.', t: [52, 45, 40], uf: [8, 18, 28, 38], bk: 'FFFF',
+      ph: [{ f: ['ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 0.9, fr: 0.42, dr: 6 },
+           { f: ['c.c.c.c.c', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.05, fr: 0.51, dr: 6 }] },
+
+    /*  3 */ { n: 'Formación completa', tip: 'Abre un pasillo por un lado y sube por él.', t: [64, 56, 49], uf: [12, 30, 46], bk: 'FFFF',
+      ph: [{ f: ['ccccccccc', 'bbbbbbbbb', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1, fr: 0.51, dr: 5 },
+           { f: ['ccccccccc', 'bbbbbbbbb', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.15, fr: 0.59, dr: 5 }] },
+
+    /*  4 */ { n: 'Blindados', tip: 'Los del aro dorado aguantan dos impactos.', t: [58, 50, 44], uf: [14, 34], bk: 'FFFF',
+      ph: [{ f: ['.d.d.d.d.', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 0.95, fr: 0.51, dr: 6 },
+           { f: ['d.d.d.d.d', 'bbbbbbbbb', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.1, fr: 0.59, dr: 5 }] },
+
+    /*  5 */ { n: 'Picados', tip: 'El saltarín se descuelga: no te quedes bajo su columna.', t: [62, 54, 48], uf: [12, 32], bk: 'FFFF', dv: 4.6,
+      ph: [{ f: ['..z...z..', '.ccccccc.', '.bbbbbbb.', '.aaaaaaa.'], sp: 1, fr: 0.51, dr: 6 },
+           { f: ['.z.z.z.z.', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.1, fr: 0.59, dr: 5, dv: 4 },
+           { f: ['z...z...z', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.25, fr: 0.64, dr: 7, dv: 3.6 }] },
+
+    /*  6 */ { n: 'Escuderos', tip: 'El escudero cubre las columnas de al lado: dispara por la suya.', t: [60, 52, 46], uf: [14, 36], bk: 'FFFF',
+      ph: [{ f: ['..e...e..', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 0.95, fr: 0.51, dr: 7 },
+           { f: ['.e.e.e.e.', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.05, fr: 0.59, dr: 6 },
+           { f: ['e...e...e', 'bbbbbbbbb', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.15, fr: 0.64, dr: 6 }] },
+
+    /*  7 */ { n: 'Artilleros', tip: 'Cuando el artillero marca la línea, sal de ella.', t: [62, 54, 47], uf: [12, 30, 48], bk: 'FFFF', gc: 4.4,
+      ph: [{ f: ['..g...g..', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 0.95, fr: 0.42, dr: 7 },
+           { f: ['.g.g.g.g.', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.05, fr: 0.51, dr: 6 },
+           { f: ['g..g..g..', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.15, fr: 0.59, dr: 6 }] },
+
+    /*  8 */ { n: 'Minadores', tip: 'Las bombas se pueden disparar antes de que caigan.', t: [64, 55, 48], uf: [14, 34], bk: 'FFFF', mc: 3.4,
+      ph: [{ f: ['..m...m..', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 0.95, fr: 0.42, dr: 7 },
+           { f: ['.m.m.m.m.', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.05, fr: 0.51, dr: 6 },
+           { f: ['m...m...m', 'bbbbbbbbb', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.15, fr: 0.59, dr: 6 }] },
+
+    /*  9 */ { n: 'Lluvia de piedra', tip: 'La sombra avisa del meteoro 1,2 s antes.', t: [64, 55, 49], uf: [16, 40], bk: 'hFFh', mt: 5.4,
+      ph: [{ f: ['ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1, fr: 0.51, dr: 7 },
+           { f: ['c.c.c.c.c', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.1, fr: 0.59, dr: 6 },
+           { f: ['ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.2, fr: 0.68, dr: 7 }] },
+
+    /* 10 */ { n: 'Crucero de Asalto', tip: 'Se prepara antes de disparar: golpéalo entre salvas.', t: [76, 66, 58], uf: [12, 30], bk: 'FFFF',
+      ph: [{ f: ['ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1, fr: 0.55, dr: 6 },
+           { f: ['.c.c.c.c.', '.b.b.b.b.'], y0: 168, sp: 1.15, fr: 0.51, dr: 6, bs: { hp: 30, name: 'Crucero de Asalto', ph: 2 } }] },
+
+    /* 11 */ { n: 'Enjambradores', tip: 'Al morir suelta dos crías: prepárate para el picado.', t: [72, 62, 55], uf: [14, 38], bk: 'FFFF', cp: 1,
+      ph: [{ f: ['..h...h..', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 0.95, fr: 0.47, dr: 7 },
+           { f: ['.h.h.h.h.', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.05, fr: 0.55, dr: 6 },
+           { f: ['h..h..h..', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.15, fr: 0.64, dr: 6 }] },
+
+    /* 12 */ { n: 'Rayo trazador', tip: 'La columna marcada es mortal, pero el búnker la absorbe.', t: [66, 57, 50], uf: [12, 34], bk: 'F--F', ry: 6.4, cp: 1,
+      ph: [{ f: ['ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1, fr: 0.51, dr: 7 },
+           { f: ['.d.d.d.d.', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.1, fr: 0.59, dr: 6 },
+           { f: ['ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.2, fr: 0.68, dr: 7 }] },
+
+    /* 13 */ { n: 'Escudo y cañón', tip: 'El halo azul es intocable: baja antes al escudero.', t: [74, 64, 56], uf: [12, 32, 52], bk: 'hFFh', gc: 4.2, cp: 1,
+      ph: [{ f: ['.e.g.e.g.', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1, fr: 0.51, dr: 7 },
+           { f: ['e.g.e.g.e', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.1, fr: 0.59, dr: 6 },
+           { f: ['.g.e.g.e.', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.2, fr: 0.68, dr: 7 }] },
+
+    /* 14 */ { n: 'Bombas y piedra', tip: 'Dispara a las bombas antes de que toquen el suelo.', t: [68, 58, 51], uf: [14, 36], bk: 'hhhh', mt: 5.2, mc: 3.2, cp: 1,
+      ph: [{ f: ['..m...m..', 'ccccccccc', 'aaaaaaaaa'], sp: 1, fr: 0.51, dr: 7 },
+           { f: ['.m.m.m.m.', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.1, fr: 0.59, dr: 6 },
+           { f: ['m...m...m', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.2, fr: 0.68, dr: 7 }] },
+
+    /* 15 */ { n: 'Enjambre y rayo', tip: 'Con el rayo marcado, olvida las crías un segundo.', t: [74, 64, 56], uf: [12, 34, 54], bk: 'F--F', ry: 6.2, dv: 4, cp: 1,
+      ph: [{ f: ['..h...h..', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1, fr: 0.51, dr: 7 },
+           { f: ['.h.h.z.z.', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.1, fr: 0.59, dr: 6 },
+           { f: ['h..z..h..', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.2, fr: 0.68, dr: 6 }] },
+
+    /* 16 */ { n: 'Coraza pesada', tip: 'Una fila entera de blindados: insiste por una columna.', t: [78, 68, 59], uf: [14, 38], bk: 'hFFh', dv: 3.8, cp: 1,
+      ph: [{ f: ['.e.d.e.d.', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1, fr: 0.51, dr: 7 },
+           { f: ['ddddddddd', '.e.e.e.e.', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.05, fr: 0.64, dr: 6 },
+           { f: ['.z.z.z.z.', 'ccccccccc', 'bbbbbbbbb'], sp: 1.2, fr: 0.68, dr: 7 }] },
+
+    /* 17 */ { n: 'Tormenta', tip: 'Meteoros, rayo y artilleros: mira arriba antes de moverte.', t: [76, 66, 58], uf: [12, 32, 52], bk: 'F--F', mt: 5, ry: 7, gc: 4, cp: 1,
+      ph: [{ f: ['..g...g..', 'ccccccccc', 'bbbbbbbbb'], sp: 1, fr: 0.51, dr: 7 },
+           { f: ['.g.g.g.g.', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.1, fr: 0.59, dr: 6 },
+           { f: ['g..g..g..', 'ccccccccc', 'aaaaaaaaa'], sp: 1.2, fr: 0.68, dr: 7 }] },
+
+    /* 18 */ { n: 'Desguace', tip: 'Escudero, minador y enjambrador a la vez: por orden.', t: [80, 70, 61], uf: [14, 36, 56], bk: 'hhhh', mc: 3.2, cp: 1,
+      ph: [{ f: ['.m.h.m.h.', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1, fr: 0.51, dr: 7 },
+           { f: ['e.m.h.m.e', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.1, fr: 0.59, dr: 6 },
+           { f: ['h..e..m..', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.2, fr: 0.68, dr: 6 }] },
+
+    /* 19 */ { n: 'Última línea', tip: 'Todo lo aprendido, sin un hueco donde respirar.', t: [84, 73, 64], uf: [12, 32, 52], bk: 'hh--', mt: 5.4, ry: 7, dv: 3.6, gc: 4, mc: 3.2, cp: 1,
+      ph: [{ f: ['d.e.g.e.d', 'ccccccccc', 'bbbbbbbbb'], sp: 1, fr: 0.55, dr: 7 },
+           { f: ['.h.m.z.m.h', 'cccccccccc', 'bbbbbbbbbb', 'aaaaaaaaaa'], sp: 1.1, fr: 0.64, dr: 6 },
+           { f: ['e.g.h.g.e', 'ddddddddd', 'aaaaaaaaa'], sp: 1.2, fr: 0.68, dr: 7 }] },
+
+    /* 20 */ { n: 'Nave Nodriza', tip: 'Tres fases telegrafiadas: pega cuando termine la salva.', t: [88, 76, 67], uf: [14, 34], bk: 'FFFF', cp: 1,
+      ph: [{ f: ['ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.05, fr: 0.55, dr: 7 },
+           { f: ['.e.e.e.e.', 'bbbbbbbbb'], sp: 1.15, fr: 0.59, dr: 7 },
+           { f: ['.c.c.c.c.', '.b.b.b.b.'], y0: 178, sp: 1.2, fr: 0.51, dr: 6, bs: { hp: 44, name: 'Nave Nodriza', ph: 3 } }] }
   ]
 };
 
-/* ---- starfall-defender ---- */
-/* 20 oleadas escritas a mano: nada de azar. El motor (src/eng/shooter.js, modo 'vertical') lee
+/* ============================== starfall-defender ==============================
+ * 20 oleadas escritas a mano: nada de azar. El motor (src/eng/shooter.js, modo 'vertical') lee
  * esta tabla, coloca cada grupo en el segundo indicado y da la oleada por superada cuando no
- * queda ninguna nave enemiga.
+ * queda ninguna nave enemiga. Cada oleada llena 42–62 s de cronología.
  *
- * Oleada: { tip, pw, g:[grupos], p:[mejoras], boss:{jefe} }
+ * Oleada: { tip, pw, g:[grupos], p:[mejoras], cap:[cápsulas], pt:[f,n,d], cp, boss:{jefe} }
  *   tip  rótulo de ayuda bajo el número de oleada      pw  disparo con el que empiezas (1-3)
+ *   pt   puntuación objetivo de la 2ª estrella, por dificultad. Solo se llega recogiendo las
+ *        cápsulas y rompiendo lo opcional (asteroides, minas, núcleos), no limpiando lo justo.
+ *   cap  CÁPSULAS DE RESCATE: [{t, x}] segundo y posición 0..1. Valen 120 puntos y suben el
+ *        disparo; son los TESOROS de la oleada (la 3ª estrella pide todas).
+ *   cp   segundo del punto de control. Si pasas de ahí y caes, el reintento empieza ahí, pero
+ *        la oleada solo puntúa 1★.
  *
  * Grupo: { t, f, n, k, x, w, sp, gap, hp, fire, pat, bs, sw, d, y, amp, vx, stay, per }
  *   t     segundo de entrada (contado desde el inicio de la oleada)
@@ -88,6 +168,16 @@ const SHOOLV = {
  *           'torre' dron blindado que baja hasta la altura y, se queda stay segundos y dispara
  *           'canon' cañonera: torre grande con abanicos de plasma
  *           'mina'  minador: cruza a la altura y soltando minas cada per segundos
+ *           'nucleo' NÚCLEO INESTABLE: al reventar suelta un anillo de ocho plasmas. Mátalo
+ *                   lejos (45 pts). Late y lleva aura: nunca sorprende.
+ *           'roca'  ASTEROIDE: baja despacio, aguanta cuatro impactos (90 pts) y si te roza
+ *                   duele sin romperse. Hay que apartarse o romperlo a tiempo.
+ *           'caza'  INTERCEPTOR ESPEJO: baja hasta y y se coloca en tu reflejo respecto al
+ *                   centro, disparando recto. Para alcanzarlo hay que cruzar el centro.
+ *           'esc'   ESCOLTADO: nave nodriza pequeña con dos drones en órbita. Mientras quede
+ *                   un dron, la nodriza es intocable (los tiros rebotan).
+ *           'rayo'  LANZA DE PLASMA: torre que carga 1,25 s marcando su columna y suelta un haz
+ *                   mortal de 0,45 s. Se esquiva de lado; el aviso nunca baja de 1,2 s.
  *           'jefe'  saca al jefe de la oleada (campo boss)
  *   n     cuántas naves     k  aspecto 0-3    x  centro 0..1    w  ancho del grupo 0..1
  *   sp    velocidad px/s    gap retardo entre naves (s)        hp resistencia
@@ -99,191 +189,249 @@ const SHOOLV = {
  * Jefe:   { name, hp, r, ph:[fases] }; cada fase es una lista de ataques simultáneos:
  *           'anillo' · 'abanico' · 'espiral' · 'barrido' · 'minas' · 'escolta'
  *
- * Curva: la 1 no mata (nada entra antes de 1,8 s y todo baja despacio), cada 5 oleadas aparece
- * algo que no se ha visto (5 kamikazes, 10 jefe, 15 cañonera, 20 jefe final) y a partir de la 8
- * la oleada empieza con el disparo doble o triple (campo pw).
+ * Curva de verbos: 1-5 lo de siempre (fila, vaivén, arco, disparo, kamikaze) · 6 núcleo ·
+ * 7 torreta · 8 asteroide · 9 víspera · 10 JEFE Guardián de Hierro · 11 minador ·
+ * 12 interceptor · 13 escoltado · 14 cascada · 15 cañonera · 16 lanza de plasma ·
+ * 17-19 combinaciones · 20 JEFE FINAL Corazón de Starfall.
  */
 SHOOLV['starfall-defender'] = [
   /*  1 · primer contacto: solo bajan */
-  { tip: 'Arrastra para mover la nave', g: [
+  { tip: 'Arrastra para mover la nave', pt: [900, 1050, 1150], cap: [{ t: 20, x: 0.5 }], g: [
     { t: 1.8, f: 'fila', n: 3, k: 2, x: 0.5, w: 0.42, sp: 62 },
     { t: 7.5, f: 'fila', n: 4, k: 2, x: 0.36, w: 0.5, sp: 66 },
     { t: 13, f: 'fila', n: 4, k: 2, x: 0.64, w: 0.5, sp: 66 },
-    { t: 19, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.72, sp: 70 }
+    { t: 19, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.72, sp: 70 },
+    { t: 26, f: 'fila', n: 5, k: 2, x: 0.34, w: 0.6, sp: 72 },
+    { t: 32, f: 'fila', n: 5, k: 2, x: 0.66, w: 0.6, sp: 72 },
+    { t: 39, f: 'fila', n: 6, k: 2, x: 0.5, w: 0.86, sp: 74, gap: 0.16 }
   ], p: [{ t: 10, x: 0.5, k: 'P' }] },
 
   /*  2 · se balancean y aparece el casco doble */
-  { tip: 'Ahora se balancean', g: [
+  { tip: 'Ahora se balancean', pt: [1500, 1700, 1850], cap: [{ t: 16, x: 0.25 }, { t: 38, x: 0.75 }], g: [
     { t: 1.6, f: 'fila', n: 4, k: 2, x: 0.3, w: 0.46, sp: 70, sw: 26 },
     { t: 6.5, f: 'fila', n: 4, k: 2, x: 0.7, w: 0.46, sp: 70, sw: 26 },
     { t: 11.5, f: 'fila', n: 5, k: 0, x: 0.5, w: 0.76, sp: 74, sw: 30, gap: 0.22 },
     { t: 18, f: 'fila', n: 4, k: 0, x: 0.5, w: 0.5, sp: 76, hp: 2 },
-    { t: 24, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.8, sp: 80, sw: 34 }
-  ], p: [{ t: 13, x: 0.25, k: 'P' }] },
+    { t: 24, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.8, sp: 80, sw: 34 },
+    { t: 31, f: 'fila', n: 5, k: 0, x: 0.34, w: 0.56, sp: 78, hp: 2, gap: 0.2 },
+    { t: 38, f: 'fila', n: 5, k: 2, x: 0.66, w: 0.6, sp: 80, sw: 30 },
+    { t: 45, f: 'fila', n: 6, k: 0, x: 0.5, w: 0.86, sp: 80, hp: 2, gap: 0.16 }
+  ], p: [{ t: 13, x: 0.25, k: 'P' }, { t: 34, x: 0.7, k: 'P' }] },
 
   /*  3 · entradas en arco */
-  { tip: 'Entran en arco por los lados', g: [
+  { tip: 'Entran en arco por los lados', pt: [1700, 1950, 2100], cap: [{ t: 18, x: 0.7 }, { t: 40, x: 0.3 }], g: [
     { t: 1.8, f: 'arco', n: 4, k: 1, d: 1, y: 0.18, amp: 110, sp: 160, gap: 0.4 },
     { t: 8, f: 'arco', n: 4, k: 1, d: -1, y: 0.2, amp: 120, sp: 160, gap: 0.4 },
     { t: 14, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.7, sp: 78, sw: 30 },
     { t: 20, f: 'arco', n: 5, k: 1, d: 1, y: 0.24, amp: 130, sp: 170, gap: 0.34 },
-    { t: 26, f: 'fila', n: 4, k: 0, x: 0.5, w: 0.56, sp: 80, hp: 2 }
-  ], p: [{ t: 11, x: 0.7, k: 'S' }] },
+    { t: 26, f: 'fila', n: 4, k: 0, x: 0.5, w: 0.56, sp: 80, hp: 2 },
+    { t: 33, f: 'arco', n: 5, k: 1, d: -1, y: 0.22, amp: 125, sp: 168, gap: 0.32 },
+    { t: 40, f: 'fila', n: 6, k: 2, x: 0.5, w: 0.86, sp: 80, sw: 32, gap: 0.18 },
+    { t: 47, f: 'arco', n: 5, k: 1, d: 1, y: 0.28, amp: 120, sp: 172, gap: 0.3 }
+  ], p: [{ t: 11, x: 0.7, k: 'S' }, { t: 36, x: 0.4, k: 'P' }] },
 
   /*  4 · las primeras balas enemigas */
-  { tip: 'Cuidado: ahora disparan', g: [
+  { tip: 'Cuidado: ahora disparan', pt: [1950, 2200, 2400], cap: [{ t: 16, x: 0.4 }, { t: 42, x: 0.6 }], g: [
     { t: 1.8, f: 'fila', n: 4, k: 3, x: 0.5, w: 0.6, sp: 64, hp: 2, fire: 2.8, pat: 'down', bs: 118 },
     { t: 8, f: 'arco', n: 4, k: 1, d: -1, y: 0.2, amp: 110, sp: 165, gap: 0.34 },
     { t: 14, f: 'fila', n: 5, k: 3, x: 0.4, w: 0.7, sp: 68, hp: 2, fire: 2.5, pat: 'down', bs: 124 },
     { t: 21, f: 'fila', n: 5, k: 2, x: 0.6, w: 0.7, sp: 82, sw: 30 },
-    { t: 27, f: 'arco', n: 4, k: 1, d: 1, y: 0.22, amp: 125, sp: 172, gap: 0.34 }
-  ], p: [{ t: 9, x: 0.4, k: 'P' }, { t: 23, x: 0.65, k: 'S' }] },
+    { t: 27, f: 'arco', n: 4, k: 1, d: 1, y: 0.22, amp: 125, sp: 172, gap: 0.34 },
+    { t: 34, f: 'fila', n: 5, k: 3, x: 0.5, w: 0.76, sp: 70, hp: 2, fire: 2.4, pat: 'down', bs: 126 },
+    { t: 41, f: 'fila', n: 5, k: 2, x: 0.36, w: 0.6, sp: 84, sw: 32 },
+    { t: 48, f: 'arco', n: 5, k: 1, d: -1, y: 0.26, amp: 120, sp: 174, gap: 0.3 }
+  ], p: [{ t: 9, x: 0.4, k: 'P' }, { t: 23, x: 0.65, k: 'S' }, { t: 44, x: 0.5, k: 'P' }] },
 
   /*  5 · NUEVO: kamikazes */
-  { tip: '¡Kamikazes! No te quedes quieto', g: [
+  { tip: '¡Kamikazes! No te quedes quieto', pt: [2100, 2400, 2600], cap: [{ t: 18, x: 0.3 }, { t: 44, x: 0.7 }], g: [
     { t: 2, f: 'kami', n: 3, k: 0, x: 0.5, w: 0.6, sp: 145, gap: 0.55 },
     { t: 8, f: 'fila', n: 5, k: 3, x: 0.5, w: 0.7, sp: 68, hp: 2, fire: 2.5, pat: 'down', bs: 124 },
     { t: 14.5, f: 'kami', n: 4, k: 0, x: 0.5, w: 0.8, sp: 155, gap: 0.45 },
     { t: 21, f: 'arco', n: 4, k: 1, d: 1, y: 0.2, amp: 120, sp: 172, gap: 0.34 },
-    { t: 27, f: 'kami', n: 4, k: 0, x: 0.5, w: 0.85, sp: 160, gap: 0.4 }
-  ], p: [{ t: 12, x: 0.5, k: 'S' }, { t: 25, x: 0.3, k: 'P' }] },
+    { t: 27, f: 'kami', n: 4, k: 0, x: 0.5, w: 0.85, sp: 160, gap: 0.4 },
+    { t: 34, f: 'fila', n: 5, k: 3, x: 0.44, w: 0.72, sp: 70, hp: 2, fire: 2.4, pat: 'down', bs: 126 },
+    { t: 41, f: 'kami', n: 5, k: 0, x: 0.5, w: 0.88, sp: 160, gap: 0.38 },
+    { t: 48, f: 'fila', n: 6, k: 2, x: 0.5, w: 0.86, sp: 82, sw: 32, gap: 0.16 }
+  ], p: [{ t: 12, x: 0.5, k: 'S' }, { t: 25, x: 0.3, k: 'P' }, { t: 45, x: 0.6, k: 'S' }] },
 
-  /*  6 · NUEVO: torreta blindada */
-  { tip: 'Torreta blindada: aguanta 12 impactos', g: [
+  /*  6 · NUEVO: núcleos inestables */
+  { tip: 'El núcleo estalla en anillo: mátalo lejos', pt: [2400, 2700, 2950], cap: [{ t: 20, x: 0.5 }, { t: 46, x: 0.28 }], g: [
+    { t: 1.8, f: 'nucleo', n: 2, x: 0.5, w: 0.5, sp: 58, hp: 2, gap: 0.5 },
+    { t: 8, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.74, sp: 76, sw: 30 },
+    { t: 14, f: 'nucleo', n: 3, x: 0.5, w: 0.76, sp: 60, hp: 2, gap: 0.45 },
+    { t: 21, f: 'fila', n: 5, k: 3, x: 0.4, w: 0.7, sp: 70, hp: 2, fire: 2.5, pat: 'down', bs: 124 },
+    { t: 28, f: 'nucleo', n: 3, x: 0.35, w: 0.5, sp: 62, hp: 2, gap: 0.4 },
+    { t: 34, f: 'kami', n: 4, k: 0, x: 0.5, w: 0.85, sp: 158, gap: 0.42 },
+    { t: 41, f: 'nucleo', n: 4, x: 0.5, w: 0.86, sp: 62, hp: 2, gap: 0.36 },
+    { t: 48, f: 'arco', n: 5, k: 1, d: 1, y: 0.24, amp: 120, sp: 172, gap: 0.3 }
+  ], p: [{ t: 11, x: 0.7, k: 'P' }, { t: 30, x: 0.3, k: 'S' }] },
+
+  /*  7 · NUEVO: torreta blindada */
+  { tip: 'Torreta blindada: aguanta doce impactos', pt: [2600, 2950, 3200], cap: [{ t: 16, x: 0.75 }, { t: 42, x: 0.35 }], g: [
     { t: 1.6, f: 'fila', n: 4, k: 2, x: 0.5, w: 0.6, sp: 76, sw: 30 },
     { t: 6, f: 'torre', n: 1, x: 0.5, y: 0.2, sp: 70, sw: 70, stay: 15, hp: 12, fire: 1.7, pat: 'aim', bs: 132 },
     { t: 12, f: 'arco', n: 4, k: 1, d: -1, y: 0.3, amp: 100, sp: 168, gap: 0.34 },
     { t: 19, f: 'fila', n: 5, k: 3, x: 0.45, w: 0.72, sp: 70, hp: 2, fire: 2.4, pat: 'down', bs: 126 },
-    { t: 26, f: 'kami', n: 4, k: 0, x: 0.5, w: 0.8, sp: 158, gap: 0.42 }
-  ], p: [{ t: 10, x: 0.75, k: 'P' }, { t: 22, x: 0.35, k: 'S' }] },
+    { t: 26, f: 'kami', n: 4, k: 0, x: 0.5, w: 0.8, sp: 158, gap: 0.42 },
+    { t: 32, f: 'torre', n: 1, x: 0.32, y: 0.24, sp: 72, sw: 60, stay: 14, hp: 12, fire: 1.6, pat: 'aim', bs: 132 },
+    { t: 39, f: 'nucleo', n: 3, x: 0.62, w: 0.5, sp: 62, hp: 2, gap: 0.4 },
+    { t: 46, f: 'fila', n: 6, k: 2, x: 0.5, w: 0.86, sp: 80, sw: 32, gap: 0.16 }
+  ], p: [{ t: 10, x: 0.75, k: 'P' }, { t: 22, x: 0.35, k: 'S' }, { t: 44, x: 0.5, k: 'P' }] },
 
-  /*  7 · NUEVO: cazas en zigzag */
-  { tip: 'Cazas en zigzag', g: [
-    { t: 1.8, f: 'zig', n: 3, k: 1, x: 0.4, w: 0.5, sp: 52, vx: 130, gap: 0.5 },
-    { t: 8, f: 'fila', n: 5, k: 3, x: 0.55, w: 0.7, sp: 70, hp: 2, fire: 2.3, pat: 'down', bs: 128 },
-    { t: 14, f: 'zig', n: 4, k: 1, x: 0.6, w: 0.6, sp: 56, vx: 145, gap: 0.45 },
-    { t: 21, f: 'arco', n: 5, k: 1, d: 1, y: 0.22, amp: 125, sp: 175, gap: 0.3 },
-    { t: 27, f: 'fila', n: 4, k: 0, x: 0.5, w: 0.6, sp: 84, hp: 3, sw: 30 }
-  ], p: [{ t: 11, x: 0.3, k: 'P' }, { t: 24, x: 0.6, k: 'S' }] },
+  /*  8 · NUEVO: asteroides */
+  { tip: 'El asteroide no se aparta: rómpelo o esquívalo', pt: [2800, 3150, 3400], cap: [{ t: 18, x: 0.3 }, { t: 44, x: 0.7 }], g: [
+    { t: 1.8, f: 'roca', n: 1, x: 0.5, sp: 48, hp: 4 },
+    { t: 7, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.74, sp: 78, sw: 30 },
+    { t: 13, f: 'roca', n: 2, x: 0.5, w: 0.62, sp: 50, hp: 4, gap: 1.2 },
+    { t: 20, f: 'arco', n: 5, k: 1, d: 1, y: 0.26, amp: 115, sp: 170, gap: 0.32 },
+    { t: 27, f: 'roca', n: 2, x: 0.38, w: 0.5, sp: 52, hp: 4, gap: 1 },
+    { t: 33, f: 'fila', n: 5, k: 3, x: 0.6, w: 0.7, sp: 72, hp: 2, fire: 2.3, pat: 'down', bs: 128 },
+    { t: 40, f: 'roca', n: 3, x: 0.5, w: 0.8, sp: 52, hp: 4, gap: 0.9 },
+    { t: 47, f: 'kami', n: 5, k: 0, x: 0.5, w: 0.88, sp: 162, gap: 0.38 }
+  ], p: [{ t: 11, x: 0.3, k: 'P' }, { t: 30, x: 0.7, k: 'S' }] },
 
-  /*  8 · dos frentes a la vez */
-  { tip: 'Dos frentes a la vez', pw: 2, g: [
-    { t: 1.6, f: 'arco', n: 4, k: 1, d: 1, y: 0.18, amp: 115, sp: 175, gap: 0.3 },
-    { t: 3.2, f: 'arco', n: 4, k: 1, d: -1, y: 0.26, amp: 115, sp: 175, gap: 0.3 },
-    { t: 10, f: 'torre', n: 1, x: 0.32, y: 0.22, sp: 74, sw: 60, stay: 14, hp: 12, fire: 1.6, pat: 'aim', bs: 134 },
-    { t: 13, f: 'fila', n: 5, k: 3, x: 0.7, w: 0.5, sp: 72, hp: 2, fire: 2.2, pat: 'down', bs: 130 },
-    { t: 21, f: 'kami', n: 5, k: 0, x: 0.5, w: 0.85, sp: 162, gap: 0.38 },
-    { t: 28, f: 'zig', n: 4, k: 1, x: 0.5, w: 0.6, sp: 58, vx: 150, gap: 0.4 }
-  ], p: [{ t: 12, x: 0.6, k: 'S' }, { t: 26, x: 0.4, k: 'P' }] },
+  /*  9 · víspera del jefe: zigzag y todo lo visto */
+  { tip: 'Aguanta: el jefe está cerca', pw: 2, pt: [3100, 3500, 3800], cap: [{ t: 16, x: 0.5 }, { t: 40, x: 0.2 }], cp: 26, g: [
+    { t: 1.6, f: 'zig', n: 3, k: 1, x: 0.4, w: 0.5, sp: 52, vx: 130, gap: 0.5 },
+    { t: 8, f: 'fila', n: 6, k: 3, x: 0.5, w: 0.86, sp: 72, hp: 2, fire: 2.2, pat: 'down', bs: 132, gap: 0.18 },
+    { t: 15, f: 'zig', n: 4, k: 1, x: 0.6, w: 0.6, sp: 56, vx: 145, gap: 0.45 },
+    { t: 21, f: 'kami', n: 4, k: 0, x: 0.3, w: 0.5, sp: 165, gap: 0.35 },
+    { t: 24, f: 'kami', n: 4, k: 0, x: 0.7, w: 0.5, sp: 165, gap: 0.35 },
+    { t: 31, f: 'torre', n: 1, x: 0.5, y: 0.24, sp: 76, sw: 80, stay: 16, hp: 14, fire: 1.5, pat: 'aim', bs: 136 },
+    { t: 34, f: 'nucleo', n: 3, x: 0.5, w: 0.7, sp: 62, hp: 2, gap: 0.4 },
+    { t: 42, f: 'roca', n: 2, x: 0.5, w: 0.6, sp: 52, hp: 4, gap: 1 },
+    { t: 48, f: 'arco', n: 6, k: 1, d: -1, y: 0.3, amp: 115, sp: 178, gap: 0.26 }
+  ], p: [{ t: 10, x: 0.5, k: 'S' }, { t: 28, x: 0.5, k: 'P' }, { t: 46, x: 0.3, k: 'S' }] },
 
-  /*  9 · víspera del jefe */
-  { tip: 'Aguanta: el jefe está cerca', pw: 2, g: [
-    { t: 1.6, f: 'fila', n: 6, k: 3, x: 0.5, w: 0.86, sp: 72, hp: 2, fire: 2.2, pat: 'down', bs: 132, gap: 0.18 },
-    { t: 8, f: 'kami', n: 4, k: 0, x: 0.3, w: 0.5, sp: 165, gap: 0.35 },
-    { t: 11, f: 'kami', n: 4, k: 0, x: 0.7, w: 0.5, sp: 165, gap: 0.35 },
-    { t: 17, f: 'torre', n: 1, x: 0.5, y: 0.24, sp: 76, sw: 80, stay: 16, hp: 14, fire: 1.4, pat: 'aim', bs: 138 },
-    { t: 20, f: 'arco', n: 5, k: 1, d: -1, y: 0.34, amp: 110, sp: 178, gap: 0.28 },
-    { t: 28, f: 'zig', n: 5, k: 1, x: 0.5, w: 0.7, sp: 60, vx: 155, gap: 0.35 }
-  ], p: [{ t: 10, x: 0.5, k: 'S' }, { t: 24, x: 0.5, k: 'P' }] },
-
-  /* 10 · NUEVO: JEFE — Guardián de Hierro (3 fases) */
-  { tip: 'Guardián de Hierro', pw: 2, g: [
+  /* 10 · JEFE — Guardián de Hierro (3 fases) */
+  { tip: 'Guardián de Hierro', pw: 2, pt: [3400, 3800, 4100], cap: [{ t: 14, x: 0.3 }, { t: 30, x: 0.7 }], cp: 24, g: [
     { t: 1.6, f: 'fila', n: 4, k: 2, x: 0.5, w: 0.6, sp: 76, sw: 30 },
-    { t: 7, f: 'jefe' }
-  ], p: [{ t: 4, x: 0.5, k: 'S' }],
-    boss: { name: 'Guardián de Hierro', hp: 80, r: 34, ph: [['anillo'], ['abanico', 'escolta'], ['espiral', 'barrido']] } },
+    { t: 6, f: 'nucleo', n: 3, x: 0.5, w: 0.7, sp: 60, hp: 2, gap: 0.4 },
+    { t: 12, f: 'jefe' }
+  ], p: [{ t: 4, x: 0.5, k: 'S' }, { t: 20, x: 0.5, k: 'P' }],
+    boss: { name: 'Guardián de Hierro', hp: 90, r: 34, ph: [['anillo'], ['abanico', 'escolta'], ['espiral', 'barrido']] } },
 
   /* 11 · NUEVO: minadores */
-  { tip: 'Minadores: las minas se pueden disparar', pw: 2, g: [
+  { tip: 'Minadores: las minas se pueden disparar', pw: 2, pt: [3300, 3700, 4000], cap: [{ t: 18, x: 0.3 }, { t: 44, x: 0.7 }], cp: 26, g: [
     { t: 1.8, f: 'mina', n: 1, d: 1, y: 0.16, sp: 66, per: 1.7, hp: 6 },
     { t: 7, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.74, sp: 78, sw: 30 },
     { t: 13, f: 'mina', n: 1, d: -1, y: 0.2, sp: 70, per: 1.5, hp: 6 },
     { t: 19, f: 'arco', n: 5, k: 1, d: 1, y: 0.3, amp: 110, sp: 175, gap: 0.3 },
-    { t: 26, f: 'fila', n: 5, k: 3, x: 0.5, w: 0.7, sp: 74, hp: 2, fire: 2.2, pat: 'down', bs: 132 }
-  ], p: [{ t: 10, x: 0.3, k: 'P' }, { t: 22, x: 0.7, k: 'S' }] },
+    { t: 26, f: 'fila', n: 5, k: 3, x: 0.5, w: 0.7, sp: 74, hp: 2, fire: 2.2, pat: 'down', bs: 132 },
+    { t: 33, f: 'mina', n: 1, d: 1, y: 0.18, sp: 72, per: 1.4, hp: 7 },
+    { t: 38, f: 'nucleo', n: 3, x: 0.4, w: 0.6, sp: 62, hp: 2, gap: 0.4 },
+    { t: 45, f: 'kami', n: 5, k: 0, x: 0.5, w: 0.88, sp: 165, gap: 0.36 },
+    { t: 52, f: 'fila', n: 6, k: 2, x: 0.5, w: 0.86, sp: 82, sw: 32, gap: 0.16 }
+  ], p: [{ t: 10, x: 0.3, k: 'P' }, { t: 22, x: 0.7, k: 'S' }, { t: 48, x: 0.5, k: 'P' }] },
 
-  /* 12 · minas y kamikazes */
-  { tip: 'Minas arriba, kamikazes abajo', pw: 2, g: [
-    { t: 1.8, f: 'mina', n: 1, d: -1, y: 0.15, sp: 72, per: 1.5, hp: 7 },
-    { t: 5, f: 'kami', n: 4, k: 0, x: 0.5, w: 0.8, sp: 165, gap: 0.4 },
-    { t: 12, f: 'torre', n: 1, x: 0.6, y: 0.24, sp: 76, sw: 70, stay: 14, hp: 14, fire: 1.5, pat: 'aim', bs: 138 },
-    { t: 15, f: 'mina', n: 1, d: 1, y: 0.19, sp: 74, per: 1.4, hp: 7 },
-    { t: 23, f: 'zig', n: 5, k: 1, x: 0.5, w: 0.7, sp: 60, vx: 152, gap: 0.35 },
-    { t: 30, f: 'fila', n: 6, k: 3, x: 0.5, w: 0.86, sp: 76, hp: 2, fire: 2, pat: 'down', bs: 134, gap: 0.16 }
-  ], p: [{ t: 9, x: 0.5, k: 'S' }, { t: 25, x: 0.4, k: 'P' }] },
+  /* 12 · NUEVO: interceptor espejo */
+  { tip: 'El interceptor te imita: cruza el centro', pw: 2, pt: [3500, 3900, 4200], cap: [{ t: 16, x: 0.5 }, { t: 42, x: 0.25 }], cp: 26, g: [
+    { t: 1.8, f: 'caza', n: 1, y: 0.2, sp: 90, hp: 5, fire: 1.6, bs: 132 },
+    { t: 8, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.74, sp: 78, sw: 30 },
+    { t: 14, f: 'caza', n: 2, y: 0.24, sp: 92, hp: 5, fire: 1.6, bs: 134, gap: 0.8 },
+    { t: 21, f: 'roca', n: 2, x: 0.5, w: 0.6, sp: 52, hp: 4, gap: 1 },
+    { t: 28, f: 'caza', n: 2, y: 0.28, sp: 94, hp: 5, fire: 1.5, bs: 136, gap: 0.7 },
+    { t: 35, f: 'arco', n: 5, k: 1, d: -1, y: 0.34, amp: 110, sp: 176, gap: 0.3 },
+    { t: 42, f: 'mina', n: 1, d: 1, y: 0.16, sp: 74, per: 1.4, hp: 7 },
+    { t: 48, f: 'caza', n: 3, y: 0.22, sp: 96, hp: 5, fire: 1.5, bs: 136, gap: 0.6 }
+  ], p: [{ t: 11, x: 0.5, k: 'S' }, { t: 26, x: 0.4, k: 'P' }, { t: 46, x: 0.6, k: 'S' }] },
 
-  /* 13 · torres dobles */
-  { tip: 'Dos torretas: escoge una', pw: 2, g: [
-    { t: 1.8, f: 'torre', n: 1, x: 0.26, y: 0.2, sp: 78, sw: 50, stay: 16, hp: 13, fire: 1.5, pat: 'aim', bs: 138 },
-    { t: 3.2, f: 'torre', n: 1, x: 0.74, y: 0.27, sp: 78, sw: 50, stay: 16, hp: 13, fire: 1.5, pat: 'aim', bs: 138 },
-    { t: 10, f: 'arco', n: 5, k: 1, d: 1, y: 0.4, amp: 95, sp: 178, gap: 0.28 },
-    { t: 17, f: 'kami', n: 5, k: 0, x: 0.5, w: 0.85, sp: 168, gap: 0.35 },
-    { t: 24, f: 'fila', n: 6, k: 3, x: 0.5, w: 0.86, sp: 76, hp: 2, fire: 2, pat: 'down', bs: 136, gap: 0.16 }
-  ], p: [{ t: 12, x: 0.5, k: 'P' }, { t: 22, x: 0.2, k: 'S' }] },
+  /* 13 · NUEVO: escoltado */
+  { tip: 'Tira a los drones: la nodriza es intocable', pw: 2, pt: [3700, 4100, 4450], cap: [{ t: 18, x: 0.7 }, { t: 44, x: 0.3 }], cp: 28, g: [
+    { t: 1.8, f: 'esc', n: 1, x: 0.5, y: 0.2, sp: 70, sw: 60, stay: 18, hp: 10, fire: 2, pat: 'aim', bs: 130 },
+    { t: 9, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.74, sp: 78, sw: 30 },
+    { t: 16, f: 'esc', n: 1, x: 0.3, y: 0.26, sp: 72, sw: 70, stay: 18, hp: 10, fire: 1.9, pat: 'aim', bs: 132 },
+    { t: 23, f: 'kami', n: 4, k: 0, x: 0.5, w: 0.85, sp: 162, gap: 0.4 },
+    { t: 30, f: 'esc', n: 1, x: 0.7, y: 0.24, sp: 72, sw: 70, stay: 18, hp: 10, fire: 1.8, pat: 'aim', bs: 134 },
+    { t: 37, f: 'nucleo', n: 3, x: 0.5, w: 0.7, sp: 62, hp: 2, gap: 0.4 },
+    { t: 44, f: 'caza', n: 2, y: 0.24, sp: 94, hp: 5, fire: 1.5, bs: 134, gap: 0.7 },
+    { t: 51, f: 'fila', n: 6, k: 3, x: 0.5, w: 0.86, sp: 76, hp: 2, fire: 2, pat: 'down', bs: 134, gap: 0.16 }
+  ], p: [{ t: 12, x: 0.3, k: 'P' }, { t: 27, x: 0.7, k: 'S' }, { t: 47, x: 0.5, k: 'P' }] },
 
-  /* 14 · cascada de kamikazes */
-  { tip: 'Cascada de kamikazes', pw: 2, g: [
+  /* 14 · cascada de kamikazes y núcleos */
+  { tip: 'Cascada de kamikazes', pw: 2, pt: [3600, 4000, 4350], cap: [{ t: 16, x: 0.5 }, { t: 40, x: 0.75 }], cp: 26, g: [
     { t: 1.8, f: 'kami', n: 4, k: 0, x: 0.25, w: 0.4, sp: 165, gap: 0.3 },
     { t: 5, f: 'kami', n: 4, k: 0, x: 0.75, w: 0.4, sp: 165, gap: 0.3 },
     { t: 8.5, f: 'kami', n: 5, k: 0, x: 0.5, w: 0.9, sp: 172, gap: 0.28 },
     { t: 14, f: 'mina', n: 1, d: 1, y: 0.17, sp: 76, per: 1.4, hp: 8 },
     { t: 20, f: 'zig', n: 5, k: 1, x: 0.5, w: 0.7, sp: 62, vx: 158, gap: 0.32 },
-    { t: 27, f: 'fila', n: 6, k: 3, x: 0.5, w: 0.86, sp: 78, hp: 3, fire: 2, pat: 'down', bs: 136, gap: 0.16 }
-  ], p: [{ t: 11, x: 0.5, k: 'S' }, { t: 24, x: 0.6, k: 'P' }] },
+    { t: 27, f: 'nucleo', n: 4, x: 0.5, w: 0.86, sp: 62, hp: 2, gap: 0.36 },
+    { t: 34, f: 'kami', n: 5, k: 0, x: 0.35, w: 0.5, sp: 172, gap: 0.26 },
+    { t: 37, f: 'kami', n: 5, k: 0, x: 0.65, w: 0.5, sp: 172, gap: 0.26 },
+    { t: 44, f: 'roca', n: 2, x: 0.5, w: 0.62, sp: 52, hp: 4, gap: 1 },
+    { t: 50, f: 'fila', n: 6, k: 3, x: 0.5, w: 0.86, sp: 78, hp: 3, fire: 2, pat: 'down', bs: 136, gap: 0.16 }
+  ], p: [{ t: 11, x: 0.5, k: 'S' }, { t: 24, x: 0.6, k: 'P' }, { t: 47, x: 0.4, k: 'S' }] },
 
-  /* 15 · NUEVO: cañonera */
-  { tip: 'Cañonera: abanicos de plasma', pw: 2, g: [
+  /* 15 · cañonera */
+  { tip: 'Cañonera: abanicos de plasma', pw: 2, pt: [3900, 4350, 4700], cap: [{ t: 18, x: 0.25 }, { t: 44, x: 0.75 }], cp: 28, g: [
     { t: 1.8, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.74, sp: 80, sw: 32 },
     { t: 7, f: 'canon', n: 1, x: 0.5, y: 0.24, sp: 62, sw: 80, stay: 20, hp: 22, fire: 2.4, pat: 'fan', bs: 142 },
     { t: 14, f: 'arco', n: 5, k: 1, d: -1, y: 0.42, amp: 100, sp: 180, gap: 0.26 },
     { t: 21, f: 'kami', n: 5, k: 0, x: 0.5, w: 0.85, sp: 170, gap: 0.32 },
-    { t: 28, f: 'mina', n: 1, d: 1, y: 0.18, sp: 78, per: 1.3, hp: 8 }
-  ], p: [{ t: 10, x: 0.25, k: 'S' }, { t: 24, x: 0.5, k: 'P' }] },
+    { t: 28, f: 'mina', n: 1, d: 1, y: 0.18, sp: 78, per: 1.3, hp: 8 },
+    { t: 34, f: 'esc', n: 1, x: 0.35, y: 0.24, sp: 72, sw: 70, stay: 18, hp: 10, fire: 1.8, pat: 'aim', bs: 136 },
+    { t: 42, f: 'canon', n: 1, x: 0.62, y: 0.26, sp: 64, sw: 70, stay: 18, hp: 22, fire: 2.2, pat: 'fan', bs: 144 },
+    { t: 50, f: 'fila', n: 6, k: 3, x: 0.5, w: 0.86, sp: 78, hp: 2, fire: 2, pat: 'down', bs: 136, gap: 0.16 }
+  ], p: [{ t: 10, x: 0.25, k: 'S' }, { t: 24, x: 0.5, k: 'P' }, { t: 46, x: 0.7, k: 'S' }] },
 
-  /* 16 · muro de fuego */
-  { tip: 'Muro de fuego', pw: 2, g: [
-    { t: 1.8, f: 'fila', n: 7, k: 3, x: 0.5, w: 0.9, sp: 74, hp: 2, fire: 1.9, pat: 'down', bs: 138, gap: 0.14 },
-    { t: 9, f: 'kami', n: 5, k: 0, x: 0.5, w: 0.9, sp: 172, gap: 0.3 },
-    { t: 15, f: 'torre', n: 1, x: 0.4, y: 0.22, sp: 80, sw: 80, stay: 15, hp: 14, fire: 1.35, pat: 'aim', bs: 142 },
-    { t: 17, f: 'mina', n: 1, d: -1, y: 0.16, sp: 80, per: 1.3, hp: 8 },
-    { t: 25, f: 'zig', n: 6, k: 1, x: 0.5, w: 0.8, sp: 64, vx: 160, gap: 0.3 }
-  ], p: [{ t: 12, x: 0.7, k: 'P' }, { t: 26, x: 0.3, k: 'S' }] },
+  /* 16 · NUEVO: lanza de plasma */
+  { tip: 'La columna marcada se vuelve mortal: apártate', pw: 2, pt: [4000, 4450, 4800], cap: [{ t: 16, x: 0.7 }, { t: 42, x: 0.3 }], cp: 28, g: [
+    { t: 1.8, f: 'rayo', n: 1, x: 0.5, y: 0.18, sp: 74, sw: 50, stay: 18, hp: 10 },
+    { t: 8, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.74, sp: 80, sw: 32 },
+    { t: 15, f: 'rayo', n: 2, x: 0.5, w: 0.6, y: 0.22, sp: 76, sw: 60, stay: 18, hp: 10, gap: 1.2 },
+    { t: 23, f: 'kami', n: 5, k: 0, x: 0.5, w: 0.88, sp: 168, gap: 0.34 },
+    { t: 30, f: 'rayo', n: 2, x: 0.38, w: 0.5, y: 0.26, sp: 78, sw: 60, stay: 18, hp: 10, gap: 1 },
+    { t: 37, f: 'nucleo', n: 4, x: 0.5, w: 0.86, sp: 62, hp: 2, gap: 0.36 },
+    { t: 44, f: 'rayo', n: 2, x: 0.62, w: 0.55, y: 0.2, sp: 78, sw: 70, stay: 16, hp: 10, gap: 0.9 },
+    { t: 51, f: 'arco', n: 6, k: 1, d: 1, y: 0.34, amp: 115, sp: 180, gap: 0.26 }
+  ], p: [{ t: 11, x: 0.7, k: 'P' }, { t: 26, x: 0.3, k: 'S' }, { t: 48, x: 0.5, k: 'P' }] },
 
-  /* 17 · arcos cruzados */
-  { tip: 'Arcos cruzados', pw: 2, g: [
+  /* 17 · arcos cruzados, interceptores y rayo */
+  { tip: 'Arcos cruzados', pw: 2, pt: [4100, 4550, 4900], cap: [{ t: 18, x: 0.5 }, { t: 44, x: 0.2 }], cp: 28, g: [
     { t: 1.6, f: 'arco', n: 5, k: 1, d: 1, y: 0.18, amp: 120, sp: 182, gap: 0.24 },
     { t: 2.6, f: 'arco', n: 5, k: 1, d: -1, y: 0.3, amp: 120, sp: 182, gap: 0.24 },
-    { t: 10, f: 'torre', n: 1, x: 0.24, y: 0.22, sp: 80, sw: 60, stay: 16, hp: 14, fire: 1.4, pat: 'aim', bs: 142 },
-    { t: 11.5, f: 'torre', n: 1, x: 0.76, y: 0.3, sp: 80, sw: 60, stay: 16, hp: 14, fire: 1.4, pat: 'aim', bs: 142 },
-    { t: 19, f: 'kami', n: 6, k: 0, x: 0.5, w: 0.9, sp: 175, gap: 0.28 },
-    { t: 26, f: 'fila', n: 6, k: 3, x: 0.5, w: 0.86, sp: 80, hp: 3, fire: 1.9, pat: 'down', bs: 140, gap: 0.14 }
-  ], p: [{ t: 9, x: 0.5, k: 'S' }, { t: 23, x: 0.5, k: 'P' }] },
+    { t: 10, f: 'caza', n: 2, y: 0.22, sp: 94, hp: 5, fire: 1.5, bs: 138, gap: 0.7 },
+    { t: 18, f: 'rayo', n: 2, x: 0.5, w: 0.6, y: 0.2, sp: 78, sw: 60, stay: 16, hp: 10, gap: 1 },
+    { t: 26, f: 'kami', n: 6, k: 0, x: 0.5, w: 0.9, sp: 175, gap: 0.28 },
+    { t: 33, f: 'torre', n: 1, x: 0.26, y: 0.24, sp: 80, sw: 60, stay: 16, hp: 14, fire: 1.4, pat: 'aim', bs: 142 },
+    { t: 35, f: 'torre', n: 1, x: 0.74, y: 0.3, sp: 80, sw: 60, stay: 16, hp: 14, fire: 1.4, pat: 'aim', bs: 142 },
+    { t: 44, f: 'roca', n: 3, x: 0.5, w: 0.8, sp: 54, hp: 4, gap: 0.9 },
+    { t: 51, f: 'fila', n: 6, k: 3, x: 0.5, w: 0.86, sp: 80, hp: 3, fire: 1.9, pat: 'down', bs: 140, gap: 0.14 }
+  ], p: [{ t: 9, x: 0.5, k: 'S' }, { t: 23, x: 0.5, k: 'P' }, { t: 48, x: 0.3, k: 'S' }] },
 
-  /* 18 · cañonera con escolta */
-  { tip: 'Cañonera con escolta', pw: 3, g: [
+  /* 18 · cañonera con escolta y escoltados */
+  { tip: 'Cañonera con escolta', pw: 3, pt: [4300, 4750, 5100], cap: [{ t: 16, x: 0.3 }, { t: 42, x: 0.7 }], cp: 28, g: [
     { t: 1.8, f: 'canon', n: 1, x: 0.4, y: 0.24, sp: 64, sw: 90, stay: 22, hp: 24, fire: 2.1, pat: 'fan', bs: 146 },
     { t: 4, f: 'zig', n: 4, k: 1, x: 0.6, w: 0.6, sp: 64, vx: 160, gap: 0.35 },
     { t: 12, f: 'mina', n: 1, d: 1, y: 0.15, sp: 82, per: 1.2, hp: 9 },
-    { t: 18, f: 'arco', n: 6, k: 1, d: -1, y: 0.4, amp: 105, sp: 185, gap: 0.24 },
-    { t: 25, f: 'kami', n: 6, k: 0, x: 0.5, w: 0.9, sp: 178, gap: 0.26 }
-  ], p: [{ t: 10, x: 0.3, k: 'S' }, { t: 22, x: 0.7, k: 'S' }] },
+    { t: 18, f: 'esc', n: 1, x: 0.5, y: 0.22, sp: 74, sw: 70, stay: 18, hp: 10, fire: 1.8, pat: 'aim', bs: 140 },
+    { t: 26, f: 'arco', n: 6, k: 1, d: -1, y: 0.4, amp: 105, sp: 185, gap: 0.24 },
+    { t: 33, f: 'roca', n: 3, x: 0.5, w: 0.8, sp: 54, hp: 4, gap: 0.9 },
+    { t: 40, f: 'esc', n: 1, x: 0.28, y: 0.26, sp: 76, sw: 60, stay: 16, hp: 10, fire: 1.7, pat: 'aim', bs: 142 },
+    { t: 46, f: 'kami', n: 6, k: 0, x: 0.5, w: 0.9, sp: 178, gap: 0.26 },
+    { t: 53, f: 'canon', n: 1, x: 0.66, y: 0.26, sp: 66, sw: 70, stay: 16, hp: 24, fire: 2, pat: 'fan', bs: 146 }
+  ], p: [{ t: 10, x: 0.3, k: 'S' }, { t: 24, x: 0.7, k: 'S' }, { t: 49, x: 0.5, k: 'P' }] },
 
   /* 19 · todo a la vez */
-  { tip: 'Todo a la vez', pw: 3, g: [
+  { tip: 'Todo a la vez', pw: 3, pt: [4600, 5050, 5450], cap: [{ t: 16, x: 0.5 }, { t: 38, x: 0.25 }, { t: 54, x: 0.75 }], cp: 30, g: [
     { t: 1.6, f: 'fila', n: 7, k: 3, x: 0.5, w: 0.92, sp: 80, hp: 3, fire: 1.8, pat: 'down', bs: 144, gap: 0.12 },
     { t: 6, f: 'mina', n: 1, d: -1, y: 0.14, sp: 84, per: 1.2, hp: 9 },
-    { t: 10, f: 'torre', n: 1, x: 0.5, y: 0.26, sp: 82, sw: 95, stay: 18, hp: 16, fire: 1.25, pat: 'aim', bs: 146 },
-    { t: 16, f: 'kami', n: 5, k: 0, x: 0.28, w: 0.45, sp: 178, gap: 0.24 },
-    { t: 18, f: 'kami', n: 5, k: 0, x: 0.72, w: 0.45, sp: 178, gap: 0.24 },
-    { t: 25, f: 'arco', n: 6, k: 1, d: 1, y: 0.36, amp: 115, sp: 186, gap: 0.22 },
-    { t: 32, f: 'zig', n: 6, k: 1, x: 0.5, w: 0.8, sp: 66, vx: 165, gap: 0.28 }
-  ], p: [{ t: 8, x: 0.5, k: 'S' }, { t: 21, x: 0.4, k: 'P' }, { t: 30, x: 0.6, k: 'S' }] },
+    { t: 12, f: 'rayo', n: 2, x: 0.5, w: 0.62, y: 0.2, sp: 80, sw: 60, stay: 16, hp: 10, gap: 1 },
+    { t: 20, f: 'kami', n: 5, k: 0, x: 0.28, w: 0.45, sp: 178, gap: 0.24 },
+    { t: 22, f: 'kami', n: 5, k: 0, x: 0.72, w: 0.45, sp: 178, gap: 0.24 },
+    { t: 29, f: 'esc', n: 1, x: 0.5, y: 0.24, sp: 76, sw: 70, stay: 16, hp: 10, fire: 1.7, pat: 'aim', bs: 144 },
+    { t: 36, f: 'caza', n: 2, y: 0.26, sp: 96, hp: 5, fire: 1.4, bs: 142, gap: 0.7 },
+    { t: 43, f: 'nucleo', n: 4, x: 0.5, w: 0.86, sp: 64, hp: 2, gap: 0.34 },
+    { t: 50, f: 'roca', n: 3, x: 0.5, w: 0.82, sp: 54, hp: 4, gap: 0.85 },
+    { t: 57, f: 'arco', n: 6, k: 1, d: 1, y: 0.36, amp: 115, sp: 186, gap: 0.22 }
+  ], p: [{ t: 8, x: 0.5, k: 'S' }, { t: 26, x: 0.4, k: 'P' }, { t: 47, x: 0.6, k: 'S' }] },
 
-  /* 20 · NUEVO: JEFE FINAL — Corazón de Starfall (4 fases) */
-  { tip: 'Corazón de Starfall', pw: 3, g: [
+  /* 20 · JEFE FINAL — Corazón de Starfall (4 fases) */
+  { tip: 'Corazón de Starfall', pw: 3, pt: [4800, 5300, 5700], cap: [{ t: 12, x: 0.3 }, { t: 30, x: 0.7 }], cp: 26, g: [
     { t: 1.6, f: 'fila', n: 5, k: 3, x: 0.5, w: 0.8, sp: 78, hp: 2, fire: 2.2, pat: 'down', bs: 138, gap: 0.16 },
-    { t: 8, f: 'jefe' }
-  ], p: [{ t: 5, x: 0.5, k: 'S' }, { t: 6, x: 0.3, k: 'P' }],
-    boss: { name: 'Corazón de Starfall', hp: 130, r: 38,
+    { t: 7, f: 'esc', n: 1, x: 0.5, y: 0.2, sp: 76, sw: 60, stay: 14, hp: 10, fire: 1.9, pat: 'aim', bs: 140 },
+    { t: 15, f: 'jefe' }
+  ], p: [{ t: 5, x: 0.5, k: 'S' }, { t: 6, x: 0.3, k: 'P' }, { t: 34, x: 0.7, k: 'S' }],
+    boss: { name: 'Corazón de Starfall', hp: 140, r: 38,
       ph: [['anillo'], ['abanico', 'minas'], ['espiral', 'escolta'], ['anillo', 'barrido', 'escolta']] } }
 ];
