@@ -2,7 +2,7 @@ import os, sys, threading, http.server, functools, json
 from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent
 from playwright.sync_api import sync_playwright
-ROOT = BASE / 'wp-content/mu-plugins/arcade-core/games'
+ROOT = Path(os.environ['ARCADE_GAMES']) if os.environ.get('ARCADE_GAMES') else BASE / 'wp-content/mu-plugins/arcade-core/games'
 slugs = sorted(p.name for p in ROOT.iterdir() if (p / 'index.html').exists())
 PORT = 8765
 if len(sys.argv) > 1 and sys.argv[1].startswith('batch'):
