@@ -207,8 +207,9 @@
           '<p class="pt-status" data-status>Creando sala…</p>' +
         '</aside>' +
         '<main class="pt-browse">' +
-          '<header class="pt-top"><h1>Elige un juego</h1><p class="pt-hint">Mueve con el mando del móvil o las flechas del mando de la tele · <kbd>OK</kbd> para jugar</p></header>' +
+          '<header class="pt-top"><h1>Elige un juego</h1><p class="pt-hint">Mueve con el mando del móvil o las flechas de la tele · <kbd>A</kbd> / <kbd>OK</kbd> jugar · <kbd>B</kbd> cambiar de sección</p></header>' +
           '<div class="pt-scroll" data-scroll><div data-grid></div></div>' +
+          '<div class="pt-info" data-info></div>' +
         '</main>' +
       '</div>' +
       '<div class="pt-stage" data-stage hidden><div class="pt-ghud" data-ghud></div></div>' +
@@ -216,7 +217,7 @@
       '<div class="pt-toast" data-toast hidden></div>';
     ui.qr = $('[data-qr]'); ui.code = $('[data-code]'); ui.players = $('[data-players]'); ui.status = $('[data-status]');
     ui.grid = $('[data-grid]'); ui.scroll = $('[data-scroll]'); ui.stage = $('[data-stage]'); ui.ghud = $('[data-ghud]');
-    ui.menu = $('[data-menu]'); ui.toast = $('[data-toast]');
+    ui.menu = $('[data-menu]'); ui.toast = $('[data-toast]'); ui.info = $('[data-info]');
     renderPlayers();
     phoneHint();
   }
@@ -278,6 +279,7 @@
     var h = '';
     S.cells = [];
     S.sections.forEach(function (sec, si) {
+      sec.i0 = S.cells.length; // primera celda de la sección: B salta de una a otra
       h += '<section class="pt-sec' + (sec.mp ? ' mp' : '') + '"><h2>' + (sec.mp ? ICO.users : '') + esc(sec.title) + ' <small>' + esc(sec.sub) + '</small></h2><div class="pt-grid">';
       sec.games.forEach(function (g) {
         var i = S.cells.length;
@@ -314,11 +316,34 @@
     S.cur = i;
     var c = cells[i]; c.classList.add('on');
     prefetchGame(S.cells[i]);
+    renderInfo(S.cells[i]);
+    pokeTitle();
     if (!noScroll) {
       var r = c.getBoundingClientRect(), sr = ui.scroll.getBoundingClientRect(), m = sr.height * 0.18;
       if (r.top < sr.top + m) ui.scroll.scrollTop += r.top - sr.top - m;
       else if (r.bottom > sr.bottom - m) ui.scroll.scrollTop += r.bottom - sr.bottom + m;
     }
+  }
+
+  /* Ficha del juego señalado. Con 158 juegos y cuatro personas delante, la miniatura y el título no
+     bastan para decidir: aquí van los jugadores que admite y cómo se juega, sin salir del lobby. */
+  function renderInfo(g) {
+    if (!ui.info) return;
+    if (!g) { ui.info.innerHTML = ''; return; }
+    var pl = g.mp ? (g.mp[0] === g.mp[1] ? g.mp[0] + ' jugadores' : g.mp[0] + '–' + g.mp[1] + ' jugadores') : '1 jugador';
+    ui.info.innerHTML = '<div class="pt-ihead"><b>' + esc(g.title) + '</b><span class="pt-ipl">' + ICO.users + esc(pl) + '</span>' +
+      (g.mp && g.mp[0] > 1 ? '<span class="pt-ipl warn">Hacen falta ' + g.mp[0] + ' mandos</span>' : '') + '</div>' +
+      '<p>' + esc(g.help || g.pl || 'Pulsa OK para jugar.') + '</p>';
+  }
+
+  // B en el lobby salta a la sección siguiente: recorrer 158 juegos celda a celda es eterno.
+  function jumpSection(d) {
+    if (!S.sections || S.sections.length < 2) return;
+    var si = 0;
+    for (var i = 0; i < S.sections.length; i++) if (S.cur >= S.sections[i].i0) si = i;
+    si = (si + d + S.sections.length) % S.sections.length;
+    focusCell(S.sections[si].i0);
+    toast(S.sections[si].title);
   }
 
   // Movimiento espacial: la celda más cercana en la dirección pedida (entre secciones también).
@@ -602,11 +627,13 @@
     }
     // Lobby: cursor con repetición; A elige (solo el primer jugador conectado), B no hace nada aquí.
     if (!down) return;
-    if (k === 'a') {
-      if (p === leader()) start(S.cells[S.cur]);
-      else toast('Elige J' + (leader() + 1));
+    if (k === 'a' && p === leader()) { start(S.cells[S.cur]); return; }
+    // Con cuatro mandos moviendo el mismo cursor no se elige nada: manda el primero conectado.
+    if (p !== leader()) {
+      if (!S.turnWarn) { S.turnWarn = 1; toast('En el lobby elige J' + (leader() + 1) + '; en la partida jugáis todos'); }
       return;
     }
+    if (k === 'b') { jumpSection(1); return; }
     if (['up', 'down', 'left', 'right'].indexOf(k) < 0) return;
     move(k);
     rep[id] = setTimeout(function () { rep[id] = setInterval(function () { move(k); }, 140); }, 380);
@@ -623,7 +650,8 @@
     for (var p = 0; p < 4; p++) {
       var peer = S.peers[p], on = active(p), lost = peer && peer.open && peer.lost, wait = peer && !peer.open;
       h += '<div class="pt-pl' + (on ? ' on' : lost ? ' lost' : wait ? ' wait' : '') + '" style="--pc:' + COLORS[p] + '">' +
-        '<span class="pt-av">' + ICO.pad + '</span><b>J' + (p + 1) + '</b><span>' + (on ? netLabel(peer, p) : lost ? 'Sin señal' : wait ? 'Conectando…' : 'Libre') + '</span></div>';
+        '<span class="pt-av">' + ICO.pad + '</span><b>' + esc(peer && peer.name ? peer.name : 'J' + (p + 1)) + '</b><span>' +
+        (on ? netLabel(peer, p) : lost ? 'Sin señal' : wait ? 'Conectando…' : 'Libre') + '</span></div>';
     }
     ui.players.innerHTML = h;
     relayHint();
@@ -669,7 +697,25 @@
   }
   // mn: la tele tiene el menú (o un anuncio) delante. El mando esconde la mano privada mientras tanto:
   // si no, las cartas o las fichas tapan el joystick y no se puede mover por el menú.
-  function padMsg() { return { t: 'pad', s: ++S.padSeq, pad: padSpec(), mn: (S.menu || S.ad) ? 1 : 0, title: S.ad ? 'Publicidad' : S.menu ? (S.game ? 'Pausa' : 'Menú') : S.game ? S.game.title : 'Elige un juego' }; }
+  /* El mando enseña lo que pasa en la tele: en el lobby, el juego señalado (así se elige sin levantar
+     la vista); en partida, el título y la ayuda («Cómo se juega» del propio juego, en el botón ?). */
+  function padMsg() {
+    var lob = !S.game && !S.menu && !S.ad, g = lob && S.cells ? S.cells[S.cur] : null;
+    return { t: 'pad', s: ++S.padSeq, pad: padSpec(), mn: (S.menu || S.ad) ? 1 : 0,
+      title: S.ad ? 'Publicidad' : S.menu ? (S.game ? 'Pausa' : 'Menú') : S.game ? S.game.title : g ? g.title : 'Elige un juego',
+      help: S.game ? (S.game.help || '') : g ? (g.help || '') : '',
+      lob: lob ? 1 : 0 };
+  }
+  /* Mover el cursor manda un mensaje a cada mando: se agrupa (250 ms) y solo sale si el juego
+     señalado ha cambiado de verdad. Por el servidor cada mensaje cuesta una petición. */
+  function pokeTitle() {
+    if (S.game || S.menu || S.ad) return;
+    var g = S.cells && S.cells[S.cur];
+    if (!g || g.slug === S.padTitle) return;
+    S.padTitle = g.slug;
+    clearTimeout(S.pokeT);
+    S.pokeT = setTimeout(broadcastPad, 250);
+  }
   function broadcastPad() {
     var m = padMsg();
     Object.keys(S.peers).forEach(function (p) { send(+p, m); });

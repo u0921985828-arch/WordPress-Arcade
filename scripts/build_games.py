@@ -170,7 +170,12 @@ def main():
         f = GAMES_DIR / slug / 'index.html'
         if f.exists(): dep[slug] = [m.replace('../', '') for m in re.findall(r'<script src="([^"]+)"', f.read_text(encoding='utf-8'))]
     (GAMES_DIR / 'deps.json').write_text(json.dumps(dep, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
-    party = [dict(slug=s, title=titles[s], g=genre[s], orient=inp[s][0], keys=any(c in inp[s][1] for c in 'KG') or s in MP, mp=list(MP[s]) if s in MP else None, pad=PAD.get(s))
+    # El lobby de /tele/ enseña la ficha del juego señalado: cómo se juega y un par de consejos.
+    # Antes de elegir entre 158 juegos con cuatro personas delante, la miniatura y el título no bastan.
+    tips = {d['slug']: d['tips'] for d in newcat if d.get('tips')}
+    pls = {d['slug']: d['players'] for d in newcat if d.get('players')}
+    party = [dict(slug=s, title=titles[s], g=genre[s], orient=inp[s][0], keys=any(c in inp[s][1] for c in 'KG') or s in MP, mp=list(MP[s]) if s in MP else None, pad=PAD.get(s),
+                  help=(G[s][1].get('help') or '') if s in G else '', tips=tips.get(s, [])[:2], pl=pls.get(s, ''))
              for s in sorted(titles, key=lambda x: titles[x].lower())]
     # El lobby de /tele/ precarga el runtime común: se le dan aquí las URL con su versión real
     # (antes iban escritas a mano en party-tv.js y se quedaron en v=18/v=9, así que no servían de nada).

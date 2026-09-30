@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **278 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2, 50 de la oleada 3, 13 de la oleada 4 y 15 de la oleada 5 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.43.1** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.44.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -231,6 +231,14 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
   - **Corte al instante** (`party-tv.js`, `party-pad.js`): si la petición en vuelo está esperando y aparece algo que mandar, se aborta con `AbortController` y sale ya; el aborto no cuenta como fallo de red.
   - Medido con Playwright sobre el WordPress local (WebRTC desactivado para forzar el camino por servidor): mediana de ida **153 → 48 ms** (3,2× mejor), p90 259 → ~200 ms, y en reposo 86 → 70 peticiones por cada 10 s.
   - `docs/MODO-TELE-TURN.md`: guía para el usuario de lo único que arregla el caso de verdad (tele en el router y móviles con sus datos) — poner los móviles en la misma wifi, o dar de alta el **TURN gratuito de Cloudflare** en Ajustes → Arcade, que ya estaba en el panel y no estaba documentado.
+
+- **Experiencia de mando y tele (1.44.0)**: seis arreglos al modo fiesta, todos medidos con Playwright a 1280×720, 1920×1080 y 390×844.
+  - **Ficha del juego señalado** en el lobby de `/tele/` (`.pt-info`): título, cuántos jugadores admite, aviso «Hacen falta N mandos» en los de 2+ y el **cómo se juega** del propio juego (3 líneas en tele, 2 en móvil). Antes había que decidir entre 158 juegos con una miniatura y un título. `build_games.py` mete `help`, `tips` y `pl` en `games/party.json` (38 → 156 KB, 48 KB comprimido). Altura fija: cambiar de celda no mueve la rejilla.
+  - **Nombre del jugador**: el mando lo pide una vez junto al código (opcional) y se guarda en el móvil (`arcade:pad:name`); el chip de arriba a la izquierda lo abre para cambiarlo en cualquier momento. Sale en la tarjeta del jugador del lobby y, por `playersMsg()`, en los marcadores y podios de los juegos. La cañería (`join {name}`, `{t:'hi',name}`) ya existía y nadie la usaba.
+  - **Botón «?» en el mando**: enseña el «cómo se juega» del juego en curso (o del señalado en el lobby) sin levantarse a leer la tele. El texto viaja en el mensaje `pad` (`help`).
+  - **El mando enseña lo que pasa en la tele**: en el lobby, el juego señalado (`▸ Bolos Humanos`). El aviso se agrupa a 250 ms y solo sale si el juego cambia de verdad: por el servidor cada mensaje cuesta una petición.
+  - **Manda el primer mando**: con cuatro mandos moviendo el mismo cursor no se elegía nada. Ahora el cursor del lobby es del líder (la plaza activa más baja, así que se reelige si se va); a los demás se les dice una vez. **B salta de sección** (Fiesta, Deportes, Carreras, Mesa y cartas, Trivia y palabras, Acción y arcade) en vez de recorrer 158 celdas.
+  - **La columna izquierda no cabía**: en 720p y en 1080p el contenido medía 742 px en 674 de hueco, así que **las tarjetas de J3 y J4 y la línea de estado se salían por abajo** (y en una tele de verdad, con sobrebarrido, más). QR y código algo menores en apaisado y la columna encoge y se desplaza; medido: contenido = hueco en los dos tamaños.
 
 ## Kuboplay Shield (plugin aparte, `wp-content/plugins/kuboplay-shield`, v1.1.2)
 Segundo plugin, independiente del arcade: seguridad + rendimiento, con panel propio en español. Guía para el usuario: `docs/SEGURIDAD.md` (Cloudflare gratis paso a paso, qué hace y qué no, cómo recuperar el acceso desde IONOS).

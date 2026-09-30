@@ -10,6 +10,14 @@
   var LOBBY = { d: '8', a: 'Elegir', b: 'Atrás' };
 
   function $(s, r) { return (r || document).querySelector(s); }
+  // El nombre es del móvil, no de la sala: se guarda aparte y vale para todas las partidas.
+  function myName(v) {
+    try {
+      if (v === undefined) return (localStorage.getItem('arcade:pad:name') || '').slice(0, 16);
+      localStorage.setItem('arcade:pad:name', v);
+    } catch (e) { /* nada */ }
+    return v || '';
+  }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
   function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   function store(k, v) { try { if (v === undefined) return sessionStorage.getItem(k); if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch (e) { return null; } return null; }
@@ -47,20 +55,22 @@
 
   var code = ((location.search.match(/[?&]c=([A-Za-z]{4})/) || [])[1] || '').toUpperCase();
   var S = { p: -1, tok: '', pc: null, dc: null, open: false, spec: LOBBY, title: 'Conectando…', gen: 0, held: {}, retry: 0,
-    seq: 0, padSeq: -1, rx: 0, rtt: [], priv: null, block: false };
+    seq: 0, padSeq: -1, rx: 0, rtt: [], priv: null, block: false, name: '', help: '', lob: 0 };
+  S.name = myName();
   var IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   var app = $('#pt-app');
 
   /* ================================================================ Interfaz */
   app.innerHTML =
     '<div class="pd">' +
-      '<header class="pd-top"><span class="pd-me" data-me>··</span><span class="pd-title" data-title></span>' +
-        '<button type="button" class="pd-menu" data-menu>Menú</button></header>' +
+      '<header class="pd-top"><button type="button" class="pd-me" data-me>··</button><span class="pd-title" data-title></span>' +
+        '<button type="button" class="pd-menu" data-menu>Menú</button>' +
+        '<button type="button" class="pd-help" data-help hidden aria-label="Cómo se juega">?</button></header>' +
       '<div class="pd-zones"><div class="pd-l" data-l></div><div class="pd-r" data-r></div></div>' +
       '<div class="pd-priv" data-priv></div>' +
       '<div class="pd-over" data-over></div>' +
     '</div>';
-  var ui = { priv: $('[data-priv]'), me: $('[data-me]'), title: $('[data-title]'), l: $('[data-l]'), r: $('[data-r]'), over: $('[data-over]'), menu: $('[data-menu]') };
+  var ui = { priv: $('[data-priv]'), me: $('[data-me]'), title: $('[data-title]'), l: $('[data-l]'), r: $('[data-r]'), over: $('[data-over]'), menu: $('[data-menu]'), help: $('[data-help]') };
 
   function overlay(html) {
     ui.over.innerHTML = html ? '<div class="pd-card">' + html + '</div>' : '';
@@ -72,14 +82,16 @@
       '<h1>Usa el móvil como mando</h1>' +
       (msg ? '<p class="bad">' + esc(msg) + '</p>' : '<p>Escribe el código que aparece en la tele o escanea su QR.</p>') +
       '<form data-form><input name="c" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" placeholder="ABCD" aria-label="Código de la sala" value="' + esc(code) + '"><button class="pd-btn" type="submit">Conectar</button></form>' +
+      '<input class="pd-name" name="n" maxlength="12" autocomplete="off" spellcheck="false" placeholder="Tu nombre (opcional)" aria-label="Tu nombre" value="' + esc(S.name) + '">' +
       '<p class="pd-small">En la tele u ordenador abre <b>' + esc(C.host ? C.host + '/tele' : (C.brand || 'Kuboplay')) + '</b></p>' +
       (IOS && !navigator.standalone ? '<p class="pd-small">En iPhone: gira el móvil en horizontal. Para quitar las barras de Safari, Compartir → «Añadir a pantalla de inicio».</p>' : ''));
-    var f = $('[data-form]'), inp = f.c;
+    var f = $('[data-form]'), inp = f.c, nm = $('.pd-name');
     inp.addEventListener('input', function () { inp.value = inp.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4); });
     f.addEventListener('submit', function (e) {
       e.preventDefault();
       var v = inp.value.toUpperCase();
       if (!ALPHA.test(v)) { inp.classList.add('bad'); return; }
+      S.name = myName(nm.value.trim().slice(0, 12));
       code = v;
       try { history.replaceState(null, '', '?c=' + v); } catch (er) { /* nada */ }
       loadSeat(); connect();
@@ -90,9 +102,32 @@
   function setMe() {
     var col = S.p >= 0 ? COLORS[S.p] : '#6e62f5';
     document.documentElement.style.setProperty('--pc', col);
-    ui.me.textContent = S.p >= 0 ? 'J' + (S.p + 1) : '··';
-    ui.title.textContent = S.title;
+    ui.me.textContent = S.p >= 0 ? (S.name || 'J' + (S.p + 1)) : '··';
+    ui.title.textContent = (S.lob ? '▸ ' : '') + S.title;
+    ui.help.hidden = !S.help;
   }
+
+  ui.me.addEventListener('click', function () {
+    if (S.p < 0) return;
+    overlay('<h1>Tu nombre</h1><p>Sale en la tele y en los marcadores de los juegos.</p>' +
+      '<form data-nform><input name="n" maxlength="12" autocomplete="off" spellcheck="false" placeholder="J' + (S.p + 1) + '" value="' + esc(S.name) + '" aria-label="Tu nombre"><button class="pd-btn" type="submit">Listo</button></form>');
+    var f = $('[data-nform]');
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      S.name = myName(f.n.value.trim().slice(0, 12));
+      send({ t: 'hi', name: S.name });
+      setMe(); overlay('');
+    });
+    setTimeout(function () { try { f.n.focus(); f.n.select(); } catch (er) { /* nada */ } }, 60);
+  });
+
+  // «Cómo se juega» del juego en curso (o del señalado en el lobby): en una partida de fiesta nadie
+  // se levanta a leer la tele, y el texto ya lo trae el juego.
+  ui.help.addEventListener('click', function () {
+    if (ui.over.classList.contains('show')) { overlay(''); return; }
+    overlay('<h1>' + esc(S.title) + '</h1><p class="pd-howto">' + esc(S.help) + '</p><button class="pd-btn" data-x type="button">Seguir</button>');
+    var b = $('[data-x]'); if (b) b.addEventListener('click', function () { overlay(''); });
+  });
 
   /* ================================================================ Mando */
   function send(m) { if (S.dc && S.dc.readyState === 'open') { try { S.dc.send(JSON.stringify(m)); } catch (e) { /* nada */ } } }
@@ -310,7 +345,7 @@
     teardown();
     S.title = 'Conectando…'; setMe();
     overlay('<span class="pd-spin"></span><h1>Conectando con la tele…</h1><p>Sala <b>' + esc(code) + '</b></p>');
-    var body = { tok: S.tok, name: '' };
+    var body = { tok: S.tok, name: S.name };
     if (S.p >= 0) body.p = S.p;
     api('/' + code + '/join', { method: 'POST', body: body }).then(function (r) {
       if (gen !== S.gen) return null;
@@ -375,7 +410,7 @@
       if (gen !== S.gen) return;
       S.open = true; S.retry = 0; S.rx = Date.now(); S.padSeq = -1; S.block = false; S.netFail = S.tvFail = 0;
       overlay('');
-      send({ t: 'hi' });
+      send({ t: 'hi', name: S.name });
       buzz(30);
     };
     dc.onmessage = function (m) {
@@ -386,7 +421,9 @@
       else if (d.t === 'you') { S.p = d.p; saveSeat(); setMe(); }
       else if (d.t === 'pad') {
         if (typeof d.s === 'number') { if (d.s <= S.padSeq) return; S.padSeq = d.s; }
-        S.spec = d.pad || LOBBY; S.title = d.title || ''; S.block = !!d.mn; drawPriv(); build(S.spec); setMe();
+        S.spec = d.pad || LOBBY; S.title = d.title || ''; S.block = !!d.mn; S.help = d.help || ''; S.lob = d.lob ? 1 : 0;
+        if (!S.help && ui.over.classList.contains('show') && $('.pd-howto')) overlay(''); // la ayuda de antes ya no vale
+        drawPriv(); build(S.spec); setMe();
       }
       else if (d.t === 'buzz') buzz(Math.min(400, d.ms | 0));
       else if (d.t === 'priv') priv(d.d);
