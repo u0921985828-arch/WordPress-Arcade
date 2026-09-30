@@ -61,15 +61,13 @@
     });
     document.addEventListener('click', (e) => { if (!form.contains(e.target)) box.hidden = true; });
   }
-  /* Móvil: la lupa de la cabecera despliega el buscador (en escritorio siempre está abierto). */
-  const find = $('[data-ax-find]');
-  find && find.addEventListener('click', () => {
-    if (!inp) return;
-    const bar = find.closest('.ax-bar');
-    if (bar) bar.classList.toggle('sopen');
-    scrollTo({ top: 0, behavior: 'smooth' });
-    if (!bar || bar.classList.contains('sopen')) inp.focus(); else { inp.value = ''; box && (box.hidden = true); }
-  });
+  /* El buscador de la cabecera va siempre visible; en pantallas estrechas el texto de
+     ayuda se acorta para que quepa dentro de la caja. */
+  if (inp && inp.dataset.phSm) {
+    const ph = inp.getAttribute('placeholder');
+    const fit = () => inp.setAttribute('placeholder', innerWidth < 560 ? inp.dataset.phSm : ph);
+    fit(); addEventListener('resize', fit);
+  }
   /* ---------- Anuncios: se piden al acercarse a la pantalla y nunca si están ocultos ---------- */
   const pushAd = (ins) => { if (ins.dataset.axPushed || !ins.offsetWidth) return; ins.dataset.axPushed = 1; try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch (e) {} };
   const io = 'IntersectionObserver' in window ? new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { io.unobserve(e.target); pushAd(e.target); } }), { rootMargin: '300px 0px' }) : null;

@@ -43,9 +43,8 @@ $sec_head = static function ( $title, $url = '', $count = 0 ) use ( $ico ) {
 <header class="ax-top">
 	<div class="ax-wrap ax-bar">
 		<a class="ax-logo" href="<?php echo esc_url( home_url( '/' ) ); ?>"><img class="ax-wm" src="<?php echo esc_url( plugins_url( 'assets/img/kuboplay-logo.svg', dirname( __FILE__ ) ) ); ?>" width="119" height="29" alt="<?php echo esc_attr( $brand ); ?>"></a>
-		<button type="button" class="ax-searchbtn" data-ax-find aria-label="Buscar juegos"><?php echo $ico['search']; // phpcs:ignore ?></button>
 		<form class="ax-search" role="search" action="<?php echo esc_url( home_url( '/' ) ); ?>" data-ax-search>
-			<input type="search" name="s" placeholder="Buscar entre <?php echo (int) wp_count_posts( 'game' )->publish; ?> juegos…" value="<?php echo esc_attr( get_search_query() ); ?>" aria-label="Buscar juegos" autocomplete="off" enterkeyhint="search">
+			<input type="search" name="s" placeholder="Buscar entre <?php echo (int) wp_count_posts( 'game' )->publish; ?> juegos…" data-ph-sm="Buscar juegos…" value="<?php echo esc_attr( get_search_query() ); ?>" aria-label="Buscar juegos" autocomplete="off" enterkeyhint="search">
 			<input type="hidden" name="post_type" value="game">
 			<div class="ax-sugg" role="listbox" hidden></div>
 		</form>
