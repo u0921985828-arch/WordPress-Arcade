@@ -646,7 +646,9 @@
     if (!S.game) return null;
     return S.game.pad && typeof S.game.pad === 'object' ? S.game.pad : DEFAULT_PAD;
   }
-  function padMsg() { return { t: 'pad', s: ++S.padSeq, pad: padSpec(), title: S.ad ? 'Publicidad' : S.menu ? (S.game ? 'Pausa' : 'Menú') : S.game ? S.game.title : 'Elige un juego' }; }
+  // mn: la tele tiene el menú (o un anuncio) delante. El mando esconde la mano privada mientras tanto:
+  // si no, las cartas o las fichas tapan el joystick y no se puede mover por el menú.
+  function padMsg() { return { t: 'pad', s: ++S.padSeq, pad: padSpec(), mn: (S.menu || S.ad) ? 1 : 0, title: S.ad ? 'Publicidad' : S.menu ? (S.game ? 'Pausa' : 'Menú') : S.game ? S.game.title : 'Elige un juego' }; }
   function broadcastPad() {
     var m = padMsg();
     Object.keys(S.peers).forEach(function (p) { send(+p, m); });

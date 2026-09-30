@@ -46,7 +46,7 @@
 
   var code = ((location.search.match(/[?&]c=([A-Za-z]{4})/) || [])[1] || '').toUpperCase();
   var S = { p: -1, tok: '', pc: null, dc: null, open: false, spec: LOBBY, title: 'Conectando…', gen: 0, held: {}, retry: 0,
-    seq: 0, padSeq: -1, rx: 0, rtt: [] };
+    seq: 0, padSeq: -1, rx: 0, rtt: [], priv: null, block: false };
   var IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   var app = $('#pt-app');
 
@@ -107,7 +107,14 @@
      d = {title, text, items:[{v, label, sub, img, col, off}], bar, sm} · bar: aviso pequeño sin tapar los controles.
      sm: fichas pequeñas (manos largas: rummikub, triominós, blokus), caben muchas sin desplazar. */
   function priv(d) {
-    var p = ui.priv;
+    S.priv = d || null;
+    drawPriv();
+  }
+
+  /* Con el menú (o un anuncio) abierto en la tele la mano se guarda pero no se pinta: el mando manda,
+     y las cartas o las fichas taparían el joystick. Al cerrar el menú vuelve tal cual estaba. */
+  function drawPriv() {
+    var p = ui.priv, d = S.block ? null : S.priv;
     if (!d) { p.innerHTML = ''; p.className = 'pd-priv'; return; }
     var items = Array.isArray(d.items) ? d.items.slice(0, 36) : [];
     p.className = 'pd-priv show' + (d.bar || !items.length ? ' bar' : '') + (d.sm ? ' sm' : '');
@@ -358,7 +365,7 @@
   function wire(gen, dc) {
     dc.onopen = function () {
       if (gen !== S.gen) return;
-      S.open = true; S.retry = 0; S.rx = Date.now(); S.padSeq = -1; S.netFail = S.tvFail = 0;
+      S.open = true; S.retry = 0; S.rx = Date.now(); S.padSeq = -1; S.block = false; S.netFail = S.tvFail = 0;
       overlay('');
       send({ t: 'hi' });
       buzz(30);
@@ -371,7 +378,7 @@
       else if (d.t === 'you') { S.p = d.p; saveSeat(); setMe(); }
       else if (d.t === 'pad') {
         if (typeof d.s === 'number') { if (d.s <= S.padSeq) return; S.padSeq = d.s; }
-        S.spec = d.pad || LOBBY; S.title = d.title || ''; build(S.spec); setMe();
+        S.spec = d.pad || LOBBY; S.title = d.title || ''; S.block = !!d.mn; drawPriv(); build(S.spec); setMe();
       }
       else if (d.t === 'buzz') buzz(Math.min(400, d.ms | 0));
       else if (d.t === 'priv') priv(d.d);

@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **278 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2, 50 de la oleada 3, 13 de la oleada 4 y 15 de la oleada 5 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.42.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.42.1** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -217,6 +217,8 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
   - **Mis juegos**: fila «Para empezar» con 12 recomendados al final, para que la página no quede corta sin guardados.
   - **Móvil**: cabecera de una sola fila (la lupa despliega el buscador, `.ax-bar.sopen`), la tira de categorías solo en la portada y la barra inferior a 4 destinos (Buscar se va con la lupa).
   - Alturas de página medidas: listado móvil 21 546 → 7 237 px, ficha móvil 3 668 → 2 217 px, portada móvil 7 877 → 5 372 px.
+
+- **El menú del mando manda (1.42.1)**: en los juegos de cartas y fichas del modo tele, el móvil enseña la mano privada a pantalla completa (`.pd-priv.show`), que tapaba el joystick y los botones. Al abrir el **menú** en la tele (o durante un anuncio), `padMsg()` manda `mn:1` y `party-pad.js` **esconde la mano y devuelve el mando** (`S.priv` se guarda, `drawPriv()` no pinta mientras `S.block`); al cerrar el menú vuelve la mano tal cual estaba. Verificado con Playwright: con la mano, el punto central del joystick lo ocupa `.pd-priv`; con el menú abierto lo ocupa `.pd-l`.
 
 ## Kuboplay Shield (plugin aparte, `wp-content/plugins/kuboplay-shield`, v1.1.2)
 Segundo plugin, independiente del arcade: seguridad + rendimiento, con panel propio en español. Guía para el usuario: `docs/SEGURIDAD.md` (Cloudflare gratis paso a paso, qué hace y qué no, cómo recuperar el acceso desde IONOS).
