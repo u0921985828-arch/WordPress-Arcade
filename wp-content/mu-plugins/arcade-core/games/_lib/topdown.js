@@ -143,8 +143,10 @@ function buildHand(lv) {
 const lvTg = () => (HR && HR.tg ? HR.tg[k.dif] || HR.tg[1] : 0);
 /* Con tiempo objetivo medido (tg > 0) la 2ª estrella es el reloj; en las salas que aún no lo
    tienen, el criterio es de contenido y cambia con la dificultad: 2★ salir con como mucho
-   2/1/0 golpes recibidos (fácil/normal/difícil), 3★ eso mismo y todo el botín. */
-const hitMax = () => 2 - k.dif;
+   4/3/2 golpes recibidos (fácil/normal/difícil), 3★ eso mismo y todo el botín. Antes eran
+   2/1/0: en difícil obligaba a una sala perfecta para la SEGUNDA estrella, que es meta de
+   maestría y no de paso (docs/VARA.md §5). La tercera sigue pidiendo eso mismo + el botín. */
+const hitMax = () => 4 - k.dif;
 const lvS2 = () => (lvTg() ? t <= lvTg() : hitTaken <= hitMax());
 const lvStars = () => (lvS2() ? (lootGot >= lootTot ? 3 : 2) : 1);
 function handLoadout(lv) { /* quien entra directo a una sala desde el menú lleva el equipo de esa altura */

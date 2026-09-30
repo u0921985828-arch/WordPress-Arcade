@@ -64,16 +64,17 @@ const BURBLV = {
       '331122331',
       '22331122',
     ] },
-    { /*  3 */ name: 'Que se derrumbe', goal: 'clear', cols: 3, shots: [34, 32, 32], push: [17, 16, 16],
-      par: [[24, 18], [23, 18], [23, 18]], tip: 'Lo que se queda colgando cae solo… y vale el doble.', m: [
-      '112211221',
-      '22112211',
-      '.1.2.1.2.',
-      '.1.2.1.2',
-      '.1.2.1.2.',
-      '.3.3.3.3',
+    { /*  3 */ name: 'Que se derrumbe', goal: 'clear', cols: 3, shots: [42, 40, 44], push: [21, 20, 22],
+      par: [[31, 26], [32, 27], [33, 28]], tip: 'Lo que se queda colgando cae solo… y vale el doble.', m: [
+      '123123123',
+      '23123123',
+      '.1.2.3.1',
+      '.2.3.1.2.',
+      '.3.1.2.3',
       '.3.3.3.3.',
       '.2.1.2.1',
+      '.1.2.1.2.',
+      '.3.1.3.1',
     ] },
     /* ---- 4-5: los objetos ---- */
     { /*  4 */ name: 'El cofre dorado', goal: 'drop', need: [4, 4, 4], cols: 4, shots: [30, 27, 26], push: 0,
@@ -84,8 +85,8 @@ const BURBLV = {
       '44112233',
       '1o2o3o4o1',
     ] },
-    { /*  5 */ name: 'Descuelga cinco', goal: 'drop', need: [5, 5, 5], cols: 4, shots: [36, 35, 36], push: [17, 17, 17],
-      par: [[28, 22], [28, 22], [28, 22]], tip: 'Revienta lo que sujeta el objeto y déjalo caer.', m: [
+    { /*  5 */ name: 'Descuelga cinco', goal: 'drop', need: [5, 5, 5], cols: 4, shots: [44, 44, 46], push: [22, 22, 23],
+      par: [[28, 22], [28, 22], [32, 26]], tip: 'Revienta lo que sujeta el objeto y déjalo caer.', m: [
       '112233441',
       '2o344o12',
       '334411223',
@@ -103,7 +104,7 @@ const BURBLV = {
       '12233112',
       '#2#1#3#2#',
     ] },
-    { /*  7 */ name: 'Tras el muro', goal: 'rescue', need: [5, 5, 5], cols: 4, shots: [32, 28, 25], push: [15, 13, 12],
+    { /*  7 */ name: 'Tras el muro', goal: 'rescue', need: [5, 5, 5], cols: 4, shots: [36, 33, 31], push: [18, 16, 15],
       par: [[24, 18], [22, 17], [20, 16]], tip: 'Tira la piedra de arriba y la atrapada cae con ella.', m: [
       '112233441',
       '22334411',
@@ -113,7 +114,7 @@ const BURBLV = {
       '11223344',
     ] },
     /* ---- 8-9: el hielo ---- */
-    { /*  8 */ name: 'Dos capas', goal: 'clear', cols: 4, shots: [34, 32, 30], push: 0,
+    { /*  8 */ name: 'Dos capas', goal: 'clear', cols: 4, shots: [40, 38, 36], push: 0,
       par: [[26, 21], [25, 21], [25, 21]], tip: 'El hielo aguanta dos tríos: el primero rompe la capa.', m: [
       '112233441',
       'aabbccdd',
@@ -122,7 +123,7 @@ const BURBLV = {
       '223344112',
       'bbccddaa',
     ] },
-    { /*  9 */ name: 'Hielo y roca', goal: 'rescue', need: [5, 5, 5], cols: 4, shots: [40, 36, 33], push: [15, 13, 12],
+    { /*  9 */ name: 'Hielo y roca', goal: 'rescue', need: [5, 5, 5], cols: 4, shots: [44, 41, 39], push: [18, 17, 16],
       par: [[30, 24], [28, 23], [26, 22]], tip: 'Hielo y piedra juntos: pica primero por los lados.', m: [
       '112233441',
       'aabbccdd',
@@ -142,7 +143,7 @@ const BURBLV = {
       '551122334',
     ] },
     /* ---- 11: TESORO ---- */
-    { /* 11 */ name: 'Los tres tesoros', goal: 'clear', cols: 4, shots: [36, 36, 37], push: [18, 18, 18],
+    { /* 11 */ name: 'Los tres tesoros', goal: 'clear', cols: 4, shots: [42, 42, 43], push: [20, 20, 24],
       par: [[27, 21], [27, 21], [27, 21]], tip: 'El tesoro turquesa también se descuelga: los tres dan la tercera estrella.', m: [
       '112233441',
       '22334411',
@@ -153,8 +154,12 @@ const BURBLV = {
       '....+....',
     ] },
     /* ---- 12: la bomba ---- */
-    { /* 12 */ name: 'Bomba de racimo', goal: 'clear', cols: 4, shots: [32, 29, 28], push: [17, 16, 15], spec: { b: 0.16 },
-      par: [[22, 16], [21, 16], [20, 16]], tip: 'La bomba revienta a sus seis vecinas: cae media pared.', m: [
+    { /* 12 */ name: 'Bomba de racimo', goal: 'clear', cols: 4, shots: [42, 38, 36], push: [22, 20, 19], spec: { b: 0.16 },
+      par: [[30, 22], [28, 21], [27, 21]], tip: 'La bomba revienta a sus seis vecinas: cae media pared.', m: [
+      '1122*3344',
+      '22334411',
+      '3344*1122',
+      '44112233',
       '1122*3344',
       '22334411',
       '3344*1122',
@@ -163,8 +168,12 @@ const BURBLV = {
       '22334411',
     ] },
     /* ---- 13: CERROJO ---- */
-    { /* 13 */ name: 'El cerrojo', goal: 'clear', cols: 4, shots: [38, 34, 31], push: [19, 17, 15], spec: { b: 0.1 },
-      par: [[28, 22], [26, 21], [24, 20]], tip: 'El cerrojo lo abre un racimo de cinco: lo que cuelga de él se derrumba.', m: [
+    { /* 13 */ name: 'El cerrojo', goal: 'clear', cols: 4, shots: [50, 52, 54], push: [25, 26, 27], spec: { b: 0.1 },
+      par: [[36, 30], [35, 30], [36, 31]], tip: 'El cerrojo lo abre un racimo de cinco: lo que cuelga de él se derrumba.', m: [
+      '112233441',
+      '22334411',
+      '334411223',
+      '44112233',
       '112233441',
       '22334411',
       '334411223',
@@ -173,7 +182,7 @@ const BURBLV = {
       '...a.b..',
     ] },
     /* ---- 14: el arcoíris ---- */
-    { /* 14 */ name: 'Comodín', goal: 'clear', cols: 5, shots: [38, 35, 34], push: [18, 17, 16], spec: { r: 0.16 },
+    { /* 14 */ name: 'Comodín', goal: 'clear', cols: 5, shots: [44, 41, 40], push: [18, 17, 16], spec: { r: 0.16 },
       par: [[28, 22], [27, 22], [27, 22]], tip: 'El arcoíris hace juego con cualquier color, en el tubo y en el cañón.', m: [
       '112233445',
       '23344551',
@@ -183,8 +192,8 @@ const BURBLV = {
       '1+2?3.4+',
     ] },
     /* ---- 15: RACIMOS DE CINCO ---- */
-    { /* 15 */ name: 'Racimos de cinco', goal: 'combo', need: [4, 5, 5], cols: 5, shots: [36, 34, 34], push: [14, 13, 13], spec: { r: 0.1 },
-      par: [[28, 22], [27, 22], [27, 22]], tip: 'Los racimos de cinco piden montones de cuatro ya puestos: búscalos.', m: [
+    { /* 15 */ name: 'Racimos de cinco', goal: 'combo', need: [8, 9, 9], cols: 5, shots: [40, 38, 38], push: [20, 19, 19], spec: { r: 0.1 },
+      par: [[30, 24], [29, 23], [29, 23]], tip: 'Los racimos de cinco piden montones de cuatro ya puestos: búscalos.', m: [
       '111222333',
       '11122233',
       '444555111',
@@ -192,9 +201,13 @@ const BURBLV = {
       '222333444',
       '22233344',
       '555111222',
+      '55511122',
+      '333444555',
+      '33344455',
+      '111222333',
     ] },
     /* ---- 16: TECHO A RELOJ ---- */
-    { /* 16 */ name: 'Contra el reloj', goal: 'clear', cols: 4, shots: [38, 35, 34], push: 0, sec: [40, 36, 33], spec: { b: 0.12 },
+    { /* 16 */ name: 'Contra el reloj', goal: 'clear', cols: 4, shots: [44, 41, 40], push: 0, sec: [42, 39, 38], spec: { b: 0.12 },
       par: [[28, 22], [27, 22], [26, 21]], tip: 'Aquí el techo baja por reloj: no te quedes pensando.', m: [
       '112233441',
       '22334411',
@@ -222,7 +235,7 @@ const BURBLV = {
       '44551122',
       '551122334',
     ] },
-    { /* 19 */ name: 'El tubo entero', goal: 'clear', cols: 5, shots: [42, 38, 36], push: [19, 17, 16], spec: { b: 0.14, r: 0.12 },
+    { /* 19 */ name: 'El tubo entero', goal: 'clear', cols: 5, shots: [48, 44, 42], push: [22, 20, 19], spec: { b: 0.14, r: 0.12 },
       par: [[32, 26], [30, 25], [29, 24]], mast: [2, 3, 3], tip: 'El tubo entero, cinco colores y dos tesoros: pica el techo y que caiga todo.', m: [
       '112233445',
       'aabbccdd',
@@ -231,7 +244,7 @@ const BURBLV = {
       '2+3.4.5+1',
     ] },
     /* ---- 20: el remate ---- */
-    { /* 20 */ name: 'Guardián del Prisma', goal: 'boss', boss: [12, 14, 15], cols: 5, shots: [48, 44, 42], push: [16, 15, 14], sec: [30, 27, 24], spec: { b: 0.16, r: 0.12 },
+    { /* 20 */ name: 'Guardián del Prisma', goal: 'boss', boss: [12, 14, 15], cols: 5, shots: [54, 50, 48], push: [16, 15, 14], sec: [30, 27, 24], spec: { b: 0.16, r: 0.12 },
       par: [[38, 32], [36, 31], [35, 30]], tip: 'El Guardián ancla el tubo entero. Cada racimo a su lado le quita un golpe.', m: [
       '112233445',
       '22334455',

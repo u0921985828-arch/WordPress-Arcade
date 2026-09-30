@@ -45,98 +45,98 @@
  */
 const SHOOLV = {
   'pixel-invaders': [
-    /*  1 */ { n: 'Primer contacto', tip: 'Mantén pulsado para disparar sin parar.', t: [58, 50, 44], uf: [16, 40], bk: 'FFFF',
+    /*  1 */ { n: 'Primer contacto', tip: 'Mantén pulsado para disparar sin parar.', t: [65, 61, 58], uf: [16, 40], bk: 'FFFF',
       ph: [{ f: ['bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 0.7, fr: 0.3, dr: 7 },
            { f: ['ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 0.8, fr: 0.38, dr: 7 },
            { f: ['ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 0.9, fr: 0.47, dr: 7 }] },
 
-    /*  2 */ { n: 'Contrabando', tip: 'Los OVNIs valen 150: sal del hueco y ve a por ellos.', t: [52, 45, 40], uf: [8, 18, 28, 38], bk: 'FFFF',
+    /*  2 */ { n: 'Contrabando', tip: 'Los OVNIs valen 150: sal del hueco y ve a por ellos.', t: [55, 52, 49], uf: [8, 18, 28, 38], bk: 'FFFF',
       ph: [{ f: ['ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 0.9, fr: 0.42, dr: 6 },
            { f: ['c.c.c.c.c', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.05, fr: 0.51, dr: 6 }] },
 
-    /*  3 */ { n: 'Formación completa', tip: 'Abre un pasillo por un lado y sube por él.', t: [64, 56, 49], uf: [12, 30, 46], bk: 'FFFF',
+    /*  3 */ { n: 'Formación completa', tip: 'Abre un pasillo por un lado y sube por él.', t: [72, 68, 64], uf: [12, 30, 46], bk: 'FFFF',
       ph: [{ f: ['ccccccccc', 'bbbbbbbbb', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1, fr: 0.51, dr: 5 },
            { f: ['ccccccccc', 'bbbbbbbbb', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.15, fr: 0.59, dr: 5 }] },
 
-    /*  4 */ { n: 'Blindados', tip: 'Los del aro dorado aguantan dos impactos.', t: [58, 50, 44], uf: [14, 34], bk: 'FFFF',
+    /*  4 */ { n: 'Blindados', tip: 'Los del aro dorado aguantan dos impactos.', t: [65, 61, 58], uf: [14, 34], bk: 'FFFF',
       ph: [{ f: ['.d.d.d.d.', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 0.95, fr: 0.51, dr: 6 },
            { f: ['d.d.d.d.d', 'bbbbbbbbb', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.1, fr: 0.59, dr: 5 }] },
 
-    /*  5 */ { n: 'Picados', tip: 'El saltarín se descuelga: no te quedes bajo su columna.', t: [62, 54, 48], uf: [12, 32], bk: 'FFFF', dv: 4.6,
+    /*  5 */ { n: 'Picados', tip: 'El saltarín se descuelga: no te quedes bajo su columna.', t: [67, 64, 60], uf: [12, 32], bk: 'FFFF', dv: 4.6,
       ph: [{ f: ['..z...z..', '.ccccccc.', '.bbbbbbb.', '.aaaaaaa.'], sp: 1, fr: 0.51, dr: 6 },
            { f: ['.z.z.z.z.', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.1, fr: 0.59, dr: 5, dv: 4 },
            { f: ['z...z...z', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.25, fr: 0.64, dr: 7, dv: 3.6 }] },
 
-    /*  6 */ { n: 'Escuderos', tip: 'El escudero cubre las columnas de al lado: dispara por la suya.', t: [60, 52, 46], uf: [14, 36], bk: 'FFFF',
+    /*  6 */ { n: 'Escuderos', tip: 'El escudero cubre las columnas de al lado: dispara por la suya.', t: [79, 75, 71], uf: [14, 36], bk: 'FFFF',
       ph: [{ f: ['..e...e..', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 0.95, fr: 0.51, dr: 7 },
            { f: ['.e.e.e.e.', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.05, fr: 0.59, dr: 6 },
            { f: ['e...e...e', 'bbbbbbbbb', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.15, fr: 0.64, dr: 6 }] },
 
-    /*  7 */ { n: 'Artilleros', tip: 'Cuando el artillero marca la línea, sal de ella.', t: [62, 54, 47], uf: [12, 30, 48], bk: 'FFFF', gc: 4.4,
+    /*  7 */ { n: 'Artilleros', tip: 'Cuando el artillero marca la línea, sal de ella.', t: [72, 68, 64], uf: [12, 30, 48], bk: 'FFFF', gc: 4.4,
       ph: [{ f: ['..g...g..', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 0.95, fr: 0.42, dr: 7 },
            { f: ['.g.g.g.g.', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.05, fr: 0.51, dr: 6 },
            { f: ['g..g..g..', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.15, fr: 0.59, dr: 6 }] },
 
-    /*  8 */ { n: 'Minadores', tip: 'Las bombas se pueden disparar antes de que caigan.', t: [64, 55, 48], uf: [14, 34], bk: 'FFFF', mc: 3.4,
+    /*  8 */ { n: 'Minadores', tip: 'Las bombas se pueden disparar antes de que caigan.', t: [72, 68, 64], uf: [14, 34], bk: 'FFFF', mc: 3.4,
       ph: [{ f: ['..m...m..', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 0.95, fr: 0.42, dr: 7 },
            { f: ['.m.m.m.m.', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.05, fr: 0.51, dr: 6 },
            { f: ['m...m...m', 'bbbbbbbbb', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.15, fr: 0.59, dr: 6 }] },
 
-    /*  9 */ { n: 'Lluvia de piedra', tip: 'La sombra avisa del meteoro 1,2 s antes.', t: [64, 55, 49], uf: [16, 40], bk: 'hFFh', mt: 5.4,
+    /*  9 */ { n: 'Lluvia de piedra', tip: 'La sombra avisa del meteoro 1,2 s antes.', t: [69, 65, 62], uf: [16, 40], bk: 'hFFh', mt: 5.4,
       ph: [{ f: ['ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1, fr: 0.51, dr: 7 },
            { f: ['c.c.c.c.c', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.1, fr: 0.59, dr: 6 },
            { f: ['ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.2, fr: 0.68, dr: 7 }] },
 
-    /* 10 */ { n: 'Crucero de Asalto', tip: 'Se prepara antes de disparar: golpéalo entre salvas.', t: [76, 66, 58], uf: [12, 30], bk: 'FFFF',
+    /* 10 */ { n: 'Crucero de Asalto', tip: 'Se prepara antes de disparar: golpéalo entre salvas.', t: [66, 62, 59], uf: [12, 30], bk: 'FFFF',
       ph: [{ f: ['ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1, fr: 0.55, dr: 6 },
            { f: ['.c.c.c.c.', '.b.b.b.b.'], y0: 168, sp: 1.15, fr: 0.51, dr: 6, bs: { hp: 30, name: 'Crucero de Asalto', ph: 2 } }] },
 
-    /* 11 */ { n: 'Enjambradores', tip: 'Al morir suelta dos crías: prepárate para el picado.', t: [72, 62, 55], uf: [14, 38], bk: 'FFFF', cp: 1,
+    /* 11 */ { n: 'Enjambradores', tip: 'Al morir suelta dos crías: prepárate para el picado.', t: [72, 68, 64], uf: [14, 38], bk: 'FFFF', cp: 1,
       ph: [{ f: ['..h...h..', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 0.95, fr: 0.47, dr: 7 },
            { f: ['.h.h.h.h.', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.05, fr: 0.55, dr: 6 },
            { f: ['h..h..h..', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.15, fr: 0.64, dr: 6 }] },
 
-    /* 12 */ { n: 'Rayo trazador', tip: 'La columna marcada es mortal, pero el búnker la absorbe.', t: [66, 57, 50], uf: [12, 34], bk: 'F--F', ry: 6.4, cp: 1,
+    /* 12 */ { n: 'Rayo trazador', tip: 'La columna marcada es mortal, pero el búnker la absorbe.', t: [71, 67, 64], uf: [12, 34], bk: 'F--F', ry: 6.4, cp: 1,
       ph: [{ f: ['ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1, fr: 0.51, dr: 7 },
            { f: ['.d.d.d.d.', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.1, fr: 0.59, dr: 6 },
            { f: ['ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.2, fr: 0.68, dr: 7 }] },
 
-    /* 13 */ { n: 'Escudo y cañón', tip: 'El halo azul es intocable: baja antes al escudero.', t: [74, 64, 56], uf: [12, 32, 52], bk: 'hFFh', gc: 4.2, cp: 1,
+    /* 13 */ { n: 'Escudo y cañón', tip: 'El halo azul es intocable: baja antes al escudero.', t: [77, 73, 69], uf: [12, 32, 52], bk: 'hFFh', gc: 4.2, cp: 1,
       ph: [{ f: ['.e.g.e.g.', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1, fr: 0.51, dr: 7 },
            { f: ['e.g.e.g.e', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.1, fr: 0.59, dr: 6 },
            { f: ['.g.e.g.e.', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.2, fr: 0.68, dr: 7 }] },
 
-    /* 14 */ { n: 'Bombas y piedra', tip: 'Dispara a las bombas antes de que toquen el suelo.', t: [68, 58, 51], uf: [14, 36], bk: 'hhhh', mt: 5.2, mc: 3.2, cp: 1,
+    /* 14 */ { n: 'Bombas y piedra', tip: 'Dispara a las bombas antes de que toquen el suelo.', t: [65, 61, 58], uf: [14, 36], bk: 'hhhh', mt: 5.2, mc: 3.2, cp: 1,
       ph: [{ f: ['..m...m..', 'ccccccccc', 'aaaaaaaaa'], sp: 1, fr: 0.51, dr: 7 },
            { f: ['.m.m.m.m.', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.1, fr: 0.59, dr: 6 },
            { f: ['m...m...m', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.2, fr: 0.68, dr: 7 }] },
 
-    /* 15 */ { n: 'Enjambre y rayo', tip: 'Con el rayo marcado, olvida las crías un segundo.', t: [74, 64, 56], uf: [12, 34, 54], bk: 'F--F', ry: 6.2, dv: 4, cp: 1,
+    /* 15 */ { n: 'Enjambre y rayo', tip: 'Con el rayo marcado, olvida las crías un segundo.', t: [70, 66, 62], uf: [12, 34, 54], bk: 'F--F', ry: 6.2, dv: 4, cp: 1,
       ph: [{ f: ['..h...h..', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1, fr: 0.51, dr: 7 },
            { f: ['.h.h.z.z.', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.1, fr: 0.59, dr: 6 },
            { f: ['h..z..h..', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.2, fr: 0.68, dr: 6 }] },
 
-    /* 16 */ { n: 'Coraza pesada', tip: 'Una fila entera de blindados: insiste por una columna.', t: [78, 68, 59], uf: [14, 38], bk: 'hFFh', dv: 3.8, cp: 1,
+    /* 16 */ { n: 'Coraza pesada', tip: 'Una fila entera de blindados: insiste por una columna.', t: [78, 74, 70], uf: [14, 38], bk: 'hFFh', dv: 3.8, cp: 1,
       ph: [{ f: ['.e.d.e.d.', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1, fr: 0.51, dr: 7 },
            { f: ['ddddddddd', '.e.e.e.e.', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.05, fr: 0.64, dr: 6 },
            { f: ['.z.z.z.z.', 'ccccccccc', 'bbbbbbbbb'], sp: 1.2, fr: 0.68, dr: 7 }] },
 
-    /* 17 */ { n: 'Tormenta', tip: 'Meteoros, rayo y artilleros: mira arriba antes de moverte.', t: [76, 66, 58], uf: [12, 32, 52], bk: 'F--F', mt: 5, ry: 7, gc: 4, cp: 1,
+    /* 17 */ { n: 'Tormenta', tip: 'Meteoros, rayo y artilleros: mira arriba antes de moverte.', t: [65, 61, 58], uf: [12, 32, 52], bk: 'F--F', mt: 5, ry: 7, gc: 4, cp: 1,
       ph: [{ f: ['..g...g..', 'ccccccccc', 'bbbbbbbbb'], sp: 1, fr: 0.51, dr: 7 },
            { f: ['.g.g.g.g.', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.1, fr: 0.59, dr: 6 },
            { f: ['g..g..g..', 'ccccccccc', 'aaaaaaaaa'], sp: 1.2, fr: 0.68, dr: 7 }] },
 
-    /* 18 */ { n: 'Desguace', tip: 'Escudero, minador y enjambrador a la vez: por orden.', t: [80, 70, 61], uf: [14, 36, 56], bk: 'hhhh', mc: 3.2, cp: 1,
+    /* 18 */ { n: 'Desguace', tip: 'Escudero, minador y enjambrador a la vez: por orden.', t: [79, 75, 71], uf: [14, 36, 56], bk: 'hhhh', mc: 3.2, cp: 1,
       ph: [{ f: ['.m.h.m.h.', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1, fr: 0.51, dr: 7 },
            { f: ['e.m.h.m.e', 'ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.1, fr: 0.59, dr: 6 },
            { f: ['h..e..m..', 'bbbbbbbbb', 'aaaaaaaaa', 'aaaaaaaaa'], sp: 1.2, fr: 0.68, dr: 6 }] },
 
-    /* 19 */ { n: 'Última línea', tip: 'Todo lo aprendido, sin un hueco donde respirar.', t: [84, 73, 64], uf: [12, 32, 52], bk: 'hh--', mt: 5.4, ry: 7, dv: 3.6, gc: 4, mc: 3.2, cp: 1,
+    /* 19 */ { n: 'Última línea', tip: 'Todo lo aprendido, sin un hueco donde respirar.', t: [86, 82, 77], uf: [12, 32, 52], bk: 'hh--', mt: 5.4, ry: 7, dv: 3.6, gc: 4, mc: 3.2, cp: 1,
       ph: [{ f: ['d.e.g.e.d', 'ccccccccc', 'bbbbbbbbb'], sp: 1, fr: 0.55, dr: 7 },
            { f: ['.h.m.z.m.h', 'cccccccccc', 'bbbbbbbbbb', 'aaaaaaaaaa'], sp: 1.1, fr: 0.64, dr: 6 },
            { f: ['e.g.h.g.e', 'ddddddddd', 'aaaaaaaaa'], sp: 1.2, fr: 0.68, dr: 7 }] },
 
-    /* 20 */ { n: 'Nave Nodriza', tip: 'Tres fases telegrafiadas: pega cuando termine la salva.', t: [88, 76, 67], uf: [14, 34], bk: 'FFFF', cp: 1,
+    /* 20 */ { n: 'Nave Nodriza', tip: 'Tres fases telegrafiadas: pega cuando termine la salva.', t: [89, 85, 80], uf: [14, 34], bk: 'FFFF', cp: 1,
       ph: [{ f: ['ccccccccc', 'bbbbbbbbb', 'aaaaaaaaa'], sp: 1.05, fr: 0.55, dr: 7 },
            { f: ['.e.e.e.e.', 'bbbbbbbbb'], sp: 1.15, fr: 0.59, dr: 7 },
            { f: ['.c.c.c.c.', '.b.b.b.b.'], y0: 178, sp: 1.2, fr: 0.51, dr: 6, bs: { hp: 44, name: 'Nave Nodriza', ph: 3 } }] }
@@ -196,7 +196,7 @@ const SHOOLV = {
  */
 SHOOLV['starfall-defender'] = [
   /*  1 · primer contacto: solo bajan */
-  { tip: 'Arrastra para mover la nave', pt: [900, 1050, 1150], cap: [{ t: 20, x: 0.5 }], g: [
+  { tip: 'Arrastra para mover la nave', pt: [800, 850, 850], cap: [{ t: 20, x: 0.5 }], g: [
     { t: 1.8, f: 'fila', n: 3, k: 2, x: 0.5, w: 0.42, sp: 62 },
     { t: 7.5, f: 'fila', n: 4, k: 2, x: 0.36, w: 0.5, sp: 66 },
     { t: 13, f: 'fila', n: 4, k: 2, x: 0.64, w: 0.5, sp: 66 },
@@ -207,7 +207,7 @@ SHOOLV['starfall-defender'] = [
   ], p: [{ t: 10, x: 0.5, k: 'P' }] },
 
   /*  2 · se balancean y aparece el casco doble */
-  { tip: 'Ahora se balancean', pt: [1500, 1700, 1850], cap: [{ t: 16, x: 0.25 }, { t: 38, x: 0.75 }], g: [
+  { tip: 'Ahora se balancean', pt: [1200, 1200, 1250], cap: [{ t: 16, x: 0.25 }, { t: 38, x: 0.75 }], g: [
     { t: 1.6, f: 'fila', n: 4, k: 2, x: 0.3, w: 0.46, sp: 70, sw: 26 },
     { t: 6.5, f: 'fila', n: 4, k: 2, x: 0.7, w: 0.46, sp: 70, sw: 26 },
     { t: 11.5, f: 'fila', n: 5, k: 0, x: 0.5, w: 0.76, sp: 74, sw: 30, gap: 0.22 },
@@ -219,7 +219,7 @@ SHOOLV['starfall-defender'] = [
   ], p: [{ t: 13, x: 0.25, k: 'P' }, { t: 34, x: 0.7, k: 'P' }] },
 
   /*  3 · entradas en arco */
-  { tip: 'Entran en arco por los lados', pt: [1700, 1950, 2100], cap: [{ t: 18, x: 0.7 }, { t: 40, x: 0.3 }], g: [
+  { tip: 'Entran en arco por los lados', pt: [850, 850, 900], cap: [{ t: 18, x: 0.7 }, { t: 40, x: 0.3 }], g: [
     { t: 1.8, f: 'arco', n: 4, k: 1, d: 1, y: 0.18, amp: 110, sp: 160, gap: 0.4 },
     { t: 8, f: 'arco', n: 4, k: 1, d: -1, y: 0.2, amp: 120, sp: 160, gap: 0.4 },
     { t: 14, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.7, sp: 78, sw: 30 },
@@ -231,7 +231,7 @@ SHOOLV['starfall-defender'] = [
   ], p: [{ t: 11, x: 0.7, k: 'S' }, { t: 36, x: 0.4, k: 'P' }] },
 
   /*  4 · las primeras balas enemigas */
-  { tip: 'Cuidado: ahora disparan', pt: [1950, 2200, 2400], cap: [{ t: 16, x: 0.4 }, { t: 42, x: 0.6 }], g: [
+  { tip: 'Cuidado: ahora disparan', pt: [1000, 1050, 1100], cap: [{ t: 16, x: 0.4 }, { t: 42, x: 0.6 }], g: [
     { t: 1.8, f: 'fila', n: 4, k: 3, x: 0.5, w: 0.6, sp: 64, hp: 2, fire: 2.8, pat: 'down', bs: 118 },
     { t: 8, f: 'arco', n: 4, k: 1, d: -1, y: 0.2, amp: 110, sp: 165, gap: 0.34 },
     { t: 14, f: 'fila', n: 5, k: 3, x: 0.4, w: 0.7, sp: 68, hp: 2, fire: 2.5, pat: 'down', bs: 124 },
@@ -243,7 +243,7 @@ SHOOLV['starfall-defender'] = [
   ], p: [{ t: 9, x: 0.4, k: 'P' }, { t: 23, x: 0.65, k: 'S' }, { t: 44, x: 0.5, k: 'P' }] },
 
   /*  5 · NUEVO: kamikazes */
-  { tip: '¡Kamikazes! No te quedes quieto', pt: [2100, 2400, 2600], cap: [{ t: 18, x: 0.3 }, { t: 44, x: 0.7 }], g: [
+  { tip: '¡Kamikazes! No te quedes quieto', pt: [1050, 1100, 1100], cap: [{ t: 18, x: 0.3 }, { t: 44, x: 0.7 }], g: [
     { t: 2, f: 'kami', n: 3, k: 0, x: 0.5, w: 0.6, sp: 145, gap: 0.55 },
     { t: 8, f: 'fila', n: 5, k: 3, x: 0.5, w: 0.7, sp: 68, hp: 2, fire: 2.5, pat: 'down', bs: 124 },
     { t: 14.5, f: 'kami', n: 4, k: 0, x: 0.5, w: 0.8, sp: 155, gap: 0.45 },
@@ -255,7 +255,7 @@ SHOOLV['starfall-defender'] = [
   ], p: [{ t: 12, x: 0.5, k: 'S' }, { t: 25, x: 0.3, k: 'P' }, { t: 45, x: 0.6, k: 'S' }] },
 
   /*  6 · NUEVO: núcleos inestables */
-  { tip: 'El núcleo estalla en anillo: mátalo lejos', pt: [2400, 2700, 2950], cap: [{ t: 20, x: 0.5 }, { t: 46, x: 0.28 }], g: [
+  { tip: 'El núcleo estalla en anillo: mátalo lejos', pt: [1000, 1050, 1050], cap: [{ t: 20, x: 0.5 }, { t: 46, x: 0.28 }], g: [
     { t: 1.8, f: 'nucleo', n: 2, x: 0.5, w: 0.5, sp: 58, hp: 2, gap: 0.5 },
     { t: 8, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.74, sp: 76, sw: 30 },
     { t: 14, f: 'nucleo', n: 3, x: 0.5, w: 0.76, sp: 60, hp: 2, gap: 0.45 },
@@ -267,7 +267,7 @@ SHOOLV['starfall-defender'] = [
   ], p: [{ t: 11, x: 0.7, k: 'P' }, { t: 30, x: 0.3, k: 'S' }] },
 
   /*  7 · NUEVO: torreta blindada */
-  { tip: 'Torreta blindada: aguanta doce impactos', pt: [2600, 2950, 3200], cap: [{ t: 16, x: 0.75 }, { t: 42, x: 0.35 }], g: [
+  { tip: 'Torreta blindada: aguanta doce impactos', pt: [1250, 1250, 1300], cap: [{ t: 16, x: 0.75 }, { t: 42, x: 0.35 }], g: [
     { t: 1.6, f: 'fila', n: 4, k: 2, x: 0.5, w: 0.6, sp: 76, sw: 30 },
     { t: 6, f: 'torre', n: 1, x: 0.5, y: 0.2, sp: 70, sw: 70, stay: 15, hp: 12, fire: 1.7, pat: 'aim', bs: 132 },
     { t: 12, f: 'arco', n: 4, k: 1, d: -1, y: 0.3, amp: 100, sp: 168, gap: 0.34 },
@@ -279,7 +279,7 @@ SHOOLV['starfall-defender'] = [
   ], p: [{ t: 10, x: 0.75, k: 'P' }, { t: 22, x: 0.35, k: 'S' }, { t: 44, x: 0.5, k: 'P' }] },
 
   /*  8 · NUEVO: asteroides */
-  { tip: 'El asteroide no se aparta: rómpelo o esquívalo', pt: [2800, 3150, 3400], cap: [{ t: 18, x: 0.3 }, { t: 44, x: 0.7 }], g: [
+  { tip: 'El asteroide no se aparta: rómpelo o esquívalo', pt: [1050, 1100, 1100], cap: [{ t: 18, x: 0.3 }, { t: 44, x: 0.7 }], g: [
     { t: 1.8, f: 'roca', n: 1, x: 0.5, sp: 48, hp: 4 },
     { t: 7, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.74, sp: 78, sw: 30 },
     { t: 13, f: 'roca', n: 2, x: 0.5, w: 0.62, sp: 50, hp: 4, gap: 1.2 },
@@ -291,7 +291,7 @@ SHOOLV['starfall-defender'] = [
   ], p: [{ t: 11, x: 0.3, k: 'P' }, { t: 30, x: 0.7, k: 'S' }] },
 
   /*  9 · víspera del jefe: zigzag y todo lo visto */
-  { tip: 'Aguanta: el jefe está cerca', pw: 2, pt: [3100, 3500, 3800], cap: [{ t: 16, x: 0.5 }, { t: 40, x: 0.2 }], cp: 26, g: [
+  { tip: 'Aguanta: el jefe está cerca', pw: 2, pt: [1200, 1250, 1250], cap: [{ t: 16, x: 0.5 }, { t: 40, x: 0.2 }], cp: 26, g: [
     { t: 1.6, f: 'zig', n: 3, k: 1, x: 0.4, w: 0.5, sp: 52, vx: 130, gap: 0.5 },
     { t: 8, f: 'fila', n: 6, k: 3, x: 0.5, w: 0.86, sp: 72, hp: 2, fire: 2.2, pat: 'down', bs: 132, gap: 0.18 },
     { t: 15, f: 'zig', n: 4, k: 1, x: 0.6, w: 0.6, sp: 56, vx: 145, gap: 0.45 },
@@ -304,7 +304,7 @@ SHOOLV['starfall-defender'] = [
   ], p: [{ t: 10, x: 0.5, k: 'S' }, { t: 28, x: 0.5, k: 'P' }, { t: 46, x: 0.3, k: 'S' }] },
 
   /* 10 · JEFE — Guardián de Hierro (3 fases) */
-  { tip: 'Guardián de Hierro', pw: 2, pt: [3400, 3800, 4100], cap: [{ t: 14, x: 0.3 }, { t: 30, x: 0.7 }], cp: 24, g: [
+  { tip: 'Guardián de Hierro', pw: 2, pt: [5450, 5600, 5800], cap: [{ t: 14, x: 0.3 }, { t: 30, x: 0.7 }], cp: 24, g: [
     { t: 1.6, f: 'fila', n: 4, k: 2, x: 0.5, w: 0.6, sp: 76, sw: 30 },
     { t: 6, f: 'nucleo', n: 3, x: 0.5, w: 0.7, sp: 60, hp: 2, gap: 0.4 },
     { t: 12, f: 'jefe' }
@@ -312,7 +312,7 @@ SHOOLV['starfall-defender'] = [
     boss: { name: 'Guardián de Hierro', hp: 90, r: 34, ph: [['anillo'], ['abanico', 'escolta'], ['espiral', 'barrido']] } },
 
   /* 11 · NUEVO: minadores */
-  { tip: 'Minadores: las minas se pueden disparar', pw: 2, pt: [3300, 3700, 4000], cap: [{ t: 18, x: 0.3 }, { t: 44, x: 0.7 }], cp: 26, g: [
+  { tip: 'Minadores: las minas se pueden disparar', pw: 2, pt: [1250, 1300, 1300], cap: [{ t: 18, x: 0.3 }, { t: 44, x: 0.7 }], cp: 26, g: [
     { t: 1.8, f: 'mina', n: 1, d: 1, y: 0.16, sp: 66, per: 1.7, hp: 6 },
     { t: 7, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.74, sp: 78, sw: 30 },
     { t: 13, f: 'mina', n: 1, d: -1, y: 0.2, sp: 70, per: 1.5, hp: 6 },
@@ -325,7 +325,7 @@ SHOOLV['starfall-defender'] = [
   ], p: [{ t: 10, x: 0.3, k: 'P' }, { t: 22, x: 0.7, k: 'S' }, { t: 48, x: 0.5, k: 'P' }] },
 
   /* 12 · NUEVO: interceptor espejo */
-  { tip: 'El interceptor te imita: cruza el centro', pw: 2, pt: [3500, 3900, 4200], cap: [{ t: 16, x: 0.5 }, { t: 42, x: 0.25 }], cp: 26, g: [
+  { tip: 'El interceptor te imita: cruza el centro', pw: 2, pt: [1100, 1100, 1150], cap: [{ t: 16, x: 0.5 }, { t: 42, x: 0.25 }], cp: 26, g: [
     { t: 1.8, f: 'caza', n: 1, y: 0.2, sp: 90, hp: 5, fire: 1.6, bs: 132 },
     { t: 8, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.74, sp: 78, sw: 30 },
     { t: 14, f: 'caza', n: 2, y: 0.24, sp: 92, hp: 5, fire: 1.6, bs: 134, gap: 0.8 },
@@ -337,7 +337,7 @@ SHOOLV['starfall-defender'] = [
   ], p: [{ t: 11, x: 0.5, k: 'S' }, { t: 26, x: 0.4, k: 'P' }, { t: 46, x: 0.6, k: 'S' }] },
 
   /* 13 · NUEVO: escoltado */
-  { tip: 'Tira a los drones: la nodriza es intocable', pw: 2, pt: [3700, 4100, 4450], cap: [{ t: 18, x: 0.7 }, { t: 44, x: 0.3 }], cp: 28, g: [
+  { tip: 'Tira a los drones: la nodriza es intocable', pw: 2, pt: [1150, 1150, 1200], cap: [{ t: 18, x: 0.7 }, { t: 44, x: 0.3 }], cp: 28, g: [
     { t: 1.8, f: 'esc', n: 1, x: 0.5, y: 0.2, sp: 70, sw: 60, stay: 18, hp: 10, fire: 2, pat: 'aim', bs: 130 },
     { t: 9, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.74, sp: 78, sw: 30 },
     { t: 16, f: 'esc', n: 1, x: 0.3, y: 0.26, sp: 72, sw: 70, stay: 18, hp: 10, fire: 1.9, pat: 'aim', bs: 132 },
@@ -349,7 +349,7 @@ SHOOLV['starfall-defender'] = [
   ], p: [{ t: 12, x: 0.3, k: 'P' }, { t: 27, x: 0.7, k: 'S' }, { t: 47, x: 0.5, k: 'P' }] },
 
   /* 14 · cascada de kamikazes y núcleos */
-  { tip: 'Cascada de kamikazes', pw: 2, pt: [3600, 4000, 4350], cap: [{ t: 16, x: 0.5 }, { t: 40, x: 0.75 }], cp: 26, g: [
+  { tip: 'Cascada de kamikazes', pw: 2, pt: [1450, 1500, 1500], cap: [{ t: 16, x: 0.5 }, { t: 40, x: 0.75 }], cp: 26, g: [
     { t: 1.8, f: 'kami', n: 4, k: 0, x: 0.25, w: 0.4, sp: 165, gap: 0.3 },
     { t: 5, f: 'kami', n: 4, k: 0, x: 0.75, w: 0.4, sp: 165, gap: 0.3 },
     { t: 8.5, f: 'kami', n: 5, k: 0, x: 0.5, w: 0.9, sp: 172, gap: 0.28 },
@@ -363,7 +363,7 @@ SHOOLV['starfall-defender'] = [
   ], p: [{ t: 11, x: 0.5, k: 'S' }, { t: 24, x: 0.6, k: 'P' }, { t: 47, x: 0.4, k: 'S' }] },
 
   /* 15 · cañonera */
-  { tip: 'Cañonera: abanicos de plasma', pw: 2, pt: [3900, 4350, 4700], cap: [{ t: 18, x: 0.25 }, { t: 44, x: 0.75 }], cp: 28, g: [
+  { tip: 'Cañonera: abanicos de plasma', pw: 2, pt: [1600, 1600, 1650], cap: [{ t: 18, x: 0.25 }, { t: 44, x: 0.75 }], cp: 28, g: [
     { t: 1.8, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.74, sp: 80, sw: 32 },
     { t: 7, f: 'canon', n: 1, x: 0.5, y: 0.24, sp: 62, sw: 80, stay: 20, hp: 22, fire: 2.4, pat: 'fan', bs: 142 },
     { t: 14, f: 'arco', n: 5, k: 1, d: -1, y: 0.42, amp: 100, sp: 180, gap: 0.26 },
@@ -375,7 +375,7 @@ SHOOLV['starfall-defender'] = [
   ], p: [{ t: 10, x: 0.25, k: 'S' }, { t: 24, x: 0.5, k: 'P' }, { t: 46, x: 0.7, k: 'S' }] },
 
   /* 16 · NUEVO: lanza de plasma */
-  { tip: 'La columna marcada se vuelve mortal: apártate', pw: 2, pt: [4000, 4450, 4800], cap: [{ t: 16, x: 0.7 }, { t: 42, x: 0.3 }], cp: 28, g: [
+  { tip: 'La columna marcada se vuelve mortal: apártate', pw: 2, pt: [1400, 1450, 1500], cap: [{ t: 16, x: 0.7 }, { t: 42, x: 0.3 }], cp: 28, g: [
     { t: 1.8, f: 'rayo', n: 1, x: 0.5, y: 0.18, sp: 74, sw: 50, stay: 18, hp: 10 },
     { t: 8, f: 'fila', n: 5, k: 2, x: 0.5, w: 0.74, sp: 80, sw: 32 },
     { t: 15, f: 'rayo', n: 2, x: 0.5, w: 0.6, y: 0.22, sp: 76, sw: 60, stay: 18, hp: 10, gap: 1.2 },
@@ -387,7 +387,7 @@ SHOOLV['starfall-defender'] = [
   ], p: [{ t: 11, x: 0.7, k: 'P' }, { t: 26, x: 0.3, k: 'S' }, { t: 48, x: 0.5, k: 'P' }] },
 
   /* 17 · arcos cruzados, interceptores y rayo */
-  { tip: 'Arcos cruzados', pw: 2, pt: [4100, 4550, 4900], cap: [{ t: 18, x: 0.5 }, { t: 44, x: 0.2 }], cp: 28, g: [
+  { tip: 'Arcos cruzados', pw: 2, pt: [1650, 1700, 1750], cap: [{ t: 18, x: 0.5 }, { t: 44, x: 0.2 }], cp: 28, g: [
     { t: 1.6, f: 'arco', n: 5, k: 1, d: 1, y: 0.18, amp: 120, sp: 182, gap: 0.24 },
     { t: 2.6, f: 'arco', n: 5, k: 1, d: -1, y: 0.3, amp: 120, sp: 182, gap: 0.24 },
     { t: 10, f: 'caza', n: 2, y: 0.22, sp: 94, hp: 5, fire: 1.5, bs: 138, gap: 0.7 },
@@ -400,7 +400,7 @@ SHOOLV['starfall-defender'] = [
   ], p: [{ t: 9, x: 0.5, k: 'S' }, { t: 23, x: 0.5, k: 'P' }, { t: 48, x: 0.3, k: 'S' }] },
 
   /* 18 · cañonera con escolta y escoltados */
-  { tip: 'Cañonera con escolta', pw: 3, pt: [4300, 4750, 5100], cap: [{ t: 16, x: 0.3 }, { t: 42, x: 0.7 }], cp: 28, g: [
+  { tip: 'Cañonera con escolta', pw: 3, pt: [1650, 1700, 1750], cap: [{ t: 16, x: 0.3 }, { t: 42, x: 0.7 }], cp: 28, g: [
     { t: 1.8, f: 'canon', n: 1, x: 0.4, y: 0.24, sp: 64, sw: 90, stay: 22, hp: 24, fire: 2.1, pat: 'fan', bs: 146 },
     { t: 4, f: 'zig', n: 4, k: 1, x: 0.6, w: 0.6, sp: 64, vx: 160, gap: 0.35 },
     { t: 12, f: 'mina', n: 1, d: 1, y: 0.15, sp: 82, per: 1.2, hp: 9 },
@@ -413,7 +413,7 @@ SHOOLV['starfall-defender'] = [
   ], p: [{ t: 10, x: 0.3, k: 'S' }, { t: 24, x: 0.7, k: 'S' }, { t: 49, x: 0.5, k: 'P' }] },
 
   /* 19 · todo a la vez */
-  { tip: 'Todo a la vez', pw: 3, pt: [4600, 5050, 5450], cap: [{ t: 16, x: 0.5 }, { t: 38, x: 0.25 }, { t: 54, x: 0.75 }], cp: 30, g: [
+  { tip: 'Todo a la vez', pw: 3, pt: [1750, 1800, 1850], cap: [{ t: 16, x: 0.5 }, { t: 38, x: 0.25 }, { t: 54, x: 0.75 }], cp: 30, g: [
     { t: 1.6, f: 'fila', n: 7, k: 3, x: 0.5, w: 0.92, sp: 80, hp: 3, fire: 1.8, pat: 'down', bs: 144, gap: 0.12 },
     { t: 6, f: 'mina', n: 1, d: -1, y: 0.14, sp: 84, per: 1.2, hp: 9 },
     { t: 12, f: 'rayo', n: 2, x: 0.5, w: 0.62, y: 0.2, sp: 80, sw: 60, stay: 16, hp: 10, gap: 1 },
@@ -427,7 +427,7 @@ SHOOLV['starfall-defender'] = [
   ], p: [{ t: 8, x: 0.5, k: 'S' }, { t: 26, x: 0.4, k: 'P' }, { t: 47, x: 0.6, k: 'S' }] },
 
   /* 20 · JEFE FINAL — Corazón de Starfall (4 fases) */
-  { tip: 'Corazón de Starfall', pw: 3, pt: [4800, 5300, 5700], cap: [{ t: 12, x: 0.3 }, { t: 30, x: 0.7 }], cp: 26, g: [
+  { tip: 'Corazón de Starfall', pw: 3, pt: [10650, 10950, 11300], cap: [{ t: 12, x: 0.3 }, { t: 30, x: 0.7 }], cp: 26, g: [
     { t: 1.6, f: 'fila', n: 5, k: 3, x: 0.5, w: 0.8, sp: 78, hp: 2, fire: 2.2, pat: 'down', bs: 138, gap: 0.16 },
     { t: 7, f: 'esc', n: 1, x: 0.5, y: 0.2, sp: 76, sw: 60, stay: 14, hp: 10, fire: 1.9, pat: 'aim', bs: 140 },
     { t: 15, f: 'jefe' }

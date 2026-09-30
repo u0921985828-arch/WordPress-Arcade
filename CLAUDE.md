@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **278 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2, 50 de la oleada 3, 13 de la oleada 4 y 15 de la oleada 5 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.41.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.41.1** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -191,6 +191,12 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
   - `g2048.js` + `g2048lv.js` (**2048-classic**): fichas atornilladas, cofres, bomba con mecha, generador y objetivo múltiple, cadena de fusiones y modo libre conservado; umbrales por simulación (`scripts/check_g2048lv.js`).
   - `burbujas.js` + `burblv.js` (**burbujas-arcoiris**) y `columnas.js` + `collv.js` (**columnas-de-joyas**): tesoro, cerrojo, racimos, techo a reloj y el **Guardián del Prisma**; hielo, rayo, suelo que sube y cuenta atrás. Verificadores `scripts/check_burblv.js` y `scripts/check_collv.js`.
   - **Qué falta por verificar** (las campañas de bot se cortaron por coste): los 20 niveles × 3 dificultades no están recorridos en ninguno de los trece; los objetivos de 2★ de starfall-defender, barrel-climb, maze-muncher y las salas 5–20 de dungeon-micro están escritos a mano y sin calibrar con datos reales; maze-muncher 18–20 y serpent-grid en difícil no están demostrados superables; no hay medida de coste por frame antes/después. **tetra-drop se quedó fuera de la tanda**: su trabajo se perdió en el worktree del equipo.
+
+- **Deuda de verificación, primera pasada (1.41.1)** — todo con simuladores en Node, sin navegador:
+  - **burbujas-arcoiris**: `src/eng/burblv.js` ajustado hasta que `node scripts/check_burblv.js 20` da **«Todo correcto»**: los 20 niveles se superan al 100 % en fácil, normal y difícil con 20 semillas. Los cuatro que se quedaban cortos (3, 12, 13 y 15) llevan tablero más alto y ahora duran 38–73 s, dentro de la banda de `docs/VARA.md`; en el 11 se frenó el techo por disparos y en el 16 el reloj, que era lo que ahogaba alguna semilla.
+  - **starfall-defender** y **pixel-invaders** (`src/eng/shoolv.js`): las tablas de 2★ estaban mal. La de starfall (`pt`) subía 900→5700 como si la puntuación se acumulara entre niveles, cuando es por nivel y plana: pedía hasta 9,5× lo máximo alcanzable. Rehechas a partir del contenido real de cada oleada (puntos por enemigo de `shooter.js`, cápsulas y jefe) y contrastadas con las únicas filas de bot que existen (starfall 1–7 y pixel-invaders 1–2 en las tres dificultades). El resto de la tabla es **derivado, no medido**.
+  - **dungeon-micro** (`src/eng/topdown.js`): en las salas sin tiempo medido la 2ª estrella pedía salir con como mucho 2/1/**0** golpes recibidos; en difícil obligaba a una sala perfecta para una estrella de paso. Ahora 4/3/2, y la 3ª sigue pidiendo eso más todo el botín.
+
 
 ## Kuboplay Shield (plugin aparte, `wp-content/plugins/kuboplay-shield`, v1.1.2)
 Segundo plugin, independiente del arcade: seguridad + rendimiento, con panel propio en español. Guía para el usuario: `docs/SEGURIDAD.md` (Cloudflare gratis paso a paso, qué hace y qué no, cómo recuperar el acceso desde IONOS).
