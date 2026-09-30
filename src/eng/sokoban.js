@@ -1,8 +1,11 @@
 /* Sokoban (mode 'push': generado por retroceso, siempre resoluble) e Ice (mode 'ice': deslizar hasta la salida, BFS garantiza solución)
  * Arte propio: almacén de losetas con muros de ladrillo y cajas de madera / pista de hielo con rocas nevadas. Movimiento interpolado.
  *
- * sokoban-warehouse (plan Friv, tanda 3): 20 almacenes escritos a mano en SOKLV (src/eng/soklv.js),
- * con mínimo de movimientos verificado por BFS, progreso por dificultad y final de verdad.
+ * sokoban-warehouse (plan Friv, tandas 3 y 7): 20 almacenes escritos a mano en SOKLV
+ * (src/eng/soklv.js), con las REGLAS PURAS de ese fichero (SOKLV.parse/step/won) — las mismas que
+ * ejecuta el resolutor de scripts/check_soklv.js, así que el mínimo de movimientos de cada nivel
+ * está demostrado. Seis artilugios nuevos (foso, suelo engrasado, rodillo, placa, reja y salida),
+ * gemas de maestría, deshaceres contados, estrellas 1/2/3 por dificultad y final de verdad.
  * Todo lo nuevo va detrás de HAND: el hielo y cualquier otro juego del motor siguen igual. */
 const M = CFG.mode, ICE = M === 'ice', OUT = ART.OUT, R2 = 6.2832;
 const HAND = (M === 'push' && typeof SOKLV !== 'undefined' && SOKLV[CFG.id]) || null;
@@ -37,6 +40,8 @@ const CDPR = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 const D = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 let N, NW, NH, wall, goals, boxes, pl, level, moves, hist, exitC, total, par, init, dead = null, bestMv = 0;
 let S, OX, OY, BY, BTN = [], boardCv, bgCv, pr, boxR, face = 1, walkT = 0, t = 0, queued = null, holdT = 0, bump = null, trail = [], winT = 0, winStars = 0, pushT = 0;
+/* Estado de los almacenes a mano: SK mapa estático, SS estado vivo (jugador, cajas, fosos, gemas). */
+let SK = null, SS = null, uLeft = 0, uMax = 0, usedUndo = false, chain = 0, tipT = 0, exitT = 0, lvStars = { s2: 0, s3: 0 };
 const BH = 36, BPAD = 14;   /* alto de los botones y margen del lienzo del tablero (la sombra se sale de la rejilla) */
 const K = (x, y) => x + ',' + y, rnd = (s) => { const x = Math.sin(s * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 function genPush() {
@@ -73,26 +78,21 @@ const mvKey = () => 'sokmv:' + CFG.id + ':' + level + (k.dif === 1 ? '' : k.dif 
 function loadBest() { let v = 0; try { v = +localStorage.getItem(mvKey()) || 0; } catch (e) {} bestMv = v; }
 function saveBest() { if (bestMv && bestMv <= moves) return; bestMv = moves; try { localStorage.setItem(mvKey(), moves); } catch (e) {} }
 function loadHand(i) {
-  const g = HAND[Math.max(0, Math.min(HAND.length - 1, i - 1))].g;
-  NH = g.length; NW = 0; for (const r of g) NW = Math.max(NW, r.length);
-  N = Math.max(NW, NH); wall = new Set(); goals = []; boxes = []; pl = [1, 1];
-  for (let y = 0; y < NH; y++) for (let x = 0; x < NW; x++) {
-    const ch = g[y][x] || ' ';
-    if (ch === '#') wall.add(K(x, y));
-    if (ch === '.' || ch === '*' || ch === '+') goals.push([x, y]);
-    if (ch === '$' || ch === '*') boxes.push([x, y]);
-    if (ch === '@' || ch === '+') pl = [x, y];
-  }
-  par = HAND[i - 1].m;
-  /* casillas donde una caja se pierde para siempre (esquina de muros sin marca): se señalan en fácil */
-  dead = new Set();
-  for (let y = 1; y < NH - 1; y++) for (let x = 1; x < NW - 1; x++) {
-    if (wall.has(K(x, y)) || goals.some((q) => q[0] === x && q[1] === y)) continue;
-    const w = (a, b) => wall.has(K(a, b));
-    if ((w(x, y - 1) || w(x, y + 1)) && (w(x - 1, y) || w(x + 1, y))) dead.add(K(x, y));
-  }
+  const lv = HAND[Math.max(0, Math.min(HAND.length - 1, i - 1))];
+  const P = SOKLV.parse(lv); SK = P.map; SS = P.st;
+  NW = SK.NW; NH = SK.NH; N = Math.max(NW, NH);
+  wall = new Set(); for (const kk in SK.wall) wall.add(kk);
+  goals = SK.goals.map((q) => [q[0], q[1]]);
+  syncHand();
+  par = lv.m; lvStars = SOKLV.stars ? SOKLV.stars(lv, k.dif) : { s2: (lv.s2 || [0, 0, 0])[k.dif], s3: (lv.s3 || [0, 0, 0])[k.dif] };
+  uMax = (lv.u && lv.u[k.dif]) || 0; uLeft = uMax; usedUndo = false; chain = 0; tipT = 4.6; exitT = 0;
+  /* casillas donde una caja se pierde para siempre: solo se señalan en fácil */
+  dead = new Set(Object.keys(SOKLV.deadCells(SK)));
   loadBest();
 }
+/* Copia el estado puro a los vectores que dibuja el motor. */
+function syncHand() { pl = [SS.p[0], SS.p[1]]; boxes = SS.b.map((b) => [b[0], b[1]]); }
+const gemLeft = () => { let n = 0; for (let i = 0; i < SK.gems.length; i++) if (!(SS.g & (1 << i))) n++; return n; };
 /* Disposición: la casilla se escala al hueco disponible, así el almacén más grande cabe en
    cualquier pantalla (y en fluido aprovecha el alto real). */
 function layout() {
@@ -109,7 +109,7 @@ function layout() {
 function build() {
   moves = 0; hist = []; goals = []; boxes = []; winT = 0; queued = null; trail = []; winStars = 0;
   if (HAND) loadHand(level); else { if (M === 'push') genPush(); else genIce(); NW = NH = N; }
-  init = JSON.stringify([pl, boxes]); snapR(); layout();
+  init = JSON.stringify(HAND ? SS : [pl, boxes]); snapR(); layout();
 }
 function snapR() { pr = [...pl]; boxR = boxes.map((b) => [...b]); }
 function reset() { level = HAND ? k.lv : 1; total = 0; build(); }
@@ -126,7 +126,29 @@ k.show(CFG.title, HAND ? `Empuja cada caja hasta su marca. Solo se empuja: piens
 
 /* ---------- Lógica ---------- */
 const onG = (b) => goals.some((g) => g[0] === b[0] && g[1] === b[1]);
+function moveHand(dn) {
+  const d = D[dn]; if (d[0]) face = d[0];
+  const r = SOKLV.step(SK, SS, dn);
+  if (!r) { bump = { d: d, t: 0.15 }; k.sfx('hit'); return; }
+  const before = boxes.filter(onG).length;
+  hist.push(JSON.stringify(SS));
+  SS = r.st; syncHand(); moves++; if (r.push) pushT = 0.25;
+  const after = boxes.filter(onG).length;
+  if (r.gem >= 0) { const X = OX + (r.st.p[0] + 0.5) * S, Y = OY + (r.st.p[1] + 0.5) * S;
+    k.burst(X, Y, '#5ce1e6', 20, 170); k.float('¡Gema!', X, Y - S * 0.5, '#5ce1e6'); k.sfx('coin'); k.punch(0.09); }
+  if (r.fell) { const q = r.path[r.path.length - 1], X = OX + (q[0] + 0.5) * S, Y = OY + (q[1] + 0.5) * S;
+    k.burst(X, Y, '#8a7a64', 22, 150); k.float('¡Foso tapado!', X, Y - S * 0.5, '#ffd9a0'); k.sfx('explode'); k.shake(4); k.hitstop(0.06); k.punch(0.14); }
+  if (after > before) { /* GANCHO r3: cadena de cajas colocadas seguidas */
+    chain++; const b = boxes.find((q) => onG(q)), X = OX + (r.st.p[0] + 0.5) * S, Y = OY + (r.st.p[1] + 0.5) * S;
+    k.chime(chain - 1); k.burst(X, Y, '#ffd23d', 16, 130); k.hitstop(0.05); k.punch(0.06); k.sfx('coin');
+    if (chain >= 2) k.combo(chain, k.W / 2, OY + S * NH + 22);
+    if (b) { /* nada más: el marcador ya lo cuenta */ }
+  } else if (after < before) { chain = 0; k.chainReset(); }
+  else if (r.push) k.sfx('pop'); else k.sfx('click');
+  if (SK.exitC && SOKLV.goalsDone(SK, SS) && !SOKLV.won(SK, SS) && exitT <= 0) { exitT = 2.6; k.reward('¡AHORA, A LA SALIDA!', '#7cf7a0'); }
+}
 function move(dn) {
+  if (HAND) return moveHand(dn);
   const d = D[dn]; if (d[0]) face = d[0];
   if (ICE) { const e = slideEnd(pl[0], pl[1], d); if (e[0] === pl[0] && e[1] === pl[1]) { bump = { d, t: 0.18 }; k.sfx('hit'); return; } pl = e; moves++; k.sfx('jump'); return; }
   const nx = pl[0] + d[0], ny = pl[1] + d[1]; if (wall.has(K(nx, ny))) { bump = { d, t: 0.15 }; return; }
@@ -138,15 +160,17 @@ function move(dn) {
   pl = [nx, ny]; moves++;
 }
 // caja fuera de marca en una esquina de muros: ya no se puede resolver
-function stuck() { const w = (x, y) => wall.has(K(x, y)); return boxes.some((q) => !onG(q) && (w(q[0] - 1, q[1]) || w(q[0] + 1, q[1])) && (w(q[0], q[1] - 1) || w(q[0], q[1] + 1))); }
-function solved() { return ICE ? pl[0] === exitC[0] && pl[1] === exitC[1] : boxes.every(onG); }
+function stuck() { if (HAND) return dead ? boxes.some((q) => !onG(q) && dead.has(K(q[0], q[1]))) : false; const w = (x, y) => wall.has(K(x, y)); return boxes.some((q) => !onG(q) && (w(q[0] - 1, q[1]) || w(q[0] + 1, q[1])) && (w(q[0], q[1] - 1) || w(q[0], q[1] + 1))); }
+function solved() { return HAND ? SOKLV.won(SK, SS) : ICE ? pl[0] === exitC[0] && pl[1] === exitC[1] : boxes.every(onG); }
 /* Medalla: en fácil basta con acercarse al mínimo, en difícil hay que clavarlo. */
 const tolMv = () => (k.dif === 0 ? 4 : k.dif === 2 ? 0 : 1);
 function win() {
   if (HAND) {
-    winStars = moves <= par + tolMv() ? 3 : moves <= Math.round(par * 1.4) + 4 ? 2 : 1;
-    const gain = Math.max(60, 600 - Math.max(0, moves - par) * 12) + level * 20;
-    total += gain; winT = 1.25; saveBest(); k.sfx('win'); k.confetti(); k.float('+' + gain, k.W / 2, k.H / 2 + 90, '#ffd23d');
+    /* 1★ terminar · 2★ dentro de s2 · 3★ dentro de s3 + todas las gemas + sin deshacer. */
+    const allG = gemLeft() === 0, in2 = !lvStars.s2 || moves <= lvStars.s2, in3 = !!lvStars.s3 && moves <= lvStars.s3;
+    winStars = (in3 && allG && !usedUndo) ? 3 : in2 ? 2 : 1;
+    const gain = Math.max(60, 600 - Math.max(0, moves - par) * 12) + level * 20 + (allG ? 150 : 0) + winStars * 100;
+    total += gain; winT = 1.25; saveBest(); k.sfx('win'); k.confetti(); k.punch(0.18); k.float('+' + gain, k.W / 2, k.H / 2 + 90, '#ffd23d');
     return;
   }
   const gain = Math.max(50, 400 - moves * (ICE ? 25 : 5)) * level; total += gain; winT = 1.6; k.best(CFG.id, total);
@@ -155,15 +179,28 @@ function win() {
 /* Nivel a mano superado: kit.js desbloquea el siguiente y ofrece Siguiente / Niveles. */
 function handDone() {
   winT = 0; k.best(CFG.id, total);
-  const lv = HAND[level - 1], st = '★★★'.slice(0, winStars) + '☆☆☆'.slice(0, 3 - winStars);
-  k.levelDone(total, `${lv.n} · ${st}<br>${moves} movimiento${moves === 1 ? '' : 's'} · mínimo ${par}` +
-    (winStars === 3 ? ' · <b style="color:#ffd166">¡Medalla!</b>' : ` · tu mejor marca ${bestMv}`));
+  const lv = HAND[level - 1];
+  const miss = [];
+  if (!(lvStars.s3 && moves <= lvStars.s3)) miss.push(`acabar en ${lvStars.s3} movimientos (has usado ${moves})`);
+  if (gemLeft()) miss.push(gemLeft() === 1 ? 'coger la gema' : `coger las ${SK.gems.length} gemas`);
+  if (usedUndo) miss.push('no deshacer ni una vez');
+  const extra = `${lv.n}<br>${moves} movimiento${moves === 1 ? '' : 's'} · mínimo ${par} · 2★ en ${lvStars.s2}` +
+    (winStars === 3 ? ' · <b style="color:#ffd166">¡Perfecto!</b>' : `<br>Para 3★ te falta: ${miss.join(' y ')}`);
+  k.levelDone(total, extra, { stars: winStars });
 }
-function undo() { if (!ICE && hist.length) { const [p2, b2] = JSON.parse(hist.pop()); pl = p2; boxes = b2; moves++; k.sfx('click'); } }
+function undo() {
+  if (HAND) {
+    if (!hist.length) return;
+    if (uMax && uLeft <= 0) { k.float('Sin deshaceres: reinicia', k.W / 2, BY - 40, '#ff6f8a'); k.sfx('hurt'); return; }
+    SS = JSON.parse(hist.pop()); syncHand(); moves = Math.max(0, moves - 1); chain = 0; k.chainReset();
+    usedUndo = true; if (uMax) uLeft--; k.sfx('click'); return;
+  }
+  if (!ICE && hist.length) { const [p2, b2] = JSON.parse(hist.pop()); pl = p2; boxes = b2; moves++; k.sfx('click'); }
+}
 /* Con niveles a mano, reiniciar deja el almacén como estaba y el contador a cero: así se puede
    volver a intentar la medalla. En los generados y en el hielo se conserva el reinicio de antes. */
 function restart() {
-  if (HAND) { const [p2, b2] = JSON.parse(init); pl = p2; boxes = b2; hist = []; moves = 0; queued = null; snapR(); }
+  if (HAND) { SS = JSON.parse(init); syncHand(); hist = []; moves = 0; queued = null; chain = 0; k.chainReset(); uLeft = uMax; usedUndo = false; exitT = 0; snapR(); }
   else if (ICE) { pl = JSON.parse(init)[0]; pr = [...pl]; trail = []; moves = 0; }
   else { const [p2, b2] = JSON.parse(init); if (moves) hist.push(JSON.stringify([pl, boxes])); pl = p2; boxes = b2; moves++; }
   k.sfx('pop');
@@ -182,6 +219,7 @@ k.run((dt) => {
   boxes.forEach((b, i) => { const r = boxR[i], s2 = 11 * dt; r[0] += k.clamp(b[0] - r[0], -s2, s2); r[1] += k.clamp(b[1] - r[1], -s2, s2); });
   for (const q of trail) q.l -= dt; trail = trail.filter((q) => q.l > 0);
   if (bump) { bump.t -= dt; if (bump.t <= 0) bump = null; } if (pushT > 0) pushT -= dt;
+  if (tipT > 0) tipT -= dt; if (exitT > 0) exitT -= dt;
   if (winT > 0) { winT -= dt; if (winT <= 0) { if (HAND) return handDone(); level++; build(); } return; }
   if (!moving() && solved()) { win(); return; }
   // entrada
@@ -226,6 +264,32 @@ function renderBoard() {
   // objetivos pintados en el suelo
   for (const q of goals) { const X = OX + (q[0] + 0.5) * S, Y = OY + (q[1] + 0.5) * S; g.strokeStyle = '#e0a31a'; g.lineWidth = 3; g.setLineDash([S * 0.12, S * 0.08]); ART.rr(g, X - S * 0.36, Y - S * 0.36, S * 0.72, S * 0.72, 5); g.stroke(); g.setLineDash([]);
     g.lineWidth = 4; g.lineCap = 'round'; g.beginPath(); g.moveTo(X - S * 0.14, Y - S * 0.14); g.lineTo(X + S * 0.14, Y + S * 0.14); g.moveTo(X + S * 0.14, Y - S * 0.14); g.lineTo(X - S * 0.14, Y + S * 0.14); g.stroke(); }
+  /* Artilugios de los almacenes a mano: lo que no cambia se hornea aquí (R5: nada de esto en el bucle). */
+  if (HAND && SK) {
+    for (const kk in SK.ice) { const [x, y] = kk.split(',').map(Number), X = OX + x * S, Y = OY + y * S;
+      g.fillStyle = 'rgba(150,215,255,.3)'; g.fillRect(X, Y, S, S);
+      g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = Math.max(1.4, S * 0.045); g.lineCap = 'round';
+      for (let i = 0; i < 2; i++) { g.beginPath(); g.moveTo(X + S * (0.12 + i * 0.42), Y + S * 0.78); g.lineTo(X + S * (0.46 + i * 0.42), Y + S * 0.26); g.stroke(); } }
+    for (const kk in SK.roll) { const [x, y] = kk.split(',').map(Number), dn = SK.roll[kk], d = D[dn], X = OX + (x + 0.5) * S, Y = OY + (y + 0.5) * S;
+      g.fillStyle = 'rgba(26,21,48,.22)'; g.fillRect(OX + x * S, OY + y * S, S, S);
+      for (let i = 0; i < 2; i++) { const o = (i - 0.5) * S * 0.38, ax = X + d[0] * o - d[1] * 0, ay = Y + d[1] * o;
+        const tri = (h) => { const r = S * 0.2; h.moveTo(ax + d[0] * r, ay + d[1] * r); h.lineTo(ax - d[0] * r * 0.4 - d[1] * r * 0.8, ay - d[1] * r * 0.4 - d[0] * r * 0.8); h.lineTo(ax - d[0] * r * 0.4 + d[1] * r * 0.8, ay - d[1] * r * 0.4 + d[0] * r * 0.8); h.closePath(); };
+        uni(g, [[tri, '#5ce1e6']], 1.2); } }
+    for (const q of SK.plate) { const X = OX + (q[0] + 0.5) * S, Y = OY + (q[1] + 0.5) * S, r = S * 0.34;
+      const body = (h) => ART.rr(h, X - r, Y - r, r * 2, r * 2, S * 0.09);
+      uni(g, [[body, '#9aa4b8']], 1.4); celp(g, [[body, '#9aa4b8']], '#9aa4b8', S * 0.06, S * 0.06);
+      g.fillStyle = 'rgba(26,21,48,.3)'; g.fillRect(X - r * 0.6, Y - S * 0.02, r * 1.2, Math.max(2, S * 0.045)); }
+    for (const kk in SK.pit) { const [x, y] = kk.split(',').map(Number), X = OX + (x + 0.5) * S, Y = OY + (y + 0.5) * S;
+      g.fillStyle = '#0d0818'; g.beginPath(); g.ellipse(X, Y, S * 0.42, S * 0.4, 0, 0, R2); g.fill();
+      g.strokeStyle = 'rgba(26,21,48,.9)'; g.lineWidth = Math.max(2, S * 0.07); g.stroke();
+      g.strokeStyle = 'rgba(255,255,255,.14)'; g.lineWidth = Math.max(1, S * 0.035); g.beginPath(); g.ellipse(X, Y - S * 0.05, S * 0.3, S * 0.26, 0, 3.4, 5.9); g.stroke(); }
+    if (SK.exitC) { const X = OX + (SK.exitC[0] + 0.5) * S, Y = OY + (SK.exitC[1] + 0.5) * S, r = S * 0.36;
+      const body = (h) => { ART.rr(h, X - r, Y - r * 1.05, r * 2, r * 2.1, S * 0.08); };
+      uni(g, [[body, '#3fbf6a']], 1.5); celp(g, [[body, '#3fbf6a']], '#3fbf6a', S * 0.07, S * 0.07);
+      g.fillStyle = 'rgba(255,255,255,.75)'; g.beginPath();
+      g.moveTo(X, Y - r * 0.6); g.lineTo(X + r * 0.45, Y); g.lineTo(X + r * 0.18, Y); g.lineTo(X + r * 0.18, Y + r * 0.6);
+      g.lineTo(X - r * 0.18, Y + r * 0.6); g.lineTo(X - r * 0.18, Y); g.lineTo(X - r * 0.45, Y); g.closePath(); g.fill(); }
+  }
   if (ICE) { const X = OX + exitC[0] * S, Y = OY + exitC[1] * S; g.fillStyle = 'rgba(124,247,160,.35)'; g.beginPath(); g.ellipse(X + S / 2, Y + S * 0.62, S * 0.42, S * 0.28, 0, 0, R2); g.fill(); g.strokeStyle = '#3fbf6a'; g.lineWidth = 2; g.stroke(); }
   // muros en relieve: cara superior + cara frontal si abajo hay suelo
   const fd = Math.max(5, S * 0.2);
@@ -296,6 +360,24 @@ function draw() {
     ART.flag(c, X - S * 0.15, Y + S * 0.34, t, '#7cf7a0', S * 0.8);
     for (const q of trail) { c.globalAlpha = q.l; c.fillStyle = '#fff'; c.beginPath(); c.arc(cx(q.x) + (rnd(q.l * 99) - 0.5) * S * 0.4, cy(q.y) + S * 0.3, 2 + q.l * 3, 0, R2); c.fill(); } c.globalAlpha = 1;
   }
+  /* Artilugios que cambian: reja, fosos tapados y gemas. */
+  if (HAND && SK) {
+    const open = SOKLV.gateOpen(SK, SS);
+    for (const q of SK.gate) { const X = cx(q[0]), Y = cy(q[1]), r = S * 0.46;
+      c.fillStyle = open ? 'rgba(124,247,160,.14)' : 'rgba(20,14,34,.55)'; c.fillRect(X - r, Y - r, r * 2, r * 2);
+      c.strokeStyle = open ? 'rgba(124,247,160,.55)' : '#b9c2d8'; c.lineWidth = Math.max(2, S * 0.09); c.lineCap = 'round';
+      if (open) { c.beginPath(); c.moveTo(X - r, Y - r * 0.85); c.lineTo(X + r, Y - r * 0.85); c.moveTo(X - r, Y + r * 0.85); c.lineTo(X + r, Y + r * 0.85); c.stroke(); }
+      else { c.beginPath(); for (let i = 0; i < 4; i++) { const bx = X - r + (i + 0.5) * (r * 2 / 4); c.moveTo(bx, Y - r); c.lineTo(bx, Y + r); } c.moveTo(X - r, Y); c.lineTo(X + r, Y); c.stroke(); } }
+    for (const kk in SS.f) { const [x, y] = kk.split(',').map(Number), X = cx(x), Y = cy(y), r = S * 0.4;
+      const body = (h) => ART.rr(h, X - r, Y - r * 0.9, r * 2, r * 1.8, S * 0.06);
+      uni(c, [[body, '#8a6a46']], 1.5); celp(c, [[body, '#8a6a46']], '#8a6a46', S * 0.06, S * 0.06);
+      c.fillStyle = 'rgba(26,21,48,.3)'; for (let i = 1; i < 3; i++) c.fillRect(X - r * 0.9, Y - r * 0.9 + i * r * 0.6, r * 1.8, Math.max(1.5, S * 0.04)); }
+    for (let i = 0; i < SK.gems.length; i++) { if (SS.g & (1 << i)) continue; const q = SK.gems[i], X = cx(q[0]), Y = cy(q[1]) + Math.sin(t * 3 + i) * S * 0.05, r = S * 0.24;
+      const body = (h) => { h.moveTo(X, Y - r * 1.25); h.lineTo(X + r, Y - r * 0.15); h.lineTo(X, Y + r * 1.25); h.lineTo(X - r, Y - r * 0.15); h.closePath(); };
+      c.fillStyle = 'rgba(0,0,0,.28)'; c.beginPath(); c.ellipse(X, Y + r * 1.35, r * 0.8, r * 0.28, 0, 0, R2); c.fill();
+      uni(c, [[body, '#5ce1e6']], 1.4); celp(c, [[body, '#5ce1e6']], '#5ce1e6', r * 0.3, r * 0.3);
+      spec(c, X - r * 0.3, Y - r * 0.5, r * 0.3, r * 0.14, -0.5, 0.75); }
+  }
   // entidades ordenadas por fila
   const ents = boxes.map((b, i) => ({ y: boxR[i] ? boxR[i][1] : b[1], i })).concat([{ y: pr[1] + 0.01, hero: 1 }]).sort((a, b) => a.y - b.y);
   for (const e of ents) {
@@ -309,9 +391,10 @@ function draw() {
   if (HAND) {
     const lv = HAND[level - 1];
     label(`Nivel ${level}/${HAND.length}`, L, k.ey(8), narrow ? 17 : 20, '#fff');
-    label(`Movs ${moves} · mín ${par}`, L, k.ey(narrow ? 28 : 32), narrow ? 12 : 14, moves > par ? '#cfc8ff' : '#b6ffcc');
+    label(`Movs ${moves} · 2★ en ${lvStars.s2}`, L, k.ey(narrow ? 28 : 32), narrow ? 12 : 14, moves <= lvStars.s2 ? '#b6ffcc' : '#ffb1b1');
+    label(`3★ en ${lvStars.s3}` + (SK.gems.length ? ' + gema' : '') + (uMax ? ` · deshaceres ${uLeft}/${uMax}` : ''), L, k.ey(narrow ? 46 : 52), narrow ? 11 : 12, usedUndo ? '#ffb1b1' : '#cfc8ff');
     label(lv.n, R, k.ey(8), narrow ? 14 : 16, '#ffd9a0', 'right');
-    label(`Cajas ${boxes.filter(onG).length}/${boxes.length}`, R, k.ey(narrow ? 28 : 32), narrow ? 12 : 14, '#ffd23d', 'right');
+    label(`Cajas ${goals.length - goals.filter((q) => !boxes.some((b) => b[0] === q[0] && b[1] === q[1])).length}/${goals.length}` + (SK.gems.length ? ` · gema ${gemLeft() ? '–' : '✓'}` : ''), R, k.ey(narrow ? 28 : 32), narrow ? 12 : 14, '#ffd23d', 'right');
   } else {
     label(`Nivel ${level}`, L, k.ey(10), 20, '#fff'); label(`Movs ${moves}`, L, k.ey(34), 14, '#cfc8ff');
     label(`${total}`, R, k.ey(10), 20, '#ffd23d', 'right');
@@ -319,6 +402,19 @@ function draw() {
   }
   for (const b of BTN) btn(b[0], b[1], b[2]);
   if (!ICE && !winT && !moving() && k.dif !== 2 && stuck()) { const bw = Math.min(280, k.W - 24); ART.rr(c, k.W / 2 - bw / 2, BY - 34, bw, 28, 12); ART.fillOut(c, 'rgba(34,28,66,.92)', 2); label('Caja atascada: deshaz o reinicia', k.W / 2, BY - 28, Math.min(15, bw / 18), '#ffd23d', 'center'); }
+  if (HAND && tipT > 0 && !winT) { const lv = HAND[level - 1], al = Math.min(1, tipT / 0.8), bw = Math.min(420, k.W - 24);
+    const words = lv.i.split(' '); const lines = []; let ln = '';
+    c.font = `600 ${Math.min(15, bw / 26)}px -apple-system,Segoe UI,Roboto,sans-serif`;
+    for (const w of words) { const cand = ln ? ln + ' ' + w : w; if (ln && c.measureText(cand).width > bw - 28) { lines.push(ln); ln = w; } else ln = cand; }
+    if (ln) lines.push(ln);
+    const hgt = 20 + lines.length * 20, y0 = Math.max(k.ey(66), OY - hgt - 8);
+    c.save(); c.globalAlpha = al; ART.rr(c, k.W / 2 - bw / 2, y0, bw, hgt, 14); ART.fillOut(c, 'rgba(20,14,40,.9)', 2.5);
+    c.font = `600 ${Math.min(15, bw / 26)}px -apple-system,Segoe UI,Roboto,sans-serif`; c.fillStyle = '#e6dfff'; c.textAlign = 'center'; c.textBaseline = 'top';
+    for (let i = 0; i < lines.length; i++) c.fillText(lines[i], k.W / 2, y0 + 10 + i * 20);
+    c.restore(); }
+  if (HAND && exitT > 0 && !winT) { const bw = Math.min(300, k.W - 24); c.save(); c.globalAlpha = Math.min(1, exitT / 0.5);
+    ART.rr(c, k.W / 2 - bw / 2, BY - 36, bw, 30, 12); ART.fillOut(c, 'rgba(24,54,36,.92)', 2.5);
+    label('Cajas listas: corre a la puerta verde', k.W / 2, BY - 29, Math.min(15, bw / 19), '#7cf7a0', 'center'); c.restore(); }
   if (winT > 0) { const p = Math.min(1, ((HAND ? 1.25 : 1.6) - winT) * 5), sc = p < 1 ? 0.6 + p * 0.5 - Math.sin(p * 3.14) * 0.1 : 1; c.save(); c.translate(k.W / 2, k.H / 2 - 20); c.scale(sc, sc);
     ART.rr(c, -150, -58, 300, 116, 22); ART.fillOut(c, 'rgba(34,28,66,.94)', 3); label('¡Nivel superado!', 0, -44, 28, '#7cf7a0', 'center');
     for (let i = 0; i < 3; i++) star(-44 + i * 44, 20, i < winStars ? 15 : 12, i < winStars && p > i * 0.3);

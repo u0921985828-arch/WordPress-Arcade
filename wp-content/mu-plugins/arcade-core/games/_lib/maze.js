@@ -7,6 +7,9 @@ const M = CFG.mode, GEM = M === 'gemas', ISO = M === 'iso' || M === 'dungeon', O
 const HAND = (M === 'muncher' && typeof MAZELV !== 'undefined' && MAZELV[CFG.id]) || null;
 let LV = null;                       // nivel a mano en curso
 const TUNR = {};                     // filas con túnel lateral
+/* --- Mecánicas de maze-muncher escritas a mano (tanda 7): barro, reloj, compuertas y dorados.
+   Todas viven detrás de HAND/MUN, así que tunnel-digger, iso-maze y mina-de-gemas no cambian. --- */
+let MUD = null, flaps = [], golds = 0, goldGot = 0, freezeG = 0, rushOn = false, runT = 0, clockT = 0;
 /* --- Ley de la pieza única (R5, docs/REMASTER.md §8) -------------------------------
    `unite(g, partes, ancho)` traza TODAS las partes y las rellena después: los contornos
    interiores quedan tapados y solo sobrevive la silueta exterior. El detalle interior va
@@ -146,6 +149,7 @@ function handMuncher() {
   const rows = LV.m.map((r) => (r.length >= N ? r : r + r.slice(0, (N - 1) / 2).split('').reverse().join('')));
   for (const key in TUNR) delete TUNR[key];
   g = []; let px = (N - 1) / 2, py = N - 2, fx = (N - 1) / 2, fy = (N - 1) / 2 + 3;
+  MUD = new Set(); flaps = []; golds = 0; goldGot = 0; freezeG = 0; rushOn = false; clockT = 0;
   for (let y = 0; y < N; y++) {
     g.push([]);
     if (rows[y][0] === '=') TUNR[y] = 1;
@@ -156,6 +160,10 @@ function handMuncher() {
       else if (ch === 'o') items.push({ x, y, t: 'power' });
       else if (ch === 'P') { px = x; py = y; }
       else if (ch === 'F') { fx = x; fy = y; }
+      else if (ch === ':') MUD.add(x + ',' + y);                                  // barro: te frena a ti, no a ellos
+      else if (ch === 'R') items.push({ x, y, t: 'clock' });                      // reloj: congela a los fantasmas
+      else if (ch === 'G') { items.push({ x, y, t: 'gold' }); golds++; }          // punto dorado: x5 y cuenta para la 3ª estrella
+      else if (ch === '/') flaps.push({ x, y, ph: ((x * 3 + y * 5) % 4) / 4 });   // compuerta a compás
     }
   }
   return [px, py, fx, fy];
@@ -176,7 +184,7 @@ function buildMuncher() {
   const nf = LV ? Math.max(1, Math.min(4, LV.n)) : 4;
   foes = [[h, h - 1], [h, h], [h - 1, h], [h + 1, h]].slice(0, nf).map(([x, y], i) => { const f = ent(x, y, 4.6); f.id = i; return f; });
   powLeft = items.filter((q) => q.t === 'power').length;
-  dch = 0; dchT = 0; mult = 1; dchBest = 0; nodie = true; frGot = 0; frSeen = 0; alertT = 0; huntT = 0; scWas = true;
+  dch = 0; dchT = 0; mult = 1; dchBest = 0; nodie = true; frGot = 0; frSeen = 0; alertT = 0; huntT = 0; scWas = true; runT = 0;
   pops.length = 0; starHint = 3.4;
   /* polvo del fondo: posiciones fijas por nivel, se mueven con el reloj (sin estado que actualizar) */
   motes = []; for (let i = 0; i < 22; i++) motes.push({ x: rnd(i * 3.1 + level) * W, y: rnd(i * 7.7 + level) * (H - MTOP) + MTOP, r: 0.9 + rnd(i * 5.3) * 1.8, sp: 6 + rnd(i * 2.9) * 12, ph: rnd(i * 1.7) * 6.283 });
@@ -224,7 +232,18 @@ function eatAt(x, y) {
   if (it) {
     it.got = true; left--;
     const cx = cellX(x), cy = cellY(y);
-    if (it.t === 'dot') {
+    if (it.t === 'clock') {                      // reloj: los fantasmas se quedan quietos unos segundos
+      freezeG = 3.4 * k.D.time; clockT = freezeG;
+      k.sfx('win'); k.reward('¡TIEMPO PARADO!', '#9ff0ff'); k.punch(0.06); k.hitstop(0.05); k.flash('rgba(160,240,255,.22)');
+      k.burst(cx, cy, '#9ff0ff', 18, 160); pop(cx, cy, '#9ff0ff', 32);
+    } else if (it.t === 'gold') {                // punto dorado: vale por cinco y hace falta para la 3ª estrella
+      const was = mult; dch++; dchT = DCHW; dchBest = Math.max(dchBest, dch); mult = multOf(dch);
+      score += 50 * mult; eaten++; goldGot++;
+      k.chime(Math.min(10, 4 + goldGot)); k.sfx('coin'); pop(cx, cy, '#ffd23d', 18); k.burst(cx, cy, '#ffd23d', 12, 130);
+      k.float(`+${50 * mult}`, cx, cy - 10, '#ffd23d');
+      if (goldGot >= golds) k.reward('¡TODOS LOS DORADOS!', '#ffd23d');
+      if (mult > was) { k.combo(mult, cx, cy - 12); k.punch(0.035); }
+    } else if (it.t === 'dot') {
       /* Cadena: cada punto seguido sube el tono y, cada 10, el multiplicador (GANCHO §A3). */
       const was = mult; dch++; dchT = DCHW; dchBest = Math.max(dchBest, dch); mult = multOf(dch);
       score += 10 * mult; eaten++;
@@ -267,7 +286,19 @@ function nextChase() {
 function updMuncher(dt) {
   const want = k.swipe || DIRS.find((d) => k.hit.has(d)) || heldDir();
   if (want) { if (pl.dir && want === OPP[pl.dir]) reverse(pl); pl.next = want; }
-  invT -= dt; lvT += dt; if (starHint > 0) starHint -= dt;
+  invT -= dt; lvT += dt; runT += dt; if (starHint > 0) starHint -= dt;
+  if (HAND) {
+    /* Barro: solo frena al héroe, así que la ruta de escape deja de ser la más corta. */
+    pl.sp = 7.2 * (MUD.has(pl.px + ',' + pl.py) || MUD.has(pl.x + ',' + pl.y) ? 0.68 : 1);
+    /* Compuertas a compás: 2,4 s abiertas y 2,4 s cerradas, con 0,6 s de parpadeo antes de cerrar.
+       Nunca dejan zona inalcanzable porque vuelven a abrirse solas. */
+    for (const fp of flaps) { const u = ((runT / 4.8) + fp.ph) % 1; fp.cl = u >= 0.5; g[fp.y][fp.x] = fp.cl ? 1 : 0; fp.warn = !fp.cl && u > 0.375; }
+    if (flaps.length) { for (const fp of flaps) { if ((pl.x === fp.x && pl.y === fp.y) || (pl.px === fp.x && pl.py === fp.y)) g[fp.y][fp.x] = 0;
+      for (const f of foes) if (f.mode !== 'eyes' && ((f.x === fp.x && f.y === fp.y) || (f.px === fp.x && f.py === fp.y))) g[fp.y][fp.x] = 0; } }   // nadie queda encerrado dentro
+    if (freezeG > 0) freezeG -= dt;
+    /* Aceleración final: cuando queda poco, aprietan. Se avisa. */
+    if (LV.rush && !rushOn && left <= Math.ceil(totN * LV.rush)) { rushOn = true; msg = '¡Aceleran!'; msgT = 1.4; k.sfx('hit'); k.shake(4); k.flash('rgba(255,90,120,.18)'); }
+  }
   if (fruit) { fruit.a += dt; if ((fruit.t -= dt) <= 0) fruit = null; }
   /* Cadena de bocados: se rompe sola si tardas demasiado en el siguiente punto. */
   if (dchT > 0 && (dchT -= dt) <= 0 && dch > 0) { dch = 0; mult = 1; k.chainReset(); }
@@ -280,10 +311,18 @@ function updMuncher(dt) {
   if (scWas && !sc && fright <= 0) { msg = '¡Te persiguen!'; msgT = 1.1; k.sfx('hit'); k.shake(3); }
   scWas = sc;
   if (fright > 0 && (fright -= dt) <= 0) foes.forEach((f) => { f.scared = false; });
-  const base = (LV ? LV.spd : Math.min(5.8, 3.3 + level * 0.2)) * k.D.spd; // 1.23: más fácil (antes 4,4→6,8). k.D.spd por nivel de dificultad
+  /* Tope de 6,5 casillas/s en los niveles a mano: el héroe corre a 7,2, así que en terreno limpio
+     siempre puede escapar (docs/VARA.md §3, «la ruta limpia siempre tiene margen»). El barro frena
+     igual a los dos: no te alcanzan por entrar, pero pierdes el tiempo del objetivo de 2★. */
+  let base = (LV ? LV.spd : Math.min(5.8, 3.3 + level * 0.2)) * k.D.spd * (rushOn ? 1.16 : 1); // 1.23: más fácil (antes 4,4→6,8). k.D.spd por nivel de dificultad
+  if (LV) base = Math.min(base, 6.5);
   for (const f of foes) {
     if (f.mode === 'house') { f.fx = f.x; f.fy = f.y + Math.sin(t * 7 + f.id) * 0.18; if ((f.rel -= dt) <= 0) f.mode = 'go'; }
-    else { f.sp = f.mode === 'eyes' ? 12 : base * (f.scared ? 0.55 : 1); mstep(f, dt, ghostPick); }
+    else if (freezeG > 0 && f.mode !== 'eyes') { f.fx = f.px + (f.x - f.px) * f.t; f.fy = f.py + (f.y - f.py) * f.t; }   // reloj: quietos
+    else {
+      const mud = MUD && MUD.size && (MUD.has(f.px + ',' + f.py) || MUD.has(f.x + ',' + f.y)) ? 0.68 : 1;
+      f.sp = f.mode === 'eyes' ? 12 : base * (f.scared ? 0.55 : 1) * mud; mstep(f, dt, ghostPick);
+    }
     if (f.mode === 'eyes' || Math.hypot(f.fx - pl.fx, f.fy - pl.fy) > 0.51) continue;
     if (f.scared) {
       /* Cada fantasma de la misma bola vale el doble que el anterior: 200-400-800-1600. */
@@ -438,15 +477,30 @@ k.run((dt) => {
   if (M === 'muncher') updMuncher(dt); else if (M === 'digger') updDigger(dt); else updIso(dt);
 }, draw);
 /* Nivel a mano superado: kit.js desbloquea el siguiente y ofrece Siguiente / Niveles. */
-/* Estrellas del come-cocos (docs/GANCHO.md §A6): 1 superar · 2 sin que te pillen ·
-   3 además las dos frutas del nivel. Se enseñan en el marcador durante la partida. */
-function starsNow() { return 1 + (nodie ? 1 : 0) + (frGot >= 2 ? 1 : 0); }
+/* Estrellas del come-cocos (docs/VARA.md §5): 1 limpiar el laberinto · 2 hacerlo dentro del
+   tiempo escrito a mano para ese nivel Y esa dificultad (LV.tg) · 3 ese tiempo y además la
+   maestría: sin que te pillen, las dos frutas y todos los puntos dorados si el nivel los trae.
+   Sin tabla de tiempos (niveles sueltos) se cae en el criterio antiguo. */
+const lvTime = () => (LV && LV.tg ? (LV.tg[k.dif] || LV.tg[1]) : 0);
+/* Con tabla de tiempos medida (tg > 0) la 2ª estrella es el reloj; mientras no la haya,
+   el criterio es de contenido: 2★ limpiarlo sin que te pillen, 3★ + las 2 frutas y los dorados. */
+const hasTg = () => lvTime() > 0;
+const inTime = () => { const g0 = lvTime(); return !g0 || runT <= g0; };
+const mastery = () => nodie && frGot >= 2 && goldGot >= golds;
+const star2 = () => (hasTg() ? inTime() : nodie);
+const star3 = () => (hasTg() ? inTime() && mastery() : mastery());
+function starsNow() { return 1 + (star2() ? 1 : 0) + (star2() && star3() ? 1 : 0); }
 function handDone() {
   clearT = 0; k.best(CFG.id, score);
   if (!MUN) return k.levelDone(score, `${score} puntos · ${lives} vida${lives === 1 ? '' : 's'}`);
-  const st = starsNow();
-  const falta = st === 3 ? '' : ` · falta: ${!nodie ? 'terminar sin que te pillen' : 'coger las dos frutas'}`;
-  k.levelDone(score, `${score} puntos · frutas ${frGot}/2${falta}`, { stars: st });
+  const st = starsNow(), g0 = lvTime(), seg = Math.round(runT);
+  let falta = '';
+  if (st < 3) {
+    if (st === 1) falta = hasTg() ? ` · falta: limpiarlo en ${g0} s` : ' · falta: limpiarlo sin que te pillen';
+    else falta = ` · falta: ${!nodie ? 'sin que te pillen' : frGot < 2 ? 'las dos frutas' : `los ${golds} dorados (${goldGot})`}`;
+  }
+  const oro = golds ? ` · dorados ${goldGot}/${golds}` : '';
+  k.levelDone(score, `${score} puntos · ${seg} s${g0 ? ` (objetivo ${g0} s)` : ''} · frutas ${frGot}/2${oro}${falta}`, { stars: st });
 }
 function afterDeath() {
   if (DG) return k.lose(CFG.id, score, 'Derrotado', `Nivel ${level}`);
@@ -516,7 +570,35 @@ function renderMaze(col, hi, sh) {
     vg.addColorStop(0, 'rgba(4,3,12,0)'); vg.addColorStop(1, 'rgba(4,3,12,.55)'); b.fillStyle = vg; b.fillRect(0, 0, W, H);
   });
 }
-let dotCv, powCv;
+let dotCv, powCv, mudCv = null, flapCv = null, goldCv = null, clockCv = null;
+/* --- Piezas nuevas del come-cocos, cacheadas y de una sola silueta (REMASTER §8) --- */
+function mudSpr() { return mudCv || (mudCv = mkCv(S, S, (b) => {   // charco de barro: una mancha, las ondas por sombra propia
+  const path = (q) => { q.moveTo(2, S * 0.52); q.quadraticCurveTo(S * 0.18, S * 0.18, S * 0.5, S * 0.22); q.quadraticCurveTo(S * 0.86, S * 0.26, S - 2, S * 0.56);
+    q.quadraticCurveTo(S * 0.82, S - 3, S * 0.48, S - 4); q.quadraticCurveTo(S * 0.14, S - 5, 2, S * 0.52); };
+  unite(b, [[path, '#6a4a2c']], 1.4);
+  within(b, path, (q) => { q.fillStyle = AL('#000000', 0.26); q.beginPath(); q.arc(S * 0.62, S * 0.7, S * 0.42, 0, R2); q.fill();
+    q.strokeStyle = AL('#c79a63', 0.4); q.lineWidth = 1.4; for (const yy of [0.42, 0.62]) { q.beginPath(); q.moveTo(S * 0.18, S * yy); q.quadraticCurveTo(S * 0.5, S * (yy - 0.09), S * 0.84, S * yy); q.stroke(); } });
+})); }
+function flapSpr() { return flapCv || (flapCv = mkCv(S, S, (b) => {   // compuerta: montantes y barrotes en una silueta
+  const parts = [[(q) => ART.rr(q, 1, 1, S - 2, 4.5, 2), '#8f96b6'], [(q) => ART.rr(q, 1, S - 5.5, S - 2, 4.5, 2), '#8f96b6']];
+  for (let i = 0; i < 3; i++) parts.push([((xx) => (q) => ART.rr(q, xx, 2, 4, S - 4, 2))(3.5 + i * 6.5), '#a9b0cc']);
+  unite(b, parts, 1.5);
+  for (let i = 0; i < 3; i++) { const xx = 3.5 + i * 6.5; b.fillStyle = AL('#ffffff', 0.3); b.fillRect(xx + 0.6, 3, 1.2, S - 6); b.fillStyle = AL('#000000', 0.28); b.fillRect(xx + 2.6, 3, 1.1, S - 6); }
+})); }
+function goldSpr() { return goldCv || (goldCv = mkCv(22, 22, (b) => {   // punto dorado: moneda de canto, un solo trazo
+  const path = (q) => { q.moveTo(11 + 7, 11); q.arc(11, 11, 7, 0, R2); };
+  unite(b, [[path, '#ffd23d']], 1.6);
+  within(b, path, (q) => { q.fillStyle = AL('#a86b12', 0.42); q.beginPath(); q.arc(13.5, 13.5, 6.5, 0, R2); q.fill();
+    q.fillStyle = AL('#fff6cf', 0.9); q.beginPath(); q.ellipse(8.6, 8.4, 2.6, 1.7, -0.6, 0, R2); q.fill(); });
+})); }
+function clockSpr() { return clockCv || (clockCv = mkCv(28, 28, (b) => {   // reloj: caja con corona, agujas aparte (se mueven)
+  const path = (q) => { q.moveTo(14 + 9.5, 14); q.arc(14, 14, 9.5, 0, R2); q.moveTo(11.5, 2.4); q.lineTo(16.5, 2.4); q.lineTo(16.5, 5.4); q.lineTo(11.5, 5.4); q.closePath(); };
+  unite(b, [[path, '#9ff0ff']], 1.8);
+  within(b, path, (q) => { q.fillStyle = AL('#12506a', 0.38); q.beginPath(); q.arc(16.5, 16.5, 9, 0, R2); q.fill();
+    q.fillStyle = AL('#ffffff', 0.8); q.beginPath(); q.ellipse(10.6, 10.4, 3, 2, -0.6, 0, R2); q.fill(); });
+  b.strokeStyle = OUT; b.lineWidth = 1.6; b.lineCap = 'round';
+  b.beginPath(); b.moveTo(14, 14); b.lineTo(14, 8.5); b.moveTo(14, 14); b.lineTo(18, 15.5); b.stroke();
+})); }
 /* Luz cálida del héroe (sprite cacheado, un solo blit por frame). */
 function lightSpr() { return lightCv || (lightCv = mkCv(96, 96, (b) => { const q = b.createRadialGradient(48, 48, 2, 48, 48, 48); q.addColorStop(0, 'rgba(255,220,140,.30)'); q.addColorStop(0.5, 'rgba(255,190,110,.10)'); q.addColorStop(1, 'rgba(255,190,110,0)'); b.fillStyle = q; b.fillRect(0, 0, 96, 96); })); }
 /* mood: 0 normal · 1 con bola grande (decidido) · 2 fantasma cerca (asustado) */
@@ -638,7 +720,12 @@ function fruitPaint(b, kind) {
 }
 function fruitSpr(kind) { return FRUITCV[kind] || (FRUITCV[kind] = mkCv(34, 36, (b) => fruitPaint(b, kind))); }
 function drawMuncher() {
-  if (!boardCv) { const base = CFG.wall || '#4a55d8'; boardCv = renderMaze(base, shade(base, 0.55), shade(base, -0.45)); flashCv = renderMaze('#e8ecff', '#ffffff', '#9aa6d8'); }
+  if (!boardCv) { const base = CFG.wall || '#4a55d8';
+    /* Las compuertas se hornean ABIERTAS (son suelo) y se dibujan en vivo: así abrir y cerrar
+       no obliga a rehornear el laberinto entero. */
+    const wasF = flaps.map((fp) => { const v = g[fp.y][fp.x]; g[fp.y][fp.x] = 0; return v; });
+    boardCv = renderMaze(base, shade(base, 0.55), shade(base, -0.45)); flashCv = renderMaze('#e8ecff', '#ffffff', '#9aa6d8');
+    flaps.forEach((fp, i) => { g[fp.y][fp.x] = wasF[i]; }); }
   if (!dotCv) { dotCv = mkCv(10, 10, (b) => { b.beginPath(); b.arc(5, 5, 3, 0, R2); b.fillStyle = '#ffe2b0'; b.fill(); b.lineWidth = 1; b.strokeStyle = 'rgba(26,21,48,.8)'; b.stroke(); });
     powCv = mkCv(32, 32, (b) => { const gr = b.createRadialGradient(16, 16, 3, 16, 16, 16); gr.addColorStop(0, 'rgba(255,240,200,.7)'); gr.addColorStop(1, 'rgba(255,240,200,0)'); b.fillStyle = gr; b.fillRect(0, 0, 32, 32); b.beginPath(); b.arc(16, 16, 7, 0, R2); ART.fillOut(b, '#fff3d6', 2); b.fillStyle = '#fff'; b.beginPath(); b.arc(13.5, 13.5, 2.2, 0, R2); b.fill(); }); }
   c.drawImage(clearT > 0 && Math.floor(clearT * 7) % 2 ? flashCv : boardCv, 0, 0, W, H);
@@ -648,7 +735,16 @@ function drawMuncher() {
   c.fill();
   /* farol del héroe: un solo blit cacheado */
   if (lives > 0 && dying <= 0) { const ls = fright > 0 ? 170 : 140; c.drawImage(lightSpr(), cellX(pl.fx) - ls / 2, cellY(pl.fy) - ls / 2, ls, ls); }
-  for (const it of items) if (!it.got) { const x = cellX(it.x), y = cellY(it.y); if (it.t === 'dot') c.drawImage(dotCv, x - 5, y - 5, 10, 10); else { const s = 30 * (1 + Math.sin(t * 7) * 0.14); c.drawImage(powCv, x - s / 2, y - s / 2, s, s); } }
+  /* barro y compuertas: encima del laberinto horneado, debajo de todo lo que se mueve */
+  if (MUD && MUD.size) { for (const key of MUD) { const [mx, my] = key.split(','), x = BX + (+mx) * S, y = BY + (+my) * S; c.drawImage(mudSpr(), x, y, S, S); } }
+  for (const fp of flaps) { const x = BX + fp.x * S, y = BY + fp.y * S;
+    if (fp.cl) c.drawImage(flapSpr(), x, y, S, S);
+    else { c.globalAlpha = fp.warn && Math.floor(t * 9) % 2 ? 0.75 : 0.28; c.drawImage(flapSpr(), x, y - S * 0.34, S, S * 0.34); c.globalAlpha = 1; } }
+  for (const it of items) if (!it.got) { const x = cellX(it.x), y = cellY(it.y);
+    if (it.t === 'dot') c.drawImage(dotCv, x - 5, y - 5, 10, 10);
+    else if (it.t === 'gold') { const gs = 17 + Math.sin(t * 6 + it.x) * 1.6; c.drawImage(goldSpr(), x - gs / 2, y - gs / 2, gs, gs); }
+    else if (it.t === 'clock') { const cs = 24 + Math.sin(t * 5 + it.y) * 1.8; c.drawImage(clockSpr(), x - cs / 2, y - cs / 2, cs, cs); }
+    else { const s = 30 * (1 + Math.sin(t * 7) * 0.14); c.drawImage(powCv, x - s / 2, y - s / 2, s, s); } }
   /* anillos de recompensa: cada bocado deja su marca */
   for (const q of pops) { const u = 1 - q.t / q.m; c.globalAlpha = (1 - u) * 0.75; c.strokeStyle = q.col; c.lineWidth = 2.4 * (1 - u) + 0.6; c.beginPath(); c.arc(q.x, q.y, 3 + u * q.r, 0, R2); c.stroke(); }
   c.globalAlpha = 1;
@@ -680,7 +776,8 @@ function drawMuncher() {
   }
   /* el criterio de las estrellas se enseña al empezar el nivel */
   if (starHint > 0 && k.st === 'play') {
-    const s1 = '★ terminar · ★ sin que te pillen · ★ las 2 frutas';
+    const s1 = hasTg() ? `★ limpiarlo · ★ en ${lvTime()} s · ★ + sin morir, 2 frutas${golds ? ' y dorados' : ''}`
+      : `★ limpiarlo · ★ sin que te pillen · ★ + las 2 frutas${golds ? ' y los dorados' : ''}`;
     c.globalAlpha = Math.min(1, starHint * 1.4);
     c.font = '800 11px ui-rounded,"Trebuchet MS",system-ui,sans-serif';
     const mw = c.measureText(s1).width + 22;
@@ -737,22 +834,33 @@ function hudPaint(b) {
   b.save(); b.translate(fx1, by + 7); b.scale(0.58, 0.58); b.drawImage(fruitSpr(LV ? LV.fruit.k : 'cereza'), -17, -18, 34, 36); b.restore();
   hlabel(b, `${frGot}/2`, fx1 + 12, by + 2, 11, frGot >= 2 ? '#7cf7a0' : '#fff');
   /* bolas grandes que quedan */
-  const px1 = 310;
+  const px1 = golds ? 348 : 310;
   hlabel(b, 'BOLAS', px1 - 9, by - 11, 9, 'rgba(255,255,255,.55)');
   b.drawImage(powCv, px1 - 9, by, 18, 18);
   hlabel(b, `x${powLeft}`, px1 + 11, by + 2, 11, powLeft ? '#fff' : 'rgba(255,255,255,.4)');
   /* estrellas del nivel, en vivo */
-  const sx1 = 380;
+  const sx1 = golds ? 404 : 380;
   hlabel(b, 'ESTRELLAS', sx1 - 10, by - 11, 9, 'rgba(255,255,255,.55)');
-  star(b, sx1, by + 8, 8, left <= 0); star(b, sx1 + 24, by + 8, 8, nodie, !nodie); star(b, sx1 + 48, by + 8, 8, frGot >= 2);
+  star(b, sx1, by + 8, 8, left <= 0); star(b, sx1 + 24, by + 8, 8, star2(), !star2()); star(b, sx1 + 48, by + 8, 8, star2() && star3());
+  /* reloj del nivel: el objetivo de la 2ª estrella siempre a la vista */
+  if (hasTg()) { const g0 = lvTime(), q0 = Math.max(0, g0 - runT);
+    hlabel(b, 'TIEMPO', 236, by - 11, 9, 'rgba(255,255,255,.55)');
+    hlabel(b, `${Math.floor(runT)}s`, 236, by + 1, 13, runT <= g0 ? '#bfffd4' : '#ff8f9c');
+    hlabel(b, `de ${g0}s`, 236, by + bh + 2, 9, q0 > 0 ? 'rgba(255,255,255,.6)' : '#ff8f9c'); }
+  /* dorados del nivel */
+  if (golds) { b.drawImage(goldSpr(), 292, by + 1, 15, 15); hlabel(b, `${goldGot}/${golds}`, 310, by + 2, 11, goldGot >= golds ? '#ffd23d' : '#fff'); }
 }
 function hudMuncher() {
   if (!hudCv) { hudCv = document.createElement('canvas'); hudCv.width = Math.ceil(W * 2); hudCv.height = Math.ceil(MTOP * 2); hudB = hudCv.getContext('2d'); hudB.scale(2, 2); hudKey = ''; }
-  const key = `${score}|${lives}|${left}|${frGot}|${frSeen}|${eaten}|${powLeft}|${nodie}|${level}|${fruit ? 1 : 0}|${best}`;
+  const key = `${score}|${lives}|${left}|${frGot}|${frSeen}|${eaten}|${powLeft}|${nodie}|${level}|${fruit ? 1 : 0}|${best}|${Math.floor(runT)}|${goldGot}`;
   if (key !== hudKey) { hudKey = key; hudPaint(hudB); }
   c.drawImage(hudCv, 0, 0, W, MTOP);
   /* caza en marcha: barra azul de cuenta atrás bajo el marcador */
-  if (fright > 0 && huntT > 0) {
+  if (freezeG > 0 && clockT > 0) {
+    const zu = Math.max(0, freezeG / clockT);
+    c.fillStyle = 'rgba(30,140,170,.35)'; c.fillRect(0, MTOP - 4, W, 4);
+    c.fillStyle = freezeG < 1 && Math.floor(freezeG * 6) % 2 ? '#fff' : '#9ff0ff'; c.fillRect(0, MTOP - 4, W * zu, 4);
+  } else if (fright > 0 && huntT > 0) {
     const fu = Math.max(0, fright / huntT);
     c.fillStyle = 'rgba(61,90,254,.35)'; c.fillRect(0, MTOP - 4, W, 4);
     c.fillStyle = fright < 2 && Math.floor(fright * 5) % 2 ? '#fff' : '#8fd3ff'; c.fillRect(0, MTOP - 4, W * fu, 4);

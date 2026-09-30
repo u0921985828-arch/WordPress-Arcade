@@ -51,7 +51,12 @@ const HAND = (M === 'dungeon' && typeof DUNLV !== 'undefined' && DUNLV[CFG.id]) 
 const GC = 32, GX = X0, GY = 72, GW = 19, GH = 7;
 const gcx = (i) => GX + i * GC + GC / 2, gcy = (j) => GY + j * GC + GC / 2;
 const HFOE = { b: 'bat', o: 'eye', e: 'skel', f: 'ghost', s: 'slime', B: 'brute' };
-let traps = [], turrets = [], wave = 0, HR = null, carry = null;
+let traps = [], turrets = [], wave = 0, HR = null, HW = [], carry = null;
+/* Verbos nuevos de la tanda 7 (docs/VARA.md): sierra en raíl, generador, placa + reja, cofre,
+   gema y el Vigía. Todo esto vive SOLO en las salas a mano de dungeon-micro; en los otros seis
+   juegos del motor HAND es null y nada de esto se crea ni se dibuja. */
+let saws = [], gens = [], plates2 = [], bars = [], chests = [], plateT = 0, vigi = null, vigW = 0;
+let lootTot = 0, lootGot = 0, hitTaken = 0, revived = false;
 
 /* ---------- Utilidades ---------- */
 const wallAt = (x, y, r) => walls.find((w) => !w.open && x + r > w.x && x - r < w.x + w.w && y + r > w.y && y - r < w.y + w.h);
@@ -107,8 +112,13 @@ function spawnGrid(grid, t0) {
 function buildHand(lv) {
   room = k.clamp(lv | 0, 1, HAND.length); HR = HAND[room - 1];
   walls = []; foes = []; shots = []; eshots = []; pend = []; drops = []; traps = []; turrets = [];
+  saws = []; gens = []; plates2 = []; bars = []; chests = []; plateT = 0; vigi = null; vigW = 0;
+  lootTot = 0; lootGot = 0; hitTaken = 0; revived = false;
   cleared = false; door = false; bossF = null; floorCv = null; clearT = 0; quota = 0; wave = 0; choice = null;
   const g = HR.m;
+  /* oleadas siguientes: 'formación:tipo' expandido por dunlv.js */
+  HW = (HR.w || []).map((sp) => (typeof sp === 'string' ? DUNLV.wave(sp) : sp)).filter(Boolean);
+  if (HR.m2) HW.push(HR.m2);
   for (const s of slabs(g, '#')) walls.push({ x: GX + s.i * GC, y: GY + s.j * GC, w: s.w * GC, h: s.h * GC, hp: 0, fl: 0, seed: 0.1 });
   for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) {
     const ch = (g[j] || '')[i] || '.', x = GX + i * GC, y = GY + j * GC, cx2 = gcx(i), cy2 = gcy(j);
@@ -116,12 +126,27 @@ function buildHand(lv) {
     else if (ch === 'T') { walls.push({ x, y, w: GC, h: GC, hp: 0, fl: 0, seed: 0.05, tur: 1 }); turrets.push({ x: cx2, y: cy2, cd: 2.4 + ((i + j) % 3) * 0.7, a: ((i + j) % 2) * 0.7854 }); }
     else if (ch === '^') traps.push({ kind: 's', x: cx2, y: cy2, ph: ((i * 5 + j * 3) % 7) / 16 });
     else if (ch === '~') traps.push({ kind: 'e', x: cx2, y: cy2, ph: ((i * 3 + j * 7) % 9) / 9 });
-    else if (ch === 'c') drops.push({ k: 'coin', x: cx2, y: cy2, t: 1e6, v: 10 });
+    else if (ch === 'c') { drops.push({ k: 'coin', x: cx2, y: cy2, t: 1e6, v: 10, lt: 1 }); lootTot++; }
     else if (ch === 'h') drops.push({ k: 'heart', x: cx2, y: cy2, t: 1e6 });
+    else if (ch === '*') { drops.push({ k: 'gem', x: cx2, y: cy2, t: 1e6, v: 60, lt: 1 }); lootTot++; }
+    else if (ch === '$') { const w = { x, y, w: GC, h: GC, hp: 3, fl: 0, seed: 0.42, chest: 1 }; walls.push(w); chests.push(w); lootTot++; }
+    else if (ch === 'A') { const w = { x: x + 1, y: y + 1, w: GC - 2, h: GC - 2, hp: 6, max: 6, fl: 0, seed: 0.5, gen: 1, cd: 3.2 }; walls.push(w); gens.push(w); }
+    else if (ch === '|') { const w = { x, y, w: GC, h: GC, hp: 0, fl: 0, seed: 0.2, bar: 1, open: false }; walls.push(w); bars.push(w); }
+    else if (ch === '_') plates2.push({ x: cx2, y: cy2, on: 0 });
+    else if (ch === '>') saws.push({ x: cx2, y: cy2, vx: (i + j) % 2 ? 1 : -1, vy: 0, a: 0 });
+    else if (ch === 'v') saws.push({ x: cx2, y: cy2, vx: 0, vy: (i + j) % 2 ? 1 : -1, a: 0 });
   }
   spawnGrid(g, room === 1 ? 2.2 : 1.3);
   msg = `Sala ${room}: ${HR.tip}`; msgT = 2.6;
 }
+/* Tiempo objetivo de la 2ª estrella (por sala y dificultad) y estrellas conseguidas. */
+const lvTg = () => (HR && HR.tg ? HR.tg[k.dif] || HR.tg[1] : 0);
+/* Con tiempo objetivo medido (tg > 0) la 2ª estrella es el reloj; en las salas que aún no lo
+   tienen, el criterio es de contenido y cambia con la dificultad: 2★ salir con como mucho
+   2/1/0 golpes recibidos (fácil/normal/difícil), 3★ eso mismo y todo el botín. */
+const hitMax = () => 2 - k.dif;
+const lvS2 = () => (lvTg() ? t <= lvTg() : hitTaken <= hitMax());
+const lvStars = () => (lvS2() ? (lootGot >= lootTot ? 3 : 2) : 1);
 function handLoadout(lv) { /* quien entra directo a una sala desde el menú lleva el equipo de esa altura */
   const eq = (typeof DUNLV !== 'undefined' && DUNLV.eq) || [];
   for (let i = 0; i < lv - 1 && i < eq.length; i++) { const o = eq[i]; if (UP[o]) UP[o][2](); }
@@ -129,7 +154,11 @@ function handLoadout(lv) { /* quien entra directo a una sala desde el menú llev
 function levelFinish() {
   score += 30 * room;
   carry = { lv: Math.min(HAND.length, k.lv + 1), upg: Object.assign({}, upg), hp: p.hp, max: p.max, score, kills };
-  k.levelDone(score, `Sala ${room} de ${HAND.length} · ${kills} bajas · ${score} puntos`);
+  const st = lvStars(), tg = lvTg(), seg = Math.round(t);
+  /* La tarjeta final dice qué falta para la estrella siguiente (docs/VARA.md §5). */
+  const falta = st === 3 ? '' : st === 2 ? ` · falta: todo el botín (${lootGot}/${lootTot})`
+    : tg ? ` · falta: acabar en ${tg} s` : ` · falta: salir con ${hitMax()} golpe${hitMax() === 1 ? '' : 's'} o menos (llevas ${hitTaken})`;
+  k.levelDone(score, `Sala ${room} de ${HAND.length} · ${seg} s${tg ? ` (objetivo ${tg} s)` : ''} · botín ${lootGot}/${lootTot}${falta}`, { stars: st });
 }
 function buildRoom() {
   if (HAND) return buildHand(k.lv);
@@ -720,8 +749,18 @@ k.onDif = () => { if (k.st !== 'play') reset(); };
 function hurt(n, sx, sy) {
   if (p.inv > 0 || k.st !== 'play') return;
   p.hp -= n; p.inv = 1.5 / k.D.dmg; k.shake(6); k.flash('rgba(255,60,80,.3)'); k.sfx('hurt');
+  if (HAND) hitTaken += n;
   if (sx !== undefined) { const a = Math.atan2(p.y - sy, p.x - sx); p.kx = Math.cos(a) * 280; p.ky = Math.sin(a) * 280; }
-  if (p.hp <= 0) { k.burst(p.x, p.y, '#5ce1e6', 30, 240); carry = null; k.lose(CFG.id, score, 'Derrotado', HAND ? `Sala ${room} de ${HAND.length} · ${kills} bajas` : `${TH.label} ${room} · ${kills} bajas`); }
+  /* Punto de control de la segunda mitad de la tabla (docs/VARA.md §1): en las salas 11-20 la
+     primera caída te levanta en la entrada con 3 de vida y la sala sigue como estaba. */
+  if (p.hp <= 0 && HAND && room >= 11 && !revived) {
+    revived = true; p.hp = 3; p.inv = 2.6; p.x = X0 + 40; p.y = H / 2; p.kx = p.ky = 0;
+    k.burst(p.x, p.y, '#7cf7a0', 26, 220); k.sfx('start'); k.flash('rgba(124,247,160,.22)');
+    msg = '¡Segunda oportunidad!'; msgT = 2; return;
+  }
+  if (p.hp <= 0) { k.burst(p.x, p.y, '#5ce1e6', 30, 240); carry = null;
+    const cerca = HAND ? `Sala ${room} de ${HAND.length} · te faltaban ${foes.length + pend.length + gens.length} enemigo${foes.length + pend.length + gens.length === 1 ? '' : 's'}` : `${TH.label} ${room} · ${kills} bajas`;
+    k.lose(CFG.id, score, 'Derrotado', cerca); }
 }
 function dmgFoe(f, n, a) {
   f.hp -= n; f.fl = 0.1; const kb = f.boss ? 30 : tankM ? 60 : 190; f.kx += Math.cos(a) * kb; f.ky += Math.sin(a) * kb; k.sfx('pop');
@@ -754,6 +793,69 @@ function handUpdate(dt) {
       q.cd = 3.6 * cdK(); q.a += 0.7854;
       for (let i = 0; i < 4; i++) { const a = q.a + i * 1.5708; eshots.push({ x: q.x + Math.cos(a) * 28, y: q.y + Math.sin(a) * 28, vx: Math.cos(a) * 165 * bK(), vy: Math.sin(a) * 165 * bK(), life: 3.5, b: 0, r: 5 }); }
       k.sfx('shoot');
+    }
+  }
+  /* --- Sierra en raíl: va y viene por su fila (o su columna) hasta topar con un muro.
+     Siempre visible y a velocidad constante: se cuenta, no se memoriza. --- */
+  const ssp = 88 * k.D.spd;
+  for (const q of saws) {
+    q.a += dt * 11;
+    const nx = q.x + q.vx * ssp * dt, ny = q.y + q.vy * ssp * dt;
+    if (rectHit(nx, ny, 12)) { q.vx = -q.vx; q.vy = -q.vy; } else { q.x = nx; q.y = ny; }
+    if (Math.hypot(q.x - p.x, q.y - p.y) < 12 + p.r * 0.7) hurt(1, q.x, q.y);
+  }
+  /* --- Placa de presión y reja: la reja está abierta mientras alguien pisa la placa, más
+     1,8 s de gracia (y parpadea antes de cerrarse). Si el héroe está justo debajo, espera. --- */
+  if (plates2.length) {
+    let on = false;
+    for (const q of plates2) { q.on = Math.abs(p.x - q.x) < 16 + p.r * 0.4 && Math.abs(p.y - q.y) < 16 + p.r * 0.4; if (q.on) on = true; }
+    if (on) { if (plateT <= 0) { k.sfx('click'); k.float('¡Reja abierta!', p.x, p.y - 34, '#7cf7a0'); } plateT = 1.8; }
+    else if (plateT > 0) {
+      plateT -= dt;
+      if (plateT <= 0 && bars.some((w) => p.x + p.r > w.x && p.x - p.r < w.x + w.w && p.y + p.r > w.y && p.y - p.r < w.y + w.h)) plateT = 0.4;
+      if (plateT <= 0) k.sfx('hit');
+    }
+    for (const w of bars) if (w.open !== plateT > 0) { w.open = plateT > 0; w.fl = 0.1; }
+  }
+  /* --- Generador: suelta murciélagos (anunciados con el aro de siempre) hasta que lo rompes.
+     La sala no se despeja mientras quede uno en pie. --- */
+  for (let i = gens.length - 1; i >= 0; i--) {
+    const q = gens[i];
+    if (q.dead) { gens.splice(i, 1); k.shake(7); k.sfx('explode'); k.burst(q.x + q.w / 2, q.y + q.h / 2, '#b98cff', 30, 220); k.reward('¡GENERADOR ROTO!', '#b98cff'); score += 80; continue; }
+    q.cd -= dt;
+    if (q.cd <= 0) {
+      q.cd = 4.4 * cdK();
+      if (foes.length + pend.length < 7) { const t1 = 1; pend.push({ type: 'bat', x: q.x + q.w / 2, y: q.y + q.h / 2, t: t1, max: t1 }); }
+    }
+  }
+  /* --- Cofre: tres impactos, dos monedas y una gema. Está donde más duele llegar. --- */
+  for (let i = chests.length - 1; i >= 0; i--) {
+    const w = chests[i];
+    if (!w.dead) continue;
+    chests.splice(i, 1); lootGot++;
+    const cx2 = w.x + w.w / 2, cy2 = w.y + w.h / 2;
+    for (const dx of [-11, 11]) drops.push({ k: 'coin', x: cx2 + dx, y: cy2, t: 12, v: 20 });
+    drops.push({ k: 'gem', x: cx2, y: cy2 - 8, t: 12, v: 60 });
+    k.sfx('coin'); k.punch(0.05); k.reward('¡COFRE!', '#ffc928'); k.burst(cx2, cy2, '#ffc928', 22, 200);
+  }
+  /* --- El Vigía: espectro invulnerable y lento que despierta si te entretienes (salas 11+).
+     Avisa 3 s antes, cruza los muros y se va cuando la sala queda despejada. --- */
+  if (HR.vig && !cleared) {
+    const left = HR.vig * k.D.time - t;
+    if (left <= 3 && left > 0 && !vigW) { vigW = 1; msg = '¡El Vigía despierta!'; msgT = 2; k.sfx('lose'); }
+    if (left <= 0 && !vigi) {
+      const cx2 = p.x < W / 2 ? X1 - 30 : X0 + 30;
+      vigi = { x: cx2, y: p.y < H / 2 ? Y1 - 30 : Y0 + 30, r: 14, a: 0 };
+      k.shake(10); k.flash('rgba(160,120,255,.25)'); k.sfx('explode'); msg = '¡Corre, el Vigía te busca!'; msgT = 2;
+    }
+  }
+  if (vigi) {
+    if (cleared) vigi = null;
+    else {
+      const a = Math.atan2(p.y - vigi.y, p.x - vigi.x), sp2 = 66 * k.D.spd;
+      vigi.x += Math.cos(a) * sp2 * dt; vigi.y += Math.sin(a) * sp2 * dt; vigi.a += dt;
+      vigi.x = k.clamp(vigi.x, X0 + 8, X1 - 8); vigi.y = k.clamp(vigi.y, Y0 + 8, Y1 - 8);
+      if (Math.hypot(vigi.x - p.x, vigi.y - p.y) < vigi.r + p.r * 0.8) hurt(1, vigi.x, vigi.y);
     }
   }
 }
@@ -818,7 +920,12 @@ k.run((dt) => {
   if (HAND) handUpdate(dt);
   // objetivo más cercano
   let near = null, nd = 1e9; for (const f of foes) { const d = Math.hypot(f.x - p.x, f.y - p.y); if (d < nd) { nd = d; near = f; } }
-  p.aim = near && (melee || nd < 380) ? Math.atan2(near.y - p.y, near.x - p.x) : tankM ? p.body : p.a;
+  /* En dungeon-micro el disparo automático también apunta a lo que hay que romper (generador, cofre)
+     cuando no queda enemigo cerca: si no, la sala se quedaría bloqueada sin nada a lo que disparar. */
+  let brk = null;
+  if (HAND && (!near || nd > 300)) { let bd = 1e9;
+    for (const w of gens.concat(chests)) { if (w.dead) continue; const wx = w.x + w.w / 2, wy = w.y + w.h / 2, d = Math.hypot(wx - p.x, wy - p.y); if (d < bd && d < 340) { bd = d; brk = { x: wx, y: wy, d }; } } }
+  p.aim = near && (melee || nd < 380) ? Math.atan2(near.y - p.y, near.x - p.x) : brk ? Math.atan2(brk.y - p.y, brk.x - p.x) : tankM ? p.body : p.a;
   p.face = Math.cos(p.aim) < 0 ? -1 : 1;
   if (melee) {
     const reach = (M === 'brawl' ? 38 : 44) * upg.reach, close = near && nd < reach + near.r;
@@ -827,7 +934,7 @@ k.run((dt) => {
       for (const f of foes) { const d = Math.hypot(f.x - p.x, f.y - p.y); if (d < reach + f.r && angDiff(Math.atan2(f.y - p.y, f.x - p.x), p.aim) < 1.25) dmgFoe(f, upg.dmg, Math.atan2(f.y - p.y, f.x - p.x)); }
     }
   } else {
-    const trig = tankM ? k.held.has('a') || k.tap || (near && nd < 260) : near && nd < 380;
+    const trig = tankM ? k.held.has('a') || k.tap || (near && nd < 260) : (near && nd < 380) || !!brk;
     if (trig && cool <= 0) {
       cool = (tankM ? 0.55 : 0.3) / upg.rate; const n = upg.multi, spd = tankM ? 380 : 440;
       for (let i = 0; i < n; i++) { const a = p.aim + (i - (n - 1) / 2) * 0.17; shots.push({ x: p.x + Math.cos(a) * 16, y: p.y - 4 + Math.sin(a) * 16, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, life: 1.4, b: tankM ? 1 : 0, pierce: upg.pierce, hits: [] }); }
@@ -887,14 +994,21 @@ k.run((dt) => {
   for (const d of drops) {
     d.t -= dt; const dd = Math.hypot(p.x - d.x, p.y - d.y) || 1;
     if (dd < 80 || cleared) { const v = cleared ? 420 : 280; d.x += (p.x - d.x) / dd * v * dt; d.y += (p.y - d.y) / dd * v * dt; }
-    if (dd < 19) { d.got = true; if (d.k === 'coin') { score += d.v; k.sfx('coin'); k.float(`+${d.v}`, d.x, d.y - 10, '#ffc928'); } else { p.hp = Math.min(p.max, p.hp + 1); k.sfx('pop'); k.float('+1', d.x, d.y - 10, '#ff5f7a'); } }
+    if (dd < 19) { d.got = true; if (d.lt) lootGot++;
+      if (d.k === 'coin') { score += d.v; k.sfx('coin'); k.float(`+${d.v}`, d.x, d.y - 10, '#ffc928'); }
+      else if (d.k === 'gem') { score += d.v; k.sfx('coin'); k.chime(Math.min(8, lootGot)); k.float(`+${d.v}`, d.x, d.y - 10, '#7df0ff'); k.burst(d.x, d.y, '#7df0ff', 10, 130); if (lootTot && lootGot >= lootTot) k.reward('¡TODO EL BOTÍN!', '#7df0ff'); }
+      else { p.hp = Math.min(p.max, p.hp + 1); k.sfx('pop'); k.float('+1', d.x, d.y - 10, '#ff5f7a'); } }
   }
   drops = drops.filter((d) => !d.got && (d.t > 0 || cleared));
   // sala superada
-  if (!cleared && !foes.length && !pend.length && quota <= 0) {
-    if (HAND && !wave && HR.m2) { wave = 1; spawnGrid(HR.m2, 1.1); msg = '¡Llegan más!'; msgT = 1.8; k.sfx('start'); }
+  if (!cleared && !foes.length && !pend.length && quota <= 0 && !gens.length) {
+    /* Oleadas de la sala: la rejilla de terreno trae la primera y `w` las siguientes
+       (formaciones escritas a mano en dunlv.js). La sala se despeja al caer la última. */
+    if (HAND && HW.length && wave < HW.length) { spawnGrid(HW[wave], 1.1); wave++;
+      msg = wave >= HW.length ? '¡Última oleada!' : `¡Oleada ${wave + 1} de ${HW.length + 1}!`; msgT = 1.8; k.sfx('start'); k.punch(0.04); }
     else { cleared = true; clearT = 0; score += 50 * room; k.sfx('win'); if (TH.door) { door = true; msg = 'Sala despejada: sal por la puerta'; msgT = 2; } else { msg = `¡${TH.label} superada!`; msgT = 1.4; } }
   }
+  else if (HAND && !cleared && !foes.length && !pend.length && gens.length && msgT <= -2.5) { msg = 'Rompe el generador'; msgT = 1.6; }
   if (cleared) { clearT += dt; if (!TH.door && clearT > 1.2 && !drops.length) openChoice(); }
   if (door && p.x > X1 - 20 && Math.abs(p.y - H / 2) < 34) { if (HAND && room >= HAND.length) return levelFinish(); openChoice(); }
 }, draw);
@@ -2193,7 +2307,9 @@ function drawDrop(d) { // botín con sombra y brillo
   const yy = d.y + (d.k === 'coin' ? 0 : Math.sin(t * 4) * 2);
   shadow(d.x, d.y + 8, 6);
   c.globalAlpha = 0.55 + Math.sin(t * 5 + d.x) * 0.2; c.drawImage(dropCv, d.x - 14, yy - 14, 28, 28); c.globalAlpha = 1;
-  if (d.k === 'coin') ART.coin(c, d.x, d.y, t, 7); else ART.heart(c, d.x, yy, 1.1, true);
+  if (d.k === 'coin') ART.coin(c, d.x, d.y, t, 7);
+  else if (d.k === 'gem') { if (!gemCv) handSprites(); c.save(); c.translate(d.x, yy); c.rotate(Math.sin(t * 2.2 + d.x) * 0.22); c.drawImage(gemCv, -13, -13, 26, 26); c.restore(); }
+  else ART.heart(c, d.x, yy, 1.1, true);
 }
 function tankSprite(x, y, body, tur, col, recoil, mv) {
   // §8: carrocería en una pieza; orugas y torreta aparte porque de verdad se mueven y giran
@@ -2341,7 +2457,7 @@ function gfx() {
     if (TH.light) for (const x of LPOS) ART.glow(g, x, 10, 15 * fl(x), LCOL, 0.95);
     for (const s2 of shots) ART.glow(g, s2.x, s2.y, 13, tankM ? '#ffb45a' : TH.shot, 0.85);
     for (const s2 of eshots) ART.glow(g, s2.x, s2.y, 12, '#ff5f7a', 0.7);
-    for (const d of drops) ART.glow(g, d.x, d.y, 11, d.k === 'coin' ? '#ffc928' : '#ff5f7a', 0.45);
+    for (const d of drops) ART.glow(g, d.x, d.y, 11, d.k === 'coin' ? '#ffc928' : d.k === 'gem' ? '#7df0ff' : '#ff5f7a', 0.45);
     if (swing > 0) ART.glow(g, p.x + Math.cos(p.swingA) * 34, p.y - 4 + Math.sin(p.swingA) * 34, 26, '#ffffff', swing / 0.18 * 0.7);
     for (const q of pend) ART.glow(g, q.x, q.y, q.boss ? 26 : 16, q.boss ? '#ff3b5c' : '#b98cff', 0.35);
   });
@@ -2353,6 +2469,7 @@ function gfx() {
 }
 /* ---------- Trampas y torretas: sprites cacheados, §8 una pieza por objeto ---------- */
 let spkPl = null, spkBl = null, embCv = null, embGl = null, turCv = null;
+let sawCv = null, genCv = null, genXt = null, barCv = null, pltCv = null, vigCv2 = null, gemCv = null, chCv = null;
 function handSprites() {
   const Q = 2, S = GC;
   spkPl = CV(S * Q, S * Q); { const g = spkPl.getContext('2d'); g.scale(Q, Q);
@@ -2387,6 +2504,78 @@ function handSprites() {
       q.fillStyle = AL('#000000', 0.22); q.beginPath(); q.arc(3, 4, 9, 0, R2); q.fill();
       q.fillStyle = AL('#ffffff', 0.5); q.beginPath(); q.ellipse(-3.5, -4.5, 3.4, 2.4, -0.5, 0, R2); q.fill(); });
   }
+  /* --- Sierra: UNA pieza (disco con dientes), el eje va aparte porque no gira con ella --- */
+  sawCv = CV(32 * Q, 32 * Q); { const g = sawCv.getContext('2d'); g.scale(Q, Q); g.translate(16, 16);
+    const path = (q) => { const R = 13.4, r0 = 10.2, n = 9;
+      for (let i = 0; i <= n * 2; i++) { const a = i / (n * 2) * R2 - 1.5708, rr2 = i % 2 ? R : r0;
+        i ? q.lineTo(Math.cos(a) * rr2, Math.sin(a) * rr2) : q.moveTo(Math.cos(a) * rr2, Math.sin(a) * rr2); } q.closePath(); };
+    g.beginPath(); path(g); ART.fillOut(g, '#cfd6e4', 2);
+    clipIn(g, path, (q) => {
+      q.fillStyle = AL('#000000', 0.26); q.beginPath(); q.arc(2.5, 3.5, 12, 0, R2); q.fill();
+      q.fillStyle = AL('#ffffff', 0.5); q.beginPath(); q.ellipse(-4, -5, 4.6, 3, -0.5, 0, R2); q.fill(); });
+    g.beginPath(); g.arc(0, 0, 3.4, 0, R2); ART.fillOut(g, '#6b6f86', 1.6);
+  }
+  /* --- Generador: obelisco de una pieza con el cristal encajado (el cristal late, va aparte) --- */
+  genCv = CV(34 * Q, 40 * Q); { const g = genCv.getContext('2d'); g.scale(Q, Q); g.translate(17, 34);
+    const body = (q) => { q.moveTo(-11, 0); q.lineTo(-8, -26); q.lineTo(0, -32); q.lineTo(8, -26); q.lineTo(11, 0); q.closePath(); };
+    g.beginPath(); body(g); ART.fillOut(g, '#4a3f6e', 2.4);
+    clipIn(g, body, (q) => {
+      q.fillStyle = AL('#000000', 0.3); q.beginPath(); q.moveTo(3, -32); q.lineTo(14, -30); q.lineTo(14, 2); q.lineTo(3, 2); q.closePath(); q.fill();
+      q.fillStyle = AL('#ffffff', 0.16); q.fillRect(-9, -28, 5, 28);
+      q.strokeStyle = AL(OUT, 0.5); q.lineWidth = 1.2;
+      for (const yy of [-20, -12, -4]) { q.beginPath(); q.moveTo(-10, yy); q.lineTo(10, yy - 1); q.stroke(); } });
+  }
+  genXt = CV(20 * Q, 20 * Q); { const g = genXt.getContext('2d'); g.scale(Q, Q); g.translate(10, 10);
+    const cr = (q) => { q.moveTo(0, -7.5); q.lineTo(5.4, 0); q.lineTo(0, 7.5); q.lineTo(-5.4, 0); q.closePath(); };
+    g.beginPath(); cr(g); ART.fillOut(g, '#b98cff', 2);
+    clipIn(g, cr, (q) => { q.fillStyle = AL('#ffffff', 0.55); q.beginPath(); q.moveTo(-1, -6); q.lineTo(2.6, 0); q.lineTo(-1, 2); q.closePath(); q.fill(); });
+  }
+  /* --- Reja: barrotes y montantes en una sola silueta (§8) --- */
+  barCv = CV(S * Q, S * Q); { const g = barCv.getContext('2d'); g.scale(Q, Q);
+    const parts = [];
+    for (let i = 0; i < 3; i++) parts.push([((xx) => (q) => ART.rr(q, xx, 1, 5, S - 2, 2))(4 + i * 10), '#9aa2bb']);
+    parts.push([(q) => ART.rr(q, 1, 2, S - 2, 5, 2), '#8a90a8'], [(q) => ART.rr(q, 1, S - 7, S - 2, 5, 2), '#8a90a8']);
+    unite(g, parts, 2);
+    for (let i = 0; i < 3; i++) { const xx = 4 + i * 10; g.fillStyle = AL('#ffffff', 0.32); g.fillRect(xx + 0.6, 2, 1.5, S - 4); g.fillStyle = AL('#000000', 0.3); g.fillRect(xx + 3.2, 2, 1.4, S - 4); }
+  }
+  /* --- Placa de presión: losa hundida con el borde biselado --- */
+  pltCv = CV(S * Q, S * Q); { const g = pltCv.getContext('2d'); g.scale(Q, Q);
+    ART.rr(g, 5, 5, S - 10, S - 10, 4); ART.fillOut(g, '#6b6f8c', 2.2);
+    clipIn(g, (q) => ART.rr(q, 5, 5, S - 10, S - 10, 4), (q) => {
+      q.fillStyle = AL('#ffffff', 0.22); q.fillRect(5, 5, S - 10, 3);
+      q.fillStyle = AL('#000000', 0.26); q.fillRect(5, S - 10, S - 10, 4); });
+  }
+  /* --- El Vigía: una silueta continua (manto + capucha), los ojos van aparte --- */
+  vigCv2 = CV(44 * Q, 52 * Q); { const g = vigCv2.getContext('2d'); g.scale(Q, Q); g.translate(22, 30);
+    const body = (q) => { q.moveTo(-13, 16); q.quadraticCurveTo(-15, -6, -8, -14); q.quadraticCurveTo(0, -22, 8, -14); q.quadraticCurveTo(15, -6, 13, 16);
+      q.quadraticCurveTo(7, 10, 0, 18); q.quadraticCurveTo(-7, 10, -13, 16); q.closePath(); };
+    g.beginPath(); body(g); ART.fillOut(g, '#6e5f9e', 2.4);
+    clipIn(g, body, (q) => {
+      q.fillStyle = AL('#000000', 0.32); q.beginPath(); q.arc(6, 2, 14, 0, R2); q.fill();
+      q.fillStyle = AL('#1a1530', 0.6); q.beginPath(); q.ellipse(0, -8, 8.4, 7, 0, 0, R2); q.fill();
+      q.fillStyle = AL('#ffffff', 0.18); q.fillRect(-12, -12, 4, 26); });
+    for (const ex of [-3.4, 3.4]) { g.beginPath(); g.arc(ex, -8, 1.9, 0, R2); ART.fillOut(g, '#ffd23d', 1.1); }
+  }
+  /* --- Cofre: una sola silueta (arca + tapa combada), herrajes por sombra propia --- */
+  chCv = CV(S * Q, (S + 8) * Q); { const g = chCv.getContext('2d'); g.scale(Q, Q); g.translate(0, 8);
+    const arca = (q) => { q.moveTo(2, S - 2); q.lineTo(2, S * 0.42); q.quadraticCurveTo(2, -2, S / 2, -2); q.quadraticCurveTo(S - 2, -2, S - 2, S * 0.42); q.lineTo(S - 2, S - 2); q.closePath(); };
+    g.beginPath(); arca(g); ART.fillOut(g, '#a2683a', 2.4);
+    clipIn(g, arca, (q) => {
+      q.fillStyle = AL('#000000', 0.3); q.beginPath(); q.moveTo(S * 0.62, -4); q.lineTo(S + 4, 0); q.lineTo(S + 4, S); q.lineTo(S * 0.62, S); q.closePath(); q.fill();
+      q.fillStyle = AL('#ffffff', 0.18); q.fillRect(4, S * 0.1, 4, S * 0.8);
+      q.fillStyle = '#c9a23d'; q.fillRect(2, S * 0.4, S - 4, 5);
+      q.fillStyle = AL('#000000', 0.25); q.fillRect(2, S * 0.4 + 3.6, S - 4, 1.6);
+      q.fillStyle = '#ffd23d'; q.fillRect(S / 2 - 3, S * 0.36, 6, 9);
+      q.fillStyle = AL('#000000', 0.45); q.fillRect(S / 2 - 1, S * 0.4, 2, 3); });
+  }
+  /* --- Gema: una sola silueta tallada, las facetas por sombra propia (§8) --- */
+  gemCv = CV(26 * Q, 26 * Q); { const g = gemCv.getContext('2d'); g.scale(Q, Q); g.translate(13, 13);
+    const gm = (q) => { q.moveTo(0, -10); q.lineTo(8, -3.5); q.lineTo(5, 9); q.lineTo(-5, 9); q.lineTo(-8, -3.5); q.closePath(); };
+    g.beginPath(); gm(g); ART.fillOut(g, '#7df0ff', 2);
+    clipIn(g, gm, (q) => {
+      q.fillStyle = AL('#000000', 0.26); q.beginPath(); q.moveTo(0, -10); q.lineTo(8, -3.5); q.lineTo(5, 9); q.lineTo(1, 9); q.closePath(); q.fill();
+      q.fillStyle = AL('#ffffff', 0.5); q.beginPath(); q.moveTo(-1, -8); q.lineTo(-6, -3); q.lineTo(-2, 1); q.closePath(); q.fill(); });
+  }
 }
 function drawTraps() {
   if (!spkPl) handSprites();
@@ -2411,14 +2600,75 @@ function drawTurrets() {
     if (ch) { c.globalAlpha = Math.min(0.9, 0.25 + (0.7 - q.cd)); c.strokeStyle = '#ff5f7a'; c.lineWidth = 2.4; c.beginPath(); c.arc(q.x, ey, 13 + (0.7 - q.cd) * 9, 0, R2); c.stroke(); c.globalAlpha = 1; }
   }
 }
+/* ---------- Elementos de dungeon-micro (solo HAND): sierras, generadores, rejas, placas, Vigía ---------- */
+function drawPlates() { // van en el suelo, antes de los bloques
+  if (!pltCv) handSprites();
+  for (const pl of plates2) {
+    const dn = pl.on ? 2 : 0;
+    c.drawImage(pltCv, pl.x - GC / 2, pl.y - GC / 2 + dn, GC, GC);
+    c.strokeStyle = pl.on ? '#a8cf3f' : '#ffc928'; c.lineWidth = 2;
+    ART.rr(c, pl.x - 7, pl.y - 7 + dn, 14, 14, 3); c.stroke();
+  }
+}
+function drawHandExtra() {
+  if (!sawCv) handSprites();
+  for (const w of bars) { // reja: si está abierta se recoge hacia arriba
+    const u = w.open ? 1 : 0;
+    if (u) { c.globalAlpha = 0.85; c.drawImage(barCv, 0, 0, GC, GC, w.x, w.y - 4, GC, GC * 0.3); c.globalAlpha = 1; }
+    else { blockShadow(w); c.drawImage(barCv, w.x, w.y, GC, GC); }
+  }
+  for (const w of chests) { // cofre: brilla suave para que se vea que hay botín dentro
+    blockShadow(w); c.drawImage(chCv, w.x, w.y - 8, GC, GC + 8);
+    if (w.hp < 3) { c.strokeStyle = OUT; c.lineWidth = 2.2; c.beginPath(); c.moveTo(w.x + 7, w.y + 4); c.lineTo(w.x + 12, w.y + 16); c.lineTo(w.x + 8, w.y + 26); c.stroke(); }
+  }
+  for (const q of gens) { // generador: obelisco + cristal que late + vidas
+    if (q.dead) continue;
+    shadow(q.x + q.w / 2, q.y + q.h + 2, 13);
+    c.drawImage(genCv, q.x + q.w / 2 - 17, q.y + q.h - 34, 34, 40);
+    const pu = 0.72 + Math.sin(t * 5) * 0.28;
+    c.save(); c.translate(q.x + q.w / 2, q.y + q.h - 22); c.scale(pu, pu); c.drawImage(genXt, -10, -10, 20, 20); c.restore();
+    if (q.cd < 0.8) { c.globalAlpha = Math.min(0.85, 0.2 + (0.8 - q.cd)); c.strokeStyle = '#b98cff'; c.lineWidth = 2.4; c.beginPath(); c.arc(q.x + q.w / 2, q.y + q.h - 22, 15 + (0.8 - q.cd) * 12, 0, R2); c.stroke(); c.globalAlpha = 1; }
+    for (let i = 0; i < q.max; i++) { const bx = q.x + q.w / 2 - (q.max * 5) / 2 + i * 5; c.fillStyle = i < q.hp ? '#b98cff' : 'rgba(255,255,255,.18)'; c.fillRect(bx, q.y + q.h + 4, 3.6, 3); }
+  }
+  for (const sw of saws) { // sierra en raíl: el raíl primero, el disco girando encima
+    c.strokeStyle = 'rgba(255,255,255,.14)'; c.lineWidth = 3;
+    c.beginPath(); if (sw.vx) { c.moveTo(sw.x - 26, sw.y); c.lineTo(sw.x + 26, sw.y); } else { c.moveTo(sw.x, sw.y - 26); c.lineTo(sw.x, sw.y + 26); } c.stroke();
+    shadow(sw.x, sw.y + 9, 9);
+    c.save(); c.translate(sw.x, sw.y); c.rotate(sw.a); c.drawImage(sawCv, -16, -16, 32, 32); c.restore();
+  }
+  if (vigi) { // el Vigía cruza los muros: se dibuja por encima de todo
+    shadow(vigi.x, vigi.y + 16, 14);
+    c.globalAlpha = 0.86 + Math.sin(t * 6) * 0.1;
+    c.save(); c.translate(vigi.x, vigi.y + Math.sin(t * 3) * 2); c.drawImage(vigCv2, -22, -30, 44, 52); c.restore();
+    c.globalAlpha = 1;
+  }
+}
+function drawHandHud() {
+  const tg = lvTg(), seg = t, st = lvStars();
+  const col = !tg ? '#fff' : seg <= tg ? '#a8cf3f' : '#ff8a5a';
+  label(`${seg < 100 ? seg.toFixed(1) : Math.round(seg)}s`, W / 2 - 46, 10, 18, col, 'right');
+  if (tg) label(`/ ${tg}s`, W / 2 - 42, 12, 14, 'rgba(255,255,255,.55)');
+  else label(`golpes ${hitTaken}/${hitMax()}`, W / 2 - 42, 12, 12, hitTaken <= hitMax() ? 'rgba(255,255,255,.6)' : '#ff8a5a');
+  for (let i = 0; i < 3; i++) { // tres estrellas vivas (una pieza cada una)
+    const sx = W / 2 + 12 + i * 17, on = i < st;
+    c.beginPath();
+    for (let j = 0; j < 10; j++) { const a = j / 10 * R2 - 1.5708, rr2 = j % 2 ? 3 : 6.6; j ? c.lineTo(sx + Math.cos(a) * rr2, 19 + Math.sin(a) * rr2) : c.moveTo(sx + Math.cos(a) * rr2, 19 + Math.sin(a) * rr2); }
+    c.closePath(); ART.fillOut(c, on ? '#ffd23d' : 'rgba(255,255,255,.16)', 1.6);
+  }
+  if (lootTot) { c.drawImage(gemCv || (handSprites(), gemCv), W / 2 + 62, 8, 20, 20); label(`${lootGot}/${lootTot}`, W / 2 + 84, 11, 15, lootGot >= lootTot ? '#7df0ff' : 'rgba(255,255,255,.8)'); }
+  if (HW.length) label(`Oleada ${Math.min(wave + 1, HW.length + 1)}/${HW.length + 1}`, 18, Y1 + 1, 11, 'rgba(255,255,255,.8)');
+  if (gens.some((q) => !q.dead)) label(`Generador ${gens.filter((q) => !q.dead).length}`, 130, Y1 + 1, 11, '#b98cff');
+  if (HR && HR.vig && !vigi) { const left = HR.vig * k.D.time - t; if (left > 0 && left < 12) label(`Vigía en ${Math.ceil(left)}s`, W / 2, Y1 + 1, 11, left < 4 ? '#ff8a5a' : '#b98cff', 'center'); }
+}
+
 function draw() {
   if (VS) return vsDraw();
   if (COOP) return coopDraw();
   if (!floorCv) floorCv = renderFloor(); if (!vigCv) vigCv = renderVig();
   c.drawImage(floorCv, 0, 0, W, H); lights(); drawDoor();
-  if (HAND) drawTraps();
-  for (const w of [...walls].sort((a, b) => a.y + a.h - b.y - b.h)) block(w);
-  if (HAND) drawTurrets();
+  if (HAND) { drawTraps(); drawPlates(); }
+  for (const w of [...walls].sort((a, b) => a.y + a.h - b.y - b.h)) { if (w.bar || w.gen || w.chest) continue; block(w); }
+  if (HAND) { drawHandExtra(); drawTurrets(); }
   for (const q of pend) { const k2 = 1 - q.t / Math.max(q.max, 0.9); c.save(); c.translate(q.x, q.y); c.rotate(t * 4); c.globalAlpha = 0.35 + k2 * 0.5; c.strokeStyle = q.boss ? '#ff3b5c' : '#b98cff'; c.lineWidth = 3; c.setLineDash([6, 6]); c.beginPath(); c.arc(0, 0, (q.boss ? 30 : 16) * (0.5 + k2 * 0.5), 0, R2); c.stroke(); c.setLineDash([]); c.fillStyle = q.boss ? 'rgba(255,59,92,.25)' : 'rgba(185,140,255,.25)'; c.fill(); c.restore(); c.globalAlpha = 1; }
   for (const d of drops) { if (d.t < 2 && Math.floor(d.t * 8) % 2) continue; drawDrop(d); }
   const ents = foes.map((f) => ({ y: f.y, f })).concat([{ y: p.y, hero: 1 }]).sort((a, b) => a.y - b.y);
@@ -2438,6 +2688,7 @@ function draw() {
   else { ART.heart(c, 18, 19, 1.1, true); label(`${Math.max(0, p.hp)}/${p.max}`, 32, 10, 18, '#fff'); }
   coinIcon(W - 18, 19); label(`${score}`, W - 32, 10, 18, '#fff', 'right');
   label(HAND ? `Sala ${room}/${HAND.length}` : `${TH.label} ${room}`, W - 14, Y1 + 1, 11, 'rgba(255,255,255,.85)', 'right');
+  if (HAND) drawHandHud();
   if (bossF && !bossF.dead) { const bw = Math.min(260, W - 160), x = W / 2 - bw / 2, y = Y1 + 3; c.fillStyle = OUT; c.fillRect(x - 2, y - 2, bw + 4, 12); c.fillStyle = '#5a1f2c'; c.fillRect(x, y, bw, 8); c.fillStyle = '#ff3b5c'; c.fillRect(x, y, bw * Math.max(0, bossF.hp) / bossF.max, 8);
     if (bossF.fin) { const ph = bossF.hp > bossF.max * 0.66 ? 1 : bossF.hp > bossF.max * 0.33 ? 2 : 3; label(`Fase ${ph}/3`, x - 8, Y1 + 1, 11, '#ffc928', 'right'); } }
   if (msgT > 0 && !choice) { c.globalAlpha = Math.min(1, msgT * 2); const mz = fitLab(msg, W - 90, 22); const mw = c.measureText(msg).width + 36; ART.rr(c, W / 2 - mw / 2, H / 2 - 64, mw, 40, 12); c.fillStyle = 'rgba(26,21,48,.82)'; c.fill(); label(msg, W / 2, H / 2 - 66 + (40 - mz) / 2 + 2, mz, '#ffc928', 'center'); c.globalAlpha = 1; }

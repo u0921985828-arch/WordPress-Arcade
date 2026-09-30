@@ -1,8 +1,10 @@
 /* 2048 (CFG.hex = false|true). Fichas con relieve cacheadas, deslizamiento interpolado, fusión con "pop",
  * fantasmas de las fichas absorbidas, aparición elástica y récord en vivo.
- * 2048-classic añade los 20 RETOS a mano de src/eng/g2048lv.js (plan Friv, tanda 3): rejilla de
- * 3/4/5, muros, hielo, comodines, movimientos contados y direcciones prohibidas, con progreso
- * guardado por dificultad y modo libre aparte. 2048-hex no los mira: sigue exactamente igual. */
+ * 2048-classic añade los 20 RETOS a mano de src/eng/g2048lv.js (plan Friv, tanda 7): rejilla de
+ * 3/4/5, muros, hielo, comodines, movimientos contados, direcciones prohibidas y cinco mecánicas
+ * nuevas (fichas atornilladas, cofres, bombas con mecha, generador y objetivo doble), con menú de
+ * niveles, progreso y estrellas 1/2/3 por dificultad, cadena de fusiones y modo libre aparte.
+ * Todo lo nuevo va dentro de `if (LVS)` / `if (lv)`: 2048-hex no lo mira y sigue igual. */
 const HEX = !!CFG.hex, W = 480, H = 560, OUT = ART.OUT, k = Kit({ w: W, h: H, title: CFG.title, bg: '#241a3d', help: CFG.hex ? '' : 'Desliza (o usa las flechas) y todas las fichas corren a ese lado; las del mismo número se juntan en una del doble. Cada reto pide un número: lo tienes arriba, en «Objetivo». La piedra no se mueve, el hielo se rompe si dos fichas se juntan justo al lado y la estrella se une con cualquier ficha.' }), c = k.ctx;
 /* ---------- R5 §8 «pieza única» + cartoon de estudio (helpers locales) ----------
    uni(): contornea TODAS las partes y luego las rellena → solo sobrevive la silueta exterior.
@@ -33,6 +35,7 @@ let free = !LVS, wantFree = false;
 
 let cells, tiles, score, anim, ghosts, bestV, overT, nudge, moves, rescues, why;
 let N = 4, CS = 90, GAP = 10, walls = {}, lv = null, goal = 0, mvMax = 0, ban = [], bag = null, won = false, banT = 0, banW = 0;
+let need = 1, fuse = 0, gen = 0, chests = 0, opened = 0, usedRescue = false, chain = 0, ST = { s2: 0, s3: 0 };
 const SQ_D = { right: [1, 0], left: [-1, 0], down: [0, 1], up: [0, -1] };
 const HX_D = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
 const R = 50, SQ3 = Math.sqrt(3), BX = 42, BY = 134, BS = 396; /* caja interior del tablero */
@@ -61,6 +64,8 @@ function add() {
   tiles[key(cl)] = { v, w, fz: false, dv: v, dw: w, from: px(cl), a: 1, pop: 0, grow: -0.1 };
 }
 const maxv = () => { let m = 0; for (const kk in tiles) if (tiles[kk].v > m) m = tiles[kk].v; return m; };
+const goalCnt = () => { let n = 0; for (const kk in tiles) if (goal && tiles[kk].v >= goal) n++; return n; };
+const fuLeft = () => { let m = 0; for (const kk in tiles) { const t = tiles[kk]; if (t.bomb && (!m || t.fu < m)) m = t.fu; } return m; };
 
 /* ---------- Gráficos cacheados ---------- */
 function shade(hex, f) { const n = parseInt(hex.slice(1), 16); let r = n >> 16, g = (n >> 8) & 255, b = n & 255; const t = f < 0 ? 0 : 255, p = Math.abs(f); r = Math.round((t - r) * p + r); g = Math.round((t - g) * p + g); b = Math.round((t - b) * p + b); return `rgb(${r},${g},${b})`; }
@@ -102,6 +107,42 @@ function iceSprite() {
   g.beginPath(); g.moveTo(-6, 40); g.lineTo(14, 26); g.lineTo(38, 34); g.stroke(); g.globalAlpha = 1;
   ART.rr(g, -43, -43, 86, 86, 13); g.strokeStyle = '#dff5ff'; g.lineWidth = 5; g.stroke();
   return (spr.ice = cv);
+}
+/* Sobrepuestos de las mecánicas nuevas: una pieza por objeto y cacheados (R5 §8). */
+function boltSprite() {
+  if (spr.bolt) return spr.bolt;
+  const cv = document.createElement('canvas'); cv.width = cv.height = SP * 4; const g = cv.getContext('2d'); g.scale(2, 2); g.translate(SP, SP);
+  for (let i = 0; i < 4; i++) {
+    const x = (i % 2 ? 31 : -31), y = (i < 2 ? -31 : 31), head = (h) => { h.moveTo(x + 9, y); h.arc(x, y, 9, 0, 6.2832); };
+    contact(g, x, y + 7, 8, 3, 0.3);
+    uni(g, [[head, '#cfc6dd']], 1.5); celp(g, [[head, '#cfc6dd']], '#cfc6dd', 3, 3);
+    g.fillStyle = 'rgba(26,21,48,.42)'; g.fillRect(x - 6.5, y - 1.6, 13, 3.2); /* ranura: sombra propia, sin contorno */
+  }
+  return (spr.bolt = cv);
+}
+function chestSprite() {
+  if (spr.chest) return spr.chest;
+  const cv = document.createElement('canvas'); cv.width = cv.height = SP * 4; const g = cv.getContext('2d'); g.scale(2, 2); g.translate(SP, SP);
+  const band = (h) => { ART.rr(h, -46, -13, 92, 26, 7); };
+  uni(g, [[band, '#ffc83a']], 1.6); celp(g, [[band, '#ffc83a']], '#ffc83a', 6, 6);
+  const lock = (h) => { ART.rr(h, -13, -16, 26, 32, 8); h.moveTo(-7, -16); h.lineTo(-7, -24); h.lineTo(7, -24); h.lineTo(7, -16); };
+  uni(g, [[lock, '#a4762a']], 1.6); celp(g, [[lock, '#a4762a']], '#a4762a', 4, 4);
+  g.fillStyle = 'rgba(26,21,48,.5)'; g.beginPath(); g.arc(0, -1, 4.2, 0, 6.2832); g.fill(); g.fillRect(-1.7, -1, 3.4, 9);
+  spec(g, -26, -7, 12, 3.6, -0.3, 0.45);
+  return (spr.chest = cv);
+}
+function bombSprite() {
+  if (spr.bomb) return spr.bomb;
+  const cv = document.createElement('canvas'); cv.width = cv.height = SP * 4; const g = cv.getContext('2d'); g.scale(2, 2); g.translate(SP, SP);
+  const body = (h) => { h.moveTo(26, -6); h.arc(0, -6, 26, 0, 6.2832); };
+  contact(g, 0, 22, 22, 6, 0.32);
+  uni(g, [[body, '#3a3350']], 1.6); celp(g, [[body, '#3a3350']], '#3a3350', 8, 8);
+  const wick = (h) => { h.moveTo(6, -28); h.quadraticCurveTo(20, -38, 16, -50); h.lineTo(23, -50); h.quadraticCurveTo(28, -34, 11, -24); };
+  uni(g, [[wick, '#b08a5a']], 1.4);
+  const flame = (h) => { h.moveTo(19, -66); h.quadraticCurveTo(30, -56, 19, -48); h.quadraticCurveTo(9, -56, 19, -66); };
+  uni(g, [[flame, '#ffd84d']], 1.4);
+  spec(g, -10, -17, 8, 4, -0.5, 0.55);
+  return (spr.bomb = cv);
 }
 let bgCv, bgKey = '';
 function makeBg() {
@@ -149,13 +190,30 @@ function slide(d, name) {
   for (const kk in P.board) {
     const r = P.board[kk], t = tiles[r.keep];
     if (r.eat) { const e = tiles[r.eat]; ghosts.push({ v: e.dv, w: e.dw, from: e.from, to: px(kk), a: 0 }); t.burst = 1; }
-    t.v = r.v; t.w = r.w; t.fz = r.fz; t.a = 0; nt[kk] = t;
+    t.v = r.v; t.w = r.w; t.fz = r.fz; t.bo = r.bo; t.ch = r.ch; t.bomb = r.bomb; t.fu = r.fu; t.a = 0; nt[kk] = t;
   }
-  tiles = nt; score += P.gained; moves++; banT = Math.min(banT, 0.6);
+  tiles = nt; moves++; banT = Math.min(banT, 0.6);
+  /* Cadena de fusiones (GANCHO r3): cada movimiento que junta algo sube el multiplicador.
+     Solo en los retos: 2048-hex y el modo libre puntúan como siempre. */
+  if (!LVS || free) score += P.gained;
+  else if (P.gained) { chain++; k.chime(chain - 1); score += P.gained * (chain >= 5 ? 3 : chain >= 3 ? 2 : 1); if (chain >= 3) k.combo(chain, W / 2, BY + BS - 34); }
+  else { chain = 0; k.chainReset(); }
   for (let i = 0; i < P.uf.length; i++) { const [x, y] = px(P.uf[i]); k.burst(x, y, '#9fe4ff', 10, 120); k.float('¡Hielo roto!', x, y - CS * 0.45, '#9fe4ff'); }
+  for (let i = 0; i < P.opened.length; i++) { opened++; score += 200; const [x, y] = px(P.opened[i]); k.burst(x, y, '#ffd84d', 18, 170); k.float('¡Cofre! +200', x, y - CS * 0.45, '#ffd84d'); k.reward('¡COFRE ABIERTO!', '#ffd84d'); k.punch(0.1); k.sfx('coin'); }
+  for (let i = 0; i < P.defused.length; i++) { const [x, y] = px(P.defused[i]); k.burst(x, y, '#9fe4ff', 18, 170); k.reward('¡BOMBA APAGADA!', '#5ce1e6'); k.punch(0.14); k.hitstop(0.08); k.sfx('win'); }
   k.sfx(ghosts.length ? 'pop' : 'click');
   add();
-  if (goal && maxv() >= goal) { won = true; k.shake(4); later(() => { if (k.st === 'play') k.levelDone(score, `Objetivo ${goal} logrado en ${moves} movimientos · ${score} puntos`); }, 480); return; }
+  if (gen && moves % gen === 0) { add(); k.float('¡Ficha de más!', W / 2, BY + BS - 60, '#ff8c4a'); }
+  if (fuse) { let dead = false;
+    for (const kk in tiles) { const t = tiles[kk]; if (t.bomb) { t.fu--; if (t.fu <= 0) dead = true; else if (t.fu <= 3) { const [x, y] = px(kk); k.float(String(t.fu), x, y - CS * 0.45, '#f0463c'); } } }
+    if (dead) { why = 'bomb'; overT = 0.6; k.flash('rgba(240,70,60,.55)'); k.shake(7); return; } }
+  if (goal && goalCnt() >= need) { won = true; k.shake(4); k.punch(0.18); k.reward('¡OBJETIVO!', '#ffd84d');
+    const mastery = (!chests || opened >= chests) && !usedRescue, in3 = !!ST.s3 && moves <= ST.s3;
+    const stars = (in3 && mastery) ? 3 : (ST.s2 && moves <= ST.s2) ? 2 : 1;
+    const miss = []; if (!in3) miss.push(`acabar en ${ST.s3} movimientos o menos (has usado ${moves})`);
+    if (chests && opened < chests) miss.push(`abrir los ${chests} cofres`); if (usedRescue) miss.push('no gastar el rescate');
+    const extra = `Objetivo ${goal}${need > 1 ? ' ×' + need : ''} en ${moves} movimientos · ${score} puntos` + (stars < 3 ? ` · Para 3★ te falta: ${miss.join(' y ')}` : '');
+    later(() => { if (k.st === 'play') k.levelDone(score, extra, { stars: stars }); }, 520); return; }
   if (!goal && maxv() >= 2048 && !anim) { anim = 1; later(() => { if (k.st === 'play') { k.show('¡2048!', 'Sigue jugando para más puntos'); later(() => { if (k.st === 'play') k.hide(); }, 1400); } }, 250); }
   if (mvMax && moves >= mvMax) { why = 'mov'; overT = 0.6; return; }
   if (!G2048LV.alive(cells, tiles, DIRS())) { if (rescues > 0) rescue(); else { why = 'block'; overT = 0.6; } }
@@ -163,7 +221,7 @@ function slide(d, name) {
 /* Dificultad: k.D.life = 1 rescate en fácil (0 en normal y difícil, donde nada cambia).
    Al quedarse sin movimientos se retiran las tres fichas más pequeñas y la partida sigue. */
 function rescue() {
-  rescues--;
+  rescues--; usedRescue = true;
   const list = cells.map((cl) => [key(cl), tiles[key(cl)]]).filter((e) => e[1] && !e[1].fz).sort((a2, b2) => a2[1].v - b2[1].v).slice(0, 3);
   for (const [kk, t2] of list) { const [x, y] = px(kk); k.burst(x, y, '#ffd84d', 10, 130); delete tiles[kk]; }
   k.float('¡Rescate!', W / 2, H / 2 - 40, '#ffd84d'); k.sfx('win'); k.shake(3);
@@ -171,12 +229,18 @@ function rescue() {
 function reset() {
   lv = curLv(); build();
   tiles = {}; score = 0; rescues = k.D.life; anim = 0; ghosts = []; overT = 0; nudge = [0, 0]; moves = 0; won = false; why = ''; banMsg = 0;
+  chests = 0; opened = 0; usedRescue = false; chain = 0; k.chainReset();
   const t = lv ? G2048LV.tune(lv, k.dif) : null;
   goal = t ? t.goal : 0; mvMax = t ? t.mv : 0; ban = (lv && lv.ban) || []; bag = (lv && lv.sp) || null;
+  need = t ? t.need : 1; fuse = t ? t.fuse : 0; gen = t ? t.gen : 0;
+  ST = lv ? G2048LV.stars(lv, k.dif) : { s2: 0, s3: 0 };
   banT = lv ? 4.4 : 0;
   if (lv && lv.b) {
     const rows = lv.b.map((r) => r.trim().split(/\s+/));
-    for (const cl of cells) { const tk = G2048LV.token(rows[cl[1]][cl[0]]); if (tk && tk !== 'wall') tiles[key(cl)] = { v: tk.v, w: !!tk.w, fz: !!tk.fz, dv: tk.v, dw: !!tk.w, from: px(cl), a: 1, pop: 0, grow: -0.1 }; }
+    for (const cl of cells) { const tk = G2048LV.token(rows[cl[1]][cl[0]]); if (tk && tk !== 'wall') {
+      tiles[key(cl)] = { v: tk.v, w: !!tk.w, fz: !!tk.fz, bo: !!tk.bo, ch: !!tk.ch, bomb: !!tk.bomb, fu: tk.bomb ? fuse : 0, dv: tk.v, dw: !!tk.w, from: px(cl), a: 1, pop: 0, grow: -0.1 };
+      if (tk.ch) chests++;
+    } }
   } else { add(); add(); }
   bestV = k.best(CFG.id, 0); makeBg();
 }
@@ -184,7 +248,7 @@ if (LVS) { k.levels(LVS.length); k.onLevel = () => { if (wantFree) { free = true
 k.onDif = () => { if (k.st !== 'play') reset(); };
 reset();
 k.show(CFG.title, HEX ? 'Desliza en 6 direcciones (teclado: flechas + Q E Z C; mando: flechas, A arriba-derecha y B abajo-izquierda) para unir fichas iguales.'
-  : LVS ? '20 retos a mano: rejillas distintas, muros, hielo, comodines y movimientos contados.' : 'Desliza o usa las flechas para unir fichas iguales. Llega a 2048.');
+  : LVS ? '20 retos a mano con estrellas: rejillas distintas, muros, hielo, comodines, fichas atornilladas, cofres, bombas con mecha y un generador.' : 'Desliza o usa las flechas para unir fichas iguales. Llega a 2048.');
 /* Botón «Modo libre» añadido al menú del kit (el kit ignora los data-m que no conoce). */
 if (LVS) {
   const ov = document.getElementById('ov');
@@ -214,8 +278,9 @@ k.run((dt) => {
   if (!k.gate(reset)) return;
   if (banT > 0) banT -= dt;
   if (overT) { overT -= dt; if (overT <= 0) { overT = 0;
-    const head = why === 'mov' ? 'Se acabaron los movimientos' : 'Sin movimientos';
-    k.lose(CFG.id, score, head, goal ? `Reto ${k.lv}: faltaba llegar a ${goal} (ibas por ${maxv()})` : `Mayor ficha ${maxv()}`); } return; }
+    const head = why === 'bomb' ? '¡BUM! Se acabó la mecha' : why === 'mov' ? 'Se acabaron los movimientos' : 'Sin movimientos';
+    const near = goal ? (need > 1 ? `Reto ${k.lv}: te faltaban ${Math.max(0, need - goalCnt())} fichas de ${goal}` : `Reto ${k.lv}: faltaba llegar a ${goal} (ibas por ${maxv()}, a ${Math.max(1, Math.round(Math.log2(goal / Math.max(2, maxv()))))} fusiones)`) : `Mayor ficha ${maxv()}`;
+    k.lose(CFG.id, score, head, near); } return; }
   if (k.ptr.up) { const dx = k.ptr.x - k.ptr.sx, dy = k.ptr.y - k.ptr.sy; if (Math.hypot(dx, dy) * k.scale > 24) {
     if (HEX) { const a = Math.atan2(-dy, dx); const i = ((Math.round(a / (Math.PI / 3)) % 6) + 6) % 6; /* 0=E,1=NE,2=NW,3=W,4=SW,5=SE */ slide(HX_D[i]); }
     else { const nm = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'); slide(SQ_D[nm], nm); } } }
@@ -232,10 +297,18 @@ k.run((dt) => {
     c.font = '700 14px -apple-system,Segoe UI,Roboto,sans-serif'; c.fillStyle = '#ffffff'; c.textAlign = 'left'; c.textBaseline = 'top';
     c.fillText(fit(lv.name, 200, '700 14px -apple-system,Segoe UI,Roboto,sans-serif'), 21, 48);
     c.font = '700 14px -apple-system,Segoe UI,Roboto,sans-serif'; c.fillStyle = '#9fe4ff';
-    c.fillText(`Objetivo: ${goal}` + (ban.length ? ' · sin subir' : ''), 21, 70);
+    c.fillText(`Objetivo: ${goal}` + (need > 1 ? ` ×${need} (${goalCnt()}/${need})` : '') + (ban.length ? ' · sin subir' : ''), 21, 70);
+    /* Meta visible y objetivo de estrella (GANCHO r1 y r6). */
+    c.font = '700 12px -apple-system,Segoe UI,Roboto,sans-serif'; c.fillStyle = moves <= ST.s2 ? '#ffd84d' : '#a79dc4';
+    c.fillText(ST.s2 ? `2★ en ${ST.s2} mov · 3★ en ${ST.s3}` + (chests ? ` y ${chests} cofres` : '') : '', 21, 90);
     box(302, 'PUNTOS', score);
-    if (mvMax) { const left = Math.max(0, mvMax - moves); box(390, 'MOVIM.', left, left <= 10 ? '#f0463c' : '#54467a'); }
+    if (fuse) box(390, 'MECHA', fuLeft(), fuLeft() <= 3 ? '#f0463c' : '#54467a');
+    else if (mvMax) { const left = Math.max(0, mvMax - moves); box(390, 'MOVIM.', left, left <= 10 ? '#f0463c' : '#54467a'); }
     else box(390, 'MAYOR', maxv());
+    if (!fuse && mvMax) { /* nada más */ }
+    if (chests) { c.font = '700 12px -apple-system,Segoe UI,Roboto,sans-serif'; c.fillStyle = opened >= chests ? '#7ee07a' : '#ffc83a'; c.textAlign = 'left'; c.textBaseline = 'top'; c.fillText(`Cofres ${opened}/${chests}`, 21, 106); }
+    if (fuse && mvMax) { const left = Math.max(0, mvMax - moves); c.font = '700 12px -apple-system,Segoe UI,Roboto,sans-serif'; c.fillStyle = left <= 10 ? '#f0463c' : '#a79dc4'; c.textAlign = 'left'; c.textBaseline = 'top'; c.fillText(`Movimientos ${left}`, 21, 122); }
+    if (!fuse && mvMax === 0 && !chests) { c.font = '700 12px -apple-system,Segoe UI,Roboto,sans-serif'; c.fillStyle = '#a79dc4'; c.textAlign = 'left'; c.textBaseline = 'top'; c.fillText(`Movimientos ${moves}`, 21, 106); }
   } else {
     label(CFG.title, 20, 62, 24, '#ffd84d'); c.font = '600 13px -apple-system,Segoe UI,Roboto,sans-serif'; c.fillStyle = '#c9bfe8'; c.textAlign = 'left'; c.textBaseline = 'top';
     c.fillText(HEX ? 'Une fichas iguales en 6 direcciones' : 'Une fichas iguales hasta 2048', 22, 96);
@@ -247,7 +320,10 @@ k.run((dt) => {
   for (const cl of cells) { const t = tiles[key(cl)]; if (!t) continue; const [tx, ty] = px(cl), a = ease(t.a), x = t.from[0] + (tx - t.from[0]) * a, y = t.from[1] + (ty - t.from[1]) * a;
     let s = 1 + Math.sin(t.pop * Math.PI) * 0.16; if (t.grow < 1) s = t.grow <= 0 ? 0 : easeBack(t.grow); if (s <= 0.01) continue;
     const z = SP * s * f; c.drawImage(tileSprite(t.dv, t.dw), x - z, y - z, z * 2, z * 2);
-    if (t.fz) c.drawImage(iceSprite(), x - z, y - z, z * 2, z * 2); }
+    if (t.fz) c.drawImage(iceSprite(), x - z, y - z, z * 2, z * 2);
+    if (t.bo) c.drawImage(boltSprite(), x - z, y - z, z * 2, z * 2);
+    if (t.ch) c.drawImage(chestSprite(), x - z, y - z, z * 2, z * 2);
+    if (t.bomb) { c.drawImage(bombSprite(), x - z, y - z, z * 2, z * 2); label(String(t.fu), x + CS * 0.3, y + CS * 0.28, 20, t.fu <= 3 ? '#ff8c8c' : '#fff', 'center', 'middle'); } }
   c.restore();
   /* Cartel de los primeros segundos: qué enseña el reto. */
   if (lv && banT > 0) {

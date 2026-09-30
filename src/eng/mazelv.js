@@ -1,4 +1,4 @@
-/* Laberintos a mano de maze-muncher (plan Friv, F3). 20 plantas dibujadas una a una:
+/* Laberintos a mano de maze-muncher (plan Friv, tanda 7). 20 plantas dibujadas una a una:
  * ninguna se genera al azar y todas están verificadas (BFS) — todos los puntos son alcanzables.
  *
  * PLANTA — cada nivel son 19 filas. Se escribe solo la MITAD IZQUIERDA (10 casillas, columnas
@@ -10,10 +10,19 @@
  *   H  casa de los fantasmas (filas 8-10, columnas 7-11: fija en los 20)
  *   =  boca de túnel (solo en la columna 0; sale por el otro lado de la pantalla)
  *
+ * MECÁNICAS NUEVAS, una de cada vez (docs/VARA.md §2):
+ *   :  barro (nivel 6): te frena al 58 %; a los fantasmas no. Cambia la ruta de escape.
+ *   R  reloj (nivel 9): al comerlo los fantasmas se quedan clavados 3,4 s (×k.D.time).
+ *   /  compuerta a compás (nivel 11): 2,4 s abierta y 2,4 s cerrada, con parpadeo de aviso
+ *      0,6 s antes de bajar. Nunca deja zona inalcanzable porque se vuelve a abrir sola.
+ *   G  punto dorado (nivel 13): vale cinco puntos normales y hace falta cogerlos TODOS para
+ *      la tercera estrella; están en los cuatro extremos, o sea en la ruta arriesgada.
+ *   rush (nivel 7): cuando queda ese tanto por uno de puntos, los fantasmas aceleran un 26 %.
+ *      Se avisa con un aviso y un golpe de pantalla. Es la amenaza que avanza del último tercio.
+ *
  * Rejilla: las casillas de fila y columna impares son siempre pasillo (los «nudos»); las de
  * fila y columna pares son siempre muro (los pilares); lo que se dibuja a mano son las casillas
- * de en medio, que abren o cierran el paso entre dos nudos. Así la planta siempre es legible y
- * nunca aparecen pasillos de un solo hueco.
+ * de en medio, que abren o cierran el paso entre dos nudos.
  *
  * PARÁMETROS de cada nivel:
  *   n      fantasmas que salen (1-4; el 0 persigue, el 1 corta el paso, el 2 embosca, el 3 ronda)
@@ -22,18 +31,24 @@
  *   sc     cambios dispersión/persecución en segundos: [fin 1ª dispersión, fin 1ª persecución, …]
  *   fr     segundos de fantasmas comestibles tras morder una bola grande
  *   fruit  fruta del nivel: k = dibujo, v = puntos
+ *   rush   tanto por uno de puntos que quedan cuando los fantasmas aceleran (o nada)
+ *   tg     [fácil, normal, difícil] segundos para la 2ª estrella. Pendiente de medir con bot:
+ *          mientras no esté, la 2ª estrella es «limpiarlo sin que te pillen» (motor: hasTg()).
  *   tip    consejo que se enseña al empezar el nivel (una línea, sin tecnicismos)
  *
- * ESTRELLAS (docs/GANCHO.md §A6), iguales en los 20 para que se entiendan a la primera:
- *   ★ terminar el laberinto · ★ terminarlo sin que te pillen · ★ coger las dos frutas.
+ * ESTRELLAS (docs/VARA.md §5):
+ *   ★ limpiar el laberinto · ★★ el objetivo del nivel (el tiempo de tg si lo hay; si no,
+ *   limpiarlo sin que te pillen) · ★★★ ese objetivo y además las dos frutas y todos los dorados.
  * Se guardan por dificultad (kit.js) y se ven en vivo en el marcador.
+ *
+ * Punto de control: al morir no se reponen los puntos ya comidos, así que se sigue donde estabas.
  *
  * Todo se multiplica luego por la dificultad elegida (k.D).
  */
 const MAZELV = {
   'maze-muncher': [
-    /* ---- 1-5: sin túneles, 2-3 fantasmas, cuatro bolas grandes. Se aprende a moverse. ---- */
-    { /*  1 */ tip: 'Cómete todos los puntos sin que te pillen.', n: 2, spd: 3.0, rel: [0.8, 4.0], sc: [10, 30, 42], fr: 9.0, fruit: { k: 'cereza', v: 100 }, m: [
+    /* ---- 1-5: sin túneles ni artefactos. Se aprende a moverse, a comer en cadena y a usar la bola grande. ---- */
+    { /*  1 */ tip: 'Cómete todos los puntos sin que te pillen.', n: 2, spd: 3, rel: [0.8, 4], sc: [10, 30, 42], fr: 9, fruit: { k: 'cereza', v: 100 }, m: [
       '##########',
       '#.........',
       '#.###.###.',
@@ -73,7 +88,7 @@ const MAZELV = {
       '#.#.#.#.#.',
       '#........P',
       '##########'] },
-    { /*  3 */ tip: 'Tres fantasmas: no te metas donde no puedas salir.', n: 3, spd: 3.3, rel: [0.7, 2.6, 7.0], sc: [9, 28, 39], fr: 8.0, fruit: { k: 'fresa', v: 200 }, m: [
+    { /*  3 */ tip: 'Tres fantasmas: no te metas donde no puedas salir.', n: 3, spd: 3.3, rel: [0.7, 2.6, 7], sc: [9, 28, 39], fr: 8, fruit: { k: 'fresa', v: 200 }, m: [
       '##########',
       '#.........',
       '#.#.###.#.',
@@ -93,7 +108,7 @@ const MAZELV = {
       '#.#.###.#.',
       '#........P',
       '##########'] },
-    { /*  4 */ tip: 'La fruta asoma a mitad de laberinto. Vigílala.', n: 3, spd: 3.5, rel: [0.6, 2.4, 6.0], sc: [8, 27, 38], fr: 7.5, fruit: { k: 'fresa', v: 300 }, m: [
+    { /*  4 */ tip: 'La fruta asoma a mitad de laberinto. Vigílala.', n: 3, spd: 3.5, rel: [0.6, 2.4, 6], sc: [8, 27, 38], fr: 7.5, fruit: { k: 'fresa', v: 300 }, m: [
       '##########',
       '#.........',
       '#.#####.#.',
@@ -113,7 +128,7 @@ const MAZELV = {
       '#.#####.#.',
       '#........P',
       '##########'] },
-    { /*  5 */ tip: 'Muerde una bola grande y el cazador eres tú.', n: 3, spd: 3.7, rel: [0.6, 2.2, 5.5], sc: [8, 27, 37], fr: 7.0, fruit: { k: 'naranja', v: 400 }, m: [
+    { /*  5 */ tip: 'Muerde una bola grande y el cazador eres tú.', n: 3, spd: 3.7, rel: [0.6, 2.2, 5.5], sc: [8, 27, 37], fr: 7, fruit: { k: 'naranja', v: 400 }, m: [
       '##########',
       '#.........',
       '#.###.###.',
@@ -133,8 +148,8 @@ const MAZELV = {
       '#.###.###.',
       '#........P',
       '##########'] },
-    /* ---- 6-10: llegan los túneles laterales y el cuarto fantasma. ---- */
-    { /*  6 */ tip: 'Nuevo: los túneles de los lados salen por el otro extremo.', n: 3, spd: 3.8, rel: [0.6, 2.0, 5.0], sc: [8, 26, 36], fr: 7.0, fruit: { k: 'naranja', v: 500 }, m: [
+    /* ---- 6-10: barro (6), aceleración final (7) y reloj (9). El laberinto empieza a pedir decisiones. ---- */
+    { /*  6 */ tip: 'El barro te frena a ti; a ellos no.', n: 3, spd: 3.8, rel: [0.6, 2, 5], sc: [8, 26, 36], fr: 7, fruit: { k: 'naranja', v: 500 }, m: [
       '##########',
       '#.........',
       '#.###.###.',
@@ -142,11 +157,11 @@ const MAZELV = {
       '#.#.#.#.#.',
       '#.........',
       '#.#####.#.',
-      '=.........',
+      '=..:.:.:..',
       '#.###.#HHH',
       '#.#....HHH',
       '#.###.#HHH',
-      '#.........',
+      '#..:.:.:..',
       '#.#####.#F',
       '#.........',
       '#.#.#.#.#.',
@@ -154,7 +169,7 @@ const MAZELV = {
       '#.###.###.',
       '#........P',
       '##########'] },
-    { /*  7 */ tip: 'Usa el túnel cuando te acorralen.', n: 3, spd: 4.0, rel: [0.5, 1.9, 4.6], sc: [7, 26, 35], fr: 6.5, fruit: { k: 'manzana', v: 600 }, m: [
+    { /*  7 */ tip: 'Cuando queden pocos puntos, aprietan.', n: 3, spd: 4, rel: [0.5, 1.9, 4.6], sc: [7, 26, 35], fr: 6.5, rush: 0.32, fruit: { k: 'manzana', v: 600 }, m: [
       '##########',
       '#.........',
       '#.#.###.#.',
@@ -162,11 +177,11 @@ const MAZELV = {
       '#.###.###.',
       '#...#...#.',
       '#.#.#.#.#.',
-      '#.........',
+      '#..:.:.:..',
       '#.###.#HHH',
       '#.#....HHH',
       '#.###.#HHH',
-      '=.........',
+      '=..:.:.:..',
       '#.#.###.#F',
       '#...#...#.',
       '#.###.###.',
@@ -174,7 +189,7 @@ const MAZELV = {
       '#.#.###.#.',
       '#........P',
       '##########'] },
-    { /*  8 */ tip: 'Cuatro fantasmas y dos túneles para escapar.', n: 4, spd: 4.1, rel: [0.5, 1.8, 4.2, 8.0], sc: [7, 26, 35], fr: 6.5, fruit: { k: 'manzana', v: 700 }, m: [
+    { /*  8 */ tip: 'Guarda una bola grande para el final.', n: 4, spd: 4.1, rel: [0.5, 1.8, 4.2, 8], sc: [7, 26, 35], fr: 6.5, rush: 0.32, fruit: { k: 'manzana', v: 700 }, m: [
       '##########',
       '#.........',
       '#.###.###.',
@@ -182,11 +197,11 @@ const MAZELV = {
       '#.#.#.#.#.',
       '#.........',
       '#.#.###.#.',
-      '=.........',
+      '=..:.:.:..',
       '#.###.#HHH',
       '#.#....HHH',
       '#.###.#HHH',
-      '=.........',
+      '=..:.:.:..',
       '#.#.###.#F',
       '#.........',
       '#.#.#.#.#.',
@@ -194,13 +209,13 @@ const MAZELV = {
       '#.###.###.',
       '#........P',
       '##########'] },
-    { /*  9 */ tip: 'Hay tres bolas grandes: guárdate una para el final.', n: 4, spd: 4.3, rel: [0.5, 1.7, 4.0, 7.5], sc: [7, 25, 34], fr: 6.0, fruit: { k: 'melon', v: 800 }, m: [
+    { /*  9 */ tip: 'El reloj los deja clavados unos segundos.', n: 4, spd: 4.3, rel: [0.5, 1.7, 4, 7.5], sc: [7, 25, 34], fr: 6, rush: 0.32, fruit: { k: 'melon', v: 800 }, m: [
       '##########',
       '#.........',
       '#.#####.#.',
       '#o..#...#.',
       '#.#.#.###.',
-      '#.....#...',
+      '#R....#...',
       '#.#####.#.',
       '=.........',
       '#.###.#HHH',
@@ -214,19 +229,19 @@ const MAZELV = {
       '#.#####.#.',
       '#........P',
       '##########'] },
-    { /* 10 */ tip: 'Cómete los cuatro con una sola bola: 3000 puntos.', n: 4, spd: 4.4, rel: [0.5, 1.6, 3.8, 7.0], sc: [7, 25, 34], fr: 6.0, fruit: { k: 'melon', v: 1000 }, m: [
+    { /* 10 */ tip: 'Reloj y barro: elige bien por dónde huyes.', n: 4, spd: 4.4, rel: [0.5, 1.6, 3.8, 7], sc: [7, 25, 34], fr: 6, rush: 0.3, fruit: { k: 'melon', v: 1000 }, m: [
       '##########',
       '#.........',
       '#.#.#.#.#.',
       '#o..#...#.',
       '#.###.###.',
-      '#.........',
+      '#R........',
       '#.#.###.#.',
-      '=...#.....',
+      '=..:#:.:..',
       '#.###.#HHH',
       '#.#....HHH',
       '#.###.#HHH',
-      '=...#.....',
+      '=..:#:.:..',
       '#.#.###.#F',
       '#.........',
       '#.###.###.',
@@ -234,14 +249,14 @@ const MAZELV = {
       '#.#.#.#.#.',
       '#........P',
       '##########'] },
-    /* ---- 11-15: laberinto abierto, salas grandes y solo tres bolas grandes. ---- */
-    { /* 11 */ tip: 'Salas grandes: te ven venir de lejos.', n: 4, spd: 4.5, rel: [0.5, 1.5, 3.5, 6.5], sc: [6, 25, 33], fr: 5.5, fruit: { k: 'uvas', v: 1200 }, m: [
+    /* ---- 11-15: compuertas a compás (11) y puntos dorados (13). Ya hay que cronometrar y arriesgar. ---- */
+    { /* 11 */ tip: 'Las compuertas se cierran a compás. Cronometra.', n: 4, spd: 4.5, rel: [0.5, 1.5, 3.5, 6.5], sc: [6, 25, 33], fr: 5.5, rush: 0.3, fruit: { k: 'uvas', v: 1200 }, m: [
       '##########',
       '#.........',
       '#.#.#.#.#o',
       '#.........',
       '#.#####.#.',
-      '#.........',
+      '#......../',
       '#.#.#.#.#.',
       '=.........',
       '#.###.#HHH',
@@ -249,39 +264,39 @@ const MAZELV = {
       '#.###.#HHH',
       '=.........',
       '#.#.#.#.#F',
-      '#.........',
+      '#......../',
       '#.#####.#.',
       '#o........',
       '#.#.#.#.#.',
       '#........P',
       '##########'] },
-    { /* 12 */ tip: 'Menos muros, más carreras. No pierdas de vista al rojo.', n: 4, spd: 4.6, rel: [0.5, 1.5, 3.4, 6.2], sc: [6, 24, 33], fr: 5.5, fruit: { k: 'uvas', v: 1400 }, m: [
+    { /* 12 */ tip: 'Compuerta y barro: no corras a ciegas.', n: 4, spd: 4.6, rel: [0.5, 1.5, 3.4, 6.2], sc: [6, 24, 33], fr: 5.5, rush: 0.3, fruit: { k: 'uvas', v: 1400 }, m: [
       '##########',
       '#.........',
       '#.###.#.#o',
       '#.........',
       '#.#.#.###.',
-      '#.....#...',
+      '#.....#../',
       '#.###.#.#.',
-      '=.........',
+      '=..:.:.:..',
       '#.###.#HHH',
       '#.#....HHH',
       '#.###.#HHH',
-      '=.........',
+      '=..:.:.:..',
       '#.###.#.#F',
-      '#.....#...',
+      '#.....#../',
       '#.#.#.###.',
       '#o........',
       '#.###.#.#.',
       '#........P',
       '##########'] },
-    { /* 13 */ tip: 'Cuando los fantasmas parpadean, se acaba la caza.', n: 4, spd: 4.8, rel: [0.4, 1.4, 3.2, 6.0], sc: [6, 24, 32], fr: 5.0, fruit: { k: 'uvas', v: 1600 }, m: [
+    { /* 13 */ tip: 'Los puntos dorados valen por cinco.', n: 4, spd: 4.8, rel: [0.4, 1.4, 3.2, 6], sc: [6, 24, 32], fr: 5, rush: 0.3, fruit: { k: 'uvas', v: 1600 }, m: [
       '##########',
-      '#.........',
+      '#G.....G..',
       '#.#.###.#o',
       '#...#.....',
       '#.#.#.#.#.',
-      '#.........',
+      '#......../',
       '#.#####.#.',
       '=...#.....',
       '#.###.#HHH',
@@ -289,60 +304,60 @@ const MAZELV = {
       '#.###.#HHH',
       '=...#.....',
       '#.#####.#F',
-      '#.........',
+      '#......../',
       '#.#.#.#.#.',
       '#o..#.....',
       '#.#.###.#.',
-      '#........P',
+      '#G.....G.P',
       '##########'] },
-    { /* 14 */ tip: 'Antes de lanzarse a por ti se les enciende un «!».', n: 4, spd: 4.9, rel: [0.4, 1.4, 3.0, 5.8], sc: [6, 24, 32], fr: 5.0, fruit: { k: 'platano', v: 2000 }, m: [
+    { /* 14 */ tip: 'Dorados, barro y un reloj. Planifica la vuelta.', n: 4, spd: 4.9, rel: [0.4, 1.4, 3, 5.8], sc: [6, 24, 32], fr: 5, rush: 0.3, fruit: { k: 'platano', v: 2000 }, m: [
       '##########',
-      '#.........',
+      '#G.....G..',
       '#.#.#.###o',
       '#.........',
       '#.###.#.#.',
-      '#...#.....',
+      '#R..#.....',
       '#.#.#.###.',
-      '=.........',
+      '=..:.:.:..',
       '#.###.#HHH',
       '#.#....HHH',
       '#.###.#HHH',
-      '=.........',
+      '=..:.:.:..',
       '#.#.#.###F',
       '#...#.....',
       '#.###.#.#.',
       '#o........',
       '#.#.#.###.',
-      '#........P',
+      '#G.....G.P',
       '##########'] },
-    { /* 15 */ tip: 'El plátano vale 2400: no lo dejes escapar.', n: 4, spd: 5.0, rel: [0.4, 1.3, 2.9, 5.5], sc: [5, 24, 31], fr: 5.0, fruit: { k: 'platano', v: 2400 }, m: [
+    { /* 15 */ tip: 'Los dorados están donde más duele.', n: 4, spd: 5, rel: [0.4, 1.3, 2.9, 5.5], sc: [5, 24, 31], fr: 5, rush: 0.3, fruit: { k: 'platano', v: 2400 }, m: [
       '##########',
-      '#.........',
+      '#G.....G..',
       '#.#####.#o',
       '#.....#...',
       '#.###.#.#.',
-      '#.........',
+      '#......../',
       '#.#.#.###.',
-      '=...#.....',
+      '=..:#:.:..',
       '#.###.#HHH',
       '#.#....HHH',
       '#.###.#HHH',
-      '=...#.....',
+      '=..:#:.:..',
       '#.#.#.###F',
-      '#.........',
+      '#......../',
       '#.###.#.#.',
       '#o....#...',
       '#.#####.#.',
-      '#........P',
+      '#G.....G.P',
       '##########'] },
-    /* ---- 16-20: cuatro fantasmas rápidos, dos bolas (una sola en el 20) y plantas cerradas. ---- */
-    { /* 16 */ tip: 'A partir de aquí solo hay dos bolas grandes.', n: 4, spd: 5.1, rel: [0.4, 1.2, 2.8, 5.2], sc: [5, 23, 31], fr: 4.5, fruit: { k: 'sandia', v: 2600 }, m: [
+    /* ---- 16-20: todo combinado, cuatro fantasmas y el tiempo cada vez más justo. ---- */
+    { /* 16 */ tip: 'Reloj para pasar la compuerta con ventaja.', n: 4, spd: 5.1, rel: [0.4, 1.2, 2.8, 5.2], sc: [5, 23, 31], fr: 4.5, rush: 0.28, fruit: { k: 'sandia', v: 2600 }, m: [
       '##########',
-      '#.........',
+      '#G.....G..',
       '#.###.###.',
       '#.........',
       '#.#.#.#.#.',
-      '#o..#...#.',
+      '#o..#...#/',
       '#.###.###.',
       '=.........',
       '#.###.#HHH',
@@ -350,90 +365,90 @@ const MAZELV = {
       '#.###.#HHH',
       '=.........',
       '#.###.###F',
-      '#...#...#.',
+      '#...#...#/',
       '#.#.#.#.#.',
       '#.........',
       '#.###.###.',
-      '#........P',
+      '#G.....G.P',
       '##########'] },
-    { /* 17 */ tip: 'Rápidos y con pocos escondites. Ve de frente.', n: 4, spd: 5.3, rel: [0.4, 1.2, 2.6, 5.0], sc: [5, 23, 30], fr: 4.5, fruit: { k: 'sandia', v: 2800 }, m: [
+    { /* 17 */ tip: 'Todo junto. Vete a por los dorados con la bola grande.', n: 4, spd: 4.9, rel: [0.4, 1.2, 2.6, 5], sc: [5, 23, 30], fr: 4.5, rush: 0.28, fruit: { k: 'sandia', v: 2800 }, m: [
       '##########',
-      '#.........',
+      '#G.....G..',
       '#.#.###.#.',
       '#o..#...#.',
       '#.###.###.',
-      '#.........',
+      '#R......./',
       '#.#.#.#.#.',
-      '=...#...#.',
+      '=..:#:.:#.',
       '#.###.#HHH',
       '#.#....HHH',
       '#.###.#HHH',
-      '=...#...#.',
+      '=..:#:.:#.',
       '#.#.#.#.#F',
-      '#.........',
+      '#......../',
       '#.###.###.',
       '#...#...#.',
       '#.#.###.#.',
-      '#........P',
+      '#G.....G.P',
       '##########'] },
-    { /* 18 */ tip: 'Encadena puntos: con x5 el laberinto vale el doble.', n: 4, spd: 5.4, rel: [0.4, 1.1, 2.5, 4.8], sc: [5, 23, 30], fr: 4.0, fruit: { k: 'sandia', v: 3000 }, m: [
+    { /* 18 */ tip: 'Un laberinto de paciencia. No sueltes la cadena.', n: 4, spd: 5.0, rel: [0.4, 1.1, 2.5, 4.8], sc: [5, 23, 30], fr: 4, rush: 0.28, fruit: { k: 'sandia', v: 3000 }, m: [
       '##########',
-      '#.........',
+      '#G.....G..',
       '#.#####.#.',
       '#o....#...',
       '#.###.#.#.',
-      '#...#.....',
+      '#R..#..../',
       '#.#.#.###.',
-      '=.........',
+      '=..:.:.:..',
       '#.###.#HHH',
       '#.#....HHH',
       '#.###.#HHH',
-      '=.........',
+      '=..:.:.:..',
       '#.#.#.###F',
-      '#...#.....',
+      '#...#..../',
       '#.###.#.#.',
       '#.....#...',
       '#.#####.#.',
-      '#........P',
+      '#G.....G.P',
       '##########'] },
-    { /* 19 */ tip: 'Casi el final. La sandía vale 4000.', n: 4, spd: 5.6, rel: [0.4, 1.1, 2.4, 4.6], sc: [5, 22, 30], fr: 4.0, fruit: { k: 'sandia', v: 4000 }, m: [
+    { /* 19 */ tip: 'Penúltimo. Los cuatro, a tope, y todo el material.', n: 4, spd: 5.2, rel: [0.4, 1.1, 2.4, 4.6], sc: [5, 22, 30], fr: 4, rush: 0.28, fruit: { k: 'sandia', v: 4000 }, m: [
       '##########',
-      '#.........',
+      '#G.....G..',
       '#.###.###.',
       '#o..#...#.',
       '#.#.#.#.#.',
-      '#...#...#.',
+      '#R..#...#/',
       '#.#####.#.',
-      '=.........',
+      '=..:.:.:..',
       '#.###.#HHH',
       '#.#....HHH',
       '#.###.#HHH',
-      '=.........',
+      '=..:.:.:..',
       '#.#####.#F',
-      '#...#...#.',
+      '#...#...#/',
       '#.#.#.#.#.',
       '#...#...#.',
       '#.###.###.',
-      '#........P',
+      '#G.....G.P',
       '##########'] },
-    { /* 20 */ tip: 'Una sola bola grande y los cuatro a tope. Suerte.', n: 4, spd: 5.8, rel: [0.3, 1.0, 2.2, 4.2], sc: [4, 22, 29], fr: 3.5, fruit: { k: 'sandia', v: 5000 }, m: [
+    { /* 20 */ tip: 'Dos bolas grandes, cuatro fantasmas y ocho dorados.', n: 4, spd: 5.4, rel: [0.3, 1, 2.2, 4.2], sc: [4, 22, 29], fr: 3.5, rush: 0.4, fruit: { k: 'sandia', v: 5000 }, m: [
       '##########',
-      '#.........',
+      '#G.....G..',
       '#.###.###o',
       '#...#...#.',
       '#.#.#.#.#.',
-      '#.........',
+      '#R......./',
       '#.#####.#.',
-      '=...#...#.',
+      '=..:#:.:#.',
       '#.###.#HHH',
       '#.#....HHH',
       '#.###.#HHH',
-      '=...#...#.',
+      '=..:#:.:#.',
       '#.#####.#F',
-      '#.........',
+      '#......../',
       '#.#.#.#.#.',
       '#...#...#.',
-      '#.###.###.',
-      '#........P',
+      '#.###.###o',
+      '#G.....G.P',
       '##########'] }]
 };
