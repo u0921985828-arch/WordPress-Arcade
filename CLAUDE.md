@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **278 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2, 50 de la oleada 3, 13 de la oleada 4 y 15 de la oleada 5 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.48.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.48.1** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -282,6 +282,8 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
   - **Interruptor** `.pd-swap` abajo al centro, entre las dos zonas (donde no descansa ningún pulgar): «○ Joystick ⇄» / «✛ Cruceta ⇄». La elección se guarda en el móvil (`arcade:pad:dir`) y vale para todas las partidas. Solo sale en los juegos que llevan dirección.
   - **A y B en fila** con el móvil tumbado (B a la izquierda, A a la derecha, misma altura, separador de puntos vertical), que es como cae el pulgar; en vertical no caben uno al lado del otro y se quedan apilados como en 1.47.1. Medido: separación entre centros 194 px con botones de 121 en 844×390 y 170/112 en 740×360, ninguno se sale de su zona.
   - Verificado con Playwright a 844×390, 740×360 y 390×844: el interruptor cambia de mando en caliente y la cruceta da derecha, abajo, abajo+derecha, nada en reposo y izquierda desde el otro extremo de la zona.
+
+- **Estructura de mando (1.48.1)**: el interruptor de 1.48.0 flotaba encima de la zona de juego. Ahora el mando tiene **franja de abajo propia** (`.pd-bot`, `--bot` 48 px / 40 en apaisado bajo), igual que la de arriba con el botón Menú, y el interruptor va dentro con la misma piel de botón de barra: no roba sitio a los controles ni se pisa con el pulgar. Las dos mitades pasan a ser **dos empuñaduras**: panel redondeado con relieve y separación de 10 px, en vez de media pantalla lisa partida por una línea de puntos (quitada también la de los botones, que ya no hace falta). El panel privado (mano de cartas, cuadro de dibujo) se queda por encima de la franja de abajo.
 
 ## Kuboplay Shield (plugin aparte, `wp-content/plugins/kuboplay-shield`, v1.1.2)
 Segundo plugin, independiente del arcade: seguridad + rendimiento, con panel propio en español. Guía para el usuario: `docs/SEGURIDAD.md` (Cloudflare gratis paso a paso, qué hace y qué no, cómo recuperar el acceso desde IONOS).

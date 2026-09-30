@@ -77,8 +77,8 @@
       '<header class="pd-top"><button type="button" class="pd-me" data-me>··</button><span class="pd-title" data-title></span>' +
         '<button type="button" class="pd-menu" data-menu>Menú</button>' +
         '<button type="button" class="pd-help" data-help hidden aria-label="Cómo se juega">?</button></header>' +
-      '<div class="pd-zones"><div class="pd-l" data-l></div><div class="pd-r" data-r></div>' +
-        '<button type="button" class="pd-swap" data-swap hidden></button></div>' +
+      '<div class="pd-zones"><div class="pd-l" data-l></div><div class="pd-r" data-r></div></div>' +
+      '<footer class="pd-bot"><button type="button" class="pd-swap" data-swap hidden></button></footer>' +
       '<div class="pd-priv" data-priv></div>' +
       '<div class="pd-rot" data-rot><div class="pd-card">' +
         '<svg viewBox="0 0 64 64" fill="none" stroke="#a097ff" stroke-width="4" stroke-linejoin="round">' +
