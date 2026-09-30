@@ -147,6 +147,46 @@ final class Arcade_Portal {
 		wp_enqueue_style( 'arcade-portal', plugins_url( 'assets/css/portal.css', __FILE__ ), array(), Arcade_Core::VERSION );
 	}
 
+	/** Juegos por página en los listados: con 278 juegos, 200 de golpe dejaba 78 inalcanzables y la página medía 21 000 px. */
+	const PER_PAGE = 60;
+
+	/** Órdenes que ofrece el listado: clave de ?orden= => rótulo. El primero es el que manda por defecto. */
+	const SORTS = array(
+		'pop' => 'Populares',
+		'az'  => 'A-Z',
+		'new' => 'Nuevos',
+	);
+
+	/** Orden pedido en la URL (?orden=), o el de por defecto. */
+	public static function sort_key() {
+		$k = isset( $_GET['orden'] ) ? sanitize_key( wp_unslash( $_GET['orden'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+		return isset( self::SORTS[ $k ] ) ? $k : key( self::SORTS );
+	}
+
+	/** Aplica el orden a la consulta principal del listado. Se ordena en el servidor para que la paginación cuadre. */
+	private static function order( $q ) {
+		switch ( self::sort_key() ) {
+			case 'az':
+				$q->set( 'orderby', 'title' );
+				$q->set( 'order', 'ASC' );
+				break;
+			case 'new':
+				$q->set( 'orderby', 'date' );
+				$q->set( 'order', 'DESC' );
+				break;
+			default: // Populares: partidas jugadas, y a igualdad alfabético. seed_plays() garantiza la meta en todos.
+				$q->set( 'meta_key', '_game_plays' );
+				$q->set( 'orderby', array( 'meta_value_num' => 'DESC', 'title' => 'ASC' ) );
+		}
+	}
+
+	/** URL del listado actual con otro orden, conservando lo demás y volviendo a la página 1. */
+	public static function sort_url( $k ) {
+		$u = remove_query_arg( array( 'orden', 'paged' ) );
+		$u = preg_replace( '#/page/\d+/?#', '/', $u );
+		return key( self::SORTS ) === $k ? $u : add_query_arg( 'orden', $k, $u );
+	}
+
 	public static function query( $q ) {
 		if ( is_admin() || ! $q->is_main_query() ) {
 			return;
@@ -155,12 +195,11 @@ final class Arcade_Portal {
 			$q->set( 'meta_query', array( array( 'key' => '_game_source', 'compare' => 'NOT EXISTS' ) ) );
 		}
 		if ( $q->is_post_type_archive( 'game' ) || $q->is_tax( array( 'game_genre', 'game_tag', 'control_profile' ) ) ) {
-			$q->set( 'posts_per_page', 200 );
-			$q->set( 'orderby', 'title' );
-			$q->set( 'order', 'ASC' );
+			$q->set( 'posts_per_page', self::PER_PAGE );
+			self::order( $q );
 		}
 		if ( $q->is_search() && 'game' === $q->get( 'post_type' ) ) {
-			$q->set( 'posts_per_page', 60 );
+			$q->set( 'posts_per_page', self::PER_PAGE );
 		}
 		// Búsqueda desde la cabecera sin tipo: solo juegos.
 		if ( $q->is_search() && ! $q->get( 'post_type' ) ) {

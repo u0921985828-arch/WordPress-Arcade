@@ -38,15 +38,6 @@
     c.addEventListener('mouseleave', () => (paused = false));
     tick();
   });
-  /* ---------- Ordenar listados ---------- */
-  const grid = $('[data-ax-sortable]');
-  $$('.ax-sort button').forEach((b) => b.addEventListener('click', () => {
-    if (!grid) return;
-    $$('.ax-sort button').forEach((x) => x.classList.toggle('on', x === b));
-    const k = b.dataset.sort, cards = $$(':scope > .ax-card', grid), ads = $$(':scope > .ax-ad', grid);
-    cards.sort((a, c) => (k === 'az' ? a.dataset.t.localeCompare(c.dataset.t, 'es') : k === 'new' ? c.dataset.d - a.dataset.d : c.dataset.p - a.dataset.p));
-    cards.forEach((el, i) => { grid.appendChild(el); if ((i + 1) % 15 === 0 && ads.length && i + 1 < cards.length) grid.appendChild(ads.shift()); });
-  }));
   /* ---------- Búsqueda con sugerencias ---------- */
   const form = $('[data-ax-search]'), inp = form && $('input[type=search]', form), box = form && $('.ax-sugg', form);
   let index = null, loading = null, sel = -1;
@@ -70,8 +61,15 @@
     });
     document.addEventListener('click', (e) => { if (!form.contains(e.target)) box.hidden = true; });
   }
+  /* Móvil: la lupa de la cabecera despliega el buscador (en escritorio siempre está abierto). */
   const find = $('[data-ax-find]');
-  find && find.addEventListener('click', () => { if (!inp) return; scrollTo({ top: 0, behavior: 'smooth' }); inp.focus(); });
+  find && find.addEventListener('click', () => {
+    if (!inp) return;
+    const bar = find.closest('.ax-bar');
+    if (bar) bar.classList.toggle('sopen');
+    scrollTo({ top: 0, behavior: 'smooth' });
+    if (!bar || bar.classList.contains('sopen')) inp.focus(); else { inp.value = ''; box && (box.hidden = true); }
+  });
   /* ---------- Anuncios: se piden al acercarse a la pantalla y nunca si están ocultos ---------- */
   const pushAd = (ins) => { if (ins.dataset.axPushed || !ins.offsetWidth) return; ins.dataset.axPushed = 1; try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch (e) {} };
   const io = 'IntersectionObserver' in window ? new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { io.unobserve(e.target); pushAd(e.target); } }), { rootMargin: '300px 0px' }) : null;

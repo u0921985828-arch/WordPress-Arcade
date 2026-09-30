@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Arcade Core
  * Description: CPT "game", taxonomías, meta de juego y reproductor lazy para el portal arcade.
- * Version: 1.41.2
+ * Version: 1.42.0
  * Author:      Arcade Team
  *
  * Instalar: copiar este archivo + la carpeta /arcade-core/ en wp-content/mu-plugins/.
@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
 
 final class Arcade_Core {
 
-	const VERSION      = '1.41.2';
+	const VERSION      = '1.42.0';
 	const ORIENTATIONS = array( 'portrait', 'landscape', 'auto' );
 	const RATIOS       = array( '16:9', '4:3', '1:1', 'fill' );
 	const ENGINES      = array( 'canvas', 'phaser', 'threejs', 'godot_web', 'construct' );
@@ -204,11 +204,27 @@ final class Arcade_Core {
 		self::ensure_home_page();
 		self::adaptive_games();
 		self::sync_catalog();
+		self::seed_plays();
 		self::publish_pending();
 		delete_transient( 'arcade_index' );
 		flush_rewrite_rules( false );
 		update_option( 'arcade_core_version', self::VERSION, false );
 		$wpdb->delete( $wpdb->options, array( 'option_name' => 'arcade_core_upgrading' ) );
+	}
+
+	/**
+	 * Todos los juegos necesitan el contador _game_plays aunque valga 0: el listado se ordena por él
+	 * (orderby meta_value_num), y sin la meta WordPress deja fuera el juego. Una sola consulta.
+	 */
+	public static function seed_plays() {
+		global $wpdb;
+		$wpdb->query( $wpdb->prepare(
+			"INSERT INTO {$wpdb->postmeta} (post_id, meta_key, meta_value)
+			 SELECT p.ID, '_game_plays', '0' FROM {$wpdb->posts} p
+			 WHERE p.post_type = %s AND p.post_status = 'publish'
+			   AND NOT EXISTS (SELECT 1 FROM {$wpdb->postmeta} m WHERE m.post_id = p.ID AND m.meta_key = '_game_plays')",
+			'game'
+		) );
 	}
 
 	/**

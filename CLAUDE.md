@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **278 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2, 50 de la oleada 3, 13 de la oleada 4 y 15 de la oleada 5 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.41.2** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.42.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -208,6 +208,15 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
   - `Arcade_Party::tv_only($slug)` (mínimo de jugadores > 1) y `Arcade_Portal::mp_badge($post, $sm)` parten la insignia en dos: **«Solo en la tele»** (icono de tele, acento `#a097ff`) para esos 28 y «Multijugador» para los que también van solos; ambas con `title` explicativo. Vale igual en la tarjeta grande y en la compacta de «Similares».
   - En la ficha de un juego de tele, en vez del reproductor sale un panel `.ax-tvonly`: «Este juego es solo para el modo tele», cuántos jugadores hacen falta, cómo se conectan los móviles con el código de 4 letras y el botón **Abrir en la tele**. El reproductor sigue accesible en un desplegable («Abrirlo igualmente en esta pantalla») para quien quiera mirarlo desde un ordenador.
   - La línea de datos de la ficha pasa de «Hasta 4 jugadores en la tele» a «… **solo en la tele**» o «… **en la tele, o tú solo**» según el caso.
+
+- **Distribución del portal rehecha (1.42.0)**: estudio completo en `docs/ESTUDIO-DISTRIBUCION.md` (orden de apartados página a página, con capturas a 390×844 y 1280×860) y los diez arreglos de su tabla de prioridad, ya aplicados.
+  - **Listados paginados de verdad**: `Arcade_Portal::PER_PAGE` = 60 (antes 200 de golpe y sin paginación, así que **78 de los 278 juegos eran inalcanzables**). Bloque `.ax-pag` con `paginate_links()` conservando `?orden` y `?exclusivos`. El contador de la cabecera pasa de `post_count` (decía «200 juegos») a `found_posts` (dice 278).
+  - **Orden en el servidor** (`Arcade_Portal::SORTS` + `sort_key()` + `sort_url()`): `?orden=pop|az|new`, **por defecto Populares** en vez de A-Z, y los botones pasan a ser enlaces (ya no se reordenaba solo lo cargado en el navegador). `Arcade_Core::seed_plays()` siembra `_game_plays` = 0 donde falte, porque sin la meta WordPress deja el juego fuera del `orderby meta_value_num`.
+  - **Portada reordenada**: carrusel → Seguir jugando → Tus favoritos → Los más jugados / Recomendados → mosaico de categorías → Exclusivos → filas por género **de más juegos a menos** → Modo fiesta → texto SEO. El bloque de Modo fiesta **deja de imprimir los 158 juegos de tele como enlaces sueltos** (ocupaba dos pantallas de móvil entre el carrusel y las categorías): ahora lleva una fila de 10 tarjetas y «Ver los 158 juegos de tele» hacia `/tele/`.
+  - **Ficha**: «Jugar en la tele» solo en los juegos multijugador (la condición era `Arcade_Party::playable()`, cierta en 239 juegos, y salía como botón principal en el móvil de un *pixel-dash*), y **un solo** bloque de relacionados («Más juegos de <categoría>» + «También te puede gustar» como fila); «Similares» se queda en la columna lateral de escritorio (`.ax-only-lg`).
+  - **Mis juegos**: fila «Para empezar» con 12 recomendados al final, para que la página no quede corta sin guardados.
+  - **Móvil**: cabecera de una sola fila (la lupa despliega el buscador, `.ax-bar.sopen`), la tira de categorías solo en la portada y la barra inferior a 4 destinos (Buscar se va con la lupa).
+  - Alturas de página medidas: listado móvil 21 546 → 7 237 px, ficha móvil 3 668 → 2 217 px, portada móvil 7 877 → 5 372 px.
 
 ## Kuboplay Shield (plugin aparte, `wp-content/plugins/kuboplay-shield`, v1.1.2)
 Segundo plugin, independiente del arcade: seguridad + rendimiento, con panel propio en español. Guía para el usuario: `docs/SEGURIDAD.md` (Cloudflare gratis paso a paso, qué hace y qué no, cómo recuperar el acceso desde IONOS).
