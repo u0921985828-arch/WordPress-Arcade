@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **278 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2, 50 de la oleada 3, 13 de la oleada 4 y 15 de la oleada 5 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.40.1** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.40.2** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -176,6 +176,8 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
   - `src/eng/prilv.js`, `src/eng/parlv.js` — balon-prisionero (`teamball.js`) y parchis-de-la-plaza (`tablero.js`). En el parchís, las vallas pasan a «no se puede parar en ellas» (antes cerraban el paso y una ficha devuelta a casa quedaba encerrada para siempre en los retos 15, 18, 19 y 20).
   - `src/eng/trivlv.js`, `src/eng/pddlv.js`, `src/eng/dnclv.js` — trivia-de-sobremesa (`trivia.js`), palabra-del-dia (`palabras.js`) y flechas-de-baile (`rhythm.js`).
   - Correcciones de verificación: `poollv.js` contaba falta al meter la bola correcta (el orden se calculaba después de retirarla), y los tiempos de estrella de `roadlv.js` eran un 14–35 % demasiado generosos; ambos ajustados con datos reales de bot.
+
+- **Sin dominio provisional a la vista (1.40.2)**: `Arcade_Party::pretty_host()` decide si se puede enseñar una dirección. Con dominio provisional (`live-website.com`, `localhost`, IP, `.local`, `.test`, staging conocidos) devuelve vacío y el lobby de `/tele/` y el mando hablan solo de **Kuboplay** («o abre **Kuboplay** en el móvil, entra en Modo tele y escribe»); con dominio propio enseñan `kuboplay.online/mando` y `kuboplay.online/tele`. Filtro `arcade_public_host`.
 
 ## Kuboplay Shield (plugin aparte, `wp-content/plugins/kuboplay-shield`, v1.1.0)
 Segundo plugin, independiente del arcade: seguridad + rendimiento, con panel propio en español. Guía para el usuario: `docs/SEGURIDAD.md` (Cloudflare gratis paso a paso, qué hace y qué no, cómo recuperar el acceso desde IONOS).

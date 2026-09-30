@@ -94,6 +94,28 @@ final class Arcade_Party {
 	}
 
 	/** Servidores ICE: STUN públicos y, si está configurado, TURN (puente cuando la red impide la conexión directa). */
+	/**
+	 * Dominio que se puede enseñar en pantalla. Vacío mientras el sitio esté en
+	 * un dominio provisional (pruebas, localhost, IP): ahí solo hablamos de la marca.
+	 */
+	public static function pretty_host() {
+		$h = strtolower( (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST ) );
+		if ( '' === $h ) {
+			return '';
+		}
+		if ( filter_var( $h, FILTER_VALIDATE_IP ) ) {
+			return '';
+		}
+		$bad = array( 'localhost', '.local', '.test', '.invalid', 'live-website.com', 'wpengine.com', 'ngrok', 'temporary', 'myraidbox', 'instawp', 'wpcomstaging.com' );
+		foreach ( $bad as $b ) {
+			if ( false !== strpos( $h, $b ) ) {
+				return '';
+			}
+		}
+		$h = preg_replace( '/^www\./', '', $h );
+		return (string) apply_filters( 'arcade_public_host', $h );
+	}
+
 	public static function ice() {
 		$ice = array(
 			array( 'urls' => array( 'stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302' ) ),
@@ -190,6 +212,7 @@ final class Arcade_Party {
 			'tv'     => home_url( '/tele/' ),
 			'home'   => home_url( '/' ),
 			'brand'  => $brand,
+			'host'   => self::pretty_host(),
 			'logo'   => $asset( 'assets/img/kuboplay-logo.svg' ),
 			'colors' => self::COLORS,
 			'ice'    => self::ice(),

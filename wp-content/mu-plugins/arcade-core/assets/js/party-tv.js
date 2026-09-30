@@ -188,7 +188,10 @@
   /* ================================================================ Montaje */
   function build() {
     var app = $('#pt-app');
-    var host = C.pad.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    var brand = C.brand || 'Kuboplay';
+    // Solo enseñamos una dirección cuando el dominio es presentable (C.host);
+    // mientras el sitio esté en un dominio provisional hablamos solo de la marca.
+    var host = C.host ? C.host + '/mando' : '';
     app.innerHTML =
       '<div class="pt-lobby">' +
         '<aside class="pt-join">' +
@@ -196,7 +199,7 @@
           '<div class="pt-card pt-qrbox">' +
             '<p class="pt-step">Escanea con el móvil para usarlo como mando</p>' +
             '<div class="pt-qr" data-qr><span class="pt-spin"></span></div>' +
-            '<p class="pt-or">o entra en <b>' + esc(host) + '</b> y escribe</p>' +
+            '<p class="pt-or">' + (host ? 'o entra en <b>' + esc(host) + '</b> y escribe' : 'o abre <b>' + esc(brand) + '</b> en el móvil, entra en Modo tele y escribe') + '</p>' +
             '<div class="pt-code" data-code aria-live="polite">····</div>' +
           '</div>' +
           '<div class="pt-players" data-players></div>' +
@@ -222,7 +225,7 @@
     var touch = window.matchMedia && matchMedia('(pointer:coarse)').matches && !matchMedia('(any-pointer:fine)').matches;
     if (!touch || Math.min(innerWidth, innerHeight) > 600) return;
     var d = el('div', 'pt-phone',
-      '<div class="pt-card"><h2>¿Estás en el móvil?</h2><p>Abre <b>' + esc(C.tv.replace(/^https?:\/\//, '')) + '</b> en la tele o el ordenador y escanea el código con este móvil.</p>' +
+      '<div class="pt-card"><h2>¿Estás en el móvil?</h2><p>Abre <b>' + esc(C.host ? C.host + '/tele' : (C.brand || 'Kuboplay')) + '</b> en la tele o el ordenador y escanea el código con este móvil.</p>' +
       '<div class="pt-row"><a class="pt-btn" href="' + esc(C.pad) + '">' + ICO.pad + 'Usar como mando</a><button type="button" class="pt-btn ghost" data-close>Usar como tele</button></div></div>');
     document.body.appendChild(d);
     $('[data-close]', d).onclick = function () { d.remove(); };

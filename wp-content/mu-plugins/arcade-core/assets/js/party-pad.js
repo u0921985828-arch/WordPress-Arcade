@@ -71,7 +71,7 @@
       '<h1>Usa el móvil como mando</h1>' +
       (msg ? '<p class="bad">' + esc(msg) + '</p>' : '<p>Escribe el código que aparece en la tele o escanea su QR.</p>') +
       '<form data-form><input name="c" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" placeholder="ABCD" aria-label="Código de la sala" value="' + esc(code) + '"><button class="pd-btn" type="submit">Conectar</button></form>' +
-      '<p class="pd-small">En la tele u ordenador abre <b>' + esc(String(C.tv || '').replace(/^https?:\/\//, '')) + '</b></p>' +
+      '<p class="pd-small">En la tele u ordenador abre <b>' + esc(C.host ? C.host + '/tele' : (C.brand || 'Kuboplay')) + '</b></p>' +
       (IOS && !navigator.standalone ? '<p class="pd-small">En iPhone: gira el móvil en horizontal. Para quitar las barras de Safari, Compartir → «Añadir a pantalla de inicio».</p>' : ''));
     var f = $('[data-form]'), inp = f.c;
     inp.addEventListener('input', function () { inp.value = inp.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4); });
