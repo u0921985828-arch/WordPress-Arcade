@@ -155,12 +155,14 @@
     var items = Array.isArray(d.items) ? d.items.slice(0, 36) : [];
     p.className = 'pd-priv show' + (d.bar || !items.length ? ' bar' : '') + (d.sm ? ' sm' : '');
     p.innerHTML = (d.title ? '<h2>' + esc(d.title) + '</h2>' : '') + (d.text ? '<p>' + esc(d.text) + '</p>' : '') +
+      (d.draw ? '<div class="pd-draw" data-draw><span class="pd-dot" data-dot></span><i>Dibuja aqu\u00ed con el dedo</i></div>' : '') +
       (items.length ? '<div class="pd-items">' + items.map(function (it, i) {
         var img = typeof it.img === 'string' && /^data:image\/(png|webp|jpeg);base64,/.test(it.img) ? '<img src="' + it.img + '" alt="">' : '';
         return '<button type="button" class="pd-it' + (img ? ' pic' : '') + '" data-i="' + i + '"' + (it.off ? ' disabled' : '') +
           (it.col ? ' style="--ic:' + esc(String(it.col).slice(0, 24)) + '"' : '') + '>' + img +
           (it.label != null ? '<b>' + esc(String(it.label).slice(0, 40)) + '</b>' : '') + (it.sub ? '<small>' + esc(String(it.sub).slice(0, 60)) + '</small>' : '') + '</button>';
       }).join('') + '</div>' : '');
+    var surf = p.querySelector('[data-draw]'); if (surf) wireDraw(surf);
     Array.prototype.forEach.call(p.querySelectorAll('.pd-it'), function (b) {
       b.addEventListener('click', function () {
         var it = items[+b.dataset.i]; if (!it || it.off) return;
@@ -168,6 +170,39 @@
         b.classList.add('hit'); setTimeout(function () { b.classList.remove('hit'); }, 180);
       });
     });
+  }
+
+  /* Lienzo t\u00e1ctil del mando (dibujar y adivinar, cadena de garabatos): el dedo da la posici\u00f3n
+     exacta dentro del cuadro, no una direcci\u00f3n. Sale como {t:'dr',x,y,d} en mil\u00e9simas (d 1=abajo,
+     2=mueve, 0=arriba) a 25 mensajes por segundo como mucho, que por el servidor caben en una sola
+     petici\u00f3n (la cola manda hasta 40). El trazo se ve en la tele, aqu\u00ed solo el punto del dedo. */
+  var drT = 0, drQ = null, drTm = 0;
+  function wireDraw(el) {
+    var dot = el.querySelector('[data-dot]'), down = false;
+    function pos(e) {
+      var r = el.getBoundingClientRect();
+      return { x: Math.max(0, Math.min(1, (e.clientX - r.left) / (r.width || 1))), y: Math.max(0, Math.min(1, (e.clientY - r.top) / (r.height || 1))) };
+    }
+    function emit(q, m) { send({ t: 'dr', x: Math.round(q.x * 1000), y: Math.round(q.y * 1000), d: m }); }
+    function show(q) { dot.style.left = (q.x * 100) + '%'; dot.style.top = (q.y * 100) + '%'; el.classList.add('ink'); }
+    function flush() { if (drQ) { drT = Date.now(); emit(drQ, 2); drQ = null; } }
+    el.addEventListener('pointerdown', function (e) {
+      e.preventDefault(); down = true; drQ = null; clearTimeout(drTm);
+      if (el.setPointerCapture) { try { el.setPointerCapture(e.pointerId); } catch (x) { /* nada */ } }
+      var q = pos(e); show(q); drT = Date.now(); emit(q, 1); buzz(8);
+    });
+    el.addEventListener('pointermove', function (e) {
+      if (!down) return; e.preventDefault();
+      var q = pos(e); show(q); var w = 40 - (Date.now() - drT);
+      if (w <= 0) { drT = Date.now(); drQ = null; clearTimeout(drTm); emit(q, 2); }
+      else { drQ = q; clearTimeout(drTm); drTm = setTimeout(flush, w); }
+    });
+    function up(e) {
+      if (!down) return; down = false; clearTimeout(drTm); flush();
+      emit(pos(e), 0); el.classList.remove('ink');
+    }
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
   }
 
   var zoneAc = [];
@@ -516,5 +551,5 @@
   build(LOBBY);
   setMe();
   if (ALPHA.test(code)) { loadSeat(); connect(); } else askCode(code ? 'Código no válido.' : '');
-  window.__pad = S;
+  window.__pad = S; window.__padPriv = priv;   /* pruebas */
 })();

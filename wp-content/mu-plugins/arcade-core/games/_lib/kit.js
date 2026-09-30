@@ -454,7 +454,7 @@ void main(){
        k.podium(filas) = pantalla final con clasificación [{p,score,name?}] (ordena de mayor a menor salvo o.asc);
        k.priv(p,data) = información privada en el móvil del jugador p (solo en la tele: k.privOK); k.onPick(p,v) = lo que elige. */
     k.mpMax = (window.CFG && Array.isArray(CFG.mp) && CFG.mp[1]) || 1;
-    k.privOK = false; k.onPick = null;
+    k.privOK = false; k.onPick = null; k.onDraw = null;
     k.human = (p) => (k.party ? k.party.some((x) => x.p === p) : p === 0);
     k.players = (n) => { const out = []; for (let p = 0; p < (n || k.mpMax); p++) { const q = k.party && k.party.find((x) => x.p === p), hu = k.human(p); out.push({ p, color: k.pcol(p), name: hu ? (q && q.name) || (k.party ? 'J' + (p + 1) : 'Tú') : 'CPU', cpu: !hu }); } /* con varias CPU se numeran para distinguirlas en el podio */ if (out.filter((s) => s.cpu).length > 1) { let i = 0; for (const s of out) if (s.cpu) s.name = 'CPU ' + ++i; } return out; };
     k.pheld = (p, key) => (k.party ? k.pad(p).held.has(key) : p === 0 && k.held.has(key));
@@ -485,6 +485,8 @@ void main(){
         if (k.st === 'ready' && lastReady) k.show(lastReady[0], lastReady[1]);
         if ((k.party ? k.party.map((x) => x.p).join() : '') !== was && k.onParty) k.onParty(k.party);
       } else if (d.type === 'arcade:ppick' && d.p >= 0 && d.p < 4) { if (k.onPick && !k.paused) k.onPick(d.p | 0, d.v);
+      /* 1.46: trazo analógico del móvil (dibujar con el dedo). x,y en 0..1; d 1=abajo 2=mueve 0=arriba. */
+      } else if (d.type === 'arcade:pdraw' && d.p >= 0 && d.p < 4) { if (k.onDraw && !k.paused) k.onDraw(d.p | 0, +d.x || 0, +d.y || 0, d.d | 0);
       } else if (d.type === 'arcade:pkey' && PK[d.key] && d.p >= 0 && d.p < 4) {
         const pd = k.pad(d.p | 0), down = !!d.down;
         if (down) { if (!pd.held.has(d.key)) pd.hit.add(d.key); pd.held.add(d.key); } else pd.held.delete(d.key);

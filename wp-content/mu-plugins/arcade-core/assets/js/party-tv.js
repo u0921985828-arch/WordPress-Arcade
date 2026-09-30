@@ -811,6 +811,8 @@
       }
       else if (d.t === 'hi' && d.name) { peer.name = String(d.name).slice(0, 16); post(playersMsg()); }
       else if (d.t === 'pick' && S.game && !S.menu && !S.ad) post({ type: 'arcade:ppick', p: p, v: d.v });
+      /* Trazo con el dedo en el móvil: llega en milésimas (enteros, menos bytes) y sale al juego en 0..1. */
+      else if (d.t === 'dr' && S.game && !S.menu && !S.ad) post({ type: 'arcade:pdraw', p: p, x: (d.x | 0) / 1000, y: (d.y | 0) / 1000, d: d.d | 0 });
     };
     dc.onclose = gone;
   }

@@ -1,7 +1,7 @@
 /* PICTOS: juegos de fiesta de «dibuja y adivina» para el modo tele (2–4 jugadores, la CPU rellena).
  * CFG.mode:
  *  'dibuja'  Dibuja y Adivina — a quien le toca dibujar se le enseña la palabra SOLO en su móvil (k.priv);
- *            dibuja en la tele moviendo el pincel con el joystick (A pinta, B cambia de color) y los demás
+ *            dibuja en la tele con el dedo sobre el cuadro blanco de su móvil (el joystick sigue valiendo) y los demás
  *            reciben 4 opciones en su móvil (k.onPick). Puntos por acertar pronto y por que te adivinen.
  *  'mimica'  Mímica Exprés — la palabra sale solo en el móvil de quien actúa; la tele enseña la cuenta atrás,
  *            la categoría y las pistas. Los demás eligen entre 4 opciones. Varias palabras por turno.
@@ -118,9 +118,9 @@ const offs = [], offg = [], strokes = [], pen = [];
 for (let p = 0; p < 4; p++) {
   const o = document.createElement('canvas'); o.width = o.height = DSZ;
   const g = o.getContext('2d'); g.lineCap = 'round'; g.lineJoin = 'round';
-  offs.push(o); offg.push(g); strokes.push([]); pen.push({ x: 0.5, y: 0.5, col: 0, st: null, dot: 0 });
+  offs.push(o); offg.push(g); strokes.push([]); pen.push({ x: 0.5, y: 0.5, col: 0, st: null, dot: 0, fg: 0 });
 }
-function wipe(p) { const g = offg[p]; g.clearRect(0, 0, DSZ, DSZ); strokes[p].length = 0; pen[p].st = null; pen[p].x = 0.5; pen[p].y = 0.5; }
+function wipe(p) { const g = offg[p]; g.clearRect(0, 0, DSZ, DSZ); strokes[p].length = 0; pen[p].st = null; pen[p].fg = 0; pen[p].x = 0.5; pen[p].y = 0.5; }
 function repaint(p) {
   const g = offg[p]; g.clearRect(0, 0, DSZ, DSZ);
   for (const s of strokes[p]) paintStroke(g, s, DSZ);
@@ -307,8 +307,8 @@ function nextLink() {
 const COLIT = () => PAL.map((col, i) => ({ v: 'c' + i, label: PALN[i], col }));
 function privDraw(p, w) {
   if (!k.privOK || !k.human(p)) return;
-  k.priv(p, { title: 'Dibuja: ' + UP(w), sm: true, bar: true,
-    text: 'Joystick = pincel · A = pintar · B = color',
+  k.priv(p, { title: 'Dibuja: ' + UP(w), sm: true, draw: true,
+    text: 'Dibuja con el dedo en el cuadro · elige color abajo',
     items: COLIT().concat(MODE === 'cadena' ? [{ v: 'undo', label: 'Deshacer', col: '#2c4a86' }, { v: 'clear', label: 'Borrar', col: '#8a3550' }, { v: 'done', label: rdy[p] ? 'Listo ✓' : 'Listo', col: '#2f6b3a' }]
                                                   : [{ v: 'undo', label: 'Deshacer', col: '#2c4a86' }, { v: 'clear', label: 'Borrar', col: '#8a3550' }]) });
 }
@@ -338,6 +338,23 @@ function askPriv() {
     else privWait(p, phase === 'intro' ? `Dibuja ${pl[drawer].name}` : 'Mira la tele');
   }
 }
+/* Trazo con el dedo desde el móvil (1.46): la posición llega absoluta, así que el pincel salta
+   donde toque el dedo en vez de arrastrarse con el joystick, que era casi imposible de manejar.
+   d: 1 = apoya, 2 = mueve, 0 = levanta. El joystick sigue valiendo (mando sin panel privado). */
+function canDraw(p) {
+  if (!k.human(p)) return false;
+  if (MODE === 'cadena') return phase === 'cdraw' && !rdy[p];
+  return MODE === 'dibuja' && phase === 'play' && p === drawer && !plan;
+}
+k.onDraw = (p, x, y, d) => {
+  if (p < 0 || p >= np || !canDraw(p)) return;
+  const q = pen[p];
+  q.x = k.clamp(x, 0.01, 0.99); q.y = k.clamp(y, 0.01, 0.99); q.dot = 0.25;
+  q.fg = d === 0 ? 0 : 2;                     /* mientras dibuja el dedo, el joystick y A no tocan el pincel */
+  if (d === 0) { if (q.st) penUp(p); return; }
+  if (d === 1) { if (q.st) penUp(p); penDown(p); return; }
+  if (q.st) penTo(p, q.x, q.y); else penDown(p);
+};
 k.onPick = (p, v) => {
   if (p < 0 || p >= np || !k.human(p)) return;
   if (typeof v === 'string' && v[0] === 'c' && v.length === 2) { pen[p].col = +v[1] % PAL.length; k.sfx('click'); return; }
@@ -354,6 +371,8 @@ k.onPick = (p, v) => {
 const SPD = 0.52;
 function moveBrush(p, dt) {
   const q = pen[p];
+  /* Si el móvil está mandando trazo, no se mezcla con el joystick (y si se corta, a los 2 s vuelve). */
+  if (q.fg > 0) { q.fg -= dt; if (q.fg > 0) return; if (q.st) penUp(p); }
   let dx = 0, dy = 0;
   if (k.party) { const d = k.pdir(p); dx = d.x; dy = d.y; }
   else { dx = (k.held.has('right') ? 1 : 0) - (k.held.has('left') ? 1 : 0); dy = (k.held.has('down') ? 1 : 0) - (k.held.has('up') ? 1 : 0); }
