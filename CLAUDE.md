@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **278 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2, 50 de la oleada 3, 13 de la oleada 4 y 15 de la oleada 5 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.49.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.50.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -291,6 +291,13 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
   - **Cruceta**: placa hundida bajo la cruz y **flechas siempre visibles**, que se invierten a oscuro cuando el brazo se enciende.
   - **Botones**: pozo oscuro alrededor (`0 0 0 8px`), sombra interior y el mismo salto al pulsar.
   - Medido a 390×844, 844×390 y 740×360: nada desborda, la cruz deja 10 px de margen en el panel más estrecho y las direcciones siguen saliendo bien (derecha, arriba, abajo+derecha, nada en reposo).
+
+- **El mando vibra (1.50.0, kit.js `?v=30`)**: el tacto era una sola vibración de 40 ms al conectar. Ahora el mando tiene **patrones con nombre** (`HAP` en `party-pad.js`): pulsar es un golpe seco (14 ms), soltar casi nada (4), el primer empujón de dirección se nota más que los cambios de octante con el pulgar ya apoyado (12 frente a 7), elegir una carta es un doble toque, perder la conexión un aviso largo de cinco golpes y el código mal un rechazo de dos. Cada familia lleva **hueco mínimo** (`GAP`, 25–60 ms) para que un pulgar que desliza por la cruceta no convierta el móvil en un zumbador.
+  - **Interruptor propio** `.pd-vib` («◉ Vibra» / «○ Vibra») a la derecha de la franja de abajo, al lado del de mando; se recuerda en el móvil (`arcade:pad:vib`) y al encenderla vibra para que se note cómo queda.
+  - **Canal nuevo juego → mando**: `k.rumble(p, tipo)` en kit.js (tap, press, rel, dir, tick, pick, hit, hurt, big, win, lose) manda `arcade:rumble {p,h}`; `party-tv.js` lo reparte como `{t:'buzz',h}` al móvil de ese jugador (o a todos con `p<0`) y el mando decide cómo se siente y si su dueño lo quiere. Agrupado a 90 ms por jugador: por el servidor cada mensaje cuesta una petición. Fuera del modo tele el nombre se traduce a milisegundos y vibra el propio móvil.
+  - **Automático, sin tocar los 278 juegos**: `k.lose` vibra derrota, `k.levelDone` victoria, `k.podium` manda victoria al ganador y derrota a los demás (cada mando por separado: no hay que mirar la tele para saber cómo acabó) y cualquier `navigator.vibrate` de un motor se convierte en tacto en todos los mandos con la fuerza que pedía.
+  - El mando virtual de la propia página (`arcade-engine.js`, jugando solo en el móvil) estrena el mismo tacto con `_hap(ms, hueco)`.
+  - Verificado con Playwright a 844×390, 740×360 y 390×844, con `navigator.vibrate` interceptado: empujar la dirección da `[12]` y el cambio de octante `[7]`, el botón A `[14]` al pulsar y `[4]` al soltar, igual con joystick y con cruceta, y **nada** con el interruptor apagado.
 
 ## Kuboplay Shield (plugin aparte, `wp-content/plugins/kuboplay-shield`, v1.1.2)
 Segundo plugin, independiente del arcade: seguridad + rendimiento, con panel propio en español. Guía para el usuario: `docs/SEGURIDAD.md` (Cloudflare gratis paso a paso, qué hace y qué no, cómo recuperar el acceso desde IONOS).

@@ -445,6 +445,9 @@ void main(){
     /* Modo tele (fiesta): la tele envía 'arcade:party' {players:[{p,color,name}]} y 'arcade:pkey' {p,key,down} por jugador.
        k.party = jugadores (o null), k.pad(p) = {held,hit} de ese jugador (hit se limpia cada frame). J1 (p=0) también mueve k.held/k.hit. */
     const PADS = [];
+    /* Fuera del modo tele (móvil a solas) no hay mando que interprete el nombre: se traduce a
+       milisegundos y lo vibra este propio móvil. */
+    const RUMMS = { tap: 8, press: 14, rel: 4, dir: 7, tick: 6, pick: 14, hit: 24, hurt: 45, big: 90, win: 40, lose: 110 };
     k.party = null;
     k.pad = (p) => PADS[p] || (PADS[p] = { held: new Set(), hit: new Set() });
     k.pcol = (p) => { const q = k.party && k.party.find((x) => x.p === p); return (q && q.color) || ['#ff5a5f', '#3fb6ea', '#ffd166', '#5fbf45'][p % 4]; };
@@ -461,6 +464,17 @@ void main(){
     k.phit = (p, key) => (k.party ? k.pad(p).hit.has(key) : p === 0 && k.hit.has(key));
     k.pdir = (p) => ({ x: (k.pheld(p, 'right') ? 1 : 0) - (k.pheld(p, 'left') ? 1 : 0), y: (k.pheld(p, 'down') ? 1 : 0) - (k.pheld(p, 'up') ? 1 : 0) });
     k.priv = (p, data) => { if (k.privOK) tell('arcade:priv', { p, data: data || null }); };
+    /* 1.50: tacto en el móvil de un jugador del modo tele. Nombres del mando: tap, press, rel, dir,
+       tick, pick, hit, hurt, big, win, lose. p = jugador, o < 0 / sin poner = todos los humanos.
+       Solo se pide el patrón: el mando decide cómo se siente y respeta su interruptor de vibración.
+       Se agrupa a 90 ms por jugador, que por el servidor cada mensaje cuesta una petición. */
+    const rumT = [0, 0, 0, 0, 0];
+    k.rumble = (p, kind) => {
+      if (!k.party) { if (navigator.vibrate) { try { navigator.vibrate(RUMMS[kind] || 20); } catch (e) {} } return; }
+      const i = p >= 0 && p < 4 ? p : 4, now = performance.now();
+      if (now - rumT[i] < 90) return;
+      rumT[i] = now; tell('arcade:rumble', { p: p >= 0 ? p | 0 : -1, h: kind || 'tap' });
+    };
     k.podium = (rows, o) => {
       o = o || {}; if (!rows || !rows.length) rows = [{ p: 0, score: 0 }]; const r = rows.slice().sort((a, b) => (o.asc ? a.score - b.score : b.score - a.score)), top = r[0], pl = k.players(Math.max(k.mpMax, r.length));
       const raw = (x) => x.name || (pl[x.p] && pl[x.p].name) || 'J' + (x.p + 1);
@@ -469,6 +483,9 @@ void main(){
       const tie = r.length > 1 && r[1].score === top.score && !o.noTie;
       const body = r.map((x, i) => `<span style="display:inline-block;min-width:1.4em;color:${k.pcol(x.p)}">${i + 1}.</span><b style="color:${k.pcol(x.p)}">${nm(x)}</b> · ${o.fmt ? o.fmt(x.score) : x.score}`).join('<br>');
       k.win(o.head || (tie ? '¡Empate!' : `¡Gana ${nm(top)}!`), tie ? '#ffd166' : k.pcol(top.p), `${body}<br>${o.go || 'Toca para la revancha'}`, top.score);
+      /* 1.50: el podio se nota en la mano: quien gana recibe el patrón de victoria y los demás el
+         de derrota. Cada mando por separado, así que no hay que mirar la tele para saber cómo acabó. */
+      if (k.party) { const w = tie ? null : top.p; k.party.forEach((x) => k.rumble(x.p, w == null ? 'pick' : x.p === w ? 'win' : 'lose')); }
     };
     const PK = { up: 1, down: 1, left: 1, right: 1, a: 1, b: 1 };
     addEventListener('message', (e) => { const d = e.data; if (!d || e.source !== parent || parent === window) return;
@@ -616,7 +633,11 @@ void main(){
     bm.addEventListener('pointerdown', (e) => { e.stopPropagation(); setMute(!muted); });
     /* Las vibraciones de los juegos también suenan y sacuden la pantalla */
     const rawVib = navigator.vibrate ? navigator.vibrate.bind(navigator) : null;
-    const vib = (ms) => { const d = Array.isArray(ms) ? ms[0] : ms; if (d <= 20) k.sfx('pop'); else if (d <= 45) k.sfx('coin'); else if (d <= 90) { k.sfx('hit'); k.shake(4); } else { k.sfx('hurt'); k.shake(8); k.flash('rgba(255,60,80,.35)'); } try { rawVib && rawVib(ms); } catch (e) {} return true; };
+    const vib = (ms) => { const d = Array.isArray(ms) ? ms[0] : ms; if (d <= 20) k.sfx('pop'); else if (d <= 45) k.sfx('coin'); else if (d <= 90) { k.sfx('hit'); k.shake(4); } else { k.sfx('hurt'); k.shake(8); k.flash('rgba(255,60,80,.35)'); } try { rawVib && rawVib(ms); } catch (e) {}
+      /* En la tele el aparato no vibra, pero los móviles sí: lo que el juego pedía como vibración
+         local se convierte en tacto en los mandos, con la fuerza que pedía. */
+      if (k.party) k.rumble(-1, d <= 20 ? 'tap' : d <= 45 ? 'pick' : d <= 90 ? 'hit' : 'hurt');
+      return true; };
     try { Object.defineProperty(navigator, 'vibrate', { value: vib, configurable: true, writable: true }); } catch (e) {}
     /* ---------- Efectos: partículas, textos flotantes, temblor, destello ---------- */
     const parts = [], floats = [], pool = [];
@@ -794,6 +815,7 @@ void main(){
     /* Nivel superado: desbloquea el siguiente, lo guarda y ofrece Siguiente / Niveles. */
     k.levelDone = (score, extra, opt) => {
       const last = LVN > 0 && k.lv >= LVN;
+      k.rumble(-1, 'win');
       const stars = opt && opt.stars != null ? Math.max(1, Math.min(3, opt.stars | 0)) : 0;
       if (stars) setStars(k.lv, stars);
       if (LVN > 0 && k.lv >= k.lvMax && !last) { k.lvMax = k.lv + 1; try { localStorage.setItem(lvKey || lvK(), k.lvMax); } catch (e) {} }
@@ -849,7 +871,7 @@ void main(){
       ctx.lineWidth = m * 0.03; ctx.strokeStyle = '#1a1530'; ctx.strokeText(txt, 0, 0); ctx.fillStyle = k.cd > 0 ? '#fff' : '#7cf7a0'; ctx.fillText(txt, 0, 0);
       ctx.restore();
     }
-    k.lose = (id, score, head, extra) => { k.st = 'over'; k._losing = true; k.end(id, score, head, extra); k._losing = false; k.sfx('lose'); k.shake(7); try { rawVib && rawVib(90); } catch (e) {} };
+    k.lose = (id, score, head, extra) => { k.st = 'over'; k._losing = true; k.end(id, score, head, extra); k._losing = false; k.sfx('lose'); k.shake(7); try { rawVib && rawVib(90); } catch (e) {} k.rumble(-1, 'lose'); };
     k.clamp = (v, a, b) => Math.max(a, Math.min(b, v));
     k.text = (s, x, y, size, color, align) => {
       ctx.fillStyle = color || '#f5f1e6'; ctx.font = `700 ${size || 18}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;

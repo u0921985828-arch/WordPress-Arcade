@@ -35,7 +35,38 @@
   // Vibración: no existe en iOS; en Chrome solo tras el primer toque (si no, avisa en la consola).
   var touched = false;
   document.addEventListener('pointerdown', function () { touched = true; }, true);
-  function buzz(ms) { try { if (touched && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* nada */ } }
+  /* 1.50: tacto con nombre. Un mando de verdad no vibra siempre igual: pulsar es un golpe seco,
+     soltar casi nada, elegir una carta un doble toque y perder la conexión un aviso largo. Cada
+     patrón es un array de milisegundos (vibra, para, vibra…) como pide navigator.vibrate.
+     `g` = hueco mínimo en ms entre dos vibraciones de la misma familia, para que un pulgar que
+     desliza por la cruceta no convierta el móvil en un zumbador (ni se coma la batería). */
+  var HAP = {
+    tap: [8], press: [14], rel: [4], dir: [7], dir1: [12],
+    pick: [10, 28, 16], swap: [10, 45, 10], menu: [12], err: [55, 45, 55],
+    join: [16, 55, 30], lost: [40, 80, 40, 80, 40],
+    hit: [24], hurt: [40, 45, 55], big: [70, 45, 110],
+    win: [20, 40, 20, 40, 90], lose: [110, 70, 55], tick: [6]
+  };
+  var GAP = { dir: 40, press: 25, rel: 25, tap: 30, tick: 60 };
+  var hapAt = {};
+  // Preferencia del móvil: hay gente a la que la vibración le molesta o tiene el móvil en la mesa.
+  function vibOn(v) {
+    try {
+      if (v === undefined) return localStorage.getItem('arcade:pad:vib') !== '0';
+      localStorage.setItem('arcade:pad:vib', v ? '1' : '0');
+    } catch (e) { /* nada */ }
+    return !!v;
+  }
+  var VIB = vibOn();
+  function play(pat) { try { if (VIB && touched && navigator.vibrate) navigator.vibrate(pat); } catch (e) { /* nada */ } }
+  function hap(n) {
+    var pat = HAP[n]; if (!pat) return;
+    var g = GAP[n] || 0;
+    if (g) { var t = Date.now(); if (t - (hapAt[n] || 0) < g) return; hapAt[n] = t; }
+    play(pat);
+  }
+  // La tele puede pedir un patrón con nombre (`h`) o, como hasta ahora, unos milisegundos sueltos.
+  function buzz(ms) { play(ms); }
   function api(path, opt) {
     opt = opt || {};
     var init = { method: opt.method || 'GET', headers: {}, cache: 'no-store', credentials: 'omit' };
@@ -78,7 +109,8 @@
         '<button type="button" class="pd-menu" data-menu>Menú</button>' +
         '<button type="button" class="pd-help" data-help hidden aria-label="Cómo se juega">?</button></header>' +
       '<div class="pd-zones"><div class="pd-l" data-l></div><div class="pd-r" data-r></div></div>' +
-      '<footer class="pd-bot"><button type="button" class="pd-swap" data-swap hidden></button></footer>' +
+      '<footer class="pd-bot"><button type="button" class="pd-swap" data-swap hidden></button>' +
+        '<button type="button" class="pd-vib" data-vib aria-label="Vibración"></button></footer>' +
       '<div class="pd-priv" data-priv></div>' +
       '<div class="pd-rot" data-rot><div class="pd-card">' +
         '<svg viewBox="0 0 64 64" fill="none" stroke="#a097ff" stroke-width="4" stroke-linejoin="round">' +
@@ -87,7 +119,7 @@
         '<button type="button" class="pd-btn" data-keep>Seguir en vertical</button></div></div>' +
       '<div class="pd-over" data-over></div>' +
     '</div>';
-  var ui = { swap: $('[data-swap]'), rot: $('[data-rot]'), priv: $('[data-priv]'), me: $('[data-me]'), title: $('[data-title]'), l: $('[data-l]'), r: $('[data-r]'), over: $('[data-over]'), menu: $('[data-menu]'), help: $('[data-help]') };
+  var ui = { swap: $('[data-swap]'), vib: $('[data-vib]'), rot: $('[data-rot]'), priv: $('[data-priv]'), me: $('[data-me]'), title: $('[data-title]'), l: $('[data-l]'), r: $('[data-r]'), over: $('[data-over]'), menu: $('[data-menu]'), help: $('[data-help]') };
 
   function overlay(html) {
     ui.over.innerHTML = html ? '<div class="pd-card">' + html + '</div>' : '';
@@ -107,7 +139,7 @@
     f.addEventListener('submit', function (e) {
       e.preventDefault();
       var v = inp.value.toUpperCase();
-      if (!ALPHA.test(v)) { inp.classList.add('bad'); return; }
+      if (!ALPHA.test(v)) { inp.classList.add('bad'); hap('err'); return; }
       S.name = myName(nm.value.trim().slice(0, 12));
       code = v;
       try { history.replaceState(null, '', '?c=' + v); } catch (er) { /* nada */ }
@@ -183,7 +215,7 @@
     Array.prototype.forEach.call(p.querySelectorAll('.pd-it'), function (b) {
       b.addEventListener('click', function () {
         var it = items[+b.dataset.i]; if (!it || it.off) return;
-        send({ t: 'pick', v: it.v != null ? it.v : +b.dataset.i }); buzz(15);
+        send({ t: 'pick', v: it.v != null ? it.v : +b.dataset.i }); hap('pick');
         b.classList.add('hit'); setTimeout(function () { b.classList.remove('hit'); }, 180);
       });
     });
@@ -206,7 +238,7 @@
     el.addEventListener('pointerdown', function (e) {
       e.preventDefault(); down = true; drQ = null; clearTimeout(drTm);
       if (el.setPointerCapture) { try { el.setPointerCapture(e.pointerId); } catch (x) { /* nada */ } }
-      var q = pos(e); show(q); drT = Date.now(); emit(q, 1); buzz(8);
+      var q = pos(e); show(q); drT = Date.now(); emit(q, 1); hap('tap');
     });
     el.addEventListener('pointermove', function (e) {
       if (!down) return; e.preventDefault();
@@ -260,7 +292,9 @@
     function apply(next) {
       dirs.forEach(function (d) { if (next.indexOf(d) < 0) key(d, false); });
       next.forEach(function (d) { if (dirs.indexOf(d) < 0) key(d, true); });
-      if (next.length && !dirs.length) buzz(6);
+      /* Tacto de dirección: el primer empujón se nota más que los cambios de octante mientras
+         el pulgar sigue apoyado, y soltar no vibra (el pulgar ya sabe que ha soltado). */
+      if (next.length) hap(dirs.length ? 'dir' : 'dir1');
       dirs = next;
       if (dp) arms.forEach(function (a) { a.classList.toggle('on', next.indexOf(a.dataset.d) >= 0); });
     }
@@ -342,8 +376,8 @@
     }
     function press(b, down) {
       var n = b.dataset.b, c = count[n] = Math.max(0, count[n] + (down ? 1 : -1));
-      if (down && c === 1) { key(n, true); b.classList.add('on'); buzz(10); }
-      if (!down && c === 0) { key(n, false); b.classList.remove('on'); }
+      if (down && c === 1) { key(n, true); b.classList.add('on'); hap('press'); }
+      if (!down && c === 0) { key(n, false); b.classList.remove('on'); hap('rel'); }
     }
     function set(e) {
       var was = owner[e.pointerId], now = nearest(e.clientX, e.clientY, was);
@@ -362,17 +396,31 @@
   /* El interruptor de abajo cambia entre joystick y cruceta sin salir de la partida. */
   ui.swap.addEventListener('click', function (e) {
     e.preventDefault(); e.stopPropagation();
-    padMode(padMode() === 'd' ? 'j' : 'd'); buzz(12); build(S.spec);
+    padMode(padMode() === 'd' ? 'j' : 'd'); hap('swap'); build(S.spec);
   });
   ui.swap.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
 
-  ui.menu.addEventListener('pointerdown', function (e) { e.preventDefault(); ui.menu.classList.add('on'); buzz(10); key('menu', true); });
+  /* Interruptor de vibración, al lado del de mando. Se recuerda en este móvil. */
+  function vibLabel() {
+    ui.vib.textContent = (VIB ? '\u25c9' : '\u25cb') + ' Vibra';
+    ui.vib.classList.toggle('off', !VIB);
+    ui.vib.title = VIB ? 'Quitar la vibración' : 'Poner la vibración';
+  }
+  vibLabel();
+  ui.vib.addEventListener('click', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    VIB = !VIB; vibOn(VIB); vibLabel();
+    if (VIB) hap('swap'); // así se nota cómo queda al encenderla
+  });
+  ui.vib.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+
+  ui.menu.addEventListener('pointerdown', function (e) { e.preventDefault(); ui.menu.classList.add('on'); hap('menu'); key('menu', true); });
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { ui.menu.addEventListener(ev, function () { ui.menu.classList.remove('on'); key('menu', false); }); });
   document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   // iOS Safari ignora user-scalable=no: se bloquean a mano pellizco, doble toque y arrastre de la página
   // (salvo en la tarjeta del código, donde hay que poder escribir, y en el panel privado: sin esto el toque
   // no genera «click» y no se podía elegir carta/respuesta ni desplazar la lista).
-  function inForm(e) { var c = e.target.closest ? e.target : null; return c && ((ui.over.classList.contains('show') && c.closest('.pd-card')) || c.closest('.pd-priv.show') || c.closest('.pd-swap')); }
+  function inForm(e) { var c = e.target.closest ? e.target : null; return c && ((ui.over.classList.contains('show') && c.closest('.pd-card')) || c.closest('.pd-priv.show') || c.closest('.pd-swap') || c.closest('.pd-vib')); }
   ['gesturestart', 'gesturechange', 'dblclick'].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); }, { passive: false }); });
   ['touchstart', 'touchmove'].forEach(function (ev) {
     document.addEventListener(ev, function (e) { if (!inForm(e) && e.cancelable) e.preventDefault(); }, { passive: false });
@@ -480,6 +528,8 @@
   function retry(gen) {
     if (gen !== S.gen || S.retrying === gen) return; // onclose + failed llegan juntos: un solo reintento
     S.retrying = gen;
+    // Se ha cortado: aviso largo en el bolsillo, que la pantalla dice poco si estás mirando la tele.
+    if (document.body.classList.contains('pd-live')) hap('lost');
     // Falló la conexión directa: a partir de ahora, por el servidor (siempre funciona si hay internet).
     if (!S.relay && (S.why === 'net' || S.why === 'tv')) { S.relay = true; S.why = ''; saveSeat(); }
     teardown();
@@ -527,7 +577,7 @@
       document.body.classList.add('pd-live'); lockLand();
       overlay('');
       send({ t: 'hi', name: S.name });
-      buzz(30);
+      hap('join');
     };
     dc.onmessage = function (m) {
       var d; try { d = JSON.parse(m.data); } catch (e) { return; }
@@ -541,7 +591,7 @@
         if (!S.help && ui.over.classList.contains('show') && $('.pd-howto')) overlay(''); // la ayuda de antes ya no vale
         drawPriv(); build(S.spec); setMe();
       }
-      else if (d.t === 'buzz') buzz(Math.min(400, d.ms | 0));
+      else if (d.t === 'buzz') { if (d.h) hap(d.h); else buzz(Math.min(400, d.ms | 0)); }
       else if (d.t === 'priv') priv(d.d);
     };
     dc.onclose = function () { if (gen === S.gen) { S.open = false; releaseAll(); retry(gen); } };
@@ -632,5 +682,5 @@
   build(LOBBY);
   setMe();
   if (ALPHA.test(code)) { loadSeat(); connect(); } else askCode(code ? 'Código no válido.' : '');
-  window.__pad = S; window.__padPriv = priv;   /* pruebas */
+  window.__pad = S; window.__padPriv = priv; window.__padBuild = build;   /* pruebas */
 })();

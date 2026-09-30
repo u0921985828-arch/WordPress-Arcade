@@ -655,7 +655,9 @@ export class ArcadePlayer {
       const apply = (next) => {
         for (const d of dirs) if (!next.has(d)) this._key(d, false);
         for (const d of next) if (!dirs.has(d)) this._key(d, true);
-        if (next.size && !dirs.size) navigator.vibrate?.(5);
+        /* 1.50: mismo tacto que el mando del móvil (/mando/): el primer empujón se nota más que los
+           cambios de octante con el pulgar ya apoyado, y hay un hueco mínimo para no zumbar seguido. */
+        if (next.size) this._hap(dirs.size ? 7 : 12, 40);
         dirs = next;
       };
       const place = (x, y) => {
@@ -725,8 +727,8 @@ export class ArcadePlayer {
       const press = (b, on) => {
         const n = count.get(b) + (on ? 1 : -1);
         count.set(b, Math.max(0, n));
-        if (on && n === 1) { this._key(b.dataset.btn, true); b.classList.add('on'); navigator.vibrate?.(8); }
-        if (!on && n <= 0) { this._key(b.dataset.btn, false); b.classList.remove('on'); }
+        if (on && n === 1) { this._key(b.dataset.btn, true); b.classList.add('on'); this._hap(14, 25); }
+        if (!on && n <= 0) { this._key(b.dataset.btn, false); b.classList.remove('on'); this._hap(4, 25); }
       };
       const set = (t) => {
         const was = owner.get(t.identifier), now = nearest(t);
@@ -750,6 +752,14 @@ export class ArcadePlayer {
   }
 
   /* ------------------------------------------------------ Key injection */
+
+  /* Tacto del mando virtual: milisegundos + hueco mínimo para no vibrar seguido. */
+  _hap(ms, gap) {
+    const t = Date.now();
+    if (gap && t - (this._hapAt || 0) < gap) return;
+    this._hapAt = t;
+    try { navigator.vibrate?.(ms); } catch (e) { /* nada */ }
+  }
 
   _key(name, down) {
     const k = this.keymap[name];

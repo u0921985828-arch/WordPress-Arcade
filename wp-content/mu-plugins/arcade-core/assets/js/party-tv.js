@@ -452,6 +452,12 @@
     // Mensaje privado a un solo móvil (mano de cartas, rol secreto…): nunca se pinta en la tele.
     else if (d.type === 'arcade:adbreak') adBreakGame();
     else if (d.type === 'arcade:priv' && d.p >= 0 && d.p < 4) { S.priv[d.p] = d.data ? 1 : 0; send(d.p | 0, { t: 'priv', d: d.data || null }); }
+    /* 1.50: el juego pide tacto en el móvil de un jugador (golpe, daño, vuelta ganada…) o en todos
+       (p < 0). Solo un nombre de patrón: el mando decide cómo se siente y si el dueño lo quiere. */
+    else if (d.type === 'arcade:rumble' && typeof d.h === 'string' && /^[a-z0-9]{1,8}$/.test(d.h)) {
+      if (d.p >= 0 && d.p < 4) { if (active(d.p | 0)) send(d.p | 0, { t: 'buzz', h: d.h }); }
+      else for (var rp = 0; rp < 4; rp++) if (active(rp)) send(rp, { t: 'buzz', h: d.h });
+    }
   });
   function clearPriv() { Object.keys(S.priv).forEach(function (p) { if (S.priv[p]) send(+p, { t: 'priv', d: null }); }); S.priv = {}; }
 
@@ -785,7 +791,6 @@
       peer.open = true; peer.seen = Date.now(); delete S.gone[p];
       send(p, { t: 'you', p: p, color: COLORS[p] });
       send(p, padMsg());
-      send(p, { t: 'buzz', ms: 40 });
       renderPlayers();
       post(playersMsg());
       toast('J' + (p + 1) + (Date.now() - (S.recent[p] || 0) < 600000 ? ' ha vuelto' : ' se ha unido'));
