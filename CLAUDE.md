@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **278 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2, 50 de la oleada 3, 13 de la oleada 4 y 15 de la oleada 5 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.50.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.50.1** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -298,6 +298,8 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
   - **Automático, sin tocar los 278 juegos**: `k.lose` vibra derrota, `k.levelDone` victoria, `k.podium` manda victoria al ganador y derrota a los demás (cada mando por separado: no hay que mirar la tele para saber cómo acabó) y cualquier `navigator.vibrate` de un motor se convierte en tacto en todos los mandos con la fuerza que pedía.
   - El mando virtual de la propia página (`arcade-engine.js`, jugando solo en el móvil) estrena el mismo tacto con `_hap(ms, hueco)`.
   - Verificado con Playwright a 844×390, 740×360 y 390×844, con `navigator.vibrate` interceptado: empujar la dirección da `[12]` y el cambio de octante `[7]`, el botón A `[14]` al pulsar y `[4]` al soltar, igual con joystick y con cruceta, y **nada** con el interruptor apagado.
+
+  - **1.50.1: no se notaba**. Los 4–14 ms de la primera versión están por debajo de lo que un móvil puede dar: el motor de vibración es una masa que tiene que arrancar a girar y tarda unos 15–20 ms en producir algo perceptible, así que el móvil parecía no vibrar. Suelo de **18 ms** y todo recalibrado (pulsar 34, soltar 18, dirección 22/34, tick 20, elegir `[30,45,40]`, acierto 40, daño `[60,50,75]`, victoria `[30,50,30,50,110]`, derrota `[130,80,70]`), huecos mínimos al alza (32–70 ms) y los mismos valores en `kit.js` (`RUMMS`) y en el mando de la página (`arcade-engine.js`). Además, en un móvil que **no puede vibrar desde la web** (todos los iPhone) el interruptor ya no engaña: sale «⊘ Sin vibrar», apagado y con explicación. Al encender el interruptor vibra el patrón de conexión, que se nota de sobra. kit.js `?v=31`.
 
 ## Kuboplay Shield (plugin aparte, `wp-content/plugins/kuboplay-shield`, v1.1.2)
 Segundo plugin, independiente del arcade: seguridad + rendimiento, con panel propio en español. Guía para el usuario: `docs/SEGURIDAD.md` (Cloudflare gratis paso a paso, qué hace y qué no, cómo recuperar el acceso desde IONOS).

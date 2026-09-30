@@ -657,7 +657,7 @@ export class ArcadePlayer {
         for (const d of next) if (!dirs.has(d)) this._key(d, true);
         /* 1.50: mismo tacto que el mando del móvil (/mando/): el primer empujón se nota más que los
            cambios de octante con el pulgar ya apoyado, y hay un hueco mínimo para no zumbar seguido. */
-        if (next.size) this._hap(dirs.size ? 7 : 12, 40);
+        if (next.size) this._hap(dirs.size ? 22 : 34, 55);
         dirs = next;
       };
       const place = (x, y) => {
@@ -727,8 +727,8 @@ export class ArcadePlayer {
       const press = (b, on) => {
         const n = count.get(b) + (on ? 1 : -1);
         count.set(b, Math.max(0, n));
-        if (on && n === 1) { this._key(b.dataset.btn, true); b.classList.add('on'); this._hap(14, 25); }
-        if (!on && n <= 0) { this._key(b.dataset.btn, false); b.classList.remove('on'); this._hap(4, 25); }
+        if (on && n === 1) { this._key(b.dataset.btn, true); b.classList.add('on'); this._hap(34, 32); }
+        if (!on && n <= 0) { this._key(b.dataset.btn, false); b.classList.remove('on'); this._hap(18, 32); }
       };
       const set = (t) => {
         const was = owner.get(t.identifier), now = nearest(t);

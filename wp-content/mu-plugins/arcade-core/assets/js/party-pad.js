@@ -36,19 +36,24 @@
   var touched = false;
   document.addEventListener('pointerdown', function () { touched = true; }, true);
   /* 1.50: tacto con nombre. Un mando de verdad no vibra siempre igual: pulsar es un golpe seco,
-     soltar casi nada, elegir una carta un doble toque y perder la conexión un aviso largo. Cada
-     patrón es un array de milisegundos (vibra, para, vibra…) como pide navigator.vibrate.
-     `g` = hueco mínimo en ms entre dos vibraciones de la misma familia, para que un pulgar que
-     desliza por la cruceta no convierta el móvil en un zumbador (ni se coma la batería). */
+     elegir una carta un doble toque y perder la conexión un aviso largo. Cada patrón es un array
+     de milisegundos (vibra, para, vibra…) como pide navigator.vibrate.
+     1.50.1: los valores de 4–14 ms de la primera versión **no se notaban en un móvil de verdad**:
+     el motor de vibración (una masa que tiene que arrancar a girar) tarda unos 15–20 ms en dar
+     algo perceptible, así que por debajo de eso el móvil parece no vibrar. Suelo de 18 ms y los
+     avisos importantes bien por encima. `g` = hueco mínimo en ms entre dos vibraciones de la misma
+     familia, para que un pulgar que desliza por la cruceta no convierta el móvil en un zumbador. */
   var HAP = {
-    tap: [8], press: [14], rel: [4], dir: [7], dir1: [12],
-    pick: [10, 28, 16], swap: [10, 45, 10], menu: [12], err: [55, 45, 55],
-    join: [16, 55, 30], lost: [40, 80, 40, 80, 40],
-    hit: [24], hurt: [40, 45, 55], big: [70, 45, 110],
-    win: [20, 40, 20, 40, 90], lose: [110, 70, 55], tick: [6]
+    tap: [26], press: [34], rel: [18], dir: [22], dir1: [34],
+    pick: [30, 45, 40], swap: [28, 60, 28], menu: [30], err: [70, 60, 70],
+    join: [30, 70, 45], lost: [60, 90, 60, 90, 60],
+    hit: [40], hurt: [60, 50, 75], big: [90, 55, 130],
+    win: [30, 50, 30, 50, 110], lose: [130, 80, 70], tick: [20]
   };
-  var GAP = { dir: 40, press: 25, rel: 25, tap: 30, tick: 60 };
+  var GAP = { dir: 55, press: 32, rel: 32, tap: 38, tick: 70 };
   var hapAt = {};
+  // Hay móviles que no pueden vibrar desde la web (todos los iPhone): se dice, no se calla.
+  var CANVIB = (function () { try { return typeof navigator.vibrate === 'function'; } catch (e) { return false; } })();
   // Preferencia del móvil: hay gente a la que la vibración le molesta o tiene el móvil en la mesa.
   function vibOn(v) {
     try {
@@ -58,7 +63,7 @@
     return !!v;
   }
   var VIB = vibOn();
-  function play(pat) { try { if (VIB && touched && navigator.vibrate) navigator.vibrate(pat); } catch (e) { /* nada */ } }
+  function play(pat) { try { if (VIB && CANVIB && touched) navigator.vibrate(pat); } catch (e) { /* nada */ } }
   function hap(n) {
     var pat = HAP[n]; if (!pat) return;
     var g = GAP[n] || 0;
@@ -402,6 +407,13 @@
 
   /* Interruptor de vibración, al lado del de mando. Se recuerda en este móvil. */
   function vibLabel() {
+    if (!CANVIB) {
+      // Sin API de vibración (iPhone, y algún navegador de escritorio) el interruptor no engaña.
+      ui.vib.textContent = '\u2298 Sin vibrar';
+      ui.vib.classList.add('off'); ui.vib.disabled = true;
+      ui.vib.title = 'Este móvil no deja vibrar desde la web';
+      return;
+    }
     ui.vib.textContent = (VIB ? '\u25c9' : '\u25cb') + ' Vibra';
     ui.vib.classList.toggle('off', !VIB);
     ui.vib.title = VIB ? 'Quitar la vibración' : 'Poner la vibración';
@@ -409,8 +421,9 @@
   vibLabel();
   ui.vib.addEventListener('click', function (e) {
     e.preventDefault(); e.stopPropagation();
+    if (!CANVIB) return;
     VIB = !VIB; vibOn(VIB); vibLabel();
-    if (VIB) hap('swap'); // así se nota cómo queda al encenderla
+    if (VIB) { touched = true; play(HAP.join); }   // prueba clara al encenderla
   });
   ui.vib.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
 

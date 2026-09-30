@@ -447,7 +447,7 @@ void main(){
     const PADS = [];
     /* Fuera del modo tele (móvil a solas) no hay mando que interprete el nombre: se traduce a
        milisegundos y lo vibra este propio móvil. */
-    const RUMMS = { tap: 8, press: 14, rel: 4, dir: 7, tick: 6, pick: 14, hit: 24, hurt: 45, big: 90, win: 40, lose: 110 };
+    const RUMMS = { tap: 26, press: 34, rel: 18, dir: 22, tick: 20, pick: 34, hit: 40, hurt: 60, big: 110, win: 55, lose: 130 };
     k.party = null;
     k.pad = (p) => PADS[p] || (PADS[p] = { held: new Set(), hit: new Set() });
     k.pcol = (p) => { const q = k.party && k.party.find((x) => x.p === p); return (q && q.color) || ['#ff5a5f', '#3fb6ea', '#ffd166', '#5fbf45'][p % 4]; };
@@ -470,7 +470,7 @@ void main(){
        Se agrupa a 90 ms por jugador, que por el servidor cada mensaje cuesta una petición. */
     const rumT = [0, 0, 0, 0, 0];
     k.rumble = (p, kind) => {
-      if (!k.party) { if (navigator.vibrate) { try { navigator.vibrate(RUMMS[kind] || 20); } catch (e) {} } return; }
+      if (!k.party) { if (navigator.vibrate) { try { navigator.vibrate(RUMMS[kind] || 30); } catch (e) {} } return; }
       const i = p >= 0 && p < 4 ? p : 4, now = performance.now();
       if (now - rumT[i] < 90) return;
       rumT[i] = now; tell('arcade:rumble', { p: p >= 0 ? p | 0 : -1, h: kind || 'tap' });
