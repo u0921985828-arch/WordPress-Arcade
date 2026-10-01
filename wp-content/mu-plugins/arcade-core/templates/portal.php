@@ -42,8 +42,8 @@ $sec_head = static function ( $title, $url = '', $count = 0 ) use ( $ico ) {
 <a class="ax-skip" href="#ax-main">Saltar al contenido</a>
 <header class="ax-top">
 	<div class="ax-wrap ax-bar">
-		<a class="ax-logo" href="<?php echo esc_url( home_url( '/' ) ); ?>"><img class="ax-wm" src="<?php echo esc_url( plugins_url( 'assets/img/kuboplay-logo.svg', dirname( __FILE__ ) ) ); ?>" width="119" height="29" alt="<?php echo esc_attr( $brand ); ?>"></a>
-		<form class="ax-search" role="search" action="<?php echo esc_url( home_url( '/' ) ); ?>" data-ax-search>
+		<a class="ax-logo" href="<?php echo esc_url( Arcade_Portal::home() ); ?>"><img class="ax-wm" src="<?php echo esc_url( plugins_url( 'assets/img/kuboplay-logo.svg', dirname( __FILE__ ) ) ); ?>" width="119" height="29" alt="<?php echo esc_attr( $brand ); ?>"></a>
+		<form class="ax-search" role="search" action="<?php echo esc_url( Arcade_Portal::home() ); ?>" data-ax-search>
 			<input type="search" name="s" placeholder="Buscar entre <?php echo (int) wp_count_posts( 'game' )->publish; ?> juegos…" data-ph-sm="Buscar juegos…" value="<?php echo esc_attr( get_search_query() ); ?>" aria-label="Buscar juegos" autocomplete="off" enterkeyhint="search">
 			<input type="hidden" name="post_type" value="game">
 			<div class="ax-sugg" role="listbox" hidden></div>
@@ -52,7 +52,7 @@ $sec_head = static function ( $title, $url = '', $count = 0 ) use ( $ico ) {
 		<a class="ax-mine" href="<?php echo esc_url( $mine_url ); ?>"><?php echo $ico['star']; // phpcs:ignore ?><span>Mis juegos</span></a>
 	</div>
 	<nav class="ax-wrap ax-chips" aria-label="Categorías">
-		<a class="<?php echo ( ! $current && is_front_page() ) ? 'on' : ''; ?>" href="<?php echo esc_url( home_url( '/' ) ); ?>">Inicio</a>
+		<a class="<?php echo ( ! $current && Arcade_Portal::is_home_page() ) ? 'on' : ''; ?>" href="<?php echo esc_url( Arcade_Portal::home() ); ?>">Inicio</a>
 		<?php foreach ( Arcade_Portal::LABELS as $slug => $l ) : $u = Arcade_Portal::genre_url( $slug ); if ( ! $u ) { continue; } ?>
 			<a class="<?php echo $current === $slug ? 'on' : ''; ?>" style="--c:<?php echo esc_attr( $l[1] ); ?>" href="<?php echo esc_url( $u ); ?>"><span class="ax-dot"></span><?php echo esc_html( $l[0] ); ?></a>
 		<?php endforeach; ?>
@@ -155,7 +155,7 @@ elseif ( is_404() ) :
 		<span class="ax-kicker">Error 404</span>
 		<h1>Esta página no existe</h1>
 		<p>Puede que el enlace haya cambiado. Busca un juego o prueba uno de estos.</p>
-		<div class="ax-cta"><a class="ax-btn" href="<?php echo esc_url( home_url( '/' ) ); ?>">Ir al inicio</a><a class="ax-btn ghost" href="<?php echo esc_url( $all_url ); ?>">Ver todos los juegos</a></div>
+		<div class="ax-cta"><a class="ax-btn" href="<?php echo esc_url( Arcade_Portal::home() ); ?>">Ir al inicio</a><a class="ax-btn ghost" href="<?php echo esc_url( $all_url ); ?>">Ver todos los juegos</a></div>
 	</section>
 	<div class="ax-grid"><?php foreach ( $sug as $p ) { echo Arcade_Portal::card( $p ); } // phpcs:ignore ?></div>
 
@@ -404,13 +404,13 @@ endif;
 ?>
 </main>
 <footer class="ax-foot"><div class="ax-wrap ax-foot-g">
-	<div><a class="ax-logo" href="<?php echo esc_url( home_url( '/' ) ); ?>"><img class="ax-wm" src="<?php echo esc_url( plugins_url( 'assets/img/kuboplay-logo.svg', dirname( __FILE__ ) ) ); ?>" width="119" height="29" alt="<?php echo esc_attr( $brand ); ?>"></a>
+	<div><a class="ax-logo" href="<?php echo esc_url( Arcade_Portal::home() ); ?>"><img class="ax-wm" src="<?php echo esc_url( plugins_url( 'assets/img/kuboplay-logo.svg', dirname( __FILE__ ) ) ); ?>" width="119" height="29" alt="<?php echo esc_attr( $brand ); ?>"></a>
 	<p>Juegos HTML5 gratuitos para móvil, tablet y ordenador. Sin descargas ni registro.</p></div>
 	<div><h3>Categorías</h3><ul><?php foreach ( Arcade_Portal::LABELS as $slug => $l ) { $u = Arcade_Portal::genre_url( $slug ); if ( $u ) { printf( '<li><a href="%s">%s</a></li>', esc_url( $u ), esc_html( $l[0] ) ); } } ?></ul></div>
 	<div><h3>Portal</h3><ul><li><a href="<?php echo esc_url( $all_url ); ?>">Todos los juegos</a></li><li><a href="<?php echo esc_url( $mine_url ); ?>">Mis juegos</a></li><?php if ( $party ) : ?><li><a href="<?php echo esc_url( $tv_url ); ?>">Jugar en la tele</a></li><?php endif; ?><?php if ( class_exists( 'Arcade_SEO' ) ) { foreach ( Arcade_SEO::legal_links() as $lk ) { printf( '<li><a href="%s">%s</a></li>', esc_url( $lk[1] ), esc_html( $lk[0] ) ); } } ?><li><button type="button" class="ax-linkbtn" data-ax-consent hidden>Preferencias de privacidad</button></li></ul></div>
 </div><div class="ax-wrap ax-copy">© <?php echo esc_html( gmdate( 'Y' ) . ' ' . $brand ); ?>. Todos los derechos reservados.</div></footer>
 <nav class="ax-tabbar" aria-label="Navegación principal">
-	<a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="<?php echo is_front_page() ? 'on' : ''; ?>"><?php echo $ico['home']; // phpcs:ignore ?><span>Inicio</span></a>
+	<a href="<?php echo esc_url( Arcade_Portal::home() ); ?>" class="<?php echo Arcade_Portal::is_home_page() ? 'on' : ''; ?>"><?php echo $ico['home']; // phpcs:ignore ?><span>Inicio</span></a>
 	<a href="<?php echo esc_url( $all_url ); ?>" class="<?php echo ( is_post_type_archive( 'game' ) && empty( $_GET['mis'] ) ) || is_tax() ? 'on' : ''; // phpcs:ignore ?>"><?php echo $ico['grid']; // phpcs:ignore ?><span>Explorar</span></a>
 	<?php if ( $party ) : ?><a href="<?php echo esc_url( $tv_url ); ?>" aria-label="Jugar en la tele"><?php echo str_replace( 'width="20" height="20"', 'width="22" height="22"', $ico['tvbig'] ); // phpcs:ignore ?><span>Tele</span></a><?php endif; ?>
 	<a href="<?php echo esc_url( $mine_url ); ?>" class="<?php echo ! empty( $_GET['mis'] ) ? 'on' : ''; // phpcs:ignore ?>"><?php echo $ico['star']; // phpcs:ignore ?><span>Mis juegos</span></a>

@@ -6,7 +6,7 @@ Contexto para Claude Code. **Responde siempre en español, conciso y directo** (
 Portal de juegos mobile-first en WordPress con **278 juegos propios** (100 + 50 de la oleada 1, 50 de la oleada 2, 50 de la oleada 3, 13 de la oleada 4 y 15 de la oleada 5 de PLAN-400) (canvas 2D, sin librerías) servidos dentro de un plugin, más un importador opcional de catálogos profesionales (GamePix / GameDistribution). Objetivo: portal diferenciado y de calidad, monetizado con **AdSense**. Escalar a 900+ juegos.
 
 - Web en pruebas: https://myblog-wr1k1xoqsf.live-website.com (WordPress 7.1.2, tema Twenty Twenty-Five, hosting IONOS). Dominio: **kuboplay.online** (registrado en PiensaSolutions, DNS pendiente de propagar); marca **Kuboplay** (título del sitio por poner; `brand()` usa «Kuboplay» si sigue en «My Blog»).
-- Versión actual del plugin: **1.50.1** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
+- Versión actual del plugin: **1.51.0** (`const VERSION` en `wp-content/mu-plugins/arcade-core.php`).
 - Despliegue: el usuario **no tiene FTP**. Sube el zip en Plugins → Añadir nuevo → Subir plugin → "Reemplazar actual con el subido". Nombra los zips con versión (`arcade-core-plugin-X.Y.Z.zip`) para que no se confunda.
 
 ## Estructura
@@ -300,6 +300,15 @@ Si el portal no tiene juegos del menú de ejemplo del tema: la portada es la pá
   - Verificado con Playwright a 844×390, 740×360 y 390×844, con `navigator.vibrate` interceptado: empujar la dirección da `[12]` y el cambio de octante `[7]`, el botón A `[14]` al pulsar y `[4]` al soltar, igual con joystick y con cruceta, y **nada** con el interruptor apagado.
 
   - **1.50.1: no se notaba**. Los 4–14 ms de la primera versión están por debajo de lo que un móvil puede dar: el motor de vibración es una masa que tiene que arrancar a girar y tarda unos 15–20 ms en producir algo perceptible, así que el móvil parecía no vibrar. Suelo de **18 ms** y todo recalibrado (pulsar 34, soltar 18, dirección 22/34, tick 20, elegir `[30,45,40]`, acierto 40, daño `[60,50,75]`, victoria `[30,50,30,50,110]`, derrota `[130,80,70]`), huecos mínimos al alza (32–70 ms) y los mismos valores en `kit.js` (`RUMMS`) y en el mando de la página (`arcade-engine.js`). Además, en un móvil que **no puede vibrar desde la web** (todos los iPhone) el interruptor ya no engaña: sale «⊘ Sin vibrar», apagado y con explicación. Al encender el interruptor vibra el patrón de conexión, que se nota de sobra. kit.js `?v=31`.
+
+- **Lanzadera de juegos (plugin aparte, `wp-content/plugins/kuboplay-launcher`, v1.0.0)**: al entrar en la web sale un **menú de consola a pantalla completa** para elegir juego (Kuboplay o Liga de Barrios), en vez de caer directamente en el portal.
+  - Al activarlo crea la página «Elige juego», la pone de portada y **se guarda cuál era la portada antes**; al desactivarlo la devuelve tal cual. El portal del arcade pasa a vivir en `/juegos/`.
+  - Para que el portal siga coherente, `arcade-core` estrena `Arcade_Portal::home()` (permalink de la página `arcade_home_page_id`, filtro `arcade_portal_home`) y `Arcade_Portal::is_home_page()`: el logo, «Inicio», el buscador, «Ir al inicio», el pie, la barra inferior y el `start_url` del PWA dejan de apuntar a `home_url('/')` a pelo. Sin lanzadera no cambia nada (la página «Juegos» sigue siendo la portada).
+  - Fichas estilo PS5: la señalada crece, se ilumina con su color y enseña el texto y el botón; el fondo se tiñe de ese color. Se mueve con flechas, ratón, gesto del dedo y **mando** (eje, cruceta, A/Start; solo se sondea con un mando conectado). Portadas en SVG dibujado por código (cubo isométrico y campo de fútbol con balón de píxeles), nada de imágenes de terceros.
+  - Detecta solo lo instalado (clases `Arcade_Portal` y `Liga_Barrios`) y admite hasta 6 juegos a mano en Ajustes → Lanzadera (nombre, texto, dirección, color y dibujo).
+  - Verificado con Playwright a 390×844, 844×390, 1280×720 y 1920×1080: sin desbordes, sin errores de consola, la flecha cambia de ficha e Intro entra al juego.
+
+- **Liga de Barrios de Barakaldo (plugin aparte, `wp-content/plugins/liga-barrios`, v1.0.0)**: hospeda el juego del repositorio `43digitalinfo-hue/ligadebarrios` (un único HTML de 800 KB con sus 125 sprites en base64). Dirección propia `/liga-de-barrios/` (se sirve el fichero tal cual con un `<base>` inyectado, no en un iframe: el juego usa `env(safe-area-inset-*)`), atajo `[liga_barrios alto="600px"]`, panel en Ajustes, fuente Pixelify Sans (SIL OFL) dentro del plugin —cero peticiones a Google— y cabeceras de caché con respuesta 304 por ETag.
 
 ## Kuboplay Shield (plugin aparte, `wp-content/plugins/kuboplay-shield`, v1.1.2)
 Segundo plugin, independiente del arcade: seguridad + rendimiento, con panel propio en español. Guía para el usuario: `docs/SEGURIDAD.md` (Cloudflare gratis paso a paso, qué hace y qué no, cómo recuperar el acceso desde IONOS).

@@ -58,7 +58,7 @@ final class Arcade_Portal {
 			'short_name'       => self::brand(),
 			'description'      => 'Juegos HTML5 gratis para móvil y PC, sin descargas.',
 			'lang'             => 'es',
-			'start_url'        => home_url( '/?pwa=1' ),
+			'start_url'        => add_query_arg( 'pwa', 1, self::home() ),
 			'scope'            => home_url( '/' ),
 			'display'          => 'standalone',
 			'background_color' => '#0b0d12',
@@ -208,11 +208,28 @@ final class Arcade_Portal {
 	}
 
 	public static function title( $parts ) {
-		if ( self::is_portal() && is_front_page() ) {
+		if ( self::is_portal() && self::is_home_page() ) {
 			$parts['title'] = self::brand() . ' — Juegos gratis online';
 			unset( $parts['tagline'], $parts['site'] );
 		}
 		return $parts;
+	}
+
+	/**
+	 * Inicio del portal. Deja de ser `home_url('/')` en cuanto otra cosa ocupa la portada
+	 * (por ejemplo la lanzadera de juegos): entonces la página «Juegos» tiene su propia
+	 * dirección y es ahí donde tienen que llevar el logo, «Inicio» y el buscador.
+	 */
+	public static function home() {
+		$pid = (int) get_option( 'arcade_home_page_id' );
+		$url = ( $pid && 'publish' === get_post_status( $pid ) ) ? get_permalink( $pid ) : '';
+		return apply_filters( 'arcade_portal_home', $url ? $url : home_url( '/' ) );
+	}
+
+	/** ¿Estamos en el inicio del portal? (la portada, o la página «Juegos» si ya no lo es). */
+	public static function is_home_page() {
+		$pid = (int) get_option( 'arcade_home_page_id' );
+		return $pid ? is_page( $pid ) : is_front_page();
 	}
 
 	public static function brand() {
