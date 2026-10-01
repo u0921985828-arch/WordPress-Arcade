@@ -1,0 +1,27 @@
+/* Ajustes de maquetación de Kuboplay sobre el juego original.
+   Se cargan después del <style> del juego, así que no hay que tocar el HTML de upstream.
+   Solo afectan a la pantalla de título (.title): el resto de pantallas se queda igual. */
+#ov .title{
+  text-align:center;
+  align-items:center;
+  width:100%;
+  max-width:420px;
+  min-height:100%;
+  justify-content:safe center;
+  padding-bottom:8px;
+}
+#ov .title h1{margin:0 0 2px}
+#ov .title .sub{margin:0 0 10px}
+#ov .title button{width:100%;max-width:320px}
+#ov .title .tiny{margin-top:16px;margin-bottom:0}
+/* El título va sobre el campo: sombra dura para que el texto se lea encima del césped. */
+#ov .title .sub,#ov .title .tiny{text-shadow:1px 1px 0 #1d1b26,-1px 1px 0 #1d1b26,1px -1px 0 #1d1b26,-1px -1px 0 #1d1b26}
+#ov .title .warn{margin:0}
+/* Horizontal bajo (móvil tumbado): el título ocupaba casi toda la altura. */
+@media (orientation:landscape) and (max-height:520px){
+  #ov .title{gap:8px}
+  #ov .title h1{font-size:30px}
+  #ov .title .sub{font-size:15px;margin:0 0 4px}
+  #ov .title .big{font-size:17px;padding:7px}
+  #ov .title .tiny{margin-top:8px}
+}

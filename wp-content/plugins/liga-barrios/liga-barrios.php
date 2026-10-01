@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Liga de Barrios de Barakaldo
  * Description: Hospeda el juego «Liga de Barrios de Barakaldo» dentro de WordPress: direccion propia a pantalla completa, atajo [liga_barrios] para incrustarlo en cualquier pagina y la fuente servida desde el propio plugin (nada se pide a Google).
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: 43 Digital Info
  * License: GPL-2.0-or-later
  * Text Domain: liga-barrios
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class Liga_Barrios {
 
-	const VERSION  = '1.0.0';
+	const VERSION  = '1.1.0';
 	const OPTION   = 'liga_barrios';
 	const QUERY_VAR = 'liga_barrios';
 
@@ -109,6 +109,10 @@ final class Liga_Barrios {
 		$html = file_get_contents( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 		$base = '<base href="' . esc_url( trailingslashit( self::game_url() ) ) . '">';
 		$html = preg_replace( '#(<meta\s+charset="utf-8">)#i', '$1' . "\n" . $base, $html, 1 );
+
+		// Ajustes de maquetación propios, después del <style> del juego para que manden.
+		$fix  = '<link rel="stylesheet" href="' . esc_url( self::game_url() . '/kuboplay-fix.css?v=' . self::VERSION ) . '">';
+		$html = preg_replace( '#</head>#i', $fix . "\n</head>", $html, 1 );
 
 		$etag = '"' . md5( $html . self::VERSION ) . '"';
 

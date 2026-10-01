@@ -4,7 +4,7 @@ Tags: game, juego, html5, canvas
 Requires at least: 5.6
 Tested up to: 6.8
 Requires PHP: 7.0
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 
 Hospeda el juego «Liga de Barrios de Barakaldo» dentro de WordPress.
@@ -30,6 +30,9 @@ los margenes de seguridad del movil (`env(safe-area-inset-*)`), que dentro de un
 4. Abre `tudominio.com/liga-de-barrios/`.
 
 == Changelog ==
+
+= 1.1.0 =
+* Pantalla de titulo centrada en todos los tamanos (hoja kuboplay-fix.css inyectada sobre el juego).
 
 = 1.0.0 =
 * Primera version: direccion propia, atajo, fuente local y cabeceras de cache.
