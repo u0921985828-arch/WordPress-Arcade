@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Kuboplay Lanzadera
  * Description: Pone en la portada un menú de consola a pantalla completa para elegir juego (Kuboplay, Liga de Barrios…), con mando, teclado, ratón y dedo. Al desactivarlo la portada vuelve a ser la de antes.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: Kuboplay
  * License: GPL-2.0-or-later
  * Text Domain: kuboplay-launcher
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class Kuboplay_Launcher {
 
-	const VERSION = '1.0.0';
+	const VERSION = '1.1.0';
 	const OPTION  = 'kplauncher';
 	const SLOTS   = 6;
 
@@ -28,21 +28,55 @@ final class Kuboplay_Launcher {
 				'entries' => array(),
 				'page'    => 0,
 				'prev'    => array(),
+				'off'     => array(),
 			)
 		);
 	}
 
-	/** Entradas visibles: las guardadas, o las que se detecten si aún no hay ninguna. */
+	/**
+	 * Entradas visibles: las guardadas más los juegos que se detecten y aún no estén
+	 * en la lista. Así da igual el orden de instalación: si la lanzadera se activó antes
+	 * de instalar Liga de Barrios, su ficha aparece en cuanto el plugin existe.
+	 * Lo que el usuario borra a mano se recuerda en «off» y no vuelve a salir.
+	 */
 	public static function entries() {
-		$o = self::opts();
-		$e = array();
+		$o    = self::opts();
+		$off  = array_map( 'strval', (array) $o['off'] );
+		$e    = array();
+		$keys = array();
+		$urls = array();
+
 		foreach ( (array) $o['entries'] as $row ) {
-			$row = wp_parse_args( (array) $row, array( 'title' => '', 'sub' => '', 'url' => '', 'color' => '#6e62f5', 'art' => 'kubo' ) );
-			if ( $row['title'] && $row['url'] && ! self::is_self( $row['url'] ) ) {
-				$e[] = $row;
+			$row = self::row( $row );
+			if ( ! $row['title'] || ! $row['url'] || self::is_self( $row['url'] ) ) {
+				continue;
 			}
+			$e[]    = $row;
+			$keys[] = $row['key'];
+			$urls[] = untrailingslashit( $row['url'] );
 		}
-		return $e ? $e : self::detect();
+
+		foreach ( self::detect() as $row ) {
+			if ( in_array( $row['key'], $keys, true ) || in_array( $row['key'], $off, true ) ) {
+				continue;
+			}
+			if ( in_array( untrailingslashit( $row['url'] ), $urls, true ) || self::is_self( $row['url'] ) ) {
+				continue;
+			}
+			$e[]    = $row;
+			$keys[] = $row['key'];
+			$urls[] = untrailingslashit( $row['url'] );
+		}
+
+		return array_slice( $e, 0, self::SLOTS );
+	}
+
+	/** Una fila con todos sus campos, venga del panel o de la detección. */
+	public static function row( $row ) {
+		return wp_parse_args(
+			(array) $row,
+			array( 'title' => '', 'sub' => '', 'url' => '', 'color' => '#6e62f5', 'art' => 'kubo', 'key' => '' )
+		);
 	}
 
 	/** Una ficha que lleva a la propia lanzadera no sirve de nada: se descarta. */
@@ -63,6 +97,7 @@ final class Kuboplay_Launcher {
 				'url'   => method_exists( 'Arcade_Portal', 'home' ) ? Arcade_Portal::home() : home_url( '/' ),
 				'color' => '#6e62f5',
 				'art'   => 'kubo',
+				'key'   => 'arcade',
 			);
 		}
 
@@ -73,6 +108,7 @@ final class Kuboplay_Launcher {
 				'url'   => Liga_Barrios::play_url(),
 				'color' => '#c0572b',
 				'art'   => 'liga',
+				'key'   => 'liga',
 			);
 		}
 
@@ -87,6 +123,7 @@ final class Kuboplay_Launcher {
 		add_filter( 'document_title_parts', array( __CLASS__, 'title' ) );
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
 		add_action( 'admin_init', array( __CLASS__, 'settings' ) );
+		add_action( 'admin_init', array( __CLASS__, 'maybe_reset' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( __CLASS__, 'action_links' ) );
 	}
 
@@ -166,10 +203,8 @@ final class Kuboplay_Launcher {
 		update_option( 'show_on_front', 'page' );
 		update_option( 'page_on_front', $pid );
 
-		if ( ! $o['entries'] ) {
-			$o['entries'] = self::detect();
-			update_option( self::OPTION, $o );
-		}
+		// No se congela la lista: entries() detecta en caliente, así que un juego
+		// instalado después de la lanzadera aparece solo.
 		flush_rewrite_rules();
 	}
 
@@ -247,6 +282,7 @@ final class Kuboplay_Launcher {
 		$out['title'] = isset( $in['title'] ) ? sanitize_text_field( $in['title'] ) : '';
 
 		$rows = array();
+		$seen = array();
 		foreach ( (array) ( isset( $in['entries'] ) ? $in['entries'] : array() ) as $r ) {
 			$t = isset( $r['title'] ) ? sanitize_text_field( $r['title'] ) : '';
 			$u = isset( $r['url'] ) ? esc_url_raw( trim( (string) $r['url'] ) ) : '';
@@ -254,16 +290,48 @@ final class Kuboplay_Launcher {
 				continue;
 			}
 			$col = isset( $r['color'] ) ? sanitize_hex_color( $r['color'] ) : '';
+			$key = isset( $r['key'] ) ? sanitize_key( $r['key'] ) : '';
 			$rows[] = array(
 				'title' => $t,
 				'sub'   => isset( $r['sub'] ) ? sanitize_text_field( $r['sub'] ) : '',
 				'url'   => $u,
 				'color' => $col ? $col : '#6e62f5',
 				'art'   => ( isset( $r['art'] ) && 'liga' === $r['art'] ) ? 'liga' : 'kubo',
+				'key'   => $key,
 			);
+			if ( $key ) {
+				$seen[] = $key;
+			}
 		}
 		$out['entries'] = array_slice( $rows, 0, self::SLOTS );
+
+		// Un juego detectado que el usuario deja en blanco es un juego que no quiere ver:
+		// se recuerda para que la detección no lo vuelva a añadir.
+		$off = array_map( 'strval', (array) $o['off'] );
+		foreach ( self::detect() as $d ) {
+			if ( $d['key'] && ! in_array( $d['key'], $seen, true ) && ! in_array( $d['key'], $off, true ) ) {
+				$off[] = $d['key'];
+			}
+			if ( $d['key'] && in_array( $d['key'], $seen, true ) ) {
+				$off = array_values( array_diff( $off, array( $d['key'] ) ) );
+			}
+		}
+		$out['off'] = $off;
 		return $out;
+	}
+
+	/** Botón «Volver a detectar»: borra la lista a mano y deja que manden los plugins. */
+	public static function maybe_reset() {
+		if ( empty( $_GET['kp_reset'] ) || ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		check_admin_referer( 'kp_reset' );
+		$o            = self::opts();
+		$o['entries'] = array();
+		$o['off']     = array();
+		update_option( self::OPTION, $o );
+		wp_safe_redirect( admin_url( 'options-general.php?page=kuboplay-launcher&kp_done=1' ) );
+		exit;
 	}
 
 	public static function page() {
@@ -273,14 +341,25 @@ final class Kuboplay_Launcher {
 		$o    = self::opts();
 		$rows = self::entries();
 		while ( count( $rows ) < min( self::SLOTS, count( $rows ) + 2 ) ) {
-			$rows[] = array( 'title' => '', 'sub' => '', 'url' => '', 'color' => '#6e62f5', 'art' => 'kubo' );
+			$rows[] = self::row( array() );
 		}
 		?>
 		<div class="wrap">
 			<h1>Lanzadera de juegos</h1>
 			<p>La portada del sitio (<code><?php echo esc_html( home_url( '/' ) ); ?></code>) es el menú para elegir juego.
 				Al desactivar el plugin, la portada vuelve a ser la que era.</p>
-			<p><a class="button button-primary" href="<?php echo esc_url( home_url( '/' ) ); ?>" target="_blank" rel="noopener">Ver la portada</a></p>
+			<p><a class="button button-primary" href="<?php echo esc_url( home_url( '/' ) ); ?>" target="_blank" rel="noopener">Ver la portada</a>
+				<a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'options-general.php?page=kuboplay-launcher&kp_reset=1' ), 'kp_reset' ) ); ?>">Volver a detectar los juegos</a></p>
+			<?php if ( ! empty( $_GET['kp_done'] ) ) : ?>
+				<div class="notice notice-success"><p>Lista rehecha a partir de los plugins activos.</p></div>
+			<?php endif; ?>
+			<h2>Juegos detectados</h2>
+			<table class="widefat striped" style="max-width:760px"><tbody>
+				<tr><td><strong>Kuboplay (Arcade Core)</strong></td>
+					<td><?php echo class_exists( 'Arcade_Portal' ) ? 'detectado · <code>' . esc_html( Arcade_Portal::home() ) . '</code>' : '<em>no activo</em>'; ?></td></tr>
+				<tr><td><strong>Liga de Barrios</strong></td>
+					<td><?php echo class_exists( 'Liga_Barrios' ) ? 'detectado · <code>' . esc_html( Liga_Barrios::play_url() ) . '</code>' : '<em>no activo</em> — instala y activa el plugin «Liga de Barrios»'; ?></td></tr>
+			</tbody></table>
 			<form method="post" action="options.php">
 				<?php settings_fields( 'kplauncher_group' ); ?>
 				<table class="form-table" role="presentation">
@@ -297,7 +376,8 @@ final class Kuboplay_Launcher {
 					<tbody>
 					<?php foreach ( $rows as $i => $r ) : $n = esc_attr( self::OPTION ) . '[entries][' . (int) $i . ']'; ?>
 						<tr>
-							<td><input type="text" name="<?php echo $n; // phpcs:ignore ?>[title]" value="<?php echo esc_attr( $r['title'] ); ?>"></td>
+							<td><input type="hidden" name="<?php echo $n; // phpcs:ignore ?>[key]" value="<?php echo esc_attr( $r['key'] ); ?>">
+								<input type="text" name="<?php echo $n; // phpcs:ignore ?>[title]" value="<?php echo esc_attr( $r['title'] ); ?>"></td>
 							<td><input type="text" name="<?php echo $n; // phpcs:ignore ?>[sub]" value="<?php echo esc_attr( $r['sub'] ); ?>" size="40"></td>
 							<td><input type="url" name="<?php echo $n; // phpcs:ignore ?>[url]" value="<?php echo esc_attr( $r['url'] ); ?>" size="30"></td>
 							<td><input type="color" name="<?php echo $n; // phpcs:ignore ?>[color]" value="<?php echo esc_attr( $r['color'] ); ?>"></td>
