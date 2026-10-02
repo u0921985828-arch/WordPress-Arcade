@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Liga de Barrios de Barakaldo
  * Description: Hospeda el juego «Liga de Barrios de Barakaldo» dentro de WordPress: direccion propia a pantalla completa, atajo [liga_barrios] para incrustarlo en cualquier pagina y la fuente servida desde el propio plugin (nada se pide a Google).
- * Version: 1.1.1
+ * Version: 1.2.0
  * Author: 43 Digital Info
  * License: GPL-2.0-or-later
  * Text Domain: liga-barrios
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class Liga_Barrios {
 
-	const VERSION  = '1.1.1';
+	const VERSION  = '1.2.0';
 	const OPTION   = 'liga_barrios';
 	const QUERY_VAR = 'liga_barrios';
 
