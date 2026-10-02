@@ -4,7 +4,7 @@ Tags: game, juego, html5, canvas
 Requires at least: 5.6
 Tested up to: 6.8
 Requires PHP: 7.0
-Stable tag: 1.2.0
+Stable tag: 1.2.1
 License: GPLv2 or later
 
 Hospeda el juego «Liga de Barrios de Barakaldo» dentro de WordPress.
@@ -30,6 +30,9 @@ los margenes de seguridad del movil (`env(safe-area-inset-*)`), que dentro de un
 4. Abre `tudominio.com/liga-de-barrios/`.
 
 == Changelog ==
+
+= 1.2.1 =
+* En el movil el cuadro de texto salia pegado abajo y tapaba la cruceta y los botones A y B: ahora se sube por encima de los controles cuando estan en pantalla, asi que para pasar el texto se tiene el mando libre (y el boton A tambien pasa el texto).
 
 = 1.2.0 =
 * Juego actualizado al ultimo upstream: interfaz HD (tipografia Nunito, botones, paneles y tarjetas redondeados, criaturas suavizadas con Scale2x), rediseno de los 24 minijuegos, pantalla de captura con escenario por tipo, fichaje y feria en HD, marcador y selector de tecnicas en capa HD, banda sonora adaptativa generada en el propio juego.

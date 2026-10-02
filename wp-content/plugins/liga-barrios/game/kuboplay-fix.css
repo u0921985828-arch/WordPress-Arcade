@@ -53,3 +53,16 @@
    pantallas largas), así que el bloque de título quedaba 6 px por encima del
    centro. En la pantalla de título se igualan los dos lados. */
 #ov:has(> .title){padding-bottom:calc(var(--sb) + 12px)}
+/* En el móvil el cuadro de texto salía pegado abajo (bottom: --sb + 10px) y
+   tapaba la cruceta (que llega hasta --sb + 182px) y los botones A y B, así
+   que para pasar el texto había que tocar justo encima de los controles. Con
+   los controles en pantalla el cuadro se sube por encima de su franja; el
+   alto se limita para que no se salga por arriba en apaisado. En el escritorio
+   y en las escenas sin controles no cambia nada. */
+@media (pointer:coarse){
+  #pad:not(.hide) ~ #dlg{
+    bottom:calc(var(--sb) + 190px);
+    max-height:calc(100% - var(--sb) - var(--st) - 200px);
+    overflow:auto;
+  }
+}
