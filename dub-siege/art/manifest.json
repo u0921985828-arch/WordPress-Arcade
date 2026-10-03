@@ -36,5 +36,61 @@
   "fw": 12,
   "fh": 12,
   "n": 1
+ },
+ "p_fall": {
+  "object": "aa6c046b-cbaf-433b-be04-e07444707a87",
+  "anim": null,
+  "fw": 12,
+  "fh": 14,
+  "n": 1
+ },
+ "p_aimu": {
+  "object": "e819b456-61a6-447a-887a-a7891dff07a7",
+  "anim": null,
+  "fw": 12,
+  "fh": 14,
+  "n": 1
+ },
+ "p_dash": {
+  "object": "2a87f5e7-3a16-4ee1-a165-517613c594a4",
+  "anim": null,
+  "fw": 14,
+  "fh": 14,
+  "n": 1
+ },
+ "p_jump": {
+  "object": "efeb053a-1e95-461b-9077-7646e3150eee",
+  "anim": null,
+  "fw": 12,
+  "fh": 14,
+  "n": 1
+ },
+ "e_h": {
+  "object": "8b9c46f1-bed5-4c33-9ae7-34dcb6ae323d",
+  "anim": "hop",
+  "fw": 12,
+  "fh": 12,
+  "n": 4
+ },
+ "e_s": {
+  "object": "b31c1d78-aa7f-48c1-9e0a-f15791f1cfde",
+  "anim": "walk",
+  "fw": 14,
+  "fh": 16,
+  "n": 4
+ },
+ "e_b": {
+  "object": "104341cc-fcd5-46f2-b28b-e931a878cd85",
+  "anim": "fly",
+  "fw": 16,
+  "fh": 10,
+  "n": 4
+ },
+ "e_box": {
+  "object": "3e130ee9-f156-46eb-b3a6-4d2fcfb830fb",
+  "anim": null,
+  "fw": 10,
+  "fh": 10,
+  "n": 1
  }
 }
