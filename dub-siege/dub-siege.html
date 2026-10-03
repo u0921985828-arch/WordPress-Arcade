@@ -178,7 +178,7 @@ function load(k,d){try{var v=JSON.parse(localStorage.getItem(k));return v==null?
 
 // ================= configuracion =================
 var SET=load('ds2_set',{});
-(function(){var d={diff:1,mute:false,auto:null,assist:true,touch:'auto',big:false,vib:true,light:true,upJump:false,tut:false,help:false};for(var k in d)if(SET[k]===undefined)SET[k]=d[k];})();
+(function(){var d={diff:1,mute:false,auto:null,assist:false,touch:'auto',big:false,vib:true,light:true,upJump:false,tut:false,help:false};for(var k in d)if(SET[k]===undefined)SET[k]=d[k];})();
 function touchMode(){if(SET.touch==='on')return true;if(SET.touch==='off')return false;return matchMedia('(pointer:coarse)').matches||(navigator.maxTouchPoints>0&&!matchMedia('(pointer:fine)').matches);}
 function autoFire(){return SET.auto===null?touchMode():SET.auto;}
 function buzz(ms){if(!SET.vib||!touchMode())return;try{navigator.vibrate&&navigator.vibrate(ms);}catch(e){}}
@@ -194,10 +194,10 @@ var DIFFS=[
 ];
 var D=DIFFS[SET.diff];
 var STAGES=[
-  {name:'CALLE',sub:'BARRIO DORMIDO',sky:['#05061a','#1d2050'],gnd:'#232842',top:'#5a6390',tex:'#2c3252',tier:1,boss:'EL SILENCIADOR',amb:'rgba(8,10,38,.26)'},
-  {name:'AZOTEAS',sub:'ATARDECER EN LOS TEJADOS',sky:['#26103a','#ff7a4a'],gnd:'#4a2626',top:'#d0703a',tex:'#5c3030',tier:2,boss:'DRON PIRATA',amb:'rgba(52,16,34,.15)'},
-  {name:'METRO',sub:'LINEA FANTASMA',sky:['#07080c','#171a24'],gnd:'#2b2d33',top:'#9aa0aa',tex:'#34363e',tier:2,boss:'TREN FANTASMA',amb:'rgba(4,5,12,.30)'},
-  {name:'CLUB',sub:'EL GRAN SOUND CLASH',sky:['#0c0414','#2e0a3e'],gnd:'#1a0f24',top:'#ff3d6e',tex:'#24152f',tier:3,boss:'EL CENSOR',amb:'rgba(14,2,26,.28)'}
+  {name:'CALLE',sub:'BARRIO DORMIDO',sky:['#05061a','#1d2050'],gnd:'#232842',top:'#5a6390',tex:'#2c3252',tier:1,boss:'EL SILENCIADOR',amb:'rgba(16,20,62,.17)',sun:{dx:-.30,len:1.25,a:.42}},
+  {name:'AZOTEAS',sub:'ATARDECER EN LOS TEJADOS',sky:['#26103a','#ff7a4a'],gnd:'#4a2626',top:'#d0703a',tex:'#5c3030',tier:2,boss:'DRON PIRATA',amb:'rgba(92,38,30,.13)',sun:{dx:-1.35,len:2.30,a:.34}},
+  {name:'METRO',sub:'LINEA FANTASMA',sky:['#07080c','#171a24'],gnd:'#2b2d33',top:'#9aa0aa',tex:'#34363e',tier:2,boss:'TREN FANTASMA',amb:'rgba(10,14,28,.18)',sun:{dx:0,len:.95,a:.46}},
+  {name:'CLUB',sub:'EL GRAN SOUND CLASH',sky:['#0c0414','#2e0a3e'],gnd:'#1a0f24',top:'#ff3d6e',tex:'#24152f',tier:3,boss:'EL CENSOR',amb:'rgba(34,8,52,.17)',sun:{dx:.45,len:1.35,a:.38}}
 ];
 
 // ================= trozos de nivel (alineados abajo, fila 14 = suelo) =================
@@ -501,7 +501,7 @@ function shoot(i){
   var dx=p.face,dy=0;
   if(p.aimU){if(i.L||i.R){dx=p.face*.72;dy=-.72;}else{dx=0;dy=-1;}}
   else if(p.aimD){dx=p.face*.72;dy=.72;}
-  else if(SET.assist){var q=nearestTarget(210,true);if(q){var ddx=q.x-(p.x+4),ddy=q.y-(p.y+7);
+  else if(SET.assist){var q=nearestTarget(150,true);if(q){var ddx=q.x-(p.x+4),ddy=q.y-(p.y+7);
     if(ddy<-24&&Math.abs(ddx)<20){dx=0;dy=-1;}else if(ddy<-16&&-ddy>Math.abs(ddx)*.35){dx=p.face*.72;dy=-.72;}else if(!p.ground&&ddy>18&&ddy>Math.abs(ddx)*.35){dx=p.face*.72;dy=.72;}}}
   var mx=p.x+4+dx*8,my=p.y+6+dy*8,lv=run.lv,w=run.wpn;
   function b(vx,vy,o){o=o||{};bullets.push({x:mx,y:my,vx:vx,vy:vy,l:o.l||55,dmg:o.dmg||1,pierce:o.pierce||0,home:o.home||0,w:w,hitL:[]});run.stats.shots++;}
@@ -558,7 +558,7 @@ function updatePlayer(i){
   if(p.ground&&!p.onMp&&tileAt(Math.floor(p.x/T),Math.floor((p.y+p.h+1)/T))===1&&tileAt(Math.floor((p.x+p.w)/T),Math.floor((p.y+p.h+1)/T))===1)p.safe={x:p.x,y:p.y};
   if(p.y>WH+16)fallPit();
   var wantF=i.F;
-  if(!wantF&&autoFire()&&!p.dead){var q=nearestTarget(200,false);if(q){wantF=true;if(!(i.L||i.R)&&q.x<p.x+4!==(p.face<0))p.face=q.x<p.x+4?-1:1;}}
+  if(!wantF&&autoFire()&&!p.dead){var q=nearestTarget(150,false);if(q){wantF=true;if(!(i.L||i.R)&&q.x<p.x+4!==(p.face<0))p.face=q.x<p.x+4?-1:1;}}
   if(wantF&&p.cool<=0&&!p.dash)shoot(i);
   if(i.Bp&&run.bass>=100)bassDrop();
 }
@@ -864,7 +864,7 @@ function showOpts(){
     '<button class="btn opt" data-act="o" data-v="vib">VIBRACION <i>'+onoff(SET.vib)+'</i></button>'+
     '<button class="btn opt" data-act="o" data-v="light">LUCES Y SOMBRAS <i>'+onoff(SET.light)+'</i></button>'+
     '<button class="btn hot" data-act="back">VOLVER</button></div>'+
-    '<p class="dim">Disparo automatico: dispara solo cuando hay enemigos cerca. Apuntado asistido: inclina el disparo hacia el enemigo mas cercano.</p></div>');
+    '<p class="dim">Disparo automatico: dispara solo cuando hay enemigos cerca, te quita un dedo de encima. Apuntado asistido: decide por ti hacia donde tiras, por eso viene apagado.</p></div>');
 }
 function setOpt(k){
   if(k==='diff')SET.diff=(SET.diff+1)%3;
@@ -1089,8 +1089,10 @@ function rect(x,y,w,h,c){g.fillStyle=c;g.fillRect(Math.round(x),Math.round(y),w,
 // Todo se calcula a resolucion logica (192x108) y se escala con el lienzo, asi
 // que la luz tiene el mismo pixel que los sprites: bordes duros y tramado de
 // Bayer en vez de degradados suaves. Nada de blur ni sombras HD.
-var LC=document.createElement('canvas'),LCX=null,LSPR={},LN=0,LX=[],LY=[],LR=[],LA=[],LCOL=[];
+var LSPR={},LN=0,LX=[],LY=[],LR=[],LA=[],LCOL=[];
 var BAYER=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
+// Sol por defecto (menu, antes de entrar en una fase).
+var SUN0={dx:-.30,len:1.25,a:.42};
 // Disco de luz con caida en 4 escalones y tramado: es un sprite, no un gradiente.
 function lightSpr(r,col){
   var k=r+'|'+(col||'');if(LSPR[k])return LSPR[k];
@@ -1123,38 +1125,35 @@ function floorY(x,y){
   return -1;
 }
 function shadow(sx,wx,wy,w,h){
+  var S=st?STAGES[st.n]:STAGES[0],sun=S.sun||SUN0;
   var fy=floorY(wx+w/2,wy+h-1);if(fy<0)return;
-  var d=fy-(wy+h);if(d<0)d=0;if(d>44)return;
-  var k=1-d/44,a=.42*k*k,rw=Math.round(w*(.55+.45*k));
-  if(rw<3||a<.04)return;
+  var d=fy-(wy+h);if(d<0)d=0;if(d>46)return;
+  var k=1-d/46,a=sun.a*k*k;
+  // Largo y direccion: los dibuja la hora de la fase (sol bajo al atardecer =
+  // sombra larga y tumbada; luz cenital en el metro = sombra corta y debajo).
+  var rw=Math.round(w*sun.len*(.62+.38*k));
+  var off=(h*.45+d*.55)*sun.dx;
+  if(rw<3||a<.05)return;
   g.globalAlpha=a;g.fillStyle='#000';
-  var x0=Math.round(sx+w/2-rw/2);
-  g.fillRect(x0+1,fy,rw-2,1);
-  if(rw>6)g.fillRect(x0,fy+1,rw,1);
-  else g.fillRect(x0+1,fy+1,rw-2,1);
-  if(rw>10)g.fillRect(x0+2,fy+2,rw-4,1);
+  var cx=sx+w/2;
+  g.fillRect(Math.round(cx+off*.25-rw/2)+1,fy,rw-2,1);
+  if(rw>6)g.fillRect(Math.round(cx+off*.60-rw/2),fy+1,rw,1);
+  else g.fillRect(Math.round(cx+off*.60-rw/2)+1,fy+1,rw-2,1);
+  if(rw>10)g.fillRect(Math.round(cx+off-rw/2)+2,fy+2,rw-4,1);
   g.globalAlpha=1;
 }
-// Capa de oscuridad: se rellena con el ambiente de la fase y se le hacen
-// agujeros con los focos; encima, un pase aditivo flojo para el halo de color.
+// El ambiente NO oscurece por zonas: es un tinte plano de la hora de la fase,
+// igual en toda la pantalla, para que el mapa se lea entero y se vea a quien
+// disparas. Los focos solo SUMAN luz (halo), nunca restan.
 function drawLight(){
-  var S=STAGES[st.n];
-  if(!S.amb||!SET.light){LN=0;return;}
-  var menuLit=mode==='menu';
-  if(LC.width!==W||LC.height!==H){LC.width=W;LC.height=H;LCX=null;}
-  if(!LCX){LCX=LC.getContext('2d');LCX.imageSmoothingEnabled=false;}
-  var q=LCX,i,r;
-  q.globalCompositeOperation='source-over';q.globalAlpha=1;
-  q.globalAlpha=menuLit?.42:1;q.fillStyle=S.amb;q.fillRect(0,0,W,H);q.globalAlpha=1;
-  q.globalCompositeOperation='destination-out';
-  for(i=0;i<LN;i++){r=LR[i];q.globalAlpha=LA[i];
-    q.drawImage(lightSpr(r,null),Math.round(LX[i]-r),Math.round(LY[i]-camY-r));}
-  q.globalAlpha=1;
+  var S=st?STAGES[st.n]:STAGES[0];
+  if(!SET.light){LN=0;return;}
+  var i,r;
   g.save();g.setTransform(SC,0,0,SC,0,0);
-  g.drawImage(LC,0,0,W,H);
+  if(S.amb){g.globalAlpha=mode==='menu'?.65:1;g.fillStyle=S.amb;g.fillRect(0,0,W,H);g.globalAlpha=1;}
   g.globalCompositeOperation='lighter';
-  for(i=0;i<LN;i++){if(!LCOL[i])continue;r=LR[i];g.globalAlpha=LA[i]*.3;
-    g.drawImage(lightSpr(r,LCOL[i]),Math.round(LX[i]-r),Math.round(LY[i]-camY-r));}
+  for(i=0;i<LN;i++){r=LR[i];g.globalAlpha=LA[i]*(LCOL[i]?.34:.20);
+    g.drawImage(lightSpr(r,LCOL[i]||'#fff6d8'),Math.round(LX[i]-r),Math.round(LY[i]-camY-r));}
   g.globalAlpha=1;g.globalCompositeOperation='source-over';g.restore();
   LN=0;
 }
@@ -1263,9 +1262,6 @@ function drawEnemy(e){
 }
 function drawBoss(b){
   if(!b.dead){shadow(b.x-cam,b.x,b.y,b.w,b.h);
-    // Luz de relleno del combate: sin ella el suelo de la arena se queda negro
-    // y no se ve donde pisas mientras el jefe te acorrala.
-    light(b.x-cam+b.w/2,GY-22,72,.55,null);
     light(b.x-cam+b.w/2,b.y+b.h/2,Math.max(16,b.w),b.fl>0?1:.55,b.ph>1?'#ff3d6e':'#ff8aa6');}
   var x=Math.round(b.x-cam),y=Math.round(b.y),wh=b.fl>0||(b.act&&b.actT>0&&b.actT<40&&(b.actT>>2)&1&&b.act!=='burst'&&b.act!=='low'&&b.act!=='ground');
   function R(a,c,w,h,col){g.fillStyle=wh?'#fff':col;g.fillRect(x+a,y+c,w,h);}
@@ -1320,8 +1316,8 @@ function drawPlayer(){
   var legs=p.ground?(p.vx?[PL.r1,PL.st,PL.r2,PL.st][(p.anim|0)%4]:PL.st):PL.air;
   var x=p.x-2-cam,y=p.y-0;
   shadow(p.x-cam,p.x,p.y,p.w,p.h);
-  // Foco amplio sobre el heroe: la fase es de noche, pero se tiene que jugar.
-  light(p.x-cam+p.w/2,p.y+p.h/2,p.dash?72:60,.9,'#9fd2ff');
+  // Brillo corto alrededor del heroe (solo presencia: la escena ya se ve).
+  light(p.x-cam+p.w/2,p.y+p.h/2,p.dash?30:20,.8,'#9fd2ff');
   // Capa de sprites: estado -> hoja. Si la hoja no esta lista se cae a la hoja de
   // reposo y, si tampoco, al dibujo por codigo de siempre.
   var pst=p.dash?'dash':(!p.ground?(p.vy<0?'jump':'fall'):(p.aimU?'aimu':(p.vx?'run':'idle')));
