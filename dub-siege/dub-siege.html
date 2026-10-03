@@ -1237,14 +1237,98 @@ function city(par,sp,hmin,hr,col,win,seed){
 }
 function speaker(x,y,pu){rect(x,y,40,38,'#0f0a18');rect(x+1,y+1,38,1,'#2a1e3a');
   [[20,13,10],[20,30,6]].forEach(function(c){var r=c[2]+(c[2]>8?pu:0);rect(x+c[0]-r,y+c[1]-r,r*2,r*2,'#05030a');rect(x+c[0]-r+2,y+c[1]-r+2,r*2-4,r*2-4,'#1f1530');rect(x+c[0]-2,y+c[1]-2,4,4,'#05030a');});}
+// ============ BALDOSAS A RESOLUCION DE SPRITE ============
+// Los personajes son PNG con 4 pixeles por unidad logica (12x14 unidades =
+// 48x56 pixeles). El suelo se pintaba con rect() en unidades logicas, o sea con
+// el pixel 4 veces mas gordo: al lado del personaje parecian dos juegos
+// distintos. Ahora cada baldosa se hornea UNA vez en un lienzo de 48x48 (T*SC)
+// con el mismo pixel que los sprites y se pega entera, asi que el coste por
+// fotograma es un drawImage por baldosa, menos que los 3-5 rect() de antes.
+var TSPR={};
+function shade(c,f){
+  var n=parseInt(c.slice(1),16),r=n>>16&255,gg=n>>8&255,b=n&255;
+  function m(v){v=Math.round(v*f);return v<0?0:v>255?255:v;}
+  return 'rgb('+m(r)+','+m(gg)+','+m(b)+')';
+}
+// Lienzo cacheado por clave. paint(q,D) dibuja en pixeles de sprite (D=48).
+function tileSpr(key,paint){
+  var o=TSPR[key];if(o)return o;
+  var cn=document.createElement('canvas');cn.width=T*SC;cn.height=T*SC;
+  var q=cn.getContext('2d');q.imageSmoothingEnabled=false;paint(q,T*SC);
+  TSPR[key]=cn;return cn;
+}
+function qp(q,x,y,w,h,c){q.fillStyle=c;q.fillRect(x,y,w,h);}
+// Bloque de suelo: sillares con junta, grano y luz de arriba-izquierda.
+function paintGnd(q,D,S,v,top){
+  var x,y,i;
+  qp(q,0,0,D,D,S.gnd);
+  var CH=12,BW=24;                       // curso de 12 px, sillar de 24
+  for(var cr=0;cr<D/CH;cr++){
+    var oy=cr*CH,offx=((cr+v)%2)*BW/2;
+    for(i=-1;i<D/BW+1;i++){
+      var bx=Math.round(i*BW+offx),s=rnd(cr*7+i*13+v*31);
+      qp(q,bx,oy,BW-1,CH-1,shade(S.gnd,.93+s*.16));         // tono del sillar
+      qp(q,bx,oy,BW-1,1,shade(S.gnd,1.22));                 // luz arriba
+      qp(q,bx,oy,1,CH-1,shade(S.gnd,1.12));                 // luz izquierda
+      qp(q,bx,oy+CH-2,BW-1,1,shade(S.gnd,.74));             // sombra abajo
+      qp(q,bx+BW-2,oy+1,1,CH-3,shade(S.gnd,.8));            // sombra derecha
+    }
+    qp(q,0,oy+CH-1,D,1,shade(S.gnd,.58));                   // junta
+  }
+  // Grano: motas de 1 px, deterministas, para que la piedra no sea plana.
+  for(y=0;y<D;y++)for(x=0;x<D;x++){
+    var r=rnd(x*3.7+y*11.3+v*53);
+    if(r>.955)qp(q,x,y,1,1,shade(S.gnd,1.16));
+    else if(r<.045)qp(q,x,y,1,1,shade(S.gnd,.84));
+  }
+  // Grieta en dos de las cuatro variantes.
+  if(v>1){var gx=10+((rnd(v*17)*20)|0),gy=6;
+    for(i=0;i<16;i++){qp(q,gx,gy+i,1,1,shade(S.gnd,.62));if(rnd(i+v)>.6)gx+=rnd(i*3+v)>.5?1:-1;}}
+  if(top){
+    // Remate: franja de S.top con brillo arriba, linea oscura y goteo irregular.
+    qp(q,0,0,D,10,S.top);
+    qp(q,0,0,D,2,shade(S.top,1.3));
+    qp(q,0,8,D,2,S.tex);
+    for(x=0;x<D;x++){var d=(rnd(x*5.1+v*29)*7)|0;if(d>3)qp(q,x,10,1,d-3,S.tex);}
+    for(i=0;i<D;i+=1)if(rnd(i*2.3+v*7)>.9)qp(q,i,3+((rnd(i+v)*4)|0),1,1,shade(S.top,.78));
+  }
+}
+// Plataforma fina: tablon con cantos, tornillos y sombra debajo.
+function paintPlat(q,D,S){
+  qp(q,0,0,D,12,S.top);
+  qp(q,0,0,D,2,shade(S.top,1.32));
+  qp(q,0,10,D,2,shade(S.top,.68));
+  for(var x=0;x<D;x++){var r=rnd(x*4.3);if(r>.86)qp(q,x,3+((r*5)|0),1,1,shade(S.top,.82));}
+  qp(q,0,12,D,3,'rgba(0,0,0,.45)');
+  qp(q,2,12,2,5,S.tex);qp(q,D-4,12,2,5,S.tex);
+  qp(q,5,4,2,2,shade(S.top,.6));qp(q,D-7,4,2,2,shade(S.top,.6));   // tornillos
+}
+// Pinchos: metal con tres tonos duros y punta roja.
+function paintSpikes(q,D){
+  for(var k=0;k<3;k++){
+    var bx=k*16,h=24;
+    for(var r=0;r<h;r++){
+      var w=Math.max(1,Math.round((h-r)/h*14)),sx=bx+8-(w>>1),yy=D-1-r;
+      qp(q,sx,yy,w,1,'#9aa2b8');
+      qp(q,sx,yy,Math.max(1,w>>1),1,'#d8dcea');
+      if(w>3)qp(q,sx+w-1,yy,1,1,'#6a7088');
+    }
+    qp(q,bx+7,D-h,2,3,'#ff3d6e');
+    qp(q,bx+7,D-h,2,1,'#ffb0c4');
+  }
+}
 function drawTiles(){
-  var S=STAGES[st.n],c0=Math.floor(cam/T),c1=c0+Math.ceil(W/T)+1;
-  for(var cy=0;cy<ROWS;cy++)for(var cx=c0;cx<=c1;cx++){var tt=tileAt(cx,cy);if(!tt||cx<0||cx>=COLS)continue;var x=Math.round(cx*T-cam),y=cy*T;
-    if(tt===1){rect(x,y,T,T,S.gnd);if(tileAt(cx,cy-1)!==1){rect(x,y,T,2,S.top);rect(x,y+2,T,1,S.tex);}
-      if(rnd(cx*3+cy*7)>.6)rect(x+(rnd(cx+cy)*8|0)+1,y+5+(rnd(cx*cy+1)*5|0),3,1,S.tex);
-      if(st.n===2&&cy===13&&tileAt(cx,cy-1)!==1){rect(x,y+5,T,1,'#5a5f6a');}}
-    else if(tt===2){rect(x,y,T,3,S.top);rect(x,y+3,T,1,'#00000066');rect(x+1,y+3,1,3,S.tex);rect(x+T-2,y+3,1,3,S.tex);}
-    else if(tt===3){g.fillStyle='#c8ccd8';for(var k=0;k<3;k++){g.beginPath();g.moveTo(x+k*4,y+T);g.lineTo(x+k*4+2,y+T-6);g.lineTo(x+k*4+4,y+T);g.fill();}g.fillStyle='#ff3d6e';for(k=0;k<3;k++)g.fillRect(x+k*4+2,y+T-6,1,1);}
+  var S=STAGES[st.n],c0=Math.floor(cam/T),c1=c0+Math.ceil(W/T)+1,n=st.n;
+  for(var cy=0;cy<ROWS;cy++)for(var cx=c0;cx<=c1;cx++){
+    var tt=tileAt(cx,cy);if(!tt||cx<0||cx>=COLS)continue;
+    var x=Math.round(cx*T-cam),y=cy*T;
+    if(tt===1){
+      var top=tileAt(cx,cy-1)!==1,v=(rnd(cx*3+cy*7)*4)|0;
+      g.drawImage(tileSpr('g'+n+v+(top?'t':''),function(q,D){paintGnd(q,D,S,v,top);}),x,y,T,T);
+      if(n===2&&cy===13&&top)rect(x,y+5,T,1,'#5a5f6a');
+    }
+    else if(tt===2)g.drawImage(tileSpr('p'+n,function(q,D){paintPlat(q,D,S);}),x,y,T,T);
+    else if(tt===3)g.drawImage(tileSpr('s',paintSpikes),x,y,T,T);
   }
   mplats.forEach(function(m){var x=Math.round(m.x-cam);rect(x,m.y,m.w,4,'#3de8ff');rect(x,m.y+4,m.w,1,'#1a6a7a');rect(x+2,m.y+1,m.w-4,1,'#c8f8ff');});
   st.cps.forEach(function(c){var x=Math.round(c.x-cam)+4;rect(x,c.y-12,2,28,'#9aa0b0');
@@ -1467,6 +1551,7 @@ if(DEBUG)window.DS={
   warp:function(n){run.stage=n;buildStage(n);hideOv();mode='play';},
   act:act,
   setDiff:function(d){SET.diff=d;D=DIFFS[d];},
+  tile:function(x,y){return tileAt(x,y);},
   mp:function(){return mplats.map(function(m){return {x:Math.round(m.x),y:m.y,w:m.w};});},place:function(x,y){p.x=x;p.y=y;p.vx=0;p.vy=0;},
   sense:function(){var fx=p.x+p.w+14,pit=tileAt(Math.floor(fx/T),13)===0,
     spike=tileAt(Math.floor((p.x+p.w+10)/T),12)===3||tileAt(Math.floor((p.x+p.w+22)/T),12)===3,wall=tileAt(Math.floor((p.x+p.w+6)/T),Math.floor((p.y+8)/T))===1,
