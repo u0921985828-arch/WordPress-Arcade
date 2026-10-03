@@ -90,6 +90,8 @@ def main():
     op = opener()
     cache = {}
     for k in keys:
+        if man[k].get('local'):
+            print(k, 'local, no se descarga'); continue
         d = man[k]
         if d['object'] not in cache:
             cache[d['object']] = sheet(op, d['object'])
