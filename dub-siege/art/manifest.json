@@ -134,5 +134,33 @@
   "fw": 10,
   "fh": 10,
   "n": 1
+ },
+ "b_0": {
+  "object": "24cdf94b-525d-4e9e-9673-c9c58fe80a39",
+  "anim": "walk",
+  "fw": 28,
+  "fh": 34,
+  "n": 4
+ },
+ "b_1": {
+  "object": "f0c43b27-86ef-4ede-a86b-33d037388d21",
+  "anim": "fly",
+  "fw": 32,
+  "fh": 20,
+  "n": 4
+ },
+ "b_2": {
+  "object": "e4e7f1f7-4e78-42cc-a858-757aefe37356",
+  "anim": "float",
+  "fw": 28,
+  "fh": 22,
+  "n": 4
+ },
+ "b_3": {
+  "object": "0ec6679d-4a65-432b-b797-bc50520947ad",
+  "anim": "float",
+  "fw": 30,
+  "fh": 38,
+  "n": 4
  }
 }
