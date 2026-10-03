@@ -92,5 +92,47 @@
   "fw": 10,
   "fh": 10,
   "n": 1
+ },
+ "i_coin": {
+  "object": "425712bc-2ce4-4fc5-8792-97e801f328c9",
+  "anim": "spin",
+  "fw": 8,
+  "fh": 8,
+  "n": 4
+ },
+ "i_hp": {
+  "object": "c9648f85-2d2b-4069-ae52-cc3f78525257",
+  "anim": null,
+  "fw": 8,
+  "fh": 8,
+  "n": 1
+ },
+ "i_N": {
+  "object": "a78b5c27-fc85-4d1d-8d7e-ea2d9666faec",
+  "anim": null,
+  "fw": 10,
+  "fh": 10,
+  "n": 1
+ },
+ "i_S": {
+  "object": "2593813a-29c6-488f-a711-e8b42d88a401",
+  "anim": null,
+  "fw": 10,
+  "fh": 10,
+  "n": 1
+ },
+ "i_L": {
+  "object": "e63b90fa-077e-4228-8fa5-e87e2179b56c",
+  "anim": null,
+  "fw": 10,
+  "fh": 10,
+  "n": 1
+ },
+ "i_H": {
+  "object": "0d0114fa-5aee-4350-ad52-14cf4f5e8b8c",
+  "anim": null,
+  "fw": 10,
+  "fh": 10,
+  "n": 1
  }
 }
