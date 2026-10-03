@@ -15,8 +15,8 @@
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--pix);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:8px 16px;touch-action:manipulation}
 body.big{--bt:84px}
-#wrap{position:relative;flex:none;width:min(100%,calc((100vh - 16px)*var(--ar)));width:min(100%,calc((100dvh - 16px)*var(--ar)));max-width:100%;aspect-ratio:var(--ar);background:#000;overflow:hidden;box-shadow:0 0 0 2px var(--line),0 0 40px #3de8ff22;container-type:inline-size}
-canvas{width:100%;height:100%;display:block;image-rendering:pixelated}
+#wrap{position:relative;flex:none;max-width:100%;background:#000;overflow:hidden;line-height:0;box-shadow:0 0 0 2px var(--line),0 0 40px #3de8ff22}
+canvas{display:block;image-rendering:pixelated}
 .ov{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:auto;z-index:5;overscroll-behavior:contain;background:rgba(6,7,13,.9);
   padding:max(10px,2vh) max(12px,calc(12px + env(safe-area-inset-right,0px))) max(10px,2vh) max(12px,calc(12px + env(safe-area-inset-left,0px)))}
 .ov[hidden]{display:none!important}
@@ -78,14 +78,12 @@ body:not(.ingame) #touch .ctl{visibility:hidden}
 
 @media (orientation:portrait){
   body.touch{justify-content:flex-start;padding-top:calc(8px + env(safe-area-inset-top,0px))}
-  body.touch #wrap{width:100%}
   body.touch #touch{flex:1;min-height:0;align-items:stretch;gap:12px;padding-top:56px;padding-bottom:env(safe-area-inset-bottom,0px)}
   body.touch #stick .base{left:50%;top:60%}
   body.touch #stick .knob{left:50%;top:60%}
 }
 @media (orientation:landscape){
   body.touch{padding:0 16px}
-  body.touch #wrap{width:min(100%,calc(100vh*var(--ar)));width:min(100%,calc(100dvh*var(--ar)));max-width:calc(100% - var(--bt)*4.7)}
   body.touch #touch{position:fixed;inset:0;z-index:4;pointer-events:none}
   body.touch #stick{position:absolute;left:0;bottom:0;width:42%;height:72%;pointer-events:auto}
   body.touch #stick .base{left:calc(var(--bt)*1.1 + env(safe-area-inset-left,0px));top:calc(100% - var(--bt)*1.1)}
@@ -147,23 +145,47 @@ var HS=.78,HW=Math.round(W/HS),HH=Math.round(H/HS);  // lienzo logico del HUD
 // vez, asi que fisica, colisiones y cajas no cambian. Los sprites de imagen se
 // pintan a su tamano nativo (SC veces la caja logica), o sea 1:1 sin perdida.
 var SC=4;
-// Ventana adaptable al ancho real de la pantalla. El alto logico sigue siendo
-// 108 siempre (la dificultad no cambia: no se ve mas arriba ni mas abajo); lo
-// que crece es el ancho, de 192 a 264 como mucho. En un movil tumbado de 20:9
-// una ventana fija de 16:9 dejaba casi la mitad del cristal en negro.
+// Ventana adaptable CON PIXEL CUADRADO. Regla del proyecto: un pixel del juego
+// mide siempre un numero ENTERO de pixeles de la pantalla, nunca 1,6 ni 2,45.
+// Si no, el navegador reparte cada pixel en unos de 2 y otros de 3 y el sprite
+// se deforma (la cara sale con unas lineas el doble de gruesas que otras).
+// El alto logico sigue siendo 108 siempre (no se ve mas arriba ni mas abajo);
+// lo que se ajusta es el ancho, de 192 a 264, y lo que sobra queda en negro.
+var ZOOM=1;
 function fitW(){
   var tch=document.body.classList.contains('touch')&&innerWidth>innerHeight;
   // Con el movil tumbado el mando vive FUERA del lienzo (regla del proyecto), asi
   // que sus dos columnas se descuentan antes de medir: el juego nunca queda por
   // debajo de los botones, ni siquiera con MANDOS GRANDES.
   var bt=parseFloat(getComputedStyle(document.body).getPropertyValue('--bt'))||68;
-  var res=tch?bt*4.7:32;
-  var h=Math.max(1,innerHeight-(tch?0:16)),ar=Math.max(1,innerWidth-res)/h;
-  var nw=clamp(Math.round(H*ar/2)*2,192,264);
-  if(nw===W&&cv.width===W*SC)return;
-  W=nw;HW=Math.round(W/HS);
-  cv.width=W*SC;cv.height=H*SC;g.imageSmoothingEnabled=false;
-  document.documentElement.style.setProperty('--ar',(W/H).toFixed(4));
+  var res=tch?bt*4.7+10:32;
+  var dpr=Math.min(3,window.devicePixelRatio||1);
+  var aw=Math.max(64,innerWidth-res),ah=Math.max(64,innerHeight-(tch?0:16));
+  // Hueco medido en pixeles REALES de la pantalla: es ahi donde el pixel tiene
+  // que cuadrar, no en pixeles CSS (un movil pinta 2 o 3 reales por cada CSS).
+  var dw=aw*dpr,dh=ah*dpr;
+  // Cuanto cabe, con la ventana mas estrecha que admite el juego (192 de ancho).
+  var zf=Math.min(dw/(192*SC),dh/(H*SC));
+  var nw,z;
+  if(zf>=1){
+    // Escala ENTERA: un pixel del juego mide z pixeles de pantalla, todos iguales.
+    z=Math.floor(zf);
+    // Lo que sobra de ancho se gana como ventana mas ancha (hasta 264), no como
+    // estiramiento: el alto logico sigue siendo 108 y la dificultad no cambia.
+    nw=clamp(Math.round(dw/(z*SC)/2)*2,192,264);
+  }else{
+    // Ventana enana (menos de 768x432 pixeles reales): ni a escala 1 cabe el juego,
+    // asi que se reduce con escala fraccionaria. Unico caso sin pixel cuadrado, y
+    // ahi fitPx deja que el navegador interpole para que no salga a dentelladas.
+    z=zf;nw=192;
+  }
+  var cw=nw*SC,chh=H*SC;
+  if(nw===W&&z===ZOOM&&cv.width===cw)return;
+  W=nw;ZOOM=z;HW=Math.round(W/HS);
+  cv.width=cw;cv.height=chh;g.imageSmoothingEnabled=false;
+  // Tamano en pantalla = tamano del lienzo x escala, devuelto a pixeles CSS.
+  cv.style.width=(cw*z/dpr)+'px';
+  cv.style.height=(chh*z/dpr)+'px';
 }
 var RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
 var DEBUG=location.hash==='#debug';
@@ -1420,6 +1442,9 @@ function draw(){
   g.restore();
 }
 loadArt();
+// Con escala entera el pixelado es siempre lo correcto. Solo en la ventana
+// enana donde ni z=1 cabe se deja que el navegador interpole, para que el
+// recorte no salga a dentelladas.
 function fitPx(){var r=cv.getBoundingClientRect(),dp=window.devicePixelRatio||1;
   cv.style.imageRendering=(r.width*dp>=cv.width-1)?'pixelated':'auto';}
 addEventListener('resize',function(){fitW();fitPx();});
