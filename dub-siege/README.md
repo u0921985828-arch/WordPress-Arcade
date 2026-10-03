@@ -55,6 +55,12 @@ Tres botones: BASS, FUEGO y **SALTO/DASH**. En el botón doble, un toque corto
 fotogramas por dentro para que salga el salto completo— y mantenerlo hace el
 dash. Teclado y mando siguen con sus teclas separadas.
 
+Colocación: `placePad()` pone SALTO (×1,2 de tamaño) en el arco cómodo del
+pulgar —32–48 mm de su base, que se supone 5 mm fuera de la esquina inferior— y
+FUEGO y BASS en el mismo arco a su lado, sin tapar nunca el lienzo. Toda la
+columna derecha responde (`padPick`: gana el botón más cercano, SALTO con 14 px
+de ventaja). Estudio y cifras: `ESTUDIO-CONTROLES.md`.
+
 ## Depuración
 Con `#debug` en la dirección: `DS.warp(0..11, conCinematica)`, `DS.cutAdv()`,
 `DS.cutSkip()`, `DS.toArena()`, `DS.hitBoss(n)`, `DS.god()`, `DS.s`, `DS.sheets`.
