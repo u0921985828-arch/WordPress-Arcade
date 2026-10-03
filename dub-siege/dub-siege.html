@@ -10,12 +10,12 @@
 <style>
 /* Mundo arcade oscuro unico. Escritorio: monitor 16:9 que llena la ventana.
    Movil vertical: juego arriba + mandos grandes abajo. Movil horizontal: juego a pantalla completa con mandos superpuestos. */
-:root{color-scheme:dark;--bg:#06070d;--ink:#eef3ff;--dim:#8f98c8;--acc:#ff3d6e;--yel:#ffd23f;--cy:#3de8ff;--grn:#4dff88;--panel:#121730;--line:#3a4680;--pix:'Press Start 2P',ui-monospace,Menlo,monospace;--bt:68px}
+:root{color-scheme:dark;--bg:#06070d;--ink:#eef3ff;--dim:#8f98c8;--acc:#ff3d6e;--yel:#ffd23f;--cy:#3de8ff;--grn:#4dff88;--panel:#121730;--line:#3a4680;--pix:'Press Start 2P',ui-monospace,Menlo,monospace;--bt:68px;--ar:1.7778}
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--pix);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:8px 16px;touch-action:manipulation}
 body.big{--bt:84px}
-#wrap{position:relative;flex:none;width:min(100%,calc((100vh - 16px)*16/9));width:min(100%,calc((100dvh - 16px)*16/9));max-width:100%;aspect-ratio:16/9;background:#000;overflow:hidden;box-shadow:0 0 0 2px var(--line),0 0 40px #3de8ff22;container-type:inline-size}
+#wrap{position:relative;flex:none;width:min(100%,calc((100vh - 16px)*var(--ar)));width:min(100%,calc((100dvh - 16px)*var(--ar)));max-width:100%;aspect-ratio:var(--ar);background:#000;overflow:hidden;box-shadow:0 0 0 2px var(--line),0 0 40px #3de8ff22;container-type:inline-size}
 canvas{width:100%;height:100%;display:block;image-rendering:pixelated}
 .ov{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:auto;z-index:5;overscroll-behavior:contain;background:rgba(6,7,13,.9);
   padding:max(10px,2vh) max(12px,calc(12px + env(safe-area-inset-right,0px))) max(10px,2vh) max(12px,calc(12px + env(safe-area-inset-left,0px)))}
@@ -85,7 +85,7 @@ body:not(.ingame) #touch .ctl{visibility:hidden}
 }
 @media (orientation:landscape){
   body.touch{padding:0 16px}
-  body.touch #wrap{width:min(100%,calc(100vh*16/9));width:min(100%,calc(100dvh*16/9))}
+  body.touch #wrap{width:min(100%,calc(100vh*var(--ar)));width:min(100%,calc(100dvh*var(--ar)));max-width:calc(100% - var(--bt)*4.7)}
   body.touch #touch{position:fixed;inset:0;z-index:4;pointer-events:none}
   body.touch #stick{position:absolute;left:0;bottom:0;width:42%;height:72%;pointer-events:auto}
   body.touch #stick .base{left:calc(var(--bt)*1.1 + env(safe-area-inset-left,0px));top:calc(100% - var(--bt)*1.1)}
@@ -147,6 +147,24 @@ var HS=.78,HW=Math.round(W/HS),HH=Math.round(H/HS);  // lienzo logico del HUD
 // vez, asi que fisica, colisiones y cajas no cambian. Los sprites de imagen se
 // pintan a su tamano nativo (SC veces la caja logica), o sea 1:1 sin perdida.
 var SC=4;
+// Ventana adaptable al ancho real de la pantalla. El alto logico sigue siendo
+// 108 siempre (la dificultad no cambia: no se ve mas arriba ni mas abajo); lo
+// que crece es el ancho, de 192 a 264 como mucho. En un movil tumbado de 20:9
+// una ventana fija de 16:9 dejaba casi la mitad del cristal en negro.
+function fitW(){
+  var tch=document.body.classList.contains('touch')&&innerWidth>innerHeight;
+  // Con el movil tumbado el mando vive FUERA del lienzo (regla del proyecto), asi
+  // que sus dos columnas se descuentan antes de medir: el juego nunca queda por
+  // debajo de los botones, ni siquiera con MANDOS GRANDES.
+  var bt=parseFloat(getComputedStyle(document.body).getPropertyValue('--bt'))||68;
+  var res=tch?bt*4.7:32;
+  var h=Math.max(1,innerHeight-(tch?0:16)),ar=Math.max(1,innerWidth-res)/h;
+  var nw=clamp(Math.round(H*ar/2)*2,192,264);
+  if(nw===W&&cv.width===W*SC)return;
+  W=nw;HW=Math.round(W/HS);
+  cv.width=W*SC;cv.height=H*SC;g.imageSmoothingEnabled=false;
+  document.documentElement.style.setProperty('--ar',(W/H).toFixed(4));
+}
 var RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
 var DEBUG=location.hash==='#debug';
 function clamp(v,a,b){return v<a?a:v>b?b:v;}
@@ -167,6 +185,7 @@ function buzz(ms){if(!SET.vib||!touchMode())return;try{navigator.vibrate&&naviga
 var layoutKey='';
 function applyLayout(){var k=[touchMode(),SET.big,mode==='play'||mode==='pause'].join();if(k===layoutKey)return;layoutKey=k;
   document.body.classList.toggle('touch',touchMode());document.body.classList.toggle('big',!!SET.big);document.body.classList.toggle('ingame',mode==='play'||mode==='pause');
+  fitW();
   var f=document.querySelector('#btns .f');if(f)f.classList.toggle('auto',autoFire());}
 var DIFFS=[
   {n:'FACIL',lives:5,hp:5,eHp:.7,bs:.8,rate:.7,inv:120},
@@ -955,7 +974,7 @@ function update(){
   for(var c=ghosts.length-1;c>=0;c--)if(--ghosts[c].l<=0)ghosts.splice(c,1);
   if(ring){ring.r+=6;if(ring.r>360)ring=null;}
   if(banner&&--banner.l<=0)banner=null;
-  var tgt=st.lock?st.arenaX+2:clamp(p.x-91+p.face*24,0,COLS*T-W);
+  var tgt=st.lock?st.arenaX+2:clamp(p.x-(W/2-5)+p.face*24,0,COLS*T-W);
   cam+=(tgt-cam)*(st.lock?.08:.1);
   // Vertical: normalmente el suelo va pegado al borde de abajo (camY=CY). Si el
   // jugador sube mucho (o entra el jefe por arriba) la camara sube con el.
@@ -1407,7 +1426,9 @@ function draw(){
 loadArt();
 function fitPx(){var r=cv.getBoundingClientRect(),dp=window.devicePixelRatio||1;
   cv.style.imageRendering=(r.width*dp>=cv.width-1)?'pixelated':'auto';}
-addEventListener('resize',fitPx);fitPx();
+addEventListener('resize',function(){fitW();fitPx();});
+addEventListener('orientationchange',function(){setTimeout(function(){fitW();fitPx();},120);});
+fitW();fitPx();
 var last=0,acc=0;
 function frame(ts){acc+=Math.min(ts-last,100);last=ts;while(acc>=16.67){update();acc-=16.67;}draw();requestAnimationFrame(frame);}
 showMenu();
