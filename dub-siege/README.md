@@ -49,6 +49,12 @@ Textos en mayúsculas y sin tildes ni eñes (la tipografía no las trae).
 El menú guarda la fase más alta alcanzada por dificultad (`ds2_prog`) y ofrece
 **CONTINUAR FASE N** (empieza con 30 discos por fase saltada).
 
+## Controles táctiles
+Tres botones: BASS, FUEGO y **SALTO/DASH**. En el botón doble, un toque corto
+(soltar antes de `JD_MS` = 150 ms) salta —se mantiene pulsado `JD_HOLD`
+fotogramas por dentro para que salga el salto completo— y mantenerlo hace el
+dash. Teclado y mando siguen con sus teclas separadas.
+
 ## Depuración
 Con `#debug` en la dirección: `DS.warp(0..11, conCinematica)`, `DS.cutAdv()`,
 `DS.cutSkip()`, `DS.toArena()`, `DS.hitBoss(n)`, `DS.god()`, `DS.s`, `DS.sheets`.

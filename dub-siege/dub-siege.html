@@ -68,13 +68,14 @@ body.touch #touch{display:flex}
 #stick .base{width:calc(var(--bt)*1.7);height:calc(var(--bt)*1.7);border:2px solid var(--line);background:#12173088}
 #stick .knob{width:calc(var(--bt)*.8);height:calc(var(--bt)*.8);background:var(--line);border:2px solid var(--cy)}
 #stick .lbl{position:absolute;left:0;right:0;bottom:6px;text-align:center;font-size:9px;color:var(--dim);pointer-events:none}
-#btns{display:grid;grid-template-columns:repeat(2,var(--bt));grid-template-areas:"bs da" "f j";gap:12px;align-content:end;padding-bottom:8px}
+#btns{display:grid;grid-template-columns:repeat(2,var(--bt));grid-template-areas:". bs" "f j";gap:12px;align-content:end;padding-bottom:8px}
 #btns button,#tp{font-family:var(--pix);font-size:10px;color:var(--ink);background:var(--panel);border:3px solid var(--line);border-radius:50%;touch-action:none;padding:0;width:var(--bt);height:var(--bt);-webkit-tap-highlight-color:transparent}
 #btns .j{grid-area:j;border-color:var(--cy);background:#0f2c36}
 #btns .f{grid-area:f;border-color:var(--acc)}
 #btns .f.auto{border-style:dashed}
 #btns .bs{grid-area:bs;border-color:var(--yel)}
-#btns .da{grid-area:da;border-color:var(--grn)}
+#btns .j small{display:block;font-size:6px;line-height:1.3;margin-top:4px;color:var(--grn);opacity:.9}
+#btns .j.dash{border-color:var(--grn);background:#12361f}
 #btns button.on,#tp.on{background:var(--line);transform:scale(.94)}
 #btns .bs.ready{background:#4a3a08;box-shadow:0 0 14px var(--yel)}
 #tp{position:absolute;top:6px;right:0;width:44px;height:44px;border-radius:8px;font-size:11px}
@@ -127,7 +128,7 @@ body:not(.ingame) #touch .ctl{visibility:hidden}
 </div>
 <div id="touch">
   <div id="stick" class="ctl" aria-label="Zona de movimiento: arrastra para moverte y apuntar"><div class="base"></div><div class="knob"></div><span class="lbl">ARRASTRA PARA MOVER / APUNTAR</span></div>
-  <div id="btns" class="ctl"><button class="bs" data-k="B">BASS</button><button class="da" data-k="DA">DASH</button><button class="f" data-k="F">FUEGO</button><button class="j" data-k="J">SALTO</button></div>
+  <div id="btns" class="ctl"><button class="bs" data-k="B">BASS</button><button class="f" data-k="F">FUEGO</button><button class="j" data-k="JD">SALTO<small>MANTEN<br>DASH</small></button></div>
   <button id="tp" class="ctl" data-k="P" aria-label="Pausa">II</button>
   <p id="rot" class="ctl">GIRA EL MOVIL PARA<br>VER EL JUEGO MAS GRANDE</p>
 </div>
@@ -443,8 +444,16 @@ function setMute(m){SET.mute=m;save('ds2_set',SET);if(master)master.gain.value=m
 
 // ================= entrada =================
 var K={},TS={},GP={},LATCH={},prevI={};
+// Boton tactil SALTO/DASH: si se suelta antes de JD_MS es un salto (se mantiene
+// pulsado JD_HOLD fotogramas para que salga el salto entero, no el corto); si
+// se mantiene, a los JD_MS sale el dash y al soltar ya no salta.
+var JD_MS=150,JD_HOLD=12,jd={on:0,tm:0,dash:0,hold:0};
+function jdDown(b){if(jd.on)return;jd.on=1;jd.dash=0;b.classList.add('on');
+  clearTimeout(jd.tm);jd.tm=setTimeout(function(){if(!jd.on)return;jd.dash=1;LATCH.DA=1;b.classList.add('dash');buzz(14);},JD_MS);}
+function jdUp(b,real){if(!jd.on)return;jd.on=0;clearTimeout(jd.tm);b.classList.remove('on','dash');
+  if(!jd.dash&&real){LATCH.J=1;TS.J=1;jd.hold=JD_HOLD;}}
 function readInput(){
-  pollPad();
+  pollPad();if(jd.hold>0&&--jd.hold===0&&!jd.on)TS.J=0;
   var ku=K.ArrowUp||K.KeyW,i={L:K.ArrowLeft||K.KeyA||TS.L||GP.L,R:K.ArrowRight||K.KeyD||TS.R||GP.R,U:(SET.upJump?0:ku)||TS.U||GP.U,D:K.ArrowDown||K.KeyS||TS.D||GP.D,
     J:K.Space||K.KeyZ||K.KeyK||(SET.upJump&&ku)||TS.J||GP.J,F:K.KeyX||K.KeyJ||TS.F||GP.F,DA:K.KeyC||K.KeyL||K.ShiftLeft||K.ShiftRight||TS.DA||GP.DA,B:K.KeyV||K.KeyB||K.KeyQ||TS.B||GP.B};
   ['J','DA','B'].forEach(function(k){i[k+'p']=(i[k]&&!prevI[k])||LATCH[k];LATCH[k]=0;});
@@ -495,8 +504,9 @@ document.addEventListener('visibilitychange',function(){if(document.hidden&&mode
   b.addEventListener('contextmenu',function(e){e.preventDefault();});
   b.addEventListener('pointerdown',function(e){e.preventDefault();audioOn();buzz(8);
     if(c==='P'){if(mode==='play')pause();else if(mode==='pause')resume();return;}
+    if(c==='JD'){jdDown(b);try{b.setPointerCapture(e.pointerId);}catch(x){}return;}
     if(!TS[c]&&(c==='J'||c==='DA'||c==='B'))LATCH[c]=1;TS[c]=1;b.classList.add('on');try{b.setPointerCapture(e.pointerId);}catch(x){}});
-  ['pointerup','pointercancel','lostpointercapture'].forEach(function(n){b.addEventListener(n,function(){TS[c]=0;b.classList.remove('on');});});
+  ['pointerup','pointercancel','lostpointercapture'].forEach(function(n){b.addEventListener(n,function(){if(c==='JD'){jdUp(b,n==='pointerup');return;}TS[c]=0;b.classList.remove('on');});});
 });
 (function(){
   var zone=$('stick'),base=zone.querySelector('.base'),knob=zone.querySelector('.knob'),id=null,ox=0,oy=0;
@@ -1122,9 +1132,9 @@ function showControls(then){
   var tch=touchMode();
   var body=tch?
     '<b>ZONA IZQUIERDA</b><span>Arrastra para moverte. Arriba apunta arriba, abajo + SALTO baja de plataformas</span>'+
-    '<b>SALTO</b><span>Pulsa otra vez en el aire para el doble salto</span>'+
+    '<b>SALTO</b><span>Toca para saltar, otra vez en el aire para el doble salto</span><b>MANTEN SALTO</b><span>Dash: esquiva atravesando balas y enemigos</span>'+
     '<b>FUEGO</b><span>'+(autoFire()?'Automatico cuando hay enemigos cerca (puedes forzarlo pulsando)':'Mantenlo pulsado para disparar')+'</span>'+
-    '<b>DASH</b><span>Esquiva atravesando balas y enemigos</span><b>BASS</b><span>Con la barra llena limpia la pantalla</span><b>II</b><span>Pausa</span>':
+    '<b>BASS</b><span>Con la barra llena limpia la pantalla</span><b>II</b><span>Pausa</span>':
     '<b>FLECHAS / A D</b><span>Moverse</span><b>Z / ESPACIO</b><span>Saltar (otra vez en el aire = doble salto)</span>'+
     '<b>X / J</b><span>Disparar (mantener = rafaga)</span>'+(SET.upJump?'':'<b>ARRIBA + FUEGO</b><span>Disparo vertical o diagonal</span>')+
     '<b>ABAJO + SALTO</b><span>Bajar de una plataforma</span>'+
@@ -1862,7 +1872,7 @@ function drawHUD(){
     if(g.measureText(lb).width>tgap)lb='FASE '+(st.i+1);
     txt(lb,tcx,4,'#8f98c8','c');if(run.mult>1)txt('COMBO x'+run.mult,HW/2,13,'#3de8ff','c');}
   if(st.i===0&&!SET.tut&&!st.lock&&st.t>150){var tips=touchMode()?
-      ['ARRASTRA EN LA IZQUIERDA PARA MOVERTE','SALTO DOS VECES = DOBLE SALTO',autoFire()?'DISPARA SOLO AL VER ENEMIGOS':'MANTEN FUEGO PARA DISPARAR','DASH: ESQUIVA ATRAVESANDO BALAS','BARRA LLENA: PULSA BASS']:
+      ['ARRASTRA EN LA IZQUIERDA PARA MOVERTE','TOCA SALTO DOS VECES = DOBLE SALTO',autoFire()?'DISPARA SOLO AL VER ENEMIGOS':'MANTEN FUEGO PARA DISPARAR','MANTEN SALTO: DASH, ATRAVIESA BALAS','BARRA LLENA: PULSA BASS']:
       ['FLECHAS: MOVERTE','Z / ESPACIO: SALTO (DOBLE EN EL AIRE)','X: DISPARO (MANTEN PULSADO)','C: DASH, ESQUIVA LAS BALAS','V: BASS DROP CON LA BARRA LLENA'];
     var k=Math.floor((st.t-150)/260);if(k<tips.length){var lt=(st.t-150)%260;g.globalAlpha=lt<20?lt/20:lt>240?(260-lt)/20:1;
       // El consejo se parte en dos lineas si no cabe de ancho.
