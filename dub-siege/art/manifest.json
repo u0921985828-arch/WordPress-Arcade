@@ -1,0 +1,40 @@
+{
+ "p_idle": {
+  "object": "ff5a9dcc-e093-420b-bc6d-75cfa6e28b5b",
+  "anim": "idle",
+  "fw": 12,
+  "fh": 14,
+  "n": 5
+ },
+ "p_run": {
+  "object": "ff5a9dcc-e093-420b-bc6d-75cfa6e28b5b",
+  "anim": "run",
+  "fw": 12,
+  "fh": 14,
+  "n": 8,
+  "skip": 1
+ },
+ "e_w": {
+  "object": "d332d3a6-1731-43f0-a1c7-b89545b502da",
+  "anim": "walk",
+  "fw": 12,
+  "fh": 10,
+  "n": 4,
+  "skip": 1
+ },
+ "e_f": {
+  "object": "0b33d6f1-9ced-46f3-a46e-f9af621b3fa3",
+  "anim": "fly",
+  "fw": 12,
+  "fh": 9,
+  "skip": 1,
+  "n": 4
+ },
+ "e_t": {
+  "object": "9ce82227-54a6-4140-aad0-344b8ebcd046",
+  "anim": null,
+  "fw": 12,
+  "fh": 12,
+  "n": 1
+ }
+}
