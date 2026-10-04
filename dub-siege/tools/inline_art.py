@@ -3,7 +3,8 @@
 
 Las imagenes viajan como data: URI para que el juego siga siendo un solo
 fichero. Cada entrada declara el tamano LOGICO del fotograma (fw, fh); la tira
-tiene SC veces ese tamano, o sea 1:1 con el lienzo.
+tiene SC veces ese tamano, o sea 1:1 con el lienzo. Las que llevan x1 (retratos
+e ilustraciones) se guardan a 1x: el juego las escala por entero al pintarlas.
 
 Cada hoja se guarda en el formato SIN PERDIDA que menos ocupe (WebP sin
 perdida o PNG optimizado) y se comprueba pixel a pixel que decodifica igual.
@@ -59,8 +60,9 @@ def main():
         if not os.path.exists(f):
             print('falta', f); continue
         mime, v = best(f); total += len(v); png += os.path.getsize(f)
-        ent.append((len(v), "%s:{fw:%d,fh:%d,n:%d,src:'data:%s;base64,%s'}"
-                    % (k, d['fw'], d['fh'], d.get('n', 1), mime, base64.b64encode(v).decode())))
+        x1 = ',x1:1' if d.get('x1') else ''
+        ent.append((len(v), "%s:{fw:%d,fh:%d,n:%d%s,src:'data:%s;base64,%s'}"
+                    % (k, d['fw'], d['fh'], d.get('n', 1), x1, mime, base64.b64encode(v).decode())))
     # Trozos de tamano parecido: la barra avanza a ritmo constante.
     ent.sort(key=lambda e: e[0]); per = total / TROZOS
     groups, cur, acc = [], [], 0

@@ -35,6 +35,7 @@ Cada jefe guarda una cinta del Viejo Bombo. Al superar la fase, la cinta se desb
 | 11. La pista | La máquina | Ritmos hechos con ordenador y teclado barato (era digital) |
 | 12. Gran sound clash | El último clash | El clash entre equipos: gana quien hace bailar a más gente |
 
-## Cambios en las cinemáticas
-- Se cambiaron o añadieron 9 líneas para que el lore aparezca jugando: Bahía Grave, el Archivo, el Viejo Bombo, la Oficina de Ondas, la infancia de Flux en sótanos, el primer clash de La Bestia y el nombre del Censor.
-- Las claves `w:` y la estructura no cambian.
+## Guion de las cinemáticas
+- Reescrito entero: 127 líneas en 12 fases, con dos voces nuevas además de Mamá Dub, Selecta, MC Flux y el Censor: **el Viejo Bombo**, que habla desde sus cintas grabadas, y **Rosalba**, que aparece en los túneles.
+- Cada fase abre con una ilustración propia (barrio, mercado, plaza, tejados, antenas, helipuerto, andén, túneles, línea fantasma, la cola, la pista y el clash), que también sale en la cinta correspondiente del Archivo.
+- Retratos de busto con tres expresiones por personaje. Todo el arte es propio, generado para este juego: no se ha usado la imagen de ningún artista real.
