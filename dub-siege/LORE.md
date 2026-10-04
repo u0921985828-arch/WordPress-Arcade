@@ -14,7 +14,7 @@ El juego se juega en **español**. Los nombres de los personajes van en **patwa*
 
 ## El mundo
 - **La Ciudad de la Niebla**: ciudad ficticia del norte frío, años ochenta. Es donde se juega.
-- **La isla**: de donde llegó la familia en barco. Allí, en los tiempos de las haciendas, nació la palabra Babilonia (cinta 1).
+- **La isla**: de donde llegó la familia en barco. Allí, en los tiempos de las haciendas, los amos prohibían el tambor; Duke se acordaba de ellos cuando, con los rastas del barrio, aprendió a llamar Babilonia a quien manda callar (cinta 1).
 - **La Bestia**: el sound system de la familia. Lo montó **Duke Lectric**, padre de **Mumma Dub**, con cajas de nevera y cuatro válvulas de radio en el patio trasero de una pensión del puerto. La primera Bestia se la llevó la Brigada y lleva décadas en sus jaulas, debajo del metro.
 - **Mumma Dub**: lleva la radio pirata desde la que guía a Selecta. Su nombre viene de *mumma* (madre en patwa) y del dub, y lo lleva por **Sista Duppy**.
 - **Selecta**: el protagonista; el jugador elige su piel y su sudadera.
@@ -24,8 +24,8 @@ El juego se juega en **español**. Los nombres de los personajes van en **patwa*
 - **Los Silenciadores**: máquinas que construyó el Censor cuando la música empezó a salir de ordenadores («si sale de máquinas, se puede apagar»).
 
 ## Babilonia
-En la isla llamaban **Babilonia** al poder que manda callar (cinta 1). No es una persona, es un sistema que cambia de cara pero no de idea: que la calle esté en silencio. Hoy tiene tres piezas:
-- **La firma: el alcalde Sweeting.** De concejal joven se subió a una carroza del carnaval con frases robadas a los MCs, le votaron y no cumplió nada (cinta 9). Hace veinte años pidió la redada en el baile de Duke **para salir en los periódicos** (lo cuenta Sista en la fase 11). Ahora firma la **Ordenanza del Sosiego**, la ley que prohíbe la música en toda la ciudad, la víspera de unas elecciones.
+Los rastas del barrio llaman **Babilonia** al poder que manda callar (cinta 1). No es una persona, es un sistema que cambia de cara pero no de idea: que la calle esté en silencio. Hoy tiene tres piezas:
+- **La firma: el alcalde Sweeting.** De concejal joven se hizo la foto bailando delante de la Bestia y prometió un local municipal para los bailes; ganó la alcaldía y el solar acabó de aparcamiento (cinta 9). Hace veinte años pidió la redada en el baile de Duke **para salir en los periódicos** (lo cuenta Sista en la fase 11). Ahora firma la **Ordenanza del Sosiego**, la ley que prohíbe la música en toda la ciudad, la víspera de unas elecciones.
 - **La mano: el inspector Grist**, jefe de la **Brigada Nocturna**. Viene de familia de policías: su padre ya cortaba bailes (fase 1) y un agente Grist se llevó la primera Bestia (cinta 3). Hace cumplir la ordenanza con sus agentes y los Silenciadores, y es su Brigada la que atrapa a Spark en la torre de antenas.
 - **El oído: Lionel Hush**, el Censor. Escribió la prohibición, puso las máquinas y sigue siendo el jefe final.
 
@@ -35,22 +35,22 @@ Babilonia **pega** (redadas, ley de sospecha, calabozo) y también **compra** (c
 - **El gancho (fase 1)**: el Censor no ha roto las cuatro válvulas de la Bestia, se las ha llevado: las quiere para algo, y tiene prisa porque mañana hay elecciones. Mumma cuenta que su padre sabía algo del Censor que nunca le contó, y que la respuesta está en las cintas que guarda cada jefe.
 - **El misterio que tira**: en la fase 2 alguien más escucha la frecuencia de Mumma; en la 5 resulta ser Sista Duppy, a la que daban por muerta (*duppy*: fantasma). En la 3, Mumma recuerda que nunca supieron dónde acabó la primera Bestia; en la 8, Spark ve en las jaulas de la Brigada unos altavoces viejísimos. En la 4, nadie que haya subido a la torre ha vuelto a pinchar; allí cae Spark.
 - **Los jefes pagan**: cada jefe suelta una cinta y casi todos un dato: quién es el Censor (7), quién hizo la máquina de silencio y por qué (8: Sista la construyó después de aquel baile, para que no hubiera más redadas —si nadie oye el baile, nadie llama a la Brigada— y le dejó una puerta trasera, la nota de las cuatro válvulas), cómo funciona Babilonia (10) y quién pidió la redada (11).
-- **El final**: en el clash, la Bestia vuelve a sonar con las cuatro válvulas. Hush le pregunta al alcalde si aquella redada la pidió él, y la cinta de Duke le cuenta que su hermano bailaba allí cada domingo: era eso lo que Duke sabía. Hush rompe la ordenanza delante de todos, a Sweeting ya no le escucha nadie y Grist se retira mandando devolver lo requisado. Entre lo devuelto vienen unos altavoces viejos con una B pintada: la primera Bestia vuelve a casa. Nadie gana a golpes: gana el baile.
+- **El final**: en el clash, la Bestia vuelve a sonar con las cuatro válvulas. Hush le pregunta al alcalde si aquella redada la pidió él, y la cinta de Duke le cuenta que su hermano bailaba con él cada sábado: era eso lo que Duke sabía. Hush rompe la ordenanza delante de todos, a Sweeting ya no le escucha nadie y Grist se retira mandando devolver lo requisado. Entre lo devuelto vienen unos altavoces viejos con una B pintada: la primera Bestia vuelve a casa. Nadie gana a golpes: gana el baile.
 
 ## El Archivo (12 cintas)
 Cada jefe guarda una cinta de Duke Lectric. Al superar la fase, la cinta se desbloquea en **Menú → Archivo** (se guarda en `ds2_lore`). Cada cinta enseña la ilustración de su fase, salvo tres que tienen imagen propia de Babilonia. Se cuentan en tercera persona y sin cursiva.
 
 | Fase | Cinta | Época real en la que se inspira | Imagen |
 |---|---|---|---|
-| 1. Barrio dormido | Los tambores del cerro | Amos de plantación que prohibían el tambor por miedo a la revuelta; de ahí viene el nombre de Babilonia | il_01 |
+| 1. Barrio dormido | Los tambores del cerro | Amos de plantación que prohibían el tambor por miedo a la revuelta; Babilonia, el nombre rasta para quien manda callar | il_01 |
 | 2. Mercado cerrado | La ley de sospecha | Una ley contra mendigos de los tiempos de los carruajes, usada para parar y registrar a los jóvenes negros sin más motivo que la sospecha | il_02 |
-| 3. La plaza | Nace la bestia | Los primeros sound systems de los recién llegados, en casas y patios; la policía cortaba los bailes y se llevaba los altavoces | **il_redada** |
-| 4. Tejados | El año del salto | La independencia de la isla y el ska, que llega en los baúles de los marineros; la televisión lo enseña una vez como rareza | il_04 |
-| 5. Torre de antenas | La oficina de ondas | Una radio pública que no ponía música de los barrios; las emisoras piratas | il_05 |
+| 3. La plaza | Nace la bestia | Los primeros sound systems de los recién llegados, en casas y patios; un agente se lleva la primera Bestia en una carretilla y Duke salva las válvulas en una lata de galletas | **il_redada** |
+| 4. Tejados | El año del salto | La independencia de la isla y el ska, que llega en los baúles de los marineros; la televisión lo enseña una vez como rareza y lo corta a la mitad | il_04 |
+| 5. Torre de antenas | La oficina de ondas | Una radio pública que no ponía música de los barrios; las emisoras piratas; un auxiliar joven que lo apunta todo | il_05 |
 | 6. Helipuerto | Verano de excavadoras | Derribo de casas viejas y torres nuevas con listas de espera; el tempo lento (rocksteady) | il_06 |
-| 7. Andén cero | El gran cruce | Emigración al norte frío; pensiones y clubes que cerraban la puerta; bailes en sótanos | il_07 |
+| 7. Vía muerta | El gran cruce | Emigración al norte frío; pensiones y clubes que cerraban la puerta; bailes en sótanos | il_07 |
 | 8. Túneles | La ingeniera del eco | El dub: canciones viejas sin la voz y llenas de eco, hechas con poco dinero | il_08 |
-| 9. Línea fantasma | La voz sobre el ritmo | MCs que hablan sobre el ritmo; candidatos que usan la música del barrio en campaña | **il_mitin** |
+| 9. Línea fantasma | La voz sobre el ritmo | MCs que meten a los vecinos en sus rimas; un concejal que promete un local para los bailes y no lo abre | **il_mitin** |
 | 10. La cola | La noche de la escalera | Redadas en los bailes con perros y periódicos que culpaban al ruido | **il_cola** |
 | 11. La pista | La máquina | Ritmos hechos con ordenador y teclado barato (era digital) | il_11 |
 | 12. Gran sound clash | El último clash | El clash entre equipos: gana quien hace bailar a más gente | il_12 |
