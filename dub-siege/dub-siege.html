@@ -1090,8 +1090,8 @@ var POR={
   BOMBO:{n:'VIEJO BOMBO',c:'#ff8a2a',k:'po_bombo',f:{n:0,h:2,t:4},o:1},
   ROSA:{n:'ROSALBA',c:'#ff6fb5',k:'po_rosa',f:{n:0,a:2,t:4},o:1},
   CENSOR:{n:'EL CENSOR',c:'#ff3d6e',k:'po_censor',f:{n:0,a:1,r:2},o:0},
-  COMIS:{n:'COMISARIO GARRIDO',c:'#4d7cff',k:'po_comis',f:{n:0,a:2,s:4},o:1},
-  GOBER:{n:'GOBERNADOR OJEDA',c:'#d8b4ff',k:'po_gober',f:{n:0,h:2,r:4},o:1}
+  COMIS:{n:'COMISARIO GARRIDO',s:'GARRIDO',c:'#4d7cff',k:'po_comis',f:{n:0,a:2,s:4},o:1},
+  GOBER:{n:'GOBERNADOR OJEDA',s:'OJEDA',c:'#d8b4ff',k:'po_gober',f:{n:0,h:2,r:4},o:1}
 };
 // Tonos medios del retrato de SELECTA (piel y sudadera): el resto escala a partir de ellos.
 var PSK=lum(146,79,50),PHD=lum(66,143,64);
@@ -1116,7 +1116,10 @@ function startCut(lines,then,ill){
   cut={lines:lines,i:0,ch:0,t:0,then:then||null,bar:0,card:io&&io.ok?1:0,ill:ill};mode='cut';TS={};LATCH={};
   if(p){p.vx=0;}bullets=[];ebul=[];
 }
-function cutLine(){var c=cut,l=c.lines[c.i];if(!c.wr)c.wr=wrap(l.s,HW-(l.w&&!cutIl(l)?73:16));return l;}
+// El texto se vuelve a partir si cambia el ancho: la escena que salta en plena partida
+// se pinta una vez con el HUD de juego antes de pasar al de escena, y la lamina puede
+// cargar tarde (sin ella la linea lleva busto y es mas estrecha).
+function cutLine(){var c=cut,l=c.lines[c.i],mw=HW-(l.w&&!cutIl(l)?73:16);if(!c.wr||c.mw!==mw){c.wr=wrap(l.s,mw);c.mw=mw;}return l;}
 function cutIl(l){var o=l.i&&SHEET[l.i];return !!(o&&o.ok);}
 function cutAdv(){if(!cut)return;var c=cut,l=c.lines[c.i];
   if(c.card){if(c.t<10)return;sfx('clink');c.card=0;c.t=0;c.bar=0;return;}
@@ -1186,8 +1189,9 @@ function drawCut(){
   var c=cut;if(!c)return;if(c.card){drawCard(c);return;}
   var l=cutLine(),il=cutIl(l),e=c.bar,tb=il?0:Math.round(16*e),bh=Math.round((il?16+10*c.wr.length:56)*e),by=HH-bh;
   // Linea con ilustracion (l.i): lamina 160x90 a escala 1 sobre la caja de texto, sin
-  // busto y sin banda de arriba; si no cabe entera se recorta el cielo, no el suelo.
-  if(il){var bt=Math.floor(by*HS),ix=Math.floor((W-160)/2),iy=bt>=90?Math.floor((bt-90)/2):bt-90;
+  // busto y sin banda de arriba. Nunca cabe entera (la caja deja menos de 90 de alto):
+  // se apoya en la caja y se recorta por arriba (el cielo), nunca el suelo.
+  if(il){var bt=Math.floor(by*HS),ix=Math.floor((W-160)/2),iy=bt-90;
     g.save();g.setTransform(SC,0,0,SC,0,0);g.globalAlpha=Math.min(1,c.t/10);rect(0,0,W,H,'#000');blitS(l.i,0,ix,iy,1);g.globalAlpha=1;
     // sin busto, el efecto de la voz va sobre la parte visible de la lamina
     if(l.x&&c.t>=10){var vy=Math.max(0,iy),vh=iy+90-vy;g.beginPath();g.rect(ix,vy,160,vh);g.clip();cutFx(l,ix,vy,160,vh);}
@@ -1209,6 +1213,8 @@ function drawCut(){
     cutFace(l,px,py);}
   g.save();g.setTransform(SC*HS,0,0,SC*HS,0,0);
   var tx=l.w&&!il?69:8,y0=il?by+13:l.w?HH-43:HH-48,ny=il?by+3:HH-53;
+  // nombre largo que llegaria al '>' (HUD estrecho, W=160): va el corto (P.s)
+  if(P&&P.s){g.font='8px "Press Start 2P", monospace';if(tx+g.measureText(nm).width>HW-16)nm=P.s;}
   if(nm)txt(nm,tx,ny,nc);
   var left=c.ch|0,ln=c.wr,i2;
   for(i2=0;i2<ln.length&&left>0;i2++){txt(ln[i2].slice(0,left),tx,y0+i2*10,'#eef3ff');left-=ln[i2].length+1;}

@@ -70,9 +70,14 @@ que daña a enemigos, jefe y también al jugador si está cerca. Las explosiones
 `{w:'MAMA'|'SELECTA'|'FLUX'|'BOMBO'|'ROSA'|'CENSOR'|'COMIS'|'GOBER'|'BOSS', s:'TEXTO', f:'n'|'a'|'h'|'s'|'t'|'r', e:'boom'|'booms'|'alarm'|'shake'|'flash', x:'static'|'tape', i:'il_*'}`
 (sin `w` habla el narrador y el texto ocupa todo el ancho). 171 líneas en total.
 Una línea con `i` (lámina de 160×90, hoy `il_redada`, `il_mitin` e `il_cola`) se
-pinta sin busto: la lámina a escala 1 encima de la caja de texto, que se ajusta
-a las líneas que ocupa; si la pantalla es baja se recorta el cielo, nunca el
-suelo. El efecto de `x` va entonces sobre la lámina.
+pinta sin busto si la lámina ha cargado (si no, sale el busto de siempre): la
+lámina a escala 1, centrada sobre negro y apoyada en la caja de texto, que se
+ajusta a las líneas que ocupa. La caja nunca deja 90 de alto, así que la lámina
+pierde siempre su parte de arriba, el cielo (con las tres de hoy, de 11 a 37 de
+sus 90 filas según la pantalla y las líneas); el suelo no se recorta nunca. El
+efecto de `x` va entonces sobre la lámina. El texto se vuelve a partir si cambia
+el ancho: la escena que salta en plena partida se pinta un fotograma con el HUD
+de juego antes de pasar al de escena.
 Salen al empezar la fase, en el primer punto de control, al aparecer el jefe y
 al ganarle (la de la fase 12 es el final). La escena de entrada abre con una
 **ilustración de la fase** (`il_01..12`, 160×90 a escala entera y centrada, con
@@ -85,10 +90,13 @@ lámina de su fase (`il_NN`) salvo que traiga otra como tercer elemento
 **Retratos** (`POR` en el código): busto de 48×56 por personaje (`po_*`, hojas a
 1× con `x1`), con 3 caras cada uno —`n` normal más dos de su carácter
 (`a` alerta, `h` contenta, `s` seria, `t` triste, `r` furia)— y boca que se mueve
-mientras escribe (fotograma +1). Las dos caras de Babilonia (ver `LORE.md`) tienen
-las suyas retocadas a mano: el comisario Garrido (`COMIS`: `n`, `a` grita una
-orden, `s` sonrisa burlona) y el gobernador Ojeda (`GOBER`: `n`, `h` sonrisa de
-cartel, `r` se le cae la careta). El de Selecta se tiñe con la piel y la sudadera
+mientras escribe (fotograma +1; todos menos el Censor, `o:0`). Las dos caras de
+Babilonia (ver `LORE.md`) tienen las suyas retocadas a mano: el comisario Garrido
+(`COMIS`: `n`, `a` grita una orden, `s` sonrisa burlona) y el gobernador Ojeda
+(`GOBER`: `n`, `h` sonrisa de cartel, `r` se le cae la careta). Sus rótulos
+largos («COMISARIO GARRIDO», «GOBERNADOR OJEDA») pasan a la forma corta de `s`
+(«GARRIDO», «OJEDA») cuando llegarían al «>» del busto, como con W=160 (la escena
+a pantalla completa en 16:9). El de Selecta se tiñe con la piel y la sudadera
 elegidas (`lookPor`). `x:'static'` mete ruido de radio y `x:'tape'` tono cálido y
 una cinta girando (las grabaciones del Viejo Bombo). El jefe habla con su propio
 sprite de juego a escala entera dentro del marco.
