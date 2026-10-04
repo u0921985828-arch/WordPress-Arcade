@@ -14,20 +14,25 @@
   var de=document.documentElement,c=de.classList,s=de.style;
   function mq(q){return matchMedia(q).matches;}
   function dev(){return mq('(pointer:coarse)')||(navigator.maxTouchPoints>0&&!mq('(pointer:fine)'));}
+  var lw=0,sig='',D={rw:0,rh:0};
   function upd(){
     var w=innerWidth,h=innerHeight,a=document.activeElement;
-    // Con el teclado abierto el alto cambia: no se gira ni se recoloca nada.
-    if(c.contains('rot')&&a&&a.tagName==='INPUT')return;
-    var rot=dev()&&h>w;c.toggle('rot',rot);
+    // Con el teclado abierto cambia solo el alto: no se gira ni se recoloca nada.
+    if(c.contains('rot')&&a&&a.tagName==='INPUT'&&w===lw)return;
+    // Solo con la pantalla en vertical (no una ventana alta en pantalla partida).
+    var so=screen.orientation&&screen.orientation.type,sp=so?so.indexOf('portrait')===0:screen.height>screen.width;
+    var rot=dev()&&h>w&&sp;c.toggle('rot',rot);lw=w;D.rw=rot?h:w;D.rh=rot?w:h;
     if(rot){s.setProperty('--vw',h/100+'px');s.setProperty('--vh',w/100+'px');s.setProperty('--rw',h+'px');s.setProperty('--rh',w+'px');s.setProperty('--rx',Math.round(w*(devicePixelRatio||1))/(devicePixelRatio||1)+'px');
       c.remove('vp');c.add('vl');c.toggle('h600',w<=600);c.toggle('h430',w<=430);c.toggle('w480',h>=480);}
     else{['--vw','--vh','--rw','--rh','--rx'].forEach(function(k){s.removeProperty(k);});
       c.toggle('vp',mq('(orientation:portrait)'));c.toggle('vl',mq('(orientation:landscape)'));
       c.toggle('h600',mq('(max-height:600px)'));c.toggle('h430',mq('(max-height:430px)'));c.toggle('w480',mq('(min-width:480px)'));}
+    // Si cambió el giro o la medida, el juego se recoloca ya (no espera a otro resize).
+    var g=rot+','+w+','+h;if(sig&&g!==sig){sig=g;dispatchEvent(new Event('resize'));}sig=g;
   }
   upd();addEventListener('resize',upd);addEventListener('focusout',function(){setTimeout(upd,60);});
   addEventListener('orientationchange',function(){upd();setTimeout(upd,100);});
-  window.DSV={dev:dev,upd:upd};
+  D.dev=dev;D.upd=upd;window.DSV=D;
 })();
 </script>
 <title>Dub Siege</title>
@@ -191,11 +196,11 @@ var $=function(id){return document.getElementById(id);};
 // el dedo pasa por aqui y trabaja en coordenadas de la pagina tumbada, no en
 // las del cristal. Sin giro devuelven lo mismo que innerWidth, clientX, etc.
 function ROT(){return document.documentElement.classList.contains('rot');}
-function VW(){return ROT()?innerHeight:innerWidth;}
-function VH(){return ROT()?innerWidth:innerHeight;}
-function vrect(el){var r=el.getBoundingClientRect();if(!ROT())return r;var w=innerWidth;
+function VW(){return ROT()?DSV.rw:innerWidth;}
+function VH(){return ROT()?DSV.rh:innerHeight;}
+function vrect(el){var r=el.getBoundingClientRect();if(!ROT())return r;var w=DSV.rh;
   return {left:r.top,top:w-r.right,right:r.bottom,bottom:w-r.left,width:r.height,height:r.width};}
-function vpt(e){return ROT()?{x:e.clientY,y:innerWidth-e.clientX}:{x:e.clientX,y:e.clientY};}
+function vpt(e){return ROT()?{x:e.clientY,y:DSV.rh-e.clientX}:{x:e.clientX,y:e.clientY};}
 var cv=$('c'),g=cv.getContext('2d');g.imageSmoothingEnabled=false;
 // W x H es lo que se VE (ventana de camara); WH es el alto real de la columna
 // del mundo (15 filas de 12 px). CY es cuanto cielo vacio se recorta por arriba:
@@ -1255,7 +1260,7 @@ function best(){var a=load('ds2_rank',[]);return a.length?a[0].score:0;}
 // EMPEZAR»). Ese toque es el gesto que piden los navegadores para poner la
 // pantalla completa y bloquearla en horizontal (Android). Donde no se puede
 // (iPhone), la pagina girada ya lo deja tumbado. En #debug no sale, salvo ?gate.
-var GATE=DSV.dev()&&!(DEBUG&&!/[?&]gate\b/.test(location.search));
+var GATE=DSV.dev()&&!!(document.fullscreenEnabled||document.webkitFullscreenEnabled)&&!(DEBUG&&!/[?&]gate\b/.test(location.search));
 function gate(ld){
   ld.classList.add('gate');ld.setAttribute('role','button');ld.querySelector('small').textContent='TOCA PARA EMPEZAR';
   function go(e){if(e){e.preventDefault();e.stopPropagation();}removeEventListener('keydown',go,true);ld.removeEventListener('click',go);
@@ -1369,6 +1374,8 @@ function pause(){if(mode!=='play')return;mode='pause';K={};TS={};
   show('<div class="panel"><h2>PAUSA</h2><p class="dim">FASE '+(st.i+1)+' - '+st.L.name+' - '+DIFFS[SET.diff].n+'</p><div class="menu"><button class="btn hot" data-act="resume">CONTINUAR</button>'+
   '<button class="btn" data-act="opts">OPCIONES</button><button class="btn" data-act="controls">CONTROLES</button><button class="btn" data-act="restart">REINICIAR FASE</button><button class="btn" data-act="tomenu">SALIR AL MENÚ</button></div></div>');}
 function resume(){hideOv();mode='play';K={};}
+// Al salir de pantalla completa (gesto del sistema) se pausa: los botones pueden haber quedado a medias.
+['fullscreenchange','webkitfullscreenchange'].forEach(function(n){document.addEventListener(n,function(){if(!(document.fullscreenElement||document.webkitFullscreenElement))pause();});});
 function startGame(n){newRun();if(n){run.coins=n*30;}enterLevel(n||0,true);audioOn();}
 function act(a,v){
   audioOn();

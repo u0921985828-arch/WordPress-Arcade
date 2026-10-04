@@ -17,15 +17,17 @@ En un móvil o tableta en vertical la página **se gira 90° por CSS**: `<html>`
 lleva la clase `rot` y el `body` pasa a medir `innerHeight × innerWidth` con
 `translateX(--rx) rotate(90deg)` (el desplazamiento se redondea al píxel real
 para no emborronar con densidades como 2,625). Se juega con el móvil tumbado
-hacia la izquierda. Por eso en el CSS no hay `vw`/`vh`, `env(safe-area-*)` ni
+hacia la izquierda. Solo gira si la **pantalla** está en vertical (una ventana alta en
+pantalla partida no gira) y no se deshace al abrir el teclado. Por eso en el CSS no hay `vw`/`vh`, `env(safe-area-*)` ni
 `@media` de orientación o tamaño: se usan `var(--vw)`/`var(--vh)`,
 `--sal/--sar/--sat/--sab` y las clases `vp`/`vl`/`h600`/`h430`/`w480`, que
 calcula el script del `<head>` (sin girar copian a `matchMedia` tal cual). En
 JS, toda medida de pantalla pasa por `VW()`/`VH()`, `vrect(el)` y `vpt(evento)`.
 
 Arranque: en táctil sale **TOCA PARA EMPEZAR**; ese toque enciende el audio,
-pide pantalla completa y `screen.orientation.lock('landscape')` (Android; en
-iPhone no existe y queda el giro por CSS). Con `#debug` no sale, salvo con
+pide pantalla completa y `screen.orientation.lock('landscape')` (Android). Si
+el navegador no da pantalla completa (iPhone) no sale y queda el giro por CSS.
+Salir de pantalla completa en partida la pausa. Con `#debug` no sale, salvo con
 `?gate#debug`.
 
 ## Capa de sprites
