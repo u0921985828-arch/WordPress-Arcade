@@ -528,5 +528,40 @@
   "fw": 160,
   "fh": 90,
   "n": 1
+ },
+ "po_comis": {
+  "local": true,
+  "x1": 1,
+  "fw": 48,
+  "fh": 56,
+  "n": 6
+ },
+ "po_gober": {
+  "local": true,
+  "x1": 1,
+  "fw": 48,
+  "fh": 56,
+  "n": 6
+ },
+ "il_redada": {
+  "local": true,
+  "x1": 1,
+  "fw": 160,
+  "fh": 90,
+  "n": 1
+ },
+ "il_mitin": {
+  "local": true,
+  "x1": 1,
+  "fw": 160,
+  "fh": 90,
+  "n": 1
+ },
+ "il_cola": {
+  "local": true,
+  "x1": 1,
+  "fw": 160,
+  "fh": 90,
+  "n": 1
  }
 }

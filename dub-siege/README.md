@@ -67,19 +67,28 @@ que daña a enemigos, jefe y también al jugador si está cerca. Las explosiones
 (`boom()`) son bola de fuego, onda de choque y humo, todo con píxel cuadrado.
 
 **Cinemáticas**: cada fase lleva `cut:{pre,cp,boss,post}`, listas de líneas
-`{w:'MAMA'|'SELECTA'|'FLUX'|'BOMBO'|'ROSA'|'CENSOR'|'BOSS', s:'TEXTO', f:'n'|'a'|'h'|'s'|'t'|'r', e:'boom'|'booms'|'alarm'|'shake'|'flash', x:'static'|'tape'}`
-(sin `w` habla el narrador y el texto ocupa todo el ancho). 127 líneas en total.
+`{w:'MAMA'|'SELECTA'|'FLUX'|'BOMBO'|'ROSA'|'CENSOR'|'COMIS'|'GOBER'|'BOSS', s:'TEXTO', f:'n'|'a'|'h'|'s'|'t'|'r', e:'boom'|'booms'|'alarm'|'shake'|'flash', x:'static'|'tape', i:'il_*'}`
+(sin `w` habla el narrador y el texto ocupa todo el ancho). 171 líneas en total.
+Una línea con `i` (lámina de 160×90, hoy `il_redada`, `il_mitin` e `il_cola`) se
+pinta sin busto: la lámina a escala 1 encima de la caja de texto, que se ajusta
+a las líneas que ocupa; si la pantalla es baja se recorta el cielo, nunca el
+suelo. El efecto de `x` va entonces sobre la lámina.
 Salen al empezar la fase, en el primer punto de control, al aparecer el jefe y
 al ganarle (la de la fase 12 es el final). La escena de entrada abre con una
 **ilustración de la fase** (`il_01..12`, 160×90 a escala entera y centrada, con
 el nombre de la fase y «toca para seguir»). Avanza con salto/disparo, Intro o un
 toque, y se salta entera con Esc, Start o tocando SALTAR. Cada escena sale una
-vez por partida (reintentar no la repite).
+vez por partida (reintentar no la repite). En el Archivo, cada cinta enseña la
+lámina de su fase (`il_NN`) salvo que traiga otra como tercer elemento
+(`LORE[i][2]`): las cintas 3, 9 y 10 usan las de Babilonia.
 
 **Retratos** (`POR` en el código): busto de 48×56 por personaje (`po_*`, hojas a
 1× con `x1`), con 3 caras cada uno —`n` normal más dos de su carácter
 (`a` alerta, `h` contenta, `s` seria, `t` triste, `r` furia)— y boca que se mueve
-mientras escribe (fotograma +1). El de Selecta se tiñe con la piel y la sudadera
+mientras escribe (fotograma +1). Las dos caras de Babilonia (ver `LORE.md`) tienen
+las suyas retocadas a mano: el comisario Garrido (`COMIS`: `n`, `a` grita una
+orden, `s` sonrisa burlona) y el gobernador Ojeda (`GOBER`: `n`, `h` sonrisa de
+cartel, `r` se le cae la careta). El de Selecta se tiñe con la piel y la sudadera
 elegidas (`lookPor`). `x:'static'` mete ruido de radio y `x:'tape'` tono cálido y
 una cinta girando (las grabaciones del Viejo Bombo). El jefe habla con su propio
 sprite de juego a escala entera dentro del marco.
