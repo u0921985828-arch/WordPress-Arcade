@@ -12,6 +12,22 @@ vez (`SC = 4`). Física, colisiones y cajas
 no cambian: lo único que cambia es que un píxel lógico se pinta como un bloque
 de 4×4 píxeles reales, así que los sprites de imagen entran **1:1, sin pérdida**.
 
+## Siempre en horizontal
+En un móvil o tableta en vertical la página **se gira 90° por CSS**: `<html>`
+lleva la clase `rot` y el `body` pasa a medir `innerHeight × innerWidth` con
+`translateX(--rx) rotate(90deg)` (el desplazamiento se redondea al píxel real
+para no emborronar con densidades como 2,625). Se juega con el móvil tumbado
+hacia la izquierda. Por eso en el CSS no hay `vw`/`vh`, `env(safe-area-*)` ni
+`@media` de orientación o tamaño: se usan `var(--vw)`/`var(--vh)`,
+`--sal/--sar/--sat/--sab` y las clases `vp`/`vl`/`h600`/`h430`/`w480`, que
+calcula el script del `<head>` (sin girar copian a `matchMedia` tal cual). En
+JS, toda medida de pantalla pasa por `VW()`/`VH()`, `vrect(el)` y `vpt(evento)`.
+
+Arranque: en táctil sale **TOCA PARA EMPEZAR**; ese toque enciende el audio,
+pide pantalla completa y `screen.orientation.lock('landscape')` (Android; en
+iPhone no existe y queda el giro por CSS). Con `#debug` no sale, salvo con
+`?gate#debug`.
+
 ## Capa de sprites
 Las hojas viajan como `data:` URI en varios `<script>LD({...},pct)</script>`
 pequeños **antes** del juego (entre `<!-- <ARTDATA> -->`); cada trozo rellena

@@ -3,6 +3,33 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+/* Horizontal siempre. En un movil o tableta en vertical la pagina entera se gira
+   90° (html.rot): el juego se ve tumbado aunque el movil tenga el giro
+   bloqueado. Todo el CSS mide con --vw/--vh y clases (vp, vl, h600, h430, w480)
+   en vez de vw/vh y @media, porque esas siguen la pantalla fisica y aqui
+   manda la girada. Fuera de .rot las clases copian las @media de siempre, asi
+   que escritorio y movil tumbado quedan exactamente igual. */
+(function(){
+  var de=document.documentElement,c=de.classList,s=de.style;
+  function mq(q){return matchMedia(q).matches;}
+  function dev(){return mq('(pointer:coarse)')||(navigator.maxTouchPoints>0&&!mq('(pointer:fine)'));}
+  function upd(){
+    var w=innerWidth,h=innerHeight,a=document.activeElement;
+    // Con el teclado abierto el alto cambia: no se gira ni se recoloca nada.
+    if(c.contains('rot')&&a&&a.tagName==='INPUT')return;
+    var rot=dev()&&h>w;c.toggle('rot',rot);
+    if(rot){s.setProperty('--vw',h/100+'px');s.setProperty('--vh',w/100+'px');s.setProperty('--rw',h+'px');s.setProperty('--rh',w+'px');s.setProperty('--rx',Math.round(w*(devicePixelRatio||1))/(devicePixelRatio||1)+'px');
+      c.remove('vp');c.add('vl');c.toggle('h600',w<=600);c.toggle('h430',w<=430);c.toggle('w480',h>=480);}
+    else{['--vw','--vh','--rw','--rh','--rx'].forEach(function(k){s.removeProperty(k);});
+      c.toggle('vp',mq('(orientation:portrait)'));c.toggle('vl',mq('(orientation:landscape)'));
+      c.toggle('h600',mq('(max-height:600px)'));c.toggle('h430',mq('(max-height:430px)'));c.toggle('w480',mq('(min-width:480px)'));}
+  }
+  upd();addEventListener('resize',upd);addEventListener('focusout',function(){setTimeout(upd,60);});
+  addEventListener('orientationchange',function(){upd();setTimeout(upd,100);});
+  window.DSV={dev:dev,upd:upd};
+})();
+</script>
 <title>Dub Siege</title>
 <!-- Press Start 2P (subconjunto latino, SIL OFL 1.1) incrustada: el juego no
      pide nada a servidores de terceros. -->
@@ -10,32 +37,33 @@
 <style>
 /* Mundo arcade oscuro unico. Escritorio: monitor 16:9 que llena la ventana.
    Movil vertical: juego arriba + mandos grandes abajo. Movil horizontal: juego a pantalla completa con mandos superpuestos. */
-:root{color-scheme:dark;--bg:#06070d;--ink:#eef3ff;--dim:#8f98c8;--acc:#ff3d6e;--yel:#ffd23f;--cy:#3de8ff;--grn:#4dff88;--panel:#121730;--line:#3a4680;--pix:'Press Start 2P',ui-monospace,Menlo,monospace;--bt:68px;--ar:1.7778}
+:root{color-scheme:dark;--bg:#06070d;--ink:#eef3ff;--dim:#8f98c8;--acc:#ff3d6e;--yel:#ffd23f;--cy:#3de8ff;--grn:#4dff88;--panel:#121730;--line:#3a4680;--pix:'Press Start 2P',ui-monospace,Menlo,monospace;--bt:68px;--ar:1.7778;
+  --vw:1vw;--vh:1vh;--sal:env(safe-area-inset-left,0px);--sar:env(safe-area-inset-right,0px);--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box}
 html,body{height:100%}
-#ld{position:fixed;inset:0;z-index:99;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:var(--pix)}#ld b{font-weight:400;font-size:clamp(22px,9vmin,56px);color:var(--acc);text-shadow:0 .06em #7a1030,.05em .12em #000}#ld i{display:block;width:min(60vw,320px);height:10px;border:2px solid var(--line);padding:2px}#ld s{display:block;height:100%;width:4%;background:var(--cy);transition:width .15s}#ld small{color:var(--dim);font-size:10px;letter-spacing:.1em}
+#ld{position:fixed;inset:0;z-index:99;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:var(--pix)}#ld b{font-weight:400;font-size:clamp(22px,9vmin,56px);color:var(--acc);text-shadow:0 .06em #7a1030,.05em .12em #000}#ld i{display:block;width:min(calc(60*var(--vw)),320px);height:10px;border:2px solid var(--line);padding:2px}#ld s{display:block;height:100%;width:4%;background:var(--cy);transition:width .15s}#ld small{color:var(--dim);font-size:10px;letter-spacing:.1em}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--pix);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:8px 16px;touch-action:manipulation}
 body.big{--bt:84px}
 #wrap{position:relative;flex:none;max-width:100%;background:#000;overflow:hidden;line-height:0;box-shadow:0 0 0 2px var(--line),0 0 40px #3de8ff22}
 canvas{display:block;image-rendering:pixelated}
 .ov{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:auto;z-index:5;overscroll-behavior:contain;background:rgba(6,7,13,.9);
-  padding:max(10px,2vh) max(12px,calc(12px + env(safe-area-inset-right,0px))) max(10px,2vh) max(12px,calc(12px + env(safe-area-inset-left,0px)))}
+  padding:max(10px,calc(2*var(--vh))) max(12px,calc(12px + var(--sar))) max(10px,calc(2*var(--vh))) max(12px,calc(12px + var(--sal)))}
 .ov[hidden]{display:none!important}
-.panel{width:100%;max-width:min(640px,96vw);margin:auto;display:flex;flex-direction:column;align-items:center;text-align:center;gap:clamp(5px,1.5vh,12px);font-size:clamp(9px,min(1.7vw,2.4vh),14px);line-height:1.6}
-.panel h1{margin:0;font-weight:400;font-size:clamp(26px,min(12vw,17vh),88px);line-height:.95;color:var(--acc);text-shadow:0 .06em #7a1030,.05em .12em #000;text-wrap:balance}
-.panel h2{margin:0;font-weight:400;font-size:clamp(13px,min(3.4vw,4.6vh),26px);color:var(--yel);text-shadow:2px 2px #000;text-wrap:balance}
-.panel h3{margin:0;font-weight:400;font-size:clamp(10px,min(2vw,2.8vh),15px);color:var(--cy)}
+.panel{width:100%;max-width:min(640px,calc(96*var(--vw)));margin:auto;display:flex;flex-direction:column;align-items:center;text-align:center;gap:clamp(5px,calc(1.5*var(--vh)),12px);font-size:clamp(9px,min(calc(1.7*var(--vw)),calc(2.4*var(--vh))),14px);line-height:1.6}
+.panel h1{margin:0;font-weight:400;font-size:clamp(26px,min(calc(12*var(--vw)),calc(17*var(--vh))),88px);line-height:.95;color:var(--acc);text-shadow:0 .06em #7a1030,.05em .12em #000;text-wrap:balance}
+.panel h2{margin:0;font-weight:400;font-size:clamp(13px,min(calc(3.4*var(--vw)),calc(4.6*var(--vh))),26px);color:var(--yel);text-shadow:2px 2px #000;text-wrap:balance}
+.panel h3{margin:0;font-weight:400;font-size:clamp(10px,min(calc(2*var(--vw)),calc(2.8*var(--vh))),15px);color:var(--cy)}
 .kick{color:var(--cy);letter-spacing:.12em;margin:0}
 .dim{color:var(--dim);margin:0;max-width:min(52ch,96%)}
-.menu{display:flex;flex-direction:column;gap:clamp(5px,1.2vh,8px);width:min(100%,340px)}
-.btn{font:inherit;font-size:1em;color:var(--ink);background:var(--panel);border:2px solid var(--line);min-height:clamp(30px,6vh,46px);padding:.55em .9em;cursor:pointer;border-radius:4px;touch-action:manipulation;text-align:center}
+.menu{display:flex;flex-direction:column;gap:clamp(5px,calc(1.2*var(--vh)),8px);width:min(100%,340px)}
+.btn{font:inherit;font-size:1em;color:var(--ink);background:var(--panel);border:2px solid var(--line);min-height:clamp(30px,calc(6*var(--vh)),46px);padding:.55em .9em;cursor:pointer;border-radius:4px;touch-action:manipulation;text-align:center}
 .btn:hover,.btn:focus-visible{background:var(--line);outline:2px solid var(--yel);outline-offset:2px}
 .btn.hot{background:#10351f;border-color:var(--grn);color:#c6ffd9}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .opt{display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left}
 .opt i{font-style:normal;color:var(--yel)}
 .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
-.stats{display:grid;grid-template-columns:1fr auto;gap:clamp(2px,.6vh,4px) 18px;width:min(100%,380px);text-align:left;font-variant-numeric:tabular-nums}
+.stats{display:grid;grid-template-columns:1fr auto;gap:clamp(2px,calc(.6*var(--vh)),4px) 18px;width:min(100%,380px);text-align:left;font-variant-numeric:tabular-nums}
 .stats b{font-weight:400;color:var(--yel);text-align:right}
 .stats .tot{color:var(--grn);border-top:1px solid var(--line);padding-top:4px}
 .shop{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:8px;width:100%}
@@ -45,23 +73,22 @@ canvas{display:block;image-rendering:pixelated}
 .item .c{color:var(--yel);font-style:normal}
 .pips{color:var(--cy);letter-spacing:2px}
 .coins{color:var(--yel);margin:0}
-.keys{display:grid;grid-template-columns:auto 1fr;gap:clamp(3px,.9vh,6px) 16px;text-align:left;width:min(100%,520px)}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:clamp(3px,calc(.9*var(--vh)),6px) 16px;text-align:left;width:min(100%,520px)}
 .keys b{font-weight:400;color:var(--yel)}
 ol.rank{list-style:none;padding:0;margin:0;width:min(100%,480px);font-variant-numeric:tabular-nums}
 ol.rank li{display:grid;grid-template-columns:2.6em 3.6em 1fr auto;gap:8px;padding:4px 6px;border-bottom:1px solid var(--panel);text-align:left}
 ol.rank li:first-child{color:var(--yel)}
 ol.rank li.me{background:#10351f;color:#c6ffd9}
 ol.rank .x{color:var(--dim)}
-#tag{font:inherit;font-size:16px;width:6em;min-height:clamp(32px,6vh,46px);text-transform:uppercase;text-align:center;background:#000;color:var(--yel);border:2px solid var(--line);padding:.5em;border-radius:4px;-webkit-user-select:text;user-select:text}
+#tag{font:inherit;font-size:16px;width:6em;min-height:clamp(32px,calc(6*var(--vh)),46px);text-transform:uppercase;text-align:center;background:#000;color:var(--yel);border:2px solid var(--line);padding:.5em;border-radius:4px;-webkit-user-select:text;user-select:text}
 #tag:focus-visible{outline:2px solid var(--yel)}
 .note{color:var(--grn);min-height:1.7em;margin:0}
-.lore{margin:0;max-width:min(46ch,96%);text-align:left;line-height:1.75}.ill{display:block;flex:none;image-rendering:pixelated;image-rendering:crisp-edges;outline:2px solid #1a1530}.tapes .btn{text-align:left;padding:6px 10px;min-height:34px}@media (min-width:480px){.menu.tapes{display:grid;grid-template-columns:1fr 1fr;width:min(100%,680px)}}
-.lkw{display:flex;gap:clamp(8px,2vw,18px);align-items:center;justify-content:center;width:100%;flex-wrap:wrap}
+.lore{margin:0;max-width:min(46ch,96%);text-align:left;line-height:1.75}.ill{display:block;flex:none;image-rendering:pixelated;image-rendering:crisp-edges;outline:2px solid #1a1530}.tapes .btn{text-align:left;padding:6px 10px;min-height:34px}html.w480 .menu.tapes{display:grid;grid-template-columns:1fr 1fr;width:min(100%,680px)}
+.lkw{display:flex;gap:clamp(8px,calc(2*var(--vw)),18px);align-items:center;justify-content:center;width:100%;flex-wrap:wrap}
 #lkc{width:168px;height:168px;flex:none;image-rendering:pixelated;background:radial-gradient(circle at 50% 62%,#1d2350 0,#0b0e1f 70%);border:2px solid var(--line);border-radius:6px}
 .lkm{width:min(100%,360px)}
 .lkm .opt i.lock{color:var(--acc)}
-@media (max-height:600px){#lkc{width:112px;height:112px}.lkw{flex-wrap:nowrap}.lkh{display:none}.lkm{display:flex;flex-direction:column;width:min(100%,360px)}.lkm .btn{min-height:28px;padding:.35em .8em}}
-
+html.h600 #lkc{width:112px;height:112px}html.h600 .lkw{flex-wrap:nowrap}html.h600 .lkh{display:none}html.h600 .lkm{display:flex;flex-direction:column;width:min(100%,360px)}html.h600 .lkm .btn{min-height:28px;padding:.35em .8em}
 /* ---- mandos tactiles ---- */
 #touch{display:none;position:relative;width:100%;touch-action:none}
 body.touch #touch{display:flex}
@@ -84,41 +111,37 @@ body.touch #touch{display:flex}
 #tp{position:absolute;top:6px;right:0;width:44px;height:44px;border-radius:8px;font-size:11px}
 #rot{position:absolute;top:10px;left:0;right:56px;text-align:left;font-size:9px;color:var(--dim);line-height:1.6;pointer-events:none}
 body:not(.ingame) #touch .ctl{visibility:hidden}
-
-@media (orientation:portrait){
-  body.touch{justify-content:flex-start;padding-top:calc(8px + env(safe-area-inset-top,0px))}
-  body.touch #touch{flex:1;min-height:0;align-items:stretch;gap:12px;padding-top:56px;padding-bottom:env(safe-area-inset-bottom,0px)}
-  body.touch #stick .base{left:50%;top:60%}
-  body.touch #stick .knob{left:50%;top:60%}
-}
-@media (orientation:landscape){
-  body.touch{padding:0 env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px)}
-  body.touch #wrap{box-shadow:none}
-  body:not(.ingame){padding:0}
-  body:not(.ingame) #wrap{box-shadow:none}
-  body.touch #touch{position:fixed;inset:0;z-index:4;pointer-events:none}
-  body.touch #stick{position:absolute;left:0;bottom:0;width:42%;height:72%;pointer-events:auto}
-  body.touch #stick .base{left:calc(var(--bt)*1.1 + env(safe-area-inset-left,0px));top:calc(100% - var(--bt)*1.1)}
-  body.touch #stick .knob{left:calc(var(--bt)*1.1 + env(safe-area-inset-left,0px));top:calc(100% - var(--bt)*1.1)}
-  body.touch #stick .lbl{display:none}
-  body.touch #btns{position:absolute;pointer-events:auto}
-  body.touch #btns button{opacity:.5}
-  body.touch #tp{top:8px;right:calc(8px + env(safe-area-inset-right,0px));pointer-events:auto;opacity:.7}
-  body.touch #rot{display:none}
-}
+/* Vertical (html.vp = la antigua @media orientation:portrait) */
+html.vp body.touch{justify-content:flex-start;padding-top:calc(8px + var(--sat))}
+html.vp body.touch #touch{flex:1;min-height:0;align-items:stretch;gap:12px;padding-top:56px;padding-bottom:var(--sab)}
+html.vp body.touch #stick .base{left:50%;top:60%}
+html.vp body.touch #stick .knob{left:50%;top:60%}
+/* Apaisado (html.vl), tambien con la pagina girada */
+html.vl body.touch{padding:0 var(--sar) 0 var(--sal)}
+html.vl body.touch #wrap{box-shadow:none}
+html.vl body:not(.ingame){padding:0}
+html.vl body:not(.ingame) #wrap{box-shadow:none}
+html.vl body.touch #touch{position:fixed;inset:0;z-index:4;pointer-events:none}
+html.vl body.touch #stick{position:absolute;left:0;bottom:0;width:42%;height:72%;pointer-events:auto}
+html.vl body.touch #stick .base{left:calc(var(--bt)*1.1 + var(--sal));top:calc(100% - var(--bt)*1.1)}
+html.vl body.touch #stick .knob{left:calc(var(--bt)*1.1 + var(--sal));top:calc(100% - var(--bt)*1.1)}
+html.vl body.touch #stick .lbl{display:none}
+html.vl body.touch #btns{position:absolute;pointer-events:auto}
+html.vl body.touch #btns button{opacity:.5}
+html.vl body.touch #tp{top:8px;right:calc(8px + var(--sar));pointer-events:auto;opacity:.7}
+html.vl body.touch #rot{display:none}
 /* Pantalla baja (movil tumbado, portatil): los botones pasan a dos columnas
    para que el menu entero quepa sin tener que desplazar. */
-@media (max-height:600px){
-  .menu{display:grid;grid-template-columns:1fr 1fr;width:min(100%,560px)}
-  .menu .hot{grid-column:1/-1}
-  .keys{grid-template-columns:auto 1fr auto 1fr;width:min(100%,760px)}
-}
-@media (max-height:430px){.panel{line-height:1.45}.shop{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))}}
-@media (orientation:landscape){body.touch #stick:not(.act) .base,body.touch #stick:not(.act) .knob{opacity:.35}}
+/* html.h600 = alto de 600 px o menos */
+html.h600 .menu{display:grid;grid-template-columns:1fr 1fr;width:min(100%,560px)}
+html.h600 .menu .hot{grid-column:1/-1}
+html.h600 .keys{grid-template-columns:auto 1fr auto 1fr;width:min(100%,760px)}
+html.h430 .panel{line-height:1.45}html.h430 .shop{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))}
+html.vl body.touch #stick:not(.act) .base,html.vl body.touch #stick:not(.act) .knob{opacity:.35}
 /* Portada: el panel deja ver la escena del juego que corre por detras. */
 .ov.title{background:linear-gradient(180deg,rgba(6,7,13,.74) 0%,rgba(6,7,13,.34) 30%,rgba(6,7,13,.10) 54%,rgba(6,7,13,.42) 80%,rgba(6,7,13,.74) 100%)}
 .ov.title .panel{gap:10px}
-@media (orientation:portrait){.ov.title .panel{margin-top:0}.ov.title h1{font-size:clamp(24px,min(11vw,7vh),64px)}.ov.title{align-items:flex-start;top:var(--cvb,0);background:linear-gradient(180deg,rgba(6,7,13,.2),rgba(6,7,13,.85) 40%)}}
+html.vp .ov.title .panel{margin-top:0}html.vp .ov.title h1{font-size:clamp(24px,min(calc(11*var(--vw)),calc(7*var(--vh))),64px)}html.vp .ov.title{align-items:flex-start;top:var(--cvb,0);background:linear-gradient(180deg,rgba(6,7,13,.2),rgba(6,7,13,.85) 40%)}
 .ov.title .kick,.ov.title .dim{text-shadow:0 2px 0 #000,0 0 8px #000,0 0 16px #000}
 .ov.title h1{text-shadow:0 .06em #7a1030,.05em .12em #000,0 0 .5em #000}
 .ov.title .btn{background:rgba(18,23,48,.88);box-shadow:0 2px 0 #000a}
@@ -126,6 +149,16 @@ body:not(.ingame) #touch .ctl{visibility:hidden}
 @keyframes titleIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .ov.title .panel{animation:titleIn .35s ease-out}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* Pagina girada (ver la cabecera): el body mide el viewport tumbado y se gira
+   90° desde su esquina. Arriba de la pagina queda en el borde derecho del
+   cristal, asi que el movil se coge girado a la izquierda, como cualquier juego
+   apaisado. Los margenes seguros siguen al cristal: la muesca de arriba pasa a
+   la izquierda y la barra de abajo, a la derecha. */
+html.rot{--sal:env(safe-area-inset-top,0px);--sar:env(safe-area-inset-bottom,0px);--sat:env(safe-area-inset-right,0px);--sab:env(safe-area-inset-left,0px)}
+html.rot,html.rot body{overflow:hidden}
+html.rot body{position:fixed;top:0;left:0;width:var(--rw);height:var(--rh);transform-origin:0 0;transform:translateX(var(--rx,var(--rh))) rotate(90deg)}
+#ld.gate{cursor:pointer}#ld.gate i{display:none}#ld.gate small{color:var(--yel);font-size:12px;animation:gateB 1.1s steps(2,start) infinite}
+@keyframes gateB{50%{opacity:.35}}
 </style>
 </head>
 <body>
@@ -154,6 +187,15 @@ body:not(.ingame) #touch .ctl{visibility:hidden}
 (function(){
 'use strict';
 var $=function(id){return document.getElementById(id);};
+// Pagina girada (html.rot, ver la cabecera): todo lo que mide la pantalla o lee
+// el dedo pasa por aqui y trabaja en coordenadas de la pagina tumbada, no en
+// las del cristal. Sin giro devuelven lo mismo que innerWidth, clientX, etc.
+function ROT(){return document.documentElement.classList.contains('rot');}
+function VW(){return ROT()?innerHeight:innerWidth;}
+function VH(){return ROT()?innerWidth:innerHeight;}
+function vrect(el){var r=el.getBoundingClientRect();if(!ROT())return r;var w=innerWidth;
+  return {left:r.top,top:w-r.right,right:r.bottom,bottom:w-r.left,width:r.height,height:r.width};}
+function vpt(e){return ROT()?{x:e.clientY,y:innerWidth-e.clientX}:{x:e.clientX,y:e.clientY};}
 var cv=$('c'),g=cv.getContext('2d');g.imageSmoothingEnabled=false;
 // W x H es lo que se VE (ventana de camara); WH es el alto real de la columna
 // del mundo (15 filas de 12 px). CY es cuanto cielo vacio se recorta por arriba:
@@ -179,13 +221,13 @@ var SC=4;
 // semitransparente, sobre los bordes (donde no hay accion).
 var ZOOM=1,HMIN=90,HUDR=0;
 function fitW(){
-  var bc=document.body.classList,land=innerWidth>innerHeight;
+  var bc=document.body.classList,land=VW()>VH();
   // Tumbado en tactil, y tambien en la portada de cualquier pantalla apaisada, el
   // lienzo llena la pantalla: el logo queda siempre DENTRO de la escena.
   var tch=land&&(bc.contains('touch')||!bc.contains('ingame'));
   var cs=getComputedStyle(document.body),padX=(parseFloat(cs.paddingLeft)||0)+(parseFloat(cs.paddingRight)||0);
   var dpr=Math.min(3,window.devicePixelRatio||1);
-  var aw=Math.max(64,innerWidth-(tch?padX:32)),ah=Math.max(64,innerHeight-(tch?0:16));
+  var aw=Math.max(64,VW()-(tch?padX:32)),ah=Math.max(64,VH()-(tch?0:16));
   // Hueco medido en pixeles REALES de la pantalla: es ahi donde el pixel tiene
   // que cuadrar, no en pixeles CSS (un movil pinta 2 o 3 reales por cada CSS).
   var dw=aw*dpr,dh=ah*dpr,wmin=tch?160:192;
@@ -210,7 +252,7 @@ function fitW(){
 }
 // En vertical el lienzo va arriba y no cabe el menu dentro: el panel de portada
 // empieza justo debajo del lienzo, asi el logo queda FUERA del marco del todo.
-function titleTop(){var r=cv.getBoundingClientRect();document.body.style.setProperty('--cvb',Math.round(r.bottom+6)+'px');}
+function titleTop(){var r=vrect(cv);document.body.style.setProperty('--cvb',Math.round(r.bottom+6)+'px');}
 var RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
 var DEBUG=location.hash==='#debug';
 function clamp(v,a,b){return v<a?a:v>b?b:v;}
@@ -541,19 +583,19 @@ function padComfort(d){d/=MM;return d<20||d>62?0:d<32?(d-20)/12:d>48?(62-d)/14:1
 function placePad(){
   var z=$('btns'),bs=z.querySelectorAll('button');
   if(!document.body.classList.contains('touch')){padZ=null;HUDR=0;return;}
-  var bt=parseFloat(getComputedStyle(document.body).getPropertyValue('--bt'))||68,land=innerWidth>innerHeight;
-  var cr=cv.getBoundingClientRect(),tr=$('tp').getBoundingClientRect(),sr=land&&tr.width?Math.max(0,innerWidth-tr.right-8):0;
+  var bt=parseFloat(getComputedStyle(document.body).getPropertyValue('--bt'))||68,land=VW()>VH();
+  var cr=vrect(cv),tr=vrect($('tp')),sr=land&&tr.width?Math.max(0,VW()-tr.right-8):0;
   var x0,x1,y0,y1;
   // Tumbado: el lienzo llena la pantalla y la zona de botones es una columna fija
   // a la derecha, flotando encima (el mismo ancho que tenia la columna lateral).
-  if(land){x1=innerWidth-4-sr;x0=Math.max(innerWidth*.55,x1-Math.round(bt*2.35));y0=60;y1=innerHeight-6;
+  if(land){x1=VW()-4-sr;x0=Math.max(VW()*.55,x1-Math.round(bt*2.35));y0=60;y1=VH()-6;
     z.style.left=x0+'px';z.style.top=y0+'px';z.style.width=(x1-x0)+'px';z.style.height=(y1-y0)+'px';}
-  else{z.style.left=z.style.top=z.style.height='';z.style.width=Math.round(innerWidth*.5)+'px';
-    var zr0=z.getBoundingClientRect();x0=zr0.left+10;x1=Math.min(zr0.right,innerWidth-8);y0=zr0.top;y1=Math.min(zr0.bottom,innerHeight-8);}
+  else{z.style.left=z.style.top=z.style.height='';z.style.width=Math.round(VW()*.5)+'px';
+    var zr0=vrect(z);x0=zr0.left+10;x1=Math.min(zr0.right,VW()-8);y0=zr0.top;y1=Math.min(zr0.bottom,VH()-8);}
   padZ={x0:x0,y0:y0,x1:x1,y1:y1};
   // El boton de pausa flota sobre la esquina del lienzo: el marcador se aparta.
   HUDR=land&&tr.width&&cr.width?Math.max(0,Math.ceil((cr.right-tr.left+4)*(cv.width/cr.width)/(SC*HS))):0;
-  var px=innerWidth+PIV*MM,py=innerHeight+PIV*MM,S={j:Math.round(bt*1.2),f:bt,bs:bt},P={},st=4;
+  var px=VW()+PIV*MM,py=VH()+PIV*MM,S={j:Math.round(bt*1.2),f:bt,bs:bt},P={},st=4;
   function inside(x,y,r){return x-r>=x0&&x+r<=x1&&y-r>=y0&&y+r<=y1;}
   function best(k,score){var r=S[k]/2,bx=null,by=0,bv=-1e9;
     for(var y=y0+r;y<=y1-r;y+=st)for(var x=x0+r;x<=x1-r;x+=st){var v=score(x,y,r);if(v>bv){bv=v;bx=x;by=y;}}
@@ -572,7 +614,7 @@ function btnDown(b){var c=b.getAttribute('data-k');audioOn();buzz(8);
 function btnUp(b,real){var c=b.getAttribute('data-k');if(c==='JD'){jdUp(b,real);return;}TS[c]=0;b.classList.remove('on');}
 (function(){var z=$('btns'),own={};
   z.addEventListener('contextmenu',function(e){e.preventDefault();});
-  z.addEventListener('pointerdown',function(e){e.preventDefault();if(!padZ)placePad();var b=padPick(e.clientX,e.clientY);if(!b)return;
+  z.addEventListener('pointerdown',function(e){e.preventDefault();if(!padZ)placePad();var q=vpt(e),b=padPick(q.x,q.y);if(!b)return;
     own[e.pointerId]=b;try{z.setPointerCapture(e.pointerId);}catch(x){}btnDown(b);});
   ['pointerup','pointercancel','lostpointercapture'].forEach(function(n){z.addEventListener(n,function(e){var b=own[e.pointerId];if(!b)return;delete own[e.pointerId];btnUp(b,n==='pointerup');});});
   var t=$('tp');t.addEventListener('contextmenu',function(e){e.preventDefault();});
@@ -585,11 +627,11 @@ function btnUp(b,real){var c=b.getAttribute('data-k');if(c==='JD'){jdUp(b,real);
   zone.addEventListener('contextmenu',function(e){e.preventDefault();});
   zone.addEventListener('pointerdown',function(e){
     if(id!==null)return;e.preventDefault();audioOn();id=e.pointerId;try{zone.setPointerCapture(id);}catch(x){}
-    zone.classList.add('act');var r=zone.getBoundingClientRect();ox=e.clientX;oy=e.clientY;setPos(base,ox-r.left,oy-r.top);setPos(knob,ox-r.left,oy-r.top);
+    zone.classList.add('act');var r=vrect(zone),q=vpt(e);ox=q.x;oy=q.y;setPos(base,ox-r.left,oy-r.top);setPos(knob,ox-r.left,oy-r.top);
   });
   zone.addEventListener('pointermove',function(e){
-    if(e.pointerId!==id)return;var r=zone.getBoundingClientRect(),dx=e.clientX-ox,dy=e.clientY-oy,d=Math.hypot(dx,dy),mx=r.width?Math.min(56,base.offsetWidth/2):56;
-    if(d>mx){ox+=dx*(1-mx/d);oy+=dy*(1-mx/d);dx=e.clientX-ox;dy=e.clientY-oy;setPos(base,ox-r.left,oy-r.top);}
+    if(e.pointerId!==id)return;var r=vrect(zone),q=vpt(e),dx=q.x-ox,dy=q.y-oy,d=Math.hypot(dx,dy),mx=r.width?Math.min(56,base.offsetWidth/2):56;
+    if(d>mx){ox+=dx*(1-mx/d);oy+=dy*(1-mx/d);dx=q.x-ox;dy=q.y-oy;setPos(base,ox-r.left,oy-r.top);}
     setPos(knob,ox-r.left+dx,oy-r.top+dy);
     TS.L=dx<-12;TS.R=dx>12;TS.U=dy<-24;TS.D=dy>26;
   });
@@ -597,8 +639,8 @@ function btnUp(b,real){var c=b.getAttribute('data-k');if(c==='JD'){jdUp(b,real);
 })();
 
 // En cinematica: tocar avanza; tocar arriba a la derecha (SALTAR) la corta.
-addEventListener('pointerdown',function(e){if(mode!=='cut')return;e.preventDefault();audioOn();var r=cv.getBoundingClientRect();
-  if(e.clientX>r.left+r.width*.7&&e.clientY<r.top+r.height*.2)cutSkip();else cutAdv();},true);
+addEventListener('pointerdown',function(e){if(mode!=='cut')return;e.preventDefault();audioOn();var r=vrect(cv),q=vpt(e);
+  if(q.x>r.left+r.width*.7&&q.y<r.top+r.height*.2)cutSkip();else cutAdv();},true);
 // ================= efectos =================
 function shake(n){if(!RM)sh=Math.max(sh,n);}
 function burst(x,y,cols,n,sp,gr){for(var i=0;i<n;i++){var a=Math.random()*6.283,s=Math.random()*sp+.3;
@@ -1209,8 +1251,22 @@ var back=null;
 function show(html){var o=$('ov');o.classList.remove('title');o.innerHTML=html;o.hidden=false;var f=o.querySelector('button:not(:disabled),input');if(f)setTimeout(function(){try{f.focus({preventScroll:true});}catch(e){}},30);}
 function hideOv(){$('ov').hidden=true;$('ov').innerHTML='';back=null;}
 function best(){var a=load('ds2_rank',[]);return a.length?a[0].score:0;}
+// Arranque en tactil: la pantalla de carga se queda como puerta («TOCA PARA
+// EMPEZAR»). Ese toque es el gesto que piden los navegadores para poner la
+// pantalla completa y bloquearla en horizontal (Android). Donde no se puede
+// (iPhone), la pagina girada ya lo deja tumbado. En #debug no sale, salvo ?gate.
+var GATE=DSV.dev()&&!(DEBUG&&!/[?&]gate\b/.test(location.search));
+function gate(ld){
+  ld.classList.add('gate');ld.setAttribute('role','button');ld.querySelector('small').textContent='TOCA PARA EMPEZAR';
+  function go(e){if(e){e.preventDefault();e.stopPropagation();}removeEventListener('keydown',go,true);ld.removeEventListener('click',go);
+    audioOn();var de=document.documentElement,rf=de.requestFullscreen||de.webkitRequestFullscreen,pr=null;
+    function lock(){try{var o=screen.orientation;if(o&&o.lock)o.lock('landscape').catch(function(){});}catch(x){}}
+    try{pr=rf?rf.call(de,{navigationUI:'hide'}):null;}catch(x){}
+    if(pr&&pr.then)pr.then(lock,function(){});else lock();
+    ld.remove();}
+  ld.addEventListener('click',go);addEventListener('keydown',go,true);}
 function showMenu(){
-  var ld=$('ld');if(ld)ld.remove();
+  var ld=$('ld');if(ld){if(GATE)gate(ld);else ld.remove();}
   mode='menu';back=null;bossMusic=0;songIdx=0;
   if(!run||!st){newRun();buildStage(0);}
   cam=0;
@@ -1252,7 +1308,7 @@ var LORE=[["LOS TAMBORES DEL CERRO","ANTES DE LOS ALTAVOCES, BAHÍA GRAVE BAILAB
 function showArchive(i){back=showMenu;
   if(i!=null&&i<LOREN){var c=LORE[i];back=function(){showArchive();};
     var il=ART['il_'+pad(i+1,2)],dp=window.devicePixelRatio||1,
-      ks=Math.max(1,Math.floor(Math.min(Math.min(innerWidth*.9,520)*dp/160,innerHeight*.34*dp/90))),
+      ks=Math.max(1,Math.floor(Math.min(Math.min(VW()*.9,520)*dp/160,VH()*.34*dp/90))),
       im=il?'<img class="ill" alt="" src="'+il.src+'" style="width:'+(160*ks/dp)+'px;height:'+(90*ks/dp)+'px">':'';
     show('<div class="panel"><p class="kick">CINTA '+(i+1)+' DE '+LORE.length+'</p><h2>'+c[0]+'</h2>'+im+'<p class="lore">'+c[1]+'</p><div class="menu"><button class="btn hot" data-act="back">VOLVER</button></div></div>');return;}
   var h='<div class="panel"><h2>ARCHIVO</h2><p class="dim">CINTAS DEL VIEJO BOMBO. CADA JEFE GUARDA UNA. '+LOREN+' DE '+LORE.length+'</p><div class="menu tapes">';
@@ -2004,7 +2060,7 @@ loadArt();
 // Con escala entera el pixelado es siempre lo correcto. Solo en la ventana
 // enana donde ni z=1 cabe se deja que el navegador interpole, para que el
 // recorte no salga a dentelladas.
-function fitPx(){var r=cv.getBoundingClientRect(),dp=window.devicePixelRatio||1;
+function fitPx(){var r=vrect(cv),dp=window.devicePixelRatio||1;
   cv.style.imageRendering=(r.width*dp>=cv.width-1)?'pixelated':'auto';}
 addEventListener('resize',function(){fitW();fitPx();placePad();titleTop();});
 addEventListener('orientationchange',function(){setTimeout(function(){fitW();fitPx();placePad();},120);});
