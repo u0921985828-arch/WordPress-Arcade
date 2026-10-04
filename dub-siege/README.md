@@ -5,14 +5,19 @@ nada a servidores de terceros (la tipografía Press Start 2P va incrustada) y no
 depende de ninguna librería.
 
 ## Lienzo ×4
-El mundo lógico sigue siendo de **320×180**; el lienzo real es de **1280×720**
-y `draw()` aplica la escala una sola vez (`SC = 4`). Física, colisiones y cajas
+El mundo lógico mide de **160 a 264 de ancho por 90–108 de alto** según la
+pantalla (en horizontal ocupa todo el alto y los controles flotan sobre los
+bordes); el lienzo real es ese tamaño ×4 y `draw()` aplica la escala una sola
+vez (`SC = 4`). Física, colisiones y cajas
 no cambian: lo único que cambia es que un píxel lógico se pinta como un bloque
 de 4×4 píxeles reales, así que los sprites de imagen entran **1:1, sin pérdida**.
 
 ## Capa de sprites
-`ART` (entre las marcas `/* <ART> */`) es el banco de hojas incrustadas como
-`data:` URI. `blit(hoja, fotograma, x, y, w, h, voltear, blanco, alfa)` pinta
+Las hojas viajan como `data:` URI en varios `<script>LD({...},pct)</script>`
+pequeños **antes** del juego (entre `<!-- <ARTDATA> -->`); cada trozo rellena
+`window.DSA` y avanza la barra de la pantalla de carga (`#ld`), que se pinta en
+cuanto llega el HTML y se quita al abrir el menú. `ART` (entre `/* <ART> */`)
+es `window.DSA`. `blit(hoja, fotograma, x, y, w, h, voltear, blanco, alfa)` pinta
 sobre la caja lógica, centrado en X y apoyado abajo. **Si una hoja falta o no
 carga, el juego sigue dibujando por código** (`spr()` y `rect()` no se borran).
 
@@ -21,6 +26,9 @@ carga, el juego sigue dibujando por código** (`spr()` y `rect()` no se borran).
 PIXELLAB_TOKEN=... python3 tools/fetch_art.py   # baja las hojas a art/
 python3 tools/inline_art.py                     # las mete en el HTML
 ```
+`inline_art.py` guarda cada hoja en el formato **sin pérdida** que menos ocupa
+(WebP sin pérdida, PNG original u optimizado con oxipng) y comprueba píxel a
+píxel que decodifica igual: 907 KB de PNG → 324 KB, fichero de 1,40 MB → 0,59 MB.
 `art/manifest.json` dice, por cada hoja, el objeto de PixelLab, la animación, el
 tamaño **lógico** del fotograma y cuántos fotogramas tiene. El token nunca se
 guarda en el repositorio.
@@ -44,7 +52,11 @@ Salen al empezar la fase, en el primer punto de control, al aparecer el jefe y
 al ganarle (la de la fase 12 es el final). Bandas negras, retrato y texto a
 máquina; avanza con salto/disparo, Intro o un toque, y se salta con Esc, Start
 o tocando SALTAR. Cada escena sale una vez por partida (reintentar no la repite).
-Textos en mayúsculas y sin tildes ni eñes (la tipografía no las trae).
+Textos en mayúsculas con tildes, eñes y signos de apertura (¿ ¡). La fuente
+incrustada es un subconjunto de Press Start 2P (2,6 KB) con las mayúsculas
+acentuadas redibujadas a altura completa y la tilde en una fila encima; pide un
+paso de línea de 9 px o más (10 si hay Ñ). Las claves de `w:` siguen sin tilde
+(`'MAMA'`).
 
 El menú guarda la fase más alta alcanzada por dificultad (`ds2_prog`) y ofrece
 **CONTINUAR FASE N** (empieza con 30 discos por fase saltada).
