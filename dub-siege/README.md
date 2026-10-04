@@ -34,6 +34,8 @@ tamaño **lógico** del fotograma y cuántos fotogramas tiene. El token nunca se
 guarda en el repositorio.
 
 ## Fases e historia
+
+Mundo, personajes y Archivo de 12 cintas (una por jefe, menú ARCHIVO, `ds2_lore`): ver `LORE.md`. Nombres 100 % inventados, sin parecido con nombres reales.
 `LEVELS` tiene **12 fases** repartidas por las 4 zonas de `STAGES` (`r` = zona,
 que fija fondo, losetas y música). Cada una declara su longitud por tramos
 (`len`, con punto de control entre tramos), los tramos obligados (`must`, p. ej.
