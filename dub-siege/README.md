@@ -53,7 +53,7 @@ guarda en el repositorio.
 
 ## Fases e historia
 
-Mundo, personajes y Archivo de 12 cintas (una por jefe, menú ARCHIVO, `ds2_lore`): ver `LORE.md`. Nombres 100 % inventados, sin parecido con nombres reales.
+Mundo, personajes y Archivo de 12 cintas (una por jefe, menú ARCHIVO, `ds2_lore`): ver `LORE.md`. Nombres inventados y comprobados contra nombres reales (cifras en `LORE.md`).
 `LEVELS` tiene **12 fases** repartidas por las 4 zonas de `STAGES` (`r` = zona,
 que fija fondo, losetas y música). Cada una declara su longitud por tramos
 (`len`, con punto de control entre tramos), los tramos obligados (`must`, p. ej.
