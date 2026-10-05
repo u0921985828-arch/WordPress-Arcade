@@ -173,9 +173,13 @@ OPCIONES → **TAMAÑO DE INTERFAZ**, como la escala de interfaz de Minecraft:
   `HS·UIF`. En `AUTO`, `uiFit()` busca que un píxel del HUD mida `VH/240` px
   de pantalla (unos 13 px de letra en un móvil tumbado); con un valor manual,
   `UIF` es ese valor. Antes medía 3,1 px de pantalla por píxel de HUD en
-  844×390 y 4,7 en 1280×720; en `AUTO`, 1,6 y 3,0. Las cinemáticas siguen con
-  `HS` (no cambian) y `HUDR` reserva el hueco del botón de pausa a la escala
-  nueva.
+  844×390 y 4,7 en 1280×720; en `AUTO`, 1,6 y 3,0. `HUDR` reserva el hueco
+  del botón de pausa a la escala nueva.
+- **Cinemáticas** (rótulos, nombre, texto y busto): la misma escala `HS·UIF`
+  que el HUD. El busto de 48×56 se pinta a `CUQ = round(SC·UIF)` px de lienzo
+  por píxel del dibujo (entero, sin píxeles desiguales) y el texto empieza en
+  `cutTx()`, justo a su derecha. A 100 % sale idéntico al de antes; en `AUTO`
+  en un móvil tumbado, a la mitad, y las frases caben en 2 líneas.
 - **Menús** (paneles HTML): `zoom: var(--ui)`. En `AUTO` se quedan como
   estaban; con valor manual bajan hasta el 80 % (a 50 %).
 

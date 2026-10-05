@@ -1533,7 +1533,11 @@ function startCut(lines,then,ill){
 // El texto se vuelve a partir si cambia el ancho: la escena que salta en plena partida
 // se pinta una vez con el HUD de juego antes de pasar al de escena, y la lamina puede
 // cargar tarde (sin ella la linea lleva busto y es mas estrecha).
-function cutLine(){var c=cut,l=c.lines[c.i],mw=HW-(l.w&&!cutIl(l)?73:16);if(!c.wr||c.mw!==mw){c.wr=wrap(l.s,mw);c.mw=mw;}return l;}
+// Busto a escala entera de pixeles del lienzo (CUQ px por pixel del dibujo): sigue al
+// tamano de interfaz igual que el texto, sin pixeles desiguales. CTX = sangria del texto.
+var CUQ=SC;function cutQ(){CUQ=Math.max(1,Math.round(SC*UIF));}
+function cutTx(){return Math.ceil(52*CUQ/(SC*HS))+2;}
+function cutLine(){var c=cut,l=c.lines[c.i],mw=HW-(l.w&&!cutIl(l)?cutTx()+4:16);if(!c.wr||c.mw!==mw){c.wr=wrap(l.s,mw);c.mw=mw;}return l;}
 function cutIl(l){var o=l.i&&SHEET[l.i];return !!(o&&o.ok);}
 function cutAdv(){if(!cut)return;var c=cut,l=c.lines[c.i];
   if(c.card){if(c.t<10)return;sfx('clink');c.card=0;c.t=0;c.bar=0;return;}
@@ -1562,7 +1566,7 @@ function updateCut(){
 // mayor que cabe, apoyado abajo. Todo recortado al marco.
 function cutFace(l,x,y){
   var w=l.w,P=POR[w],k,f,o,s;
-  g.save();g.setTransform(SC,0,0,SC,0,0);g.beginPath();g.rect(x,y,48,56);g.clip();
+  g.save();g.setTransform(CUQ,0,0,CUQ,0,0);g.beginPath();g.rect(x,y,48,56);g.clip();
   if(P){k=P.look?lookPor(P.k):P.k;o=SHEET[k];
     if(o&&o.ok){f=P.f[l.f]||0;if(P.o&&cut.ch<l.s.length&&cut.t>8&&((t>>3)&1))f++;blitS(k,f,x,y,1);}}
   else{var L=st.L;k=L.ai===4?ESHEET[L.mt]:'b_'+L.ai;if(L.mk)k=tintSheet(k);o=SHEET[k];
@@ -1626,11 +1630,11 @@ function drawCut(){
   if(e<1)return;
   var P=POR[l.w],nm=l.w==='BOSS'?st.L.boss:P?P.n:'',nc=P?P.c:'#ff3d6e';
   // busto: marco de 48x56 abajo a la izquierda, borde con el color de quien habla
-  var px=2,py=H-57;
-  if(l.w&&!il){g.save();g.setTransform(SC,0,0,SC,0,0);rect(px-2,py-2,52,60,nc);rect(px-1,py-1,50,58,'#1a1530');rect(px,py,48,56,'#151a2e');g.restore();
+  var px=2,py=Math.ceil(H*SC/CUQ)-57;
+  if(l.w&&!il){g.save();g.setTransform(CUQ,0,0,CUQ,0,0);rect(px-2,py-2,52,60,nc);rect(px-1,py-1,50,58,'#1a1530');rect(px,py,48,56,'#151a2e');g.restore();
     cutFace(l,px,py);}
   g.save();g.setTransform(SC*HS,0,0,SC*HS,0,0);
-  var tx=l.w&&!il?69:8,y0=il?by+13:l.w?HH-43:HH-48,ny=il?by+3:HH-53;
+  var tx=l.w&&!il?cutTx():8,y0=il?by+13:l.w?HH-43:HH-48,ny=il?by+3:HH-53;
   // nombre largo que llegaria al '>' (HUD estrecho, W=160): va el corto (P.s)
   if(P&&P.s){g.font='8px "Press Start 2P", monospace';if(tx+g.measureText(nm).width>HW-16)nm=P.s;}
   if(nm)txt(nm,tx,ny,nc);
@@ -2590,7 +2594,9 @@ function draw(){
   g.restore();
   drawLight();
   if(mode==='menu')return;
-  if(mode==='cut'){drawCut();return;}
+  // La escena usa la misma escala que el HUD (tamano de interfaz): texto, rotulos y busto.
+  if(mode==='cut'){var hc=HS;cutQ();HS=HS*UIF;HW=Math.round(W/HS);HH=Math.round(H/HS);
+    try{drawCut();}finally{HS=hc;HW=Math.round(W/HS);HH=Math.round(H/HS);}return;}
   // El HUD, el cartel y el destello van en su propia capa escalada: asi quedan
   // fuera del temblor de camara, igual que antes de pasar a lienzo x4.
   // Escala propia del HUD (tamano de interfaz): se cambia HS el rato que se pinta.
