@@ -42,6 +42,10 @@ jobs:
   emulator:
     needs: build
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [30, 34]
     steps:
       - uses: actions/download-artifact@v4
         with: { name: apk }
@@ -53,7 +57,7 @@ jobs:
       - name: Abrir en un emulador
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          api-level: ${{ matrix.api }}
           arch: x86_64
           target: google_apis
           disable-animations: true
@@ -62,6 +66,7 @@ jobs:
             adb install -r DubSiege.apk
             adb logcat -c
             adb shell am start -n online.kuboplay.dubsiege/.MainActivity
+            adb shell dumpsys package com.google.android.webview | grep versionName | head -1
             sleep 15
             adb exec-out screencap -p > 1-arranque.png
             adb shell input keyevent KEYCODE_ENTER
@@ -75,14 +80,17 @@ jobs:
             ! grep -q 'FATAL EXCEPTION' logcat.txt
       - name: Errores de la página
         if: always()
-        run: grep -iE 'Uncaught|chromium.*(error|exception)' logcat.txt || echo 'sin errores de JS'
+        run: grep -E 'DubSiege' logcat.txt || echo 'sin mensajes de la pagina'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: emulador
+          name: emulador-${{ matrix.api }}
           path: |
             *.png
             logcat.txt
+      - name: Nombrar capturas por versión de Android
+        if: always()
+        run: for f in *.png logcat.txt; do [ -f "$f" ] && mv "$f" "api${{ matrix.api }}-$f"; done; ls
       - name: Capturas del emulador en una descarga aparte
         if: always()
         uses: softprops/action-gh-release@v2
@@ -90,7 +98,7 @@ jobs:
           tag_name: dub-siege-apk-qa
           name: Dub Siege APK (capturas de prueba)
           files: |
-            *.png
-            logcat.txt
+            api*.png
+            api*-logcat.txt
           prerelease: true
           make_latest: false

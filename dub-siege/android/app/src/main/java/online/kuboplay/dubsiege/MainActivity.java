@@ -5,12 +5,14 @@ import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.webkit.ConsoleMessage;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -50,7 +52,14 @@ public class MainActivity extends Activity {
         s.setDisplayZoomControls(false);
         s.setTextZoom(100);                           // ignora el tamano de letra del sistema
         web.setWebViewClient(new WebViewClient());
-        web.setWebChromeClient(new WebChromeClient());
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onConsoleMessage(ConsoleMessage m) {
+                // Los errores de la pagina salen en logcat con la etiqueta DubSiege.
+                Log.i("DubSiege", m.messageLevel() + " " + m.sourceId() + ":" + m.lineNumber() + " " + m.message());
+                return true;
+            }
+        });
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
         web.setVerticalScrollBarEnabled(false);
         web.setHorizontalScrollBarEnabled(false);
