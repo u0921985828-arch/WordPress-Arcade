@@ -165,6 +165,40 @@ audio): cuatro canciones originales en clave de dub, una por zona (`SONGS`,
   Coste: 0,08 ms por llamada al programador y ~3 % del hilo principal con el
   jefe en pantalla.
 
+## Tamaño de la interfaz
+OPCIONES → **TAMAÑO DE INTERFAZ**, como la escala de interfaz de Minecraft:
+`AUTO`, 50, 60, 70, 80, 90 y 100 % (`SET.ui`, `UIS`).
+
+- **HUD** (vida, puntos, combo, avisos): se dibuja en el lienzo con la escala
+  `HS·UIF`. En `AUTO`, `uiFit()` busca que un píxel del HUD mida `VH/240` px
+  de pantalla (unos 13 px de letra en un móvil tumbado); con un valor manual,
+  `UIF` es ese valor. Antes medía 3,1 px de pantalla por píxel de HUD en
+  844×390 y 4,7 en 1280×720; en `AUTO`, 1,6 y 3,0. Las cinemáticas siguen con
+  `HS` (no cambian) y `HUDR` reserva el hueco del botón de pausa a la escala
+  nueva.
+- **Menús** (paneles HTML): `zoom: var(--ui)`. En `AUTO` se quedan como
+  estaban; con valor manual bajan hasta el 80 % (a 50 %).
+
+## Partidas guardadas
+Seis ranuras en el propio móvil (`ds2_slots`; `ds2_last` = la última usada).
+JUGAR abre **PARTIDAS** (si no hay ninguna, empieza directamente en la 1) y el
+menú principal enseña **CONTINUAR** con la última. Cada ranura dice la fase, su
+nombre, la dificultad, los puntos y la fecha; tocarla da CONTINUAR, EMPEZAR DE
+NUEVO y BORRAR (estos dos piden confirmación, con «NO» seleccionado).
+Con una partida guardada, la dificultad de las nuevas se elige en PARTIDAS
+(«NUEVAS EN») o en OPCIONES; CONTINUAR usa siempre la de su ranura.
+
+- Se guarda solo (`slotSave`): al empezar cada fase, al pasar a la tienda, al
+  comprar y al caer (ya con el castigo de CONTINUAR: mitad de puntos). Al
+  ganar, la ranura queda **COMPLETADA**. Lo que pasa dentro de una fase no se
+  guarda: es el punto de control.
+- Al cargar (`slotLoad`), lo guardado se funde con una partida nueva: un campo
+  que falte o venga raro se queda con su valor de salida; una ranura ilegible
+  cuenta como vacía (`slotOk`). Si se salió en la tienda, se vuelve a la tienda.
+- Las partidas de antes (solo `ds2_prog`) pasan a ranuras la primera vez
+  (`slotMig`), con lo que daba el viejo CONTINUAR FASE N.
+- El ranking sigue aparte (`ds2_rank`).
+
 ## Depuración
 Con `#debug` en la dirección: `DS.warp(0..11, conCinematica)`, `DS.cutAdv()`,
 `DS.cutSkip()`, `DS.toArena()`, `DS.hitBoss(n)`, `DS.god()`, `DS.s`, `DS.sheets`.

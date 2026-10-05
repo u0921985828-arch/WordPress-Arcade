@@ -54,6 +54,7 @@ canvas{display:block;image-rendering:pixelated}
 .ov{position:fixed;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;overflow:auto;z-index:5;overscroll-behavior:contain;background:rgba(6,7,13,.9);
   padding:max(10px,calc(2*var(--vh))) max(12px,calc(12px + var(--sar))) max(10px,calc(2*var(--vh))) max(12px,calc(12px + var(--sal)))}
 .ov[hidden]{display:none!important}
+.ov .panel{zoom:var(--ui,1)}
 .panel{width:100%;max-width:min(640px,calc(96*var(--vw)));margin:auto;display:flex;flex-direction:column;align-items:center;text-align:center;gap:clamp(5px,calc(1.5*var(--vh)),12px);font-size:clamp(9px,min(calc(1.7*var(--vw)),calc(2.4*var(--vh))),14px);line-height:1.6}
 .panel h1{margin:0;font-weight:400;font-size:clamp(26px,min(calc(12*var(--vw)),calc(17*var(--vh))),88px);line-height:.95;color:var(--acc);text-shadow:0 .06em #7a1030,.05em .12em #000;text-wrap:balance}
 .panel h2{margin:0;font-weight:400;font-size:clamp(13px,min(calc(3.4*var(--vw)),calc(4.6*var(--vh))),26px);color:var(--yel);text-shadow:2px 2px #000;text-wrap:balance}
@@ -154,6 +155,44 @@ html.vp .ov.title .panel{margin-top:0}html.vp .ov.title h1{font-size:clamp(24px,
 .ov.title .btn:focus-visible,.ov.title .btn.hot{background:rgba(24,46,34,.92)}
 @keyframes titleIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .ov.title .panel{animation:titleIn .35s ease-out}
+/* ---- Piel de los menus: tarjeta con filo de color, botones con bisel de
+   pixel (luz arriba, sombra abajo) y valores en ficha. Sin brillos de mas:
+   el unico resplandor es el del foco. ---- */
+.ov{background:repeating-linear-gradient(0deg,#0000 0 2px,#0000001f 2px 3px),radial-gradient(ellipse at 50% 40%,rgba(14,17,34,.86),rgba(4,5,10,.95) 75%)}
+.ov:not(.title) .panel{position:relative;background:linear-gradient(180deg,#161c3cf2,#0c1024f2);border:2px solid #2b3570;border-radius:6px;
+  box-shadow:0 0 0 2px #05060c,inset 0 1px 0 #ffffff12,0 14px 40px #000c;padding:clamp(10px,calc(2.6*var(--vh)),24px) clamp(12px,calc(2.6*var(--vw)),30px)}
+.ov:not(.title) .panel::before{content:'';position:absolute;left:14px;right:14px;top:-2px;height:2px;background:linear-gradient(90deg,#0000,var(--acc) 18%,var(--yel) 50%,var(--cy) 82%,#0000)}
+.panel.wide{max-width:min(860px,calc(96*var(--vw)))}
+/* Las cintas del archivo van justas de alto (texto + ilustracion): tarjeta casi sin relleno. */
+.ov:not(.title) .panel.tape{padding:6px 10px;max-width:min(664px,calc(96*var(--vw)))}html.h430 .ov:not(.title) .panel.tape{padding:0 8px;border-top-width:0;border-bottom-width:0}
+.panel h2{letter-spacing:.04em}
+.btn{background:linear-gradient(180deg,#1b2350,#121730);box-shadow:inset 0 2px 0 #ffffff14,inset 0 -3px 0 #00000059;transition:background-color .12s,border-color .12s,transform .06s}
+.btn:hover,.btn:focus-visible{background:linear-gradient(180deg,#2a3672,#1c2452);border-color:#5b6bb8;outline:2px solid var(--yel);outline-offset:2px}
+.btn:active:not(:disabled){transform:translateY(1px);box-shadow:inset 0 2px 0 #00000059,inset 0 -1px 0 #ffffff10}
+.btn.hot{background:linear-gradient(180deg,#17502e,#0d2e1b);border-color:var(--grn);color:#d4ffe3;box-shadow:inset 0 2px 0 #ffffff1c,inset 0 -3px 0 #0000005c}
+.btn.hot:hover,.btn.hot:focus-visible{background:linear-gradient(180deg,#1f6a3d,#123d24)}
+.btn.warn{background:linear-gradient(180deg,#4a1426,#2a0b16);border-color:var(--acc);color:#ffd6e0}
+.btn.warn:hover,.btn.warn:focus-visible{background:linear-gradient(180deg,#62193a,#3a0f1f)}
+.btn:disabled{box-shadow:none}
+.opt i{padding:.2em .5em;background:#0000004d;border:1px solid #ffd23f40;border-radius:3px;line-height:1.2;white-space:nowrap}
+.btn.cont small{display:block;margin-top:.35em;font-size:.72em;color:#8fe0b0;letter-spacing:.02em}html.h430 .btn.cont small{display:inline;margin:0 0 0 .6em}
+.panel .menu.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(15em,calc(50% - 5px)),1fr));width:min(100%,780px)}
+.panel .menu.two .hot{grid-column:1/-1}
+.stats span{color:var(--dim)}.stats{padding:.5em .8em;background:#00000033;border:1px solid #232c5c;border-radius:4px}
+ol.rank li:nth-child(even){background:#ffffff06}
+.item{border-color:#2f3a78}.item .c{padding:0 .4em;background:#0000004d;border-radius:3px}
+/* ranuras de guardado */
+.slots{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(min(100%,15em),calc(33.4% - 6px)),1fr));gap:8px;width:100%}
+.btn.slot{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto auto;column-gap:.8em;row-gap:.25em;align-items:center;text-align:left;padding:.6em .8em .6em .5em;line-height:1.35}
+.slot .sn{grid-row:1/-1;align-self:stretch;display:flex;align-items:center;justify-content:center;min-width:1.7em;padding-right:.55em;border-right:1px solid #ffffff1a;font-size:1.7em;color:var(--cy);text-shadow:2px 2px #000}
+.slot .sl{display:flex;justify-content:space-between;align-items:center;gap:.6em;min-width:0;white-space:nowrap}
+.panel.sl3{max-width:min(1000px,calc(96*var(--vw)))}.slot .sl b{font-weight:400;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.slot .sl i{flex:none;font-style:normal;font-size:.78em;color:var(--yel);padding:.15em .4em;background:#0000004d;border-radius:3px}
+.slot .sd,.slot .sm{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
+.slot .sm{display:flex;justify-content:space-between;gap:.6em;font-size:.78em}.slot .sm b{font-weight:400;color:var(--ink)}
+.slot.empty{border-style:dashed;background:#0b0f22b3;box-shadow:none}.slot.empty .sn{color:#4a578f}.slot.empty .sl{color:var(--dim)}
+.slot.done .sl{color:var(--grn)}
+.dim.sv{color:#8fe0b0;font-size:.85em}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 /* Pagina girada (ver la cabecera): el body mide el viewport tumbado y se gira
    90° desde su esquina. Arriba de la pagina queda en el borde derecho del
@@ -247,15 +286,26 @@ function fitW(){
     z=Math.min(dw/(192*SC),dh/(108*SC));nw=192;nh=108;
   }
   var cw=nw*SC,chh=nh*SC;
-  if(nw===W&&nh===H&&z===ZOOM&&cv.width===cw&&cv.height===chh)return;
+  if(nw===W&&nh===H&&z===ZOOM&&cv.width===cw&&cv.height===chh){uiFit();return;}
   W=nw;H=nh;ZOOM=z;HW=Math.round(W/HS);HH=Math.round(H/HS);
   CY=WH-H;CYM=CY-12;if(camY>CYM)camY=CYM;
   cv.width=cw;cv.height=chh;g.imageSmoothingEnabled=false;
   // Tamano en pantalla = tamano del lienzo x escala, devuelto a pixeles CSS.
   cv.style.width=(cw*z/dpr)+'px';
   cv.style.height=(chh*z/dpr)+'px';
-  titleTop();
+  titleTop();uiFit();
 }
+// Tamano de la interfaz (OPCIONES, como la escala de interfaz de Minecraft). SET.ui es
+// 'auto' o un numero de 0,5 a 1 sobre el tamano de siempre. UIF escala el HUD del
+// lienzo (marcador, carteles); los menus solo encogen con un valor puesto a mano y
+// como mucho al 80 %, para que la letra no baje de lo legible. En AUTO el HUD busca
+// un pixel de VH/240 px CSS (1,5 a 3,6): ~13 px de letra en un movil tumbado.
+var UIF=1,UIS=['auto',.5,.6,.7,.8,.9,1];
+function uiFit(){var f=SET.ui,r=vrect(cv),cp=r.width&&cv.width?r.width/cv.width:.25;
+  if(typeof f!=='number')f=clamp(VH()/240,1.5,3.6)/(SC*HS*cp);
+  UIF=clamp(f,.5,1);var m=typeof SET.ui==='number'?Math.min(1,.6+.4*SET.ui):1;
+  document.documentElement.style.setProperty('--ui',m.toFixed(3));}
+function uiName(){return typeof SET.ui==='number'?Math.round(SET.ui*100)+' %':'AUTO';}
 // En vertical el lienzo va arriba y no cabe el menu dentro: el panel de portada
 // empieza justo debajo del lienzo, asi el logo queda FUERA del marco del todo.
 function titleTop(){var r=vrect(cv);document.body.style.setProperty('--cvb',Math.round(r.bottom+6)+'px');}
@@ -272,7 +322,7 @@ function load(k,d){try{var v=JSON.parse(localStorage.getItem(k));return v==null?
 
 // ================= configuracion =================
 var SET=load('ds2_set',{});
-(function(){var d={diff:1,mute:false,auto:null,assist:false,touch:'auto',big:false,vib:true,light:true,upJump:false,tut:false,help:false};for(var k in d)if(SET[k]===undefined)SET[k]=d[k];})();
+(function(){var d={diff:1,mute:false,auto:null,assist:false,touch:'auto',big:false,vib:true,light:true,upJump:false,tut:false,help:false,ui:'auto'};for(var k in d)if(SET[k]===undefined)SET[k]=d[k];})();
 function touchMode(){if(SET.touch==='on')return true;if(SET.touch==='off')return false;return matchMedia('(pointer:coarse)').matches||(navigator.maxTouchPoints>0&&!matchMedia('(pointer:fine)').matches);}
 function autoFire(){return SET.auto===null?touchMode():SET.auto;}
 function buzz(ms){if(!SET.vib||!touchMode())return;try{navigator.vibrate&&navigator.vibrate(ms);}catch(e){}}
@@ -963,7 +1013,7 @@ function placePad(){
     var zr0=vrect(z);x0=zr0.left+10;x1=Math.min(zr0.right,VW()-8);y0=zr0.top;y1=Math.min(zr0.bottom,VH()-8);}
   padZ={x0:x0,y0:y0,x1:x1,y1:y1};
   // El boton de pausa flota sobre la esquina del lienzo: el marcador se aparta.
-  HUDR=land&&tr.width&&cr.width?Math.max(0,Math.ceil((cr.right-tr.left+4)*(cv.width/cr.width)/(SC*HS))):0;
+  HUDR=land&&tr.width&&cr.width?Math.max(0,Math.ceil((cr.right-tr.left+4)*(cv.width/cr.width)/(SC*HS*UIF))):0;
   var px=VW()+PIV*MM,py=VH()+PIV*MM,S={j:Math.round(bt*1.2),f:bt,bs:bt},P={},st=4;
   function inside(x,y,r){return x-r>=x0&&x+r<=x1&&y-r>=y0&&y+r<=y1;}
   function best(k,score){var r=S[k]/2,bx=null,by=0,bv=-1e9;
@@ -1600,6 +1650,7 @@ function finishStage(){
   if(nt){LOREN=st.i+1;save('ds2_lore',LOREN);}
   mode=last?'win':'shop';
   if(last){showWin();return;}
+  slotSave('shop',st.i+1);
   show('<div class="panel"><h2>FASE '+(st.i+1)+' SUPERADA</h2><h3>'+st.L.boss+' DERROTADO</h3>'+
     '<div class="stats"><span>TIEMPO '+Math.floor(secs/60)+':'+pad(secs%60,2)+'</span><b>+'+tb+'</b><span>SIN DAÑO</span><b>+'+nh+'</b><span>DISCOS RECOGIDOS</span><b>+'+cb+'</b>'+
     '<span class="tot">PUNTOS</span><b class="tot">'+pad(run.score,7)+'</b></div>'+(nt?'<p class="note">NUEVA CINTA EN EL ARCHIVO: '+LORE[st.i][0]+'</p>':'')+
@@ -1631,14 +1682,75 @@ function buy(id){
   if(run.coins<cost||lv>=it.max){sfx('no');return;}
   run.coins-=cost;sfx('buy');
   if(id==='life')run.lives++;else{run.up[id]++;if(id==='hp')run.maxHp++;}
-  showShop();
+  slotSave('shop',st.i+1);showShop();
 }
 function nextStage(){enterLevel(st.i+1,true);}
 // Progreso: fase mas alta alcanzada por dificultad.
 var PROG=load('ds2_prog',[0,0,0]);
 function saveProg(n){if(n>(PROG[SET.diff]||0)){PROG[SET.diff]=n;save('ds2_prog',PROG);}}
-function enterLevel(n,withCut){run.stage=n;buildStage(n);hideOv();mode='play';saveProg(n);
+function enterLevel(n,withCut){run.stage=n;buildStage(n);hideOv();mode='play';saveProg(n);slotSave('play');
   if(withCut&&st.L.cut&&st.L.cut.pre)startCut(st.L.cut.pre,null,'il_'+pad(n+1,2));}
+// ================= partidas guardadas =================
+// Seis ranuras en el propio movil (ds2_slots, ds2_last = la ultima usada). Se
+// guarda solo: al empezar cada fase, al pasar a la tienda, al comprar y al caer
+// (ya con el castigo de CONTINUAR, para que salir y volver no salga mas barato).
+// Lo que pasa dentro de una fase no se guarda: es el punto de control.
+var NSL=6,CUR=null,NEWSL=null;
+function slotOk(s){
+  if(!s||typeof s!=='object'||!s.run||typeof s.run!=='object'||!DIFFS[s.diff])return null;
+  var n=s.stage;if(typeof n!=='number'||n!==(n|0)||n<0||n>=LEVELS.length)return null;
+  if(s.at!=='shop'&&s.at!=='done')s.at='play';if(s.at==='shop'&&n<1)return null;
+  if(typeof s.run.score!=='number'||!isFinite(s.run.score))return null;
+  if(typeof s.ts!=='number')s.ts=0;return s;}
+function slots(){var a=load('ds2_slots',null),r=[];if(!Array.isArray(a))a=[];
+  for(var i=0;i<NSL;i++){var v=null;try{v=slotOk(a[i]);}catch(e){}r.push(v);}return r;}
+function slotSave(at,n,r){if(CUR==null||!run)return;var a=slots(),c=JSON.parse(JSON.stringify(r||run));
+  if(n==null)n=run.stage;c.stage=at==='shop'?n-1:n;
+  a[CUR]={v:1,diff:SET.diff,stage:n,at:at,run:c,ts:Date.now()};save('ds2_slots',a);save('ds2_last',CUR);}
+function slotDel(i){var a=slots();a[i]=null;save('ds2_slots',a);if(load('ds2_last',-1)===i)save('ds2_last',-1);}
+// Partida de antes de las ranuras (solo ds2_prog): pasa a las primeras ranuras
+// con lo mismo que daba el viejo CONTINUAR FASE N (30 discos por fase saltada).
+function slotMig(){try{if(localStorage.getItem('ds2_slots')!==null)return;}catch(e){return;}
+  var a=[],d0=SET.diff,r0=run,D0=D;
+  for(var d=0;d<3;d++){var n=PROG[d]|0;if(n>0&&n<LEVELS.length){SET.diff=d;newRun();run.coins=n*30;run.stage=n;
+    a.push({v:1,diff:d,stage:n,at:'play',run:run,ts:Date.now()});}}
+  SET.diff=d0;run=r0;D=D0;
+  if(a.length){while(a.length<NSL)a.push(null);save('ds2_slots',a);save('ds2_last',0);}}
+function slotLoad(i){var s=slots()[i];if(!s||s.at==='done'){showSlots();return;}
+  CUR=i;NEWSL=null;SET.diff=s.diff;save('ds2_set',SET);newRun();
+  // Se funde con una partida nueva: un campo que falte o venga raro se queda con su valor de salida.
+  var b=run,o=s.run;
+  for(var k in b)if(k!=='up'&&k!=='stats'&&typeof o[k]===typeof b[k]&&(typeof b[k]!=='number'||isFinite(o[k])))b[k]=o[k];
+  ['up','stats'].forEach(function(g){if(o[g]&&typeof o[g]==='object')for(var k in b[g])if(typeof o[g][k]==='number'&&isFinite(o[g][k]))b[g][k]=o[g][k];});
+  if(o.seen&&typeof o.seen==='object')b.seen=o.seen;
+  if(!WPN[b.wpn])b.wpn='N';b.lv=clamp(b.lv|0,1,3);b.lives=Math.max(1,b.lives|0);b.maxHp=Math.max(1,b.maxHp|0);b.bass=clamp(+b.bass||0,0,100);
+  b.combo=0;b.comboT=0;b.mult=1;audioOn();
+  if(s.at==='shop'){b.stage=s.stage-1;buildStage(s.stage-1);back=null;showShop();}else enterLevel(s.stage,true);}
+function newGame(i){CUR=i;NEWSL=null;startGame();}
+function slotNew(i){if(!SET.help){NEWSL=i;showControls(true);}else newGame(i);}
+function slotDate(ts){if(!ts)return '--/--';var d=new Date(ts);return pad(d.getDate(),2)+'/'+pad(d.getMonth()+1,2)+' '+pad(d.getHours(),2)+':'+pad(d.getMinutes(),2);}
+function slotWhere(s){return s.at==='done'?'COMPLETADA':(s.at==='shop'?'TIENDA · ':'')+'FASE '+(s.stage+1);}
+function showSlots(){back=showMenu;mode='menu';
+  var a=slots(),h='<div class="panel wide sl3"><h2>PARTIDAS</h2><div class="slots">';
+  a.forEach(function(s,i){
+    h+='<button class="btn slot'+(s?(s.at==='done'?' done':''):' empty')+'" data-act="slot" data-v="'+i+'"><span class="sn">'+(i+1)+'</span>'+
+      (s?'<span class="sl"><b>'+(s.at==='done'?'COMPLETADA':'FASE '+(s.stage+1))+'</b><i>'+DIFFS[s.diff].n+'</i></span><span class="sd">'+(s.at==='shop'?'TIENDA · ':'')+LEVELS[s.stage].name+'</span><span class="sm"><b>'+pad(s.run.score,7)+'</b>'+slotDate(s.ts)+'</span>'
+        :'<span class="sl">VACÍA</span><span class="sd">NUEVA PARTIDA</span><span class="sm">&nbsp;</span>')+'</button>';});
+  show(h+'</div><p class="dim">Se guarda solo: al empezar cada fase, en la tienda y al caer.</p><div class="menu">'+
+    '<button class="btn opt" data-act="sdiff">NUEVAS EN <i>'+DIFFS[SET.diff].n+'</i></button><button class="btn" data-act="back">VOLVER</button></div></div>');}
+function showSlot(i,cf){var s=slots()[i];back=showSlots;
+  if(!s){slotNew(i);return;}
+  if(cf){back=function(){showSlot(i);};
+    show('<div class="panel"><p class="kick">RANURA '+(i+1)+'</p><h2>'+(cf==='del'?'¿BORRAR ESTA PARTIDA?':'¿EMPEZAR DE NUEVO AQUÍ?')+'</h2>'+
+      '<p class="dim">Se pierde lo guardado: '+slotWhere(s)+', '+pad(s.run.score,7)+' puntos.'+(cf==='del'?'':' La nueva empieza en '+DIFFS[SET.diff].n+'.')+'</p>'+
+      '<div class="menu"><button class="btn" data-act="slot" data-v="'+i+'">NO, VOLVER</button><button class="btn warn" data-act="'+(cf==='del'?'sdel':'snew')+'" data-v="'+i+'">'+(cf==='del'?'SÍ, BORRAR':'SÍ, EMPEZAR')+'</button></div></div>');return;}
+  show('<div class="panel"><p class="kick">RANURA '+(i+1)+'</p><h2>'+(s.at==='done'?'PARTIDA COMPLETADA':slotWhere(s)+': '+LEVELS[s.stage].name)+'</h2>'+
+    '<div class="stats"><span>DIFICULTAD</span><b>'+DIFFS[s.diff].n+'</b><span>PUNTOS</span><b>'+pad(s.run.score,7)+'</b><span>VIDAS</span><b>'+(s.run.lives|0)+'</b>'+
+    '<span>DISCOS</span><b>'+(s.run.coins|0)+'</b><span>GUARDADA</span><b>'+slotDate(s.ts)+'</b></div>'+
+    '<div class="menu">'+(s.at!=='done'?'<button class="btn hot" data-act="sload" data-v="'+i+'">CONTINUAR</button>':'')+
+    '<button class="btn" data-act="sask" data-v="'+i+'n">EMPEZAR DE NUEVO</button><button class="btn" data-act="sask" data-v="'+i+'d">BORRAR</button>'+
+    '<button class="btn" data-act="back">VOLVER</button></div></div>');}
+function lastSlot(){var i=load('ds2_last',-1),s=slots()[i];return s&&s.at!=='done'?i:-1;}
 function endLevel(){var c=st.L.cut;if(c&&c.post&&!seen('post'))startCut(c.post,finishStage);else finishStage();}
 
 // ================= pantallas =================
@@ -1663,11 +1775,13 @@ function gate(ld){
 function showMenu(){
   var ld=$('ld');if(ld){if(GATE)gate(ld);else ld.remove();}
   mode='menu';back=null;bossMusic=0;songIdx=0;
+  if(!slotMig.done){slotMig.done=1;slotMig();}
   if(!run||!st){newRun();buildStage(0);}
-  cam=0;
+  cam=0;var li=lastSlot(),ls=li>-1?slots()[li]:null,any=slots().some(function(x){return x;});
   show('<div class="panel"><p class="kick">SOUND SYSTEM DEFENDER</p><h1>DUB<br>SIEGE</h1>'+
-    '<div class="menu"><button class="btn hot" data-act="play">JUGAR</button>'+((PROG[SET.diff]||0)>0?'<button class="btn" data-act="cont2">CONTINUAR FASE '+(PROG[SET.diff]+1)+'</button>':'')+
-    '<button class="btn opt" data-act="diff">DIFICULTAD <i>'+DIFFS[SET.diff].n+'</i></button>'+
+    '<div class="menu">'+(ls?'<button class="btn hot cont" data-act="cont2">CONTINUAR <small>RANURA '+(li+1)+' · FASE '+(ls.stage+1)+' · '+DIFFS[ls.diff].n+'</small></button><button class="btn" data-act="slots">PARTIDAS</button>':
+      '<button class="btn hot" data-act="play">JUGAR</button>'+(any?'<button class="btn" data-act="slots">PARTIDAS</button>':''))+
+    (ls?'':'<button class="btn opt" data-act="diff">DIFICULTAD <i>'+DIFFS[SET.diff].n+'</i></button>')+
     '<button class="btn" data-act="look">PERSONAJE</button><button class="btn" data-act="opts">OPCIONES</button><button class="btn" data-act="controls">CONTROLES</button><button class="btn" data-act="arch">ARCHIVO</button><button class="btn" data-act="rank">RANKING</button></div>'+
     '<p class="dim">RÉCORD '+pad(best(),7)+'</p></div>');
   $('ov').classList.add('title');titleTop();
@@ -1676,13 +1790,14 @@ function onoff(v){return v?'SÍ':'NO';}
 function showOpts(){
   var from=mode;back=from==='pause'?function(){mode='play';pause();}:showMenu;
   var tm={auto:'AUTO',on:'SÍ',off:'NO'}[SET.touch];
-  show('<div class="panel"><h2>OPCIONES</h2><div class="menu">'+
+  show('<div class="panel wide"><h2>OPCIONES</h2><div class="menu two">'+
     '<button class="btn opt" data-act="o" data-v="diff"'+(from==='pause'?' disabled':'')+'>DIFICULTAD <i>'+DIFFS[SET.diff].n+'</i></button>'+
     '<button class="btn opt" data-act="o" data-v="mute">MÚSICA Y SONIDO <i>'+onoff(!SET.mute)+'</i></button>'+
     '<button class="btn opt" data-act="o" data-v="auto">DISPARO AUTOMÁTICO <i>'+(SET.auto===null?'AUTO':onoff(SET.auto))+'</i></button>'+
     '<button class="btn opt" data-act="o" data-v="assist">APUNTADO ASISTIDO <i>'+onoff(SET.assist)+'</i></button>'+
     '<button class="btn opt" data-act="o" data-v="upJump">ARRIBA PARA SALTAR <i>'+onoff(SET.upJump)+'</i></button>'+
     '<button class="btn opt" data-act="o" data-v="touch">MANDOS TÁCTILES <i>'+tm+'</i></button>'+
+    '<button class="btn opt" data-act="o" data-v="ui">TAMAÑO DE INTERFAZ <i>'+uiName()+'</i></button>'+
     '<button class="btn opt" data-act="o" data-v="big">BOTONES GRANDES <i>'+onoff(SET.big)+'</i></button>'+
     '<button class="btn opt" data-act="o" data-v="vib">VIBRACIÓN <i>'+onoff(SET.vib)+'</i></button>'+
     '<button class="btn opt" data-act="o" data-v="light">LUCES Y SOMBRAS <i>'+onoff(SET.light)+'</i></button>'+
@@ -1694,8 +1809,9 @@ function setOpt(k){
   else if(k==='mute'){setMute(!SET.mute);}
   else if(k==='auto')SET.auto=SET.auto===null?true:SET.auto===true?false:null;
   else if(k==='touch')SET.touch={auto:'on',on:'off',off:'auto'}[SET.touch];
+  else if(k==='ui'){var ui=UIS.indexOf(SET.ui);SET.ui=UIS[(ui+1)%UIS.length];}
   else SET[k]=!SET[k];
-  save('ds2_set',SET);layoutKey='';applyLayout();
+  save('ds2_set',SET);layoutKey='';applyLayout();uiFit();placePad();
   var keep=document.activeElement&&document.activeElement.getAttribute('data-v');
   showOpts();if(keep){var b=document.querySelector('[data-v="'+keep+'"]');if(b)setTimeout(function(){b.focus();},40);}
 }
@@ -1705,7 +1821,7 @@ function showArchive(i){back=showMenu;
     var il=ART[c[2]||'il_'+pad(i+1,2)],dp=window.devicePixelRatio||1,
       ks=Math.max(1,Math.floor(Math.min(Math.min(VW()*.9,520)*dp/160,VH()*.34*dp/90))),
       im=il?'<img class="ill" alt="" src="'+il.src+'" style="width:'+(160*ks/dp)+'px;height:'+(90*ks/dp)+'px">':'';
-    show('<div class="panel"><p class="kick">CINTA '+(i+1)+' DE '+LORE.length+'</p><h2>'+c[0]+'</h2>'+im+'<p class="lore">'+c[1]+'</p><div class="menu"><button class="btn hot" data-act="back">VOLVER</button></div></div>');return;}
+    show('<div class="panel tape"><p class="kick">CINTA '+(i+1)+' DE '+LORE.length+'</p><h2>'+c[0]+'</h2>'+im+'<p class="lore">'+c[1]+'</p><div class="menu"><button class="btn hot" data-act="back">VOLVER</button></div></div>');return;}
   var h='<div class="panel"><h2>ARCHIVO</h2><p class="dim">EL ARCHIVO DE DUKE LECTRIC. CADA JEFE GUARDA UNA CINTA. '+LOREN+' DE '+LORE.length+'</p><div class="menu tapes">';
   LORE.forEach(function(c,k){h+='<button class="btn"'+(k<LOREN?' data-act="tape" data-v="'+k+'">'+(k+1)+'. '+c[0]:' disabled>'+(k+1)+'. ???')+'</button>';});
   show(h+'</div><div class="menu"><button class="btn hot" data-act="back">VOLVER</button></div></div>');}
@@ -1760,17 +1876,18 @@ function stat(){var s=run.stats,secs=Math.floor(s.time/60);
   '<span>PUNTERÍA</span><b>'+(s.shots?Math.round(s.hits/s.shots*100):0)+'%</b><span>MUERTES</span><b>'+s.deaths+'</b><span>TIEMPO</span><b>'+Math.floor(secs/60)+':'+pad(secs%60,2)+'</b></div>';}
 function gameOver(){
   mode='over';pend={score:run.score,st:'F'+(st.i+1),d:DIFFS[SET.diff].n[0]};
+  var c=JSON.parse(JSON.stringify(run));c.conts++;c.score=Math.floor(c.score/2);c.lives=D.lives;c.lv=1;c.wpn='N';c.bass=0;slotSave('play',st.i,c);
   show('<div class="panel"><h2>EL SOUND SYSTEM CALLA</h2>'+stat()+
     '<p class="dim">Continuar reinicia la fase '+(st.i+1)+' con la mitad de los puntos.</p>'+
     '<div class="menu"><button class="btn hot" data-act="cont">CONTINUAR</button><button class="btn" data-act="rank">GUARDAR EN RANKING</button><button class="btn" data-act="tomenu">MENÚ PRINCIPAL</button></div></div>');
 }
 function showWin(){
-  pend={score:run.score,st:'FIN',d:DIFFS[SET.diff].n[0]};
+  pend={score:run.score,st:'FIN',d:DIFFS[SET.diff].n[0]};slotSave('done',st.i);
   show('<div class="panel"><p class="kick">LA BESTIA SUENA OTRA VEZ</p><h2>LA CIUDAD VUELVE A BAILAR</h2>'+stat()+
     '<div class="menu"><button class="btn hot" data-act="rank">GUARDAR EN RANKING</button><button class="btn" data-act="tomenu">MENÚ PRINCIPAL</button></div></div>');
 }
 function pause(){if(mode!=='play')return;mode='pause';K={};TS={};
-  show('<div class="panel"><h2>PAUSA</h2><p class="dim">FASE '+(st.i+1)+' - '+st.L.name+' - '+DIFFS[SET.diff].n+'</p><div class="menu"><button class="btn hot" data-act="resume">CONTINUAR</button>'+
+  show('<div class="panel"><h2>PAUSA</h2><p class="dim">FASE '+(st.i+1)+' - '+st.L.name+' - '+DIFFS[SET.diff].n+'</p>'+(CUR!=null?'<p class="dim sv">RANURA '+(CUR+1)+' · GUARDADO AL EMPEZAR LA FASE</p>':'')+'<div class="menu"><button class="btn hot" data-act="resume">CONTINUAR</button>'+
   '<button class="btn" data-act="opts">OPCIONES</button><button class="btn" data-act="controls">CONTROLES</button><button class="btn" data-act="restart">REINICIAR FASE</button><button class="btn" data-act="tomenu">SALIR AL MENÚ</button></div></div>');}
 function resume(){hideOv();mode='play';K={};}
 // Al salir de pantalla completa (gesto del sistema) se pausa: los botones pueden haber quedado a medias.
@@ -1779,9 +1896,16 @@ function startGame(n){newRun();if(n){run.coins=n*30;}enterLevel(n||0,true);audio
 function act(a,v){
   audioOn();
   switch(a){
-    case 'play':if(!SET.help){SET.help=true;save('ds2_set',SET);showControls(true);}else startGame();break;
-    case 'go':startGame();break;
-    case 'cont2':startGame(PROG[SET.diff]||0);break;
+    case 'play':if(slots().some(function(x){return x;}))showSlots();else slotNew(0);break;
+    case 'go':if(!SET.help){SET.help=true;save('ds2_set',SET);}if(NEWSL!=null)newGame(NEWSL);else startGame();break;
+    case 'cont2':var ci=lastSlot();if(ci>-1)slotLoad(ci);else showSlots();break;
+    case 'slots':showSlots();break;
+    case 'slot':showSlot(+v);break;
+    case 'sload':slotLoad(+v);break;
+    case 'sask':showSlot(parseInt(v,10),v.slice(-1)==='d'?'del':'new');break;
+    case 'sdel':slotDel(+v);showSlots();var sb=document.querySelector('[data-act=slot][data-v="'+v+'"]');if(sb)setTimeout(function(){sb.focus();},40);break;
+    case 'snew':slotNew(+v);break;
+    case 'sdiff':SET.diff=(SET.diff+1)%3;save('ds2_set',SET);showSlots();var sd=document.querySelector('[data-act=sdiff]');if(sd)setTimeout(function(){sd.focus();},40);break;
     case 'opts':showOpts();break;
     case 'o':setOpt(v);break;
     case 'diff':SET.diff=(SET.diff+1)%3;save('ds2_set',SET);showMenu();var db=document.querySelector('[data-act=diff]');if(db)setTimeout(function(){db.focus();},40);break;
@@ -1792,7 +1916,7 @@ function act(a,v){
     case 'back':if(back)back();else showMenu();break;
     case 'resume':resume();break;
     case 'restart':run.score=Math.max(0,run.score-500);buildStage(st.i);resume();break;
-    case 'tomenu':pend=null;run=null;st=null;showMenu();break;
+    case 'tomenu':pend=null;run=null;st=null;CUR=null;showMenu();break;
     case 'shop':showShop();break;
     case 'buy':buy(v);break;
     case 'next':nextStage();break;
@@ -2469,7 +2593,9 @@ function draw(){
   if(mode==='cut'){drawCut();return;}
   // El HUD, el cartel y el destello van en su propia capa escalada: asi quedan
   // fuera del temblor de camara, igual que antes de pasar a lienzo x4.
-  g.save();g.setTransform(SC*HS,0,0,SC*HS,0,0);
+  // Escala propia del HUD (tamano de interfaz): se cambia HS el rato que se pinta.
+  var hs0=HS;HS=HS*UIF;HW=Math.round(W/HS);HH=Math.round(H/HS);
+  g.save();try{g.setTransform(SC*HS,0,0,SC*HS,0,0);
   drawHUD();
   if(banner){g.globalAlpha=banner.l<20?banner.l/20:Math.min(1,(170-banner.l)/10+.2);
     // El cartel vive en la franja de arriba, justo bajo el marcador: nunca tapa la accion.
@@ -2479,7 +2605,7 @@ function draw(){
     for(bq=0;bq<bl.length;bq++)txt(bl[bq],HW/2,by+bq*9,'#ffd23f','c');g.globalAlpha=1;}
   if(flash>0){g.globalAlpha=flash/24;rect(0,0,HW,HH,flashC);g.globalAlpha=1;}
   if(p.dead&&run.lives>0&&p.deadT<60)txt('VIDAS: '+run.lives,HW/2,HH*.55,'#eef3ff','c');
-  g.restore();
+  }finally{g.restore();HS=hs0;HW=Math.round(W/HS);HH=Math.round(H/HS);}
 }
 loadArt();
 // Con escala entera el pixelado es siempre lo correcto. Solo en la ventana
@@ -2505,7 +2631,7 @@ if(DEBUG)window.DS={
   toArena:function(){p.x=st.arenaX+10;p.y=GY-p.h-30;p.vy=0;cam=st.arenaX-40;},
   hitBoss:function(n){damageBoss(n);},
   coins:function(n){run.coins+=n;},bass:function(){run.bass=100;},
-  warp:function(n,c){enterLevel(n,!!c);},cutAdv:function(){cutAdv();},cutSkip:function(){cutSkip();},
+  warp:function(n,c){CUR=null;enterLevel(n,!!c);},cutAdv:function(){cutAdv();},cutSkip:function(){cutSkip();},
   act:act,
   setDiff:function(d){SET.diff=d;D=DIFFS[d];},
   tile:function(x,y){return tileAt(x,y);},
