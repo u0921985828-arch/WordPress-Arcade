@@ -83,3 +83,14 @@ jobs:
           path: |
             *.png
             logcat.txt
+      - name: Capturas del emulador en una descarga aparte
+        if: always()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dub-siege-apk-qa
+          name: Dub Siege APK (capturas de prueba)
+          files: |
+            *.png
+            logcat.txt
+          prerelease: true
+          make_latest: false
