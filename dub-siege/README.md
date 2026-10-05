@@ -130,6 +130,41 @@ FUEGO y BASS en el mismo arco a su lado, sin tapar nunca el lienzo. Toda la
 columna derecha responde (`padPick`: gana el botón más cercano, SALTO con 14 px
 de ventaja). Estudio y cifras: `ESTUDIO-CONTROLES.md`.
 
+## Música
+Toda la banda sonora se **genera en el propio juego** (Web Audio, sin ficheros de
+audio): cuatro canciones originales en clave de dub, una por zona (`SONGS`,
+`songIdx`), escritas como cadenas de un carácter por semicorchea
+(`NA`: `'0'` = tónica, `'c'` = octava arriba, `'Z'` = semitono abajo; `-` alarga,
+`.` silencio) y acordes por compás (`CQ`: `m`, `M`, `d` séptima de dominante,
+`n` menor séptima, `j` mayor séptima).
+
+- **Capas** (hasta 17): bombo, caja, aro, platos cerrados y abiertos, shaker,
+  congas, toms, platos y plato al revés, golpe sintético, bajo, guitarra
+  (*skank*, cuerda pulsada Karplus-Strong doblada a 13 ms al otro lado),
+  órgano, melódica, metales a tres voces, colchón y sirena. Los golpes se
+  sintetizan una vez en `AudioBuffer` (`MZJ`, cola `mzWork` con presupuesto de
+  2,5 ms por llamada en partida y fundidos de entrada y salida) y las voces
+  continuas son osciladores fijos con envolventes (`mzOn`), que se desenchufan
+  solos tras 0,8 s callados.
+- **Arreglo**: grupo según el momento (`C` calma en menús, `P` partida, `X`
+  jefe) e intensidad 1–4 según el multiplicador; forma `ABAD` en partida,
+  donde `D` es la sección *dub* (se quita la batería y se cierra el filtro de
+  instrumentos, que se reabre en la segunda mitad). Redobles al final de cada
+  frase, plato al revés que entra con la sección siguiente, tiros de eco en la
+  caja y los metales armonizan dentro del acorde (`mzHarm`).
+- **Mesa** (`mzStrip`): cada capa con su volumen, panorama y envíos a un eco
+  de cinta ping-pong (filtros y saturación dentro del lazo, a 3 semicorcheas) y
+  a un muelle (convolución con respuesta sintetizada). Grupos de batería,
+  instrumentos y bajo (que se aparta del bombo), y salida con compresor y
+  recorte suave. La pausa apaga y filtra la música; el silencio (`setMute`)
+  suspende el audio entero.
+- **Medido** (render sin conexión a 44,1 kHz, `#debug`): −25 a −24 LUFS por
+  zona (antes −30 a −28), pico real ≤ −10 dB, chasquidos aislados de 145–395
+  por minuto a 0–1, estéreo real por encima de 250 Hz (correlación 0,76–0,79; el
+  bajo va en el centro a propósito) y los efectos 4 dB por encima de la música.
+  Coste: 0,08 ms por llamada al programador y ~3 % del hilo principal con el
+  jefe en pantalla.
+
 ## Depuración
 Con `#debug` en la dirección: `DS.warp(0..11, conCinematica)`, `DS.cutAdv()`,
 `DS.cutSkip()`, `DS.toArena()`, `DS.hitBoss(n)`, `DS.god()`, `DS.s`, `DS.sheets`.
