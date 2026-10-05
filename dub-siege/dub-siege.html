@@ -46,12 +46,12 @@
   --vw:1vw;--vh:1vh;--sal:env(safe-area-inset-left,0px);--sar:env(safe-area-inset-right,0px);--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box}
 html,body{height:100%}
-#ld{position:fixed;inset:0;z-index:99;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:var(--pix)}#ld b{font-weight:400;font-size:clamp(22px,9vmin,56px);color:var(--acc);text-shadow:0 .06em #7a1030,.05em .12em #000}#ld i{display:block;width:min(calc(60*var(--vw)),320px);height:10px;border:2px solid var(--line);padding:2px}#ld s{display:block;height:100%;width:4%;background:var(--cy);transition:width .15s}#ld small{color:var(--dim);font-size:10px;letter-spacing:.1em}
+#ld{position:fixed;top:0;right:0;bottom:0;left:0;z-index:99;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-family:var(--pix)}#ld b{font-weight:400;font-size:clamp(22px,9vmin,56px);color:var(--acc);text-shadow:0 .06em #7a1030,.05em .12em #000}#ld i{display:block;width:min(calc(60*var(--vw)),320px);height:10px;border:2px solid var(--line);padding:2px}#ld s{display:block;height:100%;width:4%;background:var(--cy);transition:width .15s}#ld small{color:var(--dim);font-size:10px;letter-spacing:.1em}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--pix);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:8px 16px;touch-action:manipulation}
 body.big{--bt:84px}
 #wrap{position:relative;flex:none;max-width:100%;background:#000;overflow:hidden;line-height:0;box-shadow:0 0 0 2px var(--line),0 0 40px #3de8ff22}
 canvas{display:block;image-rendering:pixelated}
-.ov{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:auto;z-index:5;overscroll-behavior:contain;background:rgba(6,7,13,.9);
+.ov{position:fixed;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;overflow:auto;z-index:5;overscroll-behavior:contain;background:rgba(6,7,13,.9);
   padding:max(10px,calc(2*var(--vh))) max(12px,calc(12px + var(--sar))) max(10px,calc(2*var(--vh))) max(12px,calc(12px + var(--sal)))}
 .ov[hidden]{display:none!important}
 .panel{width:100%;max-width:min(640px,calc(96*var(--vw)));margin:auto;display:flex;flex-direction:column;align-items:center;text-align:center;gap:clamp(5px,calc(1.5*var(--vh)),12px);font-size:clamp(9px,min(calc(1.7*var(--vw)),calc(2.4*var(--vh))),14px);line-height:1.6}
@@ -127,7 +127,7 @@ html.vl body.touch{padding:0 var(--sar) 0 var(--sal)}
 html.vl body.touch #wrap{box-shadow:none}
 html.vl body:not(.ingame){padding:0}
 html.vl body:not(.ingame) #wrap{box-shadow:none}
-html.vl body.touch #touch{position:fixed;inset:0;z-index:4;pointer-events:none}
+html.vl body.touch #touch{position:fixed;top:0;right:0;bottom:0;left:0;z-index:4;pointer-events:none}
 html.vl body.touch #stick{position:absolute;left:0;bottom:0;width:42%;height:72%;pointer-events:auto}
 html.vl body.touch #stick .base{left:calc(var(--bt)*1.1 + var(--sal));top:calc(100% - var(--bt)*1.1)}
 html.vl body.touch #stick .knob{left:calc(var(--bt)*1.1 + var(--sal));top:calc(100% - var(--bt)*1.1)}
