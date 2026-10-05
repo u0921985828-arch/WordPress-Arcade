@@ -1,0 +1,85 @@
+name: Dub Siege APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ claude/new-session-6j6z2y, main ]
+    paths:
+      - 'dub-siege/android/**'
+      - 'dub-siege/dub-siege.html'
+      - '.github/workflows/dub-siege-apk.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: android-actions/setup-android@v3
+      - name: Compilar APK
+        working-directory: dub-siege/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease
+      - name: Renombrar
+        run: cp dub-siege/android/app/build/outputs/apk/release/app-release.apk DubSiege.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: apk, path: DubSiege.apk, if-no-files-found: error }
+      - name: Publicar en la descarga fija
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dub-siege-apk
+          name: Dub Siege (APK Android)
+          body: Último APK de Dub Siege. Descárgalo en el móvil y ábrelo para instalarlo.
+          files: DubSiege.apk
+          prerelease: true
+          make_latest: false
+
+  emulator:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: apk }
+      - name: Activar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Abrir en un emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: |
+            adb install -r DubSiege.apk
+            adb logcat -c
+            adb shell am start -n online.kuboplay.dubsiege/.MainActivity
+            sleep 15
+            adb exec-out screencap -p > 1-arranque.png
+            adb shell input keyevent KEYCODE_ENTER
+            sleep 6
+            adb exec-out screencap -p > 2-menu.png
+            adb shell input keyevent KEYCODE_BACK
+            sleep 2
+            adb exec-out screencap -p > 3-atras.png
+            adb logcat -d > logcat.txt
+            adb shell dumpsys activity activities | grep -q 'online.kuboplay.dubsiege/.MainActivity'
+            ! grep -q 'FATAL EXCEPTION' logcat.txt
+      - name: Errores de la página
+        if: always()
+        run: grep -iE 'Uncaught|chromium.*(error|exception)' logcat.txt || echo 'sin errores de JS'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emulador
+          path: |
+            *.png
+            logcat.txt
