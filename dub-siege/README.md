@@ -62,6 +62,30 @@ jefes de siempre (`mk:1` = versión roja y más dura), `ai:4` convierte un enemi
 normal en jefe (`mt` = tipo, `sc` = escala entera). La dificultad interna
 `st.d` va de 0 a 3 a lo largo de las 12.
 
+**Mapas escritos a mano**: `CH` (trozos de 15 filas, alineados abajo) y `SEQ`
+(la tira de trozos de cada fase; `buildStage` le añade `box` y `arena`). Sin
+azar: la misma fase es siempre el mismo mapa. Leyenda: `#` sólido, `=`
+plataforma de un sentido, `^` pinchos, `!` muro de ruido (solo lo cruza el
+dash), `o` disco, `+` vida, `K` punto de control, `M` plataforma que va y viene,
+`V` ascensor (sube 6 casillas desde el suelo), `T` aviso de tren (a los 100
+fotogramas entra un tren por la derecha; hay que subirse a algo), y enemigos
+`w h f t s b X *`. Verificado por script (física real del juego vía `#debug`):
+todas las fases se recorren de la salida a la arena, ningún bloque ni decorado
+flota y ningún enemigo está sobre el vacío.
+
+**Evolución de los enemigos** (`EV`, la fija `evo(i)` al construir la fase):
+cada tipo gana tácticas según avanza el juego y cada una se anuncia con «!» o
+un destello. Andarín: embiste desde la 4, salta obstáculos desde la 7.
+Saltarín: espera menos cada fase, apunta desde la 5, onda al caer desde la 9.
+Mosca: picado más largo y disparo desde la 6. Torreta: cadencia por fase,
+ráfaga de 2 desde la 5, abanico de 3 desde la 9. Escudo: disparo bajo desde la
+7, giro rápido desde la 9. Bombardero: bombas de dos en dos desde la 8, más
+rápidas desde la 10. Jefes: espera entre ataques ÷ (1 + 0,025·fase).
+
+**Estilo de cada fase** (`era` en `LEVELS`): el juego recorre el reggae de
+las raíces (R&B de patio, 1955) a 1981 (rub-a-dub). El estilo sale en el
+rótulo de entrada, en el Archivo y en la música; tabla en `LORE.md`.
+
 **Bidones rojos** (`X` en los tramos): dos impactos y revientan con `explode()`,
 que daña a enemigos, jefe y también al jugador si está cerca. Las explosiones
 (`boom()`) son bola de fuego, onda de choque y humo, todo con píxel cuadrado.

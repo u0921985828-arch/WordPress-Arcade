@@ -24,9 +24,9 @@ El juego se juega en **español**, con jerga de la calle y seis expresiones en p
 
 ## Babilonia
 Los rastas llaman **Babilonia** al poder que manda callar. En el juego tiene tres piezas:
-- **El oído: Leopold Dunmore, «el Censor»**, jefe de Control de Ruido del GLC, el gobierno de Londres. En 1961 su hermano **Aubrey**, de diecinueve años, murió en una redada en un blues de Ephraim: el sótano tenía una sola escalera. Lleva veinte años culpando a la música.
+- **El oído: Leopold Dunmore, «el Censor»**, jefe de Control de Ruido del GLC, el gobierno de Londres. En 1966 su hermano **Aubrey**, de diecinueve años, murió en una redada en un blues de Ephraim: el sótano tenía una sola escalera. Lleva quince años culpando a la música.
 - **La mano: el inspector Quayle**, de la policía. Para a los chavales por «sus», detiene sin abogado y presume de olvidar lo que le conviene.
-- **La firma: el concejal Hargreaves**, candidato al GLC. En 1961 **firmó la denuncia que trajo la redada**, para salir en la foto. En 1973 bajó a un blues, se hizo la foto con la Bestia, prometió un local para la juventud negra, ganó su escaño y el local acabó en aparcamiento. Ahora firma la orden que precinta los blues la víspera de las elecciones del 7 de mayo.
+- **La firma: el concejal Hargreaves**, candidato al GLC. En 1966 **firmó la denuncia que trajo la redada**, para salir en la foto. En 1973 bajó a un blues, se hizo la foto con la Bestia, prometió un local para la juventud negra, ganó su escaño y el local acabó en aparcamiento. Ahora firma la orden que precinta los blues la víspera de las elecciones del 7 de mayo.
 
 Babilonia **pega** (redadas, registros, calabozo) y también **compra** (un carnaval oficial con vallas y patrocinador, sin sounds).
 
@@ -39,33 +39,55 @@ Babilonia **pega** (redadas, registros, calabozo) y también **compra** (un carn
 | 4 | Azoteas de Peckham | Bombardero | Pepper: las antenas no emiten, escuchan. Quayle invoca el decreto de vagancia de 1824. |
 | 5 | Crystal Palace (el mástil) | Torreta Madre | Mitin de Hargreaves. Detienen a Pepper. Aparece Hyacinth: trabaja dentro. |
 | 6 | Battersea (el helipuerto) | El Zángano | Las cuatro válvulas juntas dan el único bajo que la máquina no tapa. Carnaval oficial sin sounds. |
-| 7 | Vías de Clapham | El Escudo | Quién es el Censor y qué le pasó a su hermano en el 61. |
+| 7 | Vías de Clapham | El Escudo | Quién es el Censor y qué le pasó a su hermano en el 66. |
 | 8 | Refugio de Stockwell (túneles de la guerra) | Enjambre | Selecta libera a Pepper. Hyacinth confiesa que diseñó la máquina de silencio y por qué. |
 | 9 | Down Street (estación cerrada en 1932) | Tren Fantasma | Hargreaves en campaña por la radio. La cinta de Ephraim perdona a Hyacinth. |
 | 10 | Cola en Harlesden | Silenciador Mk2 | La cola de detenidos. Dunmore, Quayle y Hargreaves, juntos: eso es Babilonia. |
-| 11 | Blues de sótano | Zángano Mk2 | Hyacinth vio la denuncia: la que trajo la redada del 61 la firmó Hargreaves. |
+| 11 | Blues de sótano | Zángano Mk2 | Hyacinth vio la denuncia: la que trajo la redada del 66 la firmó Hargreaves. |
 | 12 | County Hall (sede del GLC) | El Censor | El clash. Suena la Bestia, Dunmore pregunta a Hargreaves por la denuncia, la última cinta de Ephraim le habla de su hermano y rompe la orden. A Hargreaves no le escucha nadie y Quayle se retira «esta noche»; entre los bafles requisados del refugio vuelve la primera Bestia. |
 
 ## El Archivo (12 cintas)
-Cada jefe guarda una cinta de Count Ephraim (se desbloquean en **Menú → Archivo**, `ds2_lore`). Las cuenta él, en primera persona, en orden cronológico: de Kingston en 1955 al carnaval de 1976. Cada cinta enseña la ilustración de su fase, salvo tres con imagen propia de Babilonia.
+Cada jefe guarda una cinta de Count Ephraim (se desbloquean en **Menú → Archivo**, `ds2_lore`). Las cuenta él, en primera persona, en orden cronológico: de Kingston en 1955 a 1979, el año de su muerte. **Una cinta por estilo**: cada una cuenta el paso del reggae que sonaba entonces, y es el estilo que suena en esa fase (ver «El reggae, fase a fase»). Cada cinta enseña la ilustración de su fase, salvo tres con imagen propia de Babilonia.
 
-| Fase | Cinta | Hecho real | Imagen |
-|---|---|---|---|
-| 1 | Los patios de Kingston | Los bailes al aire libre en patios cercados del centro de Kingston, con más de mil personas; el sound como radio y periódico de los pobres | il_01 |
-| 2 | El sello rascado | Discos de rhythm and blues comprados en Estados Unidos; un rival que soborna al chico de las cajas; etiquetas raspadas con una moneda | il_02 |
-| 3 | Los revientabailes | Matones a sueldo que reventaban el baile del rival; más tarde, los partidos políticos armando a los barrios (Ephraim ya lo sabe de oídas, desde Londres) | il_03 |
-| 4 | Redadas en el monte | Años de acoso policial a la comuna rasta del monte, hasta que en 1954 la arrasan | **il_redada** |
-| 5 | El barco | La segunda radio de 1959, que por fin puso música de la isla; la emigración de 1960; el frío, los carteles de las pensiones y los ataques de 1958 en Notting Hill | il_05 |
-| 6 | Blues de sótano | Fiestas en casas y sótanos, ilegales solo por no tener licencia; un equipo casero con graves por válvulas y agudos aparte | il_06 |
-| 7 | La noche de la escalera | Una redada en un blues en 1961 (suceso inventado sobre un patrón real: redadas con perros y prensa que culpaba al ruido) | **il_cola** |
-| 8 | El año de la bandera | La independencia de 1962 y el ska, que atrajo a chavales blancos a los bailes | il_08 |
-| 9 | Acetatos | A principios de los setenta, canciones sin voz bañadas en ecos (el dub, copiado de Kingston) y temas exclusivos cortados en acetato, de pocas pasadas | il_09 |
-| 10 | La voz sobre el ritmo | El deejay que habla sobre el ritmo; un político que promete un local en 1973 y no lo abre (inventado) | **il_mitin** |
-| 11 | Tres sounds | Un clash de tres sounds en un local del norte de Londres en 1974: se pelea con sonido, no con navajas | il_11 |
-| 12 | Carnaval del 76 | Más de mil policías en Notting Hill, la detención de un carterista y la calle que estalla; los sounds siguen tocando | il_12 |
+| Fase | Cinta | Estilo y año | Hecho real | Imagen |
+|---|---|---|---|---|
+| 1 | Los patios de Kingston | Rhythm and blues de patio, 1955 | Bailes al aire libre en patios cercados del centro de Kingston, con más de mil personas; el sound como radio, periódico e iglesia de los pobres | il_01 |
+| 2 | El sello rascado | Shuffle de Kingston, 1958 | Cuando Estados Unidos se pasa al rock and roll, Kingston graba su propio shuffle con el golpe corrido; etiquetas raspadas; matones a sueldo que revientan el baile del rival | il_02 |
+| 3 | Tambores del monte | Nyabinghi | Los tres tambores rastas (latido, apoyo e improvisación) y la última redada en la comuna del monte en 1954 | **il_redada** |
+| 4 | El barco y el ska | Ska, 1962 | La emigración de 1960, los carteles de las pensiones, el baile en sótanos con un equipo casero de válvulas y la independencia de 1962 | il_04 |
+| 5 | La noche de la escalera | Rocksteady, 1966 | Una redada en un blues en 1966 (suceso inventado sobre un patrón real: redadas con perros y prensa que culpaba al ruido) | **il_cola** |
+| 6 | El órgano y las botas | Early reggae, 1968 | El órgano que burbujea entre golpes; los chavales blancos de botas que bailaban y compraban reggae, y que años después volvieron con otras ideas | il_06 |
+| 7 | La voz sobre el ritmo | Roots, 1972 | El bombo que cae solo en el tres (one drop), la música de raíces y el deejay; un político que promete un local en 1973 y no lo abre (inventado) | **il_mitin** |
+| 8 | Acetatos | Dub, 1974 | Canciones sin voz bañadas en ecos y temas exclusivos cortados en acetato, de pocas pasadas | il_08 |
+| 9 | Tres sounds | Rockers, 1975 | La batería nerviosa del rockers y un clash de tres sounds en un local del norte de Londres: se pelea con sonido, no con navajas | il_09 |
+| 10 | Carnaval del 76 | Steppers, 1976 | Más de mil policías en Notting Hill, un carterista y la calle que estalla; después, el bombo en cada negra | il_10 |
+| 11 | Canciones de amor | Lovers rock, 1978 | Chicas del sur de Londres, hijas de la emigración, que cantan de amor sobre el bajo; los puristas lo llaman blando | il_11 |
+| 12 | La última cinta | Rub-a-dub, 1979 | Ephraim enfermo anuncia lo que viene: ritmos desnudos y deejays rimando horas sobre el mismo riddim | il_12 |
+
+## El reggae, fase a fase
+El juego recorre la historia del género **de las raíces a lo que suena en 1981**, el «ahora» del juego. Odessa pincha en la radio los discos de su padre en orden: cada fase lleva su estilo en el rótulo de entrada (`FASE n DE 12 · ESTILO, AÑO`), en el Archivo y en la música de fondo, y una línea de Odessa (o de Pepper, Rosa o Selecta) lo presenta al empezar.
+
+| Fase | Estilo | Qué lo distingue en la música del juego |
+|---|---|---|
+| 1 | R&B de patio, 1955 | Shuffle de piano boogie, bajo que anda, saxo |
+| 2 | Shuffle, 1958 | El golpe corrido al contratiempo, primer paso hacia el ska |
+| 3 | Nyabinghi | Tres tambores de mano: latido, apoyo e improvisación |
+| 4 | Ska, 1962 | Rápido, metales y guitarra en cada contratiempo |
+| 5 | Rocksteady, 1966 | Más lento; el bajo canta su propia melodía |
+| 6 | Early reggae, 1968 | Órgano que burbujea entre golpes |
+| 7 | Roots, 1972 | One drop: bombo solo en el tres |
+| 8 | Dub, 1974 | Sin voz, bajo y batería con ecos y rebotes |
+| 9 | Rockers, 1975 | Bombo en el uno y el tres, charles abierto |
+| 10 | Steppers, 1976 | Bombo en cada negra, como una marcha |
+| 11 | Lovers rock, 1978 | Dulce, acordes suaves, sobre el bajo de siempre |
+| 12 | Rub-a-dub, 1981 | Riddim desnudo, casi solo bajo y batería |
+
+## Fases y enemigos
+- **Mapas escritos a mano**, uno por fase y sin azar (`SEQ` en el HTML): cada fase añade una idea (bidones, pinchos, huecos entre tejados, subida a torretas, plataformas que van y vienen, trenes que avisan, ascensores en túneles, muros de ruido en cadena) y la última las junta. Comprobado por script que todas se recorren con la física real del juego, que ningún bloque ni decorado queda flotando y que ningún enemigo está sobre el vacío.
+- **Los enemigos aprenden** (tabla `EV`, según la fase): el andarín embiste desde la 4 y salta obstáculos desde la 7; el saltarín espera menos cada fase, apunta desde la 5 y hace temblar el suelo desde la 9; la mosca baja en picado más lejos y dispara desde la 6; la torreta dispara más rápido, en ráfaga de 2 desde la 5 y en abanico de 3 desde la 9; el escudo dispara bajo desde la 7 y se gira antes desde la 9; el bombardero suelta bombas de dos en dos desde la 8. Cada ataque nuevo se anuncia con un «!» o un destello. Los jefes atacan un 2,5 % más rápido por fase.
 
 ## Guion de las cinemáticas
-- **182 líneas** en 12 fases, frases de 60 caracteres como mucho. Hablan Odessa (por radio), Selecta, Pepper, Hyacinth (por radio y por los altavoces del ayuntamiento), Ephraim (desde sus cintas), el Censor y las otras dos caras de Babilonia: Quayle (por la radio de la policía) y Hargreaves (por radio y en sus mítines).
+- **195 líneas** en 12 fases, frases de 60 caracteres como mucho. Hablan Odessa (por radio), Selecta, Pepper, Hyacinth (por radio y por los altavoces del ayuntamiento), Ephraim (desde sus cintas), el Censor y las otras dos caras de Babilonia: Quayle (por la radio de la policía) y Hargreaves (por radio y en sus mítines).
 - Cada fase abre con una ilustración propia. Tres líneas llevan además una **lámina de Babilonia** (160×90) en lugar del busto: la redada (fase 3, cuando Ephraim cuenta que le requisaron la primera Bestia), el mitin de Hargreaves (fase 9) y la cola de detenidos (fase 10).
 - Retratos de busto con tres expresiones por personaje; todo el arte es propio y no se ha usado la imagen de ninguna persona real.
 
