@@ -55,9 +55,10 @@ guarda en el repositorio.
 
 Mundo, personajes y Archivo de 12 cintas (una por jefe, menú ARCHIVO, `ds2_lore`): ver `LORE.md`. Ambientado en lugares reales: Londres en mayo de 1981 (Brixton, Peckham, Notting Hill, Harlesden, County Hall…) y, en las cintas, Kingston en los cincuenta. Tono adulto (policía, política, racismo, rivalidad entre sounds). Personajes inventados y comprobados contra nombres reales (cifras en `LORE.md`); ninguna persona real.
 `LEVELS` tiene **12 fases** repartidas por las 4 zonas de `STAGES` (`r` = zona,
-que fija fondo, losetas y música). Cada una declara su longitud por tramos
-(`len`, con punto de control entre tramos), los tramos obligados (`must`, p. ej.
-los de bidones `x1`–`x3`), la dureza (`tier`) y su jefe: `ai` 0–3 son los cuatro
+que fija fondo y losetas; cada fase tiñe el fondo con su luz y su clima, `BGT`,
+y lleva su propia canción). El mapa sale de `SEQ` (abajo); `len`, `must` y
+`tier` son restos del generador aleatorio anterior y ya no se usan. Cada fase
+declara su jefe: `ai` 0–3 son los cuatro
 jefes de siempre (`mk:1` = versión roja y más dura), `ai:4` convierte un enemigo
 normal en jefe (`mt` = tipo, `sc` = escala entera). La dificultad interna
 `st.d` va de 0 a 3 a lo largo de las 12.
@@ -92,8 +93,8 @@ que daña a enemigos, jefe y también al jugador si está cerca. Las explosiones
 
 **Cinemáticas**: cada fase lleva `cut:{pre,cp,boss,post}`, listas de líneas
 `{w:'MAMA'|'SELECTA'|'FLUX'|'BOMBO'|'ROSA'|'CENSOR'|'COMIS'|'GOBER'|'BOSS', s:'TEXTO', f:'n'|'a'|'h'|'s'|'t'|'r', e:'boom'|'booms'|'alarm'|'shake'|'flash', x:'static'|'tape', i:'il_*'}`
-(sin `w` habla el narrador y el texto ocupa todo el ancho). 182 líneas en total.
-Las claves de `w` son las de siempre aunque los personajes se llamen distinto (`MAMA` es Queen Odessa, `FLUX` Ranking Pepper, `BOMBO` Count Ephraim, `ROSA` Miss Hyacinth, `CENSOR` Leopold Dunmore, `COMIS` el inspector Quayle y `GOBER` el concejal Hargreaves).
+(sin `w` habla el narrador y el texto ocupa todo el ancho). 195 líneas en total.
+Las claves de `w` son las de siempre aunque los personajes se llamen distinto (`MAMA` es Queen Odessa, `FLUX` Ranking Pepper, `BOMBO` Count Ephraim, `ROSA` Miss Hyacinth, `CENSOR` Leopold Dunmore, `COMIS` el inspector Brannock y `GOBER` el concejal Hargreaves).
 **Cursiva**: una expresión en patwa va entre asteriscos en `s` (`'¡*BIG UP*, SELECTA!'`). Al cargar se quitan, `l.s` queda limpio y `l.m` guarda la máscara letra a letra; `txtM()` pinta cada tramo y `txtI()` hace la cursiva por bandas de filas (2, 1 y 0 píxeles), con los cortes en píxeles enteros del lienzo. Solo en el diálogo, no en las cintas.
 Una línea con `i` (lámina de 160×90, hoy `il_redada`, `il_mitin` e `il_cola`) se
 pinta sin busto si la lámina ha cargado (si no, sale el busto de siempre): la
@@ -111,7 +112,7 @@ el nombre de la fase y «toca para seguir»). Avanza con salto/disparo, Intro o 
 toque, y se salta entera con Esc, Start o tocando SALTAR. Cada escena sale una
 vez por partida (reintentar no la repite). En el Archivo, cada cinta enseña la
 lámina de su fase (`il_NN`) salvo que traiga otra como tercer elemento
-(`LORE[i][2]`): las cintas 4, 7 y 10 usan las de Babilonia.
+(`LORE[i][2]`): las cintas 5 y 7 usan las de Babilonia (la cola y el mitin).
 
 **Iniciales del récord**: tres letras de recreativa con ▲/▼ (A–Z y 0–9), sin
 teclado del sistema (con la pantalla girada por CSS saldría de lado y tapando el
@@ -122,11 +123,11 @@ anterior. Se recuerdan en `ds2_tag`.
 1× con `x1`), con 3 caras cada uno —`n` normal más dos de su carácter
 (`a` alerta, `h` contenta, `s` seria, `t` triste, `r` furia)— y boca que se mueve
 mientras escribe (fotograma +1; todos menos el Censor, `o:0`). Las dos caras de
-Babilonia (ver `LORE.md`) tienen las suyas retocadas a mano: el inspector Quayle
+Babilonia (ver `LORE.md`) tienen las suyas retocadas a mano: el inspector Brannock
 (`COMIS`: `n`, `a` grita una orden, `s` sonrisa burlona) y el concejal Hargreaves
 (`GOBER`: `n`, `h` sonrisa de cartel, `r` se le cae la careta). Sus rótulos
-largos («INSPECTOR QUAYLE», «CONCEJAL HARGREAVES») pasan a la forma corta de `s`
-(«QUAYLE», «HARGREAVES») cuando llegarían al «>» del busto, como con W=160 (la escena
+largos («INSPECTOR BRANNOCK», «CONCEJAL HARGREAVES») pasan a la forma corta de `s`
+(«BRANNOCK», «HARGREAVES») cuando llegarían al «>» del busto, como con W=160 (la escena
 a pantalla completa en 16:9). El de Selecta se tiñe con la piel y la sudadera
 elegidas (`lookPor`). `x:'static'` mete ruido de radio y `x:'tape'` tono cálido y
 una cinta girando (las grabaciones de Count Ephraim). El jefe habla con su propio
