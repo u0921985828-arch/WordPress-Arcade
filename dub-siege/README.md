@@ -74,9 +74,9 @@ Las claves de `w` son las de siempre aunque los personajes se llamen distinto (`
 Una línea con `i` (lámina de 160×90, hoy `il_redada`, `il_mitin` e `il_cola`) se
 pinta sin busto si la lámina ha cargado (si no, sale el busto de siempre): la
 lámina a escala 1, centrada sobre negro y apoyada en la caja de texto, que se
-ajusta a las líneas que ocupa. La caja nunca deja 90 de alto, así que la lámina
-pierde siempre su parte de arriba, el cielo (con las tres de hoy, de 11 a 37 de
-sus 90 filas según la pantalla y las líneas); el suelo no se recorta nunca. El
+ajusta a las líneas que ocupa. La lámina pierde como mucho 12 filas de cielo:
+si la caja es más alta (pantallas 16:9), la lámina baja, su suelo queda detrás
+de la caja y la caja se vuelve translúcida (78 %) para que se siga viendo. El
 efecto de `x` va entonces sobre la lámina. El texto se vuelve a partir si cambia
 el ancho: la escena que salta en plena partida se pinta un fotograma con el HUD
 de juego antes de pasar al de escena.
@@ -88,6 +88,11 @@ toque, y se salta entera con Esc, Start o tocando SALTAR. Cada escena sale una
 vez por partida (reintentar no la repite). En el Archivo, cada cinta enseña la
 lámina de su fase (`il_NN`) salvo que traiga otra como tercer elemento
 (`LORE[i][2]`): las cintas 3, 9 y 10 usan las de Babilonia.
+
+**Iniciales del récord**: tres letras de recreativa con ▲/▼ (A–Z y 0–9), sin
+teclado del sistema (con la pantalla girada por CSS saldría de lado y tapando el
+campo). Con teclado físico se escribe directamente; Retroceso vuelve a la letra
+anterior. Se recuerdan en `ds2_tag`.
 
 **Retratos** (`POR` en el código): busto de 48×56 por personaje (`po_*`, hojas a
 1× con `x1`), con 3 caras cada uno —`n` normal más dos de su carácter
@@ -101,7 +106,8 @@ largos («INSPECTOR GRIST», «ALCALDE SWEETING») pasan a la forma corta de `s`
 a pantalla completa en 16:9). El de Selecta se tiñe con la piel y la sudadera
 elegidas (`lookPor`). `x:'static'` mete ruido de radio y `x:'tape'` tono cálido y
 una cinta girando (las grabaciones de Duke Lectric). El jefe habla con su propio
-sprite de juego a escala entera dentro del marco.
+sprite de juego a escala entera, como mínimo ×2 (un busto); si no cabe de alto se
+apoya arriba (cabeza y torso) y el marco recorta el resto.
 
 Textos en mayúsculas con tildes, eñes y signos de apertura (¿ ¡). La fuente
 incrustada es un subconjunto de Press Start 2P (2,6 KB) con las mayúsculas

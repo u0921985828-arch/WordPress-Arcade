@@ -87,6 +87,7 @@ ol.rank li.me{background:#10351f;color:#c6ffd9}
 ol.rank .x{color:var(--dim)}
 #tag{font:inherit;font-size:16px;width:6em;min-height:clamp(32px,calc(6*var(--vh)),46px);text-transform:uppercase;text-align:center;background:#000;color:var(--yel);border:2px solid var(--line);padding:.5em;border-radius:4px;-webkit-user-select:text;user-select:text}
 #tag:focus-visible{outline:2px solid var(--yel)}
+.tgs{align-items:center}.tgc{display:flex;flex-direction:column;align-items:center;gap:4px}.tgc b{font-weight:400;font-size:22px;line-height:1;color:var(--yel);background:#000;border:2px solid var(--line);border-radius:4px;padding:.3em .35em;min-width:1.7em;text-align:center}.tgc b.on{border-color:var(--yel)}.tgb{min-width:44px;min-height:34px;padding:.2em .6em}
 .note{color:var(--grn);min-height:1.7em;margin:0}
 .lore{margin:0;max-width:min(46ch,96%);text-align:left;line-height:1.75}.ill{display:block;flex:none;image-rendering:pixelated;image-rendering:crisp-edges;outline:2px solid #1a1530}.tapes .btn{text-align:left;padding:6px 10px;min-height:34px}html.w480 .menu.tapes{display:grid;grid-template-columns:1fr 1fr;width:min(100%,680px)}
 .lkw{display:flex;gap:clamp(8px,calc(2*var(--vw)),18px);align-items:center;justify-content:center;width:100%;flex-wrap:wrap}
@@ -562,6 +563,9 @@ addEventListener('keydown',function(e){
   if(mode==='cut'){e.preventDefault();if(!e.repeat){if(e.code==='Escape'||e.code==='KeyP')cutSkip();else if(e.code==='KeyM')setMute(!SET.mute);
     else if(['Space','Enter','KeyZ','KeyX','KeyJ','KeyK','ArrowRight','KeyD'].indexOf(e.code)>-1)cutAdv();}K[e.code]=1;return;}
   var ovOpen=!$('ov').hidden;
+  if(ovOpen&&$('tg0')){var ch=(e.key||'').toUpperCase();
+    if(ch.length===1&&TGC.indexOf(ch)>-1){e.preventDefault();tgType(ch);return;}
+    if(e.key==='Backspace'){e.preventDefault();TGi=Math.max(0,TGi-1);tgPaint();return;}}
   if(ovOpen){
     if(e.code==='ArrowDown'||e.code==='ArrowUp'||e.code==='KeyS'||e.code==='KeyW'){
       var bs=[].slice.call($('ov').querySelectorAll('button:not(:disabled)'));if(bs.length){e.preventDefault();
@@ -1158,7 +1162,9 @@ function cutFace(l,x,y){
   if(P){k=P.look?lookPor(P.k):P.k;o=SHEET[k];
     if(o&&o.ok){f=P.f[l.f]||0;if(P.o&&cut.ch<l.s.length&&cut.t>8&&((t>>3)&1))f++;blitS(k,f,x,y,1);}}
   else{var L=st.L;k=L.ai===4?ESHEET[L.mt]:'b_'+L.ai;if(L.mk)k=tintSheet(k);o=SHEET[k];
-    if(o&&o.ok){s=Math.max(1,Math.floor(Math.min(48/o.fw,56/o.fh)));blitS(k,(t>>4)%o.n,x+24-o.fw*s/2,y+56-o.fh*s,s);}}
+    // jefe: su sprite a escala entera, como minimo x2 (un busto); si no cabe de alto se
+    // apoya arriba (cabeza y torso) y el marco recorta el resto.
+    if(o&&o.ok){s=Math.max(2,Math.floor(Math.min(48/o.fw,56/o.fh)));blitS(k,(t>>4)%o.n,x+24-Math.round(o.fw*s/2),o.fh*s>56?y+2:y+56-o.fh*s,s);}}
   cutFx(l,x,y,48,56);g.restore();
 }
 // Efecto de la voz sobre el busto o sobre la lamina (w x h, ya recortado):
@@ -1197,13 +1203,15 @@ function drawCut(){
   // Linea con ilustracion (l.i): lamina 160x90 a escala 1 sobre la caja de texto, sin
   // busto y sin banda de arriba. Nunca cabe entera (la caja deja menos de 90 de alto):
   // se apoya en la caja y se recorta por arriba (el cielo), nunca el suelo.
-  if(il){var bt=Math.floor(by*HS),ix=Math.floor((W-160)/2),iy=bt-90;
+  // Como mucho se pierden 12 filas de cielo: si la caja es mas alta (pantallas 16:9),
+  // la lamina baja y su suelo queda detras de la caja, que entonces es translucida.
+  var ov=0;if(il){var bt=Math.floor(by*HS),ix=Math.floor((W-160)/2),iy=Math.max(bt-90,-12);ov=iy+90-bt;
     g.save();g.setTransform(SC,0,0,SC,0,0);g.globalAlpha=Math.min(1,c.t/10);rect(0,0,W,H,'#000');blitS(l.i,0,ix,iy,1);g.globalAlpha=1;
     // sin busto, el efecto de la voz va sobre la parte visible de la lamina
     if(l.x&&c.t>=10){var vy=Math.max(0,iy),vh=iy+90-vy;g.beginPath();g.rect(ix,vy,160,vh);g.clip();cutFx(l,ix,vy,160,vh);}
     g.restore();}
   g.save();g.setTransform(SC*HS,0,0,SC*HS,0,0);
-  rect(0,0,HW,tb,'#000');rect(0,by,HW,bh,'#06070d');rect(0,by,HW,1,'#2a2e48');
+  rect(0,0,HW,tb,'#000');if(ov>0)g.globalAlpha=.78;rect(0,by,HW,bh,'#06070d');g.globalAlpha=1;rect(0,by,HW,1,'#2a2e48');
   if(e>=1){var fz='FASE '+(st.i+1),sk=touchMode()?'SALTAR':'ESC: SALTAR';
     // sin banda de arriba, los rotulos llevan fondo propio para leerse sobre la lamina
     if(il){g.font='8px "Press Start 2P", monospace';var fw=g.measureText(fz).width,sw=g.measureText(sk).width;
@@ -1372,17 +1380,26 @@ function showRank(note){
   if(!a.length)h+='<li><span></span><span></span><span class="x">SIN PUNTUACIONES</span><span></span></li>';
   h+='</ol>';
   var can=pend&&qualifies(pend.score);
-  if(can)h+='<div class="row"><input id="tag" maxlength="3" autocomplete="off" spellcheck="false" aria-label="Tus iniciales" placeholder="AAA" value="'+(load('ds2_tag','')||'')+'"><button class="btn hot" data-act="save">GUARDAR</button></div>';
+  if(can){if(!TG)TG=((load('ds2_tag','')||'')+'AAA').slice(0,3).split('');TGi=0;
+    // Iniciales de recreativa: tres letras con flechas, sin teclado del sistema (con la
+    // pantalla girada por CSS el teclado del movil saldria de lado y tapando el campo).
+    h+='<div class="row tgs" role="group" aria-label="Tus iniciales">';
+    for(var k=0;k<3;k++)h+='<div class="tgc"><button class="btn tgb" data-act="tg" data-v="'+k+'+" aria-label="Letra '+(k+1)+' siguiente">▲</button><b id="tg'+k+'"'+(k===TGi?' class="on"':'')+'>'+TG[k]+'</b><button class="btn tgb" data-act="tg" data-v="'+k+'-" aria-label="Letra '+(k+1)+' anterior">▼</button></div>';
+    h+='<button class="btn hot" data-act="save">GUARDAR</button></div>';}
   h+='<p class="note">'+(note||'')+'</p><div class="menu"><button class="btn'+(can?'':' hot')+'" data-act="'+(mode==='menu'?'back':'tomenu')+'">'+(mode==='menu'?'VOLVER':'MENÚ PRINCIPAL')+'</button></div></div>';
   show(h);
-  if(can)setTimeout(function(){var i=$('tag');if(i){i.focus();i.addEventListener('input',function(){this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'');});}},40);
+  if(can)setTimeout(function(){var b=$('ov').querySelector('.tgb');if(b)b.focus();},40);
 }
+var TG=null,TGi=0,TGC='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+function tgPaint(){for(var k=0;k<3;k++){var e=$('tg'+k);if(e){e.textContent=TG[k];e.className=k===TGi?'on':'';}}}
+function tgStep(k,d){TGi=k;TG[k]=TGC[(TGC.indexOf(TG[k])+d+TGC.length)%TGC.length];tgPaint();}
+function tgType(c){TG[TGi]=c;TGi=Math.min(2,TGi+1);tgPaint();}
 function qualifies(s){var a=load('ds2_rank',[]);return s>0&&(a.length<10||s>a[a.length-1].score);}
 function submitRank(){
-  var i=$('tag');if(!i||!pend)return;var tag=(i.value||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,3);
+  if(!$('tg0')||!pend)return;var tag=TG.join('');
   if(tag.length<2){showRank('USA 2 O 3 LETRAS');return;}
   var a=load('ds2_rank',[]);myTs=Date.now();a.push({tag:tag,score:pend.score,st:pend.st,d:pend.d,ts:myTs});
-  a.sort(function(x,y){return y.score-x.score;});save('ds2_rank',a.slice(0,10));save('ds2_tag',tag);pend=null;showRank('GUARDADO');
+  a.sort(function(x,y){return y.score-x.score;});save('ds2_rank',a.slice(0,10));save('ds2_tag',tag);pend=null;TG=null;showRank('GUARDADO');
 }
 function stat(){var s=run.stats,secs=Math.floor(s.time/60);
   return '<div class="stats"><span>PUNTOS</span><b>'+pad(run.score,7)+'</b><span>FASE</span><b>'+(st.i+1)+' / '+LEVELS.length+'</b><span>ENEMIGOS</span><b>'+s.kills+'</b>'+
@@ -1427,6 +1444,7 @@ function act(a,v){
     case 'next':nextStage();break;
     case 'cont':run.conts++;run.score=Math.floor(run.score/2);run.lives=D.lives;run.lv=1;run.wpn='N';run.bass=0;var n=st.i;run.stage=n;buildStage(n);hideOv();mode='play';break;
     case 'save':submitRank();break;
+    case 'tg':tgStep(+v[0],v[1]==='+'?1:-1);break;
     case 'look':showLook();break;
     case 'lk':lookStep(v,1);break;
     case 'lkbuy':lookBuy();break;
