@@ -156,8 +156,15 @@ de ventaja). Estudio y cifras: `ESTUDIO-CONTROLES.md`.
 
 ## Música
 Toda la banda sonora se **genera en el propio juego** (Web Audio, sin ficheros de
-audio): cuatro canciones originales en clave de dub, una por zona (`SONGS`,
-`songIdx`), escritas como cadenas de un carácter por semicorchea
+audio): **doce canciones originales, una por fase y por estilo del reggae**,
+de las raíces a 1981 (`SONGS[n]`, `songIdx = n` en `buildStage`): R&B de patio
+(138 bpm, shuffle de piano boogie), shuffle jamaicano (152), nyabinghi (76, tres
+tambores de mano sin batería), ska (172), rocksteady (84, bombo en el 3), early
+reggae (150, órgano *bubble* con swing), roots (144, one drop), dub (136, forma
+ADBD con cortes y sirenas), rockers (150, charles abierto), steppers (156, bombo
+en cada negra), lovers rock (140, acordes maj7) y rub-a-dub (148, riddim
+desnudo). Ninguna pareja de fases seguidas repite el patrón de bombo, caja y
+charles. Ni melodías ni progresiones reales. Escritas como cadenas de un carácter por semicorchea
 (`NA`: `'0'` = tónica, `'c'` = octava arriba, `'Z'` = semitono abajo; `-` alarga,
 `.` silencio) y acordes por compás (`CQ`: `m`, `M`, `d` séptima de dominante,
 `n` menor séptima, `j` mayor séptima).
@@ -182,6 +189,10 @@ audio): cuatro canciones originales en clave de dub, una por zona (`SONGS`,
   instrumentos y bajo (que se aparta del bombo), y salida con compresor y
   recorte suave. La pausa apaga y filtra la música; el silencio (`setMute`)
   suspende el audio entero.
+- **Medido con las 12** (render sin conexión): todas las secciones a ±1,8 dB de
+  la media de las 4 anteriores, pico −9,3 dBFS, tempo medido = previsto, CPU por
+  compás 3,76 ms de media (antes 4,68), cambio de fase y de jefe sin huecos de
+  más de 0,10 s. Medidas de la versión anterior de 4 canciones:
 - **Medido** (render sin conexión a 44,1 kHz, `#debug`): −25 a −24 LUFS por
   zona (antes −30 a −28), pico real ≤ −10 dB, chasquidos aislados de 145–395
   por minuto a 0–1, estéreo real por encima de 250 Hz (correlación 0,76–0,79; el
