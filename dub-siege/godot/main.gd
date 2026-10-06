@@ -131,7 +131,50 @@ func _unhandled_input(e: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 
 
+## Atras (Android) = Esc del juego; dos veces seguidas en 1,5 s sale (como la app anterior).
+var _last_back := -10000
+var _toast: Label
+
+
+func _go_back() -> void:
+	var now := Time.get_ticks_msec()
+	if now - _last_back < 1500:
+		get_tree().quit()
+		return
+	_last_back = now
+	for down in [true, false]:
+		var e := InputEventKey.new()
+		e.keycode = KEY_ESCAPE
+		e.physical_keycode = KEY_ESCAPE
+		e.pressed = down
+		Input.parse_input_event(e)
+	if _toast == null:
+		var cl := CanvasLayer.new()
+		cl.layer = 20
+		add_child(cl)
+		_toast = Label.new()
+		_toast.text = "Pulsa atrás otra vez para salir"
+		_toast.add_theme_font_size_override("font_size", int(14 * game._dpr()))
+		_toast.add_theme_color_override("font_color", Color("#eef3ff"))
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.07, 0.09, 0.19, 0.92)
+		sb.set_corner_radius_all(int(16 * game._dpr()))
+		sb.set_content_margin_all(10 * game._dpr())
+		_toast.add_theme_stylebox_override("normal", sb)
+		cl.add_child(_toast)
+	_toast.visible = true
+	_toast.reset_size()
+	var vs := get_viewport_rect().size
+	_toast.position = Vector2((vs.x - _toast.size.x) / 2.0, vs.y - _toast.size.y - 48 * game._dpr())
+	get_tree().create_timer(2.0).timeout.connect(func():
+		if Time.get_ticks_msec() - _last_back >= 1900:
+			_toast.visible = false)
+
+
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		_go_back()
+		return
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_APPLICATION_PAUSED:
 		if game:
 			game.focus_lost()

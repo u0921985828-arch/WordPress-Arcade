@@ -106,5 +106,23 @@
    "\tvar a = j_load(\"ds2_rank\", [])",
    "\treturn s > 0 and (_len(a) < 10 or s > _ix(a, _len(a) - 1).get(\"score\"))"
   ]
+ },
+ "bytes": {
+  "lookSheet": [
+   "d",
+   "cd",
+   "hd"
+  ],
+  "paint": [
+   "d",
+   "col"
+  ],
+  "lightSpr": [
+   "im.data",
+   "BAYER"
+  ],
+  "lookPor": [
+   "d"
+  ]
  }
 }

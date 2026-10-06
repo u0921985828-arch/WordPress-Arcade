@@ -3064,12 +3064,12 @@ func lookPor(k = null):
 	tp = (_ix(LK.t, LOOK.get("t")).get("v") if LOOK.get("t") else null)
 	i = 0
 	while (i < _len(d)):
-		if (_ix(d, (i + 3)) < 128):
+		if (d[int((i + 3))] < 128):
 			i += 4
 			continue
-		r = _ix(d, i)
-		G = _ix(d, (i + 1))
-		b = _ix(d, (i + 2))
+		r = d[int(i)]
+		G = d[int((i + 1))]
+		b = d[int((i + 2))]
 		L = lum(r, G, b)
 		if (sk and isSkin(r, G, b)):
 			paint(d, i, sk, (L / float(PSK)))
@@ -4492,9 +4492,9 @@ func isSkin(r = null, g_2 = null, b = null):
 
 # L2363
 func paint(d = null, i = null, col = null, k = null):
-	_aset(d, i, int(min(255, (_ix(col, 0) * k))))
-	_aset(d, (i + 1), int(min(255, (_ix(col, 1) * k))))
-	_aset(d, (i + 2), int(min(255, (_ix(col, 2) * k))))
+	d[int(i)] = int(min(255, (col[int(0)] * k)))
+	d[int((i + 1))] = int(min(255, (col[int(1)] * k)))
+	d[int((i + 2))] = int(min(255, (col[int(2)] * k)))
 
 # L2366
 func lookSheet(st_2 = null):
@@ -4573,7 +4573,7 @@ func lookSheet(st_2 = null):
 	while (y < h):
 		x = 0
 		while (x < w):
-			if (_round(((_ix(cd, (((y * w) + x) * 4))) / 20.0)) == 2):
+			if (_round(((cd[int((((y * w) + x) * 4))]) / 20.0)) == 2):
 				f = int((x / float(fw)))
 				if (y < _ix(_ix(tb, f), 0)):
 					_aset(tb[f], 0, y)
@@ -4587,14 +4587,14 @@ func lookSheet(st_2 = null):
 		x = 0
 		while (x < w):
 			i = (((y * w) + x) * 4)
-			if (_ix(d, (i + 3)) < 128):
+			if (d[int((i + 3))] < 128):
 				x += 1
 				continue
-			cl = _round(((_ix(cd, i)) / 20.0))
+			cl = _round(((cd[int(i)]) / 20.0))
 			if (not cl):
 				x += 1
 				continue
-			L = lum(_ix(d, i), _ix(d, (i + 1)), _ix(d, (i + 2)))
+			L = lum(d[int(i)], d[int((i + 1))], d[int((i + 2))])
 			if (cl == 1):
 				paint(d, i, sk, (L / float(_ix(LREF, 1))))
 			elif (cl == 2):
@@ -4630,8 +4630,8 @@ func lookSheet(st_2 = null):
 		hd = hm.get("data")
 		i = 0
 		while (i < _len(hd)):
-			if ((_ix(hd, (i + 3)) >= 128) and isSkin(_ix(hd, i), _ix(hd, (i + 1)), _ix(hd, (i + 2)))):
-				paint(hd, i, sk, ((lum(_ix(hd, i), _ix(hd, (i + 1)), _ix(hd, (i + 2)))) / float(_ix(LREF, 1))))
+			if ((hd[int((i + 3))] >= 128) and isSkin(hd[int(i)], hd[int((i + 1))], hd[int((i + 2))])):
+				paint(hd, i, sk, ((lum(hd[int(i)], hd[int((i + 1))], hd[int((i + 2))])) / float(_ix(LREF, 1))))
 			i += 4
 		q3.putImageData(hm, 0, 0)
 		q.drawImage(c3, 0, 0)
@@ -4924,16 +4924,16 @@ func lightSpr(r = null, col = null):
 			if (v < 0):
 				v = 0
 			v *= v
-			lv = floori(((v * 11) + ((_ix(BAYER, (((int(y) & int(3)) * 4) + (int(x) & int(3))))) / 16.0)))
+			lv = floori(((v * 11) + ((BAYER[int((((int(y) & int(3)) * 4) + (int(x) & int(3))))]) / 16.0)))
 			if (lv < 0):
 				lv = 0
 			if (lv > 11):
 				lv = 11
 			i = (((y * d) + x) * 4)
-			_aset(im.data, i, 255)
-			_aset(im.data, (i + 1), 255)
-			_aset(im.data, (i + 2), 255)
-			_aset(im.data, (i + 3), (lv * 23))
+			im.data[int(i)] = 255
+			im.data[int((i + 1))] = 255
+			im.data[int((i + 2))] = 255
+			im.data[int((i + 3))] = (lv * 23)
 			x += 1
 		y += 1
 	q.putImageData(im, 0, 0)

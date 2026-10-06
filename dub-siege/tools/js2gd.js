@@ -34,7 +34,19 @@ const BODY = iife.expression.callee.body.body;
 const SKIP = new Set(CFG.skip);
 const inSkip = n => (CFG.skipRanges || []).some(([a, b]) => n.loc.start.line >= a && n.loc.start.line <= b);          // nombres de nivel superior escritos a mano
 const DATA = new Set(CFG.data);          // variables que se cargan de data.json
-const RAW = CFG.raw || {};               // funcion -> cuerpo GDScript escrito a mano (texto)
+const RAW = CFG.raw || {};
+// "bytes": funcion -> variables que son buffers de pixeles (ImageData.data o
+// arrays de enteros) con indice siempre dentro de rango. Ahi d[i] se traduce a
+// acceso directo (d[int(i)]) en vez de _ix/_aset: en los bucles por pixel la
+// llamada al ayudante era casi todo el coste (lookSheet 50-80 ms -> pocos ms).
+const BYTES = CFG.bytes || {};
+let CUR_FN = null;
+function srcName(n) {
+  if (n.type === 'Identifier') return n.name;
+  if (n.type === 'MemberExpression' && !n.computed && n.object.type === 'Identifier') return n.object.name + '.' + n.property.name;
+  return null;
+}
+const isBytes = n => !!(CUR_FN && BYTES[CUR_FN] && BYTES[CUR_FN].includes(srcName(n)));               // funcion -> cuerpo GDScript escrito a mano (texto)
 const warns = [];
 function warn(node, msg) { warns.push(`L${node.loc.start.line + lineBase - 1}: ${msg}`); }
 function src(node) { return code.slice(node.start, node.end); }
@@ -163,6 +175,7 @@ class T {
   // ---------------- funciones
   method(name, fnNode, ownerScope) {
     const _keepFins = this.fins; this.fins = [];
+    const _keepFn = CUR_FN; CUR_FN = name;
     try {
     const gfn = new GFn(null);
     const sc = new Scope(null, gfn, 'fn');
@@ -171,7 +184,7 @@ class T {
     L.body(fnNode, sc);
     const head = `func ${gdName(name)}(${params.map(p => p + ' = null').join(', ')}):`;
     return [`# L${fnNode.loc.start.line + lineBase - 1}`, head, ...L.wrapHoist(sc), ...(L.lines.length ? L.lines : ['\tpass'])];
-      } finally { this.fins = _keepFins; }
+      } finally { this.fins = _keepFins; CUR_FN = _keepFn; }
   }
   wrapHoist(sc) { return sc.gfn.hoist.map(h => '\t'.repeat(this.ind) + h); }
 
@@ -449,6 +462,7 @@ class T {
       const [v, pre] = this.withPre(() => this.expr(e.right.left, sc)); this.flushPre(pre);
       if (e.left.type === 'MemberExpression' && e.left.computed) {
         const [o2, pre3] = this.withPre(() => this.lval(e.left.object, sc)); this.flushPre(pre3);
+        if (isBytes(e.left.object)) return this.emit(`${o2}[int(${this.expr(e.left.property, sc)})] = ${v}`);
         return this.emit(`_aset(${o2}, ${this.expr(e.left.property, sc)}, ${v})`);
       }
       const [l, pre2] = this.withPre(() => this.lval(e.left, sc)); this.flushPre(pre2);
@@ -540,6 +554,11 @@ class T {
     } else {
       const r = this.expr(e.right, sc);
       const op = e.operator;
+      if (op === '=' && e.left.type === 'MemberExpression' && e.left.computed && isBytes(e.left.object)) {
+        out = `${this.lval(e.left.object, sc)}[int(${this.expr(e.left.property, sc)})] = ${r}`;
+        if (!isStmt) { this.pre.push(out); return l; }
+        return out;
+      }
       if (op === '=' && e.left.type === 'MemberExpression' && e.left.computed) {
         out = `_aset(${this.lval(e.left.object, sc)}, ${this.expr(e.left.property, sc)}, ${r})`;
         if (!isStmt) { this.pre.push(out); return l; }
@@ -736,6 +755,7 @@ class T {
     const o = this.expr(objN, sc, false, false, true);
     if (e.computed) {
       const k = this.expr(e.property, sc);
+      if (isBytes(objN)) return `${o}[int(${k})]`;
       return `_ix(${o}, ${k})`;
     }
     const k = e.property.name;

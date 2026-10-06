@@ -11,6 +11,7 @@ var _h := 0
 var img: Image
 var _tex: Texture2D = null
 var _dirty := true
+static var PT := {}
 
 var fillStyle: Variant = "#000"
 var globalAlpha := 1.0
@@ -82,7 +83,7 @@ func clearRect(x: float, y: float, w: float, h: float) -> void:
 		_dirty = true
 
 
-func fillRect(x: float, y: float, w: float, h: float) -> void:
+func _o_fillRect(x: float, y: float, w: float, h: float) -> void:
 	if img == null:
 		return
 	var r := Rect2i(int(round(x)), int(round(y)), int(round(w)), int(round(h)))
@@ -116,7 +117,7 @@ func fillRect(x: float, y: float, w: float, h: float) -> void:
 	_dirty = true
 
 
-func drawImage(src: Variant, a: float, b: float, c: Variant = null, d: Variant = null, e: Variant = null, f: Variant = null, gg: Variant = null, h: Variant = null) -> void:
+func _o_drawImage(src: Variant, a: float, b: float, c: Variant = null, d: Variant = null, e: Variant = null, f: Variant = null, gg: Variant = null, h: Variant = null) -> void:
 	if img == null:
 		return
 	var si: Image = null
@@ -162,7 +163,7 @@ func drawImage(src: Variant, a: float, b: float, c: Variant = null, d: Variant =
 
 ## ImageData: {width, height, data} con data en Array de enteros (los cambios
 ## en d[i] tienen que llegar a putImageData, y un PackedByteArray se copiaria).
-func getImageData(x: float, y: float, w: float, h: float) -> Dictionary:
+func _o_getImageData(x: float, y: float, w: float, h: float) -> Dictionary:
 	var W := int(w)
 	var H := int(h)
 	var bytes: PackedByteArray
@@ -176,14 +177,14 @@ func getImageData(x: float, y: float, w: float, h: float) -> Dictionary:
 	return {"width": W, "height": H, "data": Array(bytes)}
 
 
-func createImageData(w: float, h: float) -> Dictionary:
+func _o_createImageData(w: float, h: float) -> Dictionary:
 	var a := []
 	a.resize(int(w) * int(h) * 4)
 	a.fill(0)
 	return {"width": int(w), "height": int(h), "data": a}
 
 
-func putImageData(im: Dictionary, x: float, y: float) -> void:
+func _o_putImageData(im: Dictionary, x: float, y: float) -> void:
 	var W: int = im.width
 	var H: int = im.height
 	var src: Array = im.data
@@ -196,3 +197,14 @@ func putImageData(im: Dictionary, x: float, y: float) -> void:
 		return
 	img.blit_rect(tmp, Rect2i(0, 0, W, H), Vector2i(int(x), int(y)))
 	_dirty = true
+
+func fillRect(x: float, y: float, w: float, h: float) -> void:
+	var t := Time.get_ticks_usec(); _o_fillRect(x,y,w,h); PT["fillRect "+globalCompositeOperation] = PT.get("fillRect "+globalCompositeOperation,0) + Time.get_ticks_usec()-t
+func drawImage(src: Variant, a: float, b: float, c: Variant = null, d: Variant = null, e: Variant = null, f: Variant = null, gg: Variant = null, h: Variant = null) -> void:
+	var t := Time.get_ticks_usec(); _o_drawImage(src,a,b,c,d,e,f,gg,h); PT["drawImage"] = PT.get("drawImage",0) + Time.get_ticks_usec()-t
+func getImageData(x: float, y: float, w: float, h: float) -> Dictionary:
+	var t := Time.get_ticks_usec(); var r := _o_getImageData(x,y,w,h); PT["getImageData"] = PT.get("getImageData",0) + Time.get_ticks_usec()-t; return r
+func createImageData(w: float, h: float) -> Dictionary:
+	var t := Time.get_ticks_usec(); var r := _o_createImageData(w,h); PT["createImageData"] = PT.get("createImageData",0) + Time.get_ticks_usec()-t; return r
+func putImageData(im: Dictionary, x: float, y: float) -> void:
+	var t := Time.get_ticks_usec(); _o_putImageData(im,x,y); PT["putImageData"] = PT.get("putImageData",0) + Time.get_ticks_usec()-t

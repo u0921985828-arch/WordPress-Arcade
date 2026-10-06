@@ -392,19 +392,29 @@ func measureText(s: String) -> Dictionary:
 
 func fillText(s: String, x: float, y: float) -> void:
 	var px := _font_px()
-	var k := _T.get_scale().y
-	var size := int(round(px * k))
+	# Tamano exacto en pixeles del lienzo (p. ej. 8 x 3,12 = 24,96). La fuente se
+	# rasteriza al entero mas cercano y se escala el resto, como hace el navegador
+	# con un tamano fraccionario: si no, el avance de cada letra se pasa de 0,04 px
+	# y una linea larga acaba 1-2 px desplazada.
+	var fs := px * _T.get_scale().y
+	var size := int(round(fs))
 	if size < 1:
 		return
+	var k := fs / size
 	var f := get_font()
 	var p := _T * Vector2(x, y)
 	if textAlign == "center":
-		p.x -= f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x / 2.0
+		p.x -= f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x * k / 2.0
 	elif textAlign == "right":
-		p.x -= f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+		p.x -= f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x * k
 	if textBaseline == "top":
-		p.y += f.get_ascent(size)
+		p.y += f.get_ascent(size) * k
 	elif textBaseline == "middle":
-		p.y += f.get_ascent(size) / 2.0
+		p.y += f.get_ascent(size) * k / 2.0
 	var rid := _seg()
-	f.draw_string(rid, p, s, HORIZONTAL_ALIGNMENT_LEFT, -1, size, _fcol(fillStyle))
+	if absf(k - 1.0) < 0.0005:
+		f.draw_string(rid, p, s, HORIZONTAL_ALIGNMENT_LEFT, -1, size, _fcol(fillStyle))
+		return
+	RenderingServer.canvas_item_add_set_transform(rid, Transform2D(0.0, Vector2(k, k), 0.0, p))
+	f.draw_string(rid, Vector2.ZERO, s, HORIZONTAL_ALIGNMENT_LEFT, -1, size, _fcol(fillStyle))
+	RenderingServer.canvas_item_add_set_transform(rid, Transform2D.IDENTITY)
