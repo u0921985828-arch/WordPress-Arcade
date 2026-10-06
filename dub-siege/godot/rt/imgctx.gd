@@ -11,7 +11,6 @@ var _h := 0
 var img: Image
 var _tex: Texture2D = null
 var _dirty := true
-static var PT := {}
 
 var fillStyle: Variant = "#000"
 var globalAlpha := 1.0
@@ -83,7 +82,7 @@ func clearRect(x: float, y: float, w: float, h: float) -> void:
 		_dirty = true
 
 
-func _o_fillRect(x: float, y: float, w: float, h: float) -> void:
+func fillRect(x: float, y: float, w: float, h: float) -> void:
 	if img == null:
 		return
 	var r := Rect2i(int(round(x)), int(round(y)), int(round(w)), int(round(h)))
@@ -97,8 +96,19 @@ func _o_fillRect(x: float, y: float, w: float, h: float) -> void:
 	var op := globalCompositeOperation
 	if op == "source-over" and c.a >= 1.0:
 		img.fill_rect(r, c)
-	elif op == "source-in" or op == "source-atop":
-		_comp_rect(r, c, op == "source-in")
+	elif op == "source-in":
+		# el resultado toma el color nuevo con el alfa de lo que ya habia (por c.a)
+		for yy in range(r.position.y, r.end.y):
+			for xx in range(r.position.x, r.end.x):
+				var d := img.get_pixel(xx, yy)
+				img.set_pixel(xx, yy, Color(c.r, c.g, c.b, d.a * c.a))
+	elif op == "source-atop":
+		for yy in range(r.position.y, r.end.y):
+			for xx in range(r.position.x, r.end.x):
+				var d := img.get_pixel(xx, yy)
+				if d.a <= 0.0:
+					continue
+				img.set_pixel(xx, yy, Color(d.r + (c.r - d.r) * c.a, d.g + (c.g - d.g) * c.a, d.b + (c.b - d.b) * c.a, d.a))
 	else:
 		var src := Image.create_empty(r.size.x, r.size.y, false, Image.FORMAT_RGBA8)
 		src.fill(c)
@@ -106,35 +116,7 @@ func _o_fillRect(x: float, y: float, w: float, h: float) -> void:
 	_dirty = true
 
 
-## source-in (color nuevo con el alfa de lo que habia) y source-atop (color
-## mezclado solo donde ya habia algo) sobre los bytes de la imagen: get_pixel /
-## set_pixel crean un Color por pixel y eran el 80 % del coste.
-func _comp_rect(r: Rect2i, c: Color, src_in: bool) -> void:
-	var b := img.get_data()
-	var cr := int(round(c.r * 255.0))
-	var cg := int(round(c.g * 255.0))
-	var cb := int(round(c.b * 255.0))
-	var ca := c.a
-	var W := _w
-	for yy in range(r.position.y, r.end.y):
-		var i := (yy * W + r.position.x) * 4
-		var e := i + r.size.x * 4
-		while i < e:
-			var a := b[i + 3]
-			if src_in:
-				b[i] = cr
-				b[i + 1] = cg
-				b[i + 2] = cb
-				b[i + 3] = int(round(a * ca))
-			elif a > 0:
-				b[i] = int(round(b[i] + (cr - b[i]) * ca))
-				b[i + 1] = int(round(b[i + 1] + (cg - b[i + 1]) * ca))
-				b[i + 2] = int(round(b[i + 2] + (cb - b[i + 2]) * ca))
-			i += 4
-	img.set_data(_w, _h, false, Image.FORMAT_RGBA8, b)
-
-
-func _o_drawImage(src: Variant, a: float, b: float, c: Variant = null, d: Variant = null, e: Variant = null, f: Variant = null, gg: Variant = null, h: Variant = null) -> void:
+func drawImage(src: Variant, a: float, b: float, c: Variant = null, d: Variant = null, e: Variant = null, f: Variant = null, gg: Variant = null, h: Variant = null) -> void:
 	if img == null:
 		return
 	var si: Image = null
@@ -180,7 +162,7 @@ func _o_drawImage(src: Variant, a: float, b: float, c: Variant = null, d: Varian
 
 ## ImageData: {width, height, data} con data en Array de enteros (los cambios
 ## en d[i] tienen que llegar a putImageData, y un PackedByteArray se copiaria).
-func _o_getImageData(x: float, y: float, w: float, h: float) -> Dictionary:
+func getImageData(x: float, y: float, w: float, h: float) -> Dictionary:
 	var W := int(w)
 	var H := int(h)
 	var bytes: PackedByteArray
@@ -194,14 +176,14 @@ func _o_getImageData(x: float, y: float, w: float, h: float) -> Dictionary:
 	return {"width": W, "height": H, "data": Array(bytes)}
 
 
-func _o_createImageData(w: float, h: float) -> Dictionary:
+func createImageData(w: float, h: float) -> Dictionary:
 	var a := []
 	a.resize(int(w) * int(h) * 4)
 	a.fill(0)
 	return {"width": int(w), "height": int(h), "data": a}
 
 
-func _o_putImageData(im: Dictionary, x: float, y: float) -> void:
+func putImageData(im: Dictionary, x: float, y: float) -> void:
 	var W: int = im.width
 	var H: int = im.height
 	# Conversion nativa: el juego solo escribe enteros de 0 a 255 en sus
@@ -212,14 +194,3 @@ func _o_putImageData(im: Dictionary, x: float, y: float) -> void:
 		return
 	img.blit_rect(tmp, Rect2i(0, 0, W, H), Vector2i(int(x), int(y)))
 	_dirty = true
-
-func fillRect(x: float, y: float, w: float, h: float) -> void:
-	var t := Time.get_ticks_usec(); _o_fillRect(x,y,w,h); PT["fillRect "+globalCompositeOperation] = PT.get("fillRect "+globalCompositeOperation,0) + Time.get_ticks_usec()-t
-func drawImage(src: Variant, a: float, b: float, c: Variant = null, d: Variant = null, e: Variant = null, f: Variant = null, gg: Variant = null, h: Variant = null) -> void:
-	var t := Time.get_ticks_usec(); _o_drawImage(src,a,b,c,d,e,f,gg,h); PT["drawImage"] = PT.get("drawImage",0) + Time.get_ticks_usec()-t
-func getImageData(x: float, y: float, w: float, h: float) -> Dictionary:
-	var t := Time.get_ticks_usec(); var r := _o_getImageData(x,y,w,h); PT["getImageData"] = PT.get("getImageData",0) + Time.get_ticks_usec()-t; return r
-func createImageData(w: float, h: float) -> Dictionary:
-	var t := Time.get_ticks_usec(); var r := _o_createImageData(w,h); PT["createImageData"] = PT.get("createImageData",0) + Time.get_ticks_usec()-t; return r
-func putImageData(im: Dictionary, x: float, y: float) -> void:
-	var t := Time.get_ticks_usec(); _o_putImageData(im,x,y); PT["putImageData"] = PT.get("putImageData",0) + Time.get_ticks_usec()-t

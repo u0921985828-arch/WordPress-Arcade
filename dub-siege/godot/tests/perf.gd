@@ -46,14 +46,26 @@ func run() -> void:
 		game.K["Space"] = 1 if (i % 40) < 10 else 0
 		if game.mode == "cut":
 			game.cutAdv()
+		var ks := {}
+		for nm in ["SHEET", "TSPR", "LSPR"]:
+			var dd = game.get(nm)
+			if dd is Dictionary:
+				ks[nm] = dd.keys()
 		var t0 := Time.get_ticks_usec()
 		game.update()
 		var t1 := Time.get_ticks_usec()
+		if game.mode == "play" and game.lookVer != game._warm_ver:
+			game.warmLook()
 		game.g.begin()
 		game.draw()
 		var t2 := Time.get_ticks_usec()
 		if (t2 - t0) > 12000:
-			print("PERF pico frame %d upd %.1f draw %.1f modo %s" % [i, (t1 - t0) / 1000.0, (t2 - t1) / 1000.0, game.mode])
+			var nu := []
+			for nm in ks:
+				for kk in game.get(nm).keys():
+					if not kk in ks[nm]:
+						nu.append(nm + ":" + str(kk))
+			print("PERF pico frame %d upd %.1f draw %.1f modo %s nuevos %s" % [i, (t1 - t0) / 1000.0, (t2 - t1) / 1000.0, game.mode, nu])
 		tu.append((t1 - t0) / 1000.0)
 		td.append((t2 - t1) / 1000.0)
 		ne = maxi(ne, game._len(game.enemies))
@@ -61,6 +73,13 @@ func run() -> void:
 		main.position = game.origin
 		main.scale = Vector2(game.ZOOM, game.ZOOM)
 		await get_tree().process_frame
+	for fn in ["drawBG", "drawTiles", "drawHazards", "drawBooms", "drawLight", "drawHUD", "draw"]:
+		var t0 := Time.get_ticks_usec()
+		for r in 50:
+			game.g.begin()
+			game.g.setTransform(game.SC, 0, 0, game.SC, 0, 0)
+			game.call(fn)
+		print("PERF parte %-12s %.2f ms" % [fn, (Time.get_ticks_usec() - t0) / 50000.0])
 	print("PERF fase %d enemigos<=%d modo=%s" % [n, ne, game.mode])
 	print("PERF update  ", _stats(tu))
 	print("PERF draw    ", _stats(td))

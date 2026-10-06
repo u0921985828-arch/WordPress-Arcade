@@ -123,6 +123,9 @@
   ],
   "lookPor": [
    "d"
+  ],
+  "tileAt": [
+   "map"
   ]
  }
 }

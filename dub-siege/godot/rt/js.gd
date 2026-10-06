@@ -49,6 +49,9 @@ static func _key(k: Variant) -> Variant:
 
 
 func _ix(a: Variant, k: Variant) -> Variant:
+	# camino rapido (el mas comun): array con indice entero
+	if k is int and a is Array:
+		return a[k] if k >= 0 and k < a.size() else null
 	match typeof(a):
 		TYPE_ARRAY, TYPE_PACKED_BYTE_ARRAY, TYPE_PACKED_INT32_ARRAY, TYPE_PACKED_FLOAT32_ARRAY, TYPE_PACKED_STRING_ARRAY:
 			if not (k is int or k is float):

@@ -5,9 +5,8 @@ var game: Game
 
 func _t(name: String, c: Callable) -> void:
 	var t0 := Time.get_ticks_usec()
-	ImgCtx.PT.clear()
 	c.call()
-	print("WARM %-22s %.1f ms  %s" % [name, (Time.get_ticks_usec() - t0) / 1000.0, ImgCtx.PT])
+	print("WARM %-22s %.1f ms" % [name, (Time.get_ticks_usec() - t0) / 1000.0])
 
 func run() -> void:
 	main.set_process(false)
