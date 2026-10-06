@@ -2,6 +2,11 @@ name: Dub Siege APK
 
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publicar en la descarga fija
+        type: boolean
+        default: false
   push:
     branches: [ claude/new-session-6j6z2y, main ]
     paths:
@@ -54,6 +59,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: apk, path: DubSiege.apk, if-no-files-found: error }
       - name: Publicar en la descarga fija
+        if: github.event_name == 'push' || inputs.publish
         uses: softprops/action-gh-release@v2
         with:
           tag_name: dub-siege-apk
@@ -115,7 +121,7 @@ jobs:
         if: always()
         run: for f in *.png logcat.txt; do [ -f "$f" ] && mv "$f" "api${{ matrix.api }}-$f"; done; ls
       - name: Capturas del emulador en una descarga aparte
-        if: always()
+        if: always() && (github.event_name == 'push' || inputs.publish)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: dub-siege-apk-qa
