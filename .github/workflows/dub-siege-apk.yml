@@ -95,7 +95,7 @@ jobs:
           script: |
             adb install -r DubSiege.apk
             adb logcat -c
-            adb shell am start -n online.kuboplay.dubsiege/com.godot.game.GodotApp
+            adb shell monkey -p online.kuboplay.dubsiege -c android.intent.category.LAUNCHER 1
             sleep 15
             adb exec-out screencap -p > 1-arranque.png
             adb shell input keyevent KEYCODE_ENTER
@@ -105,9 +105,9 @@ jobs:
             sleep 2
             adb exec-out screencap -p > 3-atras.png
             adb logcat -d > logcat.txt
-            adb shell dumpsys activity activities | grep -q 'online.kuboplay.dubsiege/com.godot.game.GodotApp'
+            adb shell pidof online.kuboplay.dubsiege
             ! grep -q 'FATAL EXCEPTION' logcat.txt
-      - name: Errores de la página
+      - name: Mensajes de Godot
         if: always()
         run: grep -E 'godot|SCRIPT ERROR' logcat.txt | head -100 || echo 'sin mensajes'
       - uses: actions/upload-artifact@v4
