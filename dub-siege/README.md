@@ -56,7 +56,7 @@ guarda en el repositorio.
 Mundo, personajes y Archivo de 12 cintas (una por jefe, menú ARCHIVO, `ds2_lore`): ver `LORE.md`. Ambientado en lugares reales: Londres en mayo de 1981 (Brixton, Peckham, Notting Hill, Harlesden, County Hall…) y, en las cintas, Kingston en los cincuenta. Tono adulto (policía, política, racismo, rivalidad entre sounds). Personajes inventados y comprobados contra nombres reales (cifras en `LORE.md`); ninguna persona real.
 `LEVELS` tiene **12 fases** repartidas por las 4 zonas de `STAGES` (`r` = zona,
 que fija fondo y losetas; cada fase tiñe el fondo con su luz y su clima, `BGT`,
-y lleva su propia canción). El mapa sale de `SEQ` (abajo); `len`, `must` y
+y lleva su propia canción). En la arena final (el sound clash de County Hall) `clashTowers()` pinta las dos torres de control: la Bestia a la izquierda, apagada hasta que cae el Censor, y la máquina del Censor a la derecha, encendida mientras pelea y muerta, con chispas, cuando se calla. El mapa sale de `SEQ` (abajo); `len`, `must` y
 `tier` son restos del generador aleatorio anterior y ya no se usan. Cada fase
 declara su jefe: `ai` 0–3 son los cuatro
 jefes de siempre (`mk:1` = versión roja y más dura), `ai:4` convierte un enemigo

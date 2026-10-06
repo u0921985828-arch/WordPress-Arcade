@@ -2596,12 +2596,37 @@ function drawBG(){
       light(bx+Math.sin(ang)*200,GY-6,34,.4+pu*.3,['#ff3d6e','#3de8ff','#ffd23f'][i]);}g.globalAlpha=1;
     off=cam*.9;for(i=Math.floor(off/9)-1;i<Math.floor(off/9)+38;i++){x=Math.round(i*9-off);if(!bgFoot(x,7))continue;var hb=(rnd(i)>.5?2:0)+(pu&&rnd(i+3)>.4?2:0);rect(x,GY-10-hb,7,10+hb,'#0a0510');rect(x+1,GY-15-hb,5,5,'#0a0510');}
   }
+  if(st.i===LEVELS.length-1)clashTowers();
   // cada fase con su luz (hora, clima, sitio): un velo de color sobre el fondo
   var tn=BGT[st.i];if(tn){g.globalAlpha=tn[1];rect(0,camY-40,W,GY-camY+40,tn[0]);g.globalAlpha=1;}
   if(tn&&tn[2])for(i=0;i<60;i++){var rx=((rnd(i)*W*1.4-t*1.1-cam*.2)%W+W)%W,ry=camY+((rnd(i+90)*140+t*3.4)%140)-20;g.globalAlpha=.28;rect(rx|0,ry|0,1,4,'#9fb6ff');}
   g.globalAlpha=1;
   // los huecos se leen como huecos: fondo oscuro bajo la linea de suelo
   var c0=Math.floor(cam/T);for(i=c0;i<c0+Math.ceil(W/T)+2;i++)if(tileAt(i,13)===0&&tileAt(i,14)===0)rect(i*T-cam,GY,T,ROWS*T-GY+40,'#04030a');
+}
+// Sound clash de County Hall: las dos torres de control (racks de etapas) a cada
+// lado de la arena. A la izquierda la Bestia (madera, valvulas): apagada hasta
+// que cae el Censor. A la derecha la maquina del Censor (metal, leds rojos):
+// encendida mientras pelea y muerta cuando se calla.
+function clashTowers(){
+  var ax=st.arenaX,pu=pulse(),won=st.bossDone||st.clearT>0||(boss&&boss.dead),fight=boss&&!boss.dead;
+  tower(Math.round(ax+3-cam),0,won?1:0,pu);
+  tower(Math.round(ax+W-27-cam),1,won?(boss&&boss.dead&&(t>>2)&1?.4:0):(fight?1:.35),pu);
+}
+function tower(x,k,on,pu){
+  if(x<-30||x>W+4)return;
+  var w=24,u=13,n=4,y0=GY-n*u-6,fr=k?'#14141c':'#5a3a22',hi=k?'#3a3f50':'#8a5a32',fc=k?'#0a0a10':'#2a1a10',
+      lc=k?'#ff3d6e':'#3de8ff',off=k?'#3a1a22':'#123038',i,j,y;
+  rect(x-1,y0-1,w+2,n*u+7,'#06070d');rect(x,y0,w,n*u+6,fr);rect(x,y0,w,1,hi);rect(x,y0,1,n*u+6,hi);
+  rect(x+2,GY-3,4,3,'#06070d');rect(x+w-6,GY-3,4,3,'#06070d');
+  for(i=0;i<n;i++){y=y0+2+i*u;rect(x+2,y,w-4,u-2,fc);rect(x+2,y,w-4,1,hi);
+    if(i===0){for(j=0;j<4;j++){var v=on&&((t>>3)+j)%5;rect(x+4+j*5,y+3,3,6,v?(k?'#ff8a3a':'#ffd27a'):off);if(v&&on>.5)light(x+5+j*5,y+5,10,.5*on,k?'#ff8a3a':'#ffd27a');}}
+    else{var lv=on?Math.min(8,2+((pu*6+(i*7+t/6|0)%5)|0)):0;
+      for(j=0;j<8;j++)rect(x+4+j*2,y+3,1,3,j<lv?(j>5?'#ff3d6e':lc):off);
+      rect(x+4,y+7,2,2,'#9aa0b0');rect(x+9,y+7,2,2,'#9aa0b0');rect(x+14,y+7,2,2,'#9aa0b0');rect(x+w-6,y+7,2,2,on?lc:off);}
+  }
+  if(on>.5)light(x+w/2,y0+n*u/2,30,.35+pu*.3,lc);
+  if(k&&on>0&&on<1&&(t%9)===0)burst(x+cam+w/2+Math.random()*8-4,y0+4+Math.random()*30,['#ffd23f','#fff'],3,1.5);
 }
 // el pie de un decorado de fondo solo se pinta si debajo, en el mapa, hay suelo
 function bgFoot(x,w){var a=Math.floor((x+cam)/T),b=Math.floor((x+w-1+cam)/T);for(var c=a;c<=b;c++)if(tileAt(c,13)===0)return false;return true;}
