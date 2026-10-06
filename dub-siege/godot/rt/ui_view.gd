@@ -92,6 +92,10 @@ void fragment() {
 
 # ------------------------------------------------------------ bucle
 func _process(_dt: float) -> void:
+	var vs := get_viewport_rect().size
+	if size != vs:
+		position = Vector2.ZERO
+		size = vs
 	if game:
 		game.menu_tick()
 	var show: bool = not ui.ov.hidden
@@ -160,6 +164,9 @@ func _build() -> void:
 		b.y += off
 	content_h = y + 2 * pv
 	root = {"kids": kids}
+	if OS.get_environment("UIDBG") != "":
+		for b in kids:
+			_dump(b, 0)
 	sy = clampf(sy, 0.0, maxf(0.0, content_h - c.H))
 	if content_h <= c.H:
 		sy = 0.0
@@ -260,7 +267,11 @@ func _fsi(s: Dictionary) -> int:
 func _tw(t: String, s: Dictionary) -> float:
 	if t == "":
 		return 0.0
-	return _fnt(s).get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, _fsi(s)).x / k
+	# un pelin mas ancho que exacto: Chrome redondea el avance por encima y parte
+	# la linea cuando el texto mide justo el hueco (52ch en 52ch, etc.)
+	# medido a 64 px y escalado: el tamano CSS puede ser fraccionario
+	var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 64).x * float(s.fs) / 64.0
+	return (w + float(s.ls) * t.length()) * (1.0002 if k < 1.5 else 1.0)
 
 
 ## Palabras: [{t, s, w, sp (ancho del espacio de delante), br}]
@@ -1027,9 +1038,10 @@ func _text(b: Dictionary, pos: Vector2, al: float) -> void:
 		var p := Vector2(round((pos.x + it.x) * k), round((pos.y + it.by) * k))
 		var t: String = it.t
 		if s.glow > 0:
-			var gs := int(round(s.glow * k * 0.5))
-			paint.draw_string_outline(f, p, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, gs * 2, Color(0, 0, 0, 0.25 * al))
-			paint.draw_string_outline(f, p, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, gs, Color(0, 0, 0, 0.35 * al))
+			# text-shadow 0 0 Npx #000: halo suave aproximado con dos contornos tenues
+			var gs := maxi(1, int(round(s.glow * k * 0.5)))
+			paint.draw_string_outline(f, p, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, gs * 2, Color(0, 0, 0, 0.08 * al))
+			paint.draw_string_outline(f, p, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, gs, Color(0, 0, 0, 0.14 * al))
 		for sh in s.tsh:
 			paint.draw_string(f, p + Vector2(round(sh[0] * k), round(sh[1] * k)), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, _a(sh[2], al))
 		paint.draw_string(f, p, t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, _a(s.color, al))
@@ -1089,6 +1101,7 @@ func _gui_input(ev: InputEvent) -> void:
 		accept_event()
 	elif ev is InputEventMouseButton:
 		var mb := ev as InputEventMouseButton
+		if OS.has_environment("FDBG"): print("MB ", mb.position, " ", mb.pressed, " hit=", _hit(mb.position).textContent if _hit(mb.position) else "-")
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP or mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			if mb.pressed:
 				var d := -40.0 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 40.0
@@ -1145,3 +1158,14 @@ func _find_rect(kids: Array, e: DomEl, o: Vector2) -> Variant:
 		if r != null:
 			return r
 	return null
+
+
+func _dump(b: Dictionary, d: int) -> void:
+	var nm: String = b.kind if b.e == null else (b.e.tagName + "." + b.e.className)
+	var t := ""
+	if b.kind == "line":
+		for p in b.get("pieces", []):
+			t += p.t + " "
+	print("  ".repeat(d), nm, " ", Rect2(b.x, b.y, b.w, b.h), " ", t.left(40))
+	for c in b.kids:
+		_dump(c, d + 1)

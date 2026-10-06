@@ -26,6 +26,27 @@ var store_off := false                 # pruebas (--menu): no se escribe al disc
 const STORE := "user://dub-siege.json"
 
 
+# ------------------------------------------------------------ azar
+## Math.random(). Con rnd_seed() (pruebas de paridad) pasa a mulberry32, el
+## mismo generador que se inyecta en la web, para comparar las dos versiones
+## con los mismos niveles y los mismos enemigos.
+var _rs := -1
+
+
+func rnd_seed(s: int) -> void:
+	_rs = s & 0xFFFFFFFF
+
+
+func _rnd() -> float:
+	if _rs < 0:
+		return randf()
+	_rs = (_rs + 0x6D2B79F5) & 0xFFFFFFFF
+	var t := _rs
+	t = ((t ^ (t >> 15)) * (t | 1)) & 0xFFFFFFFF
+	t = (t ^ ((t + (((t ^ (t >> 7)) * (t | 61)) & 0xFFFFFFFF)) & 0xFFFFFFFF)) & 0xFFFFFFFF
+	return float((t ^ (t >> 14)) & 0xFFFFFFFF) / 4294967296.0
+
+
 # ------------------------------------------------------------ guardado
 func _store_load() -> void:
 	if _store_ok:
@@ -69,20 +90,27 @@ func S_(id: Variant = null) -> Variant:
 	return document.getElementById(str(id))
 
 
+## Como innerWidth/innerHeight del navegador: px CSS (pixeles reales / densidad).
 func VW() -> float:
-	return view_size.x
+	return view_size.x / _dpr()
 
 
 func VH() -> float:
-	return view_size.y
+	return view_size.y / _dpr()
 
 
 ## Escala entera mas grande que deja ver al menos HMIN de alto (ver fitW en el
 ## HTML). Aqui la ventana ya esta en pixeles reales, sin dpr ni margenes CSS.
 func fitW() -> void:
-	var dw := maxf(64.0, safe.size.x)
-	var dh := maxf(64.0, safe.size.y)
-	var wmin := 160 if touch_ui else 192
+	# Como en la web: tumbado en tactil, y fuera de la partida (portada, escenas,
+	# tienda) en cualquier pantalla apaisada, el lienzo llena la pantalla; jugando
+	# con teclado deja el margen del <body> (32 x 16 px CSS) y pide 192 de ancho.
+	var dp := _dpr()
+	var ingame: bool = mode == "play" or mode == "pause"
+	var tch: bool = view_size.x > view_size.y and (touchMode() or not ingame)
+	var dw := maxf(64.0, safe.size.x / dp - (0.0 if tch else 32.0)) * dp
+	var dh := maxf(64.0, safe.size.y / dp - (0.0 if tch else 16.0)) * dp
+	var wmin := 160 if tch else 192
 	var nw := 0
 	var nh := 108
 	var z := floori(dh / (SC * HMIN))
@@ -124,7 +152,7 @@ func uiFit() -> void:
 	var f = SET.get("ui") if SET is Dictionary else "auto"
 	var cp: float = float(ZOOM)
 	if not (f is int or f is float):
-		f = clampf(VH() / 240.0 / _dpr(), 1.5, 3.6) * _dpr() / (SC * HS * cp)
+		f = clampf(VH() / 240.0, 1.5, 3.6) * _dpr() / (SC * HS * cp)
 	UIF = clampf(f, 0.5, 1.0)
 
 

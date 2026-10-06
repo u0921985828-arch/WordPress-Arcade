@@ -67,14 +67,26 @@ func _resize() -> void:
 	var r := Rect2(Vector2(sa.position - win), Vector2(sa.size)).intersection(Rect2(Vector2.ZERO, game.view_size))
 	game.safe = r if r.has_area() and OS.has_feature("mobile") else Rect2(Vector2.ZERO, game.view_size)
 	game.fitW()
-	# el lienzo recorta como un <canvas>: lo que el juego pinta fuera no se ve
+	_clip_canvas()
+
+
+## El lienzo recorta como un <canvas>: lo que el juego pinta fuera no se ve.
+## Su tamano cambia tambien al entrar y salir de la partida (fitW), no solo al
+## redimensionar la ventana.
+var _clip_sz := Vector2i.ZERO
+func _clip_canvas() -> void:
+	var sz := Vector2i(int(game.cv.width), int(game.cv.height))
+	if sz == _clip_sz:
+		return
+	_clip_sz = sz
 	var ci := get_canvas_item()
-	RenderingServer.canvas_item_set_custom_rect(ci, true, Rect2(0, 0, game.cv.width, game.cv.height))
+	RenderingServer.canvas_item_set_custom_rect(ci, true, Rect2(Vector2.ZERO, Vector2(sz)))
 	RenderingServer.canvas_item_set_clip(ci, true)
 
 
 func _process(dt: float) -> void:
 	game.frame(dt)
+	_clip_canvas()
 	position = game.origin
 	scale = Vector2(game.ZOOM, game.ZOOM)
 	nframe += 1

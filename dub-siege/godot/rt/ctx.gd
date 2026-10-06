@@ -269,11 +269,11 @@ func drawImage(src: Variant, a: float, b: float, c: Variant = null, d: Variant =
 	var fx := p1.x < p0.x
 	var fy := p1.y < p0.y
 	var dev := Rect2(minf(p0.x, p1.x), minf(p0.y, p1.y), absf(p1.x - p0.x), absf(p1.y - p0.y))
+	# Con tamano negativo el RenderingServer voltea la textura dentro del mismo
+	# rectangulo (no lo desplaza): la esquina se queda en el minimo.
 	if fx:
-		dev.position.x += dev.size.x
 		dev.size.x = -dev.size.x
 	if fy:
-		dev.position.y += dev.size.y
 		dev.size.y = -dev.size.y
 	var m := Color(1, 1, 1, globalAlpha)
 	if mat == 2:

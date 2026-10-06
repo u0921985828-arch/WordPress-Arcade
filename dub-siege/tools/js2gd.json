@@ -96,6 +96,15 @@
    "\treturn func():",
    "\t\tstt.s = (stt.s * 1664525 + 1013904223) & 0xFFFFFFFF",
    "\t\treturn stt.s / 4294967296.0"
+  ],
+  "lookOwn": [
+   "func lookOwn(k = null, i = null):",
+   "\treturn k == \"s\" or not _ix(_ix(LK, k), i).get(\"c\") or _indexOf(LOOK.own, str(k) + str(i)) > -1"
+  ],
+  "qualifies": [
+   "func qualifies(s = null):",
+   "\tvar a = j_load(\"ds2_rank\", [])",
+   "\treturn s > 0 and (_len(a) < 10 or s > _ix(a, _len(a) - 1).get(\"score\"))"
   ]
  }
 }

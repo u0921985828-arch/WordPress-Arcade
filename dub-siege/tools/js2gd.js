@@ -152,7 +152,7 @@ const MATH = {
   floor: a => `floori(${a})`, ceil: a => `ceili(${a})`, round: a => `_round(${a})`, abs: a => `absf(${a})`,
   sqrt: a => `sqrt(${a})`, sin: a => `sin(${a})`, cos: a => `cos(${a})`, atan2: (a, b) => `atan2(${a}, ${b})`, atan: a => `atan(${a})`,
   pow: (a, b) => `pow(${a}, ${b})`, exp: a => `exp(${a})`, log: a => `log(${a})`, sign: a => `signf(${a})`, trunc: a => `int(${a})`,
-  random: () => `randf()`, hypot: (a, b) => `Vector2(${a}, ${b}).length()`, tan: a => `tan(${a})`, asin: a => `asin(${a})`, acos: a => `acos(${a})`,
+  random: () => `_rnd()`, hypot: (a, b) => `_hypot(${a}, ${b})`, tan: a => `tan(${a})`, asin: a => `asin(${a})`, acos: a => `acos(${a})`,
   log2: a => `(log(${a}) / log(2.0))`,
 };
 

@@ -143,6 +143,13 @@ func _nn(a: Variant, b: Variant) -> Variant:
 	return b if a == null else a
 
 
+## Math.hypot en doble precision (Vector2 es de 32 bits y movia sprites un pixel).
+static func _hypot(a: Variant, b: Variant) -> float:
+	var x := float(a)
+	var y := float(b)
+	return sqrt(x * x + y * y)
+
+
 func _round(x: Variant) -> int:
 	return floori(float(x) + 0.5)
 
@@ -512,7 +519,10 @@ func _tick_timers(dt_ms: float) -> void:
 		var r := _rafs.duplicate()
 		_rafs.clear()
 		for f in r:
-			(f as Callable).call(_perf())
+			if (f as Callable).get_argument_count() == 0:
+				(f as Callable).call()
+			else:
+				(f as Callable).call(_perf())
 	if _timers.is_empty():
 		return
 	var due := []

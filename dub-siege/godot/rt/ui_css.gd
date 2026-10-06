@@ -197,12 +197,9 @@ static func of(e: DomEl, ps: Dictionary, c: Dictionary) -> Dictionary:
 			s.disp = "grid"
 			s.cols = ["fr", "fr"]
 			s.wmax = 680.0
-		if _has(e, "lkm"):
+		if _has(e, "lkm") and not c.h600:
+			# html.h600 .lkm va antes que html.h600 .menu en la hoja: manda la rejilla
 			s.wmax = 360.0
-			if c.h600:
-				s.disp = "flex"
-				s.dir = "col"
-				s.cols = null
 	if _has(e, "hot") and _in(e, "menu"):
 		s.span = true
 

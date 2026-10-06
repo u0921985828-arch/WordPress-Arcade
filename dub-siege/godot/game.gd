@@ -32,6 +32,27 @@ var store_off := false                 # pruebas (--menu): no se escribe al disc
 const STORE := "user://dub-siege.json"
 
 
+# ------------------------------------------------------------ azar
+## Math.random(). Con rnd_seed() (pruebas de paridad) pasa a mulberry32, el
+## mismo generador que se inyecta en la web, para comparar las dos versiones
+## con los mismos niveles y los mismos enemigos.
+var _rs := -1
+
+
+func rnd_seed(s: int) -> void:
+	_rs = s & 0xFFFFFFFF
+
+
+func _rnd() -> float:
+	if _rs < 0:
+		return randf()
+	_rs = (_rs + 0x6D2B79F5) & 0xFFFFFFFF
+	var t := _rs
+	t = ((t ^ (t >> 15)) * (t | 1)) & 0xFFFFFFFF
+	t = (t ^ ((t + (((t ^ (t >> 7)) * (t | 61)) & 0xFFFFFFFF)) & 0xFFFFFFFF)) & 0xFFFFFFFF
+	return float((t ^ (t >> 14)) & 0xFFFFFFFF) / 4294967296.0
+
+
 # ------------------------------------------------------------ guardado
 func _store_load() -> void:
 	if _store_ok:
@@ -75,20 +96,27 @@ func S_(id: Variant = null) -> Variant:
 	return document.getElementById(str(id))
 
 
+## Como innerWidth/innerHeight del navegador: px CSS (pixeles reales / densidad).
 func VW() -> float:
-	return view_size.x
+	return view_size.x / _dpr()
 
 
 func VH() -> float:
-	return view_size.y
+	return view_size.y / _dpr()
 
 
 ## Escala entera mas grande que deja ver al menos HMIN de alto (ver fitW en el
 ## HTML). Aqui la ventana ya esta en pixeles reales, sin dpr ni margenes CSS.
 func fitW() -> void:
-	var dw := maxf(64.0, safe.size.x)
-	var dh := maxf(64.0, safe.size.y)
-	var wmin := 160 if touch_ui else 192
+	# Como en la web: tumbado en tactil, y fuera de la partida (portada, escenas,
+	# tienda) en cualquier pantalla apaisada, el lienzo llena la pantalla; jugando
+	# con teclado deja el margen del <body> (32 x 16 px CSS) y pide 192 de ancho.
+	var dp := _dpr()
+	var ingame: bool = mode == "play" or mode == "pause"
+	var tch: bool = view_size.x > view_size.y and (touchMode() or not ingame)
+	var dw := maxf(64.0, safe.size.x / dp - (0.0 if tch else 32.0)) * dp
+	var dh := maxf(64.0, safe.size.y / dp - (0.0 if tch else 16.0)) * dp
+	var wmin := 160 if tch else 192
 	var nw := 0
 	var nh := 108
 	var z := floori(dh / (SC * HMIN))
@@ -130,7 +158,7 @@ func uiFit() -> void:
 	var f = SET.get("ui") if SET is Dictionary else "auto"
 	var cp: float = float(ZOOM)
 	if not (f is int or f is float):
-		f = clampf(VH() / 240.0 / _dpr(), 1.5, 3.6) * _dpr() / (SC * HS * cp)
+		f = clampf(VH() / 240.0, 1.5, 3.6) * _dpr() / (SC * HS * cp)
 	UIF = clampf(f, 0.5, 1.0)
 
 
@@ -1026,7 +1054,7 @@ func mkEnemy(ch = null, x = null, y = null):
 	if (not d):
 		return
 	hp = (d.get("hp") if ((ch == "*") or (ch == "X")) else max(1, _round(((d.get("hp") * D.get("eHp")) * (1 + (st.get("d") * 0.2))))))
-	e = {"type": ch, "x": (x + ((T - d.get("w")) / 2.0)), "y": ((y + T) - d.get("h")), "w": d.get("w"), "h": d.get("h"), "hp": hp, "max": hp, "pts": d.get("pts"), "vx": 0, "vy": 0, "dir": -1, "fl": 0, "a": (randf() * 9), "cd": (60 + (randf() * 60)), "ground": 0, "base": y, "turn": 0, "dive": 0, "jt": (40 + (randf() * 30)), "sp": ((0.45 + (st.get("d") * 0.08)) + (randf() * 0.15))}
+	e = {"type": ch, "x": (x + ((T - d.get("w")) / 2.0)), "y": ((y + T) - d.get("h")), "w": d.get("w"), "h": d.get("h"), "hp": hp, "max": hp, "pts": d.get("pts"), "vx": 0, "vy": 0, "dir": -1, "fl": 0, "a": (_rnd() * 9), "cd": (60 + (_rnd() * 60)), "ground": 0, "base": y, "turn": 0, "dive": 0, "jt": (40 + (_rnd() * 30)), "sp": ((0.45 + (st.get("d") * 0.08)) + (_rnd() * 0.15))}
 	enemies.append(e)
 	return e
 
@@ -1172,9 +1200,9 @@ func burst(x = null, y = null, cols = null, n = null, sp = null, gr = null):
 	var s = null
 	i = 0
 	while (i < n):
-		a = (randf() * 6.283)
-		s = ((randf() * sp) + 0.3)
-		parts.append({"x": x, "y": y, "vx": (cos(a) * s), "vy": ((sin(a) * s) - 1), "l": (16 + (randf() * 24)), "c": _ix(cols, fmod(i, _len(cols))), "gr": (0.12 if (gr == null) else gr)})
+		a = (_rnd() * 6.283)
+		s = ((_rnd() * sp) + 0.3)
+		parts.append({"x": x, "y": y, "vx": (cos(a) * s), "vy": ((sin(a) * s) - 1), "l": (16 + (_rnd() * 24)), "c": _ix(cols, fmod(i, _len(cols))), "gr": (0.12 if (gr == null) else gr)})
 		i += 1
 
 # L1347
@@ -1196,11 +1224,11 @@ func explode(x = null, y = null):
 	for _i in range(_len(enemies)):
 		if _i >= _len(enemies): break
 		e = enemies[_i]
-		if ((not (e.get("dead"))) and (Vector2(((e.get("x") + ((e.get("w")) / 2.0)) - x), ((e.get("y") + ((e.get("h")) / 2.0)) - y)).length() < 36)):
+		if ((not (e.get("dead"))) and (_hypot(((e.get("x") + ((e.get("w")) / 2.0)) - x), ((e.get("y") + ((e.get("h")) / 2.0)) - y)) < 36)):
 			damageEnemy(e, 8, ((1 if (e.get("x", NAN) > x) else -1) * 6))
-	if ((boss and boss.get("on")) and (Vector2(((boss.get("x") + ((boss.get("w")) / 2.0)) - x), ((boss.get("y") + ((boss.get("h")) / 2.0)) - y)).length() < 44)):
+	if ((boss and boss.get("on")) and (_hypot(((boss.get("x") + ((boss.get("w")) / 2.0)) - x), ((boss.get("y") + ((boss.get("h")) / 2.0)) - y)) < 44)):
 		damageBoss(6)
-	if ((p and (not (p.get("dead")))) and (Vector2(((p.get("x") + 4) - x), ((p.get("y") + 7) - y)).length() < 24)):
+	if ((p and (not (p.get("dead")))) and (_hypot(((p.get("x") + 4) - x), ((p.get("y") + 7) - y)) < 24)):
 		hurt(1)
 
 # L1360
@@ -1445,7 +1473,7 @@ func nearestTarget(j_range = null, front = null):
 		dx = (q.get("x") - px)
 		if (front and ((dx * p.get("face")) < -6)):
 			continue
-		d = Vector2(dx, ((q.get("y") - py) * 1.4)).length()
+		d = _hypot(dx, ((q.get("y") - py) * 1.4))
 		if ((d < j_range) and (d < bd)):
 			bd = d
 			best_2 = q
@@ -1750,14 +1778,14 @@ func damageEnemy(e = null, d = null, vx = null):
 			_fn = func(w = null):
 				return _or((w != run.get("wpn")), (run.get("lv", NAN) < 3))
 			opts = _filter(["S", "L", "H", "N"], _fn)
-			pickups.append({"type": "wpn", "wt": _ix(opts, floori((randf() * _len(opts)))), "x": e.get("x"), "y": e.get("y"), "w": 10, "h": 10, "vy": -2.5, "l": -1})
+			pickups.append({"type": "wpn", "wt": _ix(opts, floori((_rnd() * _len(opts)))), "x": e.get("x"), "y": e.get("y"), "w": 10, "h": 10, "vy": -2.5, "l": -1})
 			addScore(e.get("pts"), e.get("x"), (e.get("y") - 8))
 		else:
 			addScore(e.get("pts"), e.get("x"), (e.get("y") - 8))
 			addBass(8)
-			r = randf()
+			r = _rnd()
 			if (r < 0.35):
-				pickups.append({"type": "coin", "x": (e.get("x") + 2), "y": e.get("y"), "w": 8, "h": 8, "vy": -2.2, "vx": ((randf() - 0.5) * 1.5), "l": 420})
+				pickups.append({"type": "coin", "x": (e.get("x") + 2), "y": e.get("y"), "w": 8, "h": 8, "vy": -2.2, "vx": ((_rnd() - 0.5) * 1.5), "l": 420})
 			elif (r < 0.4):
 				pickups.append({"type": "hp", "x": (e.get("x") + 2), "y": e.get("y"), "w": 8, "h": 8, "vy": -2.2, "l": 420})
 		return true
@@ -1775,7 +1803,7 @@ func aimAt(x = null, y = null, sp = null):
 	var d = null
 	dx = ((p.get("x") + 4) - x)
 	dy = ((p.get("y") + 7) - y)
-	d = _or(Vector2(dx, dy).length(), 1)
+	d = _or(_hypot(dx, dy), 1)
 	return [((dx / float(d)) * sp), ((dy / float(d)) * sp)]
 
 # L1500
@@ -1857,7 +1885,7 @@ func updateEnemies():
 				if _l:
 					e.dir = (1 if (dx > 0) else -1)
 					e.chg = 24
-					e.cd = (170 + (randf() * 60))
+					e.cd = (170 + (_rnd() * 60))
 					pop(e.get("x"), (e.get("y") - 12), "!", "#ff3d6e")
 					break
 				e.vx = ((e.get("dir") * e.get("sp")) * (1.5 if (adx < 90) else 1))
@@ -1889,7 +1917,7 @@ func updateEnemies():
 						hv = (1.2 + (st.get("d") * 0.15))
 						e.vx = (j_clamp((dx / 31.0), (-hv * 1.35), (hv * 1.35)) if EV.get("hAim") else ((1 if (dx > 0) else -1) * hv))
 						e.vy = -3.7
-						e.jt = ((45 + (randf() * 45)) * EV.get("hRate"))
+						e.jt = ((45 + (_rnd() * 45)) * EV.get("hRate"))
 						if EV.get("hQuake"):
 							e.fl = 10
 							if (not (e.get("wn"))):
@@ -1949,7 +1977,7 @@ func updateEnemies():
 								eshot((e.get("x") + 5), (e.get("y") + 3), (cos((a0 + o)) * 1.5), (sin((a0 + o)) * 1.5), {"c": "#ff8a2a"})
 						if EV.get("tBurst"):
 							e.bst = (EV.get("tBurst") * 10)
-						e.cd = (((115 + (randf() * 30)) / float(D.get("rate"))) / float(EV.get("tRate")))
+						e.cd = (((115 + (_rnd() * 30)) / float(D.get("rate"))) / float(EV.get("tRate")))
 			elif _sw == "s":
 				want = (1 if (dx > 0) else -1)
 				if (want != e.get("dir")):
@@ -2125,7 +2153,7 @@ func killBoss():
 
 # L1592
 func bossCd(base = null):
-	return (((((base + ((randf() * base) * 0.4)) / float(D.get("rate"))) / float((1.25 if (boss.get("ph", NAN) > 1) else 1))) / float((1.15 if (boss.get("ph", NAN) > 2) else 1))) / float((1 + (st.get("i") * 0.025))))
+	return (((((base + ((_rnd() * base) * 0.4)) / float(D.get("rate"))) / float((1.25 if (boss.get("ph", NAN) > 1) else 1))) / float((1.15 if (boss.get("ph", NAN) > 2) else 1))) / float((1 + (st.get("i") * 0.025))))
 
 # L1593
 func updateBoss():
@@ -2140,11 +2168,11 @@ func updateBoss():
 		b.fl -= 1
 	if b.get("dead"):
 		if (fmod(t, 6) == 0):
-			burst((b.get("x") + (randf() * b.get("w"))), (b.get("y") + (randf() * b.get("h"))), ["#ff3d6e", "#ffd23f", "#3de8ff", "#fff"], 14, 3)
+			burst((b.get("x") + (_rnd() * b.get("w"))), (b.get("y") + (_rnd() * b.get("h"))), ["#ff3d6e", "#ffd23f", "#3de8ff", "#fff"], 14, 3)
 			sfx("kill")
 			shake(6)
 		if (fmod(t, 15) == 0):
-			boom((b.get("x") + (randf() * b.get("w"))), (b.get("y") + (randf() * b.get("h"))), (7 + (randf() * 7)), 1)
+			boom((b.get("x") + (_rnd() * b.get("w"))), (b.get("y") + (_rnd() * b.get("h"))), (7 + (_rnd() * 7)), 1)
 		b.deadT -= 1
 		if (b.deadT <= 0):
 			burst((b.get("x") + ((b.get("w")) / 2.0)), (b.get("y") + ((b.get("h")) / 2.0)), ["#ff3d6e", "#ffd23f", "#3de8ff", "#fff", "#4dff88"], 120, 5)
@@ -2180,7 +2208,7 @@ func lob(b = null, n = null, sp = null):
 	dir = (1 if (p.get("x", NAN) > (b.get("x") + ((b.get("w")) / 2.0))) else -1)
 	i = 0
 	while (i < n):
-		eshot((b.get("x") + ((b.get("w")) / 2.0)), (b.get("y") + 8), ((dir * ((1 + (i * 0.4)) + (randf() * 0.25))) * sp), (-2.3 - (randf() * 1.3)), {"gr": 0.12, "r": 4, "c": "#ff3d6e"})
+		eshot((b.get("x") + ((b.get("w")) / 2.0)), (b.get("y") + 8), ((dir * ((1 + (i * 0.4)) + (_rnd() * 0.25))) * sp), (-2.3 - (_rnd() * 1.3)), {"gr": 0.12, "r": 4, "c": "#ff3d6e"})
 		i += 1
 	sfx("shoot")
 
@@ -2223,7 +2251,7 @@ func boss0(b = null, ax = null, rage = null):
 	b.x += j_clamp((tx - b.get("x")), -0.8, 0.8)
 	b.cd -= 1
 	if (b.cd <= 0):
-		r = randf()
+		r = _rnd()
 		if (rage and (r < 0.3)):
 			b.act = "dash"
 			b.actT = 40
@@ -2292,7 +2320,7 @@ func boss1(b = null, ax = null, rage = null):
 		b.cd -= 1
 		_l = (b.cd <= 0)
 	if _l:
-		r = randf()
+		r = _rnd()
 		if (rage and (r < 0.3)):
 			b.act = "aim"
 			b.actT = 50
@@ -2367,7 +2395,7 @@ func boss2(b = null, ax = null, rage = null):
 		b.cd -= 1
 		_l = (b.cd <= 0)
 	if _l:
-		r = randf()
+		r = _rnd()
 		if (r < 0.42):
 			b.act = "train"
 			b.actT = 75
@@ -2377,7 +2405,7 @@ func boss2(b = null, ax = null, rage = null):
 			n = (12 if rage else 8)
 			i = 0
 			while (i < n):
-				eshot(((ax + 12) + (randf() * (W - 24))), (-10 - (i * 14)), 0, (1.3 + (randf() * 0.4)), {"c": "#ffd23f", "r": 3})
+				eshot(((ax + 12) + (_rnd() * (W - 24))), (-10 - (i * 14)), 0, (1.3 + (_rnd() * 0.4)), {"c": "#ffd23f", "r": 3})
 				i += 1
 			sfx("shootS")
 		else:
@@ -2410,7 +2438,7 @@ func boss3(b = null, ax = null, rage = null):
 	b.x += j_clamp((tx - b.get("x")), -1, 1)
 	b.cd -= 1
 	if (b.cd <= 0):
-		r = randf()
+		r = _rnd()
 		if (ph == 1):
 			if (r < 0.5):
 				lob(b, 4, 1)
@@ -2434,7 +2462,7 @@ func boss3(b = null, ax = null, rage = null):
 				sfx("tele")
 		else:
 			if (r < 0.4):
-				low = (randf() < 0.55)
+				low = (_rnd() < 0.55)
 				hazards.append({"k": "laser", "y": ((GY - 11) if low else (GY - 33)), "h": 8, "warn": 55, "act": 38})
 				sfx("tele")
 			elif (r < 0.65):
@@ -2566,7 +2594,7 @@ func bossM(b = null, ax = null, rage = null):
 			b.x = j_clamp((b.get("x") + ((b.get("dir") * (0.35 if (mt == "s") else 0.55)) * (1.4 if rage else 1))), L, Rr)
 		b.cd -= 1
 		if (b.cd <= 0):
-			r = randf()
+			r = _rnd()
 			if (mt == "w"):
 				if (r < 0.4):
 					b.act = "tele"
@@ -2621,7 +2649,7 @@ func bossM(b = null, ax = null, rage = null):
 			return
 		b.cd -= 1
 		if (b.cd <= 0):
-			r = randf()
+			r = _rnd()
 			if (r < 0.4):
 				b.act = "burst"
 				b.actT = (40 if rage else 24)
@@ -2631,7 +2659,7 @@ func bossM(b = null, ax = null, rage = null):
 				if (not (mCall("f", 2, cx, (b.get("y") - 20)))):
 					ringShot(cx, (b.get("y") + 6), 8, 1.2, 0, "#ff8a2a")
 			else:
-				hazards.append({"k": "laser", "y": ((GY - 11) if (randf() < 0.5) else (GY - 33)), "h": 8, "warn": 55, "act": 38})
+				hazards.append({"k": "laser", "y": ((GY - 11) if (_rnd() < 0.5) else (GY - 33)), "h": 8, "warn": 55, "act": 38})
 				sfx("tele")
 			b.cd = bossCd((60 if rage else 80))
 		return
@@ -2664,7 +2692,7 @@ func bossM(b = null, ax = null, rage = null):
 			b.bc = (26.0 / (D.get("rate")))
 		b.cd -= 1
 		if (b.cd <= 0):
-			r = randf()
+			r = _rnd()
 			if (r < 0.45):
 				b.act = "carpet"
 				b.actT = (72 if rage else 45)
@@ -2709,7 +2737,7 @@ func bossM(b = null, ax = null, rage = null):
 	b.y += (((b.get("hy") + (sin((b.get("t") * 0.07)) * 8)) - b.get("y")) * 0.06)
 	b.cd -= 1
 	if (b.cd <= 0):
-		r = randf()
+		r = _rnd()
 		if (r < 0.4):
 			b.act = "aim"
 			b.actT = 45
@@ -2763,8 +2791,8 @@ func updateHazards():
 		tr.x += tr.get("vx")
 		if hitR((p.get("x") + 1), (p.get("y") + 1), (p.get("w") - 2), (p.get("h") - 1), tr.get("x"), tr.get("y"), tr.get("w"), tr.get("h")):
 			hurt(1)
-		if (randf() < 0.5):
-			parts.append({"x": (tr.get("x") + (0 if (tr.get("vx", NAN) > 0) else tr.get("w"))), "y": ((tr.get("y") + tr.get("h")) - 2), "vx": (-(tr.get("vx")) * 0.2), "vy": -(randf()), "l": 18, "c": "#ffd23f", "gr": 0.05})
+		if (_rnd() < 0.5):
+			parts.append({"x": (tr.get("x") + (0 if (tr.get("vx", NAN) > 0) else tr.get("w"))), "y": ((tr.get("y") + tr.get("h")) - 2), "vx": (-(tr.get("vx")) * 0.2), "vy": -(_rnd()), "l": 18, "c": "#ffd23f", "gr": 0.05})
 		if ((tr.get("x", NAN) < (cam - 200)) if tr.get("lv") else ((tr.get("x", NAN) < (ax - 200)) or (tr.get("x", NAN) > ((ax + W) + 200)))):
 			_splice(trains, k, 1, [])
 		k -= 1
@@ -2805,18 +2833,18 @@ func updateBullets():
 				d = null
 				if ((e_2.get("dead") or (e_2.get("type") == "*")) or (e_2.get("type") == "X")):
 					continue
-				d = Vector2((e_2.get("x") - b.get("x")), (e_2.get("y") - b.get("y"))).length()
+				d = _hypot((e_2.get("x") - b.get("x")), (e_2.get("y") - b.get("y")))
 				if (d < bd):
 					bd = d
 					best_2 = e_2
 			if (boss and boss.get("on")):
-				d2 = Vector2(((boss.get("x") + ((boss.get("w")) / 2.0)) - b.get("x")), ((boss.get("y") + ((boss.get("h")) / 2.0)) - b.get("y"))).length()
+				d2 = _hypot(((boss.get("x") + ((boss.get("w")) / 2.0)) - b.get("x")), ((boss.get("y") + ((boss.get("h")) / 2.0)) - b.get("y")))
 				if (d2 < bd):
 					bd = d2
 					best_2 = {"x": ((boss.get("x") + ((boss.get("w")) / 2.0)) - 4), "y": ((boss.get("y") + ((boss.get("h")) / 2.0)) - 4), "w": 8, "h": 8}
 			if (best_2 and (bd < 160)):
 				a = atan2(((best_2.get("y") + ((best_2.get("h")) / 2.0)) - b.get("y")), ((best_2.get("x") + ((best_2.get("w")) / 2.0)) - b.get("x")))
-				sp = Vector2(b.get("vx"), b.get("vy")).length()
+				sp = _hypot(b.get("vx"), b.get("vy"))
 				cur = atan2(b.get("vy"), b.get("vx"))
 				da = (a - cur)
 				while (da > PI):
@@ -3181,7 +3209,7 @@ func updateCut():
 			flashC = "#fff"
 			sfx("power")
 	if (((l.get("e") == "booms") and (fmod(c.get("t"), 13) == 1)) and (c.get("t", NAN) < 60)):
-		boom(((cam + 24) + (randf() * (W - 48))), ((GY - 16) - (randf() * 36)), (10 + (randf() * 10)), (c.get("t", NAN) > 1))
+		boom(((cam + 24) + (_rnd() * (W - 48))), ((GY - 16) - (_rnd() * 36)), (10 + (_rnd() * 10)), (c.get("t", NAN) > 1))
 	if ((c.get("t", NAN) > 8) and (c.get("ch", NAN) < _len(l.s))):
 		o = int(c.get("ch"))
 		c.ch = min(_len(l.s), (c.get("ch") + 1.25))
@@ -3260,8 +3288,8 @@ func cutFx(l = null, x = null, y = null, w = null, h = null):
 		n = 0
 		m = _round(((w * h) / 79.0))
 		while (n < m):
-			g.globalAlpha = (0.3 + (randf() * 0.4))
-			rect((x + int((randf() * (w - 1)))), (y + int((randf() * (h - 1)))), (1 + int((randf() * 3))), 1, ("#fff" if (randf() < 0.5) else "#8f98c8"))
+			g.globalAlpha = (0.3 + (_rnd() * 0.4))
+			rect((x + int((_rnd() * (w - 1)))), (y + int((_rnd() * (h - 1)))), (1 + int((_rnd() * 3))), 1, ("#fff" if (_rnd() < 0.5) else "#8f98c8"))
 			n += 1
 		g.globalAlpha = 0.16
 		rect(x, ((y + fmod((int(t) >> int(1)), (h + 4))) - 2), w, 2, "#fff")
@@ -3990,11 +4018,10 @@ func tgType(c = null):
 	TGi = min(2, (TGi + 1))
 	tgPaint()
 
-# L2171
+# L2171 (a mano)
 func qualifies(s = null):
-	var a = null
-	a = j_load("ds2_rank", [])
-	return _and((s > 0), _or((_len(a) < 10), (s > _ix(a, (_len(a) - 1)).get("score", NAN))))
+	var a = j_load("ds2_rank", [])
+	return s > 0 and (_len(a) < 10 or s > _ix(a, _len(a) - 1).get("score"))
 
 # L2172
 func submitRank():
@@ -4433,9 +4460,9 @@ func blit(k = null, f = null, x = null, y = null, w = null, h = null, flip = nul
 		g.globalAlpha = 1
 	return true
 
-# L2357
+# L2357 (a mano)
 func lookOwn(k = null, i = null):
-	return _or(_or((k == "s"), (not (_ix(_ix(LK, k), i).get("c")))), (_indexOf(LOOK.own, (k + i)) > -1))
+	return k == "s" or not _ix(_ix(LK, k), i).get("c") or _indexOf(LOOK.own, str(k) + str(i)) > -1
 
 # L2358
 func lookSave():
@@ -5235,7 +5262,7 @@ func clashPiece(key = null, wx = null, on = null, pu = null, lc = null, cen = nu
 		if sp:
 			light((x + ((a.get("fw")) / 2.0)), ((GY - a.get("fh")) + 4), 20, (0.3 + (pu * 0.3)), lc)
 	if (((cen and (on > 0)) and (on < 1)) and (fmod(t, 9) == 0)):
-		burst((((wx + ((a.get("fw")) / 2.0)) + (randf() * 8)) - 4), (((GY - a.get("fh")) + 4) + ((randf() * a.get("fh")) * 0.8)), ["#ffd23f", "#fff"], 3, 1.5)
+		burst((((wx + ((a.get("fw")) / 2.0)) + (_rnd() * 8)) - 4), (((GY - a.get("fh")) + 4) + ((_rnd() * a.get("fh")) * 0.8)), ["#ffd23f", "#fff"], 3, 1.5)
 
 # L2631
 func bgFoot(x = null, w = null):
@@ -6052,7 +6079,7 @@ func draw():
 	g.save()
 	g.setTransform(SC, 0, 0, SC, 0, (-(_round(camY)) * SC))
 	if (sh > 0):
-		g.translate(int(((randf() * 4) - 2)), int(((randf() * 4) - 2)))
+		g.translate(int(((_rnd() * 4) - 2)), int(((_rnd() * 4) - 2)))
 	if (not st):
 		rect(0, camY, W, H, "#06070d")
 		g.restore()

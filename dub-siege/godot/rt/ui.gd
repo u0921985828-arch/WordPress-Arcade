@@ -136,7 +136,7 @@ static func _match_one(e: DomEl, sel: String) -> bool:
 			return false
 		s = s.replace(":disabled", "")
 	if _re == null:
-		_re = RegEx.create_from_string("^([a-zA-Z0-9]*)|(#[\\w-]+)|(\\.[\\w-]+)|(\\[[^\\]]+\\])")
+		_re = RegEx.create_from_string("(#[\\w-]+)|(\\.[\\w-]+)|(\\[[^\\]]+\\])|([a-zA-Z][a-zA-Z0-9]*)")
 	for m in _re.search_all(s):
 		var t := m.get_string()
 		if t == "":
