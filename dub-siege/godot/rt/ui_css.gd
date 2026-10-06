@@ -510,4 +510,7 @@ static func of(e: DomEl, ps: Dictionary, c: Dictionary) -> Dictionary:
 			s.pad = [0.15 * s.fs, 0.4 * s.fs, 0.15 * s.fs, 0.4 * s.fs]
 			s.bg = Color("#0000004d")
 			s.rad = 3.0
+	# los hijos de un flex o grid se vuelven bloque (blockification de CSS)
+	if s.disp == "inline" and ps.get("disp", "") in ["flex", "grid"]:
+		s.disp = "block"
 	return s

@@ -244,7 +244,12 @@ func _push_line(kids: Array, runs: Array, s: Dictionary, trim := false) -> void:
 			break
 	if not any:
 		return
-	kids.append({"kind": "line", "e": null, "s": s, "runs": runs, "kids": [], "x": 0.0, "y": 0.0, "w": 0.0, "h": 0.0})
+	var ls: Dictionary = s
+	if s.minw > 0 or s.minh > 0:
+		ls = s.duplicate()
+		ls.minw = 0.0
+		ls.minh = 0.0
+	kids.append({"kind": "line", "e": null, "s": ls, "runs": runs, "kids": [], "x": 0.0, "y": 0.0, "w": 0.0, "h": 0.0})
 
 
 # ------------------------------------------------------------ texto
@@ -362,7 +367,7 @@ func _lay_line(b: Dictionary, cw: float) -> void:
 		var lw := 0.0
 		for it in ln:
 			lw = maxf(lw, it.x + it.w)
-		if s.ellip and lw > cw:
+		if s.ellip and lw > cw + 0.01:
 			_ellipsis(ln, cw)
 			lw = cw
 		var dx := 0.0
@@ -1101,7 +1106,6 @@ func _gui_input(ev: InputEvent) -> void:
 		accept_event()
 	elif ev is InputEventMouseButton:
 		var mb := ev as InputEventMouseButton
-		if OS.has_environment("FDBG"): print("MB ", mb.position, " ", mb.pressed, " hit=", _hit(mb.position).textContent if _hit(mb.position) else "-")
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP or mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			if mb.pressed:
 				var d := -40.0 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 40.0
