@@ -74,6 +74,16 @@ class _Layer:
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_boot()
+
+
+var _booted := false
+
+
+func _boot() -> void:
+	if _booted:
+		return
+	_booted = true
 	_ensure_buses()
 	var f := FileAccess.open(DIR + "beats.json", FileAccess.READ)
 	if f:
@@ -113,6 +123,7 @@ func set_mute(b: bool) -> void:
 ## Estado de la musica: cancion 0..11, grupo 'C' (calma), 'P' (juego) o 'X' (jefe),
 ## intensidad 1..3 (solo P) y pausa. Se puede llamar en cada fotograma.
 func set_state(new_song: int, new_group: String, new_intensity: int = 1, is_paused: bool = false) -> void:
+	_boot()
 	paused = is_paused
 	_want_group = new_group if new_group in ["C", "P", "X"] else "C"
 	_want_int = clampi(new_intensity, 1, 3)
@@ -123,6 +134,7 @@ func set_state(new_song: int, new_group: String, new_intensity: int = 1, is_paus
 
 
 func sfx(name: String) -> void:
+	_boot()
 	if muted or not _sfx.has(name):
 		return
 	var p: AudioStreamPlayer = null
@@ -243,7 +255,7 @@ func _int_mix(n: int) -> Array:
 # Aplica grupo e intensidad pendientes. 'late' = segundos desde el limite de compas
 # (se arranca el grupo nuevo con ese desfase para no salirse de la rejilla).
 func _apply(late: float) -> void:
-	if _layers.is_empty():
+	if _layers.is_empty() or not is_inside_tree():
 		return
 	if _want_group != group:
 		var old: _Layer = _layers.get(group)

@@ -28,6 +28,7 @@ var origin := Vector2.ZERO             # esquina del lienzo en la ventana
 var touch_ui := false                  # hay pantalla tactil (main.gd)
 var _store := {}
 var _store_ok := false
+var store_off := false                 # pruebas (--menu): no se escribe al disco
 const STORE := "user://dub-siege.json"
 
 
@@ -46,6 +47,8 @@ func _store_load() -> void:
 func save(k: Variant = null, v: Variant = null) -> void:
 	_store_load()
 	_store[str(k)] = JSON.stringify(v)
+	if store_off:
+		return
 	var f := FileAccess.open(STORE + ".tmp", FileAccess.WRITE)
 	if f == null:
 		return
@@ -204,6 +207,30 @@ func setMute(m: Variant = null) -> void:
 	save("ds2_set", SET)
 	if audio:
 		audio.call("mute", bool(m))
+
+
+## Latido de la musica (1 en el golpe, 0,5 en el siguiente paso, 0 despues), como pulse() del HTML.
+func pulse():
+	return audio.call("pulse") if audio else 0
+
+
+## Lo que en el HTML decide mzBar() en cada compas: grupo e intensidad segun el modo.
+## El director solo cambia en el limite de compas, asi que se puede llamar cada fotograma.
+func musicTick() -> void:
+	if not audio:
+		return
+	var G := "C"
+	var I := 1
+	if mode == "pause" and MZ.get("G"):
+		G = MZ.G
+		I = MZ.I
+	elif mode == "play":
+		var m = run.get("mult", 1) if run else 1
+		G = "X" if _truthy(bossMusic) else "P"
+		I = 3 if m >= 6 else (2 if m >= 3 else 1)
+	MZ.G = G
+	MZ.I = I
+	audio.call("set_state", int(songIdx), G, I, mode == "pause")
 
 # ======================================== src/20_input.gd
 ## Entrada: teclado, mando y controles tactiles (main.gd manda los eventos).
@@ -393,6 +420,7 @@ func loadArt() -> void:
 	ART = _intify(JSON.parse_string(f.get_as_text()))
 	for k in ART:
 		var d: Dictionary = ART[k]
+		d["src"] = "res://art/" + k + ".png"   # <img src> de los menus (ilustraciones)
 		var o := {"fw": d.fw, "fh": d.fh, "n": d.get("n", 1), "x1": d.get("x1", 0), "ok": false, "img": null, "wimg": null}
 		SHEET[k] = o
 		var tex = load("res://art/" + k + ".png")
@@ -404,17 +432,189 @@ func loadArt() -> void:
 			o.ok = true
 
 # ======================================== src/40_ui.gd
-## Menus (show/hideOv del HTML): ver rt/ui.gd.
+## Menus (show/hideOv del HTML): el arbol lo guarda rt/ui.gd y lo pinta
+## rt/ui_view.gd. Aqui va lo que en el HTML hacen los manejadores de eventos:
+## el clic en un boton (act), el teclado con un menu abierto (keydown) y, como
+## extra de la app, el mando moviendo el foco por los botones.
 
-var ui_layer: Control = null
+var ui_view: Object = null           # UiView (main.gd)
+var _mp := {}                        # mando en menus: estado anterior
+var _mp_rep := 0.0                   # repeticion de arriba/abajo con el mando
 
 
 func menu_open() -> bool:
-	return false
+	return not document.ui.ov.hidden
 
 
-func menu_key(_code: String, _e: InputEventKey) -> bool:
-	return false
+## $('ov').addEventListener('click', ...): boton pulsado con raton o toque.
+func _ui_click(el: Variant) -> void:
+	if el == null:
+		return
+	var b = el.closest("[data-act]")
+	if b and not b.disabled:
+		act(b.getAttribute("data-act"), b.getAttribute("data-v"))
+
+
+## keydown con el menu abierto (ver addEventListener('keydown') en el HTML).
+func menu_key(code: String, e: InputEventKey) -> bool:
+	if ui_view:
+		ui_view.set_kbd()
+	if S_("tg0"):
+		var ch := String.chr(e.unicode).to_upper() if e.unicode > 0 else ""
+		if ch.length() == 1 and str(TGC).find(ch) > -1:
+			tgType(ch)
+			return true
+		if code == "Backspace":
+			TGi = maxi(0, TGi - 1)
+			tgPaint()
+			return true
+	_menu_cmd(code, e.echo)
+	return true
+
+
+func _menu_cmd(code: String, echo := false) -> void:
+	var ov: DomEl = document.ui.ov
+	if code in ["ArrowDown", "ArrowUp", "KeyS", "KeyW"]:
+		var bs: Array = ov.querySelectorAll("button:not(:disabled)")
+		if bs.size():
+			var ix := bs.find(document.ui.focus_el())
+			var dn := code == "ArrowDown" or code == "KeyS"
+			bs[(ix + (1 if dn else -1) + bs.size()) % bs.size()].focus()
+		return
+	if code in ["ArrowLeft", "ArrowRight", "KeyA", "KeyD"]:
+		var fb: DomEl = document.ui.focus_el()
+		if fb and fb.getAttribute("data-act") == "lk":
+			lookStep(fb.getAttribute("data-v"), -1 if (code == "ArrowLeft" or code == "KeyA") else 1)
+		return
+	if (code == "Escape" or code == "KeyP") and mode == "pause":
+		if not echo:
+			resume()
+		return
+	if code == "Escape":
+		if back and not echo:
+			_callv(back, [])
+		return
+	# Intro/Espacio sobre un boton con foco: lo pulsa (lo hace el navegador)
+	if (code == "Enter" or code == "Space") and not echo:
+		var f: DomEl = document.ui.focus_el()
+		if f and f.tagName == "BUTTON" and not f.disabled:
+			f.click()
+
+
+## Cada fotograma (UiView): el mando en los menus. Cruceta/palanca mueven el
+## foco (con repeticion), A pulsa, B = atras, START reanuda la pausa.
+func menu_tick() -> void:
+	if not menu_open():
+		_mp = {}
+		return
+	var pads := Input.get_connected_joypads()
+	if pads.is_empty():
+		return
+	var d: int = pads[0]
+	var ay := Input.get_joy_axis(d, JOY_AXIS_LEFT_Y)
+	var ax := Input.get_joy_axis(d, JOY_AXIS_LEFT_X)
+	var now := {
+		"u": ay < -0.5 or Input.is_joy_button_pressed(d, JOY_BUTTON_DPAD_UP),
+		"d": ay > 0.5 or Input.is_joy_button_pressed(d, JOY_BUTTON_DPAD_DOWN),
+		"l": ax < -0.5 or Input.is_joy_button_pressed(d, JOY_BUTTON_DPAD_LEFT),
+		"r": ax > 0.5 or Input.is_joy_button_pressed(d, JOY_BUTTON_DPAD_RIGHT),
+		"a": Input.is_joy_button_pressed(d, JOY_BUTTON_A),
+		"b": Input.is_joy_button_pressed(d, JOY_BUTTON_B),
+		"s": Input.is_joy_button_pressed(d, JOY_BUTTON_START),
+	}
+	if _mp.is_empty():
+		_mp = now    # lo que ya estaba pulsado al abrirse el menu no cuenta
+		return
+	var prev := _mp
+	_mp = now
+	var edge := func(k: String) -> bool: return now[k] and not prev[k]
+	var any: bool = now.values().has(true)
+	if any and ui_view:
+		ui_view.set_kbd()
+	if now.u or now.d:
+		if edge.call("u") or edge.call("d"):
+			_mp_rep = _clock + 380.0
+			_menu_cmd("ArrowUp" if now.u else "ArrowDown")
+		elif _clock >= _mp_rep:
+			_mp_rep = _clock + 110.0
+			_menu_cmd("ArrowUp" if now.u else "ArrowDown")
+	if edge.call("l"):
+		_menu_cmd("ArrowLeft")
+	if edge.call("r"):
+		_menu_cmd("ArrowRight")
+	if edge.call("a"):
+		var f: DomEl = document.ui.focus_el()
+		if f == null:
+			_menu_cmd("ArrowDown")
+		else:
+			_menu_cmd("Enter")
+	elif edge.call("b"):
+		_menu_cmd("Escape")
+	elif edge.call("s") and mode == "pause":
+		resume()
+
+
+## --menu=NOMBRE (main.gd): deja el juego en esa pantalla para capturarla.
+## Mismo estado que tools/menus (Playwright) prepara en la web.
+func menu_test(n: String) -> void:
+	store_off = true
+	_store = {}
+	_store_ok = true
+	match n:
+		"title":
+			showMenu()
+		"opts":
+			showMenu()
+			showOpts()
+		"slots", "slot":
+			newRun()
+			buildStage(0)
+			CUR = 0
+			slotSave("play", 0)
+			CUR = null
+			if n == "slots":
+				showSlots()
+			else:
+				showSlot(0)
+		"shop":
+			newRun()
+			buildStage(0)
+			run.coins = 60
+			showShop()
+		"controls":
+			showMenu()
+			showControls()
+		"rank":
+			newRun()
+			buildStage(0)
+			mode = "over"
+			pend = {"score": 5000, "st": "F1", "d": "N"}
+			showRank()
+		"archive", "tape":
+			showMenu()
+			LOREN = 5
+			if n == "archive":
+				showArchive()
+			else:
+				showArchive(4)
+		"look":
+			showMenu()
+			showLook()
+		"pause", "over", "win", "clear":
+			newRun()
+			buildStage(_len(LEVELS) - 1 if n == "win" else 0)
+			mode = "play"
+			match n:
+				"pause":
+					pause()
+				"over":
+					gameOver()
+				"win":
+					showWin()
+				"clear":
+					finishStage()
+		_:
+			showMenu()
 
 # ======================================== src/90_boot.gd
 ## Arranque y bucle (lo que en el HTML hacen frame() y requestAnimationFrame).
@@ -436,6 +636,7 @@ func frame(dt: float) -> void:
 	while _acc >= 16.67:
 		update()
 		_acc -= 16.67
+	musicTick()
 	g.begin()
 	draw()
 
@@ -4807,28 +5008,6 @@ func drawLight():
 	g.globalCompositeOperation = "source-over"
 	g.restore()
 	LN = 0
-
-# L2550
-func pulse():
-	var n = null
-	var b = null
-	var i = null
-	var x = null
-	var d = null
-	if (not AC):
-		return 0
-	n = AC.get("currentTime")
-	b = -1
-	i = 0
-	while (i < 8):
-		x = _ix(MZ.bt, i)
-		if ((x <= n) and (x > b)):
-			b = x
-		i += 1
-	if (b <= 0):
-		return 0
-	d = ((n - b) / float(MZ.get("sp")))
-	return (1 if (d <= 1) else (0.5 if (d <= 2) else 0))
 
 # L2553
 func bgArt():

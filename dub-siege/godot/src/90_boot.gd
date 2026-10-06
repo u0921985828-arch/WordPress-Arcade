@@ -17,5 +17,6 @@ func frame(dt: float) -> void:
 	while _acc >= 16.67:
 		update()
 		_acc -= 16.67
+	musicTick()
 	g.begin()
 	draw()

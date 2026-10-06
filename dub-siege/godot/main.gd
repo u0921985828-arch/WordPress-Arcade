@@ -3,7 +3,8 @@ extends Node2D
 ## la entrada, y coloca el lienzo con zoom entero (pixel siempre cuadrado).
 ##
 ## Pruebas (argumentos tras --): --shot=ruta.png --frames=N --warp=fase
-## --play (salta el menu) --bot=archivo.gd (guion de prueba, ver tools/).
+## --menu=NOMBRE (title, opts, slots, slot, shop, controls, rank, archive,
+## tape, look, pause, over, win, clear) --play (salta el menu) --bot=archivo.gd (guion de prueba, ver tools/).
 
 var game: Game
 var args := {}
@@ -20,7 +21,21 @@ func _ready() -> void:
 	game.touch_ui = DisplayServer.is_touchscreen_available() or args.has("touch")
 	if args.has("dpr"):
 		game.dpr_override = float(args.dpr)
+	var ad := AudioDirector.new()
+	add_child(ad)
+	game.audio = ad
 	game.boot()
+	# menus (#ov) en una capa por encima del juego
+	var lay := CanvasLayer.new()
+	lay.layer = 10
+	add_child(lay)
+	var uv := UiView.new()
+	lay.add_child(uv)
+	uv.setup(game)
+	game.ui_view = uv
+	game.document.ui.on_click = game._ui_click
+	game.win["devicePixelRatio"] = game._dpr()
+	ad.set_mute(game._truthy(game.SET.get("mute")))
 	# mandos tactiles en su capa, por debajo de los menus (capa 5 en la web)
 	var tl := CanvasLayer.new()
 	tl.layer = 4
@@ -33,6 +48,8 @@ func _ready() -> void:
 		game.newRun()
 		game.buildStage(int(args.warp))
 		game.mode = "play"
+	elif args.has("menu"):
+		game.menu_test(args.menu)
 	else:
 		game.showMenu()
 	if args.has("test"):

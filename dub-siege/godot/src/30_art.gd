@@ -5,6 +5,7 @@ func loadArt() -> void:
 	ART = _intify(JSON.parse_string(f.get_as_text()))
 	for k in ART:
 		var d: Dictionary = ART[k]
+		d["src"] = "res://art/" + k + ".png"   # <img src> de los menus (ilustraciones)
 		var o := {"fw": d.fw, "fh": d.fh, "n": d.get("n", 1), "x1": d.get("x1", 0), "ok": false, "img": null, "wimg": null}
 		SHEET[k] = o
 		var tex = load("res://art/" + k + ".png")

@@ -22,6 +22,7 @@ var origin := Vector2.ZERO             # esquina del lienzo en la ventana
 var touch_ui := false                  # hay pantalla tactil (main.gd)
 var _store := {}
 var _store_ok := false
+var store_off := false                 # pruebas (--menu): no se escribe al disco
 const STORE := "user://dub-siege.json"
 
 
@@ -40,6 +41,8 @@ func _store_load() -> void:
 func save(k: Variant = null, v: Variant = null) -> void:
 	_store_load()
 	_store[str(k)] = JSON.stringify(v)
+	if store_off:
+		return
 	var f := FileAccess.open(STORE + ".tmp", FileAccess.WRITE)
 	if f == null:
 		return

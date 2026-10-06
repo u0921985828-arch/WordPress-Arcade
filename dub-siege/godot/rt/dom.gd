@@ -11,6 +11,11 @@ var body := DomEl.new("body")
 var hidden := false
 
 
+func _init() -> void:
+	ui = Ui.new()
+	ui.dom = self
+
+
 func createElement(tag: String) -> Variant:
 	if tag == "canvas":
 		return ImgCtx.new(0, 0)
