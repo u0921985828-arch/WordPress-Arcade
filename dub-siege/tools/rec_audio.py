@@ -11,9 +11,9 @@ vivo. Escribe en godot/audio/:
   beats.json   tempo, compas y longitud exacta de cada fichero
   sfx/<nombre>.wav  los 26 efectos
 
-Uso:  python3 tools/rec_audio.py [--songs 0,1] [--only C,P1,X|sfx] [--jobs 3] [--q 0.2]
+Uso:  PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers python3 tools/rec_audio.py [--songs 0,1] [--only C,P1,X,sfx] [--jobs 4] [--q 0.06]
 """
-import argparse, json, os, sys, threading, tempfile, time
+import argparse, json, os, shutil, sys, threading, tempfile, time
 from functools import partial
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
@@ -62,16 +62,16 @@ def stats(x):
     sec = x[: len(x) // SR * SR].reshape(-1, SR, 2) if len(x) >= SR else x[None]
     rms = np.sqrt(np.mean(sec.astype(np.float64) ** 2, axis=(1, 2)))
     db = lambda v: 20 * np.log10(max(v, 1e-9))
-    return {'peak_db': round(db(peak), 2), 'rms_db': round(db(float(np.sqrt(np.mean(x.astype(np.float64) ** 2)))), 2),
-            'rms_min_db': round(db(float(rms.min())), 2), 'rms_max_db': round(db(float(rms.max())), 2)}
+    return {'peak_db': round(float(db(peak)), 2), 'rms_db': round(float(db(float(np.sqrt(np.mean(x.astype(np.float64) ** 2))))), 2),
+            'rms_min_db': round(float(db(float(rms.min()))), 2), 'rms_max_db': round(float(db(float(rms.max()))), 2)}
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--songs', default='0-11')
     ap.add_argument('--only', default='C,P1,P2,P3,X,sfx')
-    ap.add_argument('--jobs', type=int, default=3)
-    ap.add_argument('--q', type=float, default=0.2, help='calidad Vorbis (-0.1..1; 0.2 ~ oggenc -q2)')
+    ap.add_argument('--jobs', type=int, default=4)
+    ap.add_argument('--q', type=float, default=0.06, help='calidad Vorbis (-0.1..1; 0.2 ~ oggenc -q2; 0.06 ~ 60 kb/s, cabe en 45 MB)')
     a = ap.parse_args()
     if '-' in a.songs:
         lo, hi = a.songs.split('-'); songs = list(range(int(lo), int(hi) + 1))
@@ -140,11 +140,15 @@ def main():
     for th in ths:
         th.join()
     srv.shutdown()
+    shutil.rmtree(RAW, ignore_errors=True)
     beats['sr'] = SR
     with open(bpath, 'w') as f:
         json.dump(beats, f, indent=1, sort_keys=True)
-    report.sort(key=lambda r: r['name'])
-    with open(os.path.join(ROOT, 'tools', 'rec_audio.report.json'), 'w') as f:
+    rpath = os.path.join(ROOT, 'tools', 'rec_audio.report.json')
+    old = {r['name']: r for r in json.load(open(rpath))} if os.path.exists(rpath) else {}
+    old.update({r['name']: r for r in report})
+    report = sorted(old.values(), key=lambda r: r['name'])
+    with open(rpath, 'w') as f:
         json.dump(report, f, indent=1)
     for r in report:
         print(r)
