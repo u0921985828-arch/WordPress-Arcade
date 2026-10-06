@@ -427,7 +427,7 @@ static func of(e: DomEl, ps: Dictionary, c: Dictionary) -> Dictionary:
 		s.wp = 100.0
 		s.wrap = not c.h600
 	if e.attrs.get("id") == "lkc":
-		s.w = 112.0 if c.h600 else 168.0
+		s.w = 120.0 if c.h600 else 180.0
 		s.h = s.w
 		s.radial = true
 		s.bw = [2.0, 2.0, 2.0, 2.0]

@@ -47,8 +47,9 @@ func readInput() -> Dictionary:
 		"F": _any([K.get("KeyX"), K.get("KeyJ"), TS.get("F"), GP.get("F")]),
 		"DA": _any([K.get("KeyC"), K.get("KeyL"), K.get("ShiftLeft"), TS.get("DA"), GP.get("DA")]),
 		"B": _any([K.get("KeyV"), K.get("KeyB"), K.get("KeyQ"), TS.get("B"), GP.get("B")]),
+		"I": _any([K.get("KeyE"), TS.get("I"), GP.get("I")]),
 	}
-	for k in ["J", "DA", "B"]:
+	for k in ["J", "DA", "B", "I"]:
 		i[k + "p"] = (i[k] and not _truthy(prevI.get(k))) or _truthy(LATCH.get(k))
 		LATCH[k] = 0
 	prevI = i
@@ -78,7 +79,7 @@ func pollPad() -> void:
 	GP = {"L": ax < -0.4 or bt.call(JOY_BUTTON_DPAD_LEFT), "R": ax > 0.4 or bt.call(JOY_BUTTON_DPAD_RIGHT),
 		"U": ay < -0.5 or bt.call(JOY_BUTTON_DPAD_UP), "D": ay > 0.5 or bt.call(JOY_BUTTON_DPAD_DOWN),
 		"J": bt.call(JOY_BUTTON_A), "F": bt.call(JOY_BUTTON_X) or rt, "DA": bt.call(JOY_BUTTON_B) or bt.call(JOY_BUTTON_RIGHT_SHOULDER),
-		"B": bt.call(JOY_BUTTON_Y) or bt.call(JOY_BUTTON_LEFT_SHOULDER)}
+		"B": bt.call(JOY_BUTTON_Y), "I": bt.call(JOY_BUTTON_LEFT_SHOULDER)}
 	var stp: bool = bt.call(JOY_BUTTON_START)
 	if mode == "cut":
 		if (GP.J and not gpPrev.get("j")) or (GP.F and not gpPrev.get("f")):
@@ -165,7 +166,7 @@ func btnDown(c: String) -> void:
 	if c == "JD":
 		jdDown()
 		return
-	if not _truthy(TS.get(c)) and (c == "J" or c == "DA" or c == "B"):
+	if not _truthy(TS.get(c)) and (c == "J" or c == "DA" or c == "B" or c == "I"):
 		LATCH[c] = 1
 	TS[c] = 1
 

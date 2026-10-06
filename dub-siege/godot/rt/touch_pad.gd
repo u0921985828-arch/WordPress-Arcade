@@ -25,8 +25,8 @@ var stick_id := -1
 var own := {}                # indice del dedo -> j/f/bs
 var _key := ""
 
-const KEYS := {"j": "JD", "f": "F", "bs": "B"}
-const LBL := {"j": "SALTO", "f": "FUEGO", "bs": "BASS"}
+const KEYS := {"j": "JD", "f": "F", "bs": "B", "it": "I"}
+const LBL := {"j": "SALTO", "f": "FUEGO", "bs": "BASS", "it": "OBJ"}
 const C_PANEL := Color("#121730")
 const C_LINE := Color("#3a4680")
 const C_INK := Color("#eef3ff")
@@ -72,7 +72,7 @@ func layout() -> void:
 func _place(x0: float, y0: float, x1: float, y1: float) -> void:
 	var MM := 6.3 * k
 	var piv := Vector2(game.view_size.x + 5.0 * MM, game.view_size.y + 5.0 * MM)
-	var sz := {"j": roundf(bt * 1.2), "f": bt, "bs": bt}
+	var sz := {"j": roundf(bt * 1.2), "f": bt, "bs": bt, "it": roundf(bt * 0.8)}
 	var st := maxf(2.0, roundf(4.0 * k))
 	pads = {}
 	var comfort := func(d: float) -> float:
@@ -84,7 +84,7 @@ func _place(x0: float, y0: float, x1: float, y1: float) -> void:
 		if d > 48:
 			return (62 - d) / 14.0
 		return 1.0
-	for key in ["j", "f", "bs"]:
+	for key in ["j", "f", "bs", "it"]:
 		var r: float = sz[key] / 2.0
 		var best := -1e9
 		var bp := Vector2((x0 + x1) / 2.0, (y0 + y1) / 2.0)
@@ -281,6 +281,8 @@ func _draw() -> void:
 				line = Color("#4dff88")
 		elif key == "f":
 			line = Color("#ff3d6e")
+		elif key == "it":
+			line = Color("#ff8aa6")
 		elif key == "bs":
 			line = Color("#ffd23f")
 			if bass_full:
@@ -297,7 +299,7 @@ func _draw() -> void:
 			_label("MANTÉN", q.c + Vector2(0, 7.0 * k), 6.0 * k, Color(Color("#4dff88"), al * 0.9))
 			_label("DASH", q.c + Vector2(0, 15.0 * k), 6.0 * k, Color(Color("#4dff88"), al * 0.9))
 		else:
-			_label(LBL[key], q.c, 10.0 * k, Color(C_INK, al))
+			_label(LBL[key], q.c, (8.0 if key == "it" else 10.0) * k, Color(C_INK, al))
 	# pausa
 	if play:
 		var tr := tp
