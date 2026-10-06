@@ -125,6 +125,16 @@ func _process(dt: float) -> void:
 		get_tree().quit()
 
 
+## Primer evento de cada mando en el registro (logcat): diagnóstico en móviles.
+var _pads_seen := {}
+
+
+func _input(e: InputEvent) -> void:
+	if (e is InputEventJoypadButton or e is InputEventJoypadMotion) and not _pads_seen.has(e.device):
+		_pads_seen[e.device] = true
+		print("Dub Siege: mando %d (%s) %s" % [e.device, Input.get_joy_name(e.device), e.as_text()])
+
+
 func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventKey:
 		if game.key_event(e):

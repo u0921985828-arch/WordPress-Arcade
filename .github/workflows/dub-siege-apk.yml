@@ -52,18 +52,29 @@ jobs:
           sed -i "s/^version\/code=.*/version\/code=$((GITHUB_RUN_NUMBER + 1000))/; s/^version\/name=.*/version\/name=\"2.0.$GITHUB_RUN_NUMBER\"/" export_presets.cfg
           timeout 600 godot --headless --import || true
           timeout 900 godot --headless --export-release Android ../DubSiege.apk
-          # copia x86_64 solo para el emulador (la que se publica es arm64)
-          sed -i 's/^architectures\/arm64-v8a=true/architectures\/arm64-v8a=false/; s/^architectures\/x86_64=false/architectures\/x86_64=true/' export_presets.cfg
+          # móviles antiguos de 32 bits (armeabi-v7a)
+          sed -i 's/^architectures\/arm64-v8a=true/architectures\/arm64-v8a=false/; s/^architectures\/armeabi-v7a=false/architectures\/armeabi-v7a=true/' export_presets.cfg
+          timeout 900 godot --headless --export-release Android ../DubSiege-32bit.apk
+          # copia x86_64 solo para el emulador
+          sed -i 's/^architectures\/armeabi-v7a=true/architectures\/armeabi-v7a=false/; s/^architectures\/x86_64=false/architectures\/x86_64=true/' export_presets.cfg
           timeout 900 godot --headless --export-release Android ../DubSiege-x86_64.apk
+      - name: App antigua (web en WebView) con una partida, para probar la actualización
+        run: |
+          # Solo para el emulador: la versión anterior con récord QAX 98765 y progreso en fase 4.
+          sed -i '3a <script>if(!localStorage.getItem("ds2_rank")){localStorage.setItem("ds2_rank",JSON.stringify([{tag:"QAX",score:98765,st:5,d:1,ts:1}]));localStorage.setItem("ds2_tag",JSON.stringify("QAX"));localStorage.setItem("ds2_prog","[4,0,0]");}</script>' dub-siege/dub-siege.html
+          cd dub-siege/android && chmod +x gradlew && ./gradlew --no-daemon -q assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk ../../DubSiege-webview-antigua.apk
       - name: Comprobar que es nativo
         run: |
           ls -la DubSiege.apk
-          unzip -l DubSiege.apk | grep -q libgodot_android.so
+          unzip -l DubSiege.apk | grep -q 'arm64-v8a/libgodot_android.so'
+          unzip -l DubSiege-32bit.apk | grep -q 'armeabi-v7a/libgodot_android.so'
+          ls -la DubSiege-32bit.apk
           unzip -p DubSiege.apk AndroidManifest.xml | strings | grep -qi webview && { echo 'trae webview'; exit 1; } || echo 'sin webview'
       - uses: actions/upload-artifact@v4
         with: { name: apk, path: DubSiege.apk, if-no-files-found: error }
       - uses: actions/upload-artifact@v4
-        with: { name: apk-emu, path: DubSiege-x86_64.apk, if-no-files-found: error }
+        with: { name: apk-emu, path: "DubSiege-x86_64.apk\nDubSiege-webview-antigua.apk", if-no-files-found: error }
       - name: Publicar en la descarga fija
         if: github.event_name == 'push' || inputs.publish
         uses: softprops/action-gh-release@v2
@@ -71,7 +82,9 @@ jobs:
           tag_name: dub-siege-apk
           name: Dub Siege (APK Android)
           body: Último APK de Dub Siege (app nativa hecha con Godot). Descárgalo en el móvil y ábrelo para instalarlo.
-          files: DubSiege.apk
+          files: |
+            DubSiege.apk
+            DubSiege-32bit.apk
           prerelease: true
           make_latest: false
 
@@ -99,6 +112,11 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swangle_indirect -noaudio -no-boot-anim
           script: |
+            adb install DubSiege-webview-antigua.apk
+            adb shell monkey -p online.kuboplay.dubsiege -c android.intent.category.LAUNCHER 1
+            sleep 25
+            adb exec-out screencap -p > 0-antigua.png
+            adb shell am force-stop online.kuboplay.dubsiege
             adb install -r DubSiege-x86_64.apk
             adb logcat -c
             adb shell monkey -p online.kuboplay.dubsiege -c android.intent.category.LAUNCHER 1
@@ -118,7 +136,14 @@ jobs:
             adb shell input keyevent KEYCODE_BACK
             sleep 2
             adb exec-out screencap -p > 5-atras.png
+            # mando físico: eventos con origen gamepad (cruceta abajo en el menú de pausa)
+            adb shell input gamepad keyevent KEYCODE_DPAD_DOWN
+            sleep 1
+            adb shell input gamepad keyevent KEYCODE_DPAD_DOWN
+            sleep 1
+            adb exec-out screencap -p > 6-mando.png
             adb logcat -d > logcat.txt
+            grep -q 'datos importados de la app anterior' logcat.txt || { echo 'NO importó la partida antigua'; exit 1; }
             echo "proceso: $(adb shell pidof online.kuboplay.dubsiege)"; adb shell pidof online.kuboplay.dubsiege > /dev/null
             ! grep -q 'FATAL EXCEPTION' logcat.txt
       - name: Mensajes de Godot

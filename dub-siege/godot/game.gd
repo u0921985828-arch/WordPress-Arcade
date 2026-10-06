@@ -29,7 +29,9 @@ var touch_ui := false                  # hay pantalla tactil (main.gd)
 var _store := {}
 var _store_ok := false
 var store_off := false                 # pruebas (--menu): no se escribe al disco
-const STORE := "user://dub-siege.json"
+var STORE := "user://dub-siege.json"   # pruebas: se cambia de fichero
+var web_db := ""                       # pruebas: base LevelDB a importar
+var web_imported := 0                  # claves traidas de la app antigua
 
 
 # ------------------------------------------------------------ azar
@@ -63,11 +65,26 @@ func _store_load() -> void:
 		var v = JSON.parse_string(f.get_as_text())
 		if v is Dictionary:
 			_store = v
+		return
+	# Primera vez: partidas de la app antigua (web en WebView), si las hay.
+	var dirs: Array = [web_db] if web_db != "" else (WebSaves.android_dirs() if OS.get_name() == "Android" else [])
+	for d in dirs:
+		var got: Dictionary = WebSaves.read(d)
+		if not got.is_empty():
+			_store = got
+			web_imported = got.size()
+			print("Dub Siege: %d datos importados de la app anterior" % web_imported)
+			_store_write()
+			break
 
 
 func save(k: Variant = null, v: Variant = null) -> void:
 	_store_load()
 	_store[str(k)] = JSON.stringify(v)
+	_store_write()
+
+
+func _store_write() -> void:
 	if store_off:
 		return
 	var f := FileAccess.open(STORE + ".tmp", FileAccess.WRITE)
@@ -87,8 +104,35 @@ func j_load(k: Variant = null, d: Variant = null) -> Variant:
 	return d if v == null else _intify(v)
 
 
+## Partida de antes de las ranuras (solo ds2_prog): pasa a las primeras
+## ranuras con lo mismo que daba el viejo CONTINUAR FASE N (30 discos por fase
+## saltada). Igual que slotMig() de la web; importa con partidas traídas de
+## una app antigua.
 func slotMig() -> void:
-	pass
+	_store_load()
+	if _store.has("ds2_slots"):
+		return
+	var a := []
+	var d0 = SET.get("diff")
+	var r0 = run
+	var D0 = D
+	for d in 3:
+		var x = float(_num(PROG[d])) if PROG is Array and d < PROG.size() else 0.0
+		var n := int(x) if is_finite(x) else 0
+		if n > 0 and n < LEVELS.size():
+			SET["diff"] = d
+			newRun()
+			run["coins"] = n * 30
+			run["stage"] = n
+			a.append({"v": 1, "diff": d, "stage": n, "at": "play", "run": run, "ts": _now()})
+	SET["diff"] = d0
+	run = r0
+	D = D0
+	if not a.is_empty():
+		while a.size() < int(NSL):
+			a.append(null)
+		save("ds2_slots", a)
+		save("ds2_last", 0)
 
 
 # ------------------------------------------------------------ pantalla

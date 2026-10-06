@@ -271,10 +271,21 @@ el mismo paquete `online.kuboplay.dubsiege` y la misma clave
   `touch_test.gd` (`--touch --dpr=1.5`), `back_test.gd`, `perf.gd`, `warm.gd`.
   Argumentos útiles: `--warp=N`, `--touch`, `--dpr=N`, `--menu=NOMBRE`,
   `--shot=ruta.png --frames=N`.
-- **APK**: `.github/workflows/dub-siege-apk.yml` exporta con Godot 4.7.2 (solo
-  arm64; aparte una copia x86_64 para el emulador), comprueba que no lleva
-  webview, la abre en un emulador Android 11 y 14 y la publica en la descarga
-  fija `dub-siege-apk`. `versionCode` = n.º de ejecución + 1000, por encima de
-  la versión webview.
-- Las partidas guardadas de la versión webview no pasan a la nativa (se
-  guardaban en el almacenamiento del navegador de la app).
+- **APK**: `.github/workflows/dub-siege-apk.yml` exporta con Godot 4.7.2
+  `DubSiege.apk` (arm64) y `DubSiege-32bit.apk` (armeabi-v7a, móviles antiguos),
+  más una copia x86_64 solo para el emulador; comprueba que no llevan webview y
+  publica las dos en la descarga fija `dub-siege-apk`. `versionCode` = n.º de
+  ejecución + 1000, por encima de la versión webview.
+- **Partidas de la versión webview**: la primera vez que se abre (sin
+  `user://dub-siege.json`), `WebSaves` (`rt/web_saves.gd`) lee el localStorage
+  que dejó el WebView en `app_webview/.../Local Storage/leveldb` — Android lo
+  conserva al actualizar porque el paquete y la firma son los mismos — y trae
+  las claves `ds2_*` tal cual (registro `.log`, tablas `.ldb` con Snappy, gana
+  el número de secuencia más alto, respeta los borrados). Después `slotMig()`
+  pasa a ranuras el progreso anterior a ellas, igual que la web. Prueba:
+  `websaves_test.gd --webdb=CARPETA --expect=FICHERO.json` con bases creadas
+  por Chromium. En CI el emulador instala la app webview antigua con un récord
+  (QAX 98765) y progreso, la abre, instala encima la nativa y exige el aviso
+  «datos importados de la app anterior» en logcat.
+- **Mando físico**: el primer evento de cada mando sale en logcat
+  («Dub Siege: mando N …»); el emulador manda eventos con origen gamepad.
