@@ -566,14 +566,26 @@
  },
  "t_bestia": {
   "local": true,
-  "fw": 14,
-  "fh": 37,
+  "fw": 22,
+  "fh": 34,
   "n": 2
  },
  "t_censor": {
   "local": true,
   "fw": 16,
-  "fh": 40,
+  "fh": 34,
+  "n": 2
+ },
+ "s_bestia": {
+  "local": true,
+  "fw": 24,
+  "fh": 33,
+  "n": 2
+ },
+ "s_censor": {
+  "local": true,
+  "fw": 29,
+  "fh": 36,
   "n": 2
  }
 }
