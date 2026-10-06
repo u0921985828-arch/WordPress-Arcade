@@ -288,4 +288,6 @@ el mismo paquete `online.kuboplay.dubsiege` y la misma clave
   (QAX 98765) y progreso, la abre, instala encima la nativa y exige el aviso
   «datos importados de la app anterior» en logcat.
 - **Mando físico**: el primer evento de cada mando sale en logcat
-  («Dub Siege: mando N …»); el emulador manda eventos con origen gamepad.
+  («Dub Siege: mando N …»). En el emulador no se puede probar: Godot descarta
+  las pulsaciones inyectadas con `input gamepad` porque no vienen de un mando
+  registrado.

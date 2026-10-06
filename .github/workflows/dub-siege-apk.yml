@@ -117,6 +117,9 @@ jobs:
             sleep 25
             adb exec-out screencap -p > 0-antigua.png
             adb shell am force-stop online.kuboplay.dubsiege
+            adb root || true; sleep 3; adb wait-for-device
+            adb shell ls -laR /data/data/online.kuboplay.dubsiege/app_webview | head -60 || true
+            adb shell ls -la /data/data/online.kuboplay.dubsiege /data/user/0/online.kuboplay.dubsiege || true
             adb install -r DubSiege-x86_64.apk
             adb logcat -c
             adb shell monkey -p online.kuboplay.dubsiege -c android.intent.category.LAUNCHER 1
@@ -136,19 +139,13 @@ jobs:
             adb shell input keyevent KEYCODE_BACK
             sleep 2
             adb exec-out screencap -p > 5-atras.png
-            # mando físico: eventos con origen gamepad (cruceta abajo en el menú de pausa)
-            adb shell input gamepad keyevent KEYCODE_DPAD_DOWN
-            sleep 1
-            adb shell input gamepad keyevent KEYCODE_DPAD_DOWN
-            sleep 1
-            adb exec-out screencap -p > 6-mando.png
             adb logcat -d > logcat.txt
             grep -q 'datos importados de la app anterior' logcat.txt || { echo 'NO importó la partida antigua'; exit 1; }
             echo "proceso: $(adb shell pidof online.kuboplay.dubsiege)"; adb shell pidof online.kuboplay.dubsiege > /dev/null
             ! grep -q 'FATAL EXCEPTION' logcat.txt
       - name: Mensajes de Godot
         if: always()
-        run: grep -E ' godot +:' logcat.txt | head -150 || echo 'sin mensajes'
+        run: grep -E ' godot +:|Dub Siege' logcat.txt | head -150 || echo 'sin mensajes'
       - name: Capturas como check-runs (para revisarlas sin descargar artefactos)
         if: always()
         env:

@@ -10,11 +10,13 @@ const BLOCK := 32768
 
 ## Carpetas donde el WebView de Android deja la base (según versión).
 static func android_dirs() -> Array:
-	var base := OS.get_user_data_dir().get_base_dir()  # .../online.kuboplay.dubsiege
-	return [
-		base + "/app_webview/Default/Local Storage/leveldb",
-		base + "/app_webview/Local Storage/leveldb",
-	]
+	var out := []
+	# user:// suele ser .../<paquete>/files; por si acaso, también las rutas fijas.
+	for base in [OS.get_user_data_dir().get_base_dir(), "/data/user/0/online.kuboplay.dubsiege", "/data/data/online.kuboplay.dubsiege"]:
+		for sub in ["/app_webview/Default/Local Storage/leveldb", "/app_webview/Local Storage/leveldb"]:
+			if not out.has(base + sub):
+				out.append(base + sub)
+	return out
 
 
 ## Devuelve {clave: texto} de localStorage con las claves que empiezan por
