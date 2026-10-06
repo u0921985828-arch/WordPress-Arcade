@@ -1,0 +1,42 @@
+; Dub Siege en Godot (app nativa). La fuente del juego sigue siendo la misma:
+; godot/src/*.gd es la traduccion de dub-siege.html y godot/game.gd se arma
+; uniendo esas piezas (tools/godot_join.py). El arte sale de art/ tal cual.
+
+config_version=5
+
+[application]
+
+config/name="Dub Siege"
+config/description="Juego de plataformas y disparos con banda sonora dub."
+run/main_scene="res://godot/main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+boot_splash/bg_color=Color(0.0235, 0.0275, 0.051, 1)
+boot_splash/show_image=false
+config/icon="res://godot/icon.png"
+
+[audio]
+
+driver/output_latency=30
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="disabled"
+window/handheld/orientation=6
+window/energy_saving/keep_screen_on=true
+
+[input_devices]
+
+pointing/emulate_mouse_from_touch=true
+
+[physics]
+
+common/physics_ticks_per_second=60
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/canvas_textures/default_texture_filter=0
+environment/defaults/default_clear_color=Color(0.0235, 0.0275, 0.051, 1)

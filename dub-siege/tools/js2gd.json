@@ -1,0 +1,100 @@
+{
+ "skipRanges": [
+  [
+   3,
+   16
+  ],
+  [
+   36,
+   71
+  ],
+  [
+   81,
+   82
+  ],
+  [
+   89,
+   92
+  ],
+  [
+   95,
+   102
+  ],
+  [
+   138,
+   138
+  ],
+  [
+   321,
+   980
+  ],
+  [
+   981,
+   1109
+  ],
+  [
+   2725,
+   2800
+  ]
+ ],
+ "skip": [
+  "slotMig",
+  "gate",
+  "GATE",
+  "loadArt",
+  "ART",
+  "SHEET",
+  "uiFit",
+  "titleTop",
+  "bsBtn"
+ ],
+ "data": [
+  "UIS",
+  "DIFFS",
+  "STAGES",
+  "LEVELS",
+  "CH",
+  "SEQ",
+  "EDEF",
+  "KEYMAP",
+  "WPN",
+  "POR",
+  "ITEMS",
+  "LORE",
+  "PP",
+  "PB",
+  "PL",
+  "WALK",
+  "HOP",
+  "WB",
+  "WL",
+  "FP",
+  "FR",
+  "FB",
+  "LK",
+  "LKN",
+  "LKO",
+  "BAYER",
+  "SUN0",
+  "BGT",
+  "ESHEET",
+  "PBU"
+ ],
+ "objects": [
+  "g"
+ ],
+ "handFuncs": [],
+ "handVars": [],
+ "stmts": [
+  94
+ ],
+ "raw": {
+  "rng": [
+   "func rng(s = null):",
+   "\tvar stt = {\"s\": int(s) & 0xFFFFFFFF}",
+   "\treturn func():",
+   "\t\tstt.s = (stt.s * 1664525 + 1013904223) & 0xFFFFFFFF",
+   "\t\treturn stt.s / 4294967296.0"
+  ]
+ }
+}
