@@ -288,7 +288,8 @@ el mismo paquete `online.kuboplay.dubsiege` y la misma clave
   `websaves_test.gd --webdb=CARPETA --expect=FICHERO.json` con bases creadas
   por Chromium. En CI el emulador instala la app webview antigua con un récord
   (QAX 98765) y progreso, la abre, instala encima la nativa y exige el aviso
-  «datos importados de la app anterior» en logcat.
+  «datos importados de la app anterior» en logcat (verificado en Android 11 y 14:
+  portada con «Continuar · ranura 1 · fase 5» y RÉCORD 0098765).
 - **Mando físico**: el primer evento de cada mando sale en logcat
   («Dub Siege: mando N …»). En el emulador no se puede probar: Godot descarta
   las pulsaciones inyectadas con `input gamepad` porque no vienen de un mando

@@ -116,6 +116,7 @@ jobs:
             adb shell monkey -p online.kuboplay.dubsiege -c android.intent.category.LAUNCHER 1
             sleep 25
             adb exec-out screencap -p > 0-antigua.png
+            adb shell input keyevent KEYCODE_HOME; sleep 6
             adb shell am force-stop online.kuboplay.dubsiege
             adb root || true; sleep 3; adb wait-for-device
             adb shell ls -laR /data/data/online.kuboplay.dubsiege/app_webview | head -60 || true
