@@ -578,14 +578,14 @@
  },
  "s_bestia": {
   "local": true,
-  "fw": 24,
-  "fh": 33,
+  "fw": 34,
+  "fh": 54,
   "n": 2
  },
  "s_censor": {
   "local": true,
-  "fw": 29,
-  "fh": 36,
+  "fw": 39,
+  "fh": 60,
   "n": 2
  }
 }
