@@ -262,7 +262,8 @@ el mismo paquete `online.kuboplay.dubsiege` y la misma clave
   Se regraban desde el propio HTML con `tools/rec_audio.py` (Playwright +
   OfflineAudioContext). P1–P3 suenan sincronizadas y cambian en el límite de compás.
 - **Pantalla**: el juego pinta en un SubViewport del tamaño del lienzo y se
-  escala con zoom entero y filtro nearest (píxel cuadrado).
+  escala con zoom entero y filtro nearest (píxel cuadrado). Orientación fija
+  en horizontal con sensor (`window/handheld/orientation=4`), como la web.
 - **Atrás** (Android) = Esc; dos veces en 1,5 s sale, como antes.
 - **Pruebas** (`godot/tests/`, con `godot -- --test=res://godot/tests/X.gd`):
   `run12.gd` (las 12 fases con jefe), `parity.gd` (web y Godot con la misma
