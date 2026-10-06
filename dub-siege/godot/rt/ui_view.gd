@@ -341,7 +341,7 @@ func _lay_line(b: Dictionary, cw: float) -> void:
 			ln = lines[lines.size() - 1]
 			x = 0.0
 			need = w.w
-		var it := w.duplicate()
+		var it: Dictionary = w.duplicate()
 		it.x = x + (need - w.w)
 		ln.append(it)
 		x += need
@@ -626,7 +626,7 @@ func _lay_row(b: Dictionary, cw: float) -> float:
 		for i in items.size():
 			all.append(i)
 		rows.append(all)
-		var tot := s.gap_c * maxf(0, items.size() - 1)
+		var tot: float = s.gap_c * maxf(0, items.size() - 1)
 		for v in base:
 			tot += v
 		var over: float = tot - cw
@@ -742,7 +742,7 @@ func _lay_grid(b: Dictionary, cw: float) -> float:
 	var ws := []
 	ws.resize(n)
 	ws.fill(0.0)
-	var fixed := s.gap_c * (n - 1)
+	var fixed: float = s.gap_c * (n - 1)
 	var frs := 0.0
 	for j in n:
 		var tr = cols[j]
