@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: write
+  checks: write
 
 jobs:
   build:
@@ -102,24 +103,38 @@ jobs:
             adb logcat -c
             adb shell monkey -p online.kuboplay.dubsiege -c android.intent.category.LAUNCHER 1
             sleep 15
-            adb exec-out screencap -p > 1-arranque.png
+            adb exec-out screencap -p > 1-portada.png
             adb shell input keyevent KEYCODE_ENTER
+            sleep 4
+            adb exec-out screencap -p > 2-jugar.png
+            adb shell input keyevent KEYCODE_ENTER
+            sleep 4
+            adb exec-out screencap -p > 3-escena.png
+            adb shell input keyevent KEYCODE_ESCAPE
             sleep 6
-            adb exec-out screencap -p > 2-menu.png
+            adb shell input keyevent KEYCODE_D
+            sleep 3
+            adb exec-out screencap -p > 4-partida.png
             adb shell input keyevent KEYCODE_BACK
             sleep 2
-            adb exec-out screencap -p > 3-atras.png
+            adb exec-out screencap -p > 5-atras.png
             adb logcat -d > logcat.txt
-            adb shell pidof online.kuboplay.dubsiege
+            echo "proceso: $(adb shell pidof online.kuboplay.dubsiege)"; adb shell pidof online.kuboplay.dubsiege > /dev/null
             ! grep -q 'FATAL EXCEPTION' logcat.txt
       - name: Mensajes de Godot
         if: always()
         run: grep -E ' godot +:' logcat.txt | head -150 || echo 'sin mensajes'
-      - name: Capturas en el registro (base64, pequeñas)
+      - name: Capturas como check-runs (para revisarlas sin descargar artefactos)
         if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           pip install -q pillow || true
-          for f in *.png; do [ -f "$f" ] && python3 -c "import sys,io,base64;from PIL import Image;im=Image.open(sys.argv[1]).convert('RGB');im.thumbnail((480,480));b=io.BytesIO();im.save(b,'JPEG',quality=60);print('IMG',sys.argv[1],base64.b64encode(b.getvalue()).decode())" "$f"; done || true
+          for f in *.png; do
+            [ -f "$f" ] || continue
+            python3 -c "import sys,io,base64,json;from PIL import Image;im=Image.open(sys.argv[1]).convert('RGB');im.thumbnail((640,640));b=io.BytesIO();im.save(b,'JPEG',quality=55);print(json.dumps({'name':'qa-api${{ matrix.api }}-'+sys.argv[1],'head_sha':'${{ github.sha }}','status':'completed','conclusion':'neutral','output':{'title':sys.argv[1],'summary':'captura del emulador','text':base64.b64encode(b.getvalue()).decode()}}))" "$f" > cr.json
+            gh api repos/${{ github.repository }}/check-runs --input cr.json --jq .id || true
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
