@@ -51,6 +51,34 @@ píxel que decodifica igual: 907 KB de PNG → 324 KB, fichero de 1,40 MB → 0,
 tamaño **lógico** del fotograma y cuántos fotogramas tiene. El token nunca se
 guarda en el repositorio.
 
+Después de bajar las hojas del héroe hay dos pasos más, en este orden:
+```bash
+python3 tools/aim_poses.py        # poses de apuntar: arriba (u), diagonal arriba (d) y abajo (x)
+python3 tools/aim_poses.py muz    # tabla MUZ (boca del arma por fotograma) para dub-siege.html
+python3 tools/shoes.py            # zapatillas: el fotograma pasa de 14 a 15 de alto
+```
+`aim_poses.py` cambia el brazo del arma en reposo, carrera, salto y caída en las
+7 capas (cuerpo, mapa de clases y 5 pelos), así el vestidor sigue igual.
+`shoes.py` existe porque PixelLab entregó las piernas cortadas en el tobillo:
+alarga cada fotograma 4 px y dibuja una zapatilla (clase 0, no se retiñe) bajo
+cada pierna que llega al borde. `pState()` elige la hoja según hacia dónde se
+dispara y `muzzle()` saca la bala y el fogonazo de la punta del arma.
+
+## Efectos dibujados por código
+Balas, bolas enemigas, fogonazos, cañones de torreta e iconos de objetos se
+pintan píxel a píxel una vez (`fxSpr(clave, w, h, fn)`, caché en `FXC`) y se
+colocan con `fxDraw`: cápsula con estela (N), bola de fuego (S), rayo (L), nota
+musical (H), estrella de fogonazo, tubo de cañón en 16 direcciones.
+
+## Equipo y mochila
+La tienda se llama **EQUIPO** y tiene tres pestañas: MEJORAS (vida, armadura,
+arma reforzada…), MOCHILA (comprar objetos, hasta 3 de cada) y PERSONAJE (el
+vestidor). Objetos (`OBJ`): botiquín, escudo, bomba, imán y batería; también
+caen de cajas (25 %) y enemigos (4 %). Se usan desde la pausa → MOCHILA o con el
+botón rápido: **E**, **LB** en el mando o **OBJ** en pantalla. La armadura para
+un golpe por placa y se rellena en cada fase; el arma reforzada fija el nivel
+mínimo del arma.
+
 ## Fases e historia
 
 Mundo, personajes y Archivo de 12 cintas (una por jefe, menú ARCHIVO, `ds2_lore`): ver `LORE.md`. Ambientado en lugares reales: Londres en mayo de 1981 (Brixton, Peckham, Notting Hill, Harlesden, County Hall…) y, en las cintas, Kingston en los cincuenta. Tono adulto (policía, política, racismo, rivalidad entre sounds). Personajes inventados y comprobados contra nombres reales (cifras en `LORE.md`); ninguna persona real.

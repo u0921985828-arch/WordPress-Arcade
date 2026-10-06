@@ -1406,17 +1406,17 @@ function orbSpr(col,r,bomb,fr){
     if(y<-R&&y>-R-3&&Math.abs(x-1)<1.2)return y<-R-1.6?(fr?[255,255,255,255]:c):[150,150,170,255];
     if(d>R)return null;if(d>R-1.1)return O;var l=(x+y)/R;
     if(Math.hypot(x+R*.35,y+R*.35)<R*.25)return [140,130,170,255];return l>.45?[22,18,34,255]:[52,44,72,255];});
-  return fxSpr(key,S,S,function(x,y){var d=Math.hypot(x,y),RR=R+(fr?.6:0);if(d>RR)return null;
+  return fxSpr(key,S,S,function(x,y,px,py){var d=Math.hypot(x,y),RR=R+(fr?.6:0);if(d>RR)return null;
     if(d>RR-1.1)return fr?lt:O;if(Math.hypot(x+R*.3,y+R*.3)<R*.32)return [255,255,255,255];
     var l=(x+y)/R;return l>.5?dk:(l<-.4?lt:c);});
 }
 // Fogonazo en estrella de cuatro puntas, tres tamanos.
 function flashSpr(col,n){var c=fxRGB(col),s=[0,4,7,10][n],lt=fxMix(c,[255,255,255,255],.55);
-  return fxSpr('f'+col+n,s*2+2,s*2+2,function(x,y){var q=Math.sqrt(Math.abs(x))+Math.sqrt(Math.abs(y)),d=Math.hypot(x,y);
+  return fxSpr('f'+col+n,s*2+2,s*2+2,function(x,y,px,py){var q=Math.sqrt(Math.abs(x))+Math.sqrt(Math.abs(y)),d=Math.hypot(x,y);
     if(d<s*.3)return [255,255,255,255];if(q<Math.sqrt(s)*1.1&&d<s*.6)return lt;if(q<Math.sqrt(s)*1.35)return c;return null;});}
 // Canon de la torreta (16 direcciones): tubo de metal con boca y anillo.
 function barrelSpr(dk){var a=dk*Math.PI/8,ca=Math.cos(a),sa=Math.sin(a);
-  return fxSpr('tb'+dk,48,48,function(x,y){var u=x*ca+y*sa,v=Math.abs(-x*sa+y*ca);
+  return fxSpr('tb'+dk,48,48,function(x,y,px,py){var u=x*ca+y*sa,v=Math.abs(-x*sa+y*ca);
     if(u<0||u>19)return null;var hw=u>15?4.4:3.4;if(v>hw)return null;if(v>hw-1.1||u>18)return [26,21,48,255];
     if(u>15&&u<17)return [154,160,176,255];var sd=-x*sa+y*ca;return sd<-.6?[154,160,176,255]:(sd>.9?[42,46,72,255]:[90,96,128,255]);});}
 function drawBooms(){
@@ -1562,7 +1562,8 @@ var OBJ=[
   {id:'bmb',n:'BOMBA',d:'Revienta todo lo que hay en pantalla',c:'#ff8a2a',cost:30},
   {id:'mag',n:'IMÁN',d:'Atrae los discos durante 15 segundos',c:'#ffd23f',cost:15},
   {id:'bat',n:'BATERÍA',d:'Llena la barra BASS al momento',c:'#4dff88',cost:25}
-],OMAX=3,OBJN={};OBJ.forEach(function(o){OBJN[o.id]=o;});
+],OMAX=3,OBJN=mkObjN();
+function mkObjN(){var m={};OBJ.forEach(function(o){m[o.id]=o;});return m;}
 function objCount(){var n=0;OBJ.forEach(function(o){n+=run.inv[o.id]|0;});return n;}
 function quickObj(){if(run.inv[run.qk]>0)return run.qk;for(var k=0;k<OBJ.length;k++)if(run.inv[OBJ[k].id]>0)return OBJ[k].id;return run.qk;}
 function dropObj(x,y,l){var o=OBJ[Math.floor(Math.random()*OBJ.length)];pickups.push({type:'obj',ot:o.id,x:x,y:y,w:8,h:8,vy:-2.4,l:l});}
@@ -1580,7 +1581,7 @@ function useObj(id){var n=run.inv[id]|0,o=OBJN[id];
   run.inv[id]=n-1;sfx('power');pop(p.x-16,p.y-16,o.n,o.c);return true;}
 // Icono de cada objeto (32x32 pixeles reales = 8x8 logicos; n=8 para el HUD), pintado una vez.
 function objSpr(id,n){n=n||32;var k=32/n;var o=OBJN[id],c=fxRGB(o.c),O=[26,21,48,255],Wt=[255,255,255,255],lt=fxMix(c,Wt,.5),dk=fxMix(c,O,.35),Gr=[200,204,216,255],Gd=[106,112,144,255];
-  return fxSpr('i'+id+n,n,n,function(x,y){x*=k;y*=k;var ax=Math.abs(x),ay=Math.abs(y);
+  return fxSpr('i'+id+n,n,n,function(x,y,px,py){x*=k;y*=k;var ax=Math.abs(x),ay=Math.abs(y);
     if(id==='kit'){if(ax>13.5||ay>11.5)return null;if(ax>12||ay>10)return O;if(ax<2.5&&ay<7.5||ay<2.5&&ax<7.5)return c;return y<-6?Wt:Gr;}
     if(id==='shd'){var top=-13,yy=y-top,hw=y<0?12.5:12.5*(1-(y/14)*(y/14));if(y<top||y>14||ax>hw)return null;if(ax>hw-1.6||y<top+1.6)return O;
       if(ax<2&&y<9)return Wt;return x<0?lt:c;}
