@@ -97,24 +97,41 @@ func _o_fillRect(x: float, y: float, w: float, h: float) -> void:
 	var op := globalCompositeOperation
 	if op == "source-over" and c.a >= 1.0:
 		img.fill_rect(r, c)
-	elif op == "source-in":
-		# el resultado toma el color nuevo con el alfa de lo que ya habia (por c.a)
-		for yy in range(r.position.y, r.end.y):
-			for xx in range(r.position.x, r.end.x):
-				var d := img.get_pixel(xx, yy)
-				img.set_pixel(xx, yy, Color(c.r, c.g, c.b, d.a * c.a))
-	elif op == "source-atop":
-		for yy in range(r.position.y, r.end.y):
-			for xx in range(r.position.x, r.end.x):
-				var d := img.get_pixel(xx, yy)
-				if d.a <= 0.0:
-					continue
-				img.set_pixel(xx, yy, Color(d.r + (c.r - d.r) * c.a, d.g + (c.g - d.g) * c.a, d.b + (c.b - d.b) * c.a, d.a))
+	elif op == "source-in" or op == "source-atop":
+		_comp_rect(r, c, op == "source-in")
 	else:
 		var src := Image.create_empty(r.size.x, r.size.y, false, Image.FORMAT_RGBA8)
 		src.fill(c)
 		img.blend_rect(src, Rect2i(Vector2i.ZERO, r.size), r.position)
 	_dirty = true
+
+
+## source-in (color nuevo con el alfa de lo que habia) y source-atop (color
+## mezclado solo donde ya habia algo) sobre los bytes de la imagen: get_pixel /
+## set_pixel crean un Color por pixel y eran el 80 % del coste.
+func _comp_rect(r: Rect2i, c: Color, src_in: bool) -> void:
+	var b := img.get_data()
+	var cr := int(round(c.r * 255.0))
+	var cg := int(round(c.g * 255.0))
+	var cb := int(round(c.b * 255.0))
+	var ca := c.a
+	var W := _w
+	for yy in range(r.position.y, r.end.y):
+		var i := (yy * W + r.position.x) * 4
+		var e := i + r.size.x * 4
+		while i < e:
+			var a := b[i + 3]
+			if src_in:
+				b[i] = cr
+				b[i + 1] = cg
+				b[i + 2] = cb
+				b[i + 3] = int(round(a * ca))
+			elif a > 0:
+				b[i] = int(round(b[i] + (cr - b[i]) * ca))
+				b[i + 1] = int(round(b[i + 1] + (cg - b[i + 1]) * ca))
+				b[i + 2] = int(round(b[i + 2] + (cb - b[i + 2]) * ca))
+			i += 4
+	img.set_data(_w, _h, false, Image.FORMAT_RGBA8, b)
 
 
 func _o_drawImage(src: Variant, a: float, b: float, c: Variant = null, d: Variant = null, e: Variant = null, f: Variant = null, gg: Variant = null, h: Variant = null) -> void:
@@ -187,11 +204,9 @@ func _o_createImageData(w: float, h: float) -> Dictionary:
 func _o_putImageData(im: Dictionary, x: float, y: float) -> void:
 	var W: int = im.width
 	var H: int = im.height
-	var src: Array = im.data
-	var bytes := PackedByteArray()
-	bytes.resize(src.size())
-	for i in src.size():
-		bytes[i] = clampi(int(src[i]), 0, 255)
+	# Conversion nativa: el juego solo escribe enteros de 0 a 255 en sus
+	# ImageData (paint() ya hace min(255, x)|0), asi que no hace falta recortar.
+	var bytes := PackedByteArray(im.data)
 	var tmp := Image.create_from_data(W, H, false, Image.FORMAT_RGBA8, bytes)
 	if img == null:
 		return

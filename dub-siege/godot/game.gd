@@ -790,8 +790,8 @@ func _boot_gen():
 	CY = (WH - H)
 	CYM = (CY - 12)
 	HS = 0.78
-	HW = _round((W / float(HS)))
-	HH = _round((H / float(HS)))
+	HW = floori(float((W / float(HS))) + 0.5)
+	HH = floori(float((H / float(HS))) + 0.5)
 	SC = 4
 	UIF = 1
 	UIS = _data("UIS")
@@ -880,7 +880,7 @@ func _boot_gen():
 
 # L308
 func uiName():
-	return (str(_round((SET.get("ui") * 100))) + " %" if (_typeof(SET.get("ui")) == "number") else "AUTO")
+	return (str(floori(float((SET.get("ui") * 100)) + 0.5)) + " %" if (_typeof(SET.get("ui")) == "number") else "AUTO")
 
 # L314
 func j_clamp(v = null, a = null, b = null):
@@ -1056,7 +1056,7 @@ func mkEnemy(ch = null, x = null, y = null):
 	d = _ix(EDEF, ch)
 	if (not d):
 		return
-	hp = (d.get("hp") if ((ch == "*") or (ch == "X")) else max(1, _round(((d.get("hp") * D.get("eHp")) * (1 + (st.get("d") * 0.2))))))
+	hp = (d.get("hp") if ((ch == "*") or (ch == "X")) else max(1, floori(float(((d.get("hp") * D.get("eHp")) * (1 + (st.get("d") * 0.2)))) + 0.5)))
 	e = {"type": ch, "x": (x + ((T - d.get("w")) / 2.0)), "y": ((y + T) - d.get("h")), "w": d.get("w"), "h": d.get("h"), "hp": hp, "max": hp, "pts": d.get("pts"), "vx": 0, "vy": 0, "dir": -1, "fl": 0, "a": (_rnd() * 9), "cd": (60 + (_rnd() * 60)), "ground": 0, "base": y, "turn": 0, "dive": 0, "jt": (40 + (_rnd() * 30)), "sp": ((0.45 + (st.get("d") * 0.08)) + (_rnd() * 0.15))}
 	enemies.append(e)
 	return e
@@ -1211,7 +1211,7 @@ func burst(x = null, y = null, cols = null, n = null, sp = null, gr = null):
 # L1347
 func boom(x = null, y = null, r = null, quiet = null):
 	booms.append({"x": x, "y": y, "r": r, "t": 0, "l": (26 + r)})
-	burst(x, y, ["#ffd23f", "#ff8a2a", "#ff3d6e", "#fff", "#5a4a5a"], _round((r * 1.3)), (1.2 + (r * 0.09)), 0.14)
+	burst(x, y, ["#ffd23f", "#ff8a2a", "#ff3d6e", "#fff", "#5a4a5a"], floori(float((r * 1.3)) + 0.5), (1.2 + (r * 0.09)), 0.14)
 	shake(min(22, (4 + (r * 0.7))))
 	if (r >= 14):
 		flash = max(flash, 5)
@@ -1256,11 +1256,11 @@ func disk(cx = null, cy = null, r = null, c = null):
 	if (r < 0.5):
 		return
 	g.fillStyle = c
-	R = _round(r)
+	R = floori(float(r) + 0.5)
 	dy = -R
 	while (dy <= R):
 		h = floori(sqrt(max(0, ((r * r) - (dy * dy)))))
-		g.fillRect((_round(cx) - h), (_round(cy) + dy), ((h * 2) + 1), 1)
+		g.fillRect((floori(float(cx) + 0.5) - h), (floori(float(cy) + 0.5) + dy), ((h * 2) + 1), 1)
 		dy += 1
 
 # L1363
@@ -1270,12 +1270,12 @@ func pring(cx = null, cy = null, r = null, c = null):
 	var o = null
 	var q = null
 	var ii = null
-	R = _round(r)
+	R = floori(float(r) + 0.5)
 	if (R < 2):
 		return
 	g.fillStyle = c
-	cx = _round(cx)
-	cy = _round(cy)
+	cx = floori(float(cx) + 0.5)
+	cy = floori(float(cy) + 0.5)
 	dy = -R
 	while (dy <= R):
 		o = floori(sqrt(max(0, ((r * r) - (dy * dy)))))
@@ -1363,7 +1363,7 @@ func hurt(n = null):
 		return
 	if DEBUG:
 		win.__log = (win.get("__log") if win.get("__log") else [])
-		win.__log.append("hit@" + str(_round(p.get("x"))))
+		win.__log.append("hit@" + str(floori(float(p.get("x")) + 0.5)))
 	p.hp -= n
 	p.inv = D.get("inv")
 	p.vx = (-(p.get("face")) * 2)
@@ -1425,7 +1425,7 @@ func fallPit():
 		return
 	if DEBUG:
 		win.__log = (win.get("__log") if win.get("__log") else [])
-		win.__log.append("pit@" + str(_round(p.get("x"))))
+		win.__log.append("pit@" + str(floori(float(p.get("x")) + 0.5)))
 	p.hp -= 1
 	st.hurtFree = 0
 	sfx("hurt")
@@ -1669,7 +1669,7 @@ func updatePlayer(i = null):
 		if mv:
 			p.face = mv
 		p.dash = 11
-		p.dashCd = _round((48 * (1 - (0.25 * run.up.get("dash")))))
+		p.dashCd = floori(float((48 * (1 - (0.25 * run.up.get("dash"))))) + 0.5)
 		if (not (p.get("ground"))):
 			p.airDash = 0
 		sfx("dash")
@@ -1751,7 +1751,7 @@ func bassDrop():
 		if ((e.get("x", NAN) > (cam - 10)) and (e.get("x", NAN) < ((cam + W) + 10))):
 			damageEnemy(e, 10, 0)
 	if (boss and boss.get("on")):
-		damageBoss(_round((boss.get("max") * 0.08)))
+		damageBoss(floori(float((boss.get("max") * 0.08)) + 0.5))
 	for _i_3 in range(_len(hazards)):
 		if _i_3 >= _len(hazards): break
 		h = hazards[_i_3]
@@ -2080,8 +2080,8 @@ func startBoss():
 	if (n == 4):
 		a = _or(_ix(ART, _ix(ESHEET, L.get("mt"))), {"fw": 12, "fh": 10})
 		air = _or((L.get("mt") == "b"), (L.get("mt") == "f"))
-		boss.w = _round(((a.get("fw") * boss.get("sc")) * 0.8))
-		boss.h = _round(((a.get("fh") * boss.get("sc")) * 0.85))
+		boss.w = floori(float(((a.get("fw") * boss.get("sc")) * 0.8)) + 0.5)
+		boss.h = floori(float(((a.get("fh") * boss.get("sc")) * 0.85)) + 0.5)
 		boss.gnd = (not air)
 		boss.hy = (68 if (L.get("mt") == "b") else 80)
 		boss.x = (((ax + (W / 2.0)) - ((boss.get("w")) / 2.0)) if (L.get("mt") == "t") else (((ax + W) - 24) - boss.get("w")))
@@ -3109,7 +3109,7 @@ func startCut(lines = null, then = null, ill = null):
 
 # L1836
 func cutQ():
-	CUQ = max(1, _round((SC * UIF)))
+	CUQ = max(1, floori(float((SC * UIF)) + 0.5))
 
 # L1837
 func cutTx():
@@ -3273,7 +3273,7 @@ func cutFace(l = null, x = null, y = null):
 		o = _ix(SHEET, k)
 		if (o and o.get("ok")):
 			s = max(2, floori(min((48.0 / (o.get("fw"))), (56.0 / (o.get("fh"))))))
-			blitS(k, fmod((int(t) >> int(4)), o.get("n")), ((x + 24) - _round(((o.get("fw") * s) / 2.0))), ((y + 2) if ((o.get("fh") * s) > 56) else ((y + 56) - (o.get("fh") * s))), s)
+			blitS(k, fmod((int(t) >> int(4)), o.get("n")), ((x + 24) - floori(float(((o.get("fw") * s) / 2.0)) + 0.5)), ((y + 2) if ((o.get("fh") * s) > 56) else ((y + 56) - (o.get("fh") * s))), s)
 	cutFx(l, x, y, 48, 56)
 	g.restore()
 
@@ -3289,7 +3289,7 @@ func cutFx(l = null, x = null, y = null, w = null, h = null):
 	var by = null
 	if (l.get("x") == "static"):
 		n = 0
-		m = _round(((w * h) / 79.0))
+		m = floori(float(((w * h) / 79.0)) + 0.5)
 		while (n < m):
 			g.globalAlpha = (0.3 + (_rnd() * 0.4))
 			rect((x + int((_rnd() * (w - 1)))), (y + int((_rnd() * (h - 1)))), (1 + int((_rnd() * 3))), 1, ("#fff" if (_rnd() < 0.5) else "#8f98c8"))
@@ -3402,8 +3402,8 @@ func drawCut():
 	l = cutLine()
 	il = cutIl(l)
 	e = c.get("bar")
-	tb = (0 if il else _round((16 * e)))
-	bh = _round((((20 if l.get("w") else 10) + (10 * _len(c.wr))) * e))
+	tb = (0 if il else floori(float((16 * e)) + 0.5))
+	bh = floori(float((((20 if l.get("w") else 10) + (10 * _len(c.wr))) * e)) + 0.5)
 	by = (HH - bh)
 	ov = 0
 	if il:
@@ -4055,7 +4055,7 @@ func stat():
 	var secs = null
 	s = run.get("stats")
 	secs = floori(((s.get("time")) / 60.0))
-	return "<div class=\"stats\"><span>PUNTOS</span><b>" + pad(run.get("score"), 7) + "</b><span>FASE</span><b>" + str((st.get("i") + 1)) + " / " + str(_len(LEVELS)) + "</b><span>ENEMIGOS</span><b>" + str(s.get("kills")) + "</b>" + "<span>PUNTERÍA</span><b>" + str((_round((((s.get("hits")) / float(s.get("shots"))) * 100)) if s.get("shots") else 0)) + "%</b><span>MUERTES</span><b>" + str(s.get("deaths")) + "</b><span>TIEMPO</span><b>" + str(floori((secs / 60.0))) + ":" + pad(fmod(secs, 60), 2) + "</b></div>"
+	return "<div class=\"stats\"><span>PUNTOS</span><b>" + pad(run.get("score"), 7) + "</b><span>FASE</span><b>" + str((st.get("i") + 1)) + " / " + str(_len(LEVELS)) + "</b><span>ENEMIGOS</span><b>" + str(s.get("kills")) + "</b>" + "<span>PUNTERÍA</span><b>" + str((floori(float((((s.get("hits")) / float(s.get("shots"))) * 100)) + 0.5) if s.get("shots") else 0)) + "%</b><span>MUERTES</span><b>" + str(s.get("deaths")) + "</b><span>TIEMPO</span><b>" + str(floori((secs / 60.0))) + ":" + pad(fmod(secs, 60), 2) + "</b></div>"
 
 # L2181
 func gameOver():
@@ -4298,7 +4298,7 @@ func update():
 		r = _a[_i]
 		if (((not (r.get("s"))) and (p.get("x", NAN) > (r.get("x") - 24))) and (not (p.get("dead")))):
 			r.s = 1
-			r.w = _round((100.0 / (D.get("bs"))))
+			r.w = floori(float((100.0 / (D.get("bs")))) + 0.5)
 			sfx("horn")
 			pop((p.get("x") - 10), (p.get("y") - 16), "¡TREN!", "#ffd23f")
 		else:
@@ -4394,8 +4394,8 @@ func blitS(k = null, f = null, x = null, y = null, s = null, flip = null, white 
 	sx = (fmod((fmod(int(f), o.get("n")) + o.get("n")), o.get("n")) * sw)
 	dw = (o.get("fw") * s)
 	dh = (o.get("fh") * s)
-	dx = _round(x)
-	dy = _round(y)
+	dx = floori(float(x) + 0.5)
+	dy = floori(float(y) + 0.5)
 	if flip:
 		g.save()
 		g.translate((dx + dw), dy)
@@ -4447,8 +4447,8 @@ func blit(k = null, f = null, x = null, y = null, w = null, h = null, flip = nul
 	sw = (o.get("fw") * m)
 	sh_2 = (o.get("fh") * m)
 	sx = (fmod((fmod(int(f), o.get("n")) + o.get("n")), o.get("n")) * sw)
-	dx = _round((x + ((w - o.get("fw")) / 2.0)))
-	dy = _round(((y + h) - o.get("fh")))
+	dx = floori(float((x + ((w - o.get("fw")) / 2.0))) + 0.5)
+	dy = floori(float(((y + h) - o.get("fh"))) + 0.5)
 	if (alpha != null):
 		g.globalAlpha = alpha
 	if flip:
@@ -4573,7 +4573,7 @@ func lookSheet(st_2 = null):
 	while (y < h):
 		x = 0
 		while (x < w):
-			if (_round(((cd[int((((y * w) + x) * 4))]) / 20.0)) == 2):
+			if (floori(float(((cd[int((((y * w) + x) * 4))]) / 20.0)) + 0.5) == 2):
 				f = int((x / float(fw)))
 				if (y < _ix(_ix(tb, f), 0)):
 					_aset(tb[f], 0, y)
@@ -4590,7 +4590,7 @@ func lookSheet(st_2 = null):
 			if (d[int((i + 3))] < 128):
 				x += 1
 				continue
-			cl = _round(((cd[int(i)]) / 20.0))
+			cl = floori(float(((cd[int(i)]) / 20.0)) + 0.5)
 			if (not cl):
 				x += 1
 				continue
@@ -4719,7 +4719,7 @@ func lookLoop():
 		fr = fmod(int(((_perf()) / float((95 if ph else 170)))), o.get("n"))
 		sw = (o.get("fw") * SC)
 		sh_2 = (o.get("fh") * SC)
-		q.drawImage(o.get("img"), (fr * sw), 0, sw, sh_2, _round(((c.get("width") - sw) / 2.0)), (c.get("height") - sh_2), sw, sh_2)
+		q.drawImage(o.get("img"), (fr * sw), 0, sw, sh_2, floori(float(((c.get("width") - sw) / 2.0)) + 0.5), (c.get("height") - sh_2), sw, sh_2)
 	lookRaf = _raf(lookLoop)
 
 # L2429
@@ -4781,8 +4781,8 @@ func spr(rows = null, pal = null, x = null, y = null, flip = null, white = null,
 	while (r < _len(rows)):
 		w = max(w, _len(_ix(rows, r)))
 		r += 1
-	x = _round(x)
-	y = _round(y)
+	x = floori(float(x) + 0.5)
+	y = floori(float(y) + 0.5)
 	if alpha:
 		g.globalAlpha = alpha
 	r = 0
@@ -4811,8 +4811,8 @@ func txt(s = null, x = null, y = null, col = null, al = null):
 		x -= (w / 2.0)
 	elif (al == "r"):
 		x -= w
-	x = _round(x)
-	y = _round(y)
+	x = floori(float(x) + 0.5)
+	y = floori(float(y) + 0.5)
 	g.fillStyle = "#000"
 	g.fillText(s, (x + 1), (y + 1))
 	g.fillStyle = col
@@ -4846,8 +4846,8 @@ func txtI(s = null, x = null, y = null, col = null):
 	w = ((8 * _len(s)) + 6)
 	i = 0
 	while (i < 3):
-		a = _round(((y + _ix(_ix(B, i), 0)) * k))
-		b = _round(((y + _ix(_ix(B, (i + 1)), 0)) * k))
+		a = floori(float(((y + _ix(_ix(B, i), 0)) * k)) + 0.5)
+		b = floori(float(((y + _ix(_ix(B, (i + 1)), 0)) * k)) + 0.5)
 		g.save()
 		g.setTransform(1, 0, 0, 1, 0, 0)
 		g.beginPath()
@@ -4887,7 +4887,7 @@ func j_wrap(s = null, maxw = null):
 # L2474
 func rect(x = null, y = null, w = null, h = null, c = null):
 	g.fillStyle = c
-	g.fillRect(_round(x), _round(y), w, h)
+	g.fillRect(floori(float(x) + 0.5), floori(float(y) + 0.5), w, h)
 
 # L2485
 func lightSpr(r = null, col = null):
@@ -4948,7 +4948,7 @@ func lightSpr(r = null, col = null):
 func light(x = null, y = null, r = null, a = null, col = null):
 	if (LN >= 48):
 		return
-	r = max(4, min(72, (_round((r / 2.0)) * 2)))
+	r = max(4, min(72, (floori(float((r / 2.0)) + 0.5) * 2)))
 	_aset(LX, LN, x)
 	_aset(LY, LN, y)
 	_aset(LR, LN, r)
@@ -4995,20 +4995,20 @@ func shadow(sx = null, wx = null, wy = null, w = null, h = null):
 		return
 	k = (1 - (d / 46.0))
 	a = ((sun.get("a") * k) * k)
-	rw = _round(((w * sun.get("len")) * (0.62 + (0.38 * k))))
+	rw = floori(float(((w * sun.get("len")) * (0.62 + (0.38 * k)))) + 0.5)
 	off = (((h * 0.45) + (d * 0.55)) * sun.get("dx"))
 	if ((rw < 3) or (a < 0.05)):
 		return
 	g.globalAlpha = a
 	g.fillStyle = "#000"
 	cx = (sx + (w / 2.0))
-	g.fillRect((_round(((cx + (off * 0.25)) - (rw / 2.0))) + 1), fy, (rw - 2), 1)
+	g.fillRect((floori(float(((cx + (off * 0.25)) - (rw / 2.0))) + 0.5) + 1), fy, (rw - 2), 1)
 	if (rw > 6):
-		g.fillRect(_round(((cx + (off * 0.6)) - (rw / 2.0))), (fy + 1), rw, 1)
+		g.fillRect(floori(float(((cx + (off * 0.6)) - (rw / 2.0))) + 0.5), (fy + 1), rw, 1)
 	else:
-		g.fillRect((_round(((cx + (off * 0.6)) - (rw / 2.0))) + 1), (fy + 1), (rw - 2), 1)
+		g.fillRect((floori(float(((cx + (off * 0.6)) - (rw / 2.0))) + 0.5) + 1), (fy + 1), (rw - 2), 1)
 	if (rw > 10):
-		g.fillRect((_round(((cx + off) - (rw / 2.0))) + 2), (fy + 2), (rw - 4), 1)
+		g.fillRect((floori(float(((cx + off) - (rw / 2.0))) + 0.5) + 2), (fy + 2), (rw - 4), 1)
 	g.globalAlpha = 1
 
 # L2536
@@ -5032,7 +5032,7 @@ func drawLight():
 	while (i < LN):
 		r = _ix(LR, i)
 		g.globalAlpha = (_ix(LA, i) * (0.34 if _ix(LCOL, i) else 0.2))
-		g.drawImage(lightSpr(r, (_ix(LCOL, i) if _ix(LCOL, i) else "#fff6d8")), _round((_ix(LX, i) - r)), _round(((_ix(LY, i) - camY) - r)))
+		g.drawImage(lightSpr(r, (_ix(LCOL, i) if _ix(LCOL, i) else "#fff6d8")), floori(float((_ix(LX, i) - r)) + 0.5), floori(float(((_ix(LY, i) - camY) - r)) + 0.5))
 		i += 1
 	g.globalAlpha = 1
 	g.globalCompositeOperation = "source-over"
@@ -5101,7 +5101,7 @@ func drawBG():
 		lo = floori(((cam * 0.9) / 120.0))
 		i = (lo - 1)
 		while (i < (lo + 4)):
-			x = _round((((i * 120) + 60) - (cam * 0.9)))
+			x = floori(float((((i * 120) + 60) - (cam * 0.9))) + 0.5)
 			if (not (bgFoot(x, 8))):
 				i += 1
 				continue
@@ -5128,7 +5128,7 @@ func drawBG():
 		off = (cam * 0.7)
 		i = (floori((off / 90.0)) - 1)
 		while (i < (floori((off / 90.0)) + 5)):
-			x = _round((((i * 90) - off) + 20))
+			x = floori(float((((i * 90) - off) + 20)) + 0.5)
 			if (not (bgFoot(x, 44))):
 				i += 1
 				continue
@@ -5162,7 +5162,7 @@ func drawBG():
 		off = (cam * 0.85)
 		i = (floori((off / 110.0)) - 1)
 		while (i < (floori((off / 110.0)) + 4)):
-			x = _round(((i * 110) - off))
+			x = floori(float(((i * 110) - off)) + 0.5)
 			rect(x, 30, 14, (GY - 30), "#0c0d12")
 			rect((x + 2), 30, 2, (GY - 30), "#1b1d26")
 			i += 1
@@ -5177,7 +5177,7 @@ func drawBG():
 			off = (cam * 0.5)
 			i = (floori((off / 44.0)) - 1)
 			while (i < (floori((off / 44.0)) + 9)):
-				x = _round(((i * 44) - off))
+				x = floori(float(((i * 44) - off)) + 0.5)
 				speaker(x, (GY - 80), pu)
 				speaker(x, (GY - 40), pu)
 				i += 1
@@ -5199,7 +5199,7 @@ func drawBG():
 		off = (cam * 0.9)
 		i = (floori((off / 9.0)) - 1)
 		while (i < (floori((off / 9.0)) + 38)):
-			x = _round(((i * 9) - off))
+			x = floori(float(((i * 9) - off)) + 0.5)
 			if (not (bgFoot(x, 7))):
 				i += 1
 				continue
@@ -5255,7 +5255,7 @@ func clashPiece(key = null, wx = null, on = null, pu = null, lc = null, cen = nu
 	var x = null
 	var sp = null
 	a = _ix(ART, key)
-	x = _round((wx - cam))
+	x = floori(float((wx - cam)) + 0.5)
 	if (((not a) or (x < (-(a.get("fw")) - 4))) or (x > (W + 4))):
 		return
 	blit(key, (0 if (on > 0.5) else 1), x, (GY - a.get("fh")), a.get("fw"), a.get("fh"), false, false)
@@ -5300,7 +5300,7 @@ func city(par = null, sp = null, hmin = null, hr = null, col = null, win = null,
 	while (i < (i0 + n)):
 		bw = ((sp - 2) - int((rnd((i + j_seed)) * 8)))
 		bh = (hmin + int((rnd(((i * 3) + j_seed)) * hr)))
-		x = _round(((i * sp) - off))
+		x = floori(float(((i * sp) - off)) + 0.5)
 		y = (GY - bh)
 		rect(x, y, bw, bh, col)
 		if win:
@@ -5340,7 +5340,7 @@ func shade(c = null, f = null):
 	var b = null
 	var m = null
 	m = func(v = null):
-		v = _round((v * _c.f))
+		v = floori(float((v * _c.f)) + 0.5)
 		return (0 if (v < 0) else (255 if (v > 255) else v))
 	n = _parseInt(_slice(c, 1, null), 16)
 	r = (int((int(n) >> int(16))) & int(255))
@@ -5395,7 +5395,7 @@ func paintGnd(q = null, D_2 = null, S = null, v = null, top = null):
 		offx = ((fmod((cr + v), 2) * BW) / 2.0)
 		i = -1
 		while (i < ((D_2 / float(BW)) + 1)):
-			bx = _round(((i * BW) + offx))
+			bx = floori(float(((i * BW) + offx)) + 0.5)
 			s = rnd((((cr * 7) + (i * 13)) + (v * 31)))
 			qp(q, bx, oy, (BW - 1), (CH_2 - 1), shade(S.get("gnd"), (0.93 + (s * 0.16))))
 			qp(q, bx, oy, (BW - 1), 1, shade(S.get("gnd"), 1.22))
@@ -5475,7 +5475,7 @@ func paintSpikes(q = null, D_2 = null):
 		h = 24
 		r = 0
 		while (r < h):
-			w = max(1, _round((((h - r) / float(h)) * 14)))
+			w = max(1, floori(float((((h - r) / float(h)) * 14)) + 0.5))
 			sx = ((bx + 8) - (int(w) >> int(1)))
 			yy = ((D_2 - 1) - r)
 			qp(q, sx, yy, w, 1, "#9aa2b8")
@@ -5520,7 +5520,7 @@ func drawTiles():
 			if (((not tt) or (cx < 0)) or (cx >= COLS)):
 				cx += 1
 				continue
-			x = _round(((cx * T) - cam))
+			x = floori(float(((cx * T) - cam)) + 0.5)
 			y = (cy * T)
 			if (tt == 1):
 				_c.top = (tileAt(cx, (cy - 1)) != 1)
@@ -5552,7 +5552,7 @@ func drawTiles():
 		if _i >= _len(mplats): break
 		m = mplats[_i]
 		x_2 = null
-		x_2 = _round((m.get("x") - cam))
+		x_2 = floori(float((m.get("x") - cam)) + 0.5)
 		if m.get("v"):
 			g.globalAlpha = 0.35
 			rect(((x_2 + ((m.get("w")) / 2.0)) - 1), (m.get("y0") - m.get("rg")), 2, (m.get("rg") + 6), "#3de8ff")
@@ -5565,7 +5565,7 @@ func drawTiles():
 		if _i_2 >= _len(_a): break
 		c = _a[_i_2]
 		x_3 = null
-		x_3 = (_round((c.get("x") - cam)) + 4)
+		x_3 = (floori(float((c.get("x") - cam)) + 0.5) + 4)
 		rect(x_3, (c.get("y") - 12), 2, 28, "#9aa0b0")
 		if c.get("on"):
 			rect((x_3 + 2), (c.get("y") - 12), 10, 2, "#2bb34a")
@@ -5594,8 +5594,8 @@ func drawEnemy(e = null):
 	wh = (e.get("fl", NAN) > 0)
 	ed = _ix(EDEF, e.get("type"))
 	if (e.get("type") == "X"):
-		x = _round(x)
-		y = _round(y)
+		x = floori(float(x) + 0.5)
+		y = floori(float(y) + 0.5)
 		shadow(x, e.get("x"), e.get("y"), 10, 12)
 		o = ("#fff" if wh else "#1a1530")
 		rect((x + 1), y, 8, 12, o)
@@ -5682,8 +5682,8 @@ func drawBoss(b = null):
 	if (not (b.get("dead"))):
 		shadow((b.get("x") - cam), b.get("x"), b.get("y"), b.get("w"), b.get("h"))
 		light(((b.get("x") - cam) + ((b.get("w")) / 2.0)), (b.get("y") + ((b.get("h")) / 2.0)), max(16, b.get("w")), (1 if (b.get("fl", NAN) > 0) else 0.55), ("#ff3d6e" if (b.get("ph", NAN) > 1) else "#ff8aa6"))
-	_c.x = _round((b.get("x") - cam))
-	_c.y = _round(b.get("y"))
+	_c.x = floori(float((b.get("x") - cam)) + 0.5)
+	_c.y = floori(float(b.get("y")) + 0.5)
 	_c.wh = _or((b.get("fl", NAN) > 0), _and(_and(_and(_and(_and(((b.get("actT", NAN) > 0) if b.get("act") else b.get("act")), (b.get("actT", NAN) < 40)), (int((int(b.get("actT")) >> int(2))) & int(1))), (b.get("act") != "burst")), (b.get("act") != "low")), (b.get("act") != "ground")))
 	if ((b.get("ph", NAN) > 1) and (not (b.get("dead")))):
 		g.globalAlpha = (0.16 + (0.06 * (int((int(t) >> int(3))) & int(1))))
@@ -5697,7 +5697,7 @@ func drawBoss(b = null):
 		if bok:
 			fw = (so.get("fw") * b.get("sc"))
 			fh = (so.get("fh") * b.get("sc"))
-			blitS(sk, int(b.get("a")), ((_c.x + ((b.get("w")) / 2.0)) - (fw / 2.0)), (((_c.y + b.get("h")) - fh) + _round(((fh - b.get("h")) * 0.4))), b.get("sc"), ((p.get("x", NAN) < b.get("x", NAN)) if (b.get("mt") == "f") else (b.get("dir", NAN) > 0)), _c.wh)
+			blitS(sk, int(b.get("a")), ((_c.x + ((b.get("w")) / 2.0)) - (fw / 2.0)), (((_c.y + b.get("h")) - fh) + floori(float(((fh - b.get("h")) * 0.4)) + 0.5)), b.get("sc"), ((p.get("x", NAN) < b.get("x", NAN)) if (b.get("mt") == "f") else (b.get("dir", NAN) > 0)), _c.wh)
 			if ((b.get("mt") == "s") and (b.get("act") != "stun")):
 				sx2 = (((_c.x + b.get("w")) - 2) if (b.get("dir", NAN) > 0) else (_c.x - 2))
 				rect(sx2, (_c.y + 4), 4, (b.get("h") - 6), ("#fff" if _c.wh else "#9aa0b0"))
@@ -5785,7 +5785,7 @@ func drawBoss(b = null):
 		g.globalAlpha = 1
 	if ((b.get("kind") == 4) and (b.get("act") == "aim")):
 		g.globalAlpha = (0.25 + (0.15 * (int((int(t) >> int(2))) & int(1))))
-		rect((_round((b.get("tx") - cam)) + 4), (_c.y + b.get("h")), (b.get("w") - 8), ((GY - _c.y) - b.get("h")), "#ff3d6e")
+		rect((floori(float((b.get("tx") - cam)) + 0.5) + 4), (_c.y + b.get("h")), (b.get("w") - 8), ((GY - _c.y) - b.get("h")), "#ff3d6e")
 		g.globalAlpha = 1
 	if (((b.get("kind") == 4) and (b.get("act") == "stun")) and (int((int(t) >> int(3))) & int(1))):
 		txt("!", ((_c.x + ((b.get("w")) / 2.0)) - 3), (_c.y - 12), "#ffd23f")
@@ -5798,7 +5798,7 @@ func drawBoss(b = null):
 		g.globalAlpha = 1
 	if ((b.get("kind") == 1) and (b.get("act") == "aim")):
 		g.globalAlpha = (0.25 + (0.15 * (int((int(t) >> int(2))) & int(1))))
-		rect((_round((b.get("tx") - cam)) + 4), (_c.y + b.get("h")), 20, ((GY - _c.y) - b.get("h")), "#ff3d6e")
+		rect((floori(float((b.get("tx") - cam)) + 0.5) + 4), (_c.y + b.get("h")), 20, ((GY - _c.y) - b.get("h")), "#ff3d6e")
 		g.globalAlpha = 1
 	if (((b.get("kind") == 3) and (b.get("act") == "wave")) and (b.get("actT", NAN) > 0)):
 		rect((_c.x - 8), (GY - 1), (b.get("w") + 16), 1, "#ffd23f")
@@ -5819,7 +5819,7 @@ func drawHazards():
 	var nose = null
 	var _a = null
 	var r = null
-	ax = _round((st.get("arenaX") - cam))
+	ax = floori(float((st.get("arenaX") - cam)) + 0.5)
 	for _i in range(_len(hazards)):
 		if _i >= _len(hazards): break
 		h = hazards[_i]
@@ -5828,7 +5828,7 @@ func drawHazards():
 		i = null
 		hh = null
 		if (h.get("k") == "wave"):
-			x = _round((h.get("x") - cam))
+			x = floori(float((h.get("x") - cam)) + 0.5)
 			cl = ["#3de8ff", "#ffd23f", "#ff3d6e", "#3de8ff"]
 			i = 0
 			while (i < 4):
@@ -5851,7 +5851,7 @@ func drawHazards():
 		y = null
 		k = null
 		nose = null
-		x_2 = _round((tr.get("x") - cam))
+		x_2 = floori(float((tr.get("x") - cam)) + 0.5)
 		y = tr.get("y")
 		rect(x_2, y, tr.get("w"), tr.get("h"), "#3a3f50")
 		rect(x_2, y, tr.get("w"), 3, "#6a7090")
@@ -5903,15 +5903,15 @@ func drawPlayer():
 	if ((not (blit(lookSheet(pst), int(p.get("anim")), (p.get("x") - cam), p.get("y"), p.get("w"), p.get("h"), (p.get("face", NAN) < 0), false))) and (not (blit("p_idle", int(p.get("anim")), (p.get("x") - cam), p.get("y"), p.get("w"), p.get("h"), (p.get("face", NAN) < 0), false)))):
 		spr(_concat((PBU if p.get("aimU") else PB), [legs]), PP, x, y, (p.get("face", NAN) < 0), false)
 	if p.get("aimU"):
-		gx = (_round(x) + (8 if (p.get("face", NAN) > 0) else 3))
+		gx = (floori(float(x) + 0.5) + (8 if (p.get("face", NAN) > 0) else 3))
 		rect(gx, (y + 3), 1, 4, "#c8ccd8")
 	if (p.get("mf", NAN) > 0):
 		if ((((p.get("aimU") and (not (K.get("ArrowLeft")))) and (not (K.get("ArrowRight")))) and (not (TS.get("L")))) and (not (TS.get("R")))):
-			mx = (_round(x) + (7 if (p.get("face", NAN) > 0) else 2))
-			my = (_round(y) - 1)
+			mx = (floori(float(x) + 0.5) + (7 if (p.get("face", NAN) > 0) else 2))
+			my = (floori(float(y) + 0.5) - 1)
 		else:
-			mx = (_round(x) + (12 if (p.get("face", NAN) > 0) else -4))
-			my = (_round(y) + 6)
+			mx = (floori(float(x) + 0.5) + (12 if (p.get("face", NAN) > 0) else -4))
+			my = (floori(float(y) + 0.5) + 6)
 		rect(mx, my, 4, 3, _ix(WPN, run.get("wpn")).get("c"))
 		rect((mx + 1), (my + 1), 2, 1, "#fff")
 		light((mx + 2), (my + 1), 18, 1, _ix(WPN, run.get("wpn")).get("c"))
@@ -5923,7 +5923,7 @@ func drawTitleHero():
 	var fr = null
 	var mx = null
 	var my = null
-	hx = _round((W * 0.13))
+	hx = floori(float((W * 0.13)) + 0.5)
 	hy = (GY - p.get("h"))
 	fr = int((t / 7.0))
 	shadow(hx, (hx + cam), hy, p.get("w"), p.get("h"))
@@ -5993,7 +5993,7 @@ func drawHUD():
 	full = (run.get("bass", NAN) >= 100)
 	rect(bx, 14, 46, 6, "#06070d")
 	rect((bx + 1), 15, 44, 4, "#2a1a10")
-	rect((bx + 1), 15, _round(((44 * run.get("bass")) / 100.0)), 4, (("#fff" if (int((int(t) >> int(3))) & int(1)) else "#ffd23f") if full else "#c08a20"))
+	rect((bx + 1), 15, floori(float(((44 * run.get("bass")) / 100.0)) + 0.5), 4, (("#fff" if (int((int(t) >> int(3))) & int(1)) else "#ffd23f") if full else "#c08a20"))
 	rect((bx + 48), 15, 4, 4, ("#1d3a2a" if (p.get("dashCd", NAN) > 0) else "#4dff88"))
 	if (full and (not (int(t) & int(32)))):
 		txt(("¡BASS!" if touchMode() else "V: BASS"), (bx + 56), 13, "#ffd23f")
@@ -6017,7 +6017,7 @@ func drawHUD():
 		txt(bn, tcx, 4, ("#ff8aa6" if (boss.get("ph", NAN) > 1) else "#eef3ff"), "c")
 		rect((bxx - 1), 14, (bw + 2), 7, "#000")
 		rect(bxx, 15, bw, 5, "#3a0a18")
-		rect(bxx, 15, max(0, _round(((bw * boss.get("hp")) / float(boss.get("max"))))), 5, ("#fff" if (boss.get("fl", NAN) > 0) else "#ff3d6e"))
+		rect(bxx, 15, max(0, floori(float(((bw * boss.get("hp")) / float(boss.get("max")))) + 0.5)), 5, ("#fff" if (boss.get("fl", NAN) > 0) else "#ff3d6e"))
 		if (boss.get("kind") == 3):
 			rect((bxx + (bw * 0.33)), 15, 1, 5, "#000")
 			rect((bxx + (bw * 0.66)), 15, 1, 5, "#000")
@@ -6080,7 +6080,7 @@ func draw():
 	var a = null
 	var o = null
 	g.save()
-	g.setTransform(SC, 0, 0, SC, 0, (-(_round(camY)) * SC))
+	g.setTransform(SC, 0, 0, SC, 0, (-(floori(float(camY) + 0.5)) * SC))
 	if (sh > 0):
 		g.translate(int(((_rnd() * 4) - 2)), int(((_rnd() * 4) - 2)))
 	if (not st):
@@ -6096,8 +6096,8 @@ func draw():
 		y = null
 		w = null
 		c = null
-		x = _round((k.get("x") - cam))
-		y = _round((k.get("y") + ((sin(((t * 0.08) + k.get("x"))) * 1.5) if k.get("stat") else 0)))
+		x = floori(float((k.get("x") - cam)) + 0.5)
+		y = floori(float((k.get("y") + ((sin(((t * 0.08) + k.get("x"))) * 1.5) if k.get("stat") else 0))) + 0.5)
 		if (((k.get("l", NAN) > 0) and (k.get("l", NAN) < 100)) and (int((int(k.get("l")) >> int(3))) & int(1))):
 			continue
 		shadow(x, k.get("x"), k.get("y"), k.get("w"), k.get("h"))
@@ -6136,8 +6136,8 @@ func draw():
 		x_2 = null
 		y_2 = null
 		c_2 = null
-		x_2 = _round((b.get("x") - cam))
-		y_2 = _round(b.get("y"))
+		x_2 = floori(float((b.get("x") - cam)) + 0.5)
+		y_2 = floori(float(b.get("y")) + 0.5)
 		c_2 = _ix(WPN, b.get("w")).get("c")
 		if (b.get("w") == "L"):
 			g.strokeStyle = c_2
@@ -6160,8 +6160,8 @@ func draw():
 		x_3 = null
 		y_3 = null
 		r = null
-		x_3 = _round((q.get("x") - cam))
-		y_3 = _round(q.get("y"))
+		x_3 = floori(float((q.get("x") - cam)) + 0.5)
+		y_3 = floori(float(q.get("y")) + 0.5)
 		r = q.get("r")
 		rect((x_3 - r), ((y_3 - r) + 1), (r * 2), ((r * 2) - 2), q.get("c"))
 		rect(((x_3 - r) + 1), (y_3 - r), ((r * 2) - 2), (r * 2), q.get("c"))
@@ -6197,17 +6197,17 @@ func draw():
 		hc = HS
 		cutQ()
 		HS = (HS * UIF)
-		HW = _round((W / float(HS)))
-		HH = _round((H / float(HS)))
+		HW = floori(float((W / float(HS))) + 0.5)
+		HH = floori(float((H / float(HS))) + 0.5)
 		drawCut()
 		HS = hc
-		HW = _round((W / float(HS)))
-		HH = _round((H / float(HS)))
+		HW = floori(float((W / float(HS))) + 0.5)
+		HH = floori(float((H / float(HS))) + 0.5)
 		return
 	hs0 = HS
 	HS = (HS * UIF)
-	HW = _round((W / float(HS)))
-	HH = _round((H / float(HS)))
+	HW = floori(float((W / float(HS))) + 0.5)
+	HH = floori(float((H / float(HS))) + 0.5)
 	g.save()
 	g.setTransform((SC * HS), 0, 0, (SC * HS), 0, 0)
 	drawHUD()
@@ -6231,6 +6231,6 @@ func draw():
 		txt("VIDAS: " + str(run.get("lives")), (HW / 2.0), (HH * 0.55), "#eef3ff", "c")
 	g.restore()
 	HS = hs0
-	HW = _round((W / float(HS)))
-	HH = _round((H / float(HS)))
+	HW = floori(float((W / float(HS))) + 0.5)
+	HH = floori(float((H / float(HS))) + 0.5)
 

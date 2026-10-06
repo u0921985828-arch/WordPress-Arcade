@@ -161,7 +161,7 @@ const CTX_METHODS = new Set(['fillRect', 'clearRect', 'drawImage', 'save', 'rest
   'rect', 'arc', 'fill', 'stroke', 'clip', 'measureText', 'fillText', 'setTransform', 'translate', 'scale', 'createLinearGradient',
   'getImageData', 'putImageData', 'createImageData', 'getContext', 'addColorStop', 'strokeRect']);
 const MATH = {
-  floor: a => `floori(${a})`, ceil: a => `ceili(${a})`, round: a => `_round(${a})`, abs: a => `absf(${a})`,
+  floor: a => `floori(${a})`, ceil: a => `ceili(${a})`, round: a => `floori(float(${a}) + 0.5)`, abs: a => `absf(${a})`,
   sqrt: a => `sqrt(${a})`, sin: a => `sin(${a})`, cos: a => `cos(${a})`, atan2: (a, b) => `atan2(${a}, ${b})`, atan: a => `atan(${a})`,
   pow: (a, b) => `pow(${a}, ${b})`, exp: a => `exp(${a})`, log: a => `log(${a})`, sign: a => `signf(${a})`, trunc: a => `int(${a})`,
   random: () => `_rnd()`, hypot: (a, b) => `_hypot(${a}, ${b})`, tan: a => `tan(${a})`, asin: a => `asin(${a})`, acos: a => `acos(${a})`,
