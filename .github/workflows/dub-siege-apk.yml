@@ -5,8 +5,10 @@ on:
   push:
     branches: [ claude/new-session-6j6z2y, main ]
     paths:
-      - 'dub-siege/android/**'
-      - 'dub-siege/dub-siege.html'
+      - 'dub-siege/godot/**'
+      - 'dub-siege/art/**'
+      - 'dub-siege/project.godot'
+      - 'dub-siege/export_presets.cfg'
       - '.github/workflows/dub-siege-apk.yml'
 
 permissions:
@@ -15,18 +17,40 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      GODOT: "4.7.2"
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: '17' }
-      # El runner ya trae el SDK de Android (ANDROID_HOME); setup-android fallaba.
-      - name: Compilar APK
-        working-directory: dub-siege/android
+      - name: Godot y plantillas de exportación
         run: |
-          chmod +x gradlew
-          ./gradlew --no-daemon assembleRelease
-      - name: Renombrar
-        run: cp dub-siege/android/app/build/outputs/apk/release/app-release.apk DubSiege.apk
+          base=https://github.com/godotengine/godot-builds/releases/download/${GODOT}-stable
+          curl -sSLo g.zip $base/Godot_v${GODOT}-stable_linux.x86_64.zip
+          unzip -q g.zip && mv Godot_v${GODOT}-stable_linux.x86_64 /usr/local/bin/godot
+          curl -sSLo t.tpz $base/Godot_v${GODOT}-stable_export_templates.tpz
+          d=~/.local/share/godot/export_templates/${GODOT}.stable
+          mkdir -p $d
+          unzip -q -j t.tpz 'templates/android_*' 'templates/version.txt' -d $d
+          rm -f t.tpz g.zip; ls $d
+          mkdir -p ~/.config/godot
+          printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\nexport/android/android_sdk_path = "%s"\nexport/android/java_sdk_path = "%s"\n' "$ANDROID_HOME" "$JAVA_HOME" > ~/.config/godot/editor_settings-4.7.tres
+      - name: Exportar APK (Godot, nativo)
+        working-directory: dub-siege
+        env:
+          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ github.workspace }}/dub-siege/android/app/kuboplay.keystore
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: kuboplay
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: kuboplay
+        run: |
+          # versionCode siempre por encima del de la version webview (que usaba el n.º de ejecucion)
+          sed -i "s/^version\/code=.*/version\/code=$((GITHUB_RUN_NUMBER + 1000))/; s/^version\/name=.*/version\/name=\"2.0.$GITHUB_RUN_NUMBER\"/" export_presets.cfg
+          timeout 600 godot --headless --import || true
+          timeout 900 godot --headless --export-release Android ../DubSiege.apk
+      - name: Comprobar que es nativo
+        run: |
+          ls -la DubSiege.apk
+          unzip -l DubSiege.apk | grep -q libgodot_android.so
+          unzip -p DubSiege.apk AndroidManifest.xml | strings | grep -qi webview && { echo 'trae webview'; exit 1; } || echo 'sin webview'
       - uses: actions/upload-artifact@v4
         with: { name: apk, path: DubSiege.apk, if-no-files-found: error }
       - name: Publicar en la descarga fija
@@ -34,7 +58,7 @@ jobs:
         with:
           tag_name: dub-siege-apk
           name: Dub Siege (APK Android)
-          body: Último APK de Dub Siege. Descárgalo en el móvil y ábrelo para instalarlo.
+          body: Último APK de Dub Siege (app nativa hecha con Godot). Descárgalo en el móvil y ábrelo para instalarlo.
           files: DubSiege.apk
           prerelease: true
           make_latest: false
@@ -65,8 +89,7 @@ jobs:
           script: |
             adb install -r DubSiege.apk
             adb logcat -c
-            adb shell am start -n online.kuboplay.dubsiege/.MainActivity
-            adb shell dumpsys package com.google.android.webview | grep versionName | head -1
+            adb shell am start -n online.kuboplay.dubsiege/com.godot.game.GodotApp
             sleep 15
             adb exec-out screencap -p > 1-arranque.png
             adb shell input keyevent KEYCODE_ENTER
@@ -76,11 +99,11 @@ jobs:
             sleep 2
             adb exec-out screencap -p > 3-atras.png
             adb logcat -d > logcat.txt
-            adb shell dumpsys activity activities | grep -q 'online.kuboplay.dubsiege/.MainActivity'
+            adb shell dumpsys activity activities | grep -q 'online.kuboplay.dubsiege/com.godot.game.GodotApp'
             ! grep -q 'FATAL EXCEPTION' logcat.txt
       - name: Errores de la página
         if: always()
-        run: grep -E 'DubSiege' logcat.txt || echo 'sin mensajes de la pagina'
+        run: grep -E 'godot|SCRIPT ERROR' logcat.txt | head -100 || echo 'sin mensajes'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
