@@ -8,6 +8,7 @@ extends Node2D
 var game: Game
 var args := {}
 var nframe := 0
+var pad: TouchPad
 
 
 func _ready() -> void:
@@ -16,8 +17,16 @@ func _ready() -> void:
 		args[kv[0]] = kv[1] if kv.size() > 1 else "1"
 	game = Game.new()
 	game.g = Ctx.new(get_canvas_item())
-	game.touch_ui = DisplayServer.is_touchscreen_available()
+	game.touch_ui = DisplayServer.is_touchscreen_available() or args.has("touch")
+	if args.has("dpr"):
+		game.dpr_override = float(args.dpr)
 	game.boot()
+	# mandos tactiles en su capa, por debajo de los menus (capa 5 en la web)
+	var tl := CanvasLayer.new()
+	tl.layer = 4
+	add_child(tl)
+	pad = TouchPad.new(game)
+	tl.add_child(pad)
 	_resize()
 	get_viewport().size_changed.connect(_resize)
 	if args.has("warp"):
@@ -26,6 +35,12 @@ func _ready() -> void:
 		game.mode = "play"
 	else:
 		game.showMenu()
+	if args.has("test"):
+		var t: Node = load(args.test).new()
+		t.set("main", self)
+		t.set("game", game)
+		add_child(t)
+		t.call_deferred("run")
 
 
 func _resize() -> void:
@@ -35,6 +50,10 @@ func _resize() -> void:
 	var r := Rect2(Vector2(sa.position - win), Vector2(sa.size)).intersection(Rect2(Vector2.ZERO, game.view_size))
 	game.safe = r if r.has_area() and OS.has_feature("mobile") else Rect2(Vector2.ZERO, game.view_size)
 	game.fitW()
+	# el lienzo recorta como un <canvas>: lo que el juego pinta fuera no se ve
+	var ci := get_canvas_item()
+	RenderingServer.canvas_item_set_custom_rect(ci, true, Rect2(0, 0, game.cv.width, game.cv.height))
+	RenderingServer.canvas_item_set_clip(ci, true)
 
 
 func _process(dt: float) -> void:

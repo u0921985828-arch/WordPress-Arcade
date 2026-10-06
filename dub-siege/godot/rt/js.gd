@@ -535,3 +535,35 @@ func _aset(o: Variant, k: Variant, v: Variant) -> void:
 		o[_key(k)] = v
 	elif o is Object:
 		o.set(str(k), v)
+
+
+## parseInt de JS: lee el prefijo valido en la base dada (16 para colores).
+func _parseInt(s: Variant, radix: int = 10) -> Variant:
+	if s is int:
+		return s
+	if s is float:
+		return int(s)
+	var t := str(s).strip_edges()
+	if radix == 16:
+		if t.begins_with("0x") or t.begins_with("0X"):
+			t = t.substr(2)
+		var n := 0
+		for ch in t:
+			var d := "0123456789abcdef".find(ch.to_lower())
+			if d < 0:
+				break
+			n = n * 16 + d
+		return n
+	var neg := t.begins_with("-")
+	if neg or t.begins_with("+"):
+		t = t.substr(1)
+	var m := 0
+	var any := false
+	for ch in t:
+		if ch < "0" or ch > "9":
+			break
+		m = m * 10 + int(ch)
+		any = true
+	if not any:
+		return NAN
+	return -m if neg else m

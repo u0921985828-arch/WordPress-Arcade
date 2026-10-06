@@ -32,5 +32,5 @@ func toggle(c: String, force: Variant = null) -> bool:
 
 
 func _changed() -> void:
-	if el and el.on_change.is_valid():
-		el.on_change.call(el)
+	if el:
+		el._changed()

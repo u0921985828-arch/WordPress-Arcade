@@ -125,8 +125,16 @@ func uiFit() -> void:
 	UIF = clampf(f, 0.5, 1.0)
 
 
+## Pixeles fisicos por px CSS (lo que en la web es devicePixelRatio). En Android
+## screen_get_scale() vale 1: la densidad sale de los ppp (160 ppp = 1).
+## dpr_override (--dpr=N en main.gd) lo fija para probar en escritorio.
+var dpr_override := 0.0
 func _dpr() -> float:
-	return maxf(1.0, DisplayServer.screen_get_scale()) if OS.has_feature("mobile") else 1.0
+	if dpr_override > 0.0:
+		return dpr_override
+	if OS.has_feature("mobile"):
+		return maxf(1.0, DisplayServer.screen_get_dpi() / 160.0)
+	return 1.0
 
 
 func titleTop() -> void:

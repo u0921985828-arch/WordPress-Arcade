@@ -162,6 +162,8 @@ class T {
 
   // ---------------- funciones
   method(name, fnNode, ownerScope) {
+    const _keepFins = this.fins; this.fins = [];
+    try {
     const gfn = new GFn(null);
     const sc = new Scope(null, gfn, 'fn');
     const params = fnNode.params.map(p => { const g = gfn.fresh(p.name); sc.names.set(p.name, g); return g; });
@@ -169,6 +171,7 @@ class T {
     L.body(fnNode, sc);
     const head = `func ${gdName(name)}(${params.map(p => p + ' = null').join(', ')}):`;
     return [`# L${fnNode.loc.start.line + lineBase - 1}`, head, ...L.wrapHoist(sc), ...(L.lines.length ? L.lines : ['\tpass'])];
+      } finally { this.fins = _keepFins; }
   }
   wrapHoist(sc) { return sc.gfn.hoist.map(h => '\t'.repeat(this.ind) + h); }
 
@@ -187,8 +190,38 @@ class T {
     return fns;
   }
 
+  // Las lambdas de GDScript copian los locales que capturan al crearse: un
+  // local que una funcion anidada lee o escribe y que cambia despues (o que la
+  // lambda cambia) no se veria. Esos locales viven en un diccionario de la
+  // llamada (_c.x), que si se comparte por referencia entre la funcion y sus lambdas.
+  boxCaptured(fnNode, stmts, sc) {
+    const own = new Set(fnNode.params.map(p => p.name));
+    collectVars(stmts, own);
+    const capt = new Set();
+    const self = this;
+    (function rec(n, parent) {
+      if (!n || typeof n !== 'object') return;
+      if (Array.isArray(n)) { n.forEach(x => rec(x, parent)); return; }
+      const isF = isFn(n) || n.type === 'FunctionDeclaration';
+      if (isF) {
+        const inline = parent && isInlineForEach(parent) && parent.arguments[0] === n && !hasLoopReturn(n.body);
+        if (!inline) { for (const id of freeIds(n)) if (own.has(id)) capt.add(id); return; }
+      }
+      for (const k in n) if (k !== 'loc' && n[k] && typeof n[k] === 'object') rec(n[k], n);
+    })(stmts, null);
+    if (!capt.size) return;
+    const box = sc.gfn.fresh('_c');
+    const init = [];
+    for (const v of capt) {
+      const prm = sc.names.has(v) ? sc.names.get(v) : null;
+      init.push(`"${gdName(v)}": ${prm || 'null'}`);
+      sc.names.set(v, `${box}.${gdName(v)}`);
+    }
+    sc.gfn.hoist.push(`var ${box} = {${init.join(', ')}}`);
+  }
   body(fnNode, sc) {
     const stmts = fnNode.body.type === 'BlockStatement' ? fnNode.body.body : [{ type: 'ReturnStatement', argument: fnNode.body, loc: fnNode.body.loc }];
+    this.boxCaptured(fnNode, stmts, sc);
     const fns = this.declare(sc, stmts);
     // funciones anidadas: lambdas al principio (ver aviso si leen locales que cambian despues)
     for (const f of fns) {
@@ -200,6 +233,8 @@ class T {
     this.stmts(stmts, sc);
   }
   lambdaInto(target, fnNode, sc, assign) {
+    const _keepFins = this.fins; this.fins = [];
+    try {
     const gfn = new GFn(sc.gfn);
     const ls = new Scope(sc, gfn, 'fn');
     const params = fnNode.params.map(p => { const g = gfn.fresh(p.name); ls.names.set(p.name, g); return g; });
@@ -211,6 +246,7 @@ class T {
     const body = [...gfn.hoist.map(h => '\t' + h), ...(L.lines.length ? L.lines : ['\tpass'])];
     if (this.pre) this.pre.push(head, ...body.map(l => '\u0001' + l));
     else { this.emit(head); body.forEach(l => this.emit(l)); }
+      } finally { this.fins = _keepFins; }
   }
 
   // ---------------- sentencias
@@ -252,9 +288,12 @@ class T {
           if (s.argument) { const [v, pre] = this.withPre(() => this.expr(s.argument, sc)); this.flushPre(pre); if (!/^[\w.]+$/.test(v)) this.emit(v); }
           this.emitContinue(lp); return;
         }
-        if (!s.argument) return this.emit('return');
+        const fins = (this.fins || []).slice().reverse();
+        const runFins = () => { const keep = this.fins; this.fins = []; for (const f of fins) this.stmts(f, sc); this.fins = keep; };
+        if (!s.argument) { runFins(); return this.emit('return'); }
         const [v, pre] = this.withPre(() => this.expr(s.argument, sc));
         this.flushPre(pre);
+        if (fins.length) { const t = sc.gfn.fresh('_ret'); this.emit(`var ${t} = ${v}`); runFins(); return this.emit(`return ${t}`); }
         return this.emit(`return ${v}`);
       }
       case 'IfStatement': return this.ifStmt(s, sc, false);
@@ -290,9 +329,15 @@ class T {
         return this.emitContinue(this.loops[this.loops.length - 1]);
       }
       case 'SwitchStatement': return this.switchStmt(s, sc);
-      case 'TryStatement':
+      case 'TryStatement': {
+        // sin excepciones en GDScript: el catch se pierde; el finally se pinta al
+        // final del bloque y antes de cada return de dentro.
+        const fin = s.finalizer ? s.finalizer.body : null;
+        if (fin) (this.fins = this.fins || []).push(fin);
         this.stmts(s.block.body, sc);
+        if (fin) { this.fins.pop(); this.stmts(fin, sc); }
         return;
+      }
       case 'ThrowStatement': { const [v, pre] = this.withPre(() => this.expr(s.argument, sc)); this.flushPre(pre); return this.emit(`push_error(str(${v}))`); }
       case 'LabeledStatement': warn(s, 'etiqueta ' + s.label.name); return this.stmt(s.body, sc);
       default: warn(s, 'sentencia no soportada ' + s.type); this.emit('pass # ' + s.type);
@@ -663,7 +708,11 @@ class T {
       case '%': return `fmod(${l}, ${r})`;
       case '===': case '==': return `(${l} == ${r})`;
       case '!==': case '!=': return `(${l} != ${r})`;
-      case '<': case '>': case '<=': case '>=': return `(${l} ${op} ${r})`;
+      case '<': case '>': case '<=': case '>=': {
+        // undefined < n es falso en JS: una propiedad que falta se lee como NAN (compara falso)
+        const nn = x => x.replace(/\.get\(("[^"]+")\)$/, '.get($1, NAN)');
+        return `(${nn(l)} ${op} ${nn(r)})`;
+      }
       case '|':
         if (e.right.type === 'Literal' && e.right.value === 0) return `int(${l})`;
         return `(int(${l}) | int(${r}))`;
@@ -703,7 +752,7 @@ class T {
       const a = this.args(e, sc);
       const hit = sc.lookup(n);
       if (hit) return `${hit.gd}.call(${a.join(', ')})`;
-      const G = { parseInt: x => `int(${x[0]})`, parseFloat: x => `float(${x[0]})`, isNaN: x => `is_nan(float(${x[0]}))`, String: x => `str(${x[0]})`,
+      const G = { parseInt: x => `_parseInt(${x[0]}, ${x[1] || 10})`, parseFloat: x => `float(${x[0]})`, isNaN: x => `is_nan(float(${x[0]}))`, String: x => `str(${x[0]})`,
         Number: x => `_num(${x[0]})`, isFinite: x => `is_finite(float(${x[0]}))`, Boolean: x => `bool(${x[0]})`, setTimeout: x => `_timeout(${x.join(', ')})`,
         clearTimeout: x => `_untimeout(${x[0]})`, requestAnimationFrame: x => `_raf(${x[0]})`, cancelAnimationFrame: x => `_unraf(${x[0]})` };
       if (G[n]) return G[n](a);
@@ -795,6 +844,23 @@ function walkNoLoop(n, f) {
   if (isFn(n) || n.type === 'FunctionDeclaration' || /^(For|ForIn|ForOf|While|DoWhile|Switch)Statement$/.test(n.type) || isInlineForEachLike(n)) return;
   if (n.type) f(n);
   for (const k in n) if (k !== 'loc' && n[k] && typeof n[k] === 'object') walkNoLoop(n[k], f);
+}
+// identificadores que una funcion usa sin declararlos (sin claves de objeto ni .prop)
+function freeIds(fnNode) {
+  const decl = declaredIn(fnNode), out = new Set();
+  (function rec(n, parent, key) {
+    if (!n || typeof n !== 'object') return;
+    if (Array.isArray(n)) { n.forEach(x => rec(x, parent, key)); return; }
+    if (n.type === 'Identifier') {
+      if (parent && parent.type === 'MemberExpression' && key === 'property' && !parent.computed) return;
+      if (parent && parent.type === 'Property' && key === 'key' && !parent.computed) return;
+      if (!decl.has(n.name)) out.add(n.name);
+      return;
+    }
+    for (const k in n) if (k !== 'loc' && n[k] && typeof n[k] === 'object') rec(n[k], n, k);
+  })(fnNode.body, null, null);
+  if (fnNode.type === 'FunctionDeclaration' && fnNode.id) out.delete(fnNode.id.name);
+  return out;
 }
 function usesId(fnNode, n) { let u = false; walk(fnNode.body, x => { if (x.type === 'Identifier' && x.name === n) u = true; }); return u; }
 

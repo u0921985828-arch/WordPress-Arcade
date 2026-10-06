@@ -1,0 +1,818 @@
+[
+ {
+  "name": "m0_C",
+  "late": 0,
+  "sec": 55.65,
+  "kb": 405,
+  "peak_db": -16.77,
+  "rms_db": -26.21,
+  "rms_min_db": -27.38,
+  "rms_max_db": -25.61
+ },
+ {
+  "name": "m0_P1",
+  "late": 0,
+  "sec": 111.3,
+  "kb": 891,
+  "peak_db": -12.49,
+  "rms_db": -24.69,
+  "rms_min_db": -25.31,
+  "rms_max_db": -24.05
+ },
+ {
+  "name": "m0_P2",
+  "late": 0,
+  "sec": 111.3,
+  "kb": 898,
+  "peak_db": -11.6,
+  "rms_db": -24.56,
+  "rms_min_db": -25.3,
+  "rms_max_db": -23.88
+ },
+ {
+  "name": "m0_P3",
+  "late": 0,
+  "sec": 111.3,
+  "kb": 899,
+  "peak_db": -11.6,
+  "rms_db": -24.54,
+  "rms_min_db": -25.28,
+  "rms_max_db": -23.87
+ },
+ {
+  "name": "m0_X",
+  "late": 0,
+  "sec": 27.83,
+  "kb": 232,
+  "peak_db": -11.03,
+  "rms_db": -24.14,
+  "rms_min_db": -24.67,
+  "rms_max_db": -23.71
+ },
+ {
+  "name": "m10_C",
+  "late": 0,
+  "sec": 54.86,
+  "kb": 418,
+  "peak_db": -14.62,
+  "rms_db": -25.58,
+  "rms_min_db": -26.78,
+  "rms_max_db": -24.56
+ },
+ {
+  "name": "m10_P1",
+  "late": 0,
+  "sec": 109.71,
+  "kb": 1035,
+  "peak_db": -12.91,
+  "rms_db": -25.34,
+  "rms_min_db": -26.44,
+  "rms_max_db": -23.38
+ },
+ {
+  "name": "m10_P2",
+  "late": 0,
+  "sec": 109.71,
+  "kb": 1023,
+  "peak_db": -12.14,
+  "rms_db": -25.26,
+  "rms_min_db": -26.29,
+  "rms_max_db": -23.31
+ },
+ {
+  "name": "m10_P3",
+  "late": 0,
+  "sec": 109.71,
+  "kb": 1029,
+  "peak_db": -12.07,
+  "rms_db": -25.19,
+  "rms_min_db": -26.2,
+  "rms_max_db": -23.18
+ },
+ {
+  "name": "m10_X",
+  "late": 0,
+  "sec": 27.43,
+  "kb": 260,
+  "peak_db": -10.48,
+  "rms_db": -24.05,
+  "rms_min_db": -24.84,
+  "rms_max_db": -23.26
+ },
+ {
+  "name": "m11_C",
+  "late": 0,
+  "sec": 51.89,
+  "kb": 390,
+  "peak_db": -15.87,
+  "rms_db": -26.25,
+  "rms_min_db": -27.11,
+  "rms_max_db": -25.5
+ },
+ {
+  "name": "m11_P1",
+  "late": 0,
+  "sec": 103.78,
+  "kb": 759,
+  "peak_db": -11.77,
+  "rms_db": -25.27,
+  "rms_min_db": -41.51,
+  "rms_max_db": -23.7
+ },
+ {
+  "name": "m11_P2",
+  "late": 0,
+  "sec": 103.78,
+  "kb": 803,
+  "peak_db": -11.79,
+  "rms_db": -25.22,
+  "rms_min_db": -35.85,
+  "rms_max_db": -23.82
+ },
+ {
+  "name": "m11_P3",
+  "late": 0,
+  "sec": 103.78,
+  "kb": 865,
+  "peak_db": -11.47,
+  "rms_db": -24.62,
+  "rms_min_db": -35.72,
+  "rms_max_db": -23.02
+ },
+ {
+  "name": "m11_X",
+  "late": 0,
+  "sec": 25.95,
+  "kb": 250,
+  "peak_db": -10.39,
+  "rms_db": -23.69,
+  "rms_min_db": -24.54,
+  "rms_max_db": -22.61
+ },
+ {
+  "name": "m1_C",
+  "late": 0,
+  "sec": 50.53,
+  "kb": 393,
+  "peak_db": -16.14,
+  "rms_db": -26.71,
+  "rms_min_db": -27.68,
+  "rms_max_db": -25.28
+ },
+ {
+  "name": "m1_P1",
+  "late": 0,
+  "sec": 101.05,
+  "kb": 803,
+  "peak_db": -11.84,
+  "rms_db": -25.33,
+  "rms_min_db": -26.49,
+  "rms_max_db": -24.27
+ },
+ {
+  "name": "m1_P2",
+  "late": 0,
+  "sec": 101.05,
+  "kb": 868,
+  "peak_db": -11.87,
+  "rms_db": -25.15,
+  "rms_min_db": -26.17,
+  "rms_max_db": -24.25
+ },
+ {
+  "name": "m1_P3",
+  "late": 0,
+  "sec": 101.05,
+  "kb": 868,
+  "peak_db": -11.87,
+  "rms_db": -25.15,
+  "rms_min_db": -26.16,
+  "rms_max_db": -24.24
+ },
+ {
+  "name": "m1_X",
+  "late": 0,
+  "sec": 25.26,
+  "kb": 220,
+  "peak_db": -9.55,
+  "rms_db": -24.08,
+  "rms_min_db": -24.99,
+  "rms_max_db": -23.09
+ },
+ {
+  "name": "m2_C",
+  "late": 0,
+  "sec": 101.05,
+  "kb": 596,
+  "peak_db": -16.69,
+  "rms_db": -27.3,
+  "rms_min_db": -28.81,
+  "rms_max_db": -25.86
+ },
+ {
+  "name": "m2_P1",
+  "late": 0,
+  "sec": 202.11,
+  "kb": 1277,
+  "peak_db": -13.16,
+  "rms_db": -25.04,
+  "rms_min_db": -25.67,
+  "rms_max_db": -24.41
+ },
+ {
+  "name": "m2_P2",
+  "late": 0,
+  "sec": 202.11,
+  "kb": 1290,
+  "peak_db": -12.73,
+  "rms_db": -24.8,
+  "rms_min_db": -25.5,
+  "rms_max_db": -24.26
+ },
+ {
+  "name": "m2_P3",
+  "late": 0,
+  "sec": 202.11,
+  "kb": 1295,
+  "peak_db": -12.51,
+  "rms_db": -24.8,
+  "rms_min_db": -25.43,
+  "rms_max_db": -24.21
+ },
+ {
+  "name": "m2_X",
+  "late": 0,
+  "sec": 50.53,
+  "kb": 352,
+  "peak_db": -13.29,
+  "rms_db": -24.59,
+  "rms_min_db": -24.98,
+  "rms_max_db": -24.1
+ },
+ {
+  "name": "m3_C",
+  "late": 0,
+  "sec": 44.65,
+  "kb": 327,
+  "peak_db": -16.32,
+  "rms_db": -27.0,
+  "rms_min_db": -28.16,
+  "rms_max_db": -25.72
+ },
+ {
+  "name": "m3_P1",
+  "late": 0,
+  "sec": 89.3,
+  "kb": 655,
+  "peak_db": -11.22,
+  "rms_db": -24.88,
+  "rms_min_db": -25.49,
+  "rms_max_db": -24.31
+ },
+ {
+  "name": "m3_P2",
+  "late": 0,
+  "sec": 89.3,
+  "kb": 731,
+  "peak_db": -11.4,
+  "rms_db": -24.63,
+  "rms_min_db": -25.16,
+  "rms_max_db": -24.01
+ },
+ {
+  "name": "m3_P3",
+  "late": 0,
+  "sec": 89.3,
+  "kb": 776,
+  "peak_db": -11.4,
+  "rms_db": -24.56,
+  "rms_min_db": -25.22,
+  "rms_max_db": -23.94
+ },
+ {
+  "name": "m3_X",
+  "late": 0,
+  "sec": 22.33,
+  "kb": 210,
+  "peak_db": -10.52,
+  "rms_db": -23.87,
+  "rms_min_db": -24.28,
+  "rms_max_db": -23.43
+ },
+ {
+  "name": "m4_C",
+  "late": 0,
+  "sec": 91.43,
+  "kb": 600,
+  "peak_db": -16.04,
+  "rms_db": -26.26,
+  "rms_min_db": -27.74,
+  "rms_max_db": -25.09
+ },
+ {
+  "name": "m4_P1",
+  "late": 0,
+  "sec": 182.86,
+  "kb": 1190,
+  "peak_db": -10.9,
+  "rms_db": -25.85,
+  "rms_min_db": -30.68,
+  "rms_max_db": -23.58
+ },
+ {
+  "name": "m4_P2",
+  "late": 0,
+  "sec": 182.86,
+  "kb": 1373,
+  "peak_db": -9.59,
+  "rms_db": -25.76,
+  "rms_min_db": -30.66,
+  "rms_max_db": -23.52
+ },
+ {
+  "name": "m4_P3",
+  "late": 0,
+  "sec": 182.86,
+  "kb": 1559,
+  "peak_db": -9.85,
+  "rms_db": -25.7,
+  "rms_min_db": -30.51,
+  "rms_max_db": -23.42
+ },
+ {
+  "name": "m4_X",
+  "late": 0,
+  "sec": 45.71,
+  "kb": 374,
+  "peak_db": -11.19,
+  "rms_db": -24.31,
+  "rms_min_db": -25.36,
+  "rms_max_db": -22.71
+ },
+ {
+  "name": "m5_C",
+  "late": 0,
+  "sec": 51.2,
+  "kb": 418,
+  "peak_db": -16.18,
+  "rms_db": -26.75,
+  "rms_min_db": -27.9,
+  "rms_max_db": -25.83
+ },
+ {
+  "name": "m5_P1",
+  "late": 0,
+  "sec": 102.4,
+  "kb": 882,
+  "peak_db": -12.03,
+  "rms_db": -26.11,
+  "rms_min_db": -27.9,
+  "rms_max_db": -24.42
+ },
+ {
+  "name": "m5_P2",
+  "late": 0,
+  "sec": 102.4,
+  "kb": 950,
+  "peak_db": -11.92,
+  "rms_db": -25.99,
+  "rms_min_db": -27.78,
+  "rms_max_db": -24.31
+ },
+ {
+  "name": "m5_P3",
+  "late": 0,
+  "sec": 102.4,
+  "kb": 949,
+  "peak_db": -11.45,
+  "rms_db": -25.82,
+  "rms_min_db": -27.69,
+  "rms_max_db": -23.94
+ },
+ {
+  "name": "m5_X",
+  "late": 0,
+  "sec": 25.6,
+  "kb": 240,
+  "peak_db": -11.86,
+  "rms_db": -24.27,
+  "rms_min_db": -24.94,
+  "rms_max_db": -23.81
+ },
+ {
+  "name": "m6_C",
+  "late": 0,
+  "sec": 53.33,
+  "kb": 412,
+  "peak_db": -15.9,
+  "rms_db": -26.28,
+  "rms_min_db": -27.08,
+  "rms_max_db": -25.37
+ },
+ {
+  "name": "m6_P1",
+  "late": 0,
+  "sec": 106.67,
+  "kb": 880,
+  "peak_db": -11.77,
+  "rms_db": -25.7,
+  "rms_min_db": -38.88,
+  "rms_max_db": -24.08
+ },
+ {
+  "name": "m6_P2",
+  "late": 0,
+  "sec": 106.67,
+  "kb": 994,
+  "peak_db": -11.03,
+  "rms_db": -25.56,
+  "rms_min_db": -34.9,
+  "rms_max_db": -23.93
+ },
+ {
+  "name": "m6_P3",
+  "late": 0,
+  "sec": 106.67,
+  "kb": 989,
+  "peak_db": -10.76,
+  "rms_db": -25.38,
+  "rms_min_db": -34.89,
+  "rms_max_db": -23.75
+ },
+ {
+  "name": "m6_X",
+  "late": 0,
+  "sec": 26.67,
+  "kb": 258,
+  "peak_db": -9.83,
+  "rms_db": -23.74,
+  "rms_min_db": -24.34,
+  "rms_max_db": -23.24
+ },
+ {
+  "name": "m7_C",
+  "late": 0,
+  "sec": 56.47,
+  "kb": 416,
+  "peak_db": -14.35,
+  "rms_db": -24.99,
+  "rms_min_db": -26.08,
+  "rms_max_db": -24.23
+ },
+ {
+  "name": "m7_P1",
+  "late": 0,
+  "sec": 112.94,
+  "kb": 822,
+  "peak_db": -12.59,
+  "rms_db": -25.26,
+  "rms_min_db": -36.36,
+  "rms_max_db": -23.64
+ },
+ {
+  "name": "m7_P2",
+  "late": 0,
+  "sec": 112.94,
+  "kb": 881,
+  "peak_db": -11.4,
+  "rms_db": -25.16,
+  "rms_min_db": -34.64,
+  "rms_max_db": -23.46
+ },
+ {
+  "name": "m7_P3",
+  "late": 0,
+  "sec": 112.94,
+  "kb": 894,
+  "peak_db": -11.12,
+  "rms_db": -25.04,
+  "rms_min_db": -34.02,
+  "rms_max_db": -23.31
+ },
+ {
+  "name": "m7_X",
+  "late": 0,
+  "sec": 28.24,
+  "kb": 269,
+  "peak_db": -10.55,
+  "rms_db": -24.59,
+  "rms_min_db": -25.19,
+  "rms_max_db": -23.94
+ },
+ {
+  "name": "m8_C",
+  "late": 0,
+  "sec": 51.2,
+  "kb": 357,
+  "peak_db": -15.57,
+  "rms_db": -26.66,
+  "rms_min_db": -27.89,
+  "rms_max_db": -25.82
+ },
+ {
+  "name": "m8_P1",
+  "late": 0,
+  "sec": 102.4,
+  "kb": 892,
+  "peak_db": -12.44,
+  "rms_db": -25.31,
+  "rms_min_db": -38.5,
+  "rms_max_db": -23.67
+ },
+ {
+  "name": "m8_P2",
+  "late": 0,
+  "sec": 102.4,
+  "kb": 921,
+  "peak_db": -11.63,
+  "rms_db": -25.17,
+  "rms_min_db": -33.81,
+  "rms_max_db": -23.49
+ },
+ {
+  "name": "m8_P3",
+  "late": 0,
+  "sec": 102.4,
+  "kb": 920,
+  "peak_db": -11.22,
+  "rms_db": -24.99,
+  "rms_min_db": -33.8,
+  "rms_max_db": -23.2
+ },
+ {
+  "name": "m8_X",
+  "late": 0,
+  "sec": 25.6,
+  "kb": 234,
+  "peak_db": -10.53,
+  "rms_db": -23.58,
+  "rms_min_db": -24.61,
+  "rms_max_db": -22.85
+ },
+ {
+  "name": "m9_C",
+  "late": 0,
+  "sec": 49.23,
+  "kb": 383,
+  "peak_db": -13.77,
+  "rms_db": -25.89,
+  "rms_min_db": -27.47,
+  "rms_max_db": -25.09
+ },
+ {
+  "name": "m9_P1",
+  "late": 0,
+  "sec": 98.46,
+  "kb": 809,
+  "peak_db": -10.71,
+  "rms_db": -24.69,
+  "rms_min_db": -39.67,
+  "rms_max_db": -23.21
+ },
+ {
+  "name": "m9_P2",
+  "late": 0,
+  "sec": 98.46,
+  "kb": 909,
+  "peak_db": -10.97,
+  "rms_db": -24.55,
+  "rms_min_db": -35.02,
+  "rms_max_db": -23.11
+ },
+ {
+  "name": "m9_P3",
+  "late": 0,
+  "sec": 98.46,
+  "kb": 922,
+  "peak_db": -10.15,
+  "rms_db": -24.39,
+  "rms_min_db": -34.99,
+  "rms_max_db": -23.11
+ },
+ {
+  "name": "m9_X",
+  "late": 0,
+  "sec": 24.62,
+  "kb": 235,
+  "peak_db": -10.63,
+  "rms_db": -23.78,
+  "rms_min_db": -24.12,
+  "rms_max_db": -23.24
+ },
+ {
+  "name": "sfx/bass",
+  "sec": 1.164,
+  "peak_db": -11.31,
+  "rms_db": -23.34,
+  "rms_min_db": -22.67,
+  "rms_max_db": -22.67
+ },
+ {
+  "name": "sfx/blip",
+  "sec": 0.076,
+  "peak_db": -53.35,
+  "rms_db": -67.81,
+  "rms_min_db": -67.81,
+  "rms_max_db": -67.81
+ },
+ {
+  "name": "sfx/boom",
+  "sec": 0.663,
+  "peak_db": -14.95,
+  "rms_db": -26.16,
+  "rms_min_db": -26.16,
+  "rms_max_db": -26.16
+ },
+ {
+  "name": "sfx/box",
+  "sec": 0.231,
+  "peak_db": -40.08,
+  "rms_db": -57.57,
+  "rms_min_db": -57.57,
+  "rms_max_db": -57.57
+ },
+ {
+  "name": "sfx/buy",
+  "sec": 0.201,
+  "peak_db": -33.76,
+  "rms_db": -48.82,
+  "rms_min_db": -48.82,
+  "rms_max_db": -48.82
+ },
+ {
+  "name": "sfx/clink",
+  "sec": 0.101,
+  "peak_db": -45.67,
+  "rms_db": -59.74,
+  "rms_min_db": -59.74,
+  "rms_max_db": -59.74
+ },
+ {
+  "name": "sfx/coin",
+  "sec": 0.151,
+  "peak_db": -40.79,
+  "rms_db": -55.18,
+  "rms_min_db": -55.18,
+  "rms_max_db": -55.18
+ },
+ {
+  "name": "sfx/cp",
+  "sec": 0.381,
+  "peak_db": -28.85,
+  "rms_db": -45.38,
+  "rms_min_db": -45.38,
+  "rms_max_db": -45.38
+ },
+ {
+  "name": "sfx/dash",
+  "sec": 0.201,
+  "peak_db": -39.23,
+  "rms_db": -54.92,
+  "rms_min_db": -54.92,
+  "rms_max_db": -54.92
+ },
+ {
+  "name": "sfx/drop",
+  "sec": 0.797,
+  "peak_db": -15.24,
+  "rms_db": -26.49,
+  "rms_min_db": -26.49,
+  "rms_max_db": -26.49
+ },
+ {
+  "name": "sfx/hit",
+  "sec": 0.101,
+  "peak_db": -33.31,
+  "rms_db": -54.56,
+  "rms_min_db": -54.56,
+  "rms_max_db": -54.56
+ },
+ {
+  "name": "sfx/horn",
+  "sec": 0.551,
+  "peak_db": -34.95,
+  "rms_db": -46.05,
+  "rms_min_db": -46.05,
+  "rms_max_db": -46.05
+ },
+ {
+  "name": "sfx/hurt",
+  "sec": 0.351,
+  "peak_db": -37.46,
+  "rms_db": -50.74,
+  "rms_min_db": -50.74,
+  "rms_max_db": -50.74
+ },
+ {
+  "name": "sfx/jump",
+  "sec": 0.131,
+  "peak_db": -47.55,
+  "rms_db": -59.19,
+  "rms_min_db": -59.19,
+  "rms_max_db": -59.19
+ },
+ {
+  "name": "sfx/jump2",
+  "sec": 0.151,
+  "peak_db": -46.99,
+  "rms_db": -58.43,
+  "rms_min_db": -58.43,
+  "rms_max_db": -58.43
+ },
+ {
+  "name": "sfx/kill",
+  "sec": 0.267,
+  "peak_db": -37.62,
+  "rms_db": -54.88,
+  "rms_min_db": -54.88,
+  "rms_max_db": -54.88
+ },
+ {
+  "name": "sfx/land",
+  "sec": 0.093,
+  "peak_db": -58.72,
+  "rms_db": -76.45,
+  "rms_min_db": -76.45,
+  "rms_max_db": -76.45
+ },
+ {
+  "name": "sfx/laser",
+  "sec": 0.751,
+  "peak_db": -32.12,
+  "rms_db": -48.09,
+  "rms_min_db": -48.09,
+  "rms_max_db": -48.09
+ },
+ {
+  "name": "sfx/no",
+  "sec": 0.201,
+  "peak_db": -42.4,
+  "rms_db": -52.75,
+  "rms_min_db": -52.75,
+  "rms_max_db": -52.75
+ },
+ {
+  "name": "sfx/pick",
+  "sec": 0.221,
+  "peak_db": -33.93,
+  "rms_db": -48.49,
+  "rms_min_db": -48.49,
+  "rms_max_db": -48.49
+ },
+ {
+  "name": "sfx/power",
+  "sec": 0.311,
+  "peak_db": -33.78,
+  "rms_db": -47.06,
+  "rms_min_db": -47.06,
+  "rms_max_db": -47.06
+ },
+ {
+  "name": "sfx/shoot",
+  "sec": 0.111,
+  "peak_db": -45.73,
+  "rms_db": -59.11,
+  "rms_min_db": -59.11,
+  "rms_max_db": -59.11
+ },
+ {
+  "name": "sfx/shootH",
+  "sec": 0.131,
+  "peak_db": -43.94,
+  "rms_db": -59.75,
+  "rms_min_db": -59.75,
+  "rms_max_db": -59.75
+ },
+ {
+  "name": "sfx/shootL",
+  "sec": 0.141,
+  "peak_db": -47.49,
+  "rms_db": -63.73,
+  "rms_min_db": -63.73,
+  "rms_max_db": -63.73
+ },
+ {
+  "name": "sfx/shootS",
+  "sec": 0.121,
+  "peak_db": -44.91,
+  "rms_db": -57.7,
+  "rms_min_db": -57.7,
+  "rms_max_db": -57.7
+ },
+ {
+  "name": "sfx/siren",
+  "sec": 0.851,
+  "peak_db": -31.52,
+  "rms_db": -45.97,
+  "rms_min_db": -45.97,
+  "rms_max_db": -45.97
+ },
+ {
+  "name": "sfx/tele",
+  "sec": 0.533,
+  "peak_db": -30.18,
+  "rms_db": -43.95,
+  "rms_min_db": -43.95,
+  "rms_max_db": -43.95
+ }
+]
