@@ -563,5 +563,17 @@
   "fw": 160,
   "fh": 90,
   "n": 1
+ },
+ "t_bestia": {
+  "local": true,
+  "fw": 14,
+  "fh": 37,
+  "n": 2
+ },
+ "t_censor": {
+  "local": true,
+  "fw": 16,
+  "fh": 40,
+  "n": 2
  }
 }
