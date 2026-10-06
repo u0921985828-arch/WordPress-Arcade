@@ -10,6 +10,8 @@ var game: Game
 var args := {}
 var nframe := 0
 var pad: TouchPad
+var _vp: SubViewport
+var _spr: Sprite2D
 
 
 func _ready() -> void:
@@ -17,7 +19,27 @@ func _ready() -> void:
 		var kv := a.trim_prefix("--").split("=", true, 1)
 		args[kv[0]] = kv[1] if kv.size() > 1 else "1"
 	game = Game.new()
-	game.g = Ctx.new(get_canvas_item())
+	# El juego pinta en un SubViewport del tamano exacto del <canvas> (cv.width x
+	# cv.height) y ese lienzo se amplia con zoom entero y filtro nearest, como el
+	# navegador amplia el <canvas> por CSS. Asi lo que cae entre dos pixeles del
+	# lienzo se resuelve a su pixel (no a media celda de pantalla) y el "lighter"
+	# y la persistencia del lienzo se comportan igual.
+	_vp = SubViewport.new()
+	_vp.disable_3d = true
+	_vp.transparent_bg = false
+	_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	_vp.render_target_clear_mode = SubViewport.CLEAR_MODE_ALWAYS
+	_vp.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST
+	_vp.size = Vector2i(2, 2)
+	add_child(_vp)
+	var root := Node2D.new()
+	_vp.add_child(root)
+	_spr = Sprite2D.new()
+	_spr.centered = false
+	_spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_spr.texture = _vp.get_texture()
+	add_child(_spr)
+	game.g = Ctx.new(root.get_canvas_item())
 	game.touch_ui = DisplayServer.is_touchscreen_available() or args.has("touch")
 	if args.has("dpr"):
 		game.dpr_override = float(args.dpr)
@@ -36,6 +58,10 @@ func _ready() -> void:
 	game.document.ui.on_click = game._ui_click
 	game.win["devicePixelRatio"] = game._dpr()
 	ad.set_mute(game._truthy(game.SET.get("mute")))
+	var fl := CanvasLayer.new()
+	fl.layer = -1
+	add_child(fl)
+	fl.add_child(FrameRing.new(game))
 	# mandos tactiles en su capa, por debajo de los menus (capa 5 en la web)
 	var tl := CanvasLayer.new()
 	tl.layer = 4
@@ -53,7 +79,12 @@ func _ready() -> void:
 	else:
 		game.showMenu()
 	if args.has("test"):
-		var t: Node = load(args.test).new()
+		var ts = load(args.test)
+		if ts == null or not ts.can_instantiate():
+			push_error("no se pudo cargar la prueba " + args.test)
+			get_tree().quit(1)
+			return
+		var t: Node = ts.new()
 		t.set("main", self)
 		t.set("game", game)
 		add_child(t)
@@ -70,18 +101,16 @@ func _resize() -> void:
 	_clip_canvas()
 
 
-## El lienzo recorta como un <canvas>: lo que el juego pinta fuera no se ve.
-## Su tamano cambia tambien al entrar y salir de la partida (fitW), no solo al
-## redimensionar la ventana.
+## El lienzo (SubViewport) recorta como un <canvas>: lo que el juego pinta
+## fuera no se ve. Su tamano cambia tambien al entrar y salir de la partida
+## (fitW), no solo al redimensionar la ventana.
 var _clip_sz := Vector2i.ZERO
 func _clip_canvas() -> void:
 	var sz := Vector2i(int(game.cv.width), int(game.cv.height))
 	if sz == _clip_sz:
 		return
 	_clip_sz = sz
-	var ci := get_canvas_item()
-	RenderingServer.canvas_item_set_custom_rect(ci, true, Rect2(Vector2.ZERO, Vector2(sz)))
-	RenderingServer.canvas_item_set_clip(ci, true)
+	_vp.size = sz.maxi(1)
 
 
 func _process(dt: float) -> void:

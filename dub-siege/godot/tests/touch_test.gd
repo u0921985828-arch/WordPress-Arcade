@@ -21,8 +21,9 @@ func _wait(n: int) -> void:
 		await get_tree().process_frame
 
 func run() -> void:
-	await _wait(10)
+	await _wait(60)
 	var pad: TouchPad = main.pad
+	print("TEST estado modo=", game.mode, " tactil=", game.touchMode(), " visible=", pad.visible, " zona=", pad.stick_zone)
 	var res := []
 	# palanca a la derecha
 	var x0: float = game.p.x

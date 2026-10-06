@@ -325,8 +325,11 @@ func _any(a: Array) -> bool:
 	return false
 
 
+var test_pad := -1   # pruebas: lee este dispositivo aunque no haya mando conectado
+
+
 func pollPad() -> void:
-	var pads := Input.get_connected_joypads()
+	var pads := [test_pad] if test_pad >= 0 else Input.get_connected_joypads()
 	if pads.is_empty():
 		GP = {}
 		return
