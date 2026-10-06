@@ -296,7 +296,9 @@ el mismo paquete `online.kuboplay.dubsiege` y la misma clave
 - **Pruebas** (`godot/tests/`, con `godot -- --test=res://godot/tests/X.gd`):
   `run12.gd` (las 12 fases con jefe), `parity.gd` (web y Godot con la misma
   semilla: estado del azar y píxeles), `input_test.gd` (teclado y mando),
-  `touch_test.gd` (`--touch --dpr=1.5`), `back_test.gd`, `perf.gd`, `warm.gd`.
+  `touch_test.gd` (`--touch --dpr=1.5`; necesita ventana real:
+  `xvfb-run -a godot --path . --resolution 1280x720 -- …`), `back_test.gd`,
+  `perf.gd`, `warm.gd`.
   Argumentos útiles: `--warp=N`, `--touch`, `--dpr=N`, `--menu=NOMBRE`,
   `--shot=ruta.png --frames=N`.
 - **APK**: `.github/workflows/dub-siege-apk.yml` exporta con Godot 4.7.2
@@ -314,7 +316,10 @@ el mismo paquete `online.kuboplay.dubsiege` y la misma clave
   el número de secuencia más alto, respeta los borrados). Después `slotMig()`
   pasa a ranuras el progreso anterior a ellas, igual que la web. Prueba:
   `websaves_test.gd --webdb=CARPETA --expect=FICHERO.json` con bases creadas
-  por Chromium. En CI el emulador instala la app webview antigua con un récord
+  por Chromium: `godot/tests/websaves/log` (solo registro `.log`) y
+  `godot/tests/websaves/table` (tabla `.ldb` comprimida, clave sobrescrita y
+  claves ajenas que se ignoran); cada una con su `expect.json`. No entran en
+  la APK (`export_presets.cfg` excluye `godot/tests/*`). En CI el emulador instala la app webview antigua con un récord
   (QAX 98765) y progreso, la abre, instala encima la nativa y exige el aviso
   «datos importados de la app anterior» en logcat (verificado en Android 11 y 14:
   portada con «Continuar · ranura 1 · fase 5» y RÉCORD 0098765).

@@ -1,5 +1,6 @@
 extends Node
 ## Prueba de los mandos tactiles: --test=res://godot/tests/touch_test.gd --warp=0 --touch
+## Necesita ventana real (no --headless): xvfb-run godot --path . --resolution 1280x720 -- ...
 var main: Node
 var game: Game
 
@@ -63,6 +64,16 @@ func run() -> void:
 		nb = maxi(nb, game.bullets.size())
 	_touch(2, pad.pads.f.c, false)
 	res.append(["fuego dispara", nb > 0, nb])
+	# OBJ: boton rapido de la mochila (botiquin)
+	await _wait(20)
+	game.run.inv.kit = 1
+	game.run.qk = "kit"
+	game.p.hp = 1
+	_touch(4, pad.pads.it.c, true)
+	await _wait(4)
+	_touch(4, pad.pads.it.c, false)
+	await _wait(4)
+	res.append(["OBJ usa botiquin", game.p.hp > 1 and int(game.run.inv.kit) == 0, game.p.hp])
 	# pausa
 	_touch(3, pad.tp.get_center(), true)
 	await _wait(3)
