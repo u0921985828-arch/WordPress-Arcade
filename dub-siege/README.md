@@ -242,3 +242,38 @@ Con una partida guardada, la dificultad de las nuevas se elige en PARTIDAS
 ## Depuración
 Con `#debug` en la dirección: `DS.warp(0..11, conCinematica)`, `DS.cutAdv()`,
 `DS.cutSkip()`, `DS.toArena()`, `DS.hitBoss(n)`, `DS.god()`, `DS.s`, `DS.sheets`.
+
+## App Android nativa (Godot 4.7.2)
+
+La app ya no es una webview: es un ejecutable de Godot (`libgodot_android.so`) con
+el mismo paquete `online.kuboplay.dubsiege` y la misma clave
+(`android/app/kuboplay.keystore`), así que se instala encima de la anterior.
+`dub-siege.html` sigue siendo la fuente del juego; Godot ejecuta su traducción.
+
+- **Traducción**: `tools/js2gd.js` convierte el JS del HTML en `godot/game.gd`
+  (generado, no se edita). Lo escrito a mano va en `godot/src/*.gd` (base, audio,
+  entrada, arte, menús, arranque) y el runtime que imita al navegador en
+  `godot/rt/` (lienzo 2D `ctx.gd`, `imgctx.gd`, DOM y CSS de los menús
+  `dom*.gd`/`html.gd`/`ui_*.gd`, mandos táctiles `touch_pad.gd`, música
+  `audio_director.gd`). Ajustes del traductor en `tools/js2gd.json`.
+  Regenerar: `node tools/js2gd.js` (necesita `acorn`).
+- **Audio**: la música va grabada por capas (`godot/audio/m{0..11}_{C,P1,P2,P3,X}.ogg`,
+  calma, juego a 3 intensidades y jefe) y los efectos en `godot/audio/sfx/`.
+  Se regraban desde el propio HTML con `tools/rec_audio.py` (Playwright +
+  OfflineAudioContext). P1–P3 suenan sincronizadas y cambian en el límite de compás.
+- **Pantalla**: el juego pinta en un SubViewport del tamaño del lienzo y se
+  escala con zoom entero y filtro nearest (píxel cuadrado).
+- **Atrás** (Android) = Esc; dos veces en 1,5 s sale, como antes.
+- **Pruebas** (`godot/tests/`, con `godot -- --test=res://godot/tests/X.gd`):
+  `run12.gd` (las 12 fases con jefe), `parity.gd` (web y Godot con la misma
+  semilla: estado del azar y píxeles), `input_test.gd` (teclado y mando),
+  `touch_test.gd` (`--touch --dpr=1.5`), `back_test.gd`, `perf.gd`, `warm.gd`.
+  Argumentos útiles: `--warp=N`, `--touch`, `--dpr=N`, `--menu=NOMBRE`,
+  `--shot=ruta.png --frames=N`.
+- **APK**: `.github/workflows/dub-siege-apk.yml` exporta con Godot 4.7.2 (solo
+  arm64; aparte una copia x86_64 para el emulador), comprueba que no lleva
+  webview, la abre en un emulador Android 11 y 14 y la publica en la descarga
+  fija `dub-siege-apk`. `versionCode` = n.º de ejecución + 1000, por encima de
+  la versión webview.
+- Las partidas guardadas de la versión webview no pasan a la nativa (se
+  guardaban en el almacenamiento del navegador de la app).
