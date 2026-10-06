@@ -279,7 +279,9 @@ el mismo paquete `online.kuboplay.dubsiege` y la misma clave
 - **Partidas de la versión webview**: la primera vez que se abre (sin
   `user://dub-siege.json`), `WebSaves` (`rt/web_saves.gd`) lee el localStorage
   que dejó el WebView en `app_webview/.../Local Storage/leveldb` — Android lo
-  conserva al actualizar porque el paquete y la firma son los mismos — y trae
+  conserva al actualizar porque el paquete y la firma son los mismos; como
+  Godot solo deja abrir rutas dentro de `files/` y `cache/`, antes se copia con
+  `/system/bin/cp` a `files/webview_ldb` — y trae
   las claves `ds2_*` tal cual (registro `.log`, tablas `.ldb` con Snappy, gana
   el número de secuencia más alto, respeta los borrados). Después `slotMig()`
   pasa a ranuras el progreso anterior a ellas, igual que la web. Prueba:

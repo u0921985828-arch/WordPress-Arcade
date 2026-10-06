@@ -19,6 +19,28 @@ static func android_dirs() -> Array:
 	return out
 
 
+## En Android, Godot solo deja abrir rutas dentro de files/ y cache/ de la
+## app, y app_webview/ está al lado: se copia antes con el cp del sistema
+## (mismo usuario, sin permisos extra) y se lee la copia.
+static func read_android(dir: String) -> Dictionary:
+	var tmp := OS.get_user_data_dir() + "/webview_ldb"
+	_rm(tmp)
+	var out := []
+	var code := OS.execute("/system/bin/cp", ["-r", dir, tmp], out, true)
+	var got := read(tmp)
+	print("Dub Siege: partidas antiguas en %s: cp=%d %s -> %d datos" % [dir, code, str(out).strip_edges().left(160), got.size()])
+	_rm(tmp)
+	return got
+
+
+static func _rm(d: String) -> void:
+	if not DirAccess.dir_exists_absolute(d):
+		return
+	for f in DirAccess.get_files_at(d):
+		DirAccess.remove_absolute(d + "/" + f)
+	DirAccess.remove_absolute(d)
+
+
 ## Devuelve {clave: texto} de localStorage con las claves que empiezan por
 ## `prefix` (de cualquier origen). Vacío si no hay base o no se entiende.
 static func read(dir: String, prefix := "ds2_") -> Dictionary:

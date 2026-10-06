@@ -69,8 +69,7 @@ func _store_load() -> void:
 	# Primera vez: partidas de la app antigua (web en WebView), si las hay.
 	var dirs: Array = [web_db] if web_db != "" else (WebSaves.android_dirs() if OS.get_name() == "Android" else [])
 	for d in dirs:
-		print("Dub Siege: partidas antiguas en %s: %s" % [d, DirAccess.get_files_at(d) if DirAccess.dir_exists_absolute(d) else "no existe"])
-		var got: Dictionary = WebSaves.read(d)
+		var got: Dictionary = WebSaves.read(d) if web_db != "" else WebSaves.read_android(d)
 		if not got.is_empty():
 			_store = got
 			web_imported = got.size()
