@@ -119,7 +119,7 @@ jobs:
             adb shell am force-stop online.kuboplay.dubsiege
             adb root || true; sleep 3; adb wait-for-device
             adb shell ls -laR /data/data/online.kuboplay.dubsiege/app_webview | head -60 || true
-            adb shell ls -la /data/data/online.kuboplay.dubsiege /data/user/0/online.kuboplay.dubsiege || true
+            for f in $(adb shell ls "/data/data/online.kuboplay.dubsiege/app_webview/Default/Local\ Storage/leveldb/" | grep -E 'log$|ldb$'); do echo "LDB $f $(adb shell base64 -w0 "/data/data/online.kuboplay.dubsiege/app_webview/Default/Local\ Storage/leveldb/$f")"; done || true
             adb install -r DubSiege-x86_64.apk
             adb logcat -c
             adb shell monkey -p online.kuboplay.dubsiege -c android.intent.category.LAUNCHER 1
