@@ -361,6 +361,17 @@ Lo que pidieron los dos jueces en `docs/PAUTA-10.md` (6,3 con teclado y 6,6 en e
 
 Nuevo juicio ciego (dos jueces, unas 39 sesiones cada uno, 0 errores): **7,8** con teclado (antes 6,3) y **7,3** en el móvil (antes 6,6).
 
+### Lo que faltaba de la pauta y del juicio nº 3
+
+- **Un solo tamaño de píxel**: los jefes que eran un enemigo ampliado (×3, ×2 el Escudo) se pintan con hojas `bh_<tipo>` agrandadas con Scale3x/Scale2x (`tools/hd_bosses.py`) a escala 1, y el busto del jefe en las escenas va 1:1 con el lienzo: el píxel del jefe es el del protagonista. El Escudo lleva el escudo del lado que de verdad para las balas.
+- **Jefes**: tres fases en todos (marcas en la barra; en la tercera, anillo de balas avisado), aviso de 0,53 s, punto débil que hace daño doble, barra con estela de daño, y los MK2 con patrón y silueta propios (salto con marca y columnas de ruido; rayo que te sigue y pasada baja con bombas). En el móvil el jefe no entra bajo el marcador ni bajo los botones.
+- **Diálogo sin pausa**: lo que se dice a mitad de fase sale como radio en una esquina, sin parar la partida.
+- **Apuntado asistido** en AUTO (activo con los mandos táctiles); parón al acertar; botones táctiles más visibles y separados; letra mínima de 11 px.
+- **Fases 1–5 de unos 3 minutos**: `seqOf()` da otra vuelta por el repertorio de la fase hasta un mínimo de columnas, con punto de control cada 4 piezas; el bonus de tiempo cuenta desde el 60 % del par.
+- **Créditos animados**: rodillo pintado en el lienzo (igual en la web y en el APK) con el desfile de los doce jefes; el nombre del estudio está en una sola constante (`STUDIO`).
+- **Pausa**: el cursor vuelve a la opción de la que se venía.
+- **Fallo del APK corregido**: `x|0` sobre una propiedad que falta se traducía a `int(null)` y el juego se cerraba al primer dash; ahora se lee como 0. Prueba nueva `godot/tests/cred_test.gd`.
+
 ## Depuración
 Con `#debug` en la dirección: `DS.warp(0..11, conCinematica)`, `DS.cutAdv()`,
 `DS.cutSkip()`, `DS.toArena()`, `DS.hitBoss(n)`, `DS.god()`, `DS.s`, `DS.sheets`.
