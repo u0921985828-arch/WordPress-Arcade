@@ -357,6 +357,9 @@ Lo que pidieron los dos jueces en `docs/PAUTA-10.md` (6,3 con teclado y 6,6 en e
 - **Móvil**: arriba en la palanca salta, mandos más transparentes en reposo, palanca solo en el 40 % izquierdo.
 - **Golpe con respuesta**: parón de un fotograma y retroceso.
 - **Final**: epílogo de 14 líneas con ilustraciones y pantalla de créditos.
+- **Tras el nuevo juicio ciego**: el jefe vencido ya no se queda blanco durante el diálogo final, «BASS LISTO» no pisa el aviso del tutorial, el rótulo «−1 CORAZÓN» no se duplica y tras un foso se reaparece una casilla más lejos del borde.
+
+Nuevo juicio ciego (dos jueces, unas 39 sesiones cada uno, 0 errores): **7,8** con teclado (antes 6,3) y **7,3** en el móvil (antes 6,6).
 
 ## Depuración
 Con `#debug` en la dirección: `DS.warp(0..11, conCinematica)`, `DS.cutAdv()`,
