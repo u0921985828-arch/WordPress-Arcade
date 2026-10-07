@@ -88,13 +88,74 @@ jobs:
           prerelease: true
           make_latest: false
 
+  aab:
+    # Paquete para Google Play (Android App Bundle): Godot con compilacion Gradle,
+    # 64 y 32 bits, Android 16 (API 36) y librerias alineadas a 16 KB.
+    runs-on: ubuntu-latest
+    env:
+      GODOT: "4.7.2"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: '17' }
+      - name: Godot y plantillas de exportación
+        run: |
+          base=https://github.com/godotengine/godot-builds/releases/download/${GODOT}-stable
+          curl -sSLo g.zip $base/Godot_v${GODOT}-stable_linux.x86_64.zip
+          unzip -q g.zip && mv Godot_v${GODOT}-stable_linux.x86_64 /usr/local/bin/godot
+          curl -sSLo t.tpz $base/Godot_v${GODOT}-stable_export_templates.tpz
+          d=~/.local/share/godot/export_templates/${GODOT}.stable
+          mkdir -p $d
+          unzip -q -j t.tpz 'templates/android_*' 'templates/version.txt' -d $d
+          rm -f t.tpz g.zip; ls $d
+          mkdir -p ~/.config/godot
+          printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\nexport/android/android_sdk_path = "%s"\nexport/android/java_sdk_path = "%s"\n' "$ANDROID_HOME" "$JAVA_HOME" > ~/.config/godot/editor_settings-4.7.tres
+      - name: Exportar AAB (Gradle)
+        working-directory: dub-siege
+        env:
+          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ github.workspace }}/dub-siege/android/app/kuboplay.keystore
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: kuboplay
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: kuboplay
+        run: |
+          # la carpeta android/ guarda la app WebView antigua; la plantilla de Godot va en android/build
+          rm -rf android/build
+          sed -i "s/^version\/code=.*/version\/code=$((GITHUB_RUN_NUMBER + 1000))/; s/^version\/name=.*/version\/name=\"2.0.$GITHUB_RUN_NUMBER\"/" export_presets.cfg
+          sed -i 's/^gradle_build\/use_gradle_build=.*/gradle_build\/use_gradle_build=true/; s/^gradle_build\/export_format=.*/gradle_build\/export_format=1/; s/^architectures\/armeabi-v7a=.*/architectures\/armeabi-v7a=true/; s/^architectures\/arm64-v8a=.*/architectures\/arm64-v8a=true/' export_presets.cfg
+          sed -i 's|^export_path=.*|export_path="../DubSiege.aab"|' export_presets.cfg
+          timeout 600 godot --headless --import || true
+          timeout 1800 godot --headless --install-android-build-template --export-release Android ../DubSiege.aab
+          ls -la ../DubSiege.aab
+      - name: Comprobar el AAB (API 36, 64 bits, 16 KB, permisos, firma)
+        run: |
+          curl -sSLo bt.jar https://github.com/google/bundletool/releases/download/1.18.1/bundletool-all-1.18.1.jar
+          java -jar bt.jar dump manifest --bundle DubSiege.aab > man.xml
+          grep -E 'versionCode|targetSdkVersion|minSdkVersion|uses-permission' man.xml
+          grep -q 'targetSdkVersion="36"' man.xml
+          if grep -q 'android.permission.INTERNET' man.xml; then echo 'pide internet'; exit 1; fi
+          if [ "$(grep -c 'uses-permission' man.xml)" != 1 ]; then echo 'permisos de más'; exit 1; fi
+          grep -q 'android.permission.VIBRATE' man.xml
+          unzip -l DubSiege.aab | grep -E 'lib/(arm64-v8a|armeabi-v7a)/libgodot_android.so'
+          mkdir so && unzip -q DubSiege.aab 'base/lib/*' -d so
+          bad=0; for f in $(find so -name '*.so' -path '*arm64*'); do a=$(readelf -lW $f | awk '/LOAD/{print $NF}' | sort -u | head -1); echo "$f $a"; [ "$a" = 0x4000 ] || [ "$a" = 0x10000 ] || bad=1; done; [ $bad = 0 ]
+          jarsigner -verify DubSiege.aab | tail -1
+      - uses: actions/upload-artifact@v4
+        with: { name: aab, path: DubSiege.aab, if-no-files-found: error }
+      - name: Publicar el AAB en la descarga fija
+        if: github.event_name == 'push' || inputs.publish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: dub-siege-apk
+          files: DubSiege.aab
+          prerelease: true
+          make_latest: false
+
   emulator:
     needs: build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        api: [30, 34]
+        api: [30, 34, 36]
     steps:
       - uses: actions/download-artifact@v4
         with: { name: apk-emu }

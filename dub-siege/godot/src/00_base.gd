@@ -258,3 +258,10 @@ func gate(_ld: Variant = null) -> void:
 
 func ovFit() -> void:
 	pass    # ui_view.gd desplaza el panel y sigue al foco (_scroll_to_focus)
+
+
+# Creditos: avisos de licencia de la fuente y del motor (textos completos en godot/data/LICENCIAS.txt).
+func credLic() -> Array:
+	return [["FUENTE PRESS START 2P", "#eef3ff"], ["© 2012 THE PRESS START 2P", "#5a6390"], ["PROJECT AUTHORS · SIL OFL 1.1", "#5a6390"], ["", ""],
+		["MOTOR GODOT ENGINE · MIT", "#eef3ff"], ["© 2014-HOY GODOT ENGINE", "#5a6390"], ["CONTRIBUTORS", "#5a6390"], ["© 2007-2014 JUAN LINIETSKY,", "#5a6390"], ["ARIEL MANZUR", "#5a6390"], ["", ""],
+		["PARTES © THE FREETYPE PROJECT", "#5a6390"], ["(FREETYPE.ORG)", "#5a6390"], ["", ""], ["NO RECOGE DATOS PERSONALES", "#8f98c8"]]

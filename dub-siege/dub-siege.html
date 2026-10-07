@@ -2668,9 +2668,12 @@ function showWin(){
 // Creditos: rodillo sobre el lienzo (asi sale igual en la web y en el APK) con el
 // desfile de los jefes abajo. Toque, A o Intro antes de tiempo para volver.
 var STUDIO='WOLFCADE';
+// Avisos de licencia de terceros en los creditos (la app de Godot pone tambien los del motor).
+function credLic(){return [['FUENTE PRESS START 2P','#eef3ff'],['© 2012 THE PRESS START 2P','#5a6390'],['PROJECT AUTHORS · SIL OFL 1.1','#5a6390']];}
 function credLines(){var L=[['DUB SIEGE','#ffd23f'],['',''],['UN JUEGO DE','#8f98c8'],[STUDIO,'#eef3ff'],['IDEA, CÓDIGO Y ARTE','#5a6390'],['',''],
   ['MÚSICA','#8f98c8'],['SINTETIZADA EN EL JUEGO','#eef3ff'],['',''],['INSPIRACIÓN','#8f98c8'],['SOUND SYSTEMS, 1955-1981','#eef3ff'],['',''],['',''],['REPARTO','#ff3d6e']];
   for(var i=0;i<LEVELS.length;i++)L.push([LEVELS[i].boss,'#eef3ff']);
+  L.push(['',''],['',''],['LICENCIAS','#8f98c8']);L=L.concat(credLic());
   L.push(['',''],['',''],['TODOS LOS PERSONAJES SON INVENTADOS','#8f98c8'],['',''],['GRACIAS POR JUGAR','#ffd23f']);return L;}
 function showCredits(){var m0=mode;hideOv();startCut([{s:''}],function(){mode=m0;showWin();});cut.cred=1;}
 function drawCred(c){

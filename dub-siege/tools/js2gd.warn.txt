@@ -34,39 +34,39 @@ L2633: metodo desconocido .querySelector()
 L2633: metodo desconocido .focus()
 L2636: metodo desconocido .querySelector()
 L2636: metodo desconocido .focus()
-L2699: metodo desconocido .querySelector()
-L2699: metodo desconocido .focus()
-L2707: metodo desconocido .contains()
-L2718: identificador global desconocido document
-L2718: metodo desconocido .querySelector()
-L2718: metodo desconocido .focus()
+L2702: metodo desconocido .querySelector()
+L2702: metodo desconocido .focus()
+L2710: metodo desconocido .contains()
 L2721: identificador global desconocido document
 L2721: metodo desconocido .querySelector()
 L2721: metodo desconocido .focus()
 L2724: identificador global desconocido document
 L2724: metodo desconocido .querySelector()
 L2724: metodo desconocido .focus()
-L2763: metodo desconocido .toggle()
-L2859: identificador global desconocido document
-L2859: metodo desconocido .createElement()
-L2909: identificador global desconocido document
-L2909: metodo desconocido .createElement()
-L2911: identificador global desconocido document
-L2911: metodo desconocido .createElement()
-L2931: identificador global desconocido document
-L2931: metodo desconocido .createElement()
-L2935: identificador global desconocido document
-L2935: metodo desconocido .createElement()
-L2957: identificador global desconocido document
-L2957: metodo desconocido .querySelector()
-L2957: identificador global desconocido document
-L2957: metodo desconocido .querySelector()
-L2957: metodo desconocido .focus()
-L2973: identificador global desconocido document
-L2973: metodo desconocido .querySelector()
-L2973: metodo desconocido .focus()
-L3017: identificador global desconocido document
-L3017: metodo desconocido .createElement()
-L3193: identificador global desconocido document
-L3193: metodo desconocido .createElement()
-L3331: funcion anidada R lee locales que cambian: x,y
+L2727: identificador global desconocido document
+L2727: metodo desconocido .querySelector()
+L2727: metodo desconocido .focus()
+L2766: metodo desconocido .toggle()
+L2862: identificador global desconocido document
+L2862: metodo desconocido .createElement()
+L2912: identificador global desconocido document
+L2912: metodo desconocido .createElement()
+L2914: identificador global desconocido document
+L2914: metodo desconocido .createElement()
+L2934: identificador global desconocido document
+L2934: metodo desconocido .createElement()
+L2938: identificador global desconocido document
+L2938: metodo desconocido .createElement()
+L2960: identificador global desconocido document
+L2960: metodo desconocido .querySelector()
+L2960: identificador global desconocido document
+L2960: metodo desconocido .querySelector()
+L2960: metodo desconocido .focus()
+L2976: identificador global desconocido document
+L2976: metodo desconocido .querySelector()
+L2976: metodo desconocido .focus()
+L3020: identificador global desconocido document
+L3020: metodo desconocido .createElement()
+L3196: identificador global desconocido document
+L3196: metodo desconocido .createElement()
+L3334: funcion anidada R lee locales que cambian: x,y

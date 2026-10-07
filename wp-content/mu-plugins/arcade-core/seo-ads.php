@@ -17,6 +17,7 @@ final class Arcade_SEO {
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
 		add_action( 'admin_post_arcade_site', array( __CLASS__, 'save' ) );
 		add_action( 'init', array( __CLASS__, 'ads_txt' ), 1 );
+		add_action( 'init', array( __CLASS__, 'app_privacy' ), 1 );
 		add_action( 'wp_head', array( __CLASS__, 'head' ), 2 );
 	}
 
@@ -186,6 +187,45 @@ final class Arcade_SEO {
 		}
 		header( 'Content-Type: text/plain; charset=utf-8' );
 		echo 'google.com, ' . esc_html( self::opt( 'pub' ) ) . ", DIRECT, f08c47fec0942fa0\n";
+		exit;
+	}
+
+	/* ------------------------------------------------- privacidad de las apps */
+	/**
+	 * /privacidad-app/: política de privacidad de las apps móviles (Dub Siege en
+	 * Google Play). Página fija, pública y sin anuncios, como pide la consola de Play.
+	 */
+	public static function app_privacy() {
+		$path = wp_parse_url( isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '', PHP_URL_PATH ); // phpcs:ignore
+		if ( '/privacidad-app' !== untrailingslashit( (string) $path ) ) {
+			return;
+		}
+		$o     = self::opt();
+		$owner = $o['owner'] ?: 'WOLFCADE';
+		$mail  = $o['email'] ?: get_option( 'admin_email' );
+		$p     = static function ( $t ) { return '<p>' . esc_html( $t ) . '</p>'; };
+		$h     = static function ( $t ) { return '<h2>' . esc_html( $t ) . '</h2>'; };
+		status_header( 200 );
+		header( 'Content-Type: text/html; charset=utf-8' );
+		header( 'X-Robots-Tag: index, follow' );
+		echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Política de privacidad · Dub Siege</title>'
+			. '<style>body{margin:0;background:#0d0f1c;color:#e9ecff;font:16px/1.6 system-ui,sans-serif}main{max-width:720px;margin:0 auto;padding:28px 18px 60px}h1{font-size:1.6em;margin:0 0 4px}h2{font-size:1.1em;margin:28px 0 6px;color:#a097ff}a{color:#a097ff}small{color:#8f98c8}</style></head><body><main>'
+			. '<h1>Política de privacidad de Dub Siege</h1><small>Última actualización: 7 de octubre de 2026</small>'
+			. $p( "Dub Siege es un juego para Android publicado por $owner. Esta política explica qué datos trata la app. En resumen: ninguno sale de tu móvil." )
+			. $h( 'Datos que recogemos' )
+			. $p( 'Ninguno. La app no tiene cuentas, no pide tu nombre, correo, ubicación, contactos, fotos ni ningún otro dato personal, y no usa identificadores de publicidad.' )
+			. $h( 'Datos que se guardan en tu móvil' )
+			. $p( 'La partida (progreso, monedas del juego, ajustes y la tabla de récords con las iniciales que escribas) se guarda solo en la memoria interna del propio móvil. No se envía a ningún servidor ni se comparte con nadie. Se borra al desinstalar la app o al borrar sus datos en los ajustes de Android.' )
+			. $h( 'Conexión a internet, publicidad y compras' )
+			. $p( 'La app no se conecta a internet, no muestra publicidad, no incluye compras dentro de la aplicación y no contiene herramientas de analítica ni de seguimiento de terceros.' )
+			. $h( 'Permisos' )
+			. $p( 'Solo usa el permiso de vibración, para que el mando vibre al recibir un golpe. Puedes desactivarla en las opciones del juego.' )
+			. $h( 'Menores' )
+			. $p( 'La app no recoge datos de nadie, tampoco de menores de edad.' )
+			. $h( 'Cambios y contacto' )
+			. $p( 'Si la app cambia y empieza a tratar algún dato, esta página se actualizará antes de publicar esa versión.' )
+			. '<p>Para cualquier duda: <a href="mailto:' . esc_attr( antispambot( $mail ) ) . '">' . esc_html( antispambot( $mail ) ) . '</a>.</p>'
+			. '</main></body></html>';
 		exit;
 	}
 

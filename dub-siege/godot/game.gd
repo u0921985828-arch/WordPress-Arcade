@@ -265,6 +265,13 @@ func gate(_ld: Variant = null) -> void:
 func ovFit() -> void:
 	pass    # ui_view.gd desplaza el panel y sigue al foco (_scroll_to_focus)
 
+
+# Creditos: avisos de licencia de la fuente y del motor (textos completos en godot/data/LICENCIAS.txt).
+func credLic() -> Array:
+	return [["FUENTE PRESS START 2P", "#eef3ff"], ["© 2012 THE PRESS START 2P", "#5a6390"], ["PROJECT AUTHORS · SIL OFL 1.1", "#5a6390"], ["", ""],
+		["MOTOR GODOT ENGINE · MIT", "#eef3ff"], ["© 2014-HOY GODOT ENGINE", "#5a6390"], ["CONTRIBUTORS", "#5a6390"], ["© 2007-2014 JUAN LINIETSKY,", "#5a6390"], ["ARIEL MANZUR", "#5a6390"], ["", ""],
+		["PARTES © THE FREETYPE PROJECT", "#5a6390"], ["(FREETYPE.ORG)", "#5a6390"], ["", ""], ["NO RECOGE DATOS PERSONALES", "#8f98c8"]]
+
 # ======================================== src/10_audio.gd
 ## Audio: la musica va grabada por capas (godot/audio) y los efectos tambien.
 ## (En el HTML se sintetiza en directo con WebAudio; ver tools/ para grabarlo.)
@@ -5878,7 +5885,7 @@ func showWin():
 	nb = bestUp()
 	show("<div class=\"panel\"><p class=\"kick\">LA BESTIA SUENA OTRA VEZ</p><h2>LA CIUDAD VUELVE A BAILAR</h2>" + ("<p class=\"note\">¡NUEVO RÉCORD!</p>" if nb else "") + str(stat()) + "<div class=\"menu\"><button class=\"btn hot\" data-act=\"rank\">GUARDAR EN RANKING</button><button class=\"btn\" data-act=\"credits\">CRÉDITOS</button><button class=\"btn\" data-act=\"tomenu\">MENÚ PRINCIPAL</button></div></div>")
 
-# L2671
+# L2673
 func credLines():
 	var L = null
 	var i = null
@@ -5887,10 +5894,12 @@ func credLines():
 	while (i < _len(LEVELS)):
 		L.append([_ix(LEVELS, i).get("boss"), "#eef3ff"])
 		i += 1
+	_push(L, [["", ""], ["", ""], ["LICENCIAS", "#8f98c8"]])
+	L = _concat(L, [credLic()])
 	_push(L, [["", ""], ["", ""], ["TODOS LOS PERSONAJES SON INVENTADOS", "#8f98c8"], ["", ""], ["GRACIAS POR JUGAR", "#ffd23f"]])
 	return L
 
-# L2675
+# L2678
 func showCredits():
 	var _c = {"m0": null}
 	var _fn = null
@@ -5902,7 +5911,7 @@ func showCredits():
 	startCut([{"s": ""}], _fn)
 	cut.cred = 1
 
-# L2676
+# L2679
 func drawCred(c = null):
 	var gy = null
 	var x = null
@@ -5979,7 +5988,7 @@ func drawCred(c = null):
 		txt(("TOCA PARA VOLVER" if touchMode() else "INTRO PARA VOLVER"), (HW - 5), 3, "#5a6390", "r")
 	g.restore()
 
-# L2692
+# L2695
 func pause():
 	if (mode != "play"):
 		return
@@ -5988,14 +5997,14 @@ func pause():
 	TS = {}
 	pauseShow()
 
-# L2693
+# L2696
 func showBag():
 	var q = null
 	back = pauseShow
 	q = quickObj()
 	show("<div class=\"panel\"><h2>MOCHILA</h2>" + str(bagRows(false)) + "<div class=\"menu\"><button class=\"btn\" data-act=\"oqk\">BOTÓN RÁPIDO: " + str(_ix(OBJN, q).get("n")) + "</button><button class=\"btn hot\" data-act=\"back\">VOLVER</button></div></div>")
 
-# L2695
+# L2698
 func pauseShow():
 	var pb = null
 	back = null
@@ -6005,13 +6014,13 @@ func pauseShow():
 		if pb:
 			_callm(pb, "focus", [{"preventScroll": true}])
 
-# L2701
+# L2704
 func resume():
 	hideOv()
 	mode = "play"
 	K = {}
 
-# L2704
+# L2707
 func startGame(n = null):
 	PRAC = 0
 	newRun()
@@ -6020,7 +6029,7 @@ func startGame(n = null):
 	enterLevel((n if n else 0), true)
 	audioOn()
 
-# L2705
+# L2708
 func act(a = null, v = null):
 	var _c = {"sb": null, "sd": null, "db": null}
 	var ci = null
@@ -6215,7 +6224,7 @@ func act(a = null, v = null):
 			lookExit()
 		break
 
-# L2759
+# L2762
 func padUnder(pe = null):
 	var i = null
 	var o = null
@@ -6233,7 +6242,7 @@ func padUnder(pe = null):
 		i += 1
 	return false
 
-# L2761
+# L2764
 func update():
 	var rd = null
 	var i = null
@@ -6421,7 +6430,7 @@ func update():
 		st.bossDone = 1
 		endLevel()
 
-# L2850
+# L2853
 func blitS(k = null, f = null, x = null, y = null, s = null, flip = null, white = null):
 	var o = null
 	var m = null
@@ -6455,7 +6464,7 @@ func blitS(k = null, f = null, x = null, y = null, s = null, flip = null, white 
 		g.drawImage(src, sx, 0, sw, sh_2, dx, dy, dw, dh)
 	return true
 
-# L2858
+# L2861
 func tintSheet(k = null):
 	var o = null
 	var key = null
@@ -6478,7 +6487,7 @@ func tintSheet(k = null):
 	_aset(SHEET, key, {"fw": o.get("fw"), "fh": o.get("fh"), "n": o.get("n"), "x1": o.get("x1"), "ok": true, "img": c, "wimg": o.get("wimg")})
 	return key
 
-# L2862
+# L2865
 func blit(k = null, f = null, x = null, y = null, w = null, h = null, flip = null, white = null, alpha = null):
 	var o = null
 	var src = null
@@ -6512,25 +6521,25 @@ func blit(k = null, f = null, x = null, y = null, w = null, h = null, flip = nul
 		g.globalAlpha = 1
 	return true
 
-# L2893
+# L2896
 func bankCommit():
 	BANK0 = BANK
 	save("ds2_bank", BANK)
 
-# L2896 (a mano)
+# L2899 (a mano)
 func lookOwn(k = null, i = null):
 	return k == "s" or not _ix(_ix(LK, k), i).get("c") or _indexOf(LOOK.own, str(k) + str(i)) > -1
 
-# L2897
+# L2900
 func lookSave():
 	save("ds2_look", LOOK)
 	lookVer += 1
 
-# L2898
+# L2901
 func lum(r = null, g_2 = null, b = null):
 	return (((0.3 * r) + (0.59 * g_2)) + (0.11 * b))
 
-# L2900
+# L2903
 func isSkin(r = null, g_2 = null, b = null):
 	var mx = null
 	var mn = null
@@ -6544,13 +6553,13 @@ func isSkin(r = null, g_2 = null, b = null):
 	h = ((60 * (g_2 - b)) / float((mx - mn)))
 	return _and((h >= 5), (h <= 40))
 
-# L2902
+# L2905
 func paint(d = null, i = null, col = null, k = null):
 	d[int(i)] = int(min(255, (col[int(0)] * k)))
 	d[int((i + 1))] = int(min(255, (col[int(1)] * k)))
 	d[int((i + 2))] = int(min(255, (col[int(2)] * k)))
 
-# L2905
+# L2908
 func lookSheet(st_2 = null):
 	var key = null
 	var o = null
@@ -6700,7 +6709,7 @@ func lookSheet(st_2 = null):
 	_aset(SHEET, key, {"fw": B.get("fw"), "fh": B.get("fh"), "n": B.get("n"), "ok": true, "img": cn, "wimg": wc, "ver": lookVer})
 	return key
 
-# L2945
+# L2948
 func lookCost():
 	var c = null
 	var k = null
@@ -6712,7 +6721,7 @@ func lookCost():
 			c += _ix(_ix(LK, k), _ix(LOOK, k)).get("c")
 	return c
 
-# L2946
+# L2949
 func showLook(foc = null):
 	var _c = {"b": null}
 	var cost = null
@@ -6747,7 +6756,7 @@ func showLook(foc = null):
 	if (not lookRaf):
 		lookLoop()
 
-# L2960
+# L2963
 func lookLoop():
 	var c = null
 	var q = null
@@ -6776,7 +6785,7 @@ func lookLoop():
 		q.drawImage(o.get("img"), (fr * sw), 0, sw, sh_2, floori(float(((c.get("width") - sw) / 2.0)) + 0.5), (c.get("height") - sh_2), sw, sh_2)
 	lookRaf = _raf(lookLoop)
 
-# L2968
+# L2971
 func lookStep(k = null, d = null):
 	var n = null
 	n = _len(_ix(LK, k))
@@ -6785,7 +6794,7 @@ func lookStep(k = null, d = null):
 	sfx("click")
 	showLook(k)
 
-# L2969
+# L2972
 func lookBuy():
 	var c = null
 	var k = null
@@ -6803,7 +6812,7 @@ func lookBuy():
 	sfx("coin")
 	showLook("lkok")
 
-# L2971
+# L2974
 func lookExit():
 	var _c = {"b": null}
 	var r = null
@@ -6829,7 +6838,7 @@ func lookExit():
 			_callm(_c.b, "focus", [])
 		_timeout(_fn, 40)
 
-# L2975
+# L2978
 func spr(rows = null, pal = null, x = null, y = null, flip = null, white = null, alpha = null):
 	var w = null
 	var r = null
@@ -6861,7 +6870,7 @@ func spr(rows = null, pal = null, x = null, y = null, flip = null, white = null,
 	if alpha:
 		g.globalAlpha = 1
 
-# L2982
+# L2985
 func txt(s = null, x = null, y = null, col = null, al = null):
 	var w = null
 	g.font = "8px \"Press Start 2P\", monospace"
@@ -6878,7 +6887,7 @@ func txt(s = null, x = null, y = null, col = null, al = null):
 	g.fillStyle = col
 	g.fillText(s, x, y)
 
-# L2990
+# L2993
 func txtM(s = null, x = null, y = null, col = null, m = null, o = null):
 	var j = null
 	var k = null
@@ -6893,7 +6902,7 @@ func txtM(s = null, x = null, y = null, col = null, m = null, o = null):
 		txt(_slice(s, j, k), (x + (8 * j)), y, ("#ffb060" if (_ix(m, (o + j)) == "1") else col))
 		j = k
 
-# L2996
+# L2999
 func j_wrap(s = null, maxw = null):
 	var ws = null
 	var out = null
@@ -6919,12 +6928,12 @@ func j_wrap(s = null, maxw = null):
 		out.append(cur)
 	return out
 
-# L3004
+# L3007
 func rect(x = null, y = null, w = null, h = null, c = null):
 	g.fillStyle = c
 	g.fillRect(floori(float(x) + 0.5), floori(float(y) + 0.5), w, h)
 
-# L3015
+# L3018
 func lightSpr(r = null, col = null):
 	var k = null
 	var d = null
@@ -6979,7 +6988,7 @@ func lightSpr(r = null, col = null):
 	_aset(LSPR, k, cn)
 	return cn
 
-# L3034
+# L3037
 func light(x = null, y = null, r = null, a = null, col = null):
 	if (LN >= 48):
 		return
@@ -6991,7 +7000,7 @@ func light(x = null, y = null, r = null, a = null, col = null):
 	_aset(LCOL, LN, (col if col else null))
 	LN += 1
 
-# L3040
+# L3043
 func floorY(x = null, y = null):
 	var cx = null
 	var cy = null
@@ -7007,7 +7016,7 @@ func floorY(x = null, y = null):
 		i += 1
 	return -1
 
-# L3045
+# L3048
 func shadow(sx = null, wx = null, wy = null, w = null, h = null):
 	var S = null
 	var sun = null
@@ -7046,7 +7055,7 @@ func shadow(sx = null, wx = null, wy = null, w = null, h = null):
 		g.fillRect((floori(float(((cx + off) - (rw / 2.0))) + 0.5) + 2), (fy + 2), (rw - 4), 1)
 	g.globalAlpha = 1
 
-# L3066
+# L3069
 func drawLight():
 	var S = null
 	var i = null
@@ -7074,7 +7083,7 @@ func drawLight():
 	g.restore()
 	LN = 0
 
-# L3085
+# L3088
 func bgArt():
 	var o = null
 	var BW = null
@@ -7092,7 +7101,7 @@ func bgArt():
 		g.globalAlpha = 1
 	return true
 
-# L3092
+# L3095
 func drawBG():
 	var S = null
 	var n = null
@@ -7279,7 +7288,7 @@ func drawBG():
 				rect(((px + T) - 2), GY, 1, 4, "#ff3d6e")
 		i += 1
 
-# L3147
+# L3150
 func clashTowers():
 	var ax = null
 	var pu = null
@@ -7298,7 +7307,7 @@ func clashTowers():
 	clashPiece("s_censor", ((ax + W) - 39), con, pu, "#ff3d6e", 1)
 	clashPiece("t_censor", ((ax + W) - 52), con, pu, "#ff3d6e", 1)
 
-# L3158
+# L3161
 func clashPiece(key = null, wx = null, on = null, pu = null, lc = null, cen = null):
 	var a = null
 	var x = null
@@ -7316,7 +7325,7 @@ func clashPiece(key = null, wx = null, on = null, pu = null, lc = null, cen = nu
 	if (((cen and (on > 0)) and (on < 1)) and (fmod(t, 9) == 0)):
 		burst((((wx + ((a.get("fw")) / 2.0)) + (_rnd() * 8)) - 4), (((GY - a.get("fh")) + 4) + ((_rnd() * a.get("fh")) * 0.8)), ["#ffd23f", "#fff"], 3, 1.5)
 
-# L3167
+# L3170
 func bgFoot(x = null, w = null):
 	var a = null
 	var b = null
@@ -7330,7 +7339,7 @@ func bgFoot(x = null, w = null):
 		c += 1
 	return true
 
-# L3170
+# L3173
 func city(par = null, sp = null, hmin = null, hr = null, col = null, win = null, j_seed = null):
 	var off = null
 	var i0 = null
@@ -7363,7 +7372,7 @@ func city(par = null, sp = null, hmin = null, hr = null, col = null, win = null,
 				wy += 6
 		i += 1
 
-# L3175
+# L3178
 func speaker(x = null, y = null, pu = null):
 	var _a = null
 	var c = null
@@ -7380,7 +7389,7 @@ func speaker(x = null, y = null, pu = null):
 		rect((((x + _ix(c, 0)) - r) + 2), (((y + _ix(c, 1)) - r) + 2), ((r * 2) - 4), ((r * 2) - 4), "#1f1530")
 		rect(((x + _ix(c, 0)) - 2), ((y + _ix(c, 1)) - 2), 4, 4, "#05030a")
 
-# L3185
+# L3188
 func shade(c = null, f = null):
 	var _c = {"f": f}
 	var n = null
@@ -7397,7 +7406,7 @@ func shade(c = null, f = null):
 	b = (int(n) & int(255))
 	return "rgb(" + str(m.call(r)) + "," + str(m.call(gg)) + "," + str(m.call(b)) + ")"
 
-# L3191
+# L3194
 func tileSpr(key = null, paint_2 = null):
 	var o = null
 	var cn = null
@@ -7414,12 +7423,12 @@ func tileSpr(key = null, paint_2 = null):
 	_aset(TSPR, key, cn)
 	return cn
 
-# L3197
+# L3200
 func qp(q = null, x = null, y = null, w = null, h = null, c = null):
 	q.fillStyle = c
 	q.fillRect(x, y, w, h)
 
-# L3199
+# L3202
 func paintGnd(q = null, D_2 = null, S = null, v = null, top = null):
 	var x = null
 	var y = null
@@ -7490,7 +7499,7 @@ func paintGnd(q = null, D_2 = null, S = null, v = null, top = null):
 				qp(q, i, (3 + int((rnd((i + v)) * 4))), 1, 1, shade(S.get("top"), 0.78))
 			i += 1
 
-# L3234
+# L3237
 func paintPlat(q = null, D_2 = null, S = null):
 	var x = null
 	var r = null
@@ -7509,7 +7518,7 @@ func paintPlat(q = null, D_2 = null, S = null):
 	qp(q, 5, 4, 2, 2, shade(S.get("top"), 0.6))
 	qp(q, (D_2 - 7), 4, 2, 2, shade(S.get("top"), 0.6))
 
-# L3244
+# L3247
 func paintSpikes(q = null, D_2 = null):
 	var k = null
 	var bx = null
@@ -7536,7 +7545,7 @@ func paintSpikes(q = null, D_2 = null):
 		qp(q, (bx + 7), (D_2 - h), 2, 1, "#ffb0c4")
 		k += 1
 
-# L3257
+# L3260
 func drawTiles():
 	var _c = {"S": null, "v": null, "top": null}
 	var c0 = null
@@ -7623,7 +7632,7 @@ func drawTiles():
 		else:
 			rect((x_3 + 2), (c.get("y") - 12), 10, 6, "#555a70")
 
-# L3281
+# L3284
 func drawBarrel(e = null, x = null, y = null):
 	var v = null
 	var k = null
@@ -7633,7 +7642,7 @@ func drawBarrel(e = null, x = null, y = null):
 		k = (int((int(t) >> int(2))) & int(1))
 		fxDraw(orbSpr("#ff8a2a", (2 if (e.get("cd", NAN) < 8) else 1), 0, k), ((x + 5) + (_ix(v, 0) * 4.6)), ((y + 3) + (_ix(v, 1) * 4.6)))
 
-# L3283
+# L3286
 func drawEnemy(e = null):
 	var x = null
 	var y = null
@@ -7729,7 +7738,7 @@ func drawEnemy(e = null):
 		rect(x, (y + 4), 10, 1, "#6a4018")
 		txt("?", (x + 1), (y + 1), "#ffd23f")
 
-# L3324
+# L3327
 func drawBoss(b = null):
 	var _c = {"wh": null, "x": null, "y": null}
 	var R = null
@@ -7935,7 +7944,7 @@ func drawBoss(b = null):
 		rect((_c.x - 8), (GY - 1), (b.get("w") + 16), 1, "#ffd23f")
 	g.globalAlpha = 1
 
-# L3388
+# L3391
 func drawHazards():
 	var ax = null
 	var sx = null
@@ -8033,7 +8042,7 @@ func drawHazards():
 			txt((">>" if (boss.get("side", NAN) < 0) else "<<"), sx, (GY - 22), "#ffd23f")
 			txt("SUBE", (ax + (W / 2.0)), 70, "#ffd23f", "c")
 
-# L3404
+# L3407
 func drawPlayer():
 	var legs = null
 	var x = null
@@ -8075,7 +8084,7 @@ func drawPlayer():
 		fxDraw(flashSpr(_ix(WPN, run.get("wpn")).get("c"), min(3, p.get("mf"))), (mz.get("x") - cam), mz.get("y"))
 		light((mz.get("x") - cam), mz.get("y"), 18, 1, _ix(WPN, run.get("wpn")).get("c"))
 
-# L3425
+# L3428
 func drawTitleHero():
 	var hx = null
 	var hy = null
@@ -8096,7 +8105,7 @@ func drawTitleHero():
 		rect((mx + 1), (my + 1), 2, 1, "#fff")
 		light((mx + 2), (my + 1), 20, 1, "#ffd23f")
 
-# L3434
+# L3437
 func heart(x = null, y = null, full = null, c = null):
 	var col = null
 	col = ((c if c else "#ff3d6e") if full else "#3a2030")
@@ -8107,7 +8116,7 @@ func heart(x = null, y = null, full = null, c = null):
 	rect((x + 2), (y + 4), 3, 1, col)
 	rect((x + 3), (y + 5), 1, 1, col)
 
-# L3437
+# L3440
 func wIcon(x = null, y = null, w = null):
 	var c = null
 	c = "#06070d"
@@ -8128,7 +8137,7 @@ func wIcon(x = null, y = null, w = null):
 		rect((x + 2), (y + 2), 4, 4, c)
 		rect((x + 6), (y + 3), 2, 2, c)
 
-# L3442
+# L3445
 func drawHUD():
 	var gr = null
 	var i = null
@@ -8279,7 +8288,7 @@ func drawHUD():
 			txt(_ix(ln, q), tx, ((ty + 3) + (q * 9)), cc, "c")
 			q += 1
 
-# L3482
+# L3485
 func draw():
 	var pk = null
 	var hc = null
