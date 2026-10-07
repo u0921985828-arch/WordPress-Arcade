@@ -135,7 +135,7 @@ html.vl body.touch #stick .base{left:calc(var(--bt)*1.1 + var(--sal));top:calc(1
 html.vl body.touch #stick .knob{left:calc(var(--bt)*1.1 + var(--sal));top:calc(100% - var(--bt)*1.1)}
 html.vl body.touch #stick .lbl{display:none}
 html.vl body.touch #btns{position:absolute;pointer-events:auto}
-html.vl body.touch #btns button{opacity:.5;transition:opacity .15s}html.vl body.touch #btns.thru button{opacity:.18}
+html.vl body.touch #btns button{opacity:.4;transition:opacity .15s}html.vl body.touch #btns.thru button{opacity:.18}
 html.vl body.touch #tp{top:8px;right:calc(8px + var(--sar));pointer-events:auto;opacity:.7}
 html.vl body.touch #rot{display:none}
 /* Pantalla baja (movil tumbado, portatil): los botones pasan a dos columnas
@@ -528,16 +528,18 @@ function moveX(o){
 }
 // Al chocar con el muro de ruido: chispazo, empujon y el aviso del gesto (una vez por segundo).
 var bumpT=0;
-function jumpBump(cx){if(t-bumpT<75)return;bumpT=t;COH={s:touchMode()?'EN EL AIRE, TOCA SALTO OTRA VEZ':'EN EL AIRE, SALTA OTRA VEZ',c:'#ffd23d',l:110};}
+function jumpBump(cx){coachLoad();if(t-bumpT<75||CO.d.j2)return;bumpT=t;COH={k:'j2',s:touchMode()?'EN EL AIRE, TOCA SALTO OTRA VEZ':'EN EL AIRE, SALTA OTRA VEZ',c:'#ffd23d',l:110};}
 function noiseBump(cx){if(t-bumpT<60)return;bumpT=t;sfx('hit');burst(cx*T+6,p.y+7,['#ff3d6e','#fff'],8,1.4,.02);
-  COH={s:touchMode()?'MANTÉN SALTO PARA EL DASH':'C: DASH PARA CRUZAR',c:'#4dff88',l:110};}
+  coachLoad();if(!CO.d.da)COH={k:'da',s:touchMode()?'MANTÉN SALTO PARA EL DASH':'C: DASH PARA CRUZAR',c:'#4dff88',l:110};}
 // Tutorial de la fase 1: UN cartel cada vez y no pasa al siguiente hasta que el
 // jugador hace lo que pide (antes rotaban solos cada 4 s). Los avisos de los
 // muros (COH) salen en el mismo hueco, nunca encima de otro cartel.
-var CO={d:{},ok:0},COH=null;
+// Lo aprendido se guarda (ds2_coach): al recargar o morir no vuelven carteles ya cumplidos.
+var CO={d:{},ok:0,l:0},COH=null;
+function coachLoad(){if(!CO.l){CO.l=1;CO.d=load('ds2_coach',{});}}
 var COK=['mv','j','j2','f','da','bs'];
-function coachDo(k){if(CO.d[k])return;var c=coachStep();CO.d[k]=1;if(c===k)CO.ok=40;}
-function coachStep(){if(st.i!==0||SET.tut)return null;for(var i=0;i<COK.length;i++){var k=COK[i];if(CO.d[k])continue;if(k==='bs'&&run.bass<100)return null;return k;}return null;}
+function coachDo(k){coachLoad();if(COH&&COH.k===k)COH=null;if(CO.d[k])return;var c=coachStep();CO.d[k]=1;save('ds2_coach',CO.d);if(c===k)CO.ok=40;}
+function coachStep(){if(st.i!==0||SET.tut)return null;coachLoad();for(var i=0;i<COK.length;i++){var k=COK[i];if(CO.d[k])continue;if(k==='bs'&&run.bass<100)return null;return k;}return null;}
 function coachText(k){var tm=touchMode();
   if(k==='mv')return tm?'ARRASTRA EN LA IZQUIERDA PARA MOVERTE':'FLECHAS: MOVERTE';
   if(k==='j')return tm?'TOCA SALTO':'Z O ESPACIO: SALTAR';
@@ -2495,7 +2497,9 @@ function update(){
   // Vertical: normalmente el suelo va pegado al borde de abajo (camY=CY). Si el
   // jugador sube mucho (o entra el jefe por arriba) la camara sube con el.
   var lo=clamp(p.y+p.h+2-H,0,CYM);                       // los pies del jugador nunca se salen
-  var ty=clamp(p.y-34,lo,CYM);
+  // En el aire hay zona muerta: la camara solo sube si la cabeza se va a salir
+  // por arriba y solo baja si cae por debajo; un doble salto ya no pierde el suelo.
+  var ty=clamp(p.ground?p.y-34:clamp(camY,p.y-34,p.y-8),lo,CYM);
   if(boss&&!boss.dead)ty=Math.min(ty,clamp(boss.y-10,lo,CYM));
   // En la arena del jefe el suelo no se pierde nunca de vista (antes, con el jefe
   // volando alto, la camara subia y el jugador se quedaba sin ver donde pisaba).
@@ -2583,7 +2587,7 @@ var LK={
      {n:'NEGRO',b:[14,14,18],a:[120,255,140],c:45},{n:'MORADO',b:[46,24,70],a:[255,110,220],c:55}],
   l:[{n:'LARGO',c:0},{n:'CORTO',c:40}]
 };
-var LKN={f:'CARA',s:'PIEL',t:'SUDADERA',p:'ESTAMPADO',b:'PANTALÓN',l:'PERNERA'};
+var LKN={f:'PELO',s:'PIEL',t:'SUDADERA',p:'ESTAMPADO',b:'PANTALÓN',l:'PERNERA'};
 var BANK=load('ds2_bank',0);
 var LOOK=load('ds2_look',null)||{f:0,s:0,t:0,p:0,b:0,l:0,own:[]};
 var lookVer=1;
@@ -3139,7 +3143,7 @@ function drawHUD(){
   var cs=COH?COH.s:null,cc=COH?COH.c:'#eef3ff';
   if(!cs&&!st.lock&&st.t>60){var ck=coachStep();if(CO.ok>0){cs='¡BIEN!';cc='#4dff88';}else if(ck)cs=coachText(ck);}
   if(cs){var ph=Math.ceil(PADX/(HS*UIF)),cw2=HW-ph,ln=wrap(cs,cw2-24),tw=0,q;for(q=0;q<ln.length;q++)tw=Math.max(tw,g.measureText(ln[q]).width);
-    var ty=banner?58:32,tx=cw2/2;rect(tx-tw/2-6,ty,tw+12,6+9*ln.length,'rgba(6,7,13,.8)');rect(tx-tw/2-6,ty,2,6+9*ln.length,cc);
+    var ty=banner?58:32,tx=cw2/2;rect(tx-tw/2-6,ty,tw+12,6+9*ln.length,'rgba(6,7,13,.55)');rect(tx-tw/2-6,ty,2,6+9*ln.length,cc);
     for(q=0;q<ln.length;q++)txt(ln[q],tx,ty+3+q*9,cc,'c');}
 }
 function draw(){

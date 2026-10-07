@@ -202,6 +202,14 @@ de ventaja). Estudio y cifras: `ESTUDIO-CONTROLES.md`.
   pantalla (1280×720 → 1280×720; antes 1056×432).
 - **Cámara del jefe**: en la arena no sube más allá de lo que deja ver el suelo
   (`GY+4-H`), aunque el jefe vuele alto.
+- **Cámara en el aire con zona muerta**: en el salto solo sigue al personaje
+  cuando sale de la franja `p.y-34 … p.y-8`, así el suelo no se sale de la
+  pantalla en el doble salto (antes 13–23 px fuera, ahora 0).
+- **El tutorial se recuerda** (`ds2_coach` en el almacenamiento): un paso hecho no
+  vuelve a salir tras morir o recargar; el aviso de doble salto o de dash se
+  borra al hacer esa acción, y el cartel es semitransparente para no tapar discos.
+- Etiqueta de la tienda «PELO» (antes «CARA») y botones táctiles al 40 % de
+  opacidad.
 
 ## Música
 Toda la banda sonora se **genera en el propio juego** (Web Audio, sin ficheros de
