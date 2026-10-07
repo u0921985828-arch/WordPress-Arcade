@@ -385,6 +385,12 @@ Nuevo juicio ciego (dos jueces, unas 39 sesiones cada uno, 0 errores): **7,8** c
 - Juez móvil (7,4): Controles a dos columnas anchas en apaisado con VOLVER siempre a la vista; las compras piden un segundo toque («¿… POR N? PULSA OTRA VEZ»); al continuar se recuperan los puntos que tenías al llegar al punto de control o a la puerta del jefe; los botones táctiles se atenúan también cuando hay una plataforma móvil o un enemigo debajo; el destello de impacto del jefe sale como mucho cada 9 fotogramas (ya no se queda en mancha blanca); créditos con el estudio una sola vez y el texto en pantalla desde el primer fotograma; «(1 × 10)» sin partir.
 - Las monedas son una **hucha común** a todas las ranuras (decisión de diseño, no un fallo).
 
+### Pasada de móvil
+- Auditoría automática de 16 pantallas en 5 tamaños de móvil tumbado (844×390, 740×360, 915×412, 667×375, 1024×600) con pantalla táctil: sin desplazamiento, ningún botón por debajo de 40 px ni fuera de pantalla, ningún texto cortado.
+- Tienda: en pantallas bajas el precio pasa a la esquina de abajo a la derecha de la tarjeta (antes se salía en «ARMA REFORZADA», «BAJO PROFUNDO»…); la descripción se esconde y sale en el aviso de confirmación.
+- La mochila también pide confirmación antes de comprar (pulsa otra vez), igual que las mejoras.
+- Ranura vacía: «EMPEZAR AQUÍ» (antes «NUEVA PARTI…» cortado a 667 px).
+
 ## Depuración
 Con `#debug` en la dirección: `DS.warp(0..11, conCinematica)`, `DS.cutAdv()`,
 `DS.cutSkip()`, `DS.toArena()`, `DS.hitBoss(n)`, `DS.god()`, `DS.s`, `DS.sheets`.
