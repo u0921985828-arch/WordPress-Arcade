@@ -1058,7 +1058,7 @@ func _boot_gen():
 	TG = null
 	TGi = 0
 	TGC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	STUDIO = "KUBOPLAY"
+	STUDIO = "WOLFCADE"
 	PFOC = null
 	bsReady = null
 	PP = _data("PP")
@@ -5875,7 +5875,7 @@ func showWin():
 func credLines():
 	var L = null
 	var i = null
-	L = [["DUB SIEGE", "#ffd23f"], ["", ""], ["UN JUEGO DE", "#8f98c8"], [STUDIO, "#eef3ff"], ["IDEA, DIRECCIÓN, DESARROLLO Y ARTE", "#5a6390"], ["", ""], ["MÚSICA", "#8f98c8"], ["SINTETIZADA EN EL JUEGO", "#eef3ff"], ["", ""], ["INSPIRACIÓN", "#8f98c8"], ["SOUND SYSTEMS, 1955-1981", "#eef3ff"], ["", ""], ["", ""], ["REPARTO", "#ff3d6e"]]
+	L = [["DUB SIEGE", "#ffd23f"], ["", ""], ["UN JUEGO DE", "#8f98c8"], [STUDIO, "#eef3ff"], ["IDEA, CÓDIGO Y ARTE", "#5a6390"], ["", ""], ["MÚSICA", "#8f98c8"], ["SINTETIZADA EN EL JUEGO", "#eef3ff"], ["", ""], ["INSPIRACIÓN", "#8f98c8"], ["SOUND SYSTEMS, 1955-1981", "#eef3ff"], ["", ""], ["", ""], ["REPARTO", "#ff3d6e"]]
 	i = 0
 	while (i < _len(LEVELS)):
 		L.append([_ix(LEVELS, i).get("boss"), "#eef3ff"])

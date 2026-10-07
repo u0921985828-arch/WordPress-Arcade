@@ -368,7 +368,7 @@ Nuevo juicio ciego (dos jueces, unas 39 sesiones cada uno, 0 errores): **7,8** c
 - **Diálogo sin pausa**: lo que se dice a mitad de fase sale como radio en una esquina, sin parar la partida.
 - **Apuntado asistido** en AUTO (activo con los mandos táctiles); parón al acertar; botones táctiles más visibles y separados; letra mínima de 11 px.
 - **Fases 1–5 de unos 3 minutos**: `seqOf()` da otra vuelta por el repertorio de la fase hasta un mínimo de columnas, con punto de control cada 4 piezas; el bonus de tiempo cuenta desde el 60 % del par.
-- **Créditos animados**: rodillo pintado en el lienzo (igual en la web y en el APK) con el desfile de los doce jefes; el nombre del estudio está en una sola constante (`STUDIO`).
+- **Créditos animados**: rodillo pintado en el lienzo (igual en la web y en el APK) con el desfile de los doce jefes; el nombre del estudio, WOLFCADE, está en una sola constante (`STUDIO`).
 - **Pausa**: el cursor vuelve a la opción de la que se venía.
 - **Fallo del APK corregido**: `x|0` sobre una propiedad que falta se traducía a `int(null)` y el juego se cerraba al primer dash; ahora se lee como 0. Prueba nueva `godot/tests/cred_test.gd`.
 
