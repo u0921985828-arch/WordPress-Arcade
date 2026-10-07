@@ -1388,9 +1388,6 @@ function placePad(){
   [].forEach.call(bs,function(b){var k=b.className.split(' ')[0],q=P[k];if(!q)return;
     b.style.width=b.style.height=S[k]+'px';b.style.left=(q.x-q.r-x0)+'px';b.style.top=(q.y-q.r-y0)+'px';PADB[k]={b:b,x:q.x,y:q.y,r:q.r};});
 }
-// Bajo los botones hay algo que mirar (plataforma movil o enemigo): se atenuan.
-function padUnder(pe){var i,o;for(i=0;i<mplats.length;i++){o=mplats[i];if(o.x-cam+o.w>pe&&o.x-cam<W)return true;}
-  for(i=0;i<enemies.length;i++){o=enemies[i];if(!o.dead&&o.x-cam+o.w>pe&&o.x-cam<W)return true;}return false;}
 function padDim(){var z=$('btns');if(z)z.classList.toggle('thru',!!PADT);}
 function padPick(x,y){var bk=null,bv=1e9;for(var k in PADB){var q=PADB[k],v=Math.hypot(x-q.x,y-q.y)-q.r-(k==='j'?14:0);if(v<bv){bv=v;bk=q.b;}}return bk;}
 function btnDown(b){var c=b.getAttribute('data-k');audioOn();buzz(8);
@@ -2757,6 +2754,9 @@ $('ov').addEventListener('click',function(e){var b=e.target.closest('[data-act]'
 
 // ================= bucle =================
 var bsBtn=document.querySelector('#btns .bs'),bsReady=null;
+// Bajo los botones hay algo que mirar (plataforma movil o enemigo): se atenuan.
+function padUnder(pe){var i,o;for(i=0;i<mplats.length;i++){o=mplats[i];if(o.x-cam+o.w>pe&&o.x-cam<W)return true;}
+  for(i=0;i<enemies.length;i++){o=enemies[i];if(!o.dead&&o.x-cam+o.w>pe&&o.x-cam<W)return true;}return false;}
 function update(){
   t++;if(sh>0)sh--;if(flash>0)flash--;applyLayout();
   var rd=!!(run&&run.bass>=100&&mode==='play');if(rd!==bsReady){bsReady=rd;bsBtn.classList.toggle('ready',rd);}
