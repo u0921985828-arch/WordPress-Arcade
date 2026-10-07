@@ -144,6 +144,7 @@ html.vl body.touch #rot{display:none}
 html.h600 .menu{display:grid;grid-template-columns:1fr 1fr;width:min(100%,560px)}
 html.h600 .menu .hot,html.h600 .menu>.btn:only-child{grid-column:1/-1}html.h600 .menu.one{display:flex;width:min(100%,460px)}.menu.one{width:min(100%,460px)}
 html.h600 .keys{grid-template-columns:auto 1fr auto 1fr;width:min(100%,760px)}
+.panel.wide{max-width:min(880px,calc(96*var(--vw)))}html.h600 .panel.wide .keys{width:100%;column-gap:12px}
 html.h430 .panel{line-height:1.45}html.h430 .shop{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))}
 html.vl body.touch #stick:not(.act) .base,html.vl body.touch #stick:not(.act) .knob{opacity:.25}
 /* Portada: el panel deja ver la escena del juego que corre por detras. */
@@ -1387,6 +1388,9 @@ function placePad(){
   [].forEach.call(bs,function(b){var k=b.className.split(' ')[0],q=P[k];if(!q)return;
     b.style.width=b.style.height=S[k]+'px';b.style.left=(q.x-q.r-x0)+'px';b.style.top=(q.y-q.r-y0)+'px';PADB[k]={b:b,x:q.x,y:q.y,r:q.r};});
 }
+// Bajo los botones hay algo que mirar (plataforma movil o enemigo): se atenuan.
+function padUnder(pe){var i,o;for(i=0;i<mplats.length;i++){o=mplats[i];if(o.x-cam+o.w>pe&&o.x-cam<W)return true;}
+  for(i=0;i<enemies.length;i++){o=enemies[i];if(!o.dead&&o.x-cam+o.w>pe&&o.x-cam<W)return true;}return false;}
 function padDim(){var z=$('btns');if(z)z.classList.toggle('thru',!!PADT);}
 function padPick(x,y){var bk=null,bv=1e9;for(var k in PADB){var q=PADB[k],v=Math.hypot(x-q.x,y-q.y)-q.r-(k==='j'?14:0);if(v<bv){bv=v;bk=q.b;}}return bk;}
 function btnDown(b){var c=b.getAttribute('data-k');audioOn();buzz(8);
@@ -1813,10 +1817,10 @@ function updateEnemies(){
 
 // ================= jefes =================
 function startBoss(){
-  st.lock=1;coachLoad();if(st.i===0&&!CO.d.bs&&run.bass<100)run.bass=100;p.inv=Math.max(p.inv,150);st.cp={x:st.arenaX+30,y:GY-14};run.cpi=st.i;run.cpx=st.arenaX+30;slotSave('play');
+  st.lock=1;coachLoad();if(st.i===0&&!CO.d.bs&&run.bass<100)run.bass=100;p.inv=Math.max(p.inv,150);st.cp={x:st.arenaX+30,y:GY-14};run.cpi=st.i;run.cpx=st.arenaX+30;run.scoreAt=run.score;slotSave('play');
   enemies.forEach(function(e){if(!e.dead)burst(e.x+5,e.y+4,['#7a5bf0','#fff'],8,2);});enemies=[];ebul=[];
   var L=st.L,n=L.ai,hp=L.hp*D.eHp,ax=st.arenaX;
-  boss={kind:n,mk:L.mk||0,mt:L.mt,sc:L.sc||1,x:ax+W-70,y:-50,w:24,h:30,hp:hp,max:hp,ph:1,t:0,cd:100,act:null,actT:0,fl:0,hsT:-99,vx:0,vy:0,on:0,enter:1,dead:0,deadT:0,wind:0,a:0,weak:0,chip:hp,pil:[],lx:0,tx:0,wpT:-99,
+  boss={kind:n,flc:0,mk:L.mk||0,mt:L.mt,sc:L.sc||1,x:ax+W-70,y:-50,w:24,h:30,hp:hp,max:hp,ph:1,t:0,cd:100,act:null,actT:0,fl:0,hsT:-99,vx:0,vy:0,on:0,enter:1,dead:0,deadT:0,wind:0,a:0,weak:0,chip:hp,pil:[],lx:0,tx:0,wpT:-99,
     dir:-1,turn:0,bc:0,gnd:n===0||n===3,hy:92};
   if(n===1){boss.w=28;boss.h=16;boss.x=ax+W/2-14;boss.y=-30;boss.hy=106;}
   if(n===2){boss.w=48;boss.h=36;boss.x=ax+W/2-24;boss.y=-50;}
@@ -1846,7 +1850,7 @@ function damageBoss(n){
   if((b.kind===1||b.kind===4)&&b.act==='ground')n*=1.5;
   // Los MK2 abren el nucleo tras su ataque fuerte: ahi cada impacto vale doble.
   if(b.weak>0){n*=2;if(t-b.wpT>45){b.wpT=t;pop(b.x+b.w/2-12,b.y-12,'x2','#ffd23f');}}
-  b.hp-=n;b.fl=2;run.stats.hits+=0;if(!(t-(b.hsT|0)<14)){b.hsT=t;hs=Math.max(hs,2);}
+  b.hp-=n;if(!(b.flc>0)){b.fl=2;b.flc=9;}run.stats.hits+=0;if(!(t-(b.hsT|0)<14)){b.hsT=t;hs=Math.max(hs,2);}
   var r=b.hp/b.max,old=b.ph;
   b.ph=b.kind===3?(r>.66?1:r>.33?2:3):(r>(b.mk?.75:.6)?1:r>(b.mk?.35:.25)?2:3);
   if(b.ph!==old){shake(14);sfx('drop');banner={a:'',b:b.ph===3?'FASE FINAL':'MODO FURIA',l:90,boss:1};pickups.push({type:'hp',x:b.x+b.w/2,y:Math.max(b.y,20),w:8,h:8,vy:-2,l:600});b.act=null;b.cd=50;hazards=[];}
@@ -1859,7 +1863,7 @@ function killBoss(){
 }
 function bossCd(base){return (base+Math.random()*base*.4)/D.rate/(boss.ph>1?1.25:1)/(boss.ph>2?1.15:1)/(1+st.i*.025);}
 function updateBoss(){
-  var b=boss,ax=st.arenaX;b.t++;b.a+=.12;if(b.fl>0)b.fl--;
+  var b=boss,ax=st.arenaX;b.t++;b.a+=.12;if(b.fl>0)b.fl--;if(b.flc>0)b.flc--;
   // Tramo blanco de la barra: el dano reciente se ve un momento antes de irse.
   if(b.chip>b.hp)b.chip=Math.max(b.hp,b.chip-b.max*.006);else b.chip=b.hp;
   if(b.dead){if(t%6===0){burst(b.x+Math.random()*b.w,b.y+Math.random()*b.h,['#ff3d6e','#ffd23f','#3de8ff','#fff'],14,3);sfx('kill');shake(6);}
@@ -2118,7 +2122,7 @@ function updatePickups(){
       pickups.splice(i,1);continue;}
     if(k.l>0&&--k.l<=0)pickups.splice(i,1);else if(k.y>WH+20)pickups.splice(i,1);
   }
-  st.cps.forEach(function(c){if(!c.on&&Math.abs(p.x-c.x)<10){c.on=1;st.cp={x:c.x,y:GY-14};run.cpi=st.i;run.cpx=c.x;slotSave('play');sfx('cp');pop(c.x-24,c.y-10,'PUNTO DE CONTROL','#4dff88');if(p.hp<run.maxHp)p.hp++;p.arm=run.up.arm;if(st.L.cut&&st.L.cut.cp&&!seen('cp'))radioStart(st.L.cut.cp);}});
+  st.cps.forEach(function(c){if(!c.on&&Math.abs(p.x-c.x)<10){c.on=1;st.cp={x:c.x,y:GY-14};run.cpi=st.i;run.cpx=c.x;run.scoreAt=run.score;slotSave('play');sfx('cp');pop(c.x-24,c.y-10,'PUNTO DE CONTROL','#4dff88');if(p.hp<run.maxHp)p.hp++;p.arm=run.up.arm;if(st.L.cut&&st.L.cut.cp&&!seen('cp'))radioStart(st.L.cut.cp);}});
 }
 
 // ================= fase =================
@@ -2345,7 +2349,7 @@ function finishStage(){
   if(last){showWin();return;}
   slotSave('shop',st.i+1);
   show('<div class="panel"><h2>FASE '+(st.i+1)+' SUPERADA</h2><h3>'+st.L.boss+' DERROTADO</h3>'+
-    '<div class="stats"><span>TIEMPO '+Math.floor(secs/60)+':'+pad(secs%60,2)+'</span><b>+'+tb+'</b><span>SIN DAÑO</span><b>+'+nh+'</b><span>'+'DISCOS DE LA FASE ('+cb/10+' × 10)'+'</span><b>+'+cb+'</b>'+
+    '<div class="stats"><span>TIEMPO '+Math.floor(secs/60)+':'+pad(secs%60,2)+'</span><b>+'+tb+'</b><span>SIN DAÑO</span><b>+'+nh+'</b><span>'+'DISCOS DE LA FASE ('+cb/10+'&nbsp;×&nbsp;10)'+'</span><b>+'+cb+'</b>'+
     '<span class="tot">PUNTOS'+(nb?' · RÉCORD':'')+'</span><b class="tot">'+pad(run.score,7)+'</b></div>'+medRow(md)+(nt?'<p class="note">NUEVA CINTA EN EL ARCHIVO: '+LORE[st.i][0]+'</p>':'')+
     '<div class="menu"><button class="btn hot" data-act="shop">IR A LA TIENDA</button></div></div>');
 }
@@ -2394,11 +2398,14 @@ function showShop(tab,ok,no){
   NEXTOK=0;h+='<div class="menu"><button class="btn hot" data-act="next">FASE '+(st.i+2)+': '+LEVELS[st.i+1].name+'</button></div>'+(tmText()?'':'<p class="dim">ESC: IR A LA SIGUIENTE FASE</p>')+'</div>';
   show(h);
 }
+var BUYQ=null;
 function buy(id){
   var it=ITEMS.filter(function(x){return x.id===id;})[0];if(!it)return;
   var lv=id==='life'?0:run.up[id],cost=it.cost[Math.min(lv,it.cost.length-1)];
-  if(BANK<cost||lv>=it.max){sfx('no');showShop(null,'',lv>=it.max?'NIVEL MÁXIMO':'FALTAN '+(cost-BANK)+' DISCOS');return;}
-  BANK-=cost;bankCommit();sfx('buy');
+  if(BANK<cost||lv>=it.max){BUYQ=null;sfx('no');showShop(null,'',lv>=it.max?'NIVEL MÁXIMO':'FALTAN '+(cost-BANK)+' DISCOS');return;}
+  // Segundo toque para pagar: un toque de mas no gasta discos sin querer.
+  if(BUYQ!==id){BUYQ=id;sfx('blip');showShop(null,'','¿'+it.n+' POR '+cost+'? PULSA OTRA VEZ');return;}
+  BUYQ=null;BANK-=cost;bankCommit();sfx('buy');
   if(id==='life')run.lives++;else{run.up[id]++;if(id==='hp')run.maxHp++;}
   slotSave('shop',st.i+1);showShop(null,it.n);
 }
@@ -2583,16 +2590,16 @@ function showControls(then){
   var from=mode;back=from==='pause'?function(){mode='play';pause();}:showMenu;
   var tch=touchMode();
   var body=tch?
-    '<b>ZONA IZQUIERDA</b><span>Arrastra para moverte. Arriba apunta arriba, abajo + SALTO baja de plataformas</span>'+
-    '<b>SALTO</b><span>Toca para saltar, otra vez en el aire para el doble salto</span><b>MANTÉN SALTO</b><span>Dash: esquiva atravesando balas y enemigos</span>'+
-    '<b>FUEGO</b><span>'+(autoFire()?'Automático cuando hay enemigos cerca (puedes forzarlo pulsando)':'Mantenlo pulsado para disparar')+'</span>'+
-    '<b>BASS</b><span>Con la barra llena limpia la pantalla</span><b>OBJ</b><span>Usa el objeto rápido de la mochila</span><b>II</b><span>Pausa (y MOCHILA)</span>':
+    '<b>IZQUIERDA</b><span>Arrastra para moverte; arriba apunta, abajo + SALTO baja</span>'+
+    '<b>SALTO</b><span>Toca para saltar; otra vez en el aire, doble salto</span><b>MANTÉN SALTO</b><span>Dash: atraviesa balas y aturde</span>'+
+    '<b>FUEGO</b><span>'+(autoFire()?'Solo con enemigos cerca (pulsa para forzarlo)':'Mantenlo pulsado para disparar')+'</span>'+
+    '<b>BASS</b><span>Barra llena: limpia la pantalla</span><b>OBJ</b><span>Objeto rápido de la mochila</span><b>II</b><span>Pausa y MOCHILA</span>':
     '<b>FLECHAS / A D</b><span>Moverse</span><b>Z / ESPACIO</b><span>Saltar (otra vez en el aire = doble salto)</span>'+
     '<b>X / J</b><span>Disparar (mantener = ráfaga)</span>'+(SET.upJump?'':'<b>ARRIBA + FUEGO</b><span>Disparo vertical o diagonal</span>')+
     '<b>ABAJO + SALTO</b><span>Bajar de una plataforma</span>'+
     '<b>C / SHIFT</b><span>Dash: esquiva atravesando balas</span><b>V</b><span>Bass Drop con la barra llena</span><b>E</b><span>Usar el objeto rápido de la mochila</span>'+
     '<b>P / ESC</b><span>Pausa (y MOCHILA)</span><b>MANDO</b><span>A salto, X fuego, B dash, Y bass, LB objeto, START pausa</span>';
-  show('<div class="panel"><h2>'+(then?'ASÍ SE JUEGA':'CONTROLES')+'</h2><div class="keys">'+body+'</div>'+
+  show('<div class="panel wide"><h2>'+(then?'ASÍ SE JUEGA':'CONTROLES')+'</h2><div class="keys">'+body+'</div>'+
     '<p class="dim">Las cajas ? dan armas u objetos. Coger la misma arma sube su nivel; cada golpe lo baja (la ARMADURA de la tienda para golpes).</p>'+
     '<div class="menu">'+(then?'<button class="btn hot" data-act="go">A JUGAR</button>':'<button class="btn" data-act="back">VOLVER</button>')+'</div></div>');
 }
@@ -2650,7 +2657,7 @@ function gameOver(){
   var left=D.cont-(run.conts|0),sa=run.scoreAt!=null?run.scoreAt:0;
   if(left>0){var c=JSON.parse(JSON.stringify(run));c.conts++;c.score=sa;c.lives=D.lives;c.lv=1;c.wpn='N';c.bass=0;slotSave('play',st.i,c);}
   show('<div class="panel"><h2>EL SOUND SYSTEM CALLA</h2>'+(nb?'<p class="note">¡NUEVO RÉCORD: '+pad(run.score,7)+'!</p>':'')+stat()+
-    (left>0?'<p class="dim">'+(run.cpi===st.i&&run.cpx>0?(run.cpx>=st.arenaX?'Continuar vuelve a la puerta del jefe':'Continuar vuelve al último punto de control'):'Continuar reinicia la fase '+(st.i+1))+' con los puntos de la entrada ('+pad(sa,7)+'). Te quedan '+left+'.</p>':
+    (left>0?'<p class="dim">'+(run.cpi===st.i&&run.cpx>0?(run.cpx>=st.arenaX?'Continuar vuelve a la puerta del jefe':'Continuar vuelve al último punto de control'):'Continuar reinicia la fase '+(st.i+1))+' con los puntos que tenías al llegar ('+pad(sa,7)+'). Te quedan '+left+'.</p>':
       '<p class="dim">SIN CONTINUACIONES. La ranura vuelve al principio de la fase '+(st.i+1)+'.</p>')+
     '<div class="menu">'+(left>0?'<button class="btn hot" data-act="cont">CONTINUAR ('+left+')</button>':'')+'<button class="btn'+(left>0?'':' hot')+'" data-act="rank">GUARDAR EN RANKING</button><button class="btn" data-act="tomenu">MENÚ PRINCIPAL</button></div></div>');
 }
@@ -2663,7 +2670,7 @@ function showWin(){
 // Creditos: rodillo sobre el lienzo (asi sale igual en la web y en el APK) con el
 // desfile de los jefes abajo. Toque, A o Intro antes de tiempo para volver.
 var STUDIO='KUBOPLAY';
-function credLines(){var L=[['DUB SIEGE','#ffd23f'],['',''],['IDEA Y DIRECCIÓN','#8f98c8'],[STUDIO,'#eef3ff'],['',''],['DESARROLLO','#8f98c8'],[STUDIO,'#eef3ff'],['',''],['ARTE','#8f98c8'],[STUDIO,'#eef3ff'],['',''],
+function credLines(){var L=[['DUB SIEGE','#ffd23f'],['',''],['UN JUEGO DE','#8f98c8'],[STUDIO,'#eef3ff'],['IDEA, DIRECCIÓN, DESARROLLO Y ARTE','#5a6390'],['',''],
   ['MÚSICA','#8f98c8'],['SINTETIZADA EN EL JUEGO','#eef3ff'],['',''],['INSPIRACIÓN','#8f98c8'],['SOUND SYSTEMS, 1955-1981','#eef3ff'],['',''],['',''],['REPARTO','#ff3d6e']];
   for(var i=0;i<LEVELS.length;i++)L.push([LEVELS[i].boss,'#eef3ff']);
   L.push(['',''],['',''],['TODOS LOS PERSONAJES SON INVENTADOS','#8f98c8'],['',''],['GRACIAS POR JUGAR','#ffd23f']);return L;}
@@ -2678,7 +2685,7 @@ function drawCred(c){
     if(x>-o.fw*sc&&x<W)blitS(ks[i],(t>>3)%o.n,x,gy-o.fh*sc,sc,true);x+=o.fw*sc+12;}
   g.restore();
   g.save();g.setTransform(SC*HS,0,0,SC*HS,0,0);
-  var L=credLines(),cx=HW/2,y0=HH-c.t*.32,bot=HH-Math.round(48/HS);
+  var L=credLines(),cx=HW/2,y0=Math.round(HH*.45)-c.t*.32,bot=HH-Math.round(48/HS);
   for(i=0;i<L.length;i++){var y=y0+i*11;if(y<-10||y>bot)continue;var a=Math.min(1,(bot-y)/14,(y+4)/18);if(a<=0)continue;g.globalAlpha=a;if(L[i][0])txt(L[i][0],cx,y,L[i][1],'c');}
   g.globalAlpha=1;if(y0+L.length*11<-10)c.done=1;
   if(c.t>60&&((t>>4)&1))txt(touchMode()?'TOCA PARA VOLVER':'INTRO PARA VOLVER',HW-5,3,'#5a6390','r');
@@ -2698,7 +2705,7 @@ function resume(){hideOv();mode='play';K={};}
 ['fullscreenchange','webkitfullscreenchange'].forEach(function(n){document.addEventListener(n,function(){if(!(document.fullscreenElement||document.webkitFullscreenElement))pause();});});
 function startGame(n){PRAC=0;newRun();if(n){run.coins=n*30;}enterLevel(n||0,true);audioOn();}
 function act(a,v){
-  audioOn();
+  audioOn();if(a!=='buy')BUYQ=null;
   if(mode==='menu'&&$('ov').classList.contains('title'))MFOC=a;
   if(mode==='pause'&&['bag','opts','controls'].indexOf(a)>-1)PFOC=a;else if(a==='resume'||a==='tomenu')PFOC=null;
   switch(a){
@@ -2779,7 +2786,7 @@ function update(){
   // Con botones tactiles a la derecha (PADX) el personaje se centra en la parte que se ve.
   var tgt=st.lock?st.arenaX+2:clamp(p.x-((W-PADX*.6)/2-5)+p.face*(24+pitAhead()*14),0,COLS*T-W);
   cam+=(tgt-cam)*(st.lock?.08:.1);
-  var pe=W-PADX,pt=PADX>0&&((boss&&!boss.dead&&boss.x-cam+boss.w>pe)||p.x-cam+p.w>pe)?1:0;if(pt!==PADT){PADT=pt;padDim();}
+  var pe=W-PADX,pt=PADX>0&&((boss&&!boss.dead&&boss.x-cam+boss.w>pe)||p.x-cam+p.w>pe||padUnder(pe))?1:0;if(pt!==PADT){PADT=pt;padDim();}
   // Vertical: normalmente el suelo va pegado al borde de abajo (camY=CY). Si el
   // jugador sube mucho (o entra el jefe por arriba) la camara sube con el.
   var lo=clamp(p.y+p.h+2-H,0,CYM);                       // los pies del jugador nunca se salen

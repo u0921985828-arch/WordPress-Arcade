@@ -382,6 +382,7 @@ Nuevo juicio ciego (dos jueces, unas 39 sesiones cada uno, 0 errores): **7,8** c
 - Tren Fantasma a tamaño de jefe (hoja `bh_2` con Scale2x, caja 48×36); busto del jefe centrado en la escena.
 - Los MK2 se tiñen de violeta (antes rojo, que se perdía en el club rojo de la fase 10).
 - Primer jefe: si aún no has usado el BASS DROP, la barra llega llena y sale el aviso para enseñarlo.
+- Juez móvil (7,4): Controles a dos columnas anchas en apaisado con VOLVER siempre a la vista; las compras piden un segundo toque («¿… POR N? PULSA OTRA VEZ»); al continuar se recuperan los puntos que tenías al llegar al punto de control o a la puerta del jefe; los botones táctiles se atenúan también cuando hay una plataforma móvil o un enemigo debajo; el destello de impacto del jefe sale como mucho cada 9 fotogramas (ya no se queda en mancha blanca); créditos con el estudio una sola vez y el texto en pantalla desde el primer fotograma; «(1 × 10)» sin partir.
 - Las monedas son una **hucha común** a todas las ranuras (decisión de diseño, no un fallo).
 
 ## Depuración
