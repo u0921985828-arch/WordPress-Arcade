@@ -106,7 +106,7 @@ func _place(x0: float, y0: float, x1: float, y1: float) -> void:
 				else:
 					var ok := true
 					for q in pads:
-						if Vector2(x, y).distance_to(pads[q].c) < r + pads[q].r + 12.0 * k:
+						if Vector2(x, y).distance_to(pads[q].c) < r + pads[q].r + 20.0 * k:
 							ok = false
 							break
 					if not ok:
@@ -288,6 +288,7 @@ func _draw() -> void:
 				line = Color("#4dff88")
 		elif key == "f":
 			line = Color("#ff3d6e")
+			fill = Color("#3a0f1e")
 		elif key == "it":
 			line = Color("#ff8aa6")
 		elif key == "bs":
@@ -303,10 +304,10 @@ func _draw() -> void:
 		_ring(q.c, r, Color(fill, al), Color(line, al), 3.0 * k, key == "f" and game.autoFire())
 		if key == "j":
 			_label(LBL[key], q.c - Vector2(0, 5.0 * k), 11.0 * k, Color(C_INK, al))
-			_label("MANTÉN", q.c + Vector2(0, 7.0 * k), 6.0 * k, Color(Color("#4dff88"), al * 0.9))
-			_label("DASH", q.c + Vector2(0, 15.0 * k), 6.0 * k, Color(Color("#4dff88"), al * 0.9))
+			_label("MANTÉN", q.c + Vector2(0, 7.0 * k), 8.0 * k, Color(Color("#4dff88"), al * 0.9))
+			_label("DASH", q.c + Vector2(0, 16.0 * k), 8.0 * k, Color(Color("#4dff88"), al * 0.9))
 		else:
-			_label(LBL[key], q.c, (8.0 if key == "it" else 10.0) * k, Color(C_INK, al))
+			_label(LBL[key], q.c, 11.0 * k, Color(C_INK, al))
 	# pausa
 	if play:
 		var tr := tp

@@ -180,7 +180,7 @@ static func of(e: DomEl, ps: Dictionary, c: Dictionary) -> Dictionary:
 		s.wrap = true
 		s.just = "center"
 	if _has(e, "md"):
-		s.color = YEL if _has(e, "on") else Color("#5a6390")
+		s.color = YEL if _has(e, "on") else Color("#8e97c4")
 		s.pad = [0.2 * fs, 0.5 * fs, 0.2 * fs, 0.5 * fs]
 		s.bw = [1.0, 1.0, 1.0, 1.0]
 		s.bcol = YEL if _has(e, "on") else Color("#2b3570")
