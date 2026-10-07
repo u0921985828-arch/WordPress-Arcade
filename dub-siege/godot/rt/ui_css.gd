@@ -170,6 +170,21 @@ static func of(e: DomEl, ps: Dictionary, c: Dictionary) -> Dictionary:
 		s.glow = 8.0
 	if _has(e, "coins"):
 		s.color = YEL
+	if _has(e, "no"):
+		s.color = Color("#ff8aa6")
+	if _has(e, "meds"):
+		s.disp = "flex"
+		s.dir = "row"
+		s.gap_r = 0.5 * fs
+		s.gap_c = 0.5 * fs
+		s.wrap = true
+		s.just = "center"
+	if _has(e, "md"):
+		s.color = YEL if _has(e, "on") else Color("#5a6390")
+		s.pad = [0.2 * fs, 0.5 * fs, 0.2 * fs, 0.5 * fs]
+		s.bw = [1.0, 1.0, 1.0, 1.0]
+		s.bcol = YEL if _has(e, "on") else Color("#2b3570")
+		s.rad = 3.0
 	if _has(e, "note"):
 		s.color = GRN
 		s.minh = 1.7 * fs

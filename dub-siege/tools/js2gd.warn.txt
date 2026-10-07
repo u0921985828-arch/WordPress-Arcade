@@ -1,64 +1,68 @@
-L330: llamada rara
-L330: for-in: en GDScript recorre claves de diccionario (no indices de array)
-L1423: identificador global desconocido document
-L1423: metodo desconocido .createElement()
-L1781: llamada a miembro calculado
-L1997: identificador global desconocido document
-L1997: metodo desconocido .createElement()
-L2184: metodo desconocido .querySelector()
-L2258: for-in: en GDScript recorre claves de diccionario (no indices de array)
-L2259: for-in: en GDScript recorre claves de diccionario (no indices de array)
-L2260: for-in: en GDScript recorre claves de diccionario (no indices de array)
-L2273: metodo desconocido .querySelector()
-L2273: metodo desconocido .focus()
-L2274: metodo desconocido .getDate()
-L2274: metodo desconocido .getMonth()
-L2274: metodo desconocido .getHours()
-L2274: metodo desconocido .getMinutes()
-L2334: metodo desconocido .remove()
-L2344: metodo desconocido .add()
-L2371: identificador global desconocido document
-L2371: identificador global desconocido document
-L2371: metodo desconocido .getAttribute()
-L2372: identificador global desconocido document
-L2372: metodo desconocido .querySelector()
-L2372: metodo desconocido .focus()
-L2416: metodo desconocido .querySelector()
-L2416: metodo desconocido .focus()
-L2423: metodo desconocido .querySelectorAll()
-L2423: metodo desconocido .focus()
-L2425: metodo desconocido .getAttribute()
-L2430: metodo desconocido .querySelector()
-L2430: metodo desconocido .focus()
-L2478: identificador global desconocido document
-L2478: metodo desconocido .querySelector()
-L2478: metodo desconocido .focus()
-L2481: identificador global desconocido document
-L2481: metodo desconocido .querySelector()
-L2481: metodo desconocido .focus()
-L2484: identificador global desconocido document
-L2484: metodo desconocido .querySelector()
-L2484: metodo desconocido .focus()
-L2517: metodo desconocido .toggle()
-L2611: identificador global desconocido document
-L2611: metodo desconocido .createElement()
-L2661: identificador global desconocido document
-L2661: metodo desconocido .createElement()
-L2663: identificador global desconocido document
-L2663: metodo desconocido .createElement()
-L2683: identificador global desconocido document
-L2683: metodo desconocido .createElement()
-L2687: identificador global desconocido document
-L2687: metodo desconocido .createElement()
-L2709: identificador global desconocido document
-L2709: metodo desconocido .querySelector()
-L2709: identificador global desconocido document
-L2709: metodo desconocido .querySelector()
-L2709: metodo desconocido .focus()
-L2725: identificador global desconocido document
-L2725: metodo desconocido .querySelector()
-L2725: metodo desconocido .focus()
+L331: llamada rara
+L331: for-in: en GDScript recorre claves de diccionario (no indices de array)
+L1444: identificador global desconocido document
+L1444: metodo desconocido .createElement()
+L1843: llamada a miembro calculado
+L2059: identificador global desconocido document
+L2059: metodo desconocido .createElement()
+L2271: metodo desconocido .querySelector()
+L2345: for-in: en GDScript recorre claves de diccionario (no indices de array)
+L2346: for-in: en GDScript recorre claves de diccionario (no indices de array)
+L2347: for-in: en GDScript recorre claves de diccionario (no indices de array)
+L2360: metodo desconocido .querySelector()
+L2360: metodo desconocido .focus()
+L2361: metodo desconocido .getDate()
+L2361: metodo desconocido .getMonth()
+L2361: metodo desconocido .getHours()
+L2361: metodo desconocido .getMinutes()
+L2421: metodo desconocido .remove()
+L2431: metodo desconocido .add()
+L2433: metodo desconocido .querySelector()
+L2433: metodo desconocido .focus()
+L2461: identificador global desconocido document
+L2461: identificador global desconocido document
+L2461: metodo desconocido .getAttribute()
+L2462: identificador global desconocido document
+L2462: metodo desconocido .querySelector()
+L2462: metodo desconocido .focus()
+L2507: metodo desconocido .querySelector()
+L2507: metodo desconocido .focus()
+L2514: metodo desconocido .querySelectorAll()
+L2514: metodo desconocido .focus()
+L2516: metodo desconocido .getAttribute()
+L2521: metodo desconocido .querySelector()
+L2521: metodo desconocido .focus()
+L2571: metodo desconocido .contains()
+L2581: identificador global desconocido document
+L2581: metodo desconocido .querySelector()
+L2581: metodo desconocido .focus()
+L2584: identificador global desconocido document
+L2584: metodo desconocido .querySelector()
+L2584: metodo desconocido .focus()
+L2587: identificador global desconocido document
+L2587: metodo desconocido .querySelector()
+L2587: metodo desconocido .focus()
+L2623: metodo desconocido .toggle()
+L2719: identificador global desconocido document
+L2719: metodo desconocido .createElement()
 L2769: identificador global desconocido document
 L2769: metodo desconocido .createElement()
-L2943: identificador global desconocido document
-L2943: metodo desconocido .createElement()
+L2771: identificador global desconocido document
+L2771: metodo desconocido .createElement()
+L2791: identificador global desconocido document
+L2791: metodo desconocido .createElement()
+L2795: identificador global desconocido document
+L2795: metodo desconocido .createElement()
+L2817: identificador global desconocido document
+L2817: metodo desconocido .querySelector()
+L2817: identificador global desconocido document
+L2817: metodo desconocido .querySelector()
+L2817: metodo desconocido .focus()
+L2833: identificador global desconocido document
+L2833: metodo desconocido .querySelector()
+L2833: metodo desconocido .focus()
+L2877: identificador global desconocido document
+L2877: metodo desconocido .createElement()
+L3053: identificador global desconocido document
+L3053: metodo desconocido .createElement()
+L3191: funcion anidada R lee locales que cambian: x,y

@@ -72,6 +72,18 @@
   "fh": 12,
   "n": 4
  },
+ "e_g": {
+  "local": true,
+  "fw": 12,
+  "fh": 9,
+  "n": 4
+ },
+ "bs_h": {
+  "local": true,
+  "fw": 12,
+  "fh": 12,
+  "n": 4
+ },
  "e_s": {
   "object": "b31c1d78-aa7f-48c1-9e0a-f15791f1cfde",
   "anim": "walk",
@@ -182,6 +194,54 @@
   "n": 1
  },
  "bg_3": {
+  "local": true,
+  "fw": 320,
+  "fh": 156,
+  "n": 1
+ },
+ "bg_p1": {
+  "local": true,
+  "fw": 320,
+  "fh": 156,
+  "n": 1
+ },
+ "bg_p2": {
+  "local": true,
+  "fw": 320,
+  "fh": 156,
+  "n": 1
+ },
+ "bg_p4": {
+  "local": true,
+  "fw": 320,
+  "fh": 156,
+  "n": 1
+ },
+ "bg_p5": {
+  "local": true,
+  "fw": 320,
+  "fh": 156,
+  "n": 1
+ },
+ "bg_p7": {
+  "local": true,
+  "fw": 320,
+  "fh": 156,
+  "n": 1
+ },
+ "bg_p8": {
+  "local": true,
+  "fw": 320,
+  "fh": 156,
+  "n": 1
+ },
+ "bg_p9": {
+  "local": true,
+  "fw": 320,
+  "fh": 156,
+  "n": 1
+ },
+ "bg_p11": {
   "local": true,
   "fw": 320,
   "fh": 156,

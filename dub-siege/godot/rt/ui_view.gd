@@ -177,6 +177,10 @@ func _build() -> void:
 			break
 	var ah: float = c.H - 2 * pv
 	var off := pv + maxf(0.0, (ah - y) / 2.0)
+	# .panel.eq{margin:0 auto auto}: arriba fijo, no salta al cambiar de pestaña
+	for e in ui.ov.children:
+		if not e.is_text() and e.classList.contains("eq"):
+			off = pv
 	for bx in kids:
 		bx.y += off
 	content_h = y + 2 * pv
