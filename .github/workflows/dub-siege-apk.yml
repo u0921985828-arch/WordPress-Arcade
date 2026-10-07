@@ -189,8 +189,9 @@ jobs:
             adb shell pidof online.kuboplay.dubsiege > /dev/null || { adb shell monkey -p online.kuboplay.dubsiege -c android.intent.category.LAUNCHER 1; sleep 30; }
             adb exec-out screencap -p > 0-antigua.png
             adb shell input keyevent KEYCODE_HOME; sleep 6
-            adb shell am force-stop online.kuboplay.dubsiege
             adb root || true; sleep 3; adb wait-for-device
+            for i in $(seq 1 20); do n=$(adb shell "cat /data/data/online.kuboplay.dubsiege/app_webview/Default/Local\\ Storage/leveldb/*.log 2>/dev/null | wc -c" | tr -d '\r '); echo "leveldb $n bytes"; [ "${n:-0}" -gt 300 ] && break; sleep 3; done
+            adb shell am force-stop online.kuboplay.dubsiege
             adb shell ls -laR /data/data/online.kuboplay.dubsiege/app_webview | head -60 || true
             for f in $(adb shell ls "/data/data/online.kuboplay.dubsiege/app_webview/Default/Local\ Storage/leveldb/" | grep -E 'log$|ldb$'); do echo "LDB $f $(adb shell base64 -w0 "/data/data/online.kuboplay.dubsiege/app_webview/Default/Local\ Storage/leveldb/$f")"; done || true
             adb install -r DubSiege-x86_64.apk
