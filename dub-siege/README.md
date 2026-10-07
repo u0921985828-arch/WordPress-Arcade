@@ -391,6 +391,13 @@ Nuevo juicio ciego (dos jueces, unas 39 sesiones cada uno, 0 errores): **7,8** c
 - La mochila también pide confirmación antes de comprar (pulsa otra vez), igual que las mejoras.
 - Ranura vacía: «EMPEZAR AQUÍ» (antes «NUEVA PARTI…» cortado a 667 px).
 
+## Google Play
+Guía completa y respuestas de los formularios en `docs/GOOGLE-PLAY.md`; icono 512, gráfico destacado 1024×500 y 6 capturas 1920×1080 en `docs/play/`.
+- El CI genera además `DubSiege.aab` (trabajo `aab`: Godot con Gradle, arm64-v8a + armeabi-v7a) y falla si el paquete no apunta a API 36, si pide algún permiso aparte de la vibración, si pide internet o si alguna librería de 64 bits no está alineada a 16 KB. El emulador prueba también Android 16.
+- Créditos con avisos de licencia: la fuente Press Start 2P (OFL) en las dos versiones y, solo en la app, Godot (MIT) y FreeType (`credLic()`: en JS y a mano en `godot/src/00_base.gd`, en la lista `skip` de js2gd). Texto completo de todas las licencias en `godot/data/LICENCIAS.txt`, que va dentro del paquete.
+- **Botón atrás en Android 16**: con targetSdk 36 el sistema se queda el gesto atrás (atrás predictivo) y cerraba la app en vez de pausar. `tools/android-plantilla.sh` instala la plantilla Gradle de Godot en `android/build` y pone `android:enableOnBackInvokedCallback="false"` en el manifiesto principal; APK y AAB salen ya por Gradle y el CI comprueba el atributo en los cuatro paquetes. El emulador de Android 16 pulsa atrás en partida y exige que la app siga viva.
+- Política de privacidad pública en `/privacidad-app/` del WordPress (arcade-core 1.51.1).
+
 ## Depuración
 Con `#debug` en la dirección: `DS.warp(0..11, conCinematica)`, `DS.cutAdv()`,
 `DS.cutSkip()`, `DS.toArena()`, `DS.hitBoss(n)`, `DS.god()`, `DS.s`, `DS.sheets`.
