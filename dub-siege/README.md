@@ -372,6 +372,18 @@ Nuevo juicio ciego (dos jueces, unas 39 sesiones cada uno, 0 errores): **7,8** c
 - **Pausa**: el cursor vuelve a la opción de la que se venía.
 - **Fallo del APK corregido**: `x|0` sobre una propiedad que falta se traducía a `int(null)` y el juego se cerraba al primer dash; ahora se lee como 0. Prueba nueva `godot/tests/cred_test.gd`.
 
+### Juicio nº 4 (teclado 7,9)
+
+- Un jefe de suelo nunca cae encima del jugador: entra por el lado contrario y, si al aterrizar se solapa, el jugador sale empujado.
+- BASS sin cargar: en vez de un rótulo flotante, la barra del marcador parpadea en rojo.
+- Al caer a un foso, el movimiento se bloquea un instante y no se repite la caída al reaparecer.
+- Iniciales del ranking: Intro confirma la letra y salta a la siguiente; tras la tercera, a GUARDAR.
+- Menú de fases con las estrellas siempre en su propia línea; texto de la tienda sin cortes.
+- Tren Fantasma a tamaño de jefe (hoja `bh_2` con Scale2x, caja 48×36); busto del jefe centrado en la escena.
+- Los MK2 se tiñen de violeta (antes rojo, que se perdía en el club rojo de la fase 10).
+- Primer jefe: si aún no has usado el BASS DROP, la barra llega llena y sale el aviso para enseñarlo.
+- Las monedas son una **hucha común** a todas las ranuras (decisión de diseño, no un fallo).
+
 ## Depuración
 Con `#debug` en la dirección: `DS.warp(0..11, conCinematica)`, `DS.cutAdv()`,
 `DS.cutSkip()`, `DS.toArena()`, `DS.hitBoss(n)`, `DS.god()`, `DS.s`, `DS.sheets`.

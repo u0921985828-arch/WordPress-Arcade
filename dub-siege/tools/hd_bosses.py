@@ -16,7 +16,7 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ART = os.path.join(HERE, 'art')
 SC = 4
 # tipo -> (hoja de origen, factor) ; el factor es el sc de LEVELS
-BOSS = {'w': ('e_w', 3), 'h': ('bs_h', 3), 'b': ('e_b', 3), 't': ('e_t', 3), 's': ('e_s', 2), 'f': ('e_f', 3)}
+BOSS = {'w': ('e_w', 3), 'h': ('bs_h', 3), 'b': ('e_b', 3), 't': ('e_t', 3), 's': ('e_s', 2), 'f': ('e_f', 3), '2': ('b_2', 2)}
 
 
 def key(a):
