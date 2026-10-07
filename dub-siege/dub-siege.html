@@ -65,7 +65,7 @@ canvas{display:block;image-rendering:pixelated}
 .btn{font:inherit;font-size:1em;color:var(--ink);background:var(--panel);border:2px solid var(--line);min-height:max(44px,calc(44px / var(--ui,1)));padding:.55em .9em;cursor:pointer;border-radius:4px;touch-action:manipulation;text-align:center}
 .btn:hover,.btn:focus-visible{background:var(--line);outline:2px solid var(--yel);outline-offset:2px}
 .btn.hot{background:#10351f;border-color:var(--grn);color:#c6ffd9}
-.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn:disabled{opacity:.4;cursor:not-allowed}.btn.off{opacity:.5;cursor:not-allowed}
 .opt{display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left}
 .opt i{font-style:normal;color:var(--yel)}
 .row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
@@ -494,7 +494,7 @@ function buildStage(n){
   p={x:36,y:GY-14,w:8,h:14,vx:0,vy:0,face:1,ground:0,onOne:0,onMp:null,coyote:0,jbuf:0,jmin:0,jumps:0,airDash:1,dash:0,dashCd:0,drop:0,
      inv:60,cool:0,mf:0,anim:0,hp:run.maxHp,dead:0,deadT:0,safe:{x:36,y:GY-14},aimU:0,aimD:0,aimDg:0,sa:0,saT:0,arm:run.up.arm,shd:0,mag:0};
   run.lv=Math.min(3,Math.max(run.lv,1+run.up.pow));
-  cam=0;banner={a:'FASE '+(n+1)+' DE '+LEVELS.length+' · '+L.era,b:S.name+' - '+L.name,l:170};
+  cam=0;banner={a:'FASE '+(n+1)+' DE '+LEVELS.length+' · '+L.era,b:S.name+' - '+L.name,l:170,st:1};
   evo(n);songIdx=n;bossMusic=0;booms=[];
 }
 var EDEF={X:{w:10,h:12,hp:2,pts:15},w:{w:10,h:8,hp:2,pts:10},h:{w:10,h:9,hp:3,pts:20},f:{w:10,h:7,hp:1,pts:15},t:{w:10,h:10,hp:4,pts:25},s:{w:11,h:13,hp:4,pts:30},b:{w:14,h:8,hp:3,pts:25},'*':{w:10,h:10,hp:2,pts:5}};
@@ -519,7 +519,7 @@ function mkEnemy(ch,x,y){
 // ================= mapa y fisica =================
 function tileAt(cx,cy){if(cx<0||cx>=COLS)return 1;if(cy<0||cy>=ROWS)return 0;return map[cy*COLS+cx];}
 // Muro de ruido (4): solido para todos, salvo para el jugador mientras hace dash.
-function wallX(o,cx,cy){var tt=tileAt(cx,cy);if(tt===1){if(o===p&&st.i===0&&cx<60&&p.ground)jumpBump(cx);return 1;}if(tt!==4)return 0;if(o===p&&p.dash>0)return 0;if(o===p)noiseBump(cx);return 1;}
+function wallX(o,cx,cy){var tt=tileAt(cx,cy);if(tt===1){if(o===p&&st.i===0&&cx<60&&p.ground)jumpBump(cx);return 1;}if(tt!==4)return 0;if(o===p&&p.dash>0){coachDo('nb');return 0;}if(o===p)noiseBump(cx);return 1;}
 function moveX(o){
   o.x+=o.vx;var y0=Math.floor(o.y/T),y1=Math.floor((o.y+o.h-.01)/T),cx,cy;
   if(o.vx>0){cx=Math.floor((o.x+o.w-.01)/T);for(cy=y0;cy<=y1;cy++)if(wallX(o,cx,cy)){o.x=cx*T-o.w;o.vx=0;return 1;}}
@@ -530,7 +530,12 @@ function moveX(o){
 var bumpT=0;
 function jumpBump(cx){coachLoad();if(t-bumpT<75||CO.d.j2)return;bumpT=t;COH={k:'j2',s:touchMode()?'EN EL AIRE, TOCA SALTO OTRA VEZ':'EN EL AIRE, SALTA OTRA VEZ',c:'#ffd23d',l:110};}
 function noiseBump(cx){if(t-bumpT<60)return;bumpT=t;sfx('hit');burst(cx*T+6,p.y+7,['#ff3d6e','#fff'],8,1.4,.02);
-  coachLoad();if(!CO.d.da)COH={k:'da',s:touchMode()?'MANTÉN SALTO PARA EL DASH':'C: DASH PARA CRUZAR',c:'#4dff88',l:110};}
+  coachLoad();if(!CO.d.nb)COH={k:'nb',s:nbText(),c:'#4dff88',l:110};}
+// La barrera rosa solo se cruza con el dash: se avisa al acercarse, aunque el dash ya se haya usado antes.
+function nbText(){return touchMode()?'MANTÉN SALTO: EL DASH CRUZA LA BARRERA':'C: EL DASH CRUZA LA BARRERA';}
+function nbNear(){if(SET.tut||COH||(t%15))return;coachLoad();if(CO.d.nb)return;
+  var by=Math.floor((p.y+8)/T),bx=Math.floor((p.x+p.w)/T);
+  for(var i=0;i<4;i++)if(tileAt(bx+i,by)===4){COH={k:'nb',s:nbText(),c:'#4dff88',l:100};return;}}
 // Tutorial de la fase 1: UN cartel cada vez y no pasa al siguiente hasta que el
 // jugador hace lo que pide (antes rotaban solos cada 4 s). Los avisos de los
 // muros (COH) salen en el mismo hueco, nunca encima de otro cartel.
@@ -1284,7 +1289,8 @@ addEventListener('keydown',function(e){
   var ovOpen=!$('ov').hidden;
   if(ovOpen&&$('tg0')){var ch=(e.key||'').toUpperCase();
     if(ch.length===1&&TGC.indexOf(ch)>-1){e.preventDefault();tgType(ch);return;}
-    if(e.key==='Backspace'){e.preventDefault();TGi=Math.max(0,TGi-1);tgPaint();return;}}
+    if(e.key==='Backspace'){e.preventDefault();TGi=Math.max(0,TGi-1);tgPaint();return;}
+    if(tgKey(e.code,document.activeElement)){e.preventDefault();return;}}
   if(ovOpen){
     if(e.code==='ArrowDown'||e.code==='ArrowUp'||e.code==='KeyS'||e.code==='KeyW'){
       var bs=[].slice.call($('ov').querySelectorAll('button:not(:disabled)'));if(bs.length){e.preventDefault();
@@ -1478,7 +1484,9 @@ function drawBooms(){
     if(k<.35){g.globalAlpha=1-k/.35;pring(x,y,b.r*1.7*(k/.35)+2,'#fff6d8');g.globalAlpha=1;}
     if(f>0)light(x,y,R*2.6,.9*f,'#ffb040');});
 }
-function pop(x,y,s,c){pops.push({x:x,y:y,s:s,c:c||'#ffd23f',l:55});}
+// Dos rotulos en el mismo sitio no se montan: el nuevo sube encima del anterior.
+function pop(x,y,s,c){for(var i=0;i<pops.length;i++){var o=pops[i];if(Math.abs(o.x-x)<8*Math.max(o.s.length,s.length)&&Math.abs(o.y-y)<9){y=o.y-9;i=-1;}}
+  pops.push({x:x,y:y,s:s,c:c||'#ffd23f',l:55});}
 function addScore(base,x,y){
   run.combo++;run.comboT=150;run.mult=Math.min(8,1+Math.floor(run.combo/4));
   var v=base*run.mult;run.score+=v;if(x!=null)pop(x,y,'+'+v,run.mult>1?'#3de8ff':'#ffd23f');
@@ -1502,7 +1510,8 @@ function killPlayer(){
 }
 function respawn(){
   var c=st.cp;p.x=c.x;p.y=c.y;p.vx=p.vy=0;p.face=1;p.dead=0;p.hp=run.maxHp;p.inv=150;p.dash=0;p.safe={x:c.x,y:c.y};p.arm=run.up.arm;p.shd=0;
-  if(st.lock&&boss){p.x=st.arenaX+30;p.y=GY-p.h;}
+  // En la arena se reaparece en el lado contrario al jefe, mirandolo.
+  if(st.lock&&boss){var bl=boss.x+boss.w/2<st.arenaX+W/2;p.x=bl?st.arenaX+W-30-p.w:st.arenaX+30;p.y=GY-p.h;p.face=bl?-1:1;}
   burst(p.x+4,p.y+7,['#3de8ff','#fff'],20,2);sfx('cp');
 }
 function fallPit(){
@@ -1727,7 +1736,7 @@ function updateEnemies(){
 
 // ================= jefes =================
 function startBoss(){
-  st.lock=1;st.cp={x:st.arenaX+30,y:GY-14};run.cpi=st.i;run.cpx=st.arenaX+30;slotSave('play');
+  st.lock=1;p.inv=Math.max(p.inv,150);st.cp={x:st.arenaX+30,y:GY-14};run.cpi=st.i;run.cpx=st.arenaX+30;slotSave('play');
   enemies.forEach(function(e){if(!e.dead)burst(e.x+5,e.y+4,['#7a5bf0','#fff'],8,2);});enemies=[];ebul=[];
   var L=st.L,n=L.ai,hp=L.hp*D.eHp,ax=st.arenaX;
   boss={kind:n,mk:L.mk||0,mt:L.mt,sc:L.sc||1,x:ax+W-70,y:-50,w:24,h:30,hp:hp,max:hp,ph:1,t:0,cd:100,act:null,actT:0,fl:0,vx:0,vy:0,on:0,enter:1,dead:0,a:0,
@@ -1740,7 +1749,8 @@ function startBoss(){
     boss.x=L.mt==='t'?ax+W/2-boss.w/2:ax+W-24-boss.w;boss.y=air?-40:-70;}
   banner={a:'ALERTA',b:L.boss,l:150,boss:1};sfx('siren');bossMusic=1;
 }
-function bossLand(){boss.enter=0;boss.on=1;shake(16);sfx('drop');burst(boss.x+boss.w/2,boss.y+boss.h,['#9aa0b0','#fff','#ff3d6e'],30,3);bossOn();}
+// Al aterrizar (y tras su dialogo, que congela el juego) hay un respiro sin dano.
+function bossLand(){boss.enter=0;boss.on=1;p.inv=Math.max(p.inv,120);shake(16);sfx('drop');burst(boss.x+boss.w/2,boss.y+boss.h,['#9aa0b0','#fff','#ff3d6e'],30,3);bossOn();}
 function bossOn(){if(st.L.cut&&st.L.cut.boss&&!seen('boss'))startCut(st.L.cut.boss);}
 function damageBoss(n){
   var b=boss;if(!b||!b.on||b.dead)return;
@@ -2164,11 +2174,14 @@ function eqTabs(tab,pre){var n=['MEJORAS','MOCHILA','PERSONAJE'],h='<div class="
   n.forEach(function(x,i){h+='<button class="btn'+(i===tab?' hot':'')+'" data-act="'+pre+'" data-v="'+i+'">'+x+'</button>';});return h+'</div>';}
 function bagRows(buy){var h='<div class="shop">';
   OBJ.forEach(function(o){var n=run.inv[o.id]|0,full=n>=OMAX,cl=buy?(full||BANK<o.cost):!n;
-    h+='<button class="btn item" data-act="'+(buy?'obuy':'ouse')+'" data-v="'+o.id+'"'+(cl?' disabled':'')+'><span>'+o.n+' <i class="c">'+
+    h+='<button class="btn item'+(cl&&buy?' off" aria-disabled="true':'')+'" data-act="'+(buy?'obuy':'ouse')+'" data-v="'+o.id+'"'+(cl&&!buy?' disabled':'')+'><span>'+o.n+' <i class="c">'+
       (buy?(full?'LLENO':o.cost):(n?'USAR':'—'))+'</i></span><small>'+o.d+'</small><span class="pips">'+new Array(n+1).join('■')+new Array(OMAX-n+1).join('□')+'</span></button>';});
   return h+'</div>';}
 // SHOPOK: lo ultimo que se ha comprado; sale junto a los discos hasta la siguiente vuelta.
-var SHOPOK='';
+var SHOPOK='',NEXTOK=0;
+// Salir de la tienda pide dos pulsaciones: un Intro de mas ya no empieza la fase.
+function shopNext(){if(NEXTOK){nextStage();return;}NEXTOK=1;sfx('click');
+  var b=$('ov').querySelector('[data-act="next"]');if(b)b.textContent='¿EMPEZAR LA FASE '+(st.i+2)+'? PULSA OTRA VEZ';}
 function showShop(tab,ok){
   mode='shop';if(tab!=null)shopTab=tab;SHOPOK=ok||'';
   // Una sola moneda: los DISCOS. Lo que recoges se guarda y sirve igual para la
@@ -2181,10 +2194,11 @@ function showShop(tab,ok){
     if(it.id==='heal')return;
     var lv=it.id==='life'?0:run.up[it.id],maxed=lv>=it.max,cost=it.cost[Math.min(lv,it.cost.length-1)];
     var pips=it.max<10?'<span class="pips">'+new Array(lv+1).join('■')+new Array(it.max-lv+1).join('□')+'</span>':'<span class="pips">x'+run.lives+'</span>';
-    h+='<button class="btn item" data-act="buy" data-v="'+it.id+'"'+(maxed||BANK<cost?' disabled':'')+'><span>'+it.n+' <i class="c">'+(maxed?'MAX':cost)+'</i></span><small>'+it.d+'</small>'+pips+'</button>';
+    // Lo que no se puede pagar se ve apagado pero se puede senalar (y leer); al pulsarlo suena «no».
+    h+='<button class="btn item'+(maxed||BANK<cost?' off" aria-disabled="true':'')+'" data-act="buy" data-v="'+it.id+'"><span>'+it.n+' <i class="c">'+(maxed?'MAX':cost)+'</i></span><small>'+it.d+'</small>'+pips+'</button>';
   });
   h+='</div>';}
-  h+='<div class="menu"><button class="btn hot" data-act="next">FASE '+(st.i+2)+': '+LEVELS[st.i+1].name+'</button></div></div>';
+  NEXTOK=0;h+='<div class="menu"><button class="btn hot" data-act="next">FASE '+(st.i+2)+': '+LEVELS[st.i+1].name+'</button></div></div>';
   show(h);
 }
 function buy(id){
@@ -2404,6 +2418,20 @@ function showRank(note){
 var TG=null,TGi=0,TGC='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 function tgPaint(){for(var k=0;k<3;k++){var e=$('tg'+k);if(e){e.textContent=TG[k];e.className=k===TGi?'on':'';}}}
 function tgStep(k,d){TGi=k;TG[k]=TGC[(TGC.indexOf(TG[k])+d+TGC.length)%TGC.length];tgPaint();}
+// Iniciales con teclado/mando: arriba/abajo cambian la letra, izquierda/derecha pasan
+// de letra (de la tercera a GUARDAR) e Intro guarda. Solo con el foco en las letras.
+function tgFocus(){var bs=$('ov').querySelectorAll('.tgb');if(bs.length>TGi*2)bs[TGi*2].focus();}
+function tgKey(c,fe){
+  var fa=fe?fe.getAttribute('data-act'):null;
+  if(fa==='save'&&c==='ArrowLeft'){TGi=2;tgPaint();tgFocus();return true;}
+  if(fa&&fa!=='tg')return false;
+  if(c==='ArrowUp'||c==='ArrowDown'){tgStep(TGi,c==='ArrowUp'?1:-1);tgFocus();return true;}
+  if(c==='ArrowLeft'||c==='ArrowRight'){
+    if(c==='ArrowRight'&&TGi===2){var g=$('ov').querySelector('[data-act="save"]');if(g)g.focus();}
+    else{TGi=clamp(TGi+(c==='ArrowRight'?1:-1),0,2);tgPaint();tgFocus();}return true;}
+  if(c==='Enter'){act('save');return true;}
+  return false;
+}
 function tgType(c){TG[TGi]=c;TGi=Math.min(2,TGi+1);tgPaint();}
 function qualifies(s){var a=load('ds2_rank',[]);return s>0&&(a.length<10||s>a[a.length-1].score);}
 function submitRank(){
@@ -2470,7 +2498,7 @@ function act(a,v){
     case 'bag':showBag();break;
     case 'ouse':if(useObj(v))resume();else showBag();break;
     case 'oqk':var oi=OBJ.indexOf(OBJN[quickObj()]),on=OBJ.length;for(var oj=1;oj<=on;oj++){var oo=OBJ[(oi+oj)%on];if(run.inv[oo.id]>0||oj===on){run.qk=oo.id;break;}}showBag();break;
-    case 'next':nextStage();break;
+    case 'next':if(mode==='shop')shopNext();else nextStage();break;
     case 'cont':run.conts++;run.score=Math.floor(run.score/2);run.lives=D.lives;run.lv=1;run.wpn='N';run.bass=0;var n=st.i;run.stage=n;buildStage(n);cpResume();hideOv();mode='play';break;
     case 'save':submitRank();break;
     case 'tg':tgStep(+v[0],v[1]==='+'?1:-1);break;
@@ -2504,7 +2532,7 @@ function update(){
   for(var a=parts.length-1;a>=0;a--){var q=parts[a];q.x+=q.vx;q.y+=q.vy;q.vy+=q.gr;if(--q.l<=0)parts.splice(a,1);}
   for(var b=pops.length-1;b>=0;b--){pops[b].y-=.35;if(--pops[b].l<=0)pops.splice(b,1);}
   for(var c=ghosts.length-1;c>=0;c--)if(--ghosts[c].l<=0)ghosts.splice(c,1);
-  if(CO.ok>0)CO.ok--;if(COH&&--COH.l<=0)COH=null;
+  if(CO.ok>0)CO.ok--;if(COH&&--COH.l<=0)COH=null;if(p.face>0)nbNear();
   if(ring){ring.r+=6;if(ring.r>360)ring=null;}
   updBooms();
   if(banner&&--banner.l<=0)banner=null;
@@ -2522,7 +2550,11 @@ function update(){
   // En la arena del jefe el suelo no se pierde nunca de vista (antes, con el jefe
   // volando alto, la camara subia y el jugador se quedaba sin ver donde pisaba).
   if(st.lock)ty=Math.max(ty,Math.min(GY+4-H,p.y-4,CYM));
+  // La cabeza manda sobre el suelo: en la arena saltar alto ya no saca al jugador por arriba.
+  if(st.lock)ty=Math.min(ty,Math.max(0,p.y-8));
   camY+=(ty-camY)*(ty<camY?.18:.07);
+  if(camY>p.y-2)camY=Math.max(0,p.y-2);
+  if(st.lock)cam=clamp(cam,p.x+p.w+4-W,p.x-4);
   if(st.clearT&&--st.clearT===0){st.bossDone=1;endLevel();}
 }
 
@@ -2852,7 +2884,11 @@ function drawBG(){
   if(tn&&tn[2])for(i=0;i<60;i++){var rx=((rnd(i)*W*1.4-t*1.1-cam*.2)%W+W)%W,ry=camY+((rnd(i+90)*140+t*3.4)%140)-20;g.globalAlpha=.28;rect(rx|0,ry|0,1,4,'#9fb6ff');}
   g.globalAlpha=1;
   // los huecos se leen como huecos: fondo oscuro bajo la linea de suelo
-  var c0=Math.floor(cam/T);for(i=c0;i<c0+Math.ceil(W/T)+2;i++)if(tileAt(i,13)===0&&tileAt(i,14)===0)rect(i*T-cam,GY,T,ROWS*T-GY+40,'#04030a');
+  var c0=Math.floor(cam/T);for(i=c0;i<c0+Math.ceil(W/T)+2;i++)if(tileAt(i,13)===0&&tileAt(i,14)===0){var px=Math.round(i*T-cam);rect(px,GY,T,ROWS*T-GY+40,'#04030a');
+    // Foso legible: raya de peligro en la boca y canto claro en los bordes (antes parecia una sombra).
+    for(var dq=0;dq<T;dq+=4)if(((i*T+dq)>>2)&1)rect(px+dq,GY,3,1,'#ff3d6e');
+    if(tileAt(i-1,13)!==0){rect(px,GY,1,8,'#ff8aa6');rect(px+1,GY,1,4,'#ff3d6e');}
+    if(tileAt(i+1,13)!==0){rect(px+T-1,GY,1,8,'#ff8aa6');rect(px+T-2,GY,1,4,'#ff3d6e');}}
 }
 // Sound clash de County Hall: las dos torres de control (racks de etapas) a cada
 // lado de la arena. A la izquierda la Bestia (madera, valvulas): apagada hasta
@@ -3004,6 +3040,9 @@ function drawEnemy(e){
     rect(x+3,y+4,4,4,'#ffd23f');rect(x+4,y+5,2,1,'#1a1530');rect(x+4,y+6,1,1,'#1a1530');
     if((t>>4)&1)light(x+5,y+5,12,.5,'#ff3d6e');return;}
   if(ed)shadow(x,e.x,e.y,ed.w,ed.h);
+  // Contorno claro (silueta blanca a 1 px, tenue) para que no se pierdan sobre la calle oscura.
+  var eo=ed&&SHEET[ESHEET[e.type]];
+  if(eo&&eo.ok&&eo.wimg&&!wh)for(var q=0;q<4;q++)blit(ESHEET[e.type],e.a|0,x+(q<2?q*2-1:0),y+(q<2?0:q*2-5),ed.w,ed.h,e.type==='f'?p.x<e.x:f,1,.38);
   if(ed&&blit(ESHEET[e.type],e.a|0,x,y,ed.w,ed.h,e.type==='f'?p.x<e.x:f,wh)){
     if(e.type==='t'){
       drawBarrel(e,x,y);
@@ -3150,13 +3189,13 @@ function drawHUD(){
     if(g.measureText(lb).width>tgap)lb='F'+(st.i+1)+' '+st.L.name;
     if(g.measureText(lb).width>tgap)lb=st.L.name;
     if(g.measureText(lb).width>tgap)lb='FASE '+(st.i+1);
-    txt(lb,tcx,4,'#8f98c8','c');if(run.mult>1)txt('COMBO x'+run.mult,HW/2,13,'#3de8ff','c');}
+    if(!(banner&&banner.st))txt(lb,tcx,4,'#8f98c8','c');if(run.mult>1)txt('COMBO x'+run.mult,HW/2,13,'#3de8ff','c');}
   // Cartel unico (tutorial o aviso de muro), centrado en el hueco que deja libre
   // la columna de botones tactiles (PADX), para que nunca quede debajo del pulgar.
   var cs=COH?COH.s:null,cc=COH?COH.c:'#eef3ff';
   if(!cs&&!st.lock&&st.t>60){var ck=coachStep();if(CO.ok>0){cs='¡BIEN!';cc='#4dff88';}else if(ck)cs=coachText(ck);}
   if(cs){var ph=Math.ceil(PADX/(HS*UIF)),cw2=HW-ph,ln=wrap(cs,cw2-24),tw=0,q;for(q=0;q<ln.length;q++)tw=Math.max(tw,g.measureText(ln[q]).width);
-    var ty=banner?58:32,tx=cw2/2;rect(tx-tw/2-6,ty,tw+12,6+9*ln.length,'rgba(6,7,13,.55)');rect(tx-tw/2-6,ty,2,6+9*ln.length,cc);
+    var ty=banner?61:32,tx=cw2/2;rect(tx-tw/2-6,ty,tw+12,6+9*ln.length,'rgba(6,7,13,.55)');rect(tx-tw/2-6,ty,2,6+9*ln.length,cc);
     for(q=0;q<ln.length;q++)txt(ln[q],tx,ty+3+q*9,cc,'c');}
 }
 function draw(){
@@ -3187,7 +3226,8 @@ function draw(){
   if(ring){g.globalAlpha=Math.max(0,1-ring.r/360);pring(ring.x-cam,ring.y,ring.r,'#ffd23f');pring(ring.x-cam,ring.y,ring.r-1.5,'#fff6d8');
     pring(ring.x-cam,ring.y,ring.r*.8,'#4dff88');if(ring.r>12)pring(ring.x-cam,ring.y,ring.r*.62,'#3de8ff');g.globalAlpha=1;
     light(ring.x-cam,ring.y,Math.min(72,20+ring.r*.5),Math.max(0,1-ring.r/360),'#ffd23f');}
-  pops.forEach(function(o){var x=o.x-cam,mx=W-PADX-g.measureText(o.s).width-2;txt(o.s,x>mx?Math.max(2,mx):x,o.y,o.c);});
+  // Dentro de la pantalla siempre (la fuente es de ancho fijo: 8 px por letra) y bajo el marcador.
+  pops.forEach(function(o){var mx=W-PADX-8*o.s.length-3;txt(o.s,clamp(o.x-cam,2,Math.max(2,mx)),Math.max(o.y,camY+Math.ceil(26*HS*UIF)),o.c);});
   g.restore();
   drawLight();
   if(mode==='menu')return;
@@ -3202,9 +3242,10 @@ function draw(){
   drawHUD();
   if(banner){g.globalAlpha=banner.l<20?banner.l/20:Math.min(1,(170-banner.l)/10+.2);
     // El cartel vive en la franja de arriba, justo bajo el marcador: nunca tapa la accion.
-    var bl=wrap(banner.b,HW-16),by=banner.a?33:24,bq;
-    rect(0,22,HW,(banner.a?13:4)+9*bl.length,'rgba(6,7,13,.72)');
-    if(banner.a)txt(banner.a,HW/2,24,banner.boss?'#ff3d6e':'#3de8ff','c');
+    // Empieza 3 px bajo la fila mas baja del marcador (el arma llega a y=22).
+    var bl=wrap(banner.b,HW-16),by=banner.a?36:27,bq;
+    rect(0,25,HW,(banner.a?13:4)+9*bl.length,'rgba(6,7,13,.72)');
+    if(banner.a)txt(banner.a,HW/2,27,banner.boss?'#ff3d6e':'#3de8ff','c');
     for(bq=0;bq<bl.length;bq++)txt(bl[bq],HW/2,by+bq*9,'#ffd23f','c');g.globalAlpha=1;}
   if(flash>0){g.globalAlpha=flash/24;rect(0,0,HW,HH,flashC);g.globalAlpha=1;}
   if(p.dead&&run.lives>0&&p.deadT<60)txt('VIDAS: '+run.lives,HW/2,HH*.55,'#eef3ff','c');

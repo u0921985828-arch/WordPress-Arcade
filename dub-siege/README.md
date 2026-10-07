@@ -209,12 +209,31 @@ de ventaja). Estudio y cifras: `ESTUDIO-CONTROLES.md`.
   vuelve a salir tras morir o recargar; el aviso de doble salto o de dash se
   borra al hacer esa acción, y el cartel es semitransparente para no tapar discos.
 - **Escenas sin bandas negras**: en pantallas más anchas que 16:9 (móviles) la
-  lámina de 160×90 se rodea de copias en espejo oscurecidas, a escala entera
-  (negro en pantalla: 29 % → 0,2 % a 844×390).
+  lámina de 160×90 se rodea estirando sus columnas y filas del borde,
+  oscurecidas, y la lámina va a escala entera (negro en pantalla: 29 % → 0,2 %
+  a 844×390). Las copias en espejo de antes duplicaban lunas y drones.
 - **Patwa legible**: las expresiones entre asteriscos del guion van derechas y en
   ámbar; la cursiva de píxel montaba unas letras sobre otras.
 - Etiqueta de la tienda «PELO» (antes «CARA») y botones táctiles al 40 % de
   opacidad.
+- **Diálogos con margen seguro** en táctil: busto, texto, «>» y FASE/SALTAR se
+  apartan 8 px de los lados y 5 px de abajo (muescas y esquinas redondeadas).
+- **Discos sin granjeo**: lo recogido en una fase solo se guarda al llegar a un
+  punto de guardado (`bankCommit`); cerrar la app o perder la partida devuelve
+  la cuenta al último guardado.
+- La tienda dice lo que acabas de comprar, el foco se queda en la mejora, las
+  que no se pueden pagar se ven apagadas pero se pueden señalar, y empezar la
+  siguiente fase pide dos pulsaciones.
+- **Ranking con teclado o mando**: arriba/abajo cambian la letra,
+  izquierda/derecha pasan de letra (de la tercera a GUARDAR) e Intro guarda;
+  enseña tu puntuación y «SIN PUNTUACIONES» si la tabla está vacía.
+- **Jefes justos**: invulnerable al cerrarse la arena y al aterrizar el jefe;
+  se reaparece en el lado contrario, mirándolo; la cámara de la arena no deja
+  que el jugador se salga por arriba ni por los lados.
+- Enemigos con contorno claro tenue y fosos con raya de peligro y cantos
+  marcados; aviso «C: EL DASH CRUZA LA BARRERA» al acercarse a la barrera rosa.
+- Los rótulos flotantes no se salen de la pantalla ni se montan; el cartel de
+  fase va bajo el marcador y el título de arriba se oculta mientras sale.
 
 ## Música
 Toda la banda sonora se **genera en el propio juego** (Web Audio, sin ficheros de

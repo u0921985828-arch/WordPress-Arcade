@@ -269,6 +269,8 @@ static func of(e: DomEl, ps: Dictionary, c: Dictionary) -> Dictionary:
 			s.op = 0.4
 			s.ins_t = null
 			s.ins_b = null
+		elif _has(e, "off"):
+			s.op = 0.5
 		if _parent_has(e, "tapes"):
 			s.align = "left"
 			s.pad = [6.0, 10.0, 6.0, 10.0]

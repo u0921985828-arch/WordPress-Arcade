@@ -34,6 +34,9 @@ func menu_key(code: String, e: InputEventKey) -> bool:
 			TGi = maxi(0, TGi - 1)
 			tgPaint()
 			return true
+		if not e.echo or code in ["ArrowUp", "ArrowDown"]:
+			if tgKey(code, document.ui.focus_el()):
+				return true
 	_menu_cmd(code, e.echo)
 	return true
 
