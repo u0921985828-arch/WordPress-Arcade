@@ -9,6 +9,8 @@ var cv := {"width": 768, "height": 432}
 var DEBUG := false
 var RM := false
 var HUDR := 0
+var PADX := 0      # px del mundo que tapa la columna de botones tactiles (touch_pad.gd)
+var PADT := 0      # el jefe o el jugador pasan por debajo: botones mas transparentes
 var ZOOM := 1
 var HMIN := 90
 var SHEET := {}
@@ -146,12 +148,10 @@ func VH() -> float:
 ## Escala entera mas grande que deja ver al menos HMIN de alto (ver fitW en el
 ## HTML). Aqui la ventana ya esta en pixeles reales, sin dpr ni margenes CSS.
 func fitW() -> void:
-	# Como en la web: tumbado en tactil, y fuera de la partida (portada, escenas,
-	# tienda) en cualquier pantalla apaisada, el lienzo llena la pantalla; jugando
-	# con teclado deja el margen del <body> (32 x 16 px CSS) y pide 192 de ancho.
+	# Como en la web: con la pantalla apaisada el lienzo la llena siempre (tactil
+	# o teclado); en vertical deja el margen del <body> y pide 192 de ancho.
 	var dp := _dpr()
-	var ingame: bool = mode == "play" or mode == "pause"
-	var tch: bool = view_size.x > view_size.y and (touchMode() or not ingame)
+	var tch: bool = view_size.x > view_size.y   # apaisada: llena siempre (ver la web)
 	var dw := maxf(64.0, safe.size.x / dp - (0.0 if tch else 32.0)) * dp
 	var dh := maxf(64.0, safe.size.y / dp - (0.0 if tch else 16.0)) * dp
 	var wmin := 160 if tch else 192
@@ -197,7 +197,7 @@ func uiFit() -> void:
 	var cp: float = float(ZOOM)
 	if not (f is int or f is float):
 		f = clampf(VH() / 240.0, 1.5, 3.6) * _dpr() / (SC * HS * cp)
-	UIF = clampf(f, 0.5, 1.0)
+	UIF = clampf(f, 0.5, 1.3)   # 115 y 130 %: mas grande que el de siempre
 
 
 ## Pixeles fisicos por px CSS (lo que en la web es devicePixelRatio). En Android
@@ -244,5 +244,13 @@ func applyLayout() -> void:
 	placePad()
 
 
+func padDim() -> void:
+	pass    # touch_pad.gd lee PADT al dibujar
+
+
 func gate(_ld: Variant = null) -> void:
 	pass
+
+
+func ovFit() -> void:
+	pass    # ui_view.gd desplaza el panel y sigue al foco (_scroll_to_focus)

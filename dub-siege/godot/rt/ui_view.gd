@@ -123,11 +123,11 @@ func _ctx() -> Dictionary:
 	var m := 1.0
 	var u = game.SET.get("ui") if game.SET is Dictionary else "auto"
 	if u is float or u is int:
-		m = minf(1.0, 0.6 + 0.4 * float(u))
+		m = float(u) if float(u) > 1.0 else minf(1.0, 0.6 + 0.4 * float(u))
 	k = dpr * m
 	var vwc := size.x / dpr
 	var vhc := size.y / dpr
-	return {"vw": vwc / 100.0, "vh": vhc / 100.0, "h600": vhc <= 600, "h430": vhc <= 430, "w480": vwc >= 480,
+	return {"m": m, "vw": vwc / 100.0, "vh": vhc / 100.0, "h600": vhc <= 600, "h430": vhc <= 430, "w480": vwc >= 480,
 		"vp": vhc > vwc, "title": ui.ov.classList.contains("title"), "W": size.x / k, "H": size.y / k, "dpr": dpr}
 
 
@@ -1151,6 +1151,13 @@ func _scroll_to_focus() -> void:
 		sy = maxf(0.0, r.position.y - 8)
 	elif r.end.y + 8 > sy + vh:
 		sy = minf(maxf(0.0, content_h - vh), r.end.y + 8 - vh)
+
+
+## Caja de un elemento en pantalla (para mover el foco con las flechas).
+func rect_of(e: DomEl) -> Variant:
+	if root.is_empty() or built_ver != Ui.ver:
+		_build()
+	return _find_rect(root.kids, e, Vector2.ZERO)
 
 
 func _find_rect(kids: Array, e: DomEl, o: Vector2) -> Variant:

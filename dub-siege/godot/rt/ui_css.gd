@@ -14,6 +14,7 @@ const CY := Color("#3de8ff")
 const GRN := Color("#4dff88")
 const PANEL := Color("#121730")
 const LINE := Color("#3a4680")
+const BTN_H := 44.0   # alto minimo de un boton (dedo), como .btn en la web
 
 ## c: {vw, vh (px CSS por 1 %), h600, h430, w480, vp, title}
 
@@ -211,7 +212,7 @@ static func of(e: DomEl, ps: Dictionary, c: Dictionary) -> Dictionary:
 		s.bg2 = Color("#121730")
 		s.bw = [2.0, 2.0, 2.0, 2.0]
 		s.bcol = LINE
-		s.minh = clampf(6 * vh, 30, 46)
+		s.minh = BTN_H * maxf(1.0, 1.0 / float(c.get("m", 1.0)))   # 44 px reales como minimo (dedo)
 		s.pad = [0.55 * fs, 0.9 * fs, 0.55 * fs, 0.9 * fs]
 		s.rad = 4.0
 		s.align = "center"
@@ -257,7 +258,7 @@ static func of(e: DomEl, ps: Dictionary, c: Dictionary) -> Dictionary:
 		if _parent_has(e, "tapes"):
 			s.align = "left"
 			s.pad = [6.0, 10.0, 6.0, 10.0]
-			s.minh = 34.0
+			s.minh = BTN_H * maxf(1.0, 1.0 / float(c.get("m", 1.0)))
 	fs = s.fs
 	if t == "SMALL" and _parent_has(e, "cont"):
 		s.fs = ps.fs * 0.72
@@ -315,7 +316,7 @@ static func of(e: DomEl, ps: Dictionary, c: Dictionary) -> Dictionary:
 		s.align = "center"
 	if _has(e, "tgb"):
 		s.minw = 44.0
-		s.minh = 34.0
+		s.minh = BTN_H * maxf(1.0, 1.0 / float(c.get("m", 1.0)))
 		s.pad = [0.2 * fs, 0.6 * fs, 0.2 * fs, 0.6 * fs]
 
 	# ---- .stats
@@ -436,7 +437,7 @@ static func of(e: DomEl, ps: Dictionary, c: Dictionary) -> Dictionary:
 	if _has(e, "lkh") and c.h600:
 		s.disp = "none"
 	if c.h600 and _has(e, "btn") and _in(e, "lkm"):
-		s.minh = 28.0
+		s.minh = BTN_H * maxf(1.0, 1.0 / float(c.get("m", 1.0)))
 		s.pad = [0.35 * fs, 0.8 * fs, 0.35 * fs, 0.8 * fs]
 
 	# ---- ranuras

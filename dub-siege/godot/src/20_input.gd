@@ -11,7 +11,7 @@ var gpPrev := {}
 var KEYMAP := {}
 const JD_MS := 150.0
 const JD_HOLD := 12
-var jd := {"on": 0, "tm": 0, "dash": 0, "hold": 0}
+var jd := {"on": 0, "tm": 0, "dash": 0, "hold": 0, "air": 0}
 
 const KEYNAMES := {
 	KEY_SPACE: "Space", KEY_ENTER: "Enter", KEY_KP_ENTER: "Enter", KEY_ESCAPE: "Escape", KEY_BACKSPACE: "Backspace",
@@ -140,6 +140,14 @@ func jdDown() -> void:
 		return
 	jd.on = 1
 	jd.dash = 0
+	jd.air = 0
+	# En el aire con el doble salto disponible salta al momento (ver el HTML).
+	if mode == "play" and p is Dictionary and not _truthy(p.get("ground")) and float(p.get("coyote", 0)) <= 0 and int(p.get("jumps", 0)) < 2 and not _truthy(p.get("dash")):
+		jd.air = 1
+		LATCH.J = 1
+		TS.J = 1
+		jd.hold = 0
+		return
 	_untimeout(jd.tm)
 	jd.tm = _timeout(func():
 		if not jd.on:
@@ -154,6 +162,10 @@ func jdUp(real: bool) -> void:
 		return
 	jd.on = 0
 	_untimeout(jd.tm)
+	if jd.air:
+		jd.air = 0
+		TS.J = 0
+		return
 	if not jd.dash and real:
 		LATCH.J = 1
 		TS.J = 1

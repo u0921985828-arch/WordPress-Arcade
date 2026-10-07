@@ -32,6 +32,9 @@ const C_LINE := Color("#3a4680")
 const C_INK := Color("#eef3ff")
 
 
+var _padx := 0
+
+
 func _init(g: Game) -> void:
 	game = g
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -65,6 +68,9 @@ func layout() -> void:
 	zone = Rect2(x0, y0, x1 - x0, y1 - y0)
 	_place(x0, y0, x1, y1)
 	_hudr()
+	# px del mundo que tapa la columna de botones (ver placePad en la web)
+	var crx: float = game.origin.x + game.cv.width * game.ZOOM
+	_padx = maxi(0, ceili((crx - x0) / game.ZOOM / game.SC)) if vs.x > vs.y else 0
 
 
 ## placePad() de la web: SALTO en el centro del arco comodo del pulgar,
@@ -223,6 +229,7 @@ func _input(e: InputEvent) -> void:
 
 func _process(_dt: float) -> void:
 	var on := ingame()
+	game.PADX = _padx if game.touchMode() else 0
 	if on != visible:
 		visible = on
 		if not on:
@@ -292,7 +299,7 @@ func _draw() -> void:
 		if pressed:
 			fill = C_LINE
 			r *= 0.94
-		var al := 0.5
+		var al := 0.18 if game.PADT else 0.5
 		_ring(q.c, r, Color(fill, al), Color(line, al), 3.0 * k, key == "f" and game.autoFire())
 		if key == "j":
 			_label(LBL[key], q.c - Vector2(0, 5.0 * k), 11.0 * k, Color(C_INK, al))

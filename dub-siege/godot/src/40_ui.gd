@@ -38,19 +38,79 @@ func menu_key(code: String, e: InputEventKey) -> bool:
 	return true
 
 
+## show() del HTML: el foco se pone al momento y, si el panel se repinta (comprar
+## en la tienda), vuelve al mismo boton (mismo data-act y data-v).
+func show(html: Variant = null) -> void:
+	var o: DomEl = S_("ov")
+	var a: DomEl = document.ui.focus_el()
+	var key = [a.getAttribute("data-act"), a.getAttribute("data-v")] if a != null and a.getAttribute("data-act") != null else null
+	o.classList.remove("title")
+	o.innerHTML = html
+	o.hidden = false
+	var f = null
+	if key != null:
+		var sel := "button[data-act=\"%s\"]" % key[0]
+		if key[1] != null:
+			sel += "[data-v=\"%s\"]" % key[1]
+		f = o.querySelector(sel + ":not(:disabled)")
+	if f == null:
+		f = o.querySelector("button:not(:disabled),input")
+	if f:
+		f.focus()
+
+
+## Flechas en los menus: el boton mas cercano en esa direccion (ver navMove en
+## el HTML). Usa las cajas que ha medido UiView.
+func navMove(bs: Array, dx: int, dy: int) -> void:
+	if bs.is_empty():
+		return
+	var cur: DomEl = document.ui.focus_el()
+	var ix := bs.find(cur)
+	if ix < 0:
+		bs[0].focus()
+		return
+	var r = ui_view.rect_of(cur) if ui_view else null
+	var best: DomEl = null
+	var bv := 1e9
+	if r != null:
+		var c: Vector2 = r.get_center()
+		for b in bs:
+			if b == cur:
+				continue
+			var q = ui_view.rect_of(b)
+			if q == null:
+				continue
+			var d: Vector2 = q.get_center() - c
+			var along: float = d.x * dx if dx != 0 else d.y * dy
+			var side: float = absf(d.y) if dx != 0 else absf(d.x)
+			if along < 4:
+				continue
+			if dx != 0 and side > maxf(r.size.y, q.size.y):
+				continue
+			var v := along + side * 2
+			if v < bv:
+				bv = v
+				best = b
+	if best:
+		best.focus()
+	elif dy != 0:
+		bs[(ix + dy + bs.size()) % bs.size()].focus()
+
+
 func _menu_cmd(code: String, echo := false) -> void:
 	var ov: DomEl = document.ui.ov
 	if code in ["ArrowDown", "ArrowUp", "KeyS", "KeyW"]:
 		var bs: Array = ov.querySelectorAll("button:not(:disabled)")
 		if bs.size():
-			var ix := bs.find(document.ui.focus_el())
-			var dn := code == "ArrowDown" or code == "KeyS"
-			bs[(ix + (1 if dn else -1) + bs.size()) % bs.size()].focus()
+			navMove(bs, 0, 1 if (code == "ArrowDown" or code == "KeyS") else -1)
 		return
 	if code in ["ArrowLeft", "ArrowRight", "KeyA", "KeyD"]:
 		var fb: DomEl = document.ui.focus_el()
+		var lf := code == "ArrowLeft" or code == "KeyA"
 		if fb and fb.getAttribute("data-act") == "lk":
-			lookStep(fb.getAttribute("data-v"), -1 if (code == "ArrowLeft" or code == "KeyA") else 1)
+			lookStep(fb.getAttribute("data-v"), -1 if lf else 1)
+			return
+		navMove(ov.querySelectorAll("button:not(:disabled)"), -1 if lf else 1, 0)
 		return
 	if (code == "Escape" or code == "KeyP") and mode == "pause":
 		if not echo:
@@ -145,11 +205,14 @@ func menu_test(n: String) -> void:
 		"shop":
 			newRun()
 			buildStage(0)
-			run.coins = 60
+			BANK = 60
 			showShop()
 		"controls":
 			showMenu()
 			showControls()
+		"diff":
+			showMenu()
+			slotNew(0)
 		"rank":
 			newRun()
 			buildStage(0)

@@ -50,6 +50,27 @@ func run() -> void:
 		miny = minf(miny, game.p.y)
 	res.append(["salto", miny < y0 - 8, y0 - miny])
 	await _wait(60)
+	# toque de un solo fotograma: tiene que dar un salto que se note (>= 20 px)
+	y0 = game.p.y
+	_touch(1, j, true)
+	await _wait(1)
+	_touch(1, j, false)
+	miny = y0
+	for i in 30:
+		await get_tree().process_frame
+		miny = minf(miny, game.p.y)
+	res.append(["toque corto", miny < y0 - 20, y0 - miny])
+	await _wait(60)
+	# doble salto en el aire: sale al tocar, sin esperar a soltar
+	_touch(1, j, true)
+	await _wait(1)
+	_touch(1, j, false)
+	await _wait(8)
+	_touch(1, j, true)
+	await _wait(2)
+	res.append(["doble salto al tocar", int(game.p.get("jumps", 0)) == 2, game.p.get("jumps", 0)])
+	_touch(1, j, false)
+	await _wait(60)
 	# mantener = dash
 	_touch(1, j, true)
 	await _wait(20)
