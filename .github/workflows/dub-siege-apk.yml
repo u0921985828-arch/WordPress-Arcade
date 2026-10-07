@@ -182,9 +182,11 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swangle_indirect -noaudio -no-boot-anim
           script: |
+            adb shell settings put secure immersive_mode_confirmations confirmed
             adb install DubSiege-webview-antigua.apk
             adb shell monkey -p online.kuboplay.dubsiege -c android.intent.category.LAUNCHER 1
             sleep 25
+            adb shell pidof online.kuboplay.dubsiege > /dev/null || { adb shell monkey -p online.kuboplay.dubsiege -c android.intent.category.LAUNCHER 1; sleep 30; }
             adb exec-out screencap -p > 0-antigua.png
             adb shell input keyevent KEYCODE_HOME; sleep 6
             adb shell am force-stop online.kuboplay.dubsiege
@@ -210,7 +212,7 @@ jobs:
             adb shell input keyevent KEYCODE_BACK
             sleep 2
             adb exec-out screencap -p > 5-atras.png
-            adb logcat -d > logcat.txt
+            adb logcat -d > logcat.txt || { sleep 3; adb logcat -d > logcat.txt; }
             grep -q 'datos importados de la app anterior' logcat.txt || { echo 'NO importó la partida antigua'; exit 1; }
             echo "proceso: $(adb shell pidof online.kuboplay.dubsiege)"; adb shell pidof online.kuboplay.dubsiege > /dev/null
             ! grep -q 'FATAL EXCEPTION' logcat.txt
