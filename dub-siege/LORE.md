@@ -19,14 +19,14 @@ El juego se juega en **español**, con jerga de la calle y seis expresiones en p
 - **Selecta**: el protagonista, el que pincha la Bestia. El jugador elige su piel y su sudadera.
 - **Ranking Pepper**: el MC de la Bestia (*ranking* es un título habitual de los deejays). Se crió en sótanos.
 - **Count Ephraim**: el padre de Odessa. Cargaba cajas en los patios de baile de Kingston, emigró a Londres en 1960 y murió en 1979. Dejó **doce cintas** grabadas: son el Archivo.
-- **Miss Hyacinth**: la ingeniera de Ephraim. Construyó la Bestia y aprendió a desnudar canciones con ecos. Ahora trabaja para el ayuntamiento: diseñó la **máquina de silencio**, convencida de que si los vecinos no oyen los blues nadie llama a la policía, y le dejó una puerta trasera: el bajo de las cuatro válvulas juntas.
+- **Miss Hyacinth**: la ingeniera de Ephraim. Construyó la Bestia y aprendió a desnudar canciones con ecos. Ahora trabaja para el ayuntamiento: diseñó la **máquina de silencio**, convencida de que si los vecinos no oyen los bailes nadie llama a la policía, y le dejó una puerta trasera: el bajo de las cuatro válvulas juntas.
 - **Los silenciadores, antenas y demás cacharros**: aparatos de **Control de Ruido** del ayuntamiento que localizan y tapan cualquier bajo.
 
 ## Babilonia
 Los rastas llaman **Babilonia** al poder que manda callar. En el juego tiene tres piezas:
-- **El oído: Leopold Dunmore, «el Censor»**, jefe de Control de Ruido del GLC, el gobierno de Londres. En 1966 su hermano **Aubrey**, de diecinueve años, murió en una redada en un blues de Ephraim: el sótano tenía una sola escalera. Lleva quince años culpando a la música.
+- **El oído: Leopold Dunmore, «el Censor»**, jefe de Control de Ruido del GLC, el gobierno de Londres. En 1966 su hermano **Aubrey**, de diecinueve años, murió en una redada en un baile de sótano de Ephraim: el sótano tenía una sola escalera. Lleva quince años culpando a la música.
 - **La mano: el inspector Brannock**, de la policía. Para a los chavales por «sus», detiene sin abogado y presume de olvidar lo que le conviene.
-- **La firma: el concejal Hargreaves**, candidato al GLC. En 1966 **firmó la denuncia que trajo la redada**, para salir en la foto. En 1973 bajó a un blues, se hizo la foto con la Bestia, prometió un local para la juventud negra, ganó su escaño y el local acabó en aparcamiento. Ahora firma la orden que precinta los blues la víspera de las elecciones del 7 de mayo.
+- **La firma: el concejal Hargreaves**, candidato al GLC. En 1966 **firmó la denuncia que trajo la redada**, para salir en la foto. En 1973 bajó a un baile, se hizo la foto con la Bestia, prometió un local para la juventud negra, ganó su escaño y el local acabó en aparcamiento. Ahora firma la orden que precinta los bailes la víspera de las elecciones del 7 de mayo.
 
 Babilonia **pega** (redadas, registros, calabozo) y también **compra** (un carnaval oficial con vallas y patrocinador, sin sounds).
 
@@ -43,7 +43,7 @@ Babilonia **pega** (redadas, registros, calabozo) y también **compra** (un carn
 | 8 | Refugio de Stockwell (túneles de la guerra) | Enjambre | Selecta libera a Pepper. Hyacinth confiesa que diseñó la máquina de silencio y por qué. |
 | 9 | Down Street (estación cerrada en 1932) | Tren Fantasma | Hargreaves en campaña por la radio. La cinta de Ephraim perdona a Hyacinth. |
 | 10 | Cola en Harlesden | Silenciador Mk2 | La cola de detenidos. Dunmore, Brannock y Hargreaves, juntos: eso es Babilonia. |
-| 11 | Blues de sótano | Zángano Mk2 | Hyacinth vio la denuncia: la que trajo la redada del 66 la firmó Hargreaves. |
+| 11 | Baile de sótano | Zángano Mk2 | Hyacinth vio la denuncia: la que trajo la redada del 66 la firmó Hargreaves. |
 | 12 | County Hall (sede del GLC) | El Censor | El clash. Suena la Bestia, Dunmore pregunta a Hargreaves por la denuncia, la última cinta de Ephraim le habla de su hermano y rompe la orden. A Hargreaves no le escucha nadie y Brannock se retira «esta noche»; entre los bafles requisados del refugio vuelve la primera Bestia. |
 
 ## El Archivo (12 cintas)
@@ -55,7 +55,7 @@ Cada jefe guarda una cinta de Count Ephraim (se desbloquean en **Menú → Archi
 | 2 | El sello rascado | Shuffle de Kingston, 1958 | Cuando Estados Unidos se pasa al rock and roll, Kingston graba su propio shuffle con el golpe corrido; etiquetas raspadas; matones a sueldo que revientan el baile del rival | il_02 |
 | 3 | Tambores del monte | Nyabinghi, 1959 | Los tres tambores rastas (latido, apoyo e improvisación); la comuna del monte, quemada por la policía en 1954 | il_03 |
 | 4 | El barco y el ska | Ska, 1962 | La emigración de 1960, los carteles de las pensiones, el baile en sótanos con un equipo casero de válvulas y la independencia de 1962 | il_04 |
-| 5 | La noche de la escalera | Rocksteady, 1966 | Una redada en un blues en 1966 (suceso inventado sobre un patrón real: redadas con perros y prensa que culpaba al ruido) | **il_cola** |
+| 5 | La noche de la escalera | Rocksteady, 1966 | Una redada en un baile de sótano en 1966 (suceso inventado sobre un patrón real: redadas con perros y prensa que culpaba al ruido) | **il_cola** |
 | 6 | El órgano y las botas | Early reggae, 1968 | El órgano que burbujea entre golpes; los chavales blancos de botas que bailaban y compraban reggae, y que años después volvieron con otras ideas | il_06 |
 | 7 | La voz sobre el ritmo | Roots, 1972 | El bombo que cae solo en el tres (one drop), la música de raíces y el deejay; un político que promete un local en 1973 y no lo abre (inventado) | **il_mitin** |
 | 8 | Acetatos | Dub, 1974 | Canciones sin voz bañadas en ecos y temas exclusivos cortados en acetato, de pocas pasadas | il_08 |
