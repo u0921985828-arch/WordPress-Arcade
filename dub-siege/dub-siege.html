@@ -142,7 +142,7 @@ html.vl body.touch #rot{display:none}
    para que el menu entero quepa sin tener que desplazar. */
 /* html.h600 = alto de 600 px o menos */
 html.h600 .menu{display:grid;grid-template-columns:1fr 1fr;width:min(100%,560px)}
-html.h600 .menu .hot,html.h600 .menu>.btn:only-child,html.h600 .menu>.btn:last-child:nth-child(odd){grid-column:1/-1}
+html.h600 .menu .hot,html.h600 .menu>.btn:only-child{grid-column:1/-1}html.h600 .menu.one{display:flex;width:min(100%,460px)}.menu.one{width:min(100%,460px)}
 html.h600 .keys{grid-template-columns:auto 1fr auto 1fr;width:min(100%,760px)}
 html.h430 .panel{line-height:1.45}html.h430 .shop{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))}
 html.vl body.touch #stick:not(.act) .base,html.vl body.touch #stick:not(.act) .knob{opacity:.35}
@@ -2233,7 +2233,7 @@ function newGame(i){CUR=i;NEWSL=null;startGame();}
 // sitios distintos para cambiarla). La pantalla de controles ya no se interpone:
 // el tutorial de la fase 1 ensena jugando.
 function slotNew(i){NEWSL=i;back=slots().some(function(x){return x;})?showSlots:showMenu;
-  var h='<div class="panel"><p class="kick">NUEVA PARTIDA · RANURA '+(i+1)+'</p><h2>ELIGE LA DIFICULTAD</h2><div class="menu">';
+  var h='<div class="panel"><p class="kick">NUEVA PARTIDA · RANURA '+(i+1)+'</p><h2>ELIGE LA DIFICULTAD</h2><div class="menu one">';
   DIFFS.forEach(function(d,k){h+='<button class="btn opt'+(k===SET.diff?' hot':'')+'" data-act="ndiff" data-v="'+k+'">'+d.n+' <i>'+d.lives+' VIDAS · '+d.hp+' CORAZONES</i></button>';});
   show(h+'<button class="btn" data-act="back">VOLVER</button></div><p class="dim">Se elige ahora y no se puede cambiar durante esta partida.</p></div>');
   var hb=$('ov').querySelector('.btn.hot');if(hb)hb.focus();}

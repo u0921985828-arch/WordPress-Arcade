@@ -35,6 +35,13 @@ static func _has(e: DomEl, c: String) -> bool:
 	return e != null and e.classList.contains(c)
 
 
+static func _only_el(e: DomEl) -> bool:
+	for k in e.parent.children:
+		if k != e and k.tagName != "#TEXT":
+			return false
+	return true
+
+
 static func _in(e: DomEl, c: String) -> bool:
 	var p := e.parent
 	while p:
@@ -201,7 +208,14 @@ static func of(e: DomEl, ps: Dictionary, c: Dictionary) -> Dictionary:
 		if _has(e, "lkm") and not c.h600:
 			# html.h600 .lkm va antes que html.h600 .menu en la hoja: manda la rejilla
 			s.wmax = 360.0
+		if _has(e, "one"):
+			s.disp = "flex"
+			s.cols = null
+			s.wmax = 460.0
 	if _has(e, "hot") and _in(e, "menu"):
+		s.span = true
+	# html.h600 .menu>.btn:only-child: un boton solo ocupa toda la fila
+	if _has(e, "btn") and e.parent != null and _has(e.parent, "menu") and _only_el(e):
 		s.span = true
 
 	# ---- .btn
@@ -511,6 +525,36 @@ static func of(e: DomEl, ps: Dictionary, c: Dictionary) -> Dictionary:
 			s.pad = [0.15 * s.fs, 0.4 * s.fs, 0.15 * s.fs, 0.4 * s.fs]
 			s.bg = Color("#0000004d")
 			s.rad = 3.0
+	# Panel que no cabe (ovFit en el HTML): .t1 menos aire, .t2 letra menor y sin nota
+	var tl: int = int(c.get("t", 0))
+	if tl >= 1:
+		if _has(e, "panel"):
+			s.gap_r = 4.0
+			s.gap_c = 4.0
+			s.lh = 1.35
+		if (_has(e, "menu") or _has(e, "shop")) and _in(e, "panel"):
+			s.gap_r = 5.0
+			s.gap_c = 5.0
+		if _has(e, "shop"):
+			s.autofit = "shop1"
+		if _has(e, "item"):
+			s.lh = 1.3
+			s.gap_r = 2.0
+		if s.btn:
+			s.pad = [0.3 * s.fs, s.pad[1], 0.3 * s.fs, s.pad[3]]
+	if tl >= 2:
+		if _has(e, "panel"):
+			s.fs = s.fs * 0.88
+			s.gap_r = 2.0
+			s.gap_c = 2.0
+		if _has(e, "tip"):
+			s.disp = "none"
+		if _has(e, "dim"):
+			s.lh = 1.25
+		if _has(e, "shop"):
+			s.autofit = "shop2"
+		if t == "SMALL" and _in(e, "item"):
+			s.fs = ps.fs * 0.75
 	# los hijos de un flex o grid se vuelven bloque (blockification de CSS)
 	if s.disp == "inline" and ps.get("disp", "") in ["flex", "grid"]:
 		s.disp = "block"

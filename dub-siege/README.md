@@ -177,11 +177,31 @@ Tres botones: BASS, FUEGO y **SALTO/DASH**. En el botón doble, un toque corto
 fotogramas por dentro para que salga el salto completo— y mantenerlo hace el
 dash. Teclado y mando siguen con sus teclas separadas.
 
+Mejoras del jurado (entrega 2):
+- **Toque corto**: el salto tiene un mínimo de 6 fotogramas de impulso
+  (`p.jmin`), así que el toque más breve —tecla o dedo— ya da un salto que se
+  nota (35 px con 30 ms de Espacio; 42 px con un toque de un fotograma).
+- **Doble salto al tocar**: en el aire, con el doble salto disponible, el botón
+  SALTO/DASH salta al apoyar el dedo (`jd.air`), sin esperar a soltarlo.
+- **Nada debajo de los botones**: `PADX` es el ancho que tapa la columna de
+  botones en el lienzo; los rótulos flotantes no pasan de ahí y, si el jefe o el
+  héroe se meten debajo, los botones se aclaran al 18 % (`PADT`, `#btns.thru`).
+
 Colocación: `placePad()` pone SALTO (×1,2 de tamaño) en el arco cómodo del
 pulgar —32–48 mm de su base, que se supone 5 mm fuera de la esquina inferior— y
 FUEGO y BASS en el mismo arco a su lado, sin tapar nunca el lienzo. Toda la
 columna derecha responde (`padPick`: gana el botón más cercano, SALTO con 14 px
 de ventaja). Estudio y cifras: `ESTUDIO-CONTROLES.md`.
+
+## Tutorial y cámara
+- **Un cartel cada vez** en la fase 1 (`coachStep`): moverse, saltar, doble
+  salto, disparar, dash y BASS, en ese orden; cada uno se va cuando lo haces
+  («¡BIEN!») y sale el siguiente. Va arriba, centrado en la parte libre (nunca
+  debajo de los botones). Ya no hay pantalla «ASÍ SE JUEGA».
+- **Pantalla completa también con teclado**: en horizontal el lienzo llena la
+  pantalla (1280×720 → 1280×720; antes 1056×432).
+- **Cámara del jefe**: en la arena no sube más allá de lo que deja ver el suelo
+  (`GY+4-H`), aunque el jefe vuele alto.
 
 ## Música
 Toda la banda sonora se **genera en el propio juego** (Web Audio, sin ficheros de
@@ -244,8 +264,17 @@ OPCIONES → **TAMAÑO DE INTERFAZ**, como la escala de interfaz de Minecraft:
   por píxel del dibujo (entero, sin píxeles desiguales) y el texto empieza en
   `cutTx()`, justo a su derecha. A 100 % sale idéntico al de antes; en `AUTO`
   en un móvil tumbado, a la mitad, y las frases caben en 2 líneas.
-- **Menús** (paneles HTML): `zoom: var(--ui)`. En `AUTO` se quedan como
-  estaban; con valor manual bajan hasta el 80 % (a 50 %).
+- **Menús** (paneles HTML): `zoom: var(--ui)`. Valores de 50 a **130 %**
+  (`UIS`). Todos los botones miden al menos 44 px de alto en pantalla, a
+  cualquier tamaño.
+- **Paneles que caben**: si un panel no cabe en el alto, `ovFit()` lo compacta
+  en dos pasos (`.t1` menos aire, `.t2` letra algo menor y sin la nota de
+  ayuda) y, solo en `AUTO`, un tercero (`.t3`, 84 %). En 740×360, 844×390,
+  1280×720 y 1920×1080 ya no hace falta desplazar ningún menú; si eliges un
+  tamaño grande a mano, el panel se desplaza y sigue al botón con foco.
+- **Teclado en los menús**: las flechas van al botón más cercano en esa
+  dirección (`navMove`, por posición en pantalla); el foco se queda en el
+  botón pulsado al repintar (comprar en la tienda no te devuelve arriba).
 
 ## Partidas guardadas
 Seis ranuras en el propio móvil (`ds2_slots`; `ds2_last` = la última usada).
@@ -253,8 +282,19 @@ JUGAR abre **PARTIDAS** (si no hay ninguna, empieza directamente en la 1) y el
 menú principal enseña **CONTINUAR** con la última. Cada ranura dice la fase, su
 nombre, la dificultad, los puntos y la fecha; tocarla da CONTINUAR, EMPEZAR DE
 NUEVO y BORRAR (estos dos piden confirmación, con «NO» seleccionado).
-Con una partida guardada, la dificultad de las nuevas se elige en PARTIDAS
-(«NUEVAS EN») o en OPCIONES; CONTINUAR usa siempre la de su ranura.
+La dificultad se elige **una vez**, al empezar una partida nueva (pantalla
+«ELIGE LA DIFICULTAD», con las vidas y corazones de cada una y el aviso de que
+no se puede cambiar después); CONTINUAR usa siempre la de su ranura.
+
+- **Punto de control antes del jefe**: al cruzar la puerta de la arena se
+  guarda (`run.cpi`, `run.cpx`); CONTINUAR o cargar la ranura vuelven ahí, o al
+  último punto de control de la fase, sin repetir la escena de entrada.
+- **Vidas por fase**: cada fase empieza al menos con las vidas de la
+  dificultad (las compradas se conservan).
+- **Una sola moneda**: los DISCOS que recoges (`BANK`) pagan la tienda y el
+  personaje.
+- **Récord automático** (`ds2_best`): al caer, al ganar y al terminar fase se
+  guarda solo y sale «¡NUEVO RÉCORD!».
 
 - Se guarda solo (`slotSave`): al empezar cada fase, al pasar a la tienda, al
   comprar y al caer (ya con el castigo de CONTINUAR: mitad de puntos). Al

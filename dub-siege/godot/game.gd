@@ -4610,7 +4610,7 @@ func slotNew(i = null):
 	_fn = func(x = null):
 		return x
 	back = (showSlots if _some(slots(), _fn) else showMenu)
-	h = "<div class=\"panel\"><p class=\"kick\">NUEVA PARTIDA · RANURA " + str((i + 1)) + "</p><h2>ELIGE LA DIFICULTAD</h2><div class=\"menu\">"
+	h = "<div class=\"panel\"><p class=\"kick\">NUEVA PARTIDA · RANURA " + str((i + 1)) + "</p><h2>ELIGE LA DIFICULTAD</h2><div class=\"menu one\">"
 	for _i in range(_len(DIFFS)):
 		if _i >= _len(DIFFS): break
 		d = DIFFS[_i]

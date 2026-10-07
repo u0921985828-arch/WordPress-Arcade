@@ -139,29 +139,46 @@ func _build() -> void:
 	m.set_shader_parameter("mode", 1 if c.title else 0)
 	m.set_shader_parameter("vsize", size)
 	m.set_shader_parameter("dpr", c.dpr)
-	canvases = []
 	var rs := UiCss.root_style()
 	var kids := []
-	for e in ui.ov.children:
-		if not e.is_text():
-			var b = _box(e, rs, c)
-			if b:
-				kids.append(b)
-	# .ov: flex centrado con relleno; el panel con margin:auto
-	var pv: float = maxf(10.0, 2.0 * c.vh * c.dpr / k)
-	var ph := 12.0
-	var aw: float = c.W - 2 * ph
+	var pv := 0.0
 	var y := 0.0
-	for b in kids:
-		var w := _resolve_w(b, aw, "fill")
-		_lay(b, w)
-		b.x = ph + (aw - w) / 2.0
-		b.y = y
-		y += b.h
+	# Igual que ovFit() en el HTML: si no cabe, se compacta (t1, t2) y, solo con
+	# el tamano en AUTO, se reduce al 84 % (t3).
+	var auto: bool = not (game.SET is Dictionary and (game.SET.get("ui") is float or game.SET.get("ui") is int))
+	for t in 4:
+		if t == 3:
+			if not auto:
+				break
+			k *= 0.84
+			c.m = float(c.m) * 0.84
+			c.W = size.x / k
+			c.H = size.y / k
+		c.t = mini(t, 2)
+		canvases = []
+		kids = []
+		for e in ui.ov.children:
+			if not e.is_text():
+				var bx = _box(e, rs, c)
+				if bx:
+					kids.append(bx)
+		# .ov: flex centrado con relleno; el panel con margin:auto
+		pv = maxf(10.0, 2.0 * c.vh * c.dpr / k)
+		var ph := 12.0
+		var aw: float = c.W - 2 * ph
+		y = 0.0
+		for bx in kids:
+			var w := _resolve_w(bx, aw, "fill")
+			_lay(bx, w)
+			bx.x = ph + (aw - w) / 2.0
+			bx.y = y
+			y += bx.h
+		if y + 2 * pv <= c.H + 1.0:
+			break
 	var ah: float = c.H - 2 * pv
 	var off := pv + maxf(0.0, (ah - y) / 2.0)
-	for b in kids:
-		b.y += off
+	for bx in kids:
+		bx.y += off
 	content_h = y + 2 * pv
 	root = {"kids": kids}
 	if OS.get_environment("UIDBG") != "":
@@ -713,6 +730,10 @@ func _lay_grid(b: Dictionary, cw: float) -> float:
 				mn = maxf(15.0 * fs, cw * 0.5 - 5.0)
 			"shop":
 				mn = minf(cw, 210.0 if built_size.y / k <= 430 else 250.0)
+			"shop1":
+				mn = minf(cw, 190.0)
+			"shop2":
+				mn = minf(cw, 150.0)
 			"slots":
 				mn = maxf(minf(cw, 15.0 * fs), cw * 0.334 - 6.0)
 		var n := maxi(1, int(floor((cw + s.gap_c) / (mn + s.gap_c) + 0.0001)))
