@@ -112,6 +112,9 @@ static func of(e: DomEl, ps: Dictionary, c: Dictionary) -> Dictionary:
 		s.wmax = minf(640, 96 * vw)
 		if _has(e, "wide"):
 			s.wmax = minf(860, 96 * vw)
+		# .panel.wide.eq{min-height:min(80vh,520px)}: la tienda mide lo mismo en las 3 pestanas
+		if _has(e, "wide") and _has(e, "eq"):
+			s.minh = minf(80 * vh, 520)
 		if _has(e, "sl3"):
 			s.wmax = minf(1000, 96 * vw)
 		if ttl:

@@ -78,7 +78,7 @@ canvas{display:block;image-rendering:pixelated}
 .item small{color:var(--dim);font-size:max(11px,.85em)}
 .item .c{color:var(--yel);font-style:normal}
 .pips{color:var(--cy);letter-spacing:2px}
-.coins{color:var(--yel);margin:0}.meds{display:flex;flex-wrap:wrap;gap:.5em;justify-content:center;margin:0}.meds .md{color:#8e97c4;padding:.2em .5em;border:1px solid #2b3570;border-radius:3px}.meds .md.on{color:var(--yel);border-color:var(--yel)}.coins .no{color:#ff8aa6}.ov .panel.eq{margin:0 auto auto}
+.coins{color:var(--yel);margin:0}.meds{display:flex;flex-wrap:wrap;gap:.5em;justify-content:center;margin:0}.meds .md{color:#8e97c4;padding:.2em .5em;border:1px solid #2b3570;border-radius:3px}.meds .md.on{color:var(--yel);border-color:var(--yel)}.coins .no{color:#ff8aa6}.ov .panel.eq{margin:0 auto auto}.ov .panel.wide.eq{min-height:min(80vh,520px)}
 .keys{display:grid;grid-template-columns:auto 1fr;gap:clamp(3px,calc(.9*var(--vh)),6px) 16px;text-align:left;width:min(100%,520px)}
 .keys b{font-weight:400;color:var(--yel)}
 ol.rank{list-style:none;padding:0;margin:0;width:min(100%,480px);font-variant-numeric:tabular-nums}
@@ -1815,6 +1815,7 @@ function startBoss(){
   if(n===4){var a=ART[ESHEET[L.mt]]||{fw:12,fh:10},air=L.mt==='b'||L.mt==='f';
     boss.w=Math.round(a.fw*boss.sc*.8);boss.h=Math.round(a.fh*boss.sc*.85);boss.gnd=!air;boss.hy=L.mt==='b'?100:104;
     boss.x=L.mt==='t'?ax+W/2-boss.w/2:ax+W-24-boss.w;boss.y=air?-40:-70;}
+  boss.x=Math.min(boss.x,ax+W-arenaM()[1]-boss.w-6);
   banner={a:'ALERTA',b:L.boss,l:150,boss:1};sfx('siren');bossMusic=1;
 }
 // Al aterrizar (y tras su dialogo, que congela el juego) hay un respiro sin dano.
@@ -1861,7 +1862,10 @@ function updateBoss(){
   // ataques que ya tenian su aviso propio suman este; ninguno sale de golpe).
   if(!b.act&&b.cd<=1){if(b.wind===-1)b.wind=0;else if(!(b.wind>0)){b.wind=32;sfx('tele');}
     if(b.wind>0){b.wind--;b.cd=2;if(b.wind===0)b.wind=-1;return;}}
-  ({0:boss0,1:boss1,2:boss2,3:boss3,4:bossM})[b.kind](b,ax,rage);
+  // En el movil tumbado la columna de botones tapa el borde derecho de la arena:
+  // el jefe se mueve en la arena que se ve (la misma que deja arenaM al jugador).
+  var W0=W;W=W-arenaM()[1];
+  try{({0:boss0,1:boss1,2:boss2,3:boss3,4:bossM})[b.kind](b,ax,rage);}finally{W=W0;}
   // Tercera fase (todos menos EL CENSOR, que ya trae la suya): a la desesperada
   // suelta una corona de chispas cada 2,5 s, con su aviso en forma de chisporroteo.
   if(b.ph>2&&b.kind!==3&&b.on&&!b.weak){var dz=b.t%150;
@@ -2155,7 +2159,7 @@ var CUQ=SC;function cutQ(){CUQ=Math.max(1,Math.round(SC*UIF));}
 // y barra de gestos. CSX/CSB en unidades del HUD.
 function cutSX(){return touchMode()?8:0;}function cutSB(){return touchMode()?5:0;}
 function cutTx(){var b=Math.round(cutSX()*SC*HS/CUQ);return Math.ceil((52+b)*CUQ/(SC*HS))+2;}
-function cutLine(){var c=cut,l=c.lines[c.i],mw=HW-(l.w&&!cutIl(l)?cutTx()+4:16)-2*cutSX();if(!c.wr||c.mw!==mw){c.wr=wrap(l.s,mw);c.mw=mw;}return l;}
+function cutLine(){var c=cut,l=c.lines[c.i],mw=HW-(l.w&&!cutIl(l)?cutTx()+4:16)-10-2*cutSX();if(!c.wr||c.mw!==mw){c.wr=wrap(l.s,mw);c.mw=mw;}return l;}
 function cutIl(l){var o=l.i&&SHEET[l.i];return !!(o&&o.ok);}
 function cutAdv(){if(!cut)return;var c=cut,l=c.lines[c.i];
   if(c.card){if(c.t<10)return;sfx('clink');c.card=0;c.t=0;c.bar=0;return;}
@@ -2281,7 +2285,7 @@ function drawCut(){
   if(flash>0){g.globalAlpha=flash/24;rect(0,0,HW,HH,flashC);g.globalAlpha=1;}
   g.restore();
 }
-function stageClear(){if(st.i===0&&!SET.tut){SET.tut=true;save('ds2_set',SET);}
+function stageClear(){saveProg(st.i+1);if(st.i===0&&!SET.tut){SET.tut=true;save('ds2_set',SET);}
   st.clearT=150;bossMusic=0;banner={a:'FASE SUPERADA',b:st.L.boss+' KO',l:150};
 }
 // ---- medallas por fase y dificultad: TIEMPO (bajo el par), SIN DAÑO, TODOS LOS DISCOS ----
