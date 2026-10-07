@@ -213,6 +213,15 @@ func menu_test(n: String) -> void:
 		"diff":
 			showMenu()
 			slotNew(0)
+		"card", "dlg":
+			newRun()
+			buildStage(0)
+			mode = "play"
+			hideOv()
+			startCut(st.L.cut.pre, null, "il_01")
+			if n == "dlg":
+				cut.card = 0
+				cut.bar = 1
 		"rank":
 			newRun()
 			buildStage(0)

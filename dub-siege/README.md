@@ -208,6 +208,11 @@ de ventaja). Estudio y cifras: `ESTUDIO-CONTROLES.md`.
 - **El tutorial se recuerda** (`ds2_coach` en el almacenamiento): un paso hecho no
   vuelve a salir tras morir o recargar; el aviso de doble salto o de dash se
   borra al hacer esa acción, y el cartel es semitransparente para no tapar discos.
+- **Escenas sin bandas negras**: en pantallas más anchas que 16:9 (móviles) la
+  lámina de 160×90 se rodea de copias en espejo oscurecidas, a escala entera
+  (negro en pantalla: 29 % → 0,2 % a 844×390).
+- **Patwa legible**: las expresiones entre asteriscos del guion van derechas y en
+  ámbar; la cursiva de píxel montaba unas letras sobre otras.
 - Etiqueta de la tienda «PELO» (antes «CARA») y botones táctiles al 40 % de
   opacidad.
 

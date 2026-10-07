@@ -369,8 +369,8 @@ var LEVELS=[
   {era:'LOVERS ROCK, 1978',r:3,name:'BLUES DE SÓTANO',tier:3,len:[5,4,4],boss:'ZÁNGANO MK2',ai:1,mk:1,hp:115,cut:{"pre":[{"w":"MAMA","s":"UN SÓTANO DE BLUES, COMO EL QUE VIO NACER A LA BESTIA.","f":"h","x":"static"},{"w":"FLUX","s":"DESPUÉS DE ESTO, SOLO QUEDA COUNTY HALL. VAMOS."},{"w":"MAMA","s":"LOVERS ROCK. EN ESTE SÓTANO BAILÉ YO DE NIÑA.","x":"static"}],"cp":[{"w":"FLUX","s":"¿OYES ESO? ESTÁ PROBANDO LA MÁQUINA.","f":"s","e":"shake"},{"w":"ROSA","s":"CON LA ÚLTIMA VÁLVULA, TAPARÁ ESE BAJO PARA SIEMPRE.","f":"a","x":"static"},{"w":"ROSA","s":"Y HAY MÁS. LA REDADA DEL 66, LA DE LA ESCALERA...","f":"t","x":"static"},{"w":"ROSA","s":"LA DENUNCIA LA FIRMÓ HARGREAVES. QUERÍA SU FOTO. LA VI.","f":"t","x":"static"},{"w":"SELECTA","s":"Y DUNMORE LLEVA QUINCE AÑOS CULPANDO A LA MÚSICA.","f":"a"}],"boss":[{"w":"COMIS","s":"POLICÍA. CORTAD LA MÚSICA O ENTRAMOS.","f":"a","e":"alarm","x":"static"},{"w":"FLUX","s":"LA MÚSICA LA CORTA LA GENTE, INSPECTOR. Y NO QUIERE.","f":"a"},{"w":"BOSS","s":"FUENTE DE BAJO LOCALIZADA. PERSECUCIÓN.","e":"alarm"}],"post":[{"w":"MAMA","s":"EL CLASH ES EN COUNTY HALL. EL CENSOR TE ESPERA.","x":"static"},{"w":"CENSOR","s":"SUBE, SELECTA. TE HE GUARDADO LA ÚLTIMA VÁLVULA.","x":"static"},{"w":"MAMA","s":"PAPÁ NO DEJABA SUS PLATOS A NADIE. A TI TE LOS DEJO.","f":"h","x":"static"}]}},
   {era:'RUB-A-DUB, 1981',r:3,name:'COUNTY HALL',tier:3,len:[5,5,4],must:['x3'],boss:'EL CENSOR',ai:3,hp:135,cut:{"pre":[{"w":"SELECTA","s":"ÚLTIMA PUERTA. ÚLTIMA VÁLVULA.","f":"a"},{"w":"FLUX","s":"SI PIERDES, EN EL SUR NO VUELVE A SONAR UN BLUES."},{"w":"MAMA","s":"ÚLTIMO DISCO: LO QUE SUENA HOY. RUB-A-DUB, 1981.","x":"static"}],"cp":[{"w":"MAMA","s":"LA BESTIA ESTÁ LISTA. TRAE LA VÁLVULA Y LA ENCIENDO.","x":"static"},{"w":"ROSA","s":"ME HE COLADO EN LA EMISORA DE LA POLICÍA. QUE LO OIGAN.","f":"a","x":"static"}],"boss":[{"w":"CENSOR","s":"LEOPOLD DUNMORE. QUINCE AÑOS APAGANDO VUESTRO RUIDO."},{"w":"CENSOR","s":"LA MÚSICA ES RUIDO. EL RUIDO, DESORDEN. Y SE ACABA HOY.","f":"a","e":"alarm"},{"w":"SELECTA","s":"SOUND CLASH, DUNMORE. GANA QUIEN MUEVA A MÁS GENTE.","f":"a"}],"post":[{"w":"CENSOR","s":"NO... MI MÁQUINA... SE HA CALLADO.","f":"r","e":"booms"},{"w":"MAMA","s":"VÁLVULA PUESTA. ¡ENCIENDO LA BESTIA!","f":"h","e":"flash","x":"static"},{"w":"FLUX","s":"¡*PULL UP*, SELECTA! ¡OTRA VEZ ESE BAJO!","f":"s","e":"booms"},{"w":"CENSOR","s":"ESE BAJO... ÉL LO PONÍA EN CASA. YO LO PROHIBÍ.","f":"r"},{"w":"GOBER","s":"¡DUNMORE, APAGA ESO! ¡MAÑANA HAY ELECCIONES!","f":"r","x":"static"},{"w":"COMIS","s":"CONCEJAL... LE ESTÁ OYENDO MEDIO LONDRES.","f":"s","x":"static"},{"w":"CENSOR","s":"¿LA DENUNCIA DEL 66 LA FIRMASTE TÚ, HARGREAVES?","f":"a","e":"alarm"},{"w":"BOMBO","s":"LEOPOLD: TU HERMANO BAJABA A MI BLUES CADA SÁBADO.","x":"tape"},{"w":"BOMBO","s":"EL BLUES ERA SU CASA. NO LA CIERRES POR ÉL.","f":"t","x":"tape"},{"w":"MAMA","s":"POR ESO GRABASTE ESTA CINTA, PAPÁ.","f":"h","x":"static"},{"w":"CENSOR","s":"... ÉL SIEMPRE PEDÍA ESTE RITMO.","f":"r"},{"w":"CENSOR","s":"TU ORDEN, CON TU FIRMA. LA ROMPO DELANTE DE TODOS.","f":"a"},{"w":"GOBER","s":"¡VECINOS! VUESTRO CONCEJAL OS DEVUELVE LA MÚSICA.","f":"h","x":"static"},{"w":"GOBER","s":"HABRÁ CARNAVAL OFICIAL. CON PATROCINADOR, CLARO.","f":"h","x":"static"},{"w":"FLUX","s":"HABLA, CONCEJAL. NADIE TE OYE: ESTÁN BAILANDO.","f":"s"},{"w":"GOBER","s":"APUNTAD: FUE EL CONCEJAL QUIEN DEVOLVIÓ LA MÚSICA.","f":"r","x":"static"},{"w":"COMIS","s":"A TODAS LAS UNIDADES: RETIRADA. ESTA NOCHE, NO.","x":"static"},{"w":"FLUX","s":"LOS BAFLES DEL REFUGIO... LLEVAN UNA E PINTADA.","f":"a"},{"w":"MAMA","s":"LA PRIMERA BESTIA. PAPÁ, HAS VUELTO A CASA.","f":"h","x":"static"},{"w":"ROSA","s":"VETE A CASA, LEOPOLD. O QUÉDATE. PERO CALLADO.","x":"static"},{"w":"MAMA","s":"LONDRES: ESTÁIS ESCUCHANDO A LA BESTIA.","f":"h","e":"booms","x":"static"},{"w":"MAMA","s":"EL BAILE ESTÁ ABIERTO.","f":"h","x":"static"}]}}
 ];
-// Expresiones en patwa: en el guion van entre asteriscos (*BIG UP*) y se pintan en
-// cursiva. Se quitan al cargar: l.s queda limpio y l.m marca letra a letra ('1' = cursiva).
+// Expresiones en patwa: en el guion van entre asteriscos (*BIG UP*) y se pintan
+// en ambar. Se quitan al cargar: l.s queda limpio y l.m marca letra a letra ('1' = patwa).
 LEVELS.forEach(function(L){for(var k in L.cut)L.cut[k].forEach(function(l){
   if(l.s.indexOf('*')<0)return;var s='',m='',it=0,i;
   for(i=0;i<l.s.length;i++){if(l.s[i]==='*'){it^=1;continue;}s+=l.s[i];m+=it;}
@@ -2058,11 +2058,21 @@ function cutFx(l,x,y,w,h){
     rect(cx,cy,18,10,'#1a1530');rect(cx+1,cy+1,16,8,'#d9c9a0');rect(cx+1,cy+1,16,1,'#fff3d0');rect(cx+3,cy+3,12,4,'#2a2238');
     for(var j=0;j<2;j++){var bx=cx+5+j*7,by=cy+5;rect(bx-1,by-1,2,2,'#e9e1c8');rect(bx+R[0],by+R[1],1,1,'#1a1530');}}
 }
-// Lamina de la fase: 160x90 a escala entera, con negro alrededor si sobra pantalla.
+// Lamina 160x90 en (ix,iy) y, alrededor, copias en espejo oscurecidas: en pantallas
+// mas anchas que 16:9 (moviles) no quedan bandas negras y el pixel sigue siendo entero.
+function illFill(k,ix,iy,a){
+  var o=SHEET[k];if(!o||!o.ok)return;var m=o.x1?1:SC,dx,dy,x,y;
+  g.globalAlpha=a;
+  for(dy=-1;dy<=1;dy++)for(dx=-3;dx<=3;dx++){if(!dx&&!dy)continue;x=ix+dx*160;y=iy+dy*90;
+    if(x>=W||x+160<=0||y>=H||y+90<=0)continue;
+    g.save();g.translate(dx&1?x+160:x,dy&1?y+90:y);g.scale(dx&1?-1:1,dy&1?-1:1);g.drawImage(o.img,0,0,160*m,90*m,0,0,160,90);g.restore();}
+  g.globalAlpha=a*.62;rect(0,0,W,Math.max(0,iy),'#000');rect(0,iy+90,W,H,'#000');rect(0,iy,Math.max(0,ix),90,'#000');rect(ix+160,iy,W,90,'#000');
+  g.globalAlpha=a;blitS(k,0,ix,iy,1);g.globalAlpha=1;}
+// Lamina de la fase: 160x90 a escala entera, con su espejo oscurecido si sobra pantalla.
 function drawCard(c){
   var o=SHEET[c.ill],a=Math.min(1,c.t/20),ix=Math.floor((W-160)/2),iy=Math.floor((H-90)/2);
   g.save();g.setTransform(SC,0,0,SC,0,0);rect(0,0,W,H,'#000');
-  if(o&&o.ok){g.globalAlpha=a;blitS(c.ill,0,ix,iy,1);g.globalAlpha=1;}
+  if(o&&o.ok)illFill(c.ill,ix,iy,a);
   g.restore();
   var b=Math.max(0,Math.min(1,(c.t-14)/10));if(!b)return;
   var x0=Math.ceil(ix/HS),x1=Math.floor((ix+160)/HS),y0=Math.ceil(iy/HS),y1=Math.floor((iy+90)/HS),cx=(x0+x1)/2;
@@ -2085,7 +2095,7 @@ function drawCut(){
   // Como mucho se pierden 12 filas de cielo: si la caja es mas alta (pantallas 16:9),
   // la lamina baja y su suelo queda detras de la caja, que entonces es translucida.
   var ov=0;if(il){var bt=Math.floor(by*HS),ix=Math.floor((W-160)/2),iy=Math.max(bt-90,-12);ov=iy+90-bt;
-    g.save();g.setTransform(SC,0,0,SC,0,0);g.globalAlpha=Math.min(1,c.t/10);rect(0,0,W,H,'#000');blitS(l.i,0,ix,iy,1);g.globalAlpha=1;
+    g.save();g.setTransform(SC,0,0,SC,0,0);rect(0,0,W,H,'#000');illFill(l.i,ix,iy,Math.min(1,c.t/10));
     // sin busto, el efecto de la voz va sobre la parte visible de la lamina
     if(l.x&&c.t>=10){var vy=Math.max(0,iy),vh=iy+90-vy;g.beginPath();g.rect(ix,vy,160,vh);g.clip();cutFx(l,ix,vy,160,vh);}
     g.restore();}
@@ -2682,22 +2692,13 @@ function txt(s,x,y,col,al){
   var w=g.measureText(s).width;if(al==='c')x-=w/2;else if(al==='r')x-=w;
   x=Math.round(x);y=Math.round(y);g.fillStyle='#000';g.fillText(s,x+1,y+1);g.fillStyle=col;g.fillText(s,x,y);
 }
-// Texto con tramos en cursiva (m: mascara '0'/'1' del guion; o: donde empieza s en ella).
-// La fuente es de ancho fijo (8), asi que cada tramo empieza en x+8*indice.
+// Texto con tramos en patwa (m: mascara '0'/'1' del guion; o: donde empieza s en ella).
+// La fuente es de ancho fijo (8), asi que cada tramo empieza en x+8*indice. El patwa va
+// derecho y en ambar: la cursiva de pixel montaba unas letras sobre otras.
 function txtM(s,x,y,col,m,o){
   if(!m){txt(s,x,y,col);return;}
   for(var j=0,k;j<s.length;j=k){for(k=j+1;k<s.length&&m[o+k]===m[o+j];k++);
-    (m[o+j]==='1'?txtI:txt)(s.slice(j,k),x+8*j,y,col);}
-}
-// Cursiva de pixel: el tramo se pinta tres veces, recortado cada vez a una banda de
-// filas y desplazado: arriba (con la tilde) 2, en medio 1 y abajo nada. Los cortes
-// caen en pixeles enteros del lienzo (la escala del HUD no es entera): un corte a
-// medio pixel deja una raya clara entre banda y banda.
-function txtI(s,x,y,col){
-  var B=[[-4,2],[2,1],[5,0],[11]],k=SC*HS,w=8*s.length+6,i,a,b;
-  for(i=0;i<3;i++){a=Math.round((y+B[i][0])*k);b=Math.round((y+B[i+1][0])*k);
-    g.save();g.setTransform(1,0,0,1,0,0);g.beginPath();g.rect(Math.floor((x-2)*k),a,Math.ceil(w*k),b-a);g.clip();
-    g.setTransform(k,0,0,k,0,0);txt(s,x+B[i][1],y,col);g.restore();}
+    txt(s.slice(j,k),x+8*j,y,m[o+j]==='1'?'#ffb060':col);}
 }
 // Parte un texto en lineas que quepan en maxw (fuente de 8 px, ancho fijo).
 function wrap(s,maxw){
