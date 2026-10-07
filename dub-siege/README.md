@@ -232,6 +232,9 @@ de ventaja). Estudio y cifras: `ESTUDIO-CONTROLES.md`.
   que el jugador se salga por arriba ni por los lados.
 - Enemigos con contorno claro tenue y fosos con raya de peligro y cantos
   marcados; aviso «C: EL DASH CRUZA LA BARRERA» al acercarse a la barrera rosa.
+- **El dash aturde**: el enemigo que atraviesas queda 1,5 s quieto, sin atacar
+  ni hacer daño, con estrellas girando encima (una vez por dash; no afecta a
+  jefes ni cajas).
 - Los rótulos flotantes no se salen de la pantalla ni se montan; el cartel de
   fase va bajo el marcador y el título de arriba se oculta mientras sale.
 

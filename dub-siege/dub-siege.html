@@ -550,7 +550,7 @@ function coachText(k){var tm=touchMode();
   if(k==='j')return tm?'TOCA SALTO':'Z O ESPACIO: SALTAR';
   if(k==='j2')return tm?'EN EL AIRE, TOCA SALTO OTRA VEZ':'EN EL AIRE, SALTA OTRA VEZ';
   if(k==='f')return tm?(autoFire()?'DISPARAS SOLO AL VER ENEMIGOS':'MANTÉN FUEGO PARA DISPARAR'):'X: DISPARAR (MANTÉN PULSADO)';
-  if(k==='da')return tm?'MANTÉN SALTO: DASH, ATRAVIESA BALAS':'C: DASH, ATRAVIESA BALAS';
+  if(k==='da')return tm?'MANTÉN SALTO: DASH, ATRAVIESA BALAS Y ATURDE':'C: DASH, ATRAVIESA BALAS Y ATURDE';
   return tm?'BARRA LLENA: PULSA BASS':'BARRA LLENA: V = BASS DROP';}
 function moveY(o){
   var pb=o.y+o.h,cx,cy,x0,x1;o.y+=o.vy;o.ground=0;o.onOne=0;
@@ -1568,7 +1568,7 @@ function updatePlayer(i){
   var mv=(i.R?1:0)-(i.L?1:0);
   if(p.onMp){p.x+=p.onMp.dx;p.y+=p.onMp.dy;}
   if(p.dash>0){
-    p.dash--;p.vx=p.face*4.6;p.vy=0;if(t%2===0)ghosts.push({x:p.x,y:p.y,f:p.face,l:14});
+    p.dash--;p.vx=p.face*4.6;p.vy=0;if(t%2===0)ghosts.push({x:p.x,y:p.y,f:p.face,l:14});dashStun();
   }else{
     var acc=p.ground?.42:.3,mx=1.9;
     if(mv){p.vx=clamp(p.vx+mv*acc,-mx,mx);p.face=mv;if(Math.abs(p.vx)>1.5)coachDo('mv');}else{p.vx*=p.ground?.55:.88;if(Math.abs(p.vx)<.05)p.vx=0;}
@@ -1585,7 +1585,7 @@ function updatePlayer(i){
     else if(p.jumps<2){p.vy=-3.95;p.jmin=5;coachDo('j2');p.jumps=2;p.jbuf=0;sfx('jump2');burst(p.x+4,p.y+p.h,['#3de8ff','#fff'],8,1.3,.02);}
   }
   if(i.DAp&&p.dashCd<=0&&!p.dash&&(p.ground||p.airDash)){
-    if(mv)p.face=mv;p.dash=11;p.dashCd=Math.round(48*(1-.25*run.up.dash));if(!p.ground)p.airDash=0;sfx('dash');coachDo('da');p.inv=Math.max(p.inv,12);
+    if(mv)p.face=mv;p.dash=11;p.dashN=(p.dashN|0)+1;p.dashCd=Math.round(48*(1-.25*run.up.dash));if(!p.ground)p.airDash=0;sfx('dash');coachDo('da');p.inv=Math.max(p.inv,12);
   }
   if(p.dashCd>0)p.dashCd--;if(p.drop>0)p.drop--;
   var wasG=p.ground;
@@ -1673,11 +1673,23 @@ function damageEnemy(e,d,vx){
 }
 function eshot(x,y,vx,vy,o){o=o||{};ebul.push({x:x,y:y,vx:vx*D.bs,vy:vy*D.bs,r:o.r||3,gr:o.gr||0,c:o.c||'#ff3d6e',l:o.l||320,home:o.home||0,bomb:o.bomb||0});}
 function aimAt(x,y,sp){var dx=p.x+4-x,dy=p.y+7-y,d=Math.hypot(dx,dy)||1;return [dx/d*sp,dy/d*sp];}
+// El dash aturde: cada enemigo que atraviesa queda 1,5 s quieto, sin atacar ni hacer
+// dano, con estrellas encima. Una vez por dash (p.dashN) y no vale con jefes ni cajas.
+function dashStun(){
+  enemies.forEach(function(e){
+    if(e.dead||e.type==='*'||e.type==='X'||e.dsN===p.dashN)return;
+    if(!hitR(p.x-2,p.y,p.w+4,p.h,e.x,e.y,e.w,e.h))return;
+    e.dsN=p.dashN;e.stun=90;e.chg=0;e.run=0;e.dive=0;damageEnemy(e,1,p.face*10);
+    if(!e.dead){sfx('hit');hs=Math.max(hs,3);shake(3);burst(e.x+e.w/2,e.y+2,['#ffd23f','#fff'],10,1.8);
+      if(!run.stats.stun){run.stats.stun=1;pop(e.x-8,e.y-12,'¡ATURDIDO!','#ffd23f');}}
+  });
+}
 function updateEnemies(){
   for(var k=enemies.length-1;k>=0;k--){var e=enemies[k];if(!e)continue;
     if(e.dead){enemies.splice(k,1);continue;}
     if(e.x<cam-120||e.x>cam+W+60){if(e.minion&&e.x<cam-200)enemies.splice(k,1);continue;}
     e.a+=.15;if(e.fl>0)e.fl--;
+    if(e.stun>0){e.stun--;e.vx=0;if(e.type!=='f'&&e.type!=='b'){e.vy=Math.min(e.vy+.25,5);moveY(e);}if(e.y>WH+20)e.dead=1;continue;}
     var px=p.x+4,dx=px-(e.x+e.w/2),adx=Math.abs(dx),onS=e.x>cam-8&&e.x<cam+W+8;
     switch(e.type){
       // Cada enemigo aprende tacticas nuevas segun avanza la campana (EV, por fase).
@@ -3040,6 +3052,8 @@ function drawEnemy(e){
     rect(x+3,y+4,4,4,'#ffd23f');rect(x+4,y+5,2,1,'#1a1530');rect(x+4,y+6,1,1,'#1a1530');
     if((t>>4)&1)light(x+5,y+5,12,.5,'#ff3d6e');return;}
   if(ed)shadow(x,e.x,e.y,ed.w,ed.h);
+  if(e.stun>0){for(var si=0;si<3;si++){var sa=t*.15+si*2.09;rect(Math.round(x+(ed?ed.w:10)/2+Math.cos(sa)*7)-1,Math.round(y-5+Math.sin(sa)*2)-1,2,2,si?'#ffd23f':'#fff');}
+    x+=(e.stun>>2)&1?1:0;}
   // Contorno claro (silueta blanca a 1 px, tenue) para que no se pierdan sobre la calle oscura.
   var eo=ed&&SHEET[ESHEET[e.type]];
   if(eo&&eo.ok&&eo.wimg&&!wh)for(var q=0;q<4;q++)blit(ESHEET[e.type],e.a|0,x+(q<2?q*2-1:0),y+(q<2?0:q*2-5),ed.w,ed.h,e.type==='f'?p.x<e.x:f,1,.38);
