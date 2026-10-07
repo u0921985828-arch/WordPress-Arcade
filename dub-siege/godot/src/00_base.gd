@@ -229,6 +229,10 @@ func autoFire() -> bool:
 	return touchMode() if SET.get("auto") == null else bool(SET.get("auto"))
 
 
+func assistOn() -> bool:
+	return touchMode() if SET.get("assist") == null else bool(SET.get("assist"))
+
+
 func buzz(ms: Variant = null) -> void:
 	if not SET.get("vib") or not touchMode():
 		return

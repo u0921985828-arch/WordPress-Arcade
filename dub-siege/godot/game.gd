@@ -235,6 +235,10 @@ func autoFire() -> bool:
 	return touchMode() if SET.get("auto") == null else bool(SET.get("auto"))
 
 
+func assistOn() -> bool:
+	return touchMode() if SET.get("assist") == null else bool(SET.get("assist"))
+
+
 func buzz(ms: Variant = null) -> void:
 	if not SET.get("vib") or not touchMode():
 		return
@@ -881,6 +885,7 @@ var cut
 var EDEF
 var EV
 var bumpT
+var KBUSE
 var CO
 var COH
 var COK
@@ -896,6 +901,7 @@ var bcard
 var POR
 var PSK
 var PHD
+var RADIO
 var CUQ
 var CUTN
 var MED
@@ -905,6 +911,7 @@ var shopTab
 var SHOPOK
 var SHOPNO
 var NEXTOK
+var SHOPT
 var PROG
 var NSL
 var CUR
@@ -918,6 +925,8 @@ var myTs
 var TG
 var TGi
 var TGC
+var STUDIO
+var PFOC
 var bsReady
 var PP
 var PB
@@ -977,11 +986,15 @@ func _boot_gen():
 	_fn = func():
 		var d = null
 		var k = null
-		d = {"diff": 1, "mute": false, "auto": null, "assist": false, "touch": "auto", "big": false, "vib": true, "light": true, "upJump": false, "tut": false, "help": false, "ui": "auto"}
+		d = {"diff": 1, "mute": false, "auto": null, "assist": null, "touch": "auto", "big": false, "vib": true, "light": true, "upJump": false, "tut": false, "help": false, "ui": "auto"}
 		for _k in _keys(d):
 			k = _k
 			if (_ix(SET, k) == null):
 				_aset(SET, k, _ix(d, k))
+		if (not (SET.get("v11"))):
+			SET.v11 = 1
+			if (SET.get("assist") == false):
+				SET.assist = null
 	_callv(_fn, [])
 	DIFFS = _data("DIFFS")
 	D = _ix(DIFFS, SET.get("diff"))
@@ -1003,6 +1016,7 @@ func _boot_gen():
 	EDEF = _data("EDEF")
 	EV = {}
 	bumpT = 0
+	KBUSE = 0
 	CO = {"d": {}, "ok": 0, "l": 0}
 	COH = null
 	COK = ["mv", "j", "j2", "f", "da", "bs"]
@@ -1018,6 +1032,7 @@ func _boot_gen():
 	POR = _data("POR")
 	PSK = lum(146, 79, 50)
 	PHD = lum(66, 143, 64)
+	RADIO = null
 	CUQ = SC
 	CUTN = j_load("ds2_cutn", 0)
 	MED = j_load("ds2_med", [[], [], []])
@@ -1027,6 +1042,7 @@ func _boot_gen():
 	SHOPOK = ""
 	SHOPNO = ""
 	NEXTOK = 0
+	SHOPT = 0
 	PROG = j_load("ds2_prog", [0, 0, 0])
 	NSL = 6
 	CUR = null
@@ -1040,6 +1056,8 @@ func _boot_gen():
 	TG = null
 	TGi = 0
 	TGC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	STUDIO = "KUBOPLAY"
+	PFOC = null
 	bsReady = null
 	PP = _data("PP")
 	PB = _data("PB")
@@ -1111,7 +1129,7 @@ func pad(n = null, l = null):
 	n = max(0, floori(n))
 	return _slice("00000000" + str(n), -l, null)
 
-# L449
+# L453
 func chunkGrid(c = null):
 	var _c = {"j_len": null}
 	var r = null
@@ -1135,18 +1153,18 @@ func chunkGrid(c = null):
 		return s
 	return _map(_concat(out, [r]), _fn)
 
-# L460
+# L464
 func newRun():
 	D = _ix(DIFFS, SET.get("diff"))
 	run = {"score": 0, "peak": 0, "lives": D.get("lives"), "coins": 0, "maxHp": D.get("hp"), "up": {"hp": 0, "rate": 0, "dash": 0, "bass": 0, "arm": 0, "pow": 0}, "inv": {"kit": 0, "shd": 0, "bmb": 0, "mag": 0, "bat": 0}, "qk": "kit", "wpn": "N", "lv": 1, "stage": 0, "bass": 0, "conts": 0, "cpi": -1, "cpx": 0, "stats": {"kills": 0, "shots": 0, "hits": 0, "deaths": 0, "time": 0}, "combo": 0, "comboT": 0, "mult": 1}
 
-# L469
+# L473
 func hasPit(k = null):
 	var gr = null
 	gr = chunkGrid(_ix(CH, k))
 	return (_indexOf(_ix(gr, 13), ".") >= 0)
 
-# L470
+# L474
 func seqOf(n = null):
 	var a = null
 	var body = null
@@ -1157,6 +1175,8 @@ func seqOf(n = null):
 	var since = null
 	var j = null
 	var q = null
+	var cols = null
+	var minC = null
 	a = _ix(SEQ, n)
 	body = []
 	prev = []
@@ -1196,9 +1216,26 @@ func seqOf(n = null):
 			out.append(k)
 			since += 1
 		i -= 1
+	cols = 0
+	minC = min(860, (760 + (n * 20)))
+	i = 0
+	while (i < _len(out)):
+		cols += _len(_ix(chunkGrid(_ix(CH, _ix(out, i))), 0))
+		i += 1
+	i = 0
+	while ((cols < minC) and _len(body)):
+		k = _ix(body, fmod(i, _len(body)))
+		i += 1
+		if ((since > 3) or (hasPit(k) and (since > 2))):
+			out.append("cp")
+			since = 0
+			cols += _len(_ix(chunkGrid(CH.get("cp")), 0))
+		out.append(k)
+		since += 1
+		cols += _len(_ix(chunkGrid(_ix(CH, k)), 0))
 	return out
 
-# L483
+# L493
 func buildStage(n = null):
 	var L = null
 	var S = null
@@ -1217,6 +1254,7 @@ func buildStage(n = null):
 	var ch = null
 	var cx = null
 	var e = null
+	RADIO = null
 	L = _ix(LEVELS, n)
 	S = _ix(STAGES, L.get("r"))
 	seq = _concat(seqOf(n), [["box", "arena"]])
@@ -1304,11 +1342,11 @@ func buildStage(n = null):
 	bossMusic = 0
 	booms = []
 
-# L528
+# L538
 func evo(i = null):
 	EV = {"wCharge": (i >= 3), "wHop": (i >= 6), "hRate": max(0.55, (1 - (i * 0.04))), "hAim": (i >= 4), "hQuake": (i >= 8), "fRange": (64 if (i >= 5) else 44), "fCd": (95 if (i >= 5) else 120), "fShot": (i >= 5), "tRate": (1 + (i * 0.05)), "tBurst": (1 if (i >= 4) else 0), "tFan": (i >= 8), "sShot": (i >= 6), "sTurn": (28 if (i >= 8) else 45), "bPair": (i >= 7), "bCd": (58 if (i >= 9) else 70)}
 
-# L531
+# L541
 func mkEnemy(ch = null, x = null, y = null):
 	var d = null
 	var hp = null
@@ -1321,7 +1359,7 @@ func mkEnemy(ch = null, x = null, y = null):
 	enemies.append(e)
 	return e
 
-# L539
+# L549
 func tileAt(cx = null, cy = null):
 	if ((cx < 0) or (cx >= COLS)):
 		return 1
@@ -1329,7 +1367,7 @@ func tileAt(cx = null, cy = null):
 		return 0
 	return map[int(((cy * COLS) + cx))]
 
-# L541
+# L551
 func wallX(o = null, cx = null, cy = null):
 	var tt = null
 	tt = tileAt(cx, cy)
@@ -1346,7 +1384,7 @@ func wallX(o = null, cx = null, cy = null):
 		noiseBump(cx)
 	return 1
 
-# L542
+# L552
 func moveX(o = null):
 	var y0 = null
 	var y1 = null
@@ -1375,7 +1413,7 @@ func moveX(o = null):
 			cy += 1
 	return 0
 
-# L550
+# L560
 func jumpBump(cx = null):
 	coachLoad()
 	if (((t - bumpT) < 75) or CO.d.get("j2")):
@@ -1383,7 +1421,7 @@ func jumpBump(cx = null):
 	bumpT = t
 	COH = {"k": "j2", "s": ("EN EL AIRE, TOCA SALTO OTRA VEZ" if touchMode() else "EN EL AIRE, SALTA OTRA VEZ"), "c": "#ffd23d", "l": 110}
 
-# L551
+# L561
 func noiseBump(cx = null):
 	if ((t - bumpT) < 60):
 		return
@@ -1394,11 +1432,15 @@ func noiseBump(cx = null):
 	if (not (CO.d.get("nb"))):
 		COH = {"k": "nb", "s": nbText(), "c": "#4dff88", "l": 110}
 
-# L554
-func nbText():
-	return ("MANTÉN SALTO: EL DASH CRUZA LA BARRERA" if touchMode() else "C: EL DASH CRUZA LA BARRERA")
+# L566
+func tmText():
+	return _and(touchMode(), (not KBUSE))
 
-# L555
+# L567
+func nbText():
+	return ("MANTÉN SALTO: EL DASH CRUZA LA BARRERA" if tmText() else "C: EL DASH CRUZA LA BARRERA")
+
+# L568
 func nbNear():
 	var by = null
 	var bx = null
@@ -1417,13 +1459,13 @@ func nbNear():
 			return
 		i += 1
 
-# L563
+# L576
 func coachLoad():
 	if (not (CO.get("l"))):
 		CO.l = 1
 		CO.d = j_load("ds2_coach", {})
 
-# L565
+# L578
 func coachDo(k = null):
 	var c = null
 	coachLoad()
@@ -1437,7 +1479,7 @@ func coachDo(k = null):
 	if (c == k):
 		CO.ok = 40
 
-# L566
+# L579
 func coachStep():
 	var i = null
 	var k = null
@@ -1455,10 +1497,10 @@ func coachStep():
 		return k
 	return null
 
-# L567
+# L580
 func coachText(k = null):
 	var tm = null
-	tm = touchMode()
+	tm = tmText()
 	if (k == "mv"):
 		return ("ARRASTRA EN LA IZQUIERDA PARA MOVERTE" if tm else "FLECHAS: MOVERTE")
 	if (k == "j"):
@@ -1471,7 +1513,7 @@ func coachText(k = null):
 		return ("MANTÉN SALTO: DASH, ATRAVIESA BALAS Y ATURDE" if tm else "C: DASH, ATRAVIESA BALAS Y ATURDE")
 	return ("BARRA LLENA: PULSA BASS" if tm else "BARRA LLENA: V = BASS DROP")
 
-# L574
+# L587
 func moveY(o = null):
 	var pb = null
 	var cx = null
@@ -1508,7 +1550,7 @@ func moveY(o = null):
 			cx += 1
 	return pb
 
-# L583
+# L596
 func onMplat(o = null, pb = null):
 	var i = null
 	var m = null
@@ -1526,18 +1568,18 @@ func onMplat(o = null, pb = null):
 		i += 1
 	return null
 
-# L589
+# L602
 func edgeAhead(e = null):
 	var fx = null
 	fx = (((e.get("x") + e.get("w")) + 1) if (e.get("dir", NAN) > 0) else (e.get("x") - 1))
 	return (tileAt(floori((fx / float(T))), floori((((e.get("y") + e.get("h")) + 2) / float(T)))) == 0)
 
-# L1411
+# L1428
 func shake(n = null):
 	if (not RM):
 		sh = max(sh, n)
 
-# L1412
+# L1429
 func burst(x = null, y = null, cols = null, n = null, sp = null, gr = null):
 	var i = null
 	var a = null
@@ -1549,7 +1591,7 @@ func burst(x = null, y = null, cols = null, n = null, sp = null, gr = null):
 		parts.append({"x": x, "y": y, "vx": (cos(a) * s), "vy": ((sin(a) * s) - 1), "l": (16 + (_rnd() * 24)), "c": _ix(cols, fmod(i, _len(cols))), "gr": (0.12 if (gr == null) else gr)})
 		i += 1
 
-# L1417
+# L1434
 func boom(x = null, y = null, r = null, quiet = null):
 	booms.append({"x": x, "y": y, "r": r, "t": 0, "l": (26 + r)})
 	burst(x, y, ["#ffd23f", "#ff8a2a", "#ff3d6e", "#fff", "#5a4a5a"], floori(float((r * 1.3)) + 0.5), (1.2 + (r * 0.09)), 0.14)
@@ -1560,7 +1602,7 @@ func boom(x = null, y = null, r = null, quiet = null):
 	if (not quiet):
 		sfx(("boom" if (r >= 14) else "box"))
 
-# L1424
+# L1441
 func explode(x = null, y = null):
 	var e = null
 	boom(x, y, 20)
@@ -1575,7 +1617,7 @@ func explode(x = null, y = null):
 	if ((p and (not (p.get("dead")))) and (_hypot(((p.get("x") + 4) - x), ((p.get("y") + 7) - y)) < 24)):
 		hurt(1)
 
-# L1430
+# L1447
 func updBooms():
 	var i = null
 	var b = null
@@ -1589,7 +1631,7 @@ func updBooms():
 			burst(b.get("x"), (b.get("y") - (b.get("r") * 0.4)), ["#3a3046", "#5a4a5a"], 6, 0.6, -0.02)
 		i -= 1
 
-# L1432
+# L1449
 func disk(cx = null, cy = null, r = null, c = null):
 	var R = null
 	var dy = null
@@ -1604,7 +1646,7 @@ func disk(cx = null, cy = null, r = null, c = null):
 		g.fillRect((floori(float(cx) + 0.5) - h), (floori(float(cy) + 0.5) + dy), ((h * 2) + 1), 1)
 		dy += 1
 
-# L1433
+# L1450
 func pring(cx = null, cy = null, r = null, c = null):
 	var R = null
 	var dy = null
@@ -1629,17 +1671,17 @@ func pring(cx = null, cy = null, r = null, c = null):
 			g.fillRect(((cx + ii) + 1), (cy + dy), (o - ii), 1)
 		dy += 1
 
-# L1441
+# L1458
 func fxRGB(c = null):
 	var n = null
 	n = _parseInt(_slice(c, 1, null), 16)
 	return [(int((int(n) >> int(16))) & int(255)), (int((int(n) >> int(8))) & int(255)), (int(n) & int(255)), 255]
 
-# L1442
+# L1459
 func fxMix(a = null, b = null, k = null):
 	return [floori(float((_ix(a, 0) + ((_ix(b, 0) - _ix(a, 0)) * k))) + 0.5), floori(float((_ix(a, 1) + ((_ix(b, 1) - _ix(a, 1)) * k))) + 0.5), floori(float((_ix(a, 2) + ((_ix(b, 2) - _ix(a, 2)) * k))) + 0.5), 255]
 
-# L1443
+# L1460
 func fxSpr(key = null, w = null, h = null, fn = null):
 	var o = null
 	var cn = null
@@ -1677,7 +1719,7 @@ func fxSpr(key = null, w = null, h = null, fn = null):
 	_aset(FXC, key, o)
 	return o
 
-# L1449
+# L1466
 func lasSpr(f = null, hh = null):
 	var _c = {"hh": hh, "f": f}
 	var _fn = null
@@ -1703,7 +1745,7 @@ func lasSpr(f = null, hh = null):
 		return null
 	return fxSpr("lz" + str(_c.f) + "_" + str(_c.hh), (16 * SC), (_c.hh * SC), _fn)
 
-# L1453
+# L1470
 func lasEm(sd = null, ch = null):
 	var _c = {"sd": sd, "ch": ch}
 	var _fn = null
@@ -1731,17 +1773,17 @@ func lasEm(sd = null, ch = null):
 		return ([255, 210, 63, 255] if (((ly == 6) or (ly == 7)) and (lx == 2)) else [58, 63, 80, 255])
 	return fxSpr("lzE" + str(_c.sd) + str(_c.ch), (7 * SC), (14 * SC), _fn)
 
-# L1459
+# L1476
 func fxDraw(o = null, x = null, y = null):
 	g.drawImage(o.get("img"), ((floori(float(((x * SC) - ((o.get("w")) / 2.0))) + 0.5)) / float(SC)), ((floori(float(((y * SC) - ((o.get("h")) / 2.0))) + 0.5)) / float(SC)), ((o.get("w")) / float(SC)), ((o.get("h")) / float(SC)))
 
-# L1460
+# L1477
 func fxDir(vx = null, vy = null):
 	var k = null
 	k = floori(float(((atan2(vy, vx)) / float((PI / 8.0)))) + 0.5)
 	return fmod((fmod(k, 16) + 16), 16)
 
-# L1462
+# L1479
 func bulSpr(w = null, dk = null):
 	var _c = {"ca": null, "sa": null, "W1": null, "c": null, "dk2": null, "O": null, "lt": null}
 	var key = null
@@ -1828,7 +1870,7 @@ func bulSpr(w = null, dk = null):
 		return null
 	return fxSpr(key, 26, 26, _fn_4)
 
-# L1480
+# L1497
 func orbSpr(col = null, r = null, bomb = null, fr = null):
 	var _c = {"R": null, "fr": fr, "c": null, "O": null, "lt": null, "dk": null}
 	var key = null
@@ -1875,7 +1917,7 @@ func orbSpr(col = null, r = null, bomb = null, fr = null):
 		return (_c.dk if (l > 0.5) else (_c.lt if (l < -0.4) else _c.c))
 	return fxSpr(key, S, S, _fn_2)
 
-# L1492
+# L1509
 func flashSpr(col = null, n = null):
 	var _c = {"s": null, "lt": null, "c": null}
 	var _fn = null
@@ -1896,7 +1938,7 @@ func flashSpr(col = null, n = null):
 		return null
 	return fxSpr("f" + str(col) + str(n), ((_c.s * 2) + 2), ((_c.s * 2) + 2), _fn)
 
-# L1496
+# L1513
 func barrelSpr(dk = null):
 	var _c = {"ca": null, "sa": null}
 	var a = null
@@ -1924,7 +1966,7 @@ func barrelSpr(dk = null):
 		return ([154, 160, 176, 255] if (sd < -0.6) else ([42, 46, 72, 255] if (sd > 0.9) else [90, 96, 128, 255]))
 	return fxSpr("tb" + str(dk), 48, 48, _fn)
 
-# L1500
+# L1517
 func drawBooms():
 	var b = null
 	var k = null
@@ -1969,7 +2011,7 @@ func drawBooms():
 		if (f > 0):
 			light(x, y, (R * 2.6), (0.9 * f), "#ffb040")
 
-# L1509
+# L1526
 func pop(x = null, y = null, s = null, c = null):
 	var j = null
 	var q = null
@@ -1987,13 +2029,13 @@ func pop(x = null, y = null, s = null, c = null):
 	i = 0
 	while (i < _len(pops)):
 		o = _ix(pops, i)
-		if ((absf((o.get("x") - x)) < (8 * max(_len(o.s), _len(s)))) and (absf((o.get("y") - y)) < 9)):
-			y = (o.get("y") - 9)
+		if ((absf((o.get("x") - x)) < (5 * max(_len(o.s), _len(s)))) and (absf((o.get("y") - y)) < 6)):
+			y = (o.get("y") - 6)
 			i = -1
 		i += 1
 	pops.append({"x": x, "y": y, "s": s, "c": (c if c else "#ffd23f"), "l": 55})
 
-# L1512
+# L1529
 func addScore(base = null, x = null, y = null):
 	var v = null
 	run.combo += 1
@@ -2004,7 +2046,7 @@ func addScore(base = null, x = null, y = null):
 	if (x != null):
 		pop(x, y, "+" + str(v), ("#3de8ff" if (run.get("mult", NAN) > 1) else "#ffd23f"))
 
-# L1516
+# L1533
 func addBass(n = null):
 	var was = null
 	was = (run.get("bass", NAN) < 100)
@@ -2014,7 +2056,7 @@ func addBass(n = null):
 			pop((p.get("x") - 14), (p.get("y") - 12), "BASS LISTO", "#ffd23f")
 		sfx("pick")
 
-# L1519
+# L1536
 func hurt(n = null):
 	if (((((p.get("inv", NAN) > 0) or (p.get("dash", NAN) > 0)) or p.get("dead")) or st.get("clearT")) or (DEBUG and win.get("__god"))):
 		return
@@ -2057,7 +2099,7 @@ func hurt(n = null):
 	if (p.get("hp", NAN) <= 0):
 		killPlayer()
 
-# L1529
+# L1546
 func killPlayer():
 	p.dead = 1
 	p.deadT = 90
@@ -2070,7 +2112,7 @@ func killPlayer():
 	burst((p.get("x") + 4), (p.get("y") + 7), ["#2bb37a", "#ffd23f", "#ff3d6e", "#fff"], 50, 3.5)
 	ebul = []
 
-# L1533
+# L1550
 func respawn():
 	var c = null
 	var bl = null
@@ -2097,11 +2139,11 @@ func respawn():
 	burst((p.get("x") + 4), (p.get("y") + 7), ["#3de8ff", "#fff"], 20, 2)
 	sfx("cp")
 
-# L1541
+# L1558
 func arenaM():
 	return ([12, floori(float((PADX * 0.85)) + 0.5)] if (PADX > 0) else [0, 0])
 
-# L1543
+# L1560
 func pitAhead():
 	var c = null
 	var i = null
@@ -2113,7 +2155,7 @@ func pitAhead():
 		i += 1
 	return 0
 
-# L1544
+# L1561
 func fallPit():
 	var rc = null
 	var rr = null
@@ -2146,7 +2188,7 @@ func fallPit():
 		p.x += T
 	pop((p.get("x") - 12), (p.get("y") - 12), "-1 CORAZÓN", "#ff8aa6")
 
-# L1556
+# L1573
 func targets():
 	var a = null
 	var e = null
@@ -2160,7 +2202,7 @@ func targets():
 		a.append({"x": (boss.get("x") + ((boss.get("w")) / 2.0)), "y": (boss.get("y") + ((boss.get("h")) / 2.0)), "boss": 1})
 	return a
 
-# L1558
+# L1575
 func nearestTarget(j_range = null, front = null):
 	var px = null
 	var py = null
@@ -2189,13 +2231,13 @@ func nearestTarget(j_range = null, front = null):
 			best_2 = q
 	return best_2
 
-# L1566
+# L1583
 func aimPose():
 	if (p.get("saT", NAN) > 0):
 		return p.get("sa")
 	return ((2 if p.get("aimDg") else 1) if p.get("aimU") else (3 if p.get("aimD") else 0))
 
-# L1567
+# L1584
 func pState():
 	var a = null
 	var air = null
@@ -2211,15 +2253,15 @@ func pState():
 		return ("idle" if (s == "i") else ("run" if (s == "r") else ("jump" if (s == "j") else "fall")))
 	return "aim" + _charAt("udx", (a - 1)) + str(s)
 
-# L1571
+# L1588
 func muzzle(st_2 = null):
 	var m = null
 	var o = null
 	m = (_ix(MUZ, st_2) if _ix(MUZ, st_2) else MUZ.get("idle"))
-	o = _ix(m, fmod(int(p.get("anim")), _len(m)))
+	o = _ix(m, fmod(int(p.get("anim", 0)), _len(m)))
 	return {"x": ((p.get("x") - 2) + ((12 - _ix(o, 0)) if (p.get("face", NAN) < 0) else _ix(o, 0))), "y": (((p.get("y") + p.get("h")) - 15) + _ix(o, 1))}
 
-# L1573
+# L1590
 func shoot(i = null):
 	var _c = {"mx": null, "my": null, "w": null}
 	var dx = null
@@ -2258,7 +2300,7 @@ func shoot(i = null):
 	elif p.get("aimD"):
 		dx = (p.get("face") * 0.72)
 		dy = 0.72
-	elif SET.get("assist"):
+	elif assistOn():
 		q = nearestTarget(150, true)
 		if q:
 			ddx = (q.get("x") - (p.get("x") + 4))
@@ -2325,7 +2367,7 @@ func shoot(i = null):
 	p.cool = max(4, cd)
 	p.mf = 3
 
-# L1597
+# L1614
 func updatePlayer(i = null):
 	var mv = null
 	var acc_2 = null
@@ -2427,7 +2469,7 @@ func updatePlayer(i = null):
 		if mv:
 			p.face = mv
 		p.dash = 11
-		p.dashN = (int(p.get("dashN")) + 1)
+		p.dashN = (int(p.get("dashN", 0)) + 1)
 		p.dashCd = floori(float((48 * (1 - (0.25 * run.up.get("dash"))))) + 0.5)
 		if (not (p.get("ground"))):
 			p.airDash = 0
@@ -2494,7 +2536,7 @@ func updatePlayer(i = null):
 			shake(2)
 			pop((p.get("x") - 20), (p.get("y") - 14), "BASS " + str(floori(run.get("bass"))) + "%", "#8f98c8")
 
-# L1641
+# L1658
 func bassDrop():
 	var b = null
 	var e = null
@@ -2526,7 +2568,7 @@ func bassDrop():
 		h.warn = 0
 		h.act = 0
 
-# L1660
+# L1677
 func mkObjN():
 	var m = null
 	var o = null
@@ -2537,7 +2579,7 @@ func mkObjN():
 		_aset(m, o.get("id"), o)
 	return m
 
-# L1661
+# L1678
 func objCount():
 	var n = null
 	var o = null
@@ -2548,7 +2590,7 @@ func objCount():
 		n += int(_ix(run.inv, o.get("id")))
 	return n
 
-# L1662
+# L1679
 func quickObj():
 	var k = null
 	if (_ix(run.inv, run.get("qk")) > 0):
@@ -2560,13 +2602,13 @@ func quickObj():
 		k += 1
 	return run.get("qk")
 
-# L1663
+# L1680
 func dropObj(x = null, y = null, l = null):
 	var o = null
 	o = _ix(OBJ, floori((_rnd() * _len(OBJ))))
 	pickups.append({"type": "obj", "ot": o.get("id"), "x": x, "y": y, "w": 8, "h": 8, "vy": -2.4, "l": l})
 
-# L1664
+# L1681
 func useObj(id = null):
 	var n = null
 	var o = null
@@ -2619,7 +2661,7 @@ func useObj(id = null):
 	pop((p.get("x") - 16), (p.get("y") - 16), o.get("n"), o.get("c"))
 	return true
 
-# L1677
+# L1694
 func objSpr(id = null, n = null):
 	var _c = {"k": null, "id": id, "O": null, "c": null, "Wt": null, "Gr": null, "lt": null, "Gd": null}
 	var o = null
@@ -2705,7 +2747,7 @@ func objSpr(id = null, n = null):
 		return [42, 46, 72, 255]
 	return fxSpr("i" + str(_c.id) + str(n), n, n, _fn)
 
-# L1689
+# L1706
 func damageEnemy(e = null, d = null, vx = null):
 	var opts = null
 	var r = null
@@ -2713,10 +2755,10 @@ func damageEnemy(e = null, d = null, vx = null):
 	e.hp -= d
 	e.fl = 5
 	e.x += (vx * 0.25)
-	if (((e.get("hp", NAN) > 0) and (not (e.get("dead")))) and (not ((t - int(e.get("hsT"))) < 12))):
+	if (((e.get("hp", NAN) > 0) and (not (e.get("dead")))) and (not ((t - int(e.get("hsT", 0))) < 10))):
 		e.hsT = t
-		hs = max(hs, 1)
-		e.x += (vx * 0.15)
+		hs = max(hs, 2)
+		e.x += (vx * 0.35)
 	if ((e.get("hp", NAN) <= 0) and (not (e.get("dead")))):
 		e.dead = 1
 		if (e.get("type") == "X"):
@@ -2750,12 +2792,12 @@ func damageEnemy(e = null, d = null, vx = null):
 		return true
 	return false
 
-# L1708
+# L1725
 func eshot(x = null, y = null, vx = null, vy = null, o = null):
 	o = (o if o else {})
 	ebul.append({"x": x, "y": y, "vx": (vx * D.get("bs")), "vy": (vy * D.get("bs")), "r": (o.get("r") if o.get("r") else 3), "gr": (o.get("gr") if o.get("gr") else 0), "c": (o.get("c") if o.get("c") else "#ff3d6e"), "l": (o.get("l") if o.get("l") else 320), "home": (o.get("home") if o.get("home") else 0), "bomb": (o.get("bomb") if o.get("bomb") else 0)})
 
-# L1709
+# L1726
 func aimAt(x = null, y = null, sp = null):
 	var dx = null
 	var dy = null
@@ -2765,7 +2807,7 @@ func aimAt(x = null, y = null, sp = null):
 	d = _or(_hypot(dx, dy), 1)
 	return [((dx / float(d)) * sp), ((dy / float(d)) * sp)]
 
-# L1712
+# L1729
 func dashStun():
 	var e = null
 	for _i in range(_len(enemies)):
@@ -2790,7 +2832,7 @@ func dashStun():
 				run.stats.stun = 1
 				pop((e.get("x") - 8), (e.get("y") - 12), "¡ATURDIDO!", "#ffd23f")
 
-# L1721
+# L1738
 func updateEnemies():
 	var k = null
 	var e = null
@@ -3077,7 +3119,7 @@ func updateEnemies():
 			hurt(1)
 		k -= 1
 
-# L1795
+# L1812
 func startBoss():
 	var L = null
 	var n = null
@@ -3103,12 +3145,13 @@ func startBoss():
 	n = L.get("ai")
 	hp = (L.get("hp") * D.get("eHp"))
 	ax = st.get("arenaX")
-	boss = {"kind": n, "mk": (L.get("mk") if L.get("mk") else 0), "mt": L.get("mt"), "sc": (L.get("sc") if L.get("sc") else 1), "x": ((ax + W) - 70), "y": -50, "w": 24, "h": 30, "hp": hp, "max": hp, "ph": 1, "t": 0, "cd": 100, "act": null, "actT": 0, "fl": 0, "hsT": -99, "vx": 0, "vy": 0, "on": 0, "enter": 1, "dead": 0, "deadT": 0, "wind": 0, "a": 0, "dir": -1, "turn": 0, "bc": 0, "gnd": _or((n == 0), (n == 3)), "hy": 92}
+	boss = {"kind": n, "mk": (L.get("mk") if L.get("mk") else 0), "mt": L.get("mt"), "sc": (L.get("sc") if L.get("sc") else 1), "x": ((ax + W) - 70), "y": -50, "w": 24, "h": 30, "hp": hp, "max": hp, "ph": 1, "t": 0, "cd": 100, "act": null, "actT": 0, "fl": 0, "hsT": -99, "vx": 0, "vy": 0, "on": 0, "enter": 1, "dead": 0, "deadT": 0, "wind": 0, "a": 0, "weak": 0, "chip": hp, "pil": [], "lx": 0, "tx": 0, "wpT": -99, "dir": -1, "turn": 0, "bc": 0, "gnd": _or((n == 0), (n == 3)), "hy": 92}
 	if (n == 1):
 		boss.w = 28
 		boss.h = 16
 		boss.x = ((ax + (W / 2.0)) - 14)
 		boss.y = -30
+		boss.hy = 106
 	if (n == 2):
 		boss.w = 24
 		boss.h = 18
@@ -3125,14 +3168,15 @@ func startBoss():
 		boss.w = floori(float(((a.get("fw") * boss.get("sc")) * 0.8)) + 0.5)
 		boss.h = floori(float(((a.get("fh") * boss.get("sc")) * 0.85)) + 0.5)
 		boss.gnd = (not air)
-		boss.hy = (68 if (L.get("mt") == "b") else 80)
+		boss.hy = (100 if (L.get("mt") == "b") else 104)
 		boss.x = (((ax + (W / 2.0)) - ((boss.get("w")) / 2.0)) if (L.get("mt") == "t") else (((ax + W) - 24) - boss.get("w")))
 		boss.y = (-40 if air else -70)
+	boss.x = min(boss.get("x"), ((((ax + W) - _ix(arenaM(), 1)) - boss.get("w")) - 6))
 	banner = {"a": "ALERTA", "b": L.get("boss"), "l": 150, "boss": 1}
 	sfx("siren")
 	bossMusic = 1
 
-# L1810
+# L1828
 func bossLand():
 	boss.enter = 0
 	boss.on = 1
@@ -3142,14 +3186,14 @@ func bossLand():
 	burst((boss.get("x") + ((boss.get("w")) / 2.0)), (boss.get("y") + boss.get("h")), ["#9aa0b0", "#fff", "#ff3d6e"], 30, 3)
 	bossOn()
 
-# L1811
+# L1829
 func bossOn():
 	banner = null
-	bcard = {"n": st.L.get("boss"), "s": "FASE " + str((st.get("i") + 1)) + " · " + str(st.L.get("name")), "l": 110}
+	bcard = {"n": st.L.get("boss"), "s": ("PUNTO DÉBIL: SU NÚCLEO" if st.L.get("mk") else "FASE " + str((st.get("i") + 1)) + " · " + str(st.L.get("name"))), "l": 110}
 	if ((st.L.get("cut") and st.L.cut.get("boss")) and (not (seen("boss")))):
 		startCut(st.L.cut.get("boss"))
 
-# L1814
+# L1832
 func drawBCard():
 	var c = null
 	var a = null
@@ -3179,7 +3223,7 @@ func drawBCard():
 	txt(c.get("s"), (HW / 2.0), (cy + 6), "#eef3ff", "c")
 	g.globalAlpha = 1
 
-# L1819
+# L1837
 func damageBoss(n = null):
 	var b = null
 	var r = null
@@ -3189,15 +3233,20 @@ func damageBoss(n = null):
 		return
 	if (((b.get("kind") == 1) or (b.get("kind") == 4)) and (b.get("act") == "ground")):
 		n *= 1.5
+	if (b.get("weak", NAN) > 0):
+		n *= 2
+		if ((t - b.get("wpT")) > 45):
+			b.wpT = t
+			pop(((b.get("x") + ((b.get("w")) / 2.0)) - 12), (b.get("y") - 12), "x2", "#ffd23f")
 	b.hp -= n
-	b.fl = 4
+	b.fl = 2
 	run.stats.hits += 0
-	if (not ((t - int(b.get("hsT"))) < 14)):
+	if (not ((t - int(b.get("hsT", 0))) < 14)):
 		b.hsT = t
 		hs = max(hs, 2)
 	r = ((b.get("hp")) / float(b.get("max")))
 	old = b.get("ph")
-	b.ph = ((1 if (r > 0.66) else (2 if (r > 0.33) else 3)) if (b.get("kind") == 3) else (1 if (r > (0.75 if b.get("mk") else 0.5)) else 2))
+	b.ph = ((1 if (r > 0.66) else (2 if (r > 0.33) else 3)) if (b.get("kind") == 3) else (1 if (r > (0.75 if b.get("mk") else 0.6)) else (2 if (r > (0.35 if b.get("mk") else 0.25)) else 3)))
 	if (b.get("ph") != old):
 		shake(14)
 		sfx("drop")
@@ -3209,7 +3258,7 @@ func damageBoss(n = null):
 	if (b.get("hp", NAN) <= 0):
 		killBoss()
 
-# L1828
+# L1848
 func killBoss():
 	var b = null
 	var e = null
@@ -3234,21 +3283,27 @@ func killBoss():
 		e = enemies[_i]
 		e.dead = 1
 
-# L1833
+# L1853
 func bossCd(base = null):
 	return (((((base + ((_rnd() * base) * 0.4)) / float(D.get("rate"))) / float((1.25 if (boss.get("ph", NAN) > 1) else 1))) / float((1.15 if (boss.get("ph", NAN) > 2) else 1))) / float((1 + (st.get("i") * 0.025))))
 
-# L1834
+# L1854
 func updateBoss():
 	var b = null
 	var ax = null
 	var rage = null
+	var W0 = null
+	var dz = null
 	b = boss
 	ax = st.get("arenaX")
 	b.t += 1
 	b.a += 0.12
 	if (b.get("fl", NAN) > 0):
 		b.fl -= 1
+	if (b.get("chip", NAN) > b.get("hp", NAN)):
+		b.chip = max(b.get("hp"), (b.get("chip") - (b.get("max") * 0.006)))
+	else:
+		b.chip = b.get("hp")
 	if b.get("dead"):
 		if (fmod(t, 6) == 0):
 			burst((b.get("x") + (_rnd() * b.get("w"))), (b.get("y") + (_rnd() * b.get("h"))), ["#ff3d6e", "#ffd23f", "#3de8ff", "#fff"], 14, 3)
@@ -3284,7 +3339,7 @@ func updateBoss():
 		if (b.get("wind") == -1):
 			b.wind = 0
 		elif (not (b.get("wind", NAN) > 0)):
-			b.wind = 24
+			b.wind = 32
 			sfx("tele")
 		if (b.get("wind", NAN) > 0):
 			b.wind -= 1
@@ -3292,11 +3347,20 @@ func updateBoss():
 			if (b.get("wind") == 0):
 				b.wind = -1
 			return
+	W0 = W
+	W = (W - _ix(arenaM(), 1))
 	_callv(_ix({0: boss0, 1: boss1, 2: boss2, 3: boss3, 4: bossM}, b.get("kind")), [b, ax, rage])
+	W = W0
+	if ((((b.get("ph", NAN) > 2) and (b.get("kind") != 3)) and b.get("on")) and (not (b.get("weak")))):
+		dz = fmod(b.get("t"), 150)
+		if ((dz > 120) and (fmod(dz, 4) == 0)):
+			parts.append({"x": (b.get("x") + (_rnd() * b.get("w"))), "y": (b.get("y") + (_rnd() * b.get("h"))), "vx": 0, "vy": -0.6, "l": 14, "c": "#ffd23f", "gr": 0})
+		if (dz == 0):
+			ringShot((b.get("x") + ((b.get("w")) / 2.0)), (b.get("y") + ((b.get("h")) / 2.0)), 10, 1.05, (b.get("t") * 0.07), "#ffd23f")
 	if ((b.get("on") and hitR((p.get("x") + 1), (p.get("y") + 1), (p.get("w") - 2), (p.get("h") - 1), (b.get("x") + 2), (b.get("y") + 2), (b.get("w") - 4), (b.get("h") - 3))) and (not ((b.get("kind") == 2) and (b.get("act") != "low")))):
 		hurt(1)
 
-# L1852
+# L1882
 func lob(b = null, n = null, sp = null):
 	var dir = null
 	var i = null
@@ -3307,7 +3371,7 @@ func lob(b = null, n = null, sp = null):
 		i += 1
 	sfx("shoot")
 
-# L1853
+# L1883
 func ringShot(x = null, y = null, n = null, sp = null, off = null, c = null):
 	var i = null
 	var a = null
@@ -3318,10 +3382,13 @@ func ringShot(x = null, y = null, n = null, sp = null, off = null, c = null):
 		i += 1
 	sfx("shootS")
 
-# L1854
+# L1884
 func boss0(b = null, ax = null, rage = null):
 	var tx = null
 	var r = null
+	if b.get("mk"):
+		bossMk0(b, ax, rage)
+		return
 	if ((b.get("act") == "dash") and (b.get("actT", NAN) <= 0)):
 		b.x += b.get("vx")
 		if ((b.get("x", NAN) <= (ax + 6)) or (b.get("x", NAN) >= (((ax + W) - b.get("w")) - 6))):
@@ -3359,7 +3426,7 @@ func boss0(b = null, ax = null, rage = null):
 			lob(b, (5 if rage else 3), 1)
 		b.cd = bossCd((55 if rage else 85))
 
-# L1867
+# L1898
 func boss1(b = null, ax = null, rage = null):
 	var v = null
 	var tx = null
@@ -3370,6 +3437,9 @@ func boss1(b = null, ax = null, rage = null):
 	var e = null
 	var _l = null
 	var e_2 = null
+	if b.get("mk"):
+		bossMk1(b, ax, rage)
+		return
 	if (b.get("act") == "aim"):
 		b.x += ((b.get("tx") - b.get("x")) * 0.12)
 		b.actT -= 1
@@ -3394,8 +3464,8 @@ func boss1(b = null, ax = null, rage = null):
 			b.act = "rise"
 		return
 	if (b.get("act") == "rise"):
-		b.y += ((92 - b.get("y")) * 0.06)
-		if (b.get("y", NAN) < 98):
+		b.y += ((106 - b.get("y")) * 0.06)
+		if (b.get("y", NAN) < 112):
 			b.act = null
 		return
 	if (b.get("act") == "burst"):
@@ -3407,7 +3477,7 @@ func boss1(b = null, ax = null, rage = null):
 		if (b.actT <= 0):
 			b.act = null
 	tx = (((ax + (W / 2.0)) - 14) + (sin((b.get("t") * 0.018)) * ((W / 2.0) - 30)))
-	ty = (90 + (sin((b.get("t") * 0.037)) * 10))
+	ty = (106 + (sin((b.get("t") * 0.037)) * 7))
 	b.x += ((tx - b.get("x")) * 0.03)
 	b.y += ((ty - b.get("y")) * 0.05)
 	_l = (not (b.get("act")))
@@ -3446,7 +3516,165 @@ func boss1(b = null, ax = null, rage = null):
 				ringShot((b.get("x") + 14), (b.get("y") + 10), 8, 1.2, 0)
 		b.cd = bossCd((60 if rage else 85))
 
-# L1884
+# L1919
+func bossMk0(b = null, ax = null, rage = null):
+	var tx = null
+	var r = null
+	var c = null
+	var _a = null
+	var px = null
+	var k = null
+	if (b.get("weak", NAN) > 0):
+		b.weak -= 1
+		if (b.weak == 0):
+			sfx("tele")
+		return
+	if (b.get("act") == "leap"):
+		if (b.get("actT", NAN) > 0):
+			b.actT -= 1
+			return
+		b.vy += 0.32
+		b.x = j_clamp((b.get("x") + b.get("vx")), (ax + 6), (((ax + W) - b.get("w")) - 6))
+		b.y += b.get("vy")
+		if ((b.get("vy", NAN) > 0) and (b.get("y", NAN) >= (GY - b.get("h")))):
+			b.y = (GY - b.get("h"))
+			b.vy = 0
+			b.act = null
+			b.weak = (65 if rage else 85)
+			shake(14)
+			sfx("drop")
+			_push(hazards, [{"k": "wave", "x": (b.get("x") - 4), "vx": (-2 * D.get("bs")), "h": 8}, {"k": "wave", "x": ((b.get("x") + b.get("w")) - 4), "vx": (2 * D.get("bs")), "h": 8}])
+			pop(((b.get("x") + ((b.get("w")) / 2.0)) - 28), (b.get("y") - 14), "NÚCLEO ABIERTO", "#ffd23f")
+		return
+	if (b.get("act") == "pil"):
+		b.actT -= 1
+		if (b.actT <= 0):
+			_a = b.get("pil")
+			for _i in range(_len(_a)):
+				if _i >= _len(_a): break
+				px = _a[_i]
+				k = null
+				k = 0
+				while (k < 3):
+					eshot(px, (GY - 2), 0, (-2.4 - (k * 0.8)), {"c": "#ffd23f", "r": 3, "l": 70})
+					k += 1
+			b.pil = []
+			sfx("drop")
+			shake(6)
+			b.act = null
+		return
+	if (b.get("act") == "wave"):
+		b.actT -= 1
+		if (b.actT <= 0):
+			_push(hazards, [{"k": "wave", "x": (b.get("x") - 4), "vx": (-2.3 * D.get("bs")), "h": 10}, {"k": "wave", "x": ((b.get("x") + b.get("w")) - 4), "vx": (2.3 * D.get("bs")), "h": 10}])
+			if rage:
+				_push(hazards, [{"k": "wave", "x": (b.get("x") - 4), "vx": (-1.5 * D.get("bs")), "h": 6}, {"k": "wave", "x": ((b.get("x") + b.get("w")) - 4), "vx": (1.5 * D.get("bs")), "h": 6}])
+			shake(8)
+			sfx("drop")
+			b.act = null
+		return
+	tx = (((ax + W) - 95) + ((sin((b.get("t") * 0.03)) * W) * 0.28))
+	b.x += j_clamp((tx - b.get("x")), -0.9, 0.9)
+	b.cd -= 1
+	if (b.cd <= 0):
+		r = _rnd()
+		if (r < 0.42):
+			b.act = "leap"
+			b.actT = 8
+			b.tx = j_clamp(((p.get("x") + 4) - ((b.get("w")) / 2.0)), (ax + 6), (((ax + W) - b.get("w")) - 6))
+			b.vy = -8
+			b.vx = ((b.get("tx") - b.get("x")) / 50.0)
+			sfx("jump")
+		elif (r < 0.72):
+			b.act = "pil"
+			b.actT = 48
+			c = (p.get("x") + 4)
+			b.pil = [j_clamp(c, (ax + 8), ((ax + W) - 8)), j_clamp((c - 34), (ax + 8), ((ax + W) - 8)), j_clamp((c + 34), (ax + 8), ((ax + W) - 8))]
+			sfx("tele")
+		elif (r < 0.9):
+			b.act = "wave"
+			b.actT = 40
+			sfx("tele")
+		else:
+			lob(b, (5 if rage else 4), 1.1)
+		b.cd = bossCd((62 if rage else 82))
+
+# L1943
+func bossMk1(b = null, ax = null, rage = null):
+	var tl = null
+	var tx = null
+	var ty = null
+	var r = null
+	var v = null
+	var j = null
+	var _u = null
+	if (b.get("weak", NAN) > 0):
+		b.y += (((GY - 48) - b.get("y")) * 0.08)
+		b.weak -= 1
+		if (b.weak == 0):
+			sfx("tele")
+		return
+	if (b.get("act") == "beam"):
+		tl = (p.get("x") + 4)
+		b.lx += j_clamp((tl - b.get("lx")), -(1 if rage else 0.8), (1 if rage else 0.8))
+		b.x += (((b.get("lx") - ((b.get("w")) / 2.0)) - b.get("x")) * 0.1)
+		b.actT -= 1
+		if (b.get("actT") == 0):
+			sfx("laser")
+			shake(4)
+		if (b.get("actT", NAN) <= 0):
+			if (absf((tl - b.get("lx"))) < 6):
+				hurt(1)
+			if (b.get("actT", NAN) <= -26):
+				b.act = null
+				b.weak = (65 if rage else 85)
+				pop(((b.get("x") + ((b.get("w")) / 2.0)) - 28), (b.get("y") - 12), "SE RECALIENTA", "#ffd23f")
+		return
+	if (b.get("act") == "sweep"):
+		b.x += b.get("vx")
+		b.y += (((GY - 42) - b.get("y")) * 0.1)
+		_u = b.actT
+		b.actT += 1
+		if (fmod(_u, 13) == 0):
+			eshot((b.get("x") + ((b.get("w")) / 2.0)), (b.get("y") + b.get("h")), 0, 0.6, {"gr": 0.08, "r": 4, "c": "#ff8aa6", "bomb": 1})
+			sfx("shootS")
+		if ((b.get("x", NAN) <= (ax + 6)) or (b.get("x", NAN) >= (((ax + W) - b.get("w")) - 6))):
+			b.x = j_clamp(b.get("x"), (ax + 6), (((ax + W) - b.get("w")) - 6))
+			b.act = "rise"
+		return
+	if (b.get("act") == "rise"):
+		b.y += ((106 - b.get("y")) * 0.06)
+		if (b.get("y", NAN) < 112):
+			b.act = null
+		return
+	tx = (((ax + (W / 2.0)) - 14) + (sin((b.get("t") * 0.02)) * ((W / 2.0) - 30)))
+	ty = (106 + (sin((b.get("t") * 0.04)) * 7))
+	b.x += ((tx - b.get("x")) * 0.03)
+	b.y += ((ty - b.get("y")) * 0.05)
+	b.cd -= 1
+	if (b.cd <= 0):
+		r = _rnd()
+		if (r < 0.38):
+			b.act = "beam"
+			b.actT = (55 if rage else 65)
+			b.lx = (b.get("x") + ((b.get("w")) / 2.0))
+			sfx("tele")
+		elif (r < 0.68):
+			b.act = "sweep"
+			b.actT = 0
+			b.vx = ((1 if ((b.get("x") + ((b.get("w")) / 2.0)) < (ax + (W / 2.0))) else -1) * (2.4 if rage else 2))
+		elif (r < 0.86):
+			ringShot((b.get("x") + 14), (b.get("y") + 10), (16 if rage else 12), 1.3, (b.get("t") * 0.1), "#ffd23f")
+		else:
+			v = aimAt((b.get("x") + 14), (b.get("y") + 12), 2)
+			j = -1
+			while (j <= 1):
+				eshot((b.get("x") + 14), (b.get("y") + 12), (_ix(v, 0) + (j * 0.45)), _ix(v, 1), {"c": "#ffd23f"})
+				j += 1
+			sfx("shoot")
+		b.cd = bossCd((62 if rage else 82))
+
+# L1962
 func boss2(b = null, ax = null, rage = null):
 	var side = null
 	var tx = null
@@ -3477,14 +3705,14 @@ func boss2(b = null, ax = null, rage = null):
 				eshot((b.get("x") + b.get("w")), (b.get("y") + 9), 2.2, 0, {"c": "#3de8ff"})
 				sfx("shoot")
 		else:
-			b.y += ((88 - b.get("y")) * 0.1)
+			b.y += ((104 - b.get("y")) * 0.1)
 		b.actT -= 1
 		if (b.actT <= 0):
 			b.act = null
 		return
 	tx = (((ax + (W / 2.0)) - 12) + (sin((b.get("t") * 0.025)) * ((W / 2.0) - 26)))
 	b.x += ((tx - b.get("x")) * 0.04)
-	b.y += (((88 + (sin((b.get("t") * 0.06)) * 6)) - b.get("y")) * 0.1)
+	b.y += (((104 + (sin((b.get("t") * 0.06)) * 5)) - b.get("y")) * 0.1)
 	_l = (not (b.get("act")))
 	if _l:
 		b.cd -= 1
@@ -3509,7 +3737,7 @@ func boss2(b = null, ax = null, rage = null):
 			sfx("tele")
 		b.cd = bossCd((70 if rage else 95))
 
-# L1901
+# L1979
 func boss3(b = null, ax = null, rage = null):
 	var ph = null
 	var tx = null
@@ -3573,7 +3801,7 @@ func boss3(b = null, ax = null, rage = null):
 				lob(b, 5, 1.1)
 		b.cd = bossCd((80 if (ph == 1) else (65 if (ph == 2) else 55)))
 
-# L1915
+# L1993
 func mGround(b = null):
 	var l = null
 	b.vy = min((b.get("vy") + 0.25), 6)
@@ -3587,14 +3815,14 @@ func mGround(b = null):
 	b.gr = 0
 	return false
 
-# L1916
+# L1994
 func mWaves(b = null, sp = null, h = null):
 	_push(hazards, [{"k": "wave", "x": (b.get("x") - 4), "vx": (-sp * D.get("bs")), "h": h}, {"k": "wave", "x": ((b.get("x") + b.get("w")) - 4), "vx": (sp * D.get("bs")), "h": h}])
 	shake(9)
 	sfx("drop")
 	burst((b.get("x") + ((b.get("w")) / 2.0)), GY, ["#9aa0b0", "#fff"], 12, 2)
 
-# L1917
+# L1995
 func mCall(ch = null, n = null, x = null, y = null):
 	var c = null
 	var i = null
@@ -3619,7 +3847,7 @@ func mCall(ch = null, n = null, x = null, y = null):
 	sfx("horn")
 	return true
 
-# L1919
+# L1997
 func bossM(b = null, ax = null, rage = null):
 	var mt = null
 	var cx = null
@@ -3850,7 +4078,7 @@ func bossM(b = null, ax = null, rage = null):
 			sfx("shootS")
 		b.cd = bossCd((55 if rage else 80))
 
-# L1974
+# L2052
 func updateHazards():
 	var ax = null
 	var i = null
@@ -3892,7 +4120,7 @@ func updateHazards():
 			_splice(trains, k, 1, [])
 		k -= 1
 
-# L1990
+# L2068
 func updateBullets():
 	var i = null
 	var b = null
@@ -4026,7 +4254,7 @@ func updateBullets():
 			_splice(ebul, k, 1, [])
 		k -= 1
 
-# L2019
+# L2097
 func updatePickups():
 	var i = null
 	var k = null
@@ -4129,9 +4357,9 @@ func updatePickups():
 				p.hp += 1
 			p.arm = run.up.get("arm")
 			if ((st.L.get("cut") and st.L.cut.get("cp")) and (not (seen("cp")))):
-				startCut(st.L.cut.get("cp"))
+				radioStart(st.L.cut.get("cp"))
 
-# L2059
+# L2137
 func isHood(r = null, g_2 = null, b = null):
 	var mx = null
 	var mn = null
@@ -4143,7 +4371,7 @@ func isHood(r = null, g_2 = null, b = null):
 	h = (((60 * (b - r)) / float((mx - mn))) + 120)
 	return _and(_and((h >= 105), (h <= 162)), (lum(r, g_2, b) < 135))
 
-# L2062
+# L2140
 func lookPor(k = null):
 	var B = null
 	var key = null
@@ -4199,7 +4427,7 @@ func lookPor(k = null):
 	_aset(SHEET, key, {"fw": B.get("fw"), "fh": B.get("fh"), "n": B.get("n"), "x1": B.get("x1"), "ok": true, "img": cn, "wimg": null, "ver": lookVer})
 	return key
 
-# L2072
+# L2150
 func seen(k = null):
 	var id = null
 	id = str(st.get("i")) + ":" + str(k)
@@ -4209,7 +4437,71 @@ func seen(k = null):
 	_aset(run.seen, id, 1)
 	return false
 
-# L2074
+# L2155
+func radioStart(L = null):
+	RADIO = {"L": L, "i": 0, "t": 0}
+	sfx("clink")
+
+# L2156
+func radioTick():
+	var l = null
+	if banner:
+		return
+	l = _ix(RADIO.L, RADIO.get("i"))
+	RADIO.t += 1
+	if (RADIO.get("t", NAN) > (80 + (_len(l.s) * 3))):
+		RADIO.i += 1
+		RADIO.t = 0
+		if (RADIO.get("i", NAN) >= _len(RADIO.L)):
+			RADIO = null
+		else:
+			sfx("clink")
+
+# L2158
+func drawRadio():
+	var R0 = null
+	var l = null
+	var P = null
+	var nm = null
+	var nc = null
+	var bw = null
+	var ln = null
+	var bh = null
+	var bx = null
+	var by = null
+	var a = null
+	var left = null
+	var o = null
+	var i = null
+	R0 = RADIO
+	if ((not R0) or banner):
+		return
+	l = _ix(R0.L, R0.get("i"))
+	P = _ix(POR, l.get("w"))
+	nm = (st.L.get("boss") if (l.get("w") == "BOSS") else (P.get("n") if P else ""))
+	nc = (P.get("c") if P else "#ff3d6e")
+	bw = min(((HW - HUDR) - 12), 212)
+	ln = j_wrap(l.get("s"), (bw - 10))
+	bh = (16 + (_len(ln) * 9))
+	bx = 4
+	by = (40 if (boss and boss.get("on")) else 28)
+	a = (((R0.get("t")) / 6.0) if (R0.get("t", NAN) < 6) else 1)
+	g.globalAlpha = (a * 0.85)
+	rect(bx, by, bw, bh, "#06070d")
+	g.globalAlpha = a
+	rect(bx, by, 2, bh, nc)
+	txt(nm, (bx + 6), (by + 3), nc)
+	left = floori((R0.get("t") * 1.5))
+	o = 0
+	i = 0
+	while ((i < _len(ln)) and (left > 0)):
+		txtM(_slice(_ix(ln, i), 0, left), (bx + 6), ((by + 13) + (i * 9)), "#eef3ff", l.get("m"), o)
+		left -= (_len(_ix(ln, i)) + 1)
+		o += (_len(_ix(ln, i)) + 1)
+		i += 1
+	g.globalAlpha = 1
+
+# L2164
 func startCut(lines = null, then = null, ill = null):
 	var io = null
 	if ((not lines) or (not (_len(lines)))):
@@ -4226,44 +4518,44 @@ func startCut(lines = null, then = null, ill = null):
 	bullets = []
 	ebul = []
 
-# L2085
+# L2175
 func cutQ():
 	CUQ = max(1, floori(float((SC * UIF)) + 0.5))
 
-# L2088
+# L2178
 func cutSX():
 	return (8 if touchMode() else 0)
 
-# L2088
+# L2178
 func cutSB():
 	return (5 if touchMode() else 0)
 
-# L2089
+# L2179
 func cutTx():
 	var b = null
 	b = floori(float((((cutSX() * SC) * HS) / float(CUQ))) + 0.5)
 	return (ceili((((52 + b) * CUQ) / float((SC * HS)))) + 2)
 
-# L2090
+# L2180
 func cutLine():
 	var c = null
 	var l = null
 	var mw = null
 	c = cut
 	l = _ix(c.lines, c.get("i"))
-	mw = ((HW - ((cutTx() + 4) if (l.get("w") and (not (cutIl(l)))) else 16)) - (2 * cutSX()))
+	mw = (((HW - ((cutTx() + 4) if (l.get("w") and (not (cutIl(l)))) else 16)) - 10) - (2 * cutSX()))
 	if ((not (c.get("wr"))) or (c.get("mw") != mw)):
 		c.wr = j_wrap(l.get("s"), mw)
 		c.mw = mw
 	return l
 
-# L2091
+# L2181
 func cutIl(l = null):
 	var o = null
 	o = (_ix(SHEET, l.get("i")) if l.get("i") else l.get("i"))
 	return (not (not (o and o.get("ok"))))
 
-# L2092
+# L2182
 func cutAdv():
 	var c = null
 	var l = null
@@ -4271,6 +4563,10 @@ func cutAdv():
 		return
 	c = cut
 	l = _ix(c.lines, c.get("i"))
+	if c.get("cred"):
+		if (c.get("t", NAN) > 30):
+			endCut()
+		return
 	if c.get("card"):
 		if (c.get("t", NAN) < 10):
 			return
@@ -4293,12 +4589,12 @@ func cutAdv():
 	if (c.get("i", NAN) >= _len(c.lines)):
 		endCut()
 
-# L2098
+# L2189
 func cutSkip():
 	if cut:
 		endCut()
 
-# L2099
+# L2190
 func endCut():
 	var f = null
 	f = cut.get("then")
@@ -4309,7 +4605,7 @@ func endCut():
 	if f:
 		f.call()
 
-# L2100
+# L2191
 func updateCut():
 	var c = null
 	var l = null
@@ -4324,6 +4620,10 @@ func updateCut():
 	c = cut
 	l = _ix(c.lines, c.get("i"))
 	c.t += 1
+	if c.get("cred"):
+		if c.get("done"):
+			endCut()
+		return
 	if c.get("card"):
 		return
 	if (c.get("bar", NAN) < 1):
@@ -4346,9 +4646,9 @@ func updateCut():
 	if (((l.get("e") == "booms") and (fmod(c.get("t"), 13) == 1)) and (c.get("t", NAN) < 60)):
 		boom(((cam + 24) + (_rnd() * (W - 48))), ((GY - 16) - (_rnd() * 36)), (10 + (_rnd() * 10)), (c.get("t", NAN) > 1))
 	if ((c.get("t", NAN) > 8) and (c.get("ch", NAN) < _len(l.s))):
-		o = int(c.get("ch"))
+		o = int(c.get("ch", 0))
 		c.ch = min(_len(l.s), (c.get("ch") + 1.25))
-		if (((int(c.get("ch")) != o) and ((int(o) & int(3)) == 0)) and (_ix(l.s, o) != " ")):
+		if (((int(c.get("ch", 0)) != o) and ((int(o) & int(3)) == 0)) and (_ix(l.s, o) != " ")):
 			sfx("blip")
 	a = (_len(parts) - 1)
 	while (a >= 0):
@@ -4373,7 +4673,7 @@ func updateCut():
 			ring = null
 	updBooms()
 
-# L2119
+# L2211
 func cutFace(l = null, x = null, y = null):
 	var w = null
 	var P = null
@@ -4382,6 +4682,9 @@ func cutFace(l = null, x = null, y = null):
 	var o = null
 	var s = null
 	var L = null
+	var q = null
+	var bw = null
+	var bh = null
 	w = l.get("w")
 	P = _ix(POR, w)
 	g.save()
@@ -4399,17 +4702,19 @@ func cutFace(l = null, x = null, y = null):
 			blitS(k, f, x, y, 1)
 	else:
 		L = st.get("L")
-		k = (_ix(ESHEET, L.get("mt")) if (L.get("ai") == 4) else "b_" + str(L.get("ai")))
+		k = (("bh_" + str(L.get("mt")) if (_ix(SHEET, "bh_" + str(L.get("mt"))) and _ix(SHEET, "bh_" + str(L.get("mt"))).get("ok")) else _ix(ESHEET, L.get("mt"))) if (L.get("ai") == 4) else "b_" + str(L.get("ai")))
 		if L.get("mk"):
 			k = tintSheet(k)
 		o = _ix(SHEET, k)
 		if (o and o.get("ok")):
-			s = max(2, floori(min((48.0 / (o.get("fw"))), (56.0 / (o.get("fh"))))))
-			blitS(k, fmod((int(t) >> int(4)), o.get("n")), ((x + 24) - floori(float(((o.get("fw") * s) / 2.0)) + 0.5)), ((y + 2) if ((o.get("fh") * s) > 56) else ((y + 56) - (o.get("fh") * s))), s)
+			q = (SC / float(CUQ))
+			bw = (o.get("fw") * q)
+			bh = (o.get("fh") * q)
+			blitS(k, fmod((int(t) >> int(4)), o.get("n")), ((x + 24) - (bw / 2.0)), ((y + 2) if (bh > 56) else ((y + 56) - bh)), q)
 	cutFx(l, x, y, 48, 56)
 	g.restore()
 
-# L2133
+# L2225
 func cutFx(l = null, x = null, y = null, w = null, h = null):
 	var n = null
 	var m = null
@@ -4448,7 +4753,7 @@ func cutFx(l = null, x = null, y = null, w = null, h = null):
 			rect((bx + _ix(R, 0)), (by + _ix(R, 1)), 1, 1, "#1a1530")
 			j += 1
 
-# L2147
+# L2239
 func illFill(k = null, ix = null, iy = null, a = null):
 	var o = null
 	var m = null
@@ -4486,7 +4791,7 @@ func illFill(k = null, ix = null, iy = null, a = null):
 	blitS(k, 0, ix, iy, 1)
 	g.globalAlpha = 1
 
-# L2158
+# L2250
 func drawCard(c = null):
 	var o = null
 	var a = null
@@ -4531,7 +4836,7 @@ func drawCard(c = null):
 	g.globalAlpha = 1
 	g.restore()
 
-# L2173
+# L2265
 func drawCut():
 	var c = null
 	var l = null
@@ -4565,6 +4870,9 @@ func drawCut():
 	var hw2 = null
 	c = cut
 	if (not c):
+		return
+	if c.get("cred"):
+		drawCred(c)
 		return
 	if c.get("card"):
 		drawCard(c)
@@ -4641,11 +4949,11 @@ func drawCut():
 			nm = P.get("s")
 	if nm:
 		txt(nm, tx, ny, nc)
-	left = int(c.get("ch"))
+	left = int(c.get("ch", 0))
 	ln = c.get("wr")
 	i2 = 0
 	while ((i2 < _len(ln)) and (left > 0)):
-		txtM(_slice(_ix(ln, i2), 0, left), tx, (y0 + (i2 * 10)), "#eef3ff", l.get("m"), (int(c.get("ch")) - left))
+		txtM(_slice(_ix(ln, i2), 0, left), tx, (y0 + (i2 * 10)), "#eef3ff", l.get("m"), (int(c.get("ch", 0)) - left))
 		left -= (_len(_ix(ln, i2)) + 1)
 		i2 += 1
 	if ((c.get("ch", NAN) >= _len(l.s)) and (int((int(t) >> int(4))) & int(1))):
@@ -4662,8 +4970,9 @@ func drawCut():
 		g.globalAlpha = 1
 	g.restore()
 
-# L2216
+# L2308
 func stageClear():
+	saveProg((st.get("i") + 1))
 	if ((st.get("i") == 0) and (not (SET.get("tut")))):
 		SET.tut = true
 		save("ds2_set", SET)
@@ -4671,17 +4980,17 @@ func stageClear():
 	bossMusic = 0
 	banner = {"a": "FASE SUPERADA", "b": str(st.L.get("boss")) + " KO", "l": 150}
 
-# L2221
+# L2313
 func parT():
 	return floori(float(((((COLS * T) / 1.6) / 60.0) + 45)) + 0.5)
 
-# L2222
+# L2314
 func medGet(d = null, i = null):
 	var m = null
 	m = _ix((_ix(MED, d) if _ix(MED, d) else []), i)
 	return (m if m else [0, 0, 0])
 
-# L2223
+# L2315
 func medRow(m = null):
 	var n = null
 	var h = null
@@ -4694,7 +5003,7 @@ func medRow(m = null):
 		i += 1
 	return str(h) + "</p>"
 
-# L2225
+# L2317
 func medSave(m = null):
 	var o = null
 	var r = null
@@ -4706,7 +5015,7 @@ func medSave(m = null):
 	save("ds2_med", MED)
 	return r
 
-# L2227
+# L2319
 func showStages():
 	var top = null
 	var h = null
@@ -4724,7 +5033,7 @@ func showStages():
 		i += 1
 	show(str(h) + "</div><div class=\"menu\"><button class=\"btn hot\" data-act=\"back\">VOLVER</button></div></div>")
 
-# L2231
+# L2323
 func startPrac(n = null):
 	CUR = null
 	pend = null
@@ -4733,12 +5042,12 @@ func startPrac(n = null):
 	enterLevel(n, false)
 	audioOn()
 
-# L2232
+# L2324
 func pracEnd(win = null, secs = null, m = null):
 	mode = "over"
 	show("<div class=\"panel\"><p class=\"kick\">PRÁCTICA · FASE " + str((st.get("i") + 1)) + "</p><h2>" + (str(st.L.get("boss")) + " DERROTADO" if win else "EL SOUND SYSTEM CALLA") + "</h2>" + ("<div class=\"stats\"><span>TIEMPO</span><b>" + str(floori((secs / 60.0))) + ":" + pad(fmod(secs, 60), 2) + " / PAR " + str(floori(((parT()) / 60.0))) + ":" + pad(fmod(parT(), 60), 2) + "</b><span>DISCOS</span><b>" + str(st.get("coinP")) + " / " + str(st.get("coinT")) + "</b></div>" + str(medRow(m)) if win else "") + "<div class=\"menu\"><button class=\"btn hot\" data-act=\"prac\" data-v=\"" + str(st.get("i")) + "\">REPETIR FASE</button><button class=\"btn\" data-act=\"tomenu\">MENÚ PRINCIPAL</button></div></div>")
 
-# L2236
+# L2328
 func finishStage():
 	var secs = null
 	var nh = null
@@ -4751,7 +5060,7 @@ func finishStage():
 	secs = floori(((st.get("t")) / 60.0))
 	nh = (2000 if st.get("hurtFree") else 0)
 	cb = ((run.get("coins") - st.get("coinsAt")) * 10)
-	tb = max(0, (3000 - (secs * 12)))
+	tb = max(0, (3000 - (max(0, (secs - floori(float((parT() * 0.6)) + 0.5))) * 12)))
 	tb = min(tb, floori(((((run.get("score") + nh) + cb) * 3) / 7.0)))
 	md = medSave([(1 if (secs <= parT()) else 0), (1 if st.get("hurtFree") else 0), (1 if ((st.get("coinT", NAN) > 0) and (st.get("coinP", NAN) >= st.get("coinT", NAN))) else 0)])
 	if PRAC:
@@ -4769,9 +5078,9 @@ func finishStage():
 		showWin()
 		return
 	slotSave("shop", (st.get("i") + 1))
-	show("<div class=\"panel\"><h2>FASE " + str((st.get("i") + 1)) + " SUPERADA</h2><h3>" + str(st.L.get("boss")) + " DERROTADO</h3>" + "<div class=\"stats\"><span>TIEMPO " + str(floori((secs / 60.0))) + ":" + pad(fmod(secs, 60), 2) + "</span><b>+" + str(tb) + "</b><span>SIN DAÑO</span><b>+" + str(nh) + "</b><span>" + ("DISCOS (" + str((cb / 10.0)) + " × 10)" if cb else "DISCOS: NINGUNO") + "</span><b>+" + str(cb) + "</b>" + "<span class=\"tot\">PUNTOS" + (" · RÉCORD" if nb else "") + "</span><b class=\"tot\">" + pad(run.get("score"), 7) + "</b></div>" + str(medRow(md)) + ("<p class=\"note\">NUEVA CINTA EN EL ARCHIVO: " + str(_ix(_ix(LORE, st.get("i")), 0)) + "</p>" if nt else "") + "<div class=\"menu\"><button class=\"btn hot\" data-act=\"shop\">IR A LA TIENDA</button></div></div>")
+	show("<div class=\"panel\"><h2>FASE " + str((st.get("i") + 1)) + " SUPERADA</h2><h3>" + str(st.L.get("boss")) + " DERROTADO</h3>" + "<div class=\"stats\"><span>TIEMPO " + str(floori((secs / 60.0))) + ":" + pad(fmod(secs, 60), 2) + "</span><b>+" + str(tb) + "</b><span>SIN DAÑO</span><b>+" + str(nh) + "</b><span>" + "DISCOS DE LA FASE (" + str((cb / 10.0)) + " × 10)" + "</span><b>+" + str(cb) + "</b>" + "<span class=\"tot\">PUNTOS" + (" · RÉCORD" if nb else "") + "</span><b class=\"tot\">" + pad(run.get("score"), 7) + "</b></div>" + str(medRow(md)) + ("<p class=\"note\">NUEVA CINTA EN EL ARCHIVO: " + str(_ix(_ix(LORE, st.get("i")), 0)) + "</p>" if nt else "") + "<div class=\"menu\"><button class=\"btn hot\" data-act=\"shop\">IR A LA TIENDA</button></div></div>")
 
-# L2266
+# L2358
 func eqTabs(tab = null, pre = null):
 	var n = null
 	var h = null
@@ -4786,7 +5095,7 @@ func eqTabs(tab = null, pre = null):
 		h = str(h) + "<button class=\"btn" + (" hot" if (i == tab) else "") + "\" data-act=\"" + str(pre) + "\" data-v=\"" + str(i) + "\">" + str(x) + "</button>"
 	return str(h) + "</div>"
 
-# L2268
+# L2360
 func bagRows(buy_2 = null):
 	var h = null
 	var o = null
@@ -4806,10 +5115,10 @@ func bagRows(buy_2 = null):
 		h = str(h) + "<button class=\"btn item" + (" off\" aria-disabled=\"true" if (cl and buy_2) else "") + "\" data-act=\"" + ("obuy" if buy_2 else "ouse") + "\" data-v=\"" + str(o.get("id")) + "\"" + (" disabled" if (cl and (not buy_2)) else "") + "><span>" + str(o.get("n")) + " <i class=\"c\">" + str((("LLENO" if full else o.get("cost")) if buy_2 else ("USAR" if n else "—"))) + "</i></span><small>" + str(o.get("d")) + "</small><span class=\"pips\">" + _join(_newArray((n + 1)), "■") + _join(_newArray(((OMAX - n) + 1)), "□") + "</span></button>"
 	return str(h) + "</div>"
 
-# L2276
+# L2369
 func shopNext():
 	var b = null
-	if NEXTOK:
+	if (NEXTOK or ((_now() - SHOPT) > 900)):
 		nextStage()
 		return
 	NEXTOK = 1
@@ -4818,7 +5127,7 @@ func shopNext():
 	if b:
 		b.textContent = "¿EMPEZAR LA FASE " + str((st.get("i") + 2)) + "? PULSA OTRA VEZ"
 
-# L2278
+# L2371
 func showShop(tab = null, ok = null, no = null):
 	var h = null
 	var it = null
@@ -4826,6 +5135,8 @@ func showShop(tab = null, ok = null, no = null):
 	var maxed = null
 	var cost = null
 	var pips = null
+	if (mode != "shop"):
+		SHOPT = _now()
 	mode = "shop"
 	if (tab != null):
 		shopTab = tab
@@ -4854,10 +5165,10 @@ func showShop(tab = null, ok = null, no = null):
 			h = str(h) + "<button class=\"btn item" + (" off\" aria-disabled=\"true" if (maxed or (BANK < cost)) else "") + "\" data-act=\"buy\" data-v=\"" + str(it.get("id")) + "\"><span>" + str(it.get("n")) + " <i class=\"c\">" + str(("MAX" if maxed else cost)) + "</i></span><small>" + str(it.get("d")) + "</small>" + str(pips) + "</button>"
 		h = str(h) + "</div>"
 	NEXTOK = 0
-	h = str(h) + "<div class=\"menu\"><button class=\"btn hot\" data-act=\"next\">FASE " + str((st.get("i") + 2)) + ": " + str(_ix(LEVELS, (st.get("i") + 1)).get("name")) + "</button></div></div>"
+	h = str(h) + "<div class=\"menu\"><button class=\"btn hot\" data-act=\"next\">FASE " + str((st.get("i") + 2)) + ": " + str(_ix(LEVELS, (st.get("i") + 1)).get("name")) + "</button></div>" + ("" if tmText() else "<p class=\"dim\">ESC: IR A LA SIGUIENTE FASE</p>") + "</div>"
 	show(h)
 
-# L2297
+# L2390
 func buy(id = null):
 	var _c = {"id": id}
 	var it = null
@@ -4887,7 +5198,7 @@ func buy(id = null):
 	slotSave("shop", (st.get("i") + 1))
 	showShop(null, it.get("n"))
 
-# L2305
+# L2398
 func objBuy(id = null):
 	var o = null
 	o = _ix(OBJN, id)
@@ -4904,18 +5215,18 @@ func objBuy(id = null):
 	slotSave("shop", (st.get("i") + 1))
 	showShop(null, o.get("n"))
 
-# L2309
+# L2402
 func nextStage():
 	run.lives = max(run.get("lives"), D.get("lives"))
 	enterLevel((st.get("i") + 1), true)
 
-# L2312
+# L2405
 func saveProg(n = null):
 	if (n > _or(_ix(PROG, SET.get("diff")), 0)):
 		_aset(PROG, SET.get("diff"), n)
 		save("ds2_prog", PROG)
 
-# L2313
+# L2406
 func enterLevel(n = null, withCut = null):
 	run.stage = n
 	run.scoreAt = run.get("score")
@@ -4931,7 +5242,7 @@ func enterLevel(n = null, withCut = null):
 	if (((withCut and st.L.get("cut")) and st.L.cut.get("pre")) and (not (seen("pre")))):
 		startCut(st.L.cut.get("pre"), null, "il_" + pad((n + 1), 2))
 
-# L2318
+# L2411
 func cpResume():
 	var x = null
 	var _a = null
@@ -4952,7 +5263,7 @@ func cpResume():
 			c.on = 1
 	cam = j_clamp((p.get("x") - ((W / 2.0) - 5)), 0, ((COLS * T) - W))
 
-# L2327
+# L2420
 func slotOk(s = null):
 	var n = null
 	if (((((not s) or (_typeof(s) != "object")) or (not (s.get("run")))) or (_typeof(s.get("run")) != "object")) or (not (_ix(DIFFS, s.get("diff"))))):
@@ -4970,7 +5281,7 @@ func slotOk(s = null):
 		s.ts = 0
 	return s
 
-# L2333
+# L2426
 func slots():
 	var a = null
 	var r = null
@@ -4988,7 +5299,7 @@ func slots():
 		i += 1
 	return r
 
-# L2335
+# L2428
 func slotSave(at = null, n = null, r = null):
 	var a = null
 	var c = null
@@ -5004,7 +5315,7 @@ func slotSave(at = null, n = null, r = null):
 	save("ds2_slots", a)
 	save("ds2_last", CUR)
 
-# L2338
+# L2431
 func slotDel(i = null):
 	var a = null
 	a = slots()
@@ -5013,7 +5324,7 @@ func slotDel(i = null):
 	if (j_load("ds2_last", -1) == i):
 		save("ds2_last", -1)
 
-# L2347
+# L2440
 func slotLoad(i = null):
 	var s = null
 	var b = null
@@ -5054,15 +5365,15 @@ func slotLoad(i = null):
 	for _k_3 in _keys(b.get("inv")):
 		ik = _k_3
 		_aset(b.inv, ik, j_clamp(int(_ix(b.inv, ik)), 0, OMAX))
-	b.up.arm = j_clamp(int(b.up.get("arm")), 0, 3)
-	b.up.pow = j_clamp(int(b.up.get("pow")), 0, 2)
+	b.up.arm = j_clamp(int(b.up.get("arm", 0)), 0, 3)
+	b.up.pow = j_clamp(int(b.up.get("pow", 0)), 0, 2)
 	if (o.get("seen") and (_typeof(o.get("seen")) == "object")):
 		b.seen = o.get("seen")
 	if (not (_ix(WPN, b.get("wpn")))):
 		b.wpn = "N"
-	b.lv = j_clamp(int(b.get("lv")), 1, 3)
-	b.lives = max(1, int(b.get("lives")))
-	b.maxHp = max(1, int(b.get("maxHp")))
+	b.lv = j_clamp(int(b.get("lv", 0)), 1, 3)
+	b.lives = max(1, int(b.get("lives", 0)))
+	b.maxHp = max(1, int(b.get("maxHp", 0)))
 	b.bass = j_clamp(_or(_num(b.get("bass")), 0), 0, 100)
 	b.combo = 0
 	b.comboT = 0
@@ -5076,13 +5387,13 @@ func slotLoad(i = null):
 	else:
 		enterLevel(s.get("stage"), true)
 
-# L2358
+# L2451
 func newGame(i = null):
 	CUR = i
 	NEWSL = null
 	startGame()
 
-# L2362
+# L2455
 func slotNew(i = null):
 	var h = null
 	var hb = null
@@ -5104,7 +5415,7 @@ func slotNew(i = null):
 	if hb:
 		_callm(hb, "focus", [])
 
-# L2367
+# L2460
 func slotDate(ts = null):
 	var d = null
 	if (not ts):
@@ -5112,11 +5423,11 @@ func slotDate(ts = null):
 	d = _date(ts)
 	return pad(_callm(d, "getDate", []), 2) + "/" + pad((_callm(d, "getMonth", []) + 1), 2) + " " + pad(_callm(d, "getHours", []), 2) + ":" + pad(_callm(d, "getMinutes", []), 2)
 
-# L2368
+# L2461
 func slotWhere(s = null):
 	return ("COMPLETADA" if (s.get("at") == "done") else ("TIENDA · " if (s.get("at") == "shop") else "") + "FASE " + str((s.get("stage") + 1)))
 
-# L2369
+# L2462
 func showSlots():
 	var a = null
 	var h = null
@@ -5133,7 +5444,7 @@ func showSlots():
 		h = str(h) + "<button class=\"btn slot" + ((" done" if (s.get("at") == "done") else "") if s else " empty") + "\" data-act=\"slot\" data-v=\"" + str(i) + "\"><span class=\"sn\">" + str((i + 1)) + "</span>" + ("<span class=\"sl\"><b>" + ("COMPLETADA" if (s.get("at") == "done") else "FASE " + str((s.get("stage") + 1))) + "</b><i>" + str(_ix(DIFFS, s.get("diff")).get("n")) + "</i></span><span class=\"sd\">" + ("TIENDA · " if (s.get("at") == "shop") else "") + str(_ix(LEVELS, s.get("stage")).get("name")) + "</span><span class=\"sm\"><b>" + pad(s.run.get("score"), 7) + "</b>" + str(slotDate(s.get("ts"))) + "</span>" if s else "<span class=\"sl\">VACÍA</span><span class=\"sd\">NUEVA PARTIDA</span><span class=\"sm\">&nbsp;</span>") + "</button>"
 	show(str(h) + "</div><p class=\"dim\">Se guarda solo: al empezar cada fase, en la tienda y al caer.</p><div class=\"menu\">" + "<button class=\"btn\" data-act=\"back\">VOLVER</button></div></div>")
 
-# L2377
+# L2470
 func showSlot(i = null, cf = null):
 	var _c = {"i": i}
 	var s = null
@@ -5149,9 +5460,9 @@ func showSlot(i = null, cf = null):
 		back = _fn
 		show("<div class=\"panel\"><p class=\"kick\">RANURA " + str((_c.i + 1)) + "</p><h2>" + ("¿BORRAR ESTA PARTIDA?" if (cf == "del") else "¿EMPEZAR DE NUEVO AQUÍ?") + "</h2>" + "<p class=\"dim\">Se pierde lo guardado: " + str(slotWhere(s)) + ", " + pad(s.run.get("score"), 7) + " puntos." + ("" if (cf == "del") else " Después eliges la dificultad.") + "</p>" + "<div class=\"menu\"><button class=\"btn\" data-act=\"slot\" data-v=\"" + str(_c.i) + "\">NO, VOLVER</button><button class=\"btn warn\" data-act=\"" + ("sdel" if (cf == "del") else "snew") + "\" data-v=\"" + str(_c.i) + "\">" + ("SÍ, BORRAR" if (cf == "del") else "SÍ, EMPEZAR") + "</button></div></div>")
 		return
-	show("<div class=\"panel\"><p class=\"kick\">RANURA " + str((_c.i + 1)) + "</p><h2>" + ("PARTIDA COMPLETADA" if (s.get("at") == "done") else str(slotWhere(s)) + ": " + str(_ix(LEVELS, s.get("stage")).get("name"))) + "</h2>" + "<div class=\"stats\"><span>DIFICULTAD</span><b>" + str(_ix(DIFFS, s.get("diff")).get("n")) + "</b><span>PUNTOS</span><b>" + pad(s.run.get("score"), 7) + "</b><span>VIDAS</span><b>" + str(int(s.run.get("lives"))) + "</b>" + "<span>DISCOS RECOGIDOS</span><b>" + str(int(s.run.get("coins"))) + "</b><span>GUARDADA</span><b>" + str(slotDate(s.get("ts"))) + "</b></div>" + "<div class=\"menu\">" + ("<button class=\"btn hot\" data-act=\"sload\" data-v=\"" + str(_c.i) + "\">CONTINUAR</button>" if (s.get("at") != "done") else "") + "<button class=\"btn\" data-act=\"sask\" data-v=\"" + str(_c.i) + "n\">EMPEZAR DE NUEVO</button><button class=\"btn\" data-act=\"sask\" data-v=\"" + str(_c.i) + "d\">BORRAR</button>" + "<button class=\"btn\" data-act=\"back\">VOLVER</button></div></div>")
+	show("<div class=\"panel\"><p class=\"kick\">RANURA " + str((_c.i + 1)) + "</p><h2>" + ("PARTIDA COMPLETADA" if (s.get("at") == "done") else str(slotWhere(s)) + ": " + str(_ix(LEVELS, s.get("stage")).get("name"))) + "</h2>" + "<div class=\"stats\"><span>DIFICULTAD</span><b>" + str(_ix(DIFFS, s.get("diff")).get("n")) + "</b><span>PUNTOS</span><b>" + pad(s.run.get("score"), 7) + "</b><span>VIDAS</span><b>" + str(int(s.run.get("lives", 0))) + "</b>" + "<span>DISCOS RECOGIDOS</span><b>" + str(int(s.run.get("coins", 0))) + "</b><span>GUARDADA</span><b>" + str(slotDate(s.get("ts"))) + "</b></div>" + "<div class=\"menu\">" + ("<button class=\"btn hot\" data-act=\"sload\" data-v=\"" + str(_c.i) + "\">CONTINUAR</button>" if (s.get("at") != "done") else "") + "<button class=\"btn\" data-act=\"sask\" data-v=\"" + str(_c.i) + "n\">EMPEZAR DE NUEVO</button><button class=\"btn\" data-act=\"sask\" data-v=\"" + str(_c.i) + "d\">BORRAR</button>" + "<button class=\"btn\" data-act=\"back\">VOLVER</button></div></div>")
 
-# L2389
+# L2482
 func lastSlot():
 	var i = null
 	var s = null
@@ -5159,7 +5470,7 @@ func lastSlot():
 	s = _ix(slots(), i)
 	return (i if (s and (s.get("at") != "done")) else -1)
 
-# L2390
+# L2483
 func endLevel():
 	var c = null
 	c = st.L.get("cut")
@@ -5168,19 +5479,19 @@ func endLevel():
 	else:
 		finishStage()
 
-# L2407
+# L2500
 func hideOv():
 	S_("ov").hidden = true
 	S_("ov").innerHTML = ""
 	back = null
 
-# L2410
+# L2503
 func best():
 	var a = null
 	a = j_load("ds2_rank", [])
 	return max((_ix(a, 0).get("score") if _len(a) else 0), int(j_load("ds2_best", 0)))
 
-# L2411
+# L2504
 func bestUp():
 	var b = null
 	b = best()
@@ -5189,7 +5500,7 @@ func bestUp():
 		return true
 	return false
 
-# L2426
+# L2519
 func showMenu():
 	var ld = null
 	var li = null
@@ -5227,11 +5538,11 @@ func showMenu():
 		if mb:
 			_callm(mb, "focus", [{"preventScroll": true}])
 
-# L2442
+# L2535
 func onoff(v = null):
 	return ("SÍ" if v else "NO")
 
-# L2443
+# L2536
 func showOpts():
 	var from = null
 	var tm = null
@@ -5247,9 +5558,9 @@ func showOpts():
 		_q = showMenu
 	back = _q
 	tm = _ix({"auto": "AUTO", "on": "SÍ", "off": "NO"}, SET.get("touch"))
-	show("<div class=\"panel wide eq\"><h2>OPCIONES</h2><div class=\"menu two\">" + "<button class=\"btn opt\" data-act=\"o\" data-v=\"mute\">MÚSICA Y SONIDO <i>" + str(onoff((not (SET.get("mute"))))) + "</i></button>" + "<button class=\"btn opt\" data-act=\"o\" data-v=\"auto\">DISPARO AUTOMÁTICO <i>" + str(("AUTO" if (SET.get("auto") == null) else onoff(SET.get("auto")))) + "</i></button>" + "<button class=\"btn opt\" data-act=\"o\" data-v=\"assist\">APUNTADO ASISTIDO <i>" + str(onoff(SET.get("assist"))) + "</i></button>" + "<button class=\"btn opt\" data-act=\"o\" data-v=\"upJump\">ARRIBA PARA SALTAR <i>" + str(onoff(SET.get("upJump"))) + "</i></button>" + "<button class=\"btn opt\" data-act=\"o\" data-v=\"touch\">MANDOS TÁCTILES <i>" + str(tm) + "</i></button>" + "<button class=\"btn opt\" data-act=\"o\" data-v=\"ui\">TAMAÑO DE INTERFAZ <i>" + str(uiName()) + "</i></button>" + "<button class=\"btn opt\" data-act=\"o\" data-v=\"big\">BOTONES GRANDES <i>" + str(onoff(SET.get("big"))) + "</i></button>" + "<button class=\"btn opt\" data-act=\"o\" data-v=\"vib\">VIBRACIÓN <i>" + str(onoff(SET.get("vib"))) + "</i></button>" + "<button class=\"btn opt\" data-act=\"o\" data-v=\"light\">LUCES Y SOMBRAS <i>" + str(onoff(SET.get("light"))) + "</i></button>" + "<button class=\"btn hot\" data-act=\"back\">VOLVER</button></div>" + "<p class=\"dim tip\">Disparo automático: dispara solo cuando hay enemigos cerca, te quita un dedo de encima. Apuntado asistido: decide por ti hacia dónde tiras, por eso viene apagado.</p></div>")
+	show("<div class=\"panel wide eq\"><h2>OPCIONES</h2><div class=\"menu two\">" + "<button class=\"btn opt\" data-act=\"o\" data-v=\"mute\">MÚSICA Y SONIDO <i>" + str(onoff((not (SET.get("mute"))))) + "</i></button>" + "<button class=\"btn opt\" data-act=\"o\" data-v=\"auto\">DISPARO AUTOMÁTICO <i>" + str(("AUTO" if (SET.get("auto") == null) else onoff(SET.get("auto")))) + "</i></button>" + "<button class=\"btn opt\" data-act=\"o\" data-v=\"assist\">APUNTADO ASISTIDO <i>" + str(("AUTO" if (SET.get("assist") == null) else onoff(SET.get("assist")))) + "</i></button>" + "<button class=\"btn opt\" data-act=\"o\" data-v=\"upJump\">ARRIBA PARA SALTAR <i>" + str(onoff(SET.get("upJump"))) + "</i></button>" + "<button class=\"btn opt\" data-act=\"o\" data-v=\"touch\">MANDOS TÁCTILES <i>" + str(tm) + "</i></button>" + "<button class=\"btn opt\" data-act=\"o\" data-v=\"ui\">TAMAÑO DE INTERFAZ <i>" + str(uiName()) + "</i></button>" + "<button class=\"btn opt\" data-act=\"o\" data-v=\"big\">BOTONES GRANDES <i>" + str(onoff(SET.get("big"))) + "</i></button>" + "<button class=\"btn opt\" data-act=\"o\" data-v=\"vib\">VIBRACIÓN <i>" + str(onoff(SET.get("vib"))) + "</i></button>" + "<button class=\"btn opt\" data-act=\"o\" data-v=\"light\">LUCES Y SOMBRAS <i>" + str(onoff(SET.get("light"))) + "</i></button>" + "<button class=\"btn hot\" data-act=\"back\">VOLVER</button></div>" + "<p class=\"dim tip\">Disparo automático: dispara solo cuando hay enemigos cerca, te quita un dedo de encima. Apuntado asistido: decide por ti hacia dónde tiras; en AUTO solo se activa con los mandos táctiles.</p></div>")
 
-# L2459
+# L2552
 func setOpt(k = null):
 	var _c = {"b": null}
 	var ui = null
@@ -5261,6 +5572,8 @@ func setOpt(k = null):
 		setMute((not (SET.get("mute"))))
 	elif (k == "auto"):
 		SET.auto = (true if (SET.get("auto") == null) else (false if (SET.get("auto") == true) else null))
+	elif (k == "assist"):
+		SET.assist = (true if (SET.get("assist") == null) else (false if (SET.get("assist") == true) else null))
 	elif (k == "touch"):
 		SET.touch = _ix({"auto": "on", "on": "off", "off": "auto"}, SET.get("touch"))
 	elif (k == "ui"):
@@ -5282,7 +5595,7 @@ func setOpt(k = null):
 				_callm(_c.b, "focus", [])
 			_timeout(_fn, 40)
 
-# L2471
+# L2565
 func showArchive(i = null):
 	var c = null
 	var il = null
@@ -5313,7 +5626,7 @@ func showArchive(i = null):
 		h = str(h) + "<button class=\"btn\"" + (" data-act=\"tape\" data-v=\"" + str(k) + "\">" + str((k + 1)) + ". " + str(_ix(c_2, 0)) if (k < LOREN) else " disabled>" + str((k + 1)) + ". ???") + "</button>"
 	show(str(h) + "</div><div class=\"menu\"><button class=\"btn hot\" data-act=\"back\">VOLVER</button></div></div>")
 
-# L2481
+# L2575
 func showControls(then = null):
 	var from = null
 	var tch = null
@@ -5333,7 +5646,7 @@ func showControls(then = null):
 	body = ("<b>ZONA IZQUIERDA</b><span>Arrastra para moverte. Arriba apunta arriba, abajo + SALTO baja de plataformas</span>" + "<b>SALTO</b><span>Toca para saltar, otra vez en el aire para el doble salto</span><b>MANTÉN SALTO</b><span>Dash: esquiva atravesando balas y enemigos</span>" + "<b>FUEGO</b><span>" + ("Automático cuando hay enemigos cerca (puedes forzarlo pulsando)" if autoFire() else "Mantenlo pulsado para disparar") + "</span>" + "<b>BASS</b><span>Con la barra llena limpia la pantalla</span><b>OBJ</b><span>Usa el objeto rápido de la mochila</span><b>II</b><span>Pausa (y MOCHILA)</span>" if tch else "<b>FLECHAS / A D</b><span>Moverse</span><b>Z / ESPACIO</b><span>Saltar (otra vez en el aire = doble salto)</span>" + "<b>X / J</b><span>Disparar (mantener = ráfaga)</span>" + ("" if SET.get("upJump") else "<b>ARRIBA + FUEGO</b><span>Disparo vertical o diagonal</span>") + "<b>ABAJO + SALTO</b><span>Bajar de una plataforma</span>" + "<b>C / SHIFT</b><span>Dash: esquiva atravesando balas</span><b>V</b><span>Bass Drop con la barra llena</span><b>E</b><span>Usar el objeto rápido de la mochila</span>" + "<b>P / ESC</b><span>Pausa (y MOCHILA)</span><b>MANDO</b><span>A salto, X fuego, B dash, Y bass, LB objeto, START pausa</span>")
 	show("<div class=\"panel\"><h2>" + ("ASÍ SE JUEGA" if then else "CONTROLES") + "</h2><div class=\"keys\">" + str(body) + "</div>" + "<p class=\"dim\">Las cajas ? dan armas u objetos. Coger la misma arma sube su nivel; cada golpe lo baja (la ARMADURA de la tienda para golpes).</p>" + "<div class=\"menu\">" + ("<button class=\"btn hot\" data-act=\"go\">A JUGAR</button>" if then else "<button class=\"btn\" data-act=\"back\">VOLVER</button>") + "</div></div>")
 
-# L2499
+# L2593
 func showRank(note = null):
 	var a = null
 	var h = null
@@ -5378,7 +5691,7 @@ func showRank(note = null):
 				_callm(b, "focus", [])
 		_timeout(_fn, 40)
 
-# L2516
+# L2610
 func tgPaint():
 	var k = null
 	var e = null
@@ -5390,20 +5703,20 @@ func tgPaint():
 			e.className = ("on" if (k == TGi) else "")
 		k += 1
 
-# L2517
+# L2611
 func tgStep(k = null, d = null):
 	TGi = k
 	_aset(TG, k, _ix(TGC, fmod(((_indexOf(TGC, _ix(TG, k)) + d) + _len(TGC)), _len(TGC))))
 	tgPaint()
 
-# L2520
+# L2614
 func tgFocus():
 	var bs = null
 	bs = _callm(S_("ov"), "querySelectorAll", [".tgb"])
 	if (_len(bs) > (TGi * 2)):
 		_callm(_ix(bs, (TGi * 2)), "focus", [])
 
-# L2521
+# L2615
 func tgKey(c = null, fe = null):
 	var fa = null
 	var g_2 = null
@@ -5434,18 +5747,18 @@ func tgKey(c = null, fe = null):
 		return true
 	return false
 
-# L2532
+# L2626
 func tgType(c = null):
 	_aset(TG, TGi, c)
 	TGi = min(2, (TGi + 1))
 	tgPaint()
 
-# L2533 (a mano)
+# L2627 (a mano)
 func qualifies(s = null):
 	var a = j_load("ds2_rank", [])
 	return s > 0 and (_len(a) < 10 or s > _ix(a, _len(a) - 1).get("score"))
 
-# L2534
+# L2628
 func submitRank():
 	var tag = null
 	var a = null
@@ -5458,7 +5771,7 @@ func submitRank():
 		return
 	a = j_load("ds2_rank", [])
 	myTs = _now()
-	a.append({"tag": tag, "score": pend.get("score"), "st": pend.get("st"), "d": pend.get("d"), "c": int(pend.get("c")), "ts": myTs})
+	a.append({"tag": tag, "score": pend.get("score"), "st": pend.get("st"), "d": pend.get("d"), "c": int(pend.get("c", 0)), "ts": myTs})
 	_fn = func(x = null, y = null):
 		return (y.get("score") - x.get("score"))
 	_sort(a, _fn)
@@ -5468,15 +5781,15 @@ func submitRank():
 	TG = null
 	showRank("GUARDADO")
 
-# L2540
+# L2634
 func stat():
 	var s = null
 	var secs = null
 	s = run.get("stats")
 	secs = floori(((s.get("time")) / 60.0))
-	return "<div class=\"stats\"><span>PUNTOS</span><b>" + pad(run.get("score"), 7) + "</b><span>FASE</span><b>" + str((st.get("i") + 1)) + " / " + str(_len(LEVELS)) + "</b><span>ENEMIGOS</span><b>" + str(s.get("kills")) + "</b>" + "<span>PUNTERÍA</span><b>" + str((floori(float((((s.get("hits")) / float(s.get("shots"))) * 100)) + 0.5) if s.get("shots") else 0)) + "%</b><span>VIDAS PERDIDAS</span><b>" + str(s.get("deaths")) + "</b><span>CONTINUACIONES</span><b>" + str(int(run.get("conts"))) + " / " + str(D.get("cont")) + "</b><span>TIEMPO</span><b>" + str(floori((secs / 60.0))) + ":" + pad(fmod(secs, 60), 2) + "</b></div>"
+	return "<div class=\"stats\"><span>PUNTOS</span><b>" + pad(run.get("score"), 7) + "</b><span>FASE</span><b>" + str((st.get("i") + 1)) + " / " + str(_len(LEVELS)) + "</b><span>ENEMIGOS</span><b>" + str(s.get("kills")) + "</b>" + "<span>PUNTERÍA</span><b>" + str((floori(float((((s.get("hits")) / float(s.get("shots"))) * 100)) + 0.5) if s.get("shots") else 0)) + "%</b><span>VIDAS PERDIDAS</span><b>" + str(s.get("deaths")) + "</b><span>CONTINUACIONES</span><b>" + str(int(run.get("conts", 0))) + " / " + str(D.get("cont")) + "</b><span>TIEMPO</span><b>" + str(floori((secs / 60.0))) + ":" + pad(fmod(secs, 60), 2) + "</b></div>"
 
-# L2543
+# L2637
 func gameOver():
 	var nb = null
 	var left = null
@@ -5488,9 +5801,9 @@ func gameOver():
 		return
 	mode = "over"
 	BANK = BANK0
-	pend = {"score": max(run.get("score"), (run.get("peak") if run.get("peak") else 0)), "st": "F" + str((st.get("i") + 1)), "d": _ix(_ix(DIFFS, SET.get("diff")).n, 0), "c": int(run.get("conts"))}
+	pend = {"score": max(run.get("score"), (run.get("peak") if run.get("peak") else 0)), "st": "F" + str((st.get("i") + 1)), "d": _ix(_ix(DIFFS, SET.get("diff")).n, 0), "c": int(run.get("conts", 0))}
 	nb = bestUp()
-	left = (D.get("cont") - int(run.get("conts")))
+	left = (D.get("cont") - int(run.get("conts", 0)))
 	sa = (run.get("scoreAt") if (run.get("scoreAt") != null) else 0)
 	if (left > 0):
 		c = JSON.parse_string(JSON.stringify(run))
@@ -5503,20 +5816,116 @@ func gameOver():
 		slotSave("play", st.get("i"), c)
 	show("<div class=\"panel\"><h2>EL SOUND SYSTEM CALLA</h2>" + ("<p class=\"note\">¡NUEVO RÉCORD: " + pad(run.get("score"), 7) + "!</p>" if nb else "") + str(stat()) + ("<p class=\"dim\">" + (("Continuar vuelve a la puerta del jefe" if (run.get("cpx", NAN) >= st.get("arenaX", NAN)) else "Continuar vuelve al último punto de control") if ((run.get("cpi") == st.get("i")) and (run.get("cpx", NAN) > 0)) else "Continuar reinicia la fase " + str((st.get("i") + 1))) + " con los puntos de la entrada (" + pad(sa, 7) + "). Te quedan " + str(left) + ".</p>" if (left > 0) else "<p class=\"dim\">SIN CONTINUACIONES. La ranura vuelve al principio de la fase " + str((st.get("i") + 1)) + ".</p>") + "<div class=\"menu\">" + ("<button class=\"btn hot\" data-act=\"cont\">CONTINUAR (" + str(left) + ")</button>" if (left > 0) else "") + "<button class=\"btn" + ("" if (left > 0) else " hot") + "\" data-act=\"rank\">GUARDAR EN RANKING</button><button class=\"btn\" data-act=\"tomenu\">MENÚ PRINCIPAL</button></div></div>")
 
-# L2555
+# L2649
 func showWin():
 	var nb = null
-	pend = {"score": max(run.get("score"), (run.get("peak") if run.get("peak") else 0)), "st": "FIN", "d": _ix(_ix(DIFFS, SET.get("diff")).n, 0), "c": int(run.get("conts"))}
+	pend = {"score": max(run.get("score"), (run.get("peak") if run.get("peak") else 0)), "st": "FIN", "d": _ix(_ix(DIFFS, SET.get("diff")).n, 0), "c": int(run.get("conts", 0))}
 	slotSave("done", st.get("i"))
 	nb = bestUp()
 	show("<div class=\"panel\"><p class=\"kick\">LA BESTIA SUENA OTRA VEZ</p><h2>LA CIUDAD VUELVE A BAILAR</h2>" + ("<p class=\"note\">¡NUEVO RÉCORD!</p>" if nb else "") + str(stat()) + "<div class=\"menu\"><button class=\"btn hot\" data-act=\"rank\">GUARDAR EN RANKING</button><button class=\"btn\" data-act=\"credits\">CRÉDITOS</button><button class=\"btn\" data-act=\"tomenu\">MENÚ PRINCIPAL</button></div></div>")
 
-# L2561
-func showCredits():
-	back = showWin
-	show("<div class=\"panel\"><p class=\"kick\">DUB SIEGE</p><h2>CRÉDITOS</h2><div class=\"stats\"><span>IDEA Y DIRECCIÓN</span><b>KUBOPLAY</b><span>DESARROLLO</span><b>KUBOPLAY</b>" + "<span>ARTE</span><b>KUBOPLAY</b><span>MÚSICA</span><b>SINTETIZADA EN EL JUEGO</b><span>INSPIRACIÓN</span><b>SOUND SYSTEMS, 1955-1981</b></div>" + "<p class=\"dim\">TODOS LOS PERSONAJES SON INVENTADOS. GRACIAS POR JUGAR.</p><div class=\"menu\"><button class=\"btn hot\" data-act=\"back\">VOLVER</button></div></div>")
+# L2658
+func credLines():
+	var L = null
+	var i = null
+	L = [["DUB SIEGE", "#ffd23f"], ["", ""], ["IDEA Y DIRECCIÓN", "#8f98c8"], [STUDIO, "#eef3ff"], ["", ""], ["DESARROLLO", "#8f98c8"], [STUDIO, "#eef3ff"], ["", ""], ["ARTE", "#8f98c8"], [STUDIO, "#eef3ff"], ["", ""], ["MÚSICA", "#8f98c8"], ["SINTETIZADA EN EL JUEGO", "#eef3ff"], ["", ""], ["INSPIRACIÓN", "#8f98c8"], ["SOUND SYSTEMS, 1955-1981", "#eef3ff"], ["", ""], ["", ""], ["REPARTO", "#ff3d6e"]]
+	i = 0
+	while (i < _len(LEVELS)):
+		L.append([_ix(LEVELS, i).get("boss"), "#eef3ff"])
+		i += 1
+	_push(L, [["", ""], ["", ""], ["TODOS LOS PERSONAJES SON INVENTADOS", "#8f98c8"], ["", ""], ["GRACIAS POR JUGAR", "#ffd23f"]])
+	return L
 
-# L2565
+# L2662
+func showCredits():
+	var _c = {"m0": null}
+	var _fn = null
+	_c.m0 = mode
+	hideOv()
+	_fn = func():
+		mode = _c.m0
+		showWin()
+	startCut([{"s": ""}], _fn)
+	cut.cred = 1
+
+# L2663
+func drawCred(c = null):
+	var gy = null
+	var x = null
+	var ks = null
+	var i = null
+	var k = null
+	var o = null
+	var Lv = null
+	var sc = null
+	var L = null
+	var cx = null
+	var y0 = null
+	var bot = null
+	var y = null
+	var a = null
+	g.save()
+	g.setTransform(SC, 0, 0, SC, 0, 0)
+	rect(0, 0, W, H, "#06070d")
+	gy = (H - 6)
+	x = ((W + 20) - (c.get("t") * 0.5))
+	ks = []
+	rect(0, gy, W, 6, "#141a33")
+	rect(0, gy, W, 1, "#2a3360")
+	i = 0
+	while (i < _len(LEVELS)):
+		Lv = _ix(LEVELS, i)
+		k = (("bh_" + str(Lv.get("mt")) if (_ix(SHEET, "bh_" + str(Lv.get("mt"))) and _ix(SHEET, "bh_" + str(Lv.get("mt"))).get("ok")) else _ix(ESHEET, Lv.get("mt"))) if (Lv.get("ai") == 4) else "b_" + str(Lv.get("ai")))
+		if Lv.get("mk"):
+			k = tintSheet(k)
+		ks.append(k)
+		i += 1
+	k = lookSheet("run")
+	o = _ix(SHEET, k)
+	if (o and o.get("ok")):
+		if ((x > -20) and (x < W)):
+			blitS(k, fmod((int(t) >> int(2)), o.get("n")), x, (gy - o.get("fh")), 1, true)
+		x += (o.get("fw") + 14)
+	i = 0
+	while (i < _len(ks)):
+		o = _ix(SHEET, _ix(ks, i))
+		if ((not o) or (not (o.get("ok")))):
+			i += 1
+			continue
+		sc = (1 if ((o.get("x1") or (_indexOf(_ix(ks, i), "bh_") == 0)) or (_indexOf(_ix(ks, i), "b_") == 0)) else 2)
+		if ((x > (-(o.get("fw")) * sc)) and (x < W)):
+			blitS(_ix(ks, i), fmod((int(t) >> int(3)), o.get("n")), x, (gy - (o.get("fh") * sc)), sc, true)
+		x += ((o.get("fw") * sc) + 12)
+		i += 1
+	g.restore()
+	g.save()
+	g.setTransform((SC * HS), 0, 0, (SC * HS), 0, 0)
+	L = credLines()
+	cx = (HW / 2.0)
+	y0 = (HH - (c.get("t") * 0.32))
+	bot = (HH - floori(float((48.0 / HS)) + 0.5))
+	i = 0
+	while (i < _len(L)):
+		y = (y0 + (i * 11))
+		if ((y < -10) or (y > bot)):
+			i += 1
+			continue
+		a = min(1, ((bot - y) / 14.0), ((y + 4) / 18.0))
+		if (a <= 0):
+			i += 1
+			continue
+		g.globalAlpha = a
+		if _ix(_ix(L, i), 0):
+			txt(_ix(_ix(L, i), 0), cx, y, _ix(_ix(L, i), 1), "c")
+		i += 1
+	g.globalAlpha = 1
+	if ((y0 + (_len(L) * 11)) < -10):
+		c.done = 1
+	if ((c.get("t", NAN) > 60) and (int((int(t) >> int(4))) & int(1))):
+		txt(("TOCA PARA VOLVER" if touchMode() else "INTRO PARA VOLVER"), (HW - 5), 3, "#5a6390", "r")
+	g.restore()
+
+# L2679
 func pause():
 	if (mode != "play"):
 		return
@@ -5525,25 +5934,30 @@ func pause():
 	TS = {}
 	pauseShow()
 
-# L2566
+# L2680
 func showBag():
 	var q = null
 	back = pauseShow
 	q = quickObj()
 	show("<div class=\"panel\"><h2>MOCHILA</h2>" + str(bagRows(false)) + "<div class=\"menu\"><button class=\"btn\" data-act=\"oqk\">BOTÓN RÁPIDO: " + str(_ix(OBJN, q).get("n")) + "</button><button class=\"btn hot\" data-act=\"back\">VOLVER</button></div></div>")
 
-# L2568
+# L2682
 func pauseShow():
+	var pb = null
 	back = null
 	show("<div class=\"panel\"><h2>PAUSA</h2><p class=\"dim\">FASE " + str((st.get("i") + 1)) + " - " + str(st.L.get("name")) + " - " + str(_ix(DIFFS, SET.get("diff")).get("n")) + "</p>" + ("<p class=\"dim sv\">RANURA " + str((CUR + 1)) + " · GUARDADO AL EMPEZAR LA FASE</p>" if (CUR != null) else "") + "<div class=\"menu\"><button class=\"btn hot\" data-act=\"resume\">CONTINUAR</button>" + "<button class=\"btn\" data-act=\"bag\">MOCHILA (" + str(objCount()) + ")</button><button class=\"btn\" data-act=\"opts\">OPCIONES</button><button class=\"btn\" data-act=\"controls\">CONTROLES</button><button class=\"btn\" data-act=\"restart\">REINICIAR FASE</button><button class=\"btn\" data-act=\"tomenu\">SALIR AL MENÚ</button></div></div>")
+	if PFOC:
+		pb = _callm(S_("ov"), "querySelector", ["[data-act=\"" + str(PFOC) + "\"]"])
+		if pb:
+			_callm(pb, "focus", [{"preventScroll": true}])
 
-# L2571
+# L2688
 func resume():
 	hideOv()
 	mode = "play"
 	K = {}
 
-# L2574
+# L2691
 func startGame(n = null):
 	PRAC = 0
 	newRun()
@@ -5552,7 +5966,7 @@ func startGame(n = null):
 	enterLevel((n if n else 0), true)
 	audioOn()
 
-# L2575
+# L2692
 func act(a = null, v = null):
 	var _c = {"sb": null, "sd": null, "db": null}
 	var ci = null
@@ -5561,6 +5975,7 @@ func act(a = null, v = null):
 	var oj = null
 	var oo = null
 	var n = null
+	var ca = null
 	var _sw = null
 	var _fn = null
 	var _fn_2 = null
@@ -5570,6 +5985,10 @@ func act(a = null, v = null):
 	audioOn()
 	if ((mode == "menu") and _callm(S_("ov").classList, "contains", ["title"])):
 		MFOC = a
+	if ((mode == "pause") and (_indexOf(["bag", "opts", "controls"], a) > -1)):
+		PFOC = a
+	elif ((a == "resume") or (a == "tomenu")):
+		PFOC = null
 	_sw = a
 	while true:
 		if _sw == "play":
@@ -5709,7 +6128,7 @@ func act(a = null, v = null):
 			else:
 				nextStage()
 		elif _sw == "cont":
-			if (int(run.get("conts")) >= D.get("cont", NAN)):
+			if (int(run.get("conts", 0)) >= D.get("cont", NAN)):
 				break
 			run.peak = max((run.get("peak") if run.get("peak") else 0), run.get("score"))
 			run.conts += 1
@@ -5719,8 +6138,10 @@ func act(a = null, v = null):
 			run.wpn = "N"
 			run.bass = 0
 			n = st.get("i")
+			ca = st.get("coinsAt")
 			run.stage = n
 			buildStage(n)
+			st.coinsAt = min(ca, run.get("coins"))
 			cpResume()
 			hideOv()
 			mode = "play"
@@ -5738,7 +6159,7 @@ func act(a = null, v = null):
 			lookExit()
 		break
 
-# L2627
+# L2745
 func update():
 	var rd = null
 	var i = null
@@ -5831,6 +6252,8 @@ func update():
 	if boss:
 		updateBoss()
 	updatePickups()
+	if RADIO:
+		radioTick()
 	_l_2 = (run.get("comboT", NAN) > 0)
 	if _l_2:
 		run.comboT -= 1
@@ -5874,7 +6297,7 @@ func update():
 	if (not (int(t) & int(15))):
 		ck0 = coachStep()
 		if ck0:
-			CO.tk = ((int(CO.get("tk")) + 16) if (CO.get("k") == ck0) else 0)
+			CO.tk = ((int(CO.get("tk", 0)) + 16) if (CO.get("k") == ck0) else 0)
 			CO.k = ck0
 			if (CO.get("tk", NAN) > 900):
 				_aset(CO.d, ck0, 1)
@@ -5924,7 +6347,7 @@ func update():
 		st.bossDone = 1
 		endLevel()
 
-# L2716
+# L2834
 func blitS(k = null, f = null, x = null, y = null, s = null, flip = null, white = null):
 	var o = null
 	var m = null
@@ -5958,7 +6381,7 @@ func blitS(k = null, f = null, x = null, y = null, s = null, flip = null, white 
 		g.drawImage(src, sx, 0, sw, sh_2, dx, dy, dw, dh)
 	return true
 
-# L2724
+# L2842
 func tintSheet(k = null):
 	var o = null
 	var key = null
@@ -5981,7 +6404,7 @@ func tintSheet(k = null):
 	_aset(SHEET, key, {"fw": o.get("fw"), "fh": o.get("fh"), "n": o.get("n"), "x1": o.get("x1"), "ok": true, "img": c, "wimg": o.get("wimg")})
 	return key
 
-# L2728
+# L2846
 func blit(k = null, f = null, x = null, y = null, w = null, h = null, flip = null, white = null, alpha = null):
 	var o = null
 	var src = null
@@ -6015,25 +6438,25 @@ func blit(k = null, f = null, x = null, y = null, w = null, h = null, flip = nul
 		g.globalAlpha = 1
 	return true
 
-# L2759
+# L2877
 func bankCommit():
 	BANK0 = BANK
 	save("ds2_bank", BANK)
 
-# L2762 (a mano)
+# L2880 (a mano)
 func lookOwn(k = null, i = null):
 	return k == "s" or not _ix(_ix(LK, k), i).get("c") or _indexOf(LOOK.own, str(k) + str(i)) > -1
 
-# L2763
+# L2881
 func lookSave():
 	save("ds2_look", LOOK)
 	lookVer += 1
 
-# L2764
+# L2882
 func lum(r = null, g_2 = null, b = null):
 	return (((0.3 * r) + (0.59 * g_2)) + (0.11 * b))
 
-# L2766
+# L2884
 func isSkin(r = null, g_2 = null, b = null):
 	var mx = null
 	var mn = null
@@ -6047,13 +6470,13 @@ func isSkin(r = null, g_2 = null, b = null):
 	h = ((60 * (g_2 - b)) / float((mx - mn)))
 	return _and((h >= 5), (h <= 40))
 
-# L2768
+# L2886
 func paint(d = null, i = null, col = null, k = null):
 	d[int(i)] = int(min(255, (col[int(0)] * k)))
 	d[int((i + 1))] = int(min(255, (col[int(1)] * k)))
 	d[int((i + 2))] = int(min(255, (col[int(2)] * k)))
 
-# L2771
+# L2889
 func lookSheet(st_2 = null):
 	var key = null
 	var o = null
@@ -6203,7 +6626,7 @@ func lookSheet(st_2 = null):
 	_aset(SHEET, key, {"fw": B.get("fw"), "fh": B.get("fh"), "n": B.get("n"), "ok": true, "img": cn, "wimg": wc, "ver": lookVer})
 	return key
 
-# L2811
+# L2929
 func lookCost():
 	var c = null
 	var k = null
@@ -6215,7 +6638,7 @@ func lookCost():
 			c += _ix(_ix(LK, k), _ix(LOOK, k)).get("c")
 	return c
 
-# L2812
+# L2930
 func showLook(foc = null):
 	var _c = {"b": null}
 	var cost = null
@@ -6250,7 +6673,7 @@ func showLook(foc = null):
 	if (not lookRaf):
 		lookLoop()
 
-# L2826
+# L2944
 func lookLoop():
 	var c = null
 	var q = null
@@ -6279,7 +6702,7 @@ func lookLoop():
 		q.drawImage(o.get("img"), (fr * sw), 0, sw, sh_2, floori(float(((c.get("width") - sw) / 2.0)) + 0.5), (c.get("height") - sh_2), sw, sh_2)
 	lookRaf = _raf(lookLoop)
 
-# L2834
+# L2952
 func lookStep(k = null, d = null):
 	var n = null
 	n = _len(_ix(LK, k))
@@ -6288,7 +6711,7 @@ func lookStep(k = null, d = null):
 	sfx("click")
 	showLook(k)
 
-# L2835
+# L2953
 func lookBuy():
 	var c = null
 	var k = null
@@ -6306,7 +6729,7 @@ func lookBuy():
 	sfx("coin")
 	showLook("lkok")
 
-# L2837
+# L2955
 func lookExit():
 	var _c = {"b": null}
 	var r = null
@@ -6332,7 +6755,7 @@ func lookExit():
 			_callm(_c.b, "focus", [])
 		_timeout(_fn, 40)
 
-# L2841
+# L2959
 func spr(rows = null, pal = null, x = null, y = null, flip = null, white = null, alpha = null):
 	var w = null
 	var r = null
@@ -6364,7 +6787,7 @@ func spr(rows = null, pal = null, x = null, y = null, flip = null, white = null,
 	if alpha:
 		g.globalAlpha = 1
 
-# L2848
+# L2966
 func txt(s = null, x = null, y = null, col = null, al = null):
 	var w = null
 	g.font = "8px \"Press Start 2P\", monospace"
@@ -6381,7 +6804,7 @@ func txt(s = null, x = null, y = null, col = null, al = null):
 	g.fillStyle = col
 	g.fillText(s, x, y)
 
-# L2856
+# L2974
 func txtM(s = null, x = null, y = null, col = null, m = null, o = null):
 	var j = null
 	var k = null
@@ -6396,7 +6819,7 @@ func txtM(s = null, x = null, y = null, col = null, m = null, o = null):
 		txt(_slice(s, j, k), (x + (8 * j)), y, ("#ffb060" if (_ix(m, (o + j)) == "1") else col))
 		j = k
 
-# L2862
+# L2980
 func j_wrap(s = null, maxw = null):
 	var ws = null
 	var out = null
@@ -6422,12 +6845,12 @@ func j_wrap(s = null, maxw = null):
 		out.append(cur)
 	return out
 
-# L2870
+# L2988
 func rect(x = null, y = null, w = null, h = null, c = null):
 	g.fillStyle = c
 	g.fillRect(floori(float(x) + 0.5), floori(float(y) + 0.5), w, h)
 
-# L2881
+# L2999
 func lightSpr(r = null, col = null):
 	var k = null
 	var d = null
@@ -6482,7 +6905,7 @@ func lightSpr(r = null, col = null):
 	_aset(LSPR, k, cn)
 	return cn
 
-# L2900
+# L3018
 func light(x = null, y = null, r = null, a = null, col = null):
 	if (LN >= 48):
 		return
@@ -6494,7 +6917,7 @@ func light(x = null, y = null, r = null, a = null, col = null):
 	_aset(LCOL, LN, (col if col else null))
 	LN += 1
 
-# L2906
+# L3024
 func floorY(x = null, y = null):
 	var cx = null
 	var cy = null
@@ -6510,7 +6933,7 @@ func floorY(x = null, y = null):
 		i += 1
 	return -1
 
-# L2911
+# L3029
 func shadow(sx = null, wx = null, wy = null, w = null, h = null):
 	var S = null
 	var sun = null
@@ -6549,7 +6972,7 @@ func shadow(sx = null, wx = null, wy = null, w = null, h = null):
 		g.fillRect((floori(float(((cx + off) - (rw / 2.0))) + 0.5) + 2), (fy + 2), (rw - 4), 1)
 	g.globalAlpha = 1
 
-# L2932
+# L3050
 func drawLight():
 	var S = null
 	var i = null
@@ -6577,7 +7000,7 @@ func drawLight():
 	g.restore()
 	LN = 0
 
-# L2951
+# L3069
 func bgArt():
 	var o = null
 	var BW = null
@@ -6595,7 +7018,7 @@ func bgArt():
 		g.globalAlpha = 1
 	return true
 
-# L2958
+# L3076
 func drawBG():
 	var S = null
 	var n = null
@@ -6782,7 +7205,7 @@ func drawBG():
 				rect(((px + T) - 2), GY, 1, 4, "#ff3d6e")
 		i += 1
 
-# L3013
+# L3131
 func clashTowers():
 	var ax = null
 	var pu = null
@@ -6801,7 +7224,7 @@ func clashTowers():
 	clashPiece("s_censor", ((ax + W) - 39), con, pu, "#ff3d6e", 1)
 	clashPiece("t_censor", ((ax + W) - 52), con, pu, "#ff3d6e", 1)
 
-# L3024
+# L3142
 func clashPiece(key = null, wx = null, on = null, pu = null, lc = null, cen = null):
 	var a = null
 	var x = null
@@ -6819,7 +7242,7 @@ func clashPiece(key = null, wx = null, on = null, pu = null, lc = null, cen = nu
 	if (((cen and (on > 0)) and (on < 1)) and (fmod(t, 9) == 0)):
 		burst((((wx + ((a.get("fw")) / 2.0)) + (_rnd() * 8)) - 4), (((GY - a.get("fh")) + 4) + ((_rnd() * a.get("fh")) * 0.8)), ["#ffd23f", "#fff"], 3, 1.5)
 
-# L3033
+# L3151
 func bgFoot(x = null, w = null):
 	var a = null
 	var b = null
@@ -6833,7 +7256,7 @@ func bgFoot(x = null, w = null):
 		c += 1
 	return true
 
-# L3036
+# L3154
 func city(par = null, sp = null, hmin = null, hr = null, col = null, win = null, j_seed = null):
 	var off = null
 	var i0 = null
@@ -6866,7 +7289,7 @@ func city(par = null, sp = null, hmin = null, hr = null, col = null, win = null,
 				wy += 6
 		i += 1
 
-# L3041
+# L3159
 func speaker(x = null, y = null, pu = null):
 	var _a = null
 	var c = null
@@ -6883,7 +7306,7 @@ func speaker(x = null, y = null, pu = null):
 		rect((((x + _ix(c, 0)) - r) + 2), (((y + _ix(c, 1)) - r) + 2), ((r * 2) - 4), ((r * 2) - 4), "#1f1530")
 		rect(((x + _ix(c, 0)) - 2), ((y + _ix(c, 1)) - 2), 4, 4, "#05030a")
 
-# L3051
+# L3169
 func shade(c = null, f = null):
 	var _c = {"f": f}
 	var n = null
@@ -6900,7 +7323,7 @@ func shade(c = null, f = null):
 	b = (int(n) & int(255))
 	return "rgb(" + str(m.call(r)) + "," + str(m.call(gg)) + "," + str(m.call(b)) + ")"
 
-# L3057
+# L3175
 func tileSpr(key = null, paint_2 = null):
 	var o = null
 	var cn = null
@@ -6917,12 +7340,12 @@ func tileSpr(key = null, paint_2 = null):
 	_aset(TSPR, key, cn)
 	return cn
 
-# L3063
+# L3181
 func qp(q = null, x = null, y = null, w = null, h = null, c = null):
 	q.fillStyle = c
 	q.fillRect(x, y, w, h)
 
-# L3065
+# L3183
 func paintGnd(q = null, D_2 = null, S = null, v = null, top = null):
 	var x = null
 	var y = null
@@ -6993,7 +7416,7 @@ func paintGnd(q = null, D_2 = null, S = null, v = null, top = null):
 				qp(q, i, (3 + int((rnd((i + v)) * 4))), 1, 1, shade(S.get("top"), 0.78))
 			i += 1
 
-# L3100
+# L3218
 func paintPlat(q = null, D_2 = null, S = null):
 	var x = null
 	var r = null
@@ -7012,7 +7435,7 @@ func paintPlat(q = null, D_2 = null, S = null):
 	qp(q, 5, 4, 2, 2, shade(S.get("top"), 0.6))
 	qp(q, (D_2 - 7), 4, 2, 2, shade(S.get("top"), 0.6))
 
-# L3110
+# L3228
 func paintSpikes(q = null, D_2 = null):
 	var k = null
 	var bx = null
@@ -7039,7 +7462,7 @@ func paintSpikes(q = null, D_2 = null):
 		qp(q, (bx + 7), (D_2 - h), 2, 1, "#ffb0c4")
 		k += 1
 
-# L3123
+# L3241
 func drawTiles():
 	var _c = {"S": null, "v": null, "top": null}
 	var c0 = null
@@ -7126,7 +7549,7 @@ func drawTiles():
 		else:
 			rect((x_3 + 2), (c.get("y") - 12), 10, 6, "#555a70")
 
-# L3147
+# L3265
 func drawBarrel(e = null, x = null, y = null):
 	var v = null
 	var k = null
@@ -7136,7 +7559,7 @@ func drawBarrel(e = null, x = null, y = null):
 		k = (int((int(t) >> int(2))) & int(1))
 		fxDraw(orbSpr("#ff8a2a", (2 if (e.get("cd", NAN) < 8) else 1), 0, k), ((x + 5) + (_ix(v, 0) * 4.6)), ((y + 3) + (_ix(v, 1) * 4.6)))
 
-# L3149
+# L3267
 func drawEnemy(e = null):
 	var x = null
 	var y = null
@@ -7186,19 +7609,19 @@ func drawEnemy(e = null):
 	if (((eo and eo.get("ok")) and eo.get("wimg")) and (not wh)):
 		q = 0
 		while (q < 4):
-			blit(_ix(ESHEET, e.get("type")), int(e.get("a")), (x + (((q * 2) - 1) if (q < 2) else 0)), (y + (0 if (q < 2) else ((q * 2) - 5))), ed.get("w"), ed.get("h"), ((p.get("x", NAN) < e.get("x", NAN)) if (e.get("type") == "f") else f), 1, 0.38)
+			blit(_ix(ESHEET, e.get("type")), int(e.get("a", 0)), (x + (((q * 2) - 1) if (q < 2) else 0)), (y + (0 if (q < 2) else ((q * 2) - 5))), ed.get("w"), ed.get("h"), ((p.get("x", NAN) < e.get("x", NAN)) if (e.get("type") == "f") else f), 1, 0.38)
 			q += 1
-	if (ed and blit(_ix(ESHEET, e.get("type")), int(e.get("a")), x, y, ed.get("w"), ed.get("h"), ((p.get("x", NAN) < e.get("x", NAN)) if (e.get("type") == "f") else f), wh)):
+	if (ed and blit(_ix(ESHEET, e.get("type")), int(e.get("a", 0)), x, y, ed.get("w"), ed.get("h"), ((p.get("x", NAN) < e.get("x", NAN)) if (e.get("type") == "f") else f), wh)):
 		if (e.get("type") == "t"):
 			drawBarrel(e, x, y)
 		return
 	_sw = e.get("type")
 	if _sw == "w":
-		spr(_concat(WB, [[_ix(WL, fmod(int(e.get("a")), 2))]]), WALK, x, y, f, wh)
+		spr(_concat(WB, [[_ix(WL, fmod(int(e.get("a", 0)), 2))]]), WALK, x, y, f, wh)
 	elif _sw == "h":
 		spr(_concat(WB, [[_ix(WL, (0 if e.get("ground") else 1)), ".........."]]), HOP, x, (y - (0 if e.get("ground") else 1)), f, wh)
 	elif _sw == "f":
-		spr(_concat([_ix(FR, fmod(int(e.get("a")), 2))], [FB]), FP, x, y, (p.get("x", NAN) < e.get("x", NAN)), wh)
+		spr(_concat([_ix(FR, fmod(int(e.get("a", 0)), 2))], [FB]), FP, x, y, (p.get("x", NAN) < e.get("x", NAN)), wh)
 	elif _sw == "t":
 		rect(x, (y + 4), 10, 6, ("#fff" if wh else "#4a5170"))
 		rect((x + 1), (y + 5), 8, 1, "#7a82a8")
@@ -7232,20 +7655,28 @@ func drawEnemy(e = null):
 		rect(x, (y + 4), 10, 1, "#6a4018")
 		txt("?", (x + 1), (y + 1), "#ffd23f")
 
-# L3190
+# L3308
 func drawBoss(b = null):
 	var _c = {"wh": null, "x": null, "y": null}
 	var R = null
 	var s = null
 	var bok = null
+	var hk = null
+	var hd = null
 	var sk = null
 	var so = null
+	var bsc = null
 	var fw = null
 	var fh = null
 	var sx2 = null
+	var s2 = null
 	var k = null
 	var j = null
 	var right = null
+	var cr = null
+	var lx = null
+	var _a = null
+	var px = null
 	R = func(a = null, c = null, w = null, h = null, col = null):
 		g.fillStyle = ("#fff" if _c.wh else col)
 		g.fillRect((_c.x + a), (_c.y + c), w, h)
@@ -7254,26 +7685,49 @@ func drawBoss(b = null):
 		light(((b.get("x") - cam) + ((b.get("w")) / 2.0)), (b.get("y") + ((b.get("h")) / 2.0)), max(16, b.get("w")), (1 if (b.get("fl", NAN) > 0) else 0.55), ("#ff3d6e" if (b.get("ph", NAN) > 1) else "#ff8aa6"))
 	_c.x = floori(float((b.get("x") - cam)) + 0.5)
 	_c.y = floori(float(b.get("y")) + 0.5)
-	_c.wh = (_and(_and((mode == "play"), (b.get("deadT", NAN) > 40)), (fmod((int(b.get("deadT")) >> int(3)), 4) == 0)) if b.get("dead") else _or(_or((b.get("fl", NAN) > 0), _and((b.get("wind", NAN) > 0), (int((int(b.get("wind")) >> int(2))) & int(1)))), _and(_and(_and(_and(_and(((b.get("actT", NAN) > 0) if b.get("act") else b.get("act")), (b.get("actT", NAN) < 40)), (int((int(b.get("actT")) >> int(2))) & int(1))), (b.get("act") != "burst")), (b.get("act") != "low")), (b.get("act") != "ground"))))
+	_c.wh = (_and(_and((mode == "play"), (b.get("deadT", NAN) > 40)), (fmod((int(b.get("deadT")) >> int(3)), 4) == 0)) if b.get("dead") else _or(_or((b.get("fl", NAN) > 0), _and((b.get("wind", NAN) > 0), (int((int(b.get("wind")) >> int(2))) & int(1)))), _and(_and(_and(_and(_and(_and(_and(_and(_and(((b.get("actT", NAN) > 0) if b.get("act") else b.get("act")), (b.get("actT", NAN) < 40)), (int((int(b.get("actT")) >> int(2))) & int(1))), (b.get("act") != "burst")), (b.get("act") != "low")), (b.get("act") != "ground")), (b.get("act") != "beam")), (b.get("act") != "pil")), (b.get("act") != "sweep")), (b.get("act") != "leap"))))
 	if b.get("dead"):
 		_c.x += (1 if (int((int(t) >> int(1))) & int(1)) else -1)
 		_c.y += floori(float(((110 - b.get("deadT")) * 0.06)) + 0.5)
 		g.globalAlpha = min(1, ((b.get("deadT")) / 40.0))
-	s = fmod(int(b.get("a")), 2)
+	s = fmod(int(b.get("a", 0)), 2)
 	if (b.get("kind") == 4):
-		sk = ("bs_" + str(b.get("mt")) if (_ix(SHEET, "bs_" + str(b.get("mt"))) and _ix(SHEET, "bs_" + str(b.get("mt"))).get("ok")) else _ix(ESHEET, b.get("mt")))
+		hk = "bh_" + str(b.get("mt"))
+		hd = (not (not (_ix(SHEET, hk) and _ix(SHEET, hk).get("ok"))))
+		sk = (hk if hd else ("bs_" + str(b.get("mt")) if (_ix(SHEET, "bs_" + str(b.get("mt"))) and _ix(SHEET, "bs_" + str(b.get("mt"))).get("ok")) else _ix(ESHEET, b.get("mt"))))
 		so = _ix(SHEET, sk)
+		bsc = (1 if hd else b.get("sc"))
 		bok = (not (not (so and so.get("ok"))))
 		if bok:
-			fw = (so.get("fw") * b.get("sc"))
-			fh = (so.get("fh") * b.get("sc"))
-			blitS(sk, int(b.get("a")), ((_c.x + ((b.get("w")) / 2.0)) - (fw / 2.0)), (((_c.y + b.get("h")) - fh) + floori(float(((fh - b.get("h")) * 0.4)) + 0.5)), b.get("sc"), ((p.get("x", NAN) < b.get("x", NAN)) if (b.get("mt") == "f") else (b.get("dir", NAN) > 0)), _c.wh)
+			fw = (so.get("fw") * bsc)
+			fh = (so.get("fh") * bsc)
+			blitS(sk, fmod(int(b.get("a", 0)), so.get("n")), ((_c.x + ((b.get("w")) / 2.0)) - (fw / 2.0)), (((_c.y + b.get("h")) - fh) + floori(float(((fh - b.get("h")) * 0.4)) + 0.5)), bsc, ((p.get("x", NAN) < b.get("x", NAN)) if (b.get("mt") == "f") else ((b.get("dir", NAN) < 0) if (b.get("mt") == "s") else (b.get("dir", NAN) > 0))), _c.wh)
 			if ((b.get("mt") == "s") and (b.get("act") != "stun")):
 				sx2 = (((_c.x + b.get("w")) - 2) if (b.get("dir", NAN) > 0) else (_c.x - 2))
 				rect(sx2, (_c.y + 4), 4, (b.get("h") - 6), ("#fff" if _c.wh else "#9aa0b0"))
 				rect((sx2 + 1), (_c.y + 5), 2, (b.get("h") - 8), "#d8dce8")
 	else:
-		bok = blit((tintSheet("b_" + str(b.get("kind"))) if b.get("mk") else "b_" + str(b.get("kind"))), int(b.get("a")), _c.x, _c.y, b.get("w"), b.get("h"), (b.get("vx", NAN) < 0), _c.wh)
+		if (b.get("mk") and (b.get("kind") == 0)):
+			R.call(-6, 5, 7, 12, "#2c3048")
+			R.call((b.get("w") - 1), 5, 7, 12, "#2c3048")
+			R.call(-5, 7, 4, 8, "#0b0c14")
+			R.call(b.get("w"), 7, 4, 8, "#0b0c14")
+			R.call(-4, 10, 2, 2, "#ff3d6e")
+			R.call((b.get("w") + 1), 10, 2, 2, "#ff3d6e")
+			R.call(5, -4, 14, 3, "#4a5170")
+			R.call(11, -9, 2, 5, "#9aa0b0")
+			R.call(10, -11, 4, 2, ("#ff3d6e" if (int((int(t) >> int(3))) & int(1)) else "#ffd23f"))
+		if (b.get("mk") and (b.get("kind") == 1)):
+			s2 = (int((int(t) >> int(1))) & int(1))
+			R.call(-10, (-3 if s2 else -2), 14, 2, "#9aa0b0")
+			R.call((b.get("w") - 4), (-2 if s2 else -3), 14, 2, "#9aa0b0")
+			R.call(-3, -1, 5, 3, "#3a3f60")
+			R.call((b.get("w") - 2), -1, 5, 3, "#3a3f60")
+			R.call((((b.get("w")) / 2.0) - 2), (b.get("h") - 1), 4, 7, "#22263a")
+			R.call((((b.get("w")) / 2.0) - 1), (b.get("h") + 6), 2, 2, "#ff3d6e")
+			R.call(1, (b.get("h") - 3), 4, 6, "#c89a1a")
+			R.call((b.get("w") - 5), (b.get("h") - 3), 4, 6, "#c89a1a")
+		bok = blit((tintSheet("b_" + str(b.get("kind"))) if b.get("mk") else "b_" + str(b.get("kind"))), int(b.get("a", 0)), _c.x, _c.y, b.get("w"), b.get("h"), (b.get("vx", NAN) < 0), _c.wh)
 	if (not bok):
 		if (b.get("kind") == 4):
 			R.call(0, 0, b.get("w"), b.get("h"), "#3a3f60")
@@ -7372,11 +7826,40 @@ func drawBoss(b = null):
 		g.globalAlpha = (0.25 + (0.15 * (int((int(t) >> int(2))) & int(1))))
 		rect((floori(float((b.get("tx") - cam)) + 0.5) + 4), (_c.y + b.get("h")), 20, ((GY - _c.y) - b.get("h")), "#ff3d6e")
 		g.globalAlpha = 1
+	if ((b.get("mk") and (b.get("weak", NAN) > 0)) and (not (b.get("dead")))):
+		cr = (4 + (int((int(t) >> int(2))) & int(1)))
+		rect(((_c.x + ((b.get("w")) / 2.0)) - cr), ((_c.y + ((b.get("h")) / 2.0)) - cr), (cr * 2), (cr * 2), "#ffd23f")
+		rect(((_c.x + ((b.get("w")) / 2.0)) - 2), ((_c.y + ((b.get("h")) / 2.0)) - 2), 4, 4, "#fff")
+		if (int((int(t) >> int(3))) & int(1)):
+			txt("x2", ((_c.x + ((b.get("w")) / 2.0)) - 8), (_c.y - 12), "#ffd23f")
+	if ((b.get("mk") and (b.get("kind") == 0)) and (b.get("act") == "leap")):
+		g.globalAlpha = (0.4 + (0.3 * (int((int(t) >> int(2))) & int(1))))
+		rect(floori(float((b.get("tx") - cam)) + 0.5), (GY - 2), b.get("w"), 2, "#ff3d6e")
+		rect(((floori(float((b.get("tx") - cam)) + 0.5) + ((b.get("w")) / 2.0)) - 1), (GY - 8), 2, 6, "#ff3d6e")
+		g.globalAlpha = 1
+	if ((b.get("mk") and (b.get("kind") == 0)) and (b.get("act") == "pil")):
+		g.globalAlpha = (0.45 + (0.35 * (int((int(t) >> int(2))) & int(1))))
+		_a = b.get("pil")
+		for _i in range(_len(_a)):
+			if _i >= _len(_a): break
+			px = _a[_i]
+			rect((floori(float((px - cam)) + 0.5) - 4), (GY - 3), 8, 3, "#ffd23f")
+			rect((floori(float((px - cam)) + 0.5) - 1), (GY - 12), 2, 8, "#ffd23f")
+		g.globalAlpha = 1
+	if ((b.get("mk") and (b.get("kind") == 1)) and (b.get("act") == "beam")):
+		lx = floori(float((b.get("lx") - cam)) + 0.5)
+		if (b.get("actT", NAN) > 0):
+			g.globalAlpha = (0.3 + (0.25 * (int((int(t) >> int(2))) & int(1))))
+			rect((lx - 1), (_c.y + b.get("h")), 2, ((GY - _c.y) - b.get("h")), "#ff3d6e")
+			g.globalAlpha = 1
+		else:
+			rect((lx - 4), (_c.y + b.get("h")), 8, ((GY - _c.y) - b.get("h")), "#ff3d6e")
+			rect((lx - 2), (_c.y + b.get("h")), 4, ((GY - _c.y) - b.get("h")), "#fff")
 	if (((b.get("kind") == 3) and (b.get("act") == "wave")) and (b.get("actT", NAN) > 0)):
 		rect((_c.x - 8), (GY - 1), (b.get("w") + 16), 1, "#ffd23f")
 	g.globalAlpha = 1
 
-# L3240
+# L3372
 func drawHazards():
 	var ax = null
 	var sx = null
@@ -7474,7 +7957,7 @@ func drawHazards():
 			txt((">>" if (boss.get("side", NAN) < 0) else "<<"), sx, (GY - 22), "#ffd23f")
 			txt("SUBE", (ax + (W / 2.0)), 70, "#ffd23f", "c")
 
-# L3256
+# L3388
 func drawPlayer():
 	var legs = null
 	var x = null
@@ -7492,13 +7975,13 @@ func drawPlayer():
 		return
 	if (((p.get("inv", NAN) > 0) and (not (p.get("dash")))) and (int((int(p.get("inv")) >> int(2))) & int(1))):
 		return
-	legs = ((_ix([PL.get("r1"), PL.get("st"), PL.get("r2"), PL.get("st")], fmod(int(p.get("anim")), 4)) if p.get("vx") else PL.get("st")) if p.get("ground") else PL.get("air"))
+	legs = ((_ix([PL.get("r1"), PL.get("st"), PL.get("r2"), PL.get("st")], fmod(int(p.get("anim", 0)), 4)) if p.get("vx") else PL.get("st")) if p.get("ground") else PL.get("air"))
 	x = ((p.get("x") - 2) - cam)
 	y = (p.get("y") - 0)
 	shadow((p.get("x") - cam), p.get("x"), p.get("y"), p.get("w"), p.get("h"))
 	light(((p.get("x") - cam) + ((p.get("w")) / 2.0)), (p.get("y") + ((p.get("h")) / 2.0)), (30 if p.get("dash") else 20), 0.8, "#9fd2ff")
 	pst = pState()
-	if ((not (blit(lookSheet(pst), int(p.get("anim")), (p.get("x") - cam), p.get("y"), p.get("w"), p.get("h"), (p.get("face", NAN) < 0), false))) and (not (blit("p_idle", int(p.get("anim")), (p.get("x") - cam), p.get("y"), p.get("w"), p.get("h"), (p.get("face", NAN) < 0), false)))):
+	if ((not (blit(lookSheet(pst), int(p.get("anim", 0)), (p.get("x") - cam), p.get("y"), p.get("w"), p.get("h"), (p.get("face", NAN) < 0), false))) and (not (blit("p_idle", int(p.get("anim", 0)), (p.get("x") - cam), p.get("y"), p.get("w"), p.get("h"), (p.get("face", NAN) < 0), false)))):
 		spr(_concat((PBU if p.get("aimU") else PB), [legs]), PP, x, y, (p.get("face", NAN) < 0), false)
 	if ((p.get("shd", NAN) > 0) and ((p.get("shd", NAN) > 90) or (int((int(t) >> int(2))) & int(1)))):
 		scx = ((p.get("x") - cam) + 4)
@@ -7516,7 +7999,7 @@ func drawPlayer():
 		fxDraw(flashSpr(_ix(WPN, run.get("wpn")).get("c"), min(3, p.get("mf"))), (mz.get("x") - cam), mz.get("y"))
 		light((mz.get("x") - cam), mz.get("y"), 18, 1, _ix(WPN, run.get("wpn")).get("c"))
 
-# L3277
+# L3409
 func drawTitleHero():
 	var hx = null
 	var hy = null
@@ -7537,7 +8020,7 @@ func drawTitleHero():
 		rect((mx + 1), (my + 1), 2, 1, "#fff")
 		light((mx + 2), (my + 1), 20, 1, "#ffd23f")
 
-# L3286
+# L3418
 func heart(x = null, y = null, full = null, c = null):
 	var col = null
 	col = ((c if c else "#ff3d6e") if full else "#3a2030")
@@ -7548,7 +8031,7 @@ func heart(x = null, y = null, full = null, c = null):
 	rect((x + 2), (y + 4), 3, 1, col)
 	rect((x + 3), (y + 5), 1, 1, col)
 
-# L3289
+# L3421
 func wIcon(x = null, y = null, w = null):
 	var c = null
 	c = "#06070d"
@@ -7569,7 +8052,7 @@ func wIcon(x = null, y = null, w = null):
 		rect((x + 2), (y + 2), 4, 4, c)
 		rect((x + 6), (y + 3), 2, 2, c)
 
-# L3294
+# L3426
 func drawHUD():
 	var gr = null
 	var i = null
@@ -7666,12 +8149,14 @@ func drawHUD():
 		by2 = 24
 		rect((bxx - 1), (by2 - 1), (bw + 2), 7, "#000")
 		rect(bxx, by2, bw, 5, "#3a0a18")
+		rect(bxx, by2, max(0, floori(float(((bw * (boss.get("chip") if boss.get("chip") else 0)) / float(boss.get("max")))) + 0.5)), 5, "#ffe0e8")
 		rect(bxx, by2, max(0, floori(float(((bw * boss.get("hp")) / float(boss.get("max")))) + 0.5)), 5, ("#fff" if (boss.get("fl", NAN) > 0) else "#ff3d6e"))
 		if (boss.get("kind") == 3):
 			rect((bxx + (bw * 0.33)), by2, 1, 5, "#000")
 			rect((bxx + (bw * 0.66)), by2, 1, 5, "#000")
 		else:
-			rect((bxx + (bw * (0.75 if boss.get("mk") else 0.5))), by2, 1, 5, "#000")
+			rect((bxx + (bw * (0.75 if boss.get("mk") else 0.6))), by2, 1, 5, "#000")
+			rect((bxx + (bw * (0.35 if boss.get("mk") else 0.25))), by2, 1, 5, "#000")
 		if (run.get("mult", NAN) > 1):
 			txt("x" + str(run.get("mult")), ((bxx + bw) + 6), (by2 - 1), "#3de8ff")
 	else:
@@ -7713,10 +8198,12 @@ func drawHUD():
 			txt(_ix(ln, q), tx, ((ty + 3) + (q * 9)), cc, "c")
 			q += 1
 
-# L3332
+# L3464
 func draw():
+	var pk = null
 	var hc = null
 	var hs0 = null
+	var tpu = null
 	var bo = null
 	var bl = null
 	var by = null
@@ -7830,12 +8317,16 @@ func draw():
 			pring((ring.get("x") - cam), ring.get("y"), (ring.get("r") * 0.62), "#3de8ff")
 		g.globalAlpha = 1
 		light((ring.get("x") - cam), ring.get("y"), min(72, (20 + (ring.get("r") * 0.5))), max(0, (1 - ((ring.get("r")) / 360.0))), "#ffd23f")
+	pk = 0.62
+	g.save()
+	g.scale(pk, pk)
 	for _i_6 in range(_len(pops)):
 		if _i_6 >= _len(pops): break
 		o = pops[_i_6]
 		mx = null
-		mx = (((W - PADX) - (8 * _len(o.s))) - 3)
-		txt(o.get("s"), j_clamp((o.get("x") - cam), 2, max(2, mx)), max(o.get("y"), (camY + ceili((((32 if (boss and boss.get("on")) else 26) * HS) * UIF)))), o.get("c"))
+		mx = (((W - PADX) - ((8 * pk) * _len(o.s))) - 3)
+		txt(o.get("s"), ((j_clamp((o.get("x") - cam), 2, max(2, mx))) / float(pk)), ((max(o.get("y"), (camY + ceili((((32 if (boss and boss.get("on")) else 26) * HS) * UIF))))) / float(pk)), o.get("c"))
+	g.restore()
 	g.restore()
 	drawLight()
 	if (mode == "menu"):
@@ -7860,10 +8351,11 @@ func draw():
 	drawHUD()
 	if banner:
 		g.globalAlpha = (((banner.get("l")) / 20.0) if (banner.get("l", NAN) < 20) else min(1, (((170 - banner.get("l")) / 10.0) + 0.2)))
+		tpu = (ceili(((60 * HW) / float(max(1, VW())))) if touchMode() else 0)
 		bo = (8 if (boss and boss.get("on")) else 0)
-		bl = j_wrap(banner.get("b"), (HW - 16))
+		bl = j_wrap(banner.get("b"), ((HW - 16) - (2 * tpu)))
 		by = ((36 if banner.get("a") else 27) + bo)
-		rect(0, (25 + bo), HW, ((13 if banner.get("a") else 4) + (9 * _len(bl))), "rgba(6,7,13,.72)")
+		rect(0, (25 + bo), (HW - tpu), ((13 if banner.get("a") else 4) + (9 * _len(bl))), "rgba(6,7,13,.72)")
 		if banner.get("a"):
 			txt(banner.get("a"), (HW / 2.0), (27 + bo), ("#ff3d6e" if banner.get("boss") else "#3de8ff"), "c")
 		bq = 0
@@ -7871,6 +8363,7 @@ func draw():
 			txt(_ix(bl, bq), (HW / 2.0), (by + (bq * 9)), "#ffd23f", "c")
 			bq += 1
 		g.globalAlpha = 1
+	drawRadio()
 	drawBCard()
 	if (flash > 0):
 		g.globalAlpha = (flash / 24.0)

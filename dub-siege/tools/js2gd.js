@@ -733,7 +733,8 @@ class T {
         return `(${nn(l)} ${op} ${nn(r)})`;
       }
       case '|':
-        if (e.right.type === 'Literal' && e.right.value === 0) return `int(${l})`;
+        // undefined|0 es 0 en JS: la propiedad que falta se lee como 0 (int(null) revienta)
+        if (e.right.type === 'Literal' && e.right.value === 0) return `int(${l.replace(/\.get\(("[^"]+")\)$/, '.get($1, 0)')})`;
         return `(int(${l}) | int(${r}))`;
       case '&': case '^': case '<<': case '>>': return `(int(${l}) ${op} int(${r}))`;
       case '>>>': return `(int(${l}) >> int(${r}))`;

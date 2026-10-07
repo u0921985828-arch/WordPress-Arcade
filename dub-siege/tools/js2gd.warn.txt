@@ -1,68 +1,70 @@
 L331: llamada rara
 L331: for-in: en GDScript recorre claves de diccionario (no indices de array)
-L1444: identificador global desconocido document
-L1444: metodo desconocido .createElement()
-L1849: llamada a miembro calculado
-L2065: identificador global desconocido document
-L2065: metodo desconocido .createElement()
-L2277: metodo desconocido .querySelector()
-L2351: for-in: en GDScript recorre claves de diccionario (no indices de array)
-L2352: for-in: en GDScript recorre claves de diccionario (no indices de array)
-L2353: for-in: en GDScript recorre claves de diccionario (no indices de array)
-L2366: metodo desconocido .querySelector()
-L2366: metodo desconocido .focus()
-L2367: metodo desconocido .getDate()
-L2367: metodo desconocido .getMonth()
-L2367: metodo desconocido .getHours()
-L2367: metodo desconocido .getMinutes()
-L2427: metodo desconocido .remove()
-L2437: metodo desconocido .add()
-L2439: metodo desconocido .querySelector()
-L2439: metodo desconocido .focus()
-L2467: identificador global desconocido document
-L2467: identificador global desconocido document
-L2467: metodo desconocido .getAttribute()
-L2468: identificador global desconocido document
-L2468: metodo desconocido .querySelector()
-L2468: metodo desconocido .focus()
-L2513: metodo desconocido .querySelector()
-L2513: metodo desconocido .focus()
-L2520: metodo desconocido .querySelectorAll()
-L2520: metodo desconocido .focus()
-L2522: metodo desconocido .getAttribute()
-L2527: metodo desconocido .querySelector()
-L2527: metodo desconocido .focus()
-L2577: metodo desconocido .contains()
-L2587: identificador global desconocido document
-L2587: metodo desconocido .querySelector()
-L2587: metodo desconocido .focus()
-L2590: identificador global desconocido document
-L2590: metodo desconocido .querySelector()
-L2590: metodo desconocido .focus()
-L2593: identificador global desconocido document
-L2593: metodo desconocido .querySelector()
-L2593: metodo desconocido .focus()
-L2629: metodo desconocido .toggle()
-L2725: identificador global desconocido document
-L2725: metodo desconocido .createElement()
-L2775: identificador global desconocido document
-L2775: metodo desconocido .createElement()
-L2777: identificador global desconocido document
-L2777: metodo desconocido .createElement()
-L2797: identificador global desconocido document
-L2797: metodo desconocido .createElement()
-L2801: identificador global desconocido document
-L2801: metodo desconocido .createElement()
-L2823: identificador global desconocido document
-L2823: metodo desconocido .querySelector()
-L2823: identificador global desconocido document
-L2823: metodo desconocido .querySelector()
-L2823: metodo desconocido .focus()
-L2839: identificador global desconocido document
-L2839: metodo desconocido .querySelector()
-L2839: metodo desconocido .focus()
-L2883: identificador global desconocido document
-L2883: metodo desconocido .createElement()
-L3059: identificador global desconocido document
-L3059: metodo desconocido .createElement()
-L3197: funcion anidada R lee locales que cambian: x,y
+L1461: identificador global desconocido document
+L1461: metodo desconocido .createElement()
+L1874: llamada a miembro calculado
+L2143: identificador global desconocido document
+L2143: metodo desconocido .createElement()
+L2370: metodo desconocido .querySelector()
+L2444: for-in: en GDScript recorre claves de diccionario (no indices de array)
+L2445: for-in: en GDScript recorre claves de diccionario (no indices de array)
+L2446: for-in: en GDScript recorre claves de diccionario (no indices de array)
+L2459: metodo desconocido .querySelector()
+L2459: metodo desconocido .focus()
+L2460: metodo desconocido .getDate()
+L2460: metodo desconocido .getMonth()
+L2460: metodo desconocido .getHours()
+L2460: metodo desconocido .getMinutes()
+L2520: metodo desconocido .remove()
+L2530: metodo desconocido .add()
+L2532: metodo desconocido .querySelector()
+L2532: metodo desconocido .focus()
+L2561: identificador global desconocido document
+L2561: identificador global desconocido document
+L2561: metodo desconocido .getAttribute()
+L2562: identificador global desconocido document
+L2562: metodo desconocido .querySelector()
+L2562: metodo desconocido .focus()
+L2607: metodo desconocido .querySelector()
+L2607: metodo desconocido .focus()
+L2614: metodo desconocido .querySelectorAll()
+L2614: metodo desconocido .focus()
+L2616: metodo desconocido .getAttribute()
+L2621: metodo desconocido .querySelector()
+L2621: metodo desconocido .focus()
+L2686: metodo desconocido .querySelector()
+L2686: metodo desconocido .focus()
+L2694: metodo desconocido .contains()
+L2705: identificador global desconocido document
+L2705: metodo desconocido .querySelector()
+L2705: metodo desconocido .focus()
+L2708: identificador global desconocido document
+L2708: metodo desconocido .querySelector()
+L2708: metodo desconocido .focus()
+L2711: identificador global desconocido document
+L2711: metodo desconocido .querySelector()
+L2711: metodo desconocido .focus()
+L2747: metodo desconocido .toggle()
+L2843: identificador global desconocido document
+L2843: metodo desconocido .createElement()
+L2893: identificador global desconocido document
+L2893: metodo desconocido .createElement()
+L2895: identificador global desconocido document
+L2895: metodo desconocido .createElement()
+L2915: identificador global desconocido document
+L2915: metodo desconocido .createElement()
+L2919: identificador global desconocido document
+L2919: metodo desconocido .createElement()
+L2941: identificador global desconocido document
+L2941: metodo desconocido .querySelector()
+L2941: identificador global desconocido document
+L2941: metodo desconocido .querySelector()
+L2941: metodo desconocido .focus()
+L2957: identificador global desconocido document
+L2957: metodo desconocido .querySelector()
+L2957: metodo desconocido .focus()
+L3001: identificador global desconocido document
+L3001: metodo desconocido .createElement()
+L3177: identificador global desconocido document
+L3177: metodo desconocido .createElement()
+L3315: funcion anidada R lee locales que cambian: x,y

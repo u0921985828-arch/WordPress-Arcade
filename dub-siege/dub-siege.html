@@ -482,6 +482,12 @@ function seqOf(n){
     out.push(k);since++;q++;
     if(q%2===0&&prev.length){k=prev[j%prev.length];j++;if(hasPit(k)&&since>2){out.push('cp');since=0;}out.push(k);since++;}
   }
+  // Fases cortas: se alargan hasta ~3 min de juego con una vuelta mas por su propio
+  // repertorio (sin piezas nuevas), con su punto de control cada 4 piezas.
+  var cols=0,minC=Math.min(860,760+n*20);for(i=0;i<out.length;i++)cols+=chunkGrid(CH[out[i]])[0].length;
+  i=0;while(cols<minC&&body.length){k=body[i%body.length];i++;
+    if(since>3||(hasPit(k)&&since>2)){out.push('cp');since=0;cols+=chunkGrid(CH.cp)[0].length;}
+    out.push(k);since++;cols+=chunkGrid(CH[k])[0].length;}
   return out;
 }
 function buildStage(n){RADIO=null;
@@ -2174,6 +2180,7 @@ function cutTx(){var b=Math.round(cutSX()*SC*HS/CUQ);return Math.ceil((52+b)*CUQ
 function cutLine(){var c=cut,l=c.lines[c.i],mw=HW-(l.w&&!cutIl(l)?cutTx()+4:16)-10-2*cutSX();if(!c.wr||c.mw!==mw){c.wr=wrap(l.s,mw);c.mw=mw;}return l;}
 function cutIl(l){var o=l.i&&SHEET[l.i];return !!(o&&o.ok);}
 function cutAdv(){if(!cut)return;var c=cut,l=c.lines[c.i];
+  if(c.cred){if(c.t>30)endCut();return;}
   if(c.card){if(c.t<10)return;sfx('clink');c.card=0;c.t=0;c.bar=0;return;}
   if(c.ch<l.s.length){c.ch=l.s.length;return;}
   sfx('clink');if(CUTN<3){CUTN++;save('ds2_cutn',CUTN);}c.i++;c.ch=0;c.t=0;c.wr=null;if(c.i>=c.lines.length)endCut();}
@@ -2183,6 +2190,7 @@ function cutSkip(){if(cut)endCut();}
 function endCut(){var f=cut.then;cut=null;mode='play';prevI={J:1,DA:1,B:1};LATCH={};if(f)f();}
 function updateCut(){
   pollPad();if(!cut)return;var c=cut,l=c.lines[c.i];c.t++;
+  if(c.cred){if(c.done)endCut();return;}
   if(c.card)return;
   if(c.bar<1)c.bar=Math.min(1,c.bar+.08);
   if(c.t===1){var e=l.e;
@@ -2255,7 +2263,7 @@ function drawCard(c){
   g.globalAlpha=1;g.restore();
 }
 function drawCut(){
-  var c=cut;if(!c)return;if(c.card){drawCard(c);return;}
+  var c=cut;if(!c)return;if(c.cred){drawCred(c);return;}if(c.card){drawCard(c);return;}
   // Caja de texto a la medida: rotulo + lineas con el mismo margen arriba y abajo (6),
   // sin hueco vacio debajo; el busto, mas alto, sobresale por encima.
   var l=cutLine(),il=cutIl(l),e=c.bar,tb=il?0:Math.round(16*e),bh=Math.round(((l.w?20:10)+10*c.wr.length+cutSB())*e),by=HH-bh;
@@ -2318,7 +2326,7 @@ function pracEnd(win,secs,m){mode='over';
     (win?'<div class="stats"><span>TIEMPO</span><b>'+Math.floor(secs/60)+':'+pad(secs%60,2)+' / PAR '+Math.floor(parT()/60)+':'+pad(parT()%60,2)+'</b><span>DISCOS</span><b>'+st.coinP+' / '+st.coinT+'</b></div>'+medRow(m):'')+
     '<div class="menu"><button class="btn hot" data-act="prac" data-v="'+st.i+'">REPETIR FASE</button><button class="btn" data-act="tomenu">MENÚ PRINCIPAL</button></div></div>');}
 function finishStage(){
-  var secs=Math.floor(st.t/60),nh=st.hurtFree?2000:0,cb=(run.coins-st.coinsAt)*10,tb=Math.max(0,3000-secs*12);
+  var secs=Math.floor(st.t/60),nh=st.hurtFree?2000:0,cb=(run.coins-st.coinsAt)*10,tb=Math.max(0,3000-Math.max(0,secs-Math.round(parT()*.6))*12);
   // El tiempo no puede pesar mas del 30 % del total: tb <= 0.3*(puntos+tb) -> tb <= 3/7*resto.
   tb=Math.min(tb,Math.floor((run.score+nh+cb)*3/7));
   var md=medSave([secs<=parT()?1:0,st.hurtFree?1:0,st.coinT>0&&st.coinP>=st.coinT?1:0]);
@@ -2539,7 +2547,7 @@ function showOpts(){
     '<button class="btn opt" data-act="o" data-v="vib">VIBRACIÓN <i>'+onoff(SET.vib)+'</i></button>'+
     '<button class="btn opt" data-act="o" data-v="light">LUCES Y SOMBRAS <i>'+onoff(SET.light)+'</i></button>'+
     '<button class="btn hot" data-act="back">VOLVER</button></div>'+
-    '<p class="dim tip">Disparo automático: dispara solo cuando hay enemigos cerca, te quita un dedo de encima. Apuntado asistido: decide por ti hacia dónde tiras, por eso viene apagado.</p></div>');
+    '<p class="dim tip">Disparo automático: dispara solo cuando hay enemigos cerca, te quita un dedo de encima. Apuntado asistido: decide por ti hacia dónde tiras; en AUTO solo se activa con los mandos táctiles.</p></div>');
 }
 function setOpt(k){
   if(k==='diff')SET.diff=(SET.diff+1)%3;
@@ -2644,16 +2652,39 @@ function showWin(){
     '<div class="menu"><button class="btn hot" data-act="rank">GUARDAR EN RANKING</button><button class="btn" data-act="credits">CRÉDITOS</button><button class="btn" data-act="tomenu">MENÚ PRINCIPAL</button></div></div>');
 }
 // Creditos: cortos, en una pantalla, y de vuelta al final.
-function showCredits(){back=showWin;
-  show('<div class="panel"><p class="kick">DUB SIEGE</p><h2>CRÉDITOS</h2><div class="stats"><span>IDEA Y DIRECCIÓN</span><b>KUBOPLAY</b><span>DESARROLLO</span><b>KUBOPLAY</b>'+
-    '<span>ARTE</span><b>KUBOPLAY</b><span>MÚSICA</span><b>SINTETIZADA EN EL JUEGO</b><span>INSPIRACIÓN</span><b>SOUND SYSTEMS, 1955-1981</b></div>'+
-    '<p class="dim">TODOS LOS PERSONAJES SON INVENTADOS. GRACIAS POR JUGAR.</p><div class="menu"><button class="btn hot" data-act="back">VOLVER</button></div></div>');}
+// Creditos: rodillo sobre el lienzo (asi sale igual en la web y en el APK) con el
+// desfile de los jefes abajo. Toque, A o Intro antes de tiempo para volver.
+var STUDIO='KUBOPLAY';
+function credLines(){var L=[['DUB SIEGE','#ffd23f'],['',''],['IDEA Y DIRECCIÓN','#8f98c8'],[STUDIO,'#eef3ff'],['',''],['DESARROLLO','#8f98c8'],[STUDIO,'#eef3ff'],['',''],['ARTE','#8f98c8'],[STUDIO,'#eef3ff'],['',''],
+  ['MÚSICA','#8f98c8'],['SINTETIZADA EN EL JUEGO','#eef3ff'],['',''],['INSPIRACIÓN','#8f98c8'],['SOUND SYSTEMS, 1955-1981','#eef3ff'],['',''],['',''],['REPARTO','#ff3d6e']];
+  for(var i=0;i<LEVELS.length;i++)L.push([LEVELS[i].boss,'#eef3ff']);
+  L.push(['',''],['',''],['TODOS LOS PERSONAJES SON INVENTADOS','#8f98c8'],['',''],['GRACIAS POR JUGAR','#ffd23f']);return L;}
+function showCredits(){var m0=mode;hideOv();startCut([{s:''}],function(){mode=m0;showWin();});cut.cred=1;}
+function drawCred(c){
+  g.save();g.setTransform(SC,0,0,SC,0,0);rect(0,0,W,H,'#06070d');
+  // desfile: el selecta delante y los doce jefes detras, a su escala de juego
+  var gy=H-6,x=W+20-c.t*.5,ks=[],i,k,o;rect(0,gy,W,6,'#141a33');rect(0,gy,W,1,'#2a3360');
+  for(i=0;i<LEVELS.length;i++){var Lv=LEVELS[i];k=Lv.ai===4?(SHEET['bh_'+Lv.mt]&&SHEET['bh_'+Lv.mt].ok?'bh_'+Lv.mt:ESHEET[Lv.mt]):'b_'+Lv.ai;if(Lv.mk)k=tintSheet(k);ks.push(k);}
+  k=lookSheet('run');o=SHEET[k];if(o&&o.ok){if(x>-20&&x<W)blitS(k,(t>>2)%o.n,x,gy-o.fh,1,true);x+=o.fw+14;}
+  for(i=0;i<ks.length;i++){o=SHEET[ks[i]];if(!o||!o.ok)continue;var sc=o.x1||ks[i].indexOf('bh_')===0||ks[i].indexOf('b_')===0?1:2;
+    if(x>-o.fw*sc&&x<W)blitS(ks[i],(t>>3)%o.n,x,gy-o.fh*sc,sc,true);x+=o.fw*sc+12;}
+  g.restore();
+  g.save();g.setTransform(SC*HS,0,0,SC*HS,0,0);
+  var L=credLines(),cx=HW/2,y0=HH-c.t*.32,bot=HH-Math.round(48/HS);
+  for(i=0;i<L.length;i++){var y=y0+i*11;if(y<-10||y>bot)continue;var a=Math.min(1,(bot-y)/14,(y+4)/18);if(a<=0)continue;g.globalAlpha=a;if(L[i][0])txt(L[i][0],cx,y,L[i][1],'c');}
+  g.globalAlpha=1;if(y0+L.length*11<-10)c.done=1;
+  if(c.t>60&&((t>>4)&1))txt(touchMode()?'TOCA PARA VOLVER':'INTRO PARA VOLVER',HW-5,3,'#5a6390','r');
+  g.restore();
+}
 function pause(){if(mode!=='play')return;mode='pause';K={};TS={};pauseShow();}
 function showBag(){back=pauseShow;var q=quickObj();
   show('<div class="panel"><h2>MOCHILA</h2>'+bagRows(false)+'<div class="menu"><button class="btn" data-act="oqk">BOTÓN RÁPIDO: '+OBJN[q].n+'</button><button class="btn hot" data-act="back">VOLVER</button></div></div>');}
 function pauseShow(){back=null;
   show('<div class="panel"><h2>PAUSA</h2><p class="dim">FASE '+(st.i+1)+' - '+st.L.name+' - '+DIFFS[SET.diff].n+'</p>'+(CUR!=null?'<p class="dim sv">RANURA '+(CUR+1)+' · GUARDADO AL EMPEZAR LA FASE</p>':'')+'<div class="menu"><button class="btn hot" data-act="resume">CONTINUAR</button>'+
-  '<button class="btn" data-act="bag">MOCHILA ('+objCount()+')</button><button class="btn" data-act="opts">OPCIONES</button><button class="btn" data-act="controls">CONTROLES</button><button class="btn" data-act="restart">REINICIAR FASE</button><button class="btn" data-act="tomenu">SALIR AL MENÚ</button></div></div>');}
+  '<button class="btn" data-act="bag">MOCHILA ('+objCount()+')</button><button class="btn" data-act="opts">OPCIONES</button><button class="btn" data-act="controls">CONTROLES</button><button class="btn" data-act="restart">REINICIAR FASE</button><button class="btn" data-act="tomenu">SALIR AL MENÚ</button></div></div>')
+  // vuelve con el cursor en la opcion de la que se venia (mochila, opciones, controles)
+  if(PFOC){var pb=$('ov').querySelector('[data-act="'+PFOC+'"]');if(pb)try{pb.focus({preventScroll:true});}catch(e){}}}
+var PFOC=null;
 function resume(){hideOv();mode='play';K={};}
 // Al salir de pantalla completa (gesto del sistema) se pausa: los botones pueden haber quedado a medias.
 ['fullscreenchange','webkitfullscreenchange'].forEach(function(n){document.addEventListener(n,function(){if(!(document.fullscreenElement||document.webkitFullscreenElement))pause();});});
@@ -2661,6 +2692,7 @@ function startGame(n){PRAC=0;newRun();if(n){run.coins=n*30;}enterLevel(n||0,true
 function act(a,v){
   audioOn();
   if(mode==='menu'&&$('ov').classList.contains('title'))MFOC=a;
+  if(mode==='pause'&&['bag','opts','controls'].indexOf(a)>-1)PFOC=a;else if(a==='resume'||a==='tomenu')PFOC=null;
   switch(a){
     case 'play':if(slots().some(function(x){return x;}))showSlots();else slotNew(0);break;
     case 'go':if(!SET.help){SET.help=true;save('ds2_set',SET);}if(NEWSL!=null)newGame(NEWSL);else startGame();break;
