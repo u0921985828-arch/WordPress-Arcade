@@ -342,6 +342,22 @@ no se puede cambiar después); CONTINUAR usa siempre la de su ranura.
   (`slotMig`), con lo que daba el viejo CONTINUAR FASE N.
 - El ranking sigue aparte (`ds2_rank`).
 
+## Pauta del 10 (juicio ciego nº 3)
+
+Lo que pidieron los dos jueces en `docs/PAUTA-10.md` (6,3 con teclado y 6,6 en el móvil), aplicado en el HTML y en la app Godot:
+
+- **Un escenario por fase**: 12 fondos distintos (`BGK`, `bg_p1…bg_p11` además de los 4 de región); ningún horizonte se repite.
+- **Fases más largas**: `seqOf(n)` repite el recorrido al revés intercalando tramos de la fase anterior, con punto de control a mitad y antes de cada tramo de fosos.
+- **Fosos justos**: caer quita un corazón y devuelve al último borde firme, nunca una vida entera.
+- **Jefes**: cada ataque avisa 0,4 s antes con «!» y destellos, derrota que tiembla y se desvanece (ya no se queda en blanco), Sapo de Lata con hoja propia (`bs_h`), dron igual en la presentación y en el combate.
+- **Enemigo nuevo, el Sabueso** (fases 10–12): se agacha, avisa y embiste en arco; se esquiva saltando o se para con el dash, y al caer se queda jadeando.
+- **Tienda y ranking honestos**: «Faltan N discos», panel de altura fija, continuaciones limitadas por dificultad, el ranking guarda la mejor puntuación de la partida (`run.peak`) y marca las continuadas; el bonus de tiempo no pasa del 30 %.
+- **Medallas por fase** (tiempo, sin daño, todos los discos).
+- **Interfaz**: Archivo en 3 columnas a 390 px de alto, el cursor vuelve al botón desde el que se salió, los carteles del tutorial caducan a los 15 s.
+- **Móvil**: arriba en la palanca salta, mandos más transparentes en reposo, palanca solo en el 40 % izquierdo.
+- **Golpe con respuesta**: parón de un fotograma y retroceso.
+- **Final**: epílogo de 14 líneas con ilustraciones y pantalla de créditos.
+
 ## Depuración
 Con `#debug` en la dirección: `DS.warp(0..11, conCinematica)`, `DS.cutAdv()`,
 `DS.cutSkip()`, `DS.toArena()`, `DS.hitBoss(n)`, `DS.god()`, `DS.s`, `DS.sheets`.

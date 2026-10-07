@@ -1138,7 +1138,7 @@ func chunkGrid(c = null):
 # L460
 func newRun():
 	D = _ix(DIFFS, SET.get("diff"))
-	run = {"score": 0, "lives": D.get("lives"), "coins": 0, "maxHp": D.get("hp"), "up": {"hp": 0, "rate": 0, "dash": 0, "bass": 0, "arm": 0, "pow": 0}, "inv": {"kit": 0, "shd": 0, "bmb": 0, "mag": 0, "bat": 0}, "qk": "kit", "wpn": "N", "lv": 1, "stage": 0, "bass": 0, "conts": 0, "cpi": -1, "cpx": 0, "stats": {"kills": 0, "shots": 0, "hits": 0, "deaths": 0, "time": 0}, "combo": 0, "comboT": 0, "mult": 1}
+	run = {"score": 0, "peak": 0, "lives": D.get("lives"), "coins": 0, "maxHp": D.get("hp"), "up": {"hp": 0, "rate": 0, "dash": 0, "bass": 0, "arm": 0, "pow": 0}, "inv": {"kit": 0, "shd": 0, "bmb": 0, "mag": 0, "bat": 0}, "qk": "kit", "wpn": "N", "lv": 1, "stage": 0, "bass": 0, "conts": 0, "cpi": -1, "cpx": 0, "stats": {"kills": 0, "shots": 0, "hits": 0, "deaths": 0, "time": 0}, "combo": 0, "comboT": 0, "mult": 1}
 
 # L469
 func hasPit(k = null):
@@ -1317,7 +1317,7 @@ func mkEnemy(ch = null, x = null, y = null):
 	if (not d):
 		return
 	hp = (d.get("hp") if ((ch == "*") or (ch == "X")) else max(1, floori(float(((d.get("hp") * D.get("eHp")) * (1 + (st.get("d") * 0.2)))) + 0.5)))
-	e = {"type": ch, "x": (x + ((T - d.get("w")) / 2.0)), "y": ((y + T) - d.get("h")), "w": d.get("w"), "h": d.get("h"), "hp": hp, "max": hp, "pts": d.get("pts"), "vx": 0, "vy": 0, "dir": -1, "fl": 0, "a": (_rnd() * 9), "cd": (60 + (_rnd() * 60)), "ground": 0, "base": y, "turn": 0, "dive": 0, "jt": (40 + (_rnd() * 30)), "sp": ((0.45 + (st.get("d") * 0.08)) + (_rnd() * 0.15))}
+	e = {"type": ch, "x": (x + ((T - d.get("w")) / 2.0)), "y": ((y + T) - d.get("h")), "w": d.get("w"), "h": d.get("h"), "hp": hp, "max": hp, "pts": d.get("pts"), "vx": 0, "vy": 0, "dir": -1, "fl": 0, "a": (_rnd() * 9), "cd": (60 + (_rnd() * 60)), "ground": 0, "base": y, "turn": 0, "dive": 0, "hsT": -99, "jt": (40 + (_rnd() * 30)), "sp": ((0.45 + (st.get("d") * 0.08)) + (_rnd() * 0.15))}
 	enemies.append(e)
 	return e
 
@@ -3083,7 +3083,7 @@ func startBoss():
 	n = L.get("ai")
 	hp = (L.get("hp") * D.get("eHp"))
 	ax = st.get("arenaX")
-	boss = {"kind": n, "mk": (L.get("mk") if L.get("mk") else 0), "mt": L.get("mt"), "sc": (L.get("sc") if L.get("sc") else 1), "x": ((ax + W) - 70), "y": -50, "w": 24, "h": 30, "hp": hp, "max": hp, "ph": 1, "t": 0, "cd": 100, "act": null, "actT": 0, "fl": 0, "vx": 0, "vy": 0, "on": 0, "enter": 1, "dead": 0, "a": 0, "dir": -1, "turn": 0, "bc": 0, "gnd": _or((n == 0), (n == 3)), "hy": 92}
+	boss = {"kind": n, "mk": (L.get("mk") if L.get("mk") else 0), "mt": L.get("mt"), "sc": (L.get("sc") if L.get("sc") else 1), "x": ((ax + W) - 70), "y": -50, "w": 24, "h": 30, "hp": hp, "max": hp, "ph": 1, "t": 0, "cd": 100, "act": null, "actT": 0, "fl": 0, "hsT": -99, "vx": 0, "vy": 0, "on": 0, "enter": 1, "dead": 0, "deadT": 0, "wind": 0, "a": 0, "dir": -1, "turn": 0, "bc": 0, "gnd": _or((n == 0), (n == 3)), "hy": 92}
 	if (n == 1):
 		boss.w = 28
 		boss.h = 16
@@ -5468,7 +5468,7 @@ func gameOver():
 		return
 	mode = "over"
 	BANK = BANK0
-	pend = {"score": max(run.get("score"), int(run.get("peak"))), "st": "F" + str((st.get("i") + 1)), "d": _ix(_ix(DIFFS, SET.get("diff")).n, 0), "c": int(run.get("conts"))}
+	pend = {"score": max(run.get("score"), (run.get("peak") if run.get("peak") else 0)), "st": "F" + str((st.get("i") + 1)), "d": _ix(_ix(DIFFS, SET.get("diff")).n, 0), "c": int(run.get("conts"))}
 	nb = bestUp()
 	left = (D.get("cont") - int(run.get("conts")))
 	sa = (run.get("scoreAt") if (run.get("scoreAt") != null) else 0)
@@ -5486,7 +5486,7 @@ func gameOver():
 # L2549
 func showWin():
 	var nb = null
-	pend = {"score": max(run.get("score"), int(run.get("peak"))), "st": "FIN", "d": _ix(_ix(DIFFS, SET.get("diff")).n, 0), "c": int(run.get("conts"))}
+	pend = {"score": max(run.get("score"), (run.get("peak") if run.get("peak") else 0)), "st": "FIN", "d": _ix(_ix(DIFFS, SET.get("diff")).n, 0), "c": int(run.get("conts"))}
 	slotSave("done", st.get("i"))
 	nb = bestUp()
 	show("<div class=\"panel\"><p class=\"kick\">LA BESTIA SUENA OTRA VEZ</p><h2>LA CIUDAD VUELVE A BAILAR</h2>" + ("<p class=\"note\">¡NUEVO RÉCORD!</p>" if nb else "") + str(stat()) + "<div class=\"menu\"><button class=\"btn hot\" data-act=\"rank\">GUARDAR EN RANKING</button><button class=\"btn\" data-act=\"credits\">CRÉDITOS</button><button class=\"btn\" data-act=\"tomenu\">MENÚ PRINCIPAL</button></div></div>")
@@ -5494,7 +5494,7 @@ func showWin():
 # L2555
 func showCredits():
 	back = showWin
-	show("<div class=\"panel\"><p class=\"kick\">DUB SIEGE</p><h2>CRÉDITOS</h2><div class=\"stats\"><span>IDEA Y DIRECCIÓN</span><b>KUBOPLAY</b><span>CÓDIGO</span><b>CLAUDE CODE</b>" + "<span>PIXEL ART</span><b>PIXELLAB + RETOQUE</b><span>MÚSICA</span><b>SINTETIZADA EN EL JUEGO</b><span>INSPIRACIÓN</span><b>SOUND SYSTEMS, 1955-1981</b></div>" + "<p class=\"dim\">TODOS LOS PERSONAJES SON INVENTADOS. GRACIAS POR JUGAR.</p><div class=\"menu\"><button class=\"btn hot\" data-act=\"back\">VOLVER</button></div></div>")
+	show("<div class=\"panel\"><p class=\"kick\">DUB SIEGE</p><h2>CRÉDITOS</h2><div class=\"stats\"><span>IDEA Y DIRECCIÓN</span><b>KUBOPLAY</b><span>DESARROLLO</span><b>KUBOPLAY</b>" + "<span>ARTE</span><b>KUBOPLAY</b><span>MÚSICA</span><b>SINTETIZADA EN EL JUEGO</b><span>INSPIRACIÓN</span><b>SOUND SYSTEMS, 1955-1981</b></div>" + "<p class=\"dim\">TODOS LOS PERSONAJES SON INVENTADOS. GRACIAS POR JUGAR.</p><div class=\"menu\"><button class=\"btn hot\" data-act=\"back\">VOLVER</button></div></div>")
 
 # L2559
 func pause():
@@ -5691,7 +5691,7 @@ func act(a = null, v = null):
 		elif _sw == "cont":
 			if (int(run.get("conts")) >= D.get("cont", NAN)):
 				break
-			run.peak = max(int(run.get("peak")), run.get("score"))
+			run.peak = max((run.get("peak") if run.get("peak") else 0), run.get("score"))
 			run.conts += 1
 			run.score = (run.get("scoreAt") if (run.get("scoreAt") != null) else 0)
 			run.lives = D.get("lives")
