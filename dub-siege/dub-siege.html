@@ -1512,7 +1512,7 @@ function addScore(base,x,y){
   run.combo++;run.comboT=150;run.mult=Math.min(8,1+Math.floor(run.combo/4));
   var v=base*run.mult;run.score+=v;if(x!=null)pop(x,y,'+'+v,run.mult>1?'#3de8ff':'#ffd23f');
 }
-function addBass(n){var was=run.bass<100;run.bass=Math.min(100,run.bass+n*(1+.3*run.up.bass));if(was&&run.bass>=100){pop(p.x-14,p.y-12,'BASS LISTO','#ffd23f');sfx('pick');}}
+function addBass(n){var was=run.bass<100;run.bass=Math.min(100,run.bass+n*(1+.3*run.up.bass));if(was&&run.bass>=100){if(coachStep()!=='bs')pop(p.x-14,p.y-12,'BASS LISTO','#ffd23f');sfx('pick');}}
 
 // ================= jugador =================
 function hurt(n){
@@ -3186,7 +3186,7 @@ function drawBoss(b){
     light(b.x-cam+b.w/2,b.y+b.h/2,Math.max(16,b.w),b.fl>0?1:.55,b.ph>1?'#ff3d6e':'#ff8aa6');}
   // Derrota: tiembla, parpadea a ratos y se desvanece al final (antes se quedaba
   // en blanco si moria a mitad de un aviso de ataque, porque actT dejaba de correr).
-  var x=Math.round(b.x-cam),y=Math.round(b.y),wh=b.dead?(b.deadT>>3)%4===0:b.fl>0||(b.wind>0&&(b.wind>>2)&1)||(b.act&&b.actT>0&&b.actT<40&&(b.actT>>2)&1&&b.act!=='burst'&&b.act!=='low'&&b.act!=='ground');
+  var x=Math.round(b.x-cam),y=Math.round(b.y),wh=b.dead?mode==='play'&&b.deadT>40&&(b.deadT>>3)%4===0:b.fl>0||(b.wind>0&&(b.wind>>2)&1)||(b.act&&b.actT>0&&b.actT<40&&(b.actT>>2)&1&&b.act!=='burst'&&b.act!=='low'&&b.act!=='ground');
   if(b.dead){x+=((t>>1)&1)?1:-1;y+=Math.round((110-b.deadT)*.06);g.globalAlpha=Math.min(1,b.deadT/40);}
   function R(a,c,w,h,col){g.fillStyle=wh?'#fff':col;g.fillRect(x+a,y+c,w,h);}
   var s=(b.a|0)%2;
