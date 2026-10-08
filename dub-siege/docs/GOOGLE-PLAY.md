@@ -80,7 +80,7 @@ El resultado esperado es PEGI 7 o PEGI 12.
 **Descripción completa** (máx. 4000):
 > Tu sound system lo es todo. Esta noche te han robado las cintas de papá y doce jefes quieren silenciar la ciudad. Coge tu pistola, carga el Bass Drop y recupera la música.
 >
-> DUB SIEGE es un arcade de disparos y plataformas en pixel art, con 12 fases que recorren la historia del reggae en el sur de Londres: de sus raíces en 1955 al ska, el rocksteady, el roots, el dub, el lovers rock y el rub-a-dub de 1981.
+> DUB SIEGE es un arcade de disparos y plataformas en pixel art, con 12 fases que recorren la historia del reggae en el sur de Londres: del rhythm and blues de 1955, su padre, al ska, el rocksteady, el roots, el dub, el lovers rock y el rub-a-dub de 1981.
 >
 > • 12 fases con su propio jefe final, cada uno con sus fases de ataque
 > • Bass Drop: llena la barra y haz temblar la pantalla
