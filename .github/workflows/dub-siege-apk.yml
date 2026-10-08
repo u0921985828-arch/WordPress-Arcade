@@ -184,13 +184,8 @@ jobs:
           script: |
             adb shell settings put secure immersive_mode_confirmations confirmed
             adb install DubSiege-webview-antigua.apk
-            adb shell monkey -p online.kuboplay.dubsiege -c android.intent.category.LAUNCHER 1
-            sleep 25
-            adb shell pidof online.kuboplay.dubsiege > /dev/null || { adb shell monkey -p online.kuboplay.dubsiege -c android.intent.category.LAUNCHER 1; sleep 30; }
-            adb exec-out screencap -p > 0-antigua.png
-            adb shell input keyevent KEYCODE_HOME; sleep 6
             adb root || true; sleep 3; adb wait-for-device
-            for i in $(seq 1 20); do n=$(adb shell "cat /data/data/online.kuboplay.dubsiege/app_webview/Default/Local\\ Storage/leveldb/*.log 2>/dev/null | wc -c" | tr -d '\r '); echo "leveldb $n bytes"; [ "${n:-0}" -gt 300 ] && break; sleep 3; done
+            for t in 1 2 3; do adb shell monkey -p online.kuboplay.dubsiege -c android.intent.category.LAUNCHER 1 > /dev/null; for i in $(seq 1 15); do sleep 3; n=$(adb shell "cat /data/data/online.kuboplay.dubsiege/app_webview/Default/Local\\ Storage/leveldb/*.log 2>/dev/null | wc -c" | tr -d '\r '); [ "${n:-0}" -gt 300 ] && break; done; adb exec-out screencap -p > 0-antigua.png; adb shell input keyevent KEYCODE_HOME; for i in $(seq 1 10); do sleep 3; n=$(adb shell "cat /data/data/online.kuboplay.dubsiege/app_webview/Default/Local\\ Storage/leveldb/*.log 2>/dev/null | wc -c" | tr -d '\r '); echo "intento $t: leveldb $n bytes"; [ "${n:-0}" -gt 300 ] && break; done; [ "${n:-0}" -gt 300 ] && break; adb shell am force-stop online.kuboplay.dubsiege; sleep 3; done
             adb shell am force-stop online.kuboplay.dubsiege
             adb shell ls -laR /data/data/online.kuboplay.dubsiege/app_webview | head -60 || true
             for f in $(adb shell ls "/data/data/online.kuboplay.dubsiege/app_webview/Default/Local\ Storage/leveldb/" | grep -E 'log$|ldb$'); do echo "LDB $f $(adb shell base64 -w0 "/data/data/online.kuboplay.dubsiege/app_webview/Default/Local\ Storage/leveldb/$f")"; done || true
