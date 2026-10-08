@@ -1345,7 +1345,7 @@ func buildStage(n = null):
 	p = {"x": 36, "y": (GY - 14), "pitL": 0, "pitT": 0, "dashN": 0, "w": 8, "h": 14, "vx": 0, "vy": 0, "face": 1, "ground": 0, "onOne": 0, "onMp": null, "coyote": 0, "jbuf": 0, "jmin": 0, "jumps": 0, "airDash": 1, "dash": 0, "dashCd": 0, "drop": 0, "inv": 60, "cool": 0, "mf": 0, "anim": 0, "hp": run.get("maxHp"), "dead": 0, "deadT": 0, "safe": {"x": 36, "y": (GY - 14)}, "aimU": 0, "aimD": 0, "aimDg": 0, "sa": 0, "saT": 0, "arm": run.up.get("arm"), "shd": 0, "mag": 0}
 	run.lv = min(3, max(run.get("lv"), (1 + run.up.get("pow"))))
 	cam = 0
-	banner = {"a": "FASE " + str((n + 1)) + " DE " + str(_len(LEVELS)) + " · " + str(L.get("era")), "b": str(S.get("name")) + " - " + str(L.get("name")), "l": 170, "st": 1}
+	banner = {"a": "FASE " + str((n + 1)) + " DE " + str(_len(LEVELS)) + " · " + str(L.get("t")), "b": str(L.get("era")) + " · " + str(L.get("name")), "l": 170, "st": 1}
 	evo(n)
 	songIdx = n
 	bossMusic = 0

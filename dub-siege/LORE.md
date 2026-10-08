@@ -51,7 +51,7 @@ Cada jefe guarda una cinta de Count Ephraim (se desbloquean en **Menú → Archi
 
 | Fase | Cinta | Estilo y año | Hecho real | Imagen |
 |---|---|---|---|---|
-| 1 | Los patios de Kingston | R&B de patio, padre del reggae, 1955 | Bailes al aire libre en patios cercados del centro de Kingston, con más de mil personas; el sound como radio, periódico e iglesia de los pobres | il_01 |
+| 1 | Los patios de Kingston | Rhythm and blues de patio, 1955 | Bailes al aire libre en patios cercados del centro de Kingston, con más de mil personas; el sound como radio, periódico e iglesia de los pobres | il_01 |
 | 2 | El sello rascado | Shuffle de Kingston, 1958 | Cuando Estados Unidos se pasa al rock and roll, Kingston graba su propio shuffle con el golpe corrido; etiquetas raspadas; matones a sueldo que revientan el baile del rival | il_02 |
 | 3 | Tambores del monte | Nyabinghi, 1959 | Los tres tambores rastas (latido, apoyo e improvisación); la comuna del monte, quemada por la policía en 1954 | il_03 |
 | 4 | El barco y el ska | Ska, 1962 | La emigración de 1960, los carteles de las pensiones, el baile en sótanos con un equipo casero de válvulas y la independencia de 1962 | il_04 |
