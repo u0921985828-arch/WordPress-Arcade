@@ -1,0 +1,13 @@
+# Motor de Godot para el navegador: el .wasm necesita su tipo y se comprime muy bien.
+<IfModule mod_mime.c>
+	AddType application/wasm .wasm
+	AddType application/octet-stream .pck
+</IfModule>
+<IfModule mod_deflate.c>
+	AddOutputFilterByType DEFLATE application/wasm application/javascript text/html
+</IfModule>
+<IfModule mod_headers.c>
+	<FilesMatch "\.(wasm|js|pck|png)$">
+		Header set Cache-Control "public, max-age=86400"
+	</FilesMatch>
+</IfModule>
