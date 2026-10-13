@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Kuboplay Lanzadera
  * Description: Pone en la portada un menú de consola a pantalla completa para elegir juego (Kuboplay, Liga de Barrios…), con mando, teclado, ratón y dedo. Al desactivarlo la portada vuelve a ser la de antes.
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author: Kuboplay
  * License: GPL-2.0-or-later
  * Text Domain: kuboplay-launcher
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class Kuboplay_Launcher {
 
-	const VERSION = '1.1.0';
+	const VERSION = '1.2.0';
 	const OPTION  = 'kplauncher';
 	const SLOTS   = 6;
 
@@ -109,6 +109,17 @@ final class Kuboplay_Launcher {
 				'color' => '#c0572b',
 				'art'   => 'liga',
 				'key'   => 'liga',
+			);
+		}
+
+		if ( class_exists( 'Landrace_Hunters' ) ) {
+			$e[] = array(
+				'title' => Landrace_Hunters::opt( 'title' ) ? Landrace_Hunters::opt( 'title' ) : 'Landrace Hunters',
+				'sub'   => 'Genética de barrio · cultiva, cruza y vende · +18',
+				'url'   => Landrace_Hunters::play_url(),
+				'color' => '#4fae5a',
+				'art'   => 'landrace',
+				'key'   => 'landrace',
 			);
 		}
 
@@ -225,6 +236,32 @@ final class Kuboplay_Launcher {
 	 */
 	public static function art( $kind, $color ) {
 		$c = esc_attr( $color );
+		if ( 'landrace' === $kind ) {
+			// Noche de barrio: luna, bloques con ventanas y un brote en su maceta.
+			$o  = '<svg class="kp-art" viewBox="0 0 160 200" aria-hidden="true" focusable="false">';
+			$o .= '<defs><linearGradient id="lh1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f1430"/><stop offset="1" stop-color="#26306a"/></linearGradient></defs>';
+			$o .= '<rect width="160" height="200" fill="url(#lh1)"/>';
+			foreach ( array( array( 18, 22 ), array( 52, 14 ), array( 96, 30 ), array( 138, 18 ), array( 30, 58 ), array( 120, 54 ) ) as $st ) {
+				$o .= '<rect x="' . $st[0] . '" y="' . $st[1] . '" width="3" height="3" fill="#cfe9a8" opacity=".7"/>';
+			}
+			$o .= '<circle cx="124" cy="40" r="14" fill="#ffe28a"/><circle cx="130" cy="36" r="12" fill="#1a2350"/>';
+			$o .= '<path d="M0 200 V118 H22 V104 H44 V126 H62 V96 H92 V120 H110 V108 H134 V124 H160 V200 Z" fill="#0a0d20"/>';
+			$o .= '<g fill="#a8e06a">';
+			foreach ( array( array( 8, 128 ), array( 28, 112 ), array( 50, 134 ), array( 70, 104 ), array( 82, 112 ), array( 116, 116 ), array( 140, 132 ), array( 148, 144 ) ) as $w ) {
+				$o .= '<rect x="' . $w[0] . '" y="' . $w[1] . '" width="5" height="6"/>';
+			}
+			$o .= '</g>';
+			// Maceta de una pieza y brote con dos pares de hojas.
+			$o .= '<path d="M58 160 H102 L96 192 H64 Z" fill="#c0663a" stroke="#1a1530" stroke-width="4" stroke-linejoin="round"/>';
+			$o .= '<rect x="54" y="154" width="52" height="10" rx="3" fill="#d9804f" stroke="#1a1530" stroke-width="4"/>';
+			$o .= '<path d="M80 154 V118" stroke="#1a1530" stroke-width="7" stroke-linecap="round"/><path d="M80 154 V118" stroke="' . $c . '" stroke-width="3" stroke-linecap="round"/>';
+			$o .= '<g fill="' . $c . '" stroke="#1a1530" stroke-width="3.5" stroke-linejoin="round">';
+			$o .= '<path d="M80 140 C68 140 56 132 50 122 C62 120 74 126 80 140 Z"/><path d="M80 140 C92 140 104 132 110 122 C98 120 86 126 80 140 Z"/>';
+			$o .= '<path d="M80 122 C72 120 64 112 62 102 C72 102 80 110 80 122 Z"/><path d="M80 122 C88 120 96 112 98 102 C88 102 80 110 80 122 Z"/>';
+			$o .= '<path d="M80 120 C76 112 76 102 80 94 C84 102 84 112 80 120 Z"/>';
+			$o .= '</g></svg>';
+			return $o;
+		}
 		if ( 'liga' === $kind ) {
 			// Campo con líneas y un balón de píxeles.
 			$o  = '<svg class="kp-art" viewBox="0 0 160 200" aria-hidden="true" focusable="false">';
@@ -296,7 +333,7 @@ final class Kuboplay_Launcher {
 				'sub'   => isset( $r['sub'] ) ? sanitize_text_field( $r['sub'] ) : '',
 				'url'   => $u,
 				'color' => $col ? $col : '#6e62f5',
-				'art'   => ( isset( $r['art'] ) && 'liga' === $r['art'] ) ? 'liga' : 'kubo',
+				'art'   => ( isset( $r['art'] ) && in_array( $r['art'], array( 'liga', 'landrace' ), true ) ) ? $r['art'] : 'kubo',
 				'key'   => $key,
 			);
 			if ( $key ) {
@@ -359,6 +396,8 @@ final class Kuboplay_Launcher {
 					<td><?php echo class_exists( 'Arcade_Portal' ) ? 'detectado · <code>' . esc_html( Arcade_Portal::home() ) . '</code>' : '<em>no activo</em>'; ?></td></tr>
 				<tr><td><strong>Liga de Barrios</strong></td>
 					<td><?php echo class_exists( 'Liga_Barrios' ) ? 'detectado · <code>' . esc_html( Liga_Barrios::play_url() ) . '</code>' : '<em>no activo</em> — instala y activa el plugin «Liga de Barrios»'; ?></td></tr>
+				<tr><td><strong>Landrace Hunters</strong></td>
+					<td><?php echo class_exists( 'Landrace_Hunters' ) ? 'detectado · <code>' . esc_html( Landrace_Hunters::play_url() ) . '</code>' : '<em>no activo</em> — instala y activa el plugin «Landrace Hunters»'; ?></td></tr>
 			</tbody></table>
 			<form method="post" action="options.php">
 				<?php settings_fields( 'kplauncher_group' ); ?>
@@ -384,6 +423,7 @@ final class Kuboplay_Launcher {
 							<td><select name="<?php echo $n; // phpcs:ignore ?>[art]">
 								<option value="kubo" <?php selected( $r['art'], 'kubo' ); ?>>Cubo</option>
 								<option value="liga" <?php selected( $r['art'], 'liga' ); ?>>Campo de fútbol</option>
+								<option value="landrace" <?php selected( $r['art'], 'landrace' ); ?>>Brote en maceta</option>
 							</select></td>
 						</tr>
 					<?php endforeach; ?>
