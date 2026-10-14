@@ -98,6 +98,12 @@ final class Landrace_Hunters {
 		flush_rewrite_rules();
 	}
 
+	/** Al borrar el plugin no deja nada en la base de datos. */
+	public static function uninstall() {
+		delete_option( self::OPTION );
+		delete_option( self::OPTION . '_ver' );
+	}
+
 	public static function deactivate() {
 		// flush_rewrite_rules() volvería a guardar la regla, que ya se registró en init:
 		// se borran y WordPress las rehace en la siguiente visita, ya sin el plugin.
@@ -368,4 +374,5 @@ final class Landrace_Hunters {
 
 register_activation_hook( __FILE__, array( 'Landrace_Hunters', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'Landrace_Hunters', 'deactivate' ) );
+register_uninstall_hook( __FILE__, array( 'Landrace_Hunters', 'uninstall' ) );
 Landrace_Hunters::init();

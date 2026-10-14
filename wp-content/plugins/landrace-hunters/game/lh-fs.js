@@ -63,6 +63,8 @@
 		box.innerHTML = '<p>' + html + '</p>' + (btn ? '<button type="button" class="lh-go">Instalar</button>' : '')
 			+ '<button type="button" class="lh-x" aria-label="Cerrar">×</button>';
 		d.body.appendChild(box);
+		/* Tapa parte del juego: si no se toca, se va solo a los 15 s (y vuelve en la siguiente visita). */
+		setTimeout(function () { close(false); }, 15000);
 		box.querySelector('.lh-x').addEventListener('click', function () { close(true); go(); });
 		if (btn) box.querySelector('.lh-go').addEventListener('click', function () {
 			if (!ask) return;

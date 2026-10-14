@@ -121,7 +121,7 @@ Con las opciones de arriba no se genera nada más. Si aparece algo (`*.service.w
 
 - `GODOT_CONFIG` tiene `"ensureCrossOriginIsolationHeaders": false`, `"canvasResizePolicy": 2` y `"executable": "index"`.
 - La etiqueta del viewport termina exactamente en `initial-scale=1.0">`. El plugin le añade `viewport-fit=cover` buscando esa cadena; si tu versión de Godot la escribe distinta, adapta el `str_replace` de `fullscreen()`.
-- El `<title>` da igual, porque el plugin lo cambia al servir la página.
+- El `<title>` del fichero da igual: el plugin lo cambia al servir la página. Pero cuando el juego arranca, Godot pone en la pestaña el nombre del proyecto (`application/config/name`), así que **ese nombre tiene que ser `{{TITULO}}`**. El ajuste «Título» del panel solo cuenta para el nombre de la app instalada y mientras carga.
 
 ### Si solo hay APK y no hay proyecto (último recurso)
 
@@ -185,10 +185,17 @@ Con las opciones de arriba no se genera nada más. Si aparece algo (`*.service.w
 2. **Icono de 576 px:**
    - Si es pixel art, amplía ×3 con «vecino más cercano», nunca suavizado:
      ```
-     python3 -c "from PIL import Image; Image.open('icon-192.png').resize((576,576), Image.NEAREST).save('icon-576.png')"
+     python3 -c "from PIL import Image; Image.open('{{SLUG}}/game/icon-192.png').resize((576,576), Image.NEAREST).save('{{SLUG}}/game/icon-576.png')"
      ```
    - Si no es pixel art, usa `Image.LANCZOS` o, mejor, la imagen original a 576.
-3. **Juego en vertical** (no en horizontal): en el apéndice A cambia `'orientation' => 'landscape'` por `'portrait'` y `(orientation:portrait)` por `(orientation:landscape)` en el aviso de girar. En el apéndice B cambia `lock('landscape')` por `lock('portrait')`.
+3. **Juego en vertical** (no en horizontal). Cambia exactamente estas cadenas y nada más:
+   - En el apéndice A:
+     - `'orientation'      => 'landscape',` → `'orientation'      => 'portrait',`
+     - `@media (orientation:portrait) and (pointer:coarse){#{{PRE}}-rot{display:flex}}` → `@media (orientation:landscape) and (pointer:coarse){#{{PRE}}-rot{display:flex}}`
+     - No toques `@media (orientation:landscape){#{{PRE}}-inst…`: es la colocación del aviso de instalar.
+     - En el panel, el texto «y se pone en horizontal» → «y se pone en vertical».
+   - En el apéndice B: `o.lock('landscape')` → `o.lock('portrait')`.
+   - En las comprobaciones del 4.5, al revés: en 390×844 no sale aviso de girar, en 844×390 sí, y la llamada esperada es `lock('portrait')`.
 4. **Temática para mayores o delicada** (alcohol, cannabis, apuestas, violencia fuerte): que el propio juego enseñe su aviso de edad al arrancar. **No** lo metas en el catálogo del arcade ni en páginas con AdSense.
 5. **Nunca** dentro del plugin: el almacén de claves de firma (`*.jks`, `*.keystore`), contraseñas, `.env`, tokens de API, el APK ni el proyecto fuente.
 
@@ -201,16 +208,16 @@ Todas las comprobaciones tienen que salir bien. Lo que no se pueda comprobar se 
    ```
    grep -rniIE "\{\{|landrace|lh-" --exclude=index.js --exclude=index.html {{SLUG}}/
    ```
-   No debe salir nada. Se excluyen `index.js` e `index.html` porque son de Godot.
+   No debe salir nada. Se excluyen `index.js` e `index.html` porque son de Godot, y `-I` se salta los binarios. Si el `.pck` se sacó de un proyecto copiado de otro juego, compruébalo aparte: `strings {{SLUG}}/game/index.pck | grep -ci <nombre del otro juego>` → 0.
 3. **Sin secretos:**
    - `find {{SLUG}} \( -iname "*.jks" -o -iname "*.keystore" -o -iname "*.apk" -o -iname ".env" \)` no debe encontrar nada.
    - `grep -rniIE "password|token|secret|api_key" --exclude=index.js {{SLUG}}/` no debe sacar nada. Lo que aparezca en `index.js` o `index.wasm` es del motor de Godot (por ejemplo, el teclado virtual).
 4. **El juego arranca en el navegador.** Godot web no funciona abriendo el fichero; necesita un servidor.
-   - Arráncalo en segundo plano: `(cd {{SLUG}}/game && python3 -m http.server 8000 >/dev/null 2>&1 &)`.
+   - Arráncalo en segundo plano: `python3 -m http.server 8000 --directory {{SLUG}}/game >/dev/null 2>&1 & echo $! > /tmp/srv.pid`.
    - Abre `http://127.0.0.1:8000/index.html` con Playwright. Usa Chromium con `--use-gl=swiftshader --enable-unsafe-swiftshader` para tener WebGL.
    - Tiene que haber un `<canvas>` y **0 errores** en la consola.
    - Haz capturas a 844×390 y 1280×720 a los 8–10 s: deben enseñar el juego, no una pantalla negra ni la barra de carga.
-   - Para el servidor al acabar.
+   - Páralo al acabar: `kill $(cat /tmp/srv.pid)`. No uses `pkill -f`: también mataría la propia terminal.
 5. **En WordPress**, si puedes montar uno local (PHP + SQLite, o `wp-env`), con Chromium con los mismos argumentos:
    - Activa el plugin.
    - **Página:** `GET /{{SLUG}}/` devuelve 200 y el HTML lleva `<base href=".../wp-content/plugins/{{SLUG}}/game/">`, `<link rel="manifest"`, `id="{{PRE}}-rot"` y `{{PRE}}-fs.js?v=`.
@@ -222,13 +229,15 @@ Todas las comprobaciones tienen que salir bien. Lo que no se pueda comprobar se 
      - Sin ese evento, a los 4 s sale la explicación del menú ⋮.
      - Con el agente de usuario de iPhone sale la explicación de Compartir.
      - En el ordenador no sale nada.
+     - Si no se toca, se oculta solo a los 15 s. En horizontal (844×390), mira en la captura que no tape los botones del propio juego. Si los tapa, cambia su sitio en el CSS de `fullscreen()`.
    - **Convivencia:** actívalo junto a otro plugin que use el mismo patrón y comprueba que cada dirección sirve su propio juego.
+   - **Desactivar:** al desactivarlo, `/{{SLUG}}/` da 404 sin tocar los enlaces permanentes.
 
    Si no puedes montar WordPress, dilo en la entrega como pendiente.
 6. **El zip:** `cd <padre> && zip -qr {{SLUG}}-1.0.0.zip {{SLUG}}`.
    - `unzip -l` tiene que enseñar `{{SLUG}}/{{SLUG}}.php`, no `{{SLUG}}.php` en la raíz.
    - La versión tiene que ser la misma en la cabecera del PHP, en `const VERSION`, en `readme.txt` y en el nombre del zip.
-7. **Tamaño:** el `.wasm` de Godot pesa ~35 MB sin comprimir, y el zip queda en unos 8–10 MB más lo que pese el `.pck`. Si el zip pasa de 30 MB no se puede enviar por aquí y puede chocar con el límite de subida del hosting. En ese caso, reduce el `.pck` antes de entregar: texturas más pequeñas y audio en Ogg Vorbis a menos calidad.
+7. **Tamaño:** el `.wasm` de Godot pesa ~35 MB sin comprimir, y en el zip queda en unos 7 MB, más lo que ocupe el `.pck` comprimido. Si el zip pasa de 30 MB no se puede enviar por aquí y puede chocar con el límite de subida del hosting. En ese caso, reduce el `.pck` antes de entregar: texturas más pequeñas y audio en Ogg Vorbis a menos calidad.
 
 ## 5. Actualizaciones
 
@@ -237,8 +246,15 @@ Todas las comprobaciones tienen que salir bien. Lo que no se pueda comprobar se 
 - **Caché del navegador:** con el `.htaccess` del apéndice C, el `.pck`, el `.wasm`, `index.js` y los worklets se revalidan en cada visita. Si no cambiaron, el servidor contesta 304 sin enviar nada; si cambiaron, se descargan. Así un motor viejo nunca se junta con un `.pck` nuevo, aunque cambies de versión de Godot.
   - No pongas `max-age` al motor: un navegador que lo guarda con caducidad no vuelve a preguntar hasta que caduca, y cambiar la cabecera después ya no le llega.
   - Se quita la ETag de esos ficheros porque Apache le añade «-gzip» al comprimir y entonces nunca contestaría 304. Se revalidan por fecha.
+  - Aquí no hay Apache para probarlo. Si la sesión puede llegar a la web publicada, compruébalo tras instalar:
+    ```
+    curl -sI -H "If-Modified-Since: $(date -u +'%a, %d %b %Y %H:%M:%S GMT')" https://<dominio>/wp-content/plugins/{{SLUG}}/game/index.wasm
+    ```
+    Tiene que contestar `304` con `Cache-Control: public, no-cache`. Si no se puede comprobar, dilo en la entrega.
 
 ## 6. Mensaje de entrega al usuario (modelo)
+
+Adjunta `{{SLUG}}-1.0.0.zip` con la herramienta de enviar ficheros y escribe junto a él:
 
 > **Instalar:** WordPress → Plugins → Añadir nuevo → Subir plugin → elige `{{SLUG}}-1.0.0.zip` → Instalar ahora → Activar. Si ya estaba instalado: «Reemplazar actual con el subido».
 >
@@ -353,6 +369,12 @@ final class {{CLASE}} {
 	public static function activate() {
 		self::rewrite();
 		flush_rewrite_rules();
+	}
+
+	/** Al borrar el plugin no deja nada en la base de datos. */
+	public static function uninstall() {
+		delete_option( self::OPTION );
+		delete_option( self::OPTION . '_ver' );
 	}
 
 	public static function deactivate() {
@@ -625,6 +647,7 @@ final class {{CLASE}} {
 
 register_activation_hook( __FILE__, array( '{{CLASE}}', 'activate' ) );
 register_deactivation_hook( __FILE__, array( '{{CLASE}}', 'deactivate' ) );
+register_uninstall_hook( __FILE__, array( '{{CLASE}}', 'uninstall' ) );
 {{CLASE}}::init();
 ```
 
@@ -696,6 +719,8 @@ register_deactivation_hook( __FILE__, array( '{{CLASE}}', 'deactivate' ) );
 		box.innerHTML = '<p>' + html + '</p>' + (btn ? '<button type="button" class="{{PRE}}-go">Instalar</button>' : '')
 			+ '<button type="button" class="{{PRE}}-x" aria-label="Cerrar">×</button>';
 		d.body.appendChild(box);
+		/* Tapa parte del juego: si no se toca, se va solo a los 15 s (y vuelve en la siguiente visita). */
+		setTimeout(function () { close(false); }, 15000);
 		box.querySelector('.{{PRE}}-x').addEventListener('click', function () { close(true); go(); });
 		if (btn) box.querySelector('.{{PRE}}-go').addEventListener('click', function () {
 			if (!ask) return;
@@ -730,9 +755,11 @@ register_deactivation_hook( __FILE__, array( '{{CLASE}}', 'deactivate' ) );
 		AddOutputFilterByType DEFLATE application/wasm application/javascript application/octet-stream text/html
 	</IfModule>
 </IfModule>
+# Sin ETag: Apache le añade «-gzip» al comprimir y entonces nunca contesta 304.
+FileETag None
 <IfModule mod_headers.c>
-	# Sin ETag: Apache le añade «-gzip» al comprimir y entonces nunca contesta 304.
-	# Sin ella se revalida por fecha (If-Modified-Since), que la compresión no toca.
+	# Y se quita también de la respuesta: sin ella se revalida por fecha
+	# (If-Modified-Since), que la compresión no toca.
 	Header unset ETag
 	# Motor y contenido se revalidan en cada visita: 304 si no cambiaron (barato),
 	# y nunca se mezcla un motor viejo con un .pck nuevo.
