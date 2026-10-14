@@ -16,7 +16,8 @@
 			if (o && o.lock) o.lock('landscape').catch(function () {});
 		} catch (e) {}
 	}
-	function go() {
+	function go(e) {
+		if (e && e.target && e.target.closest && e.target.closest('#lh-inst')) return;
 		hideRot();
 		if (app || !can || busy || isFS()) return;
 		if (!coarse && asked) return;
@@ -34,8 +35,50 @@
 	var rot = d.getElementById('lh-rot');
 	function hideRot() { if (rot) rot.classList.add('off'); }
 	if (rot && coarse && !app && !can) {
-		/* iPhone: no hay pantalla completa desde la web; se explica cómo tenerla. */
+		/* iPhone: no hay pantalla completa desde la web; el aviso de abajo explica cómo instalarlo. */
 		var t = rot.querySelector('small');
-		if (t) t.textContent = 'Para quitar la barra del navegador: Compartir → «Añadir a pantalla de inicio».';
+		if (t) t.textContent = 'Toca para jugar.';
 	}
+
+	/* Instalar como app: abierta desde el icono va sin barras desde el principio.
+	 * Android (Chrome) ofrece el botón Instalar con beforeinstallprompt; si el navegador no lo
+	 * ofrece, se explica el menú. iPhone no tiene botón posible: se explica Compartir. */
+	if (app || !coarse) return;
+	var KEY = 'lh-inst-off', ua = navigator.userAgent;
+	var ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+	var android = /Android/i.test(ua);
+	try { if (Date.now() - (+localStorage.getItem(KEY) || 0) < 7 * 864e5) return; } catch (e) {}
+	var ask = null, box = null, shown = false;
+	var SHARE = '<svg width="16" height="18" viewBox="0 0 16 18" aria-label="Compartir"><path d="M8 1v11M4 5l4-4 4 4M3 8H1.5v9h13V8H13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+	function close(save) {
+		if (box) box.classList.add('off');
+		if (save) { try { localStorage.setItem(KEY, String(Date.now())); } catch (e) {} }
+	}
+	function show(html, btn) {
+		if (shown) return;
+		shown = true;
+		box = d.createElement('div');
+		box.id = 'lh-inst';
+		box.setAttribute('role', 'dialog');
+		box.innerHTML = '<p>' + html + '</p>' + (btn ? '<button type="button" class="lh-go">Instalar</button>' : '')
+			+ '<button type="button" class="lh-x" aria-label="Cerrar">×</button>';
+		d.body.appendChild(box);
+		box.querySelector('.lh-x').addEventListener('click', function () { close(true); go(); });
+		if (btn) box.querySelector('.lh-go').addEventListener('click', function () {
+			if (!ask) return;
+			ask.prompt();
+			(ask.userChoice || Promise.resolve({})).then(function (c) { close(c && c.outcome === 'accepted'); if (!c || c.outcome !== 'accepted') go(); });
+			ask = null;
+		});
+	}
+	window.addEventListener('beforeinstallprompt', function (e) {
+		e.preventDefault();
+		ask = e;
+		show('<b>Juega sin barras:</b> instálalo como app.', true);
+	});
+	window.addEventListener('appinstalled', function () { close(true); });
+	setTimeout(function () {
+		if (ios) show('<b>Juega sin barras:</b> toca ' + SHARE + ' Compartir y luego «Añadir a pantalla de inicio».');
+		else if (android) show('<b>Juega sin barras:</b> menú ⋮ → «Instalar aplicación» o «Añadir a pantalla de inicio».');
+	}, ios ? 1500 : 4000);
 })();

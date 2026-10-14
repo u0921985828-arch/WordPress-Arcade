@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Landrace Hunters
  * Description: Hospeda el juego «Landrace Hunters» (Godot 4.3, versión web) dentro de WordPress: dirección propia a pantalla completa y atajo [landrace_hunters] para incrustarlo en cualquier página. Todo se sirve desde el propio plugin.
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author: WOLFCADE
  * License: GPL-2.0-or-later
  * Text Domain: landrace-hunters
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class Landrace_Hunters {
 
-	const VERSION   = '1.1.0';
+	const VERSION   = '1.2.0';
 	const OPTION    = 'landrace_hunters';
 	const QUERY_VAR = 'landrace_hunters';
 
@@ -166,7 +166,14 @@ final class Landrace_Hunters {
 		$head .= '<style>#lh-rot{position:fixed;inset:0;z-index:99;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;'
 			. 'background:#0b0f1e;color:#fff;font:600 20px/1.3 system-ui,sans-serif;text-align:center;padding:24px}'
 			. '#lh-rot small{font-weight:400;font-size:15px;opacity:.8;max-width:300px}'
-			. '@media (orientation:portrait) and (pointer:coarse){#lh-rot{display:flex}}#lh-rot.off{display:none!important}</style>' . "\n";
+			. '@media (orientation:portrait) and (pointer:coarse){#lh-rot{display:flex}}#lh-rot.off{display:none!important}'
+			. '#lh-inst{position:fixed;left:50%;bottom:calc(10px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:100;display:flex;align-items:center;gap:10px;'
+			. 'width:max-content;max-width:calc(100vw - 20px);box-sizing:border-box;padding:8px 8px 8px 14px;border-radius:14px;background:rgba(11,15,30,.94);'
+			. 'border:1px solid rgba(255,255,255,.18);box-shadow:0 6px 24px rgba(0,0,0,.5);color:#fff;font:14px/1.35 system-ui,sans-serif}'
+			. '@media (orientation:landscape){#lh-inst{top:calc(8px + env(safe-area-inset-top));bottom:auto;max-width:min(640px,74vw)}}#lh-inst p{margin:0}#lh-inst svg{vertical-align:-3px;color:#4fae5a}#lh-inst.off{display:none}'
+			. '#lh-inst button{flex:none;min-height:44px;border:0;border-radius:10px;font:600 15px system-ui,sans-serif;cursor:pointer}'
+			. '#lh-inst .lh-go{padding:0 16px;background:#4fae5a;color:#08130a}'
+			. '#lh-inst .lh-x{width:44px;background:transparent;color:#fff;font-size:24px;opacity:.75}</style>' . "\n";
 		$html  = preg_replace( '#</head>#i', $head . '</head>', $html, 1 );
 
 		$body  = '<div id="lh-rot" role="dialog" aria-label="Gira el móvil">'
@@ -192,6 +199,8 @@ final class Landrace_Hunters {
 			'scope'            => self::play_url(),
 			'display'          => 'fullscreen',
 			'orientation'      => 'landscape',
+			'id'               => self::play_url(),
+			'description'      => self::opt( 'title' ),
 			'background_color' => '#000000',
 			'theme_color'      => '#000000',
 			'icons'            => array(
@@ -325,8 +334,8 @@ final class Landrace_Hunters {
 					<tr>
 						<th scope="row">Pantalla completa</th>
 						<td><label><input type="checkbox" name="<?php echo esc_attr( self::OPTION ); ?>[fs]" value="1" <?php checked( (int) self::opt( 'fs' ), 1 ); ?>>
-							Al tocar la pantalla, el juego ocupa toda la pantalla y se pone en horizontal</label>
-							<p class="description">En Android quita la barra del navegador. En iPhone no se puede desde la web: hay que usar Compartir → «Añadir a pantalla de inicio».</p></td>
+							Al tocar la pantalla, el juego ocupa toda la pantalla y se pone en horizontal; en el móvil, ofrece instalarlo como app</label>
+							<p class="description">En Android quita la barra del navegador y sale un botón «Instalar». En iPhone la web no puede quitar la barra: sale un aviso que explica Compartir → «Añadir a pantalla de inicio», y abierto desde ese icono va sin barras.</p></td>
 					</tr>
 				</table>
 				<?php submit_button(); ?>
