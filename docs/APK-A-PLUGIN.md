@@ -1,26 +1,30 @@
 # De APK de Godot a plugin de WordPress
 
-> **Para Claude (la otra conversación).** Este documento es tu encargo completo: con el proyecto Godot que ya compilas a APK, saca la **versión web** del juego y empaquétala como **plugin de WordPress** instalable subiendo un zip. Sigue los pasos en orden; las plantillas del final ya están probadas en producción (es el plugin «Landrace Hunters» 1.1.0 de la web kuboplay, con los nombres cambiados por marcadores). Responde al usuario en español, corto: no es técnico y trabaja desde el móvil.
+> **Para Claude (la otra conversación).** Este documento es tu encargo completo. Con el proyecto Godot que ya compilas a APK, saca la **versión web** del juego y empaquétala como **plugin de WordPress** que se instala subiendo un zip. Sigue los pasos en orden. Las plantillas PHP y JS del final son las del plugin «Landrace Hunters» 1.2.1 de la web kuboplay (probado en su WordPress), con los nombres cambiados por marcadores; el `.htaccess` está revisado aparte. Responde al usuario en español y en corto: no es técnico y trabaja desde el móvil.
 
 ## 0. Qué se entrega
 
-- Un zip `{{SLUG}}-1.0.0.zip` que dentro tiene **una carpeta** `{{SLUG}}/` (no los ficheros sueltos en la raíz del zip; si no, WordPress no lo reconoce).
-- Instalado, el juego se juega en `https://<dominio>/{{SLUG}}/`, ocupa toda la pantalla al primer toque (sin barra del navegador en Android), se pone en horizontal, se puede «Añadir a pantalla de inicio» como app, y se incrusta en cualquier página con `[{{ID}}]`.
-- Sin anuncios, sin peticiones a otros dominios (todo sale del plugin) y sin ningún secreto dentro.
-- Se entrega con la herramienta de enviar ficheros (límite 30 MB) más 3–5 líneas de instalación para el usuario (apartado 6).
+- Un zip `{{SLUG}}-1.0.0.zip` que contiene **una carpeta** `{{SLUG}}/`. Si los ficheros van sueltos en la raíz del zip, WordPress no lo reconoce.
+- Una vez instalado:
+  - El juego está en `https://<dominio>/{{SLUG}}/`.
+  - Al primer toque ocupa toda la pantalla (en Android sin la barra del navegador) y se pone en horizontal.
+  - En el móvil sale un aviso para **instalarlo como app**: botón «Instalar» en Android, instrucciones de Compartir → «Añadir a pantalla de inicio» en iPhone. Abierto desde ese icono va sin barras.
+  - Se puede meter en cualquier página con `[{{ID}}]`.
+- No lleva anuncios, no hace peticiones a otros dominios (todo sale del plugin) y no lleva ningún secreto.
+- Lo envías con la herramienta de enviar ficheros (límite de 30 MB), junto con el mensaje de instalación del apartado 6.
 
 ## 1. Fija los nombres (marcadores)
 
-Las plantillas llevan estos marcadores. Elígelos tú a partir del título del juego; pregunta al usuario solo si no sabes el título.
+Elige los marcadores a partir del título del juego. Pregunta al usuario solo si no sabes el título.
 
 | Marcador | Qué es | Formato | Ejemplo |
 |---|---|---|---|
 | `{{TITULO}}` | Nombre visible | Libre | `Dub Siege` |
-| `{{SLUG}}` | Carpeta, fichero principal, dirección web, dominio de texto | minúsculas-con-guiones | `dub-siege` |
-| `{{ID}}` | Opción de la BD, variable de consulta, atajo | minúsculas_con_guion_bajo | `dub_siege` |
-| `{{CLASE}}` | Clase PHP (única en todo WordPress) | Palabras_Con_Mayúscula | `Dub_Siege` |
-| `{{PRE}}` | Prefijo de ids CSS y del script | 2–3 letras | `ds` |
-| `{{COLOR}}` | Color de la flecha del aviso «Gira el móvil» | `#rrggbb` | `#ff6fb5` |
+| `{{SLUG}}` | Carpeta, fichero principal, dirección web y dominio de texto | minúsculas-con-guiones | `dub-siege` |
+| `{{ID}}` | Opción de la base de datos, variable de consulta y atajo | minúsculas_con_guion_bajo | `dub_siege` |
+| `{{CLASE}}` | Clase PHP, única en todo WordPress | Palabras_Con_Mayúscula | `Dub_Siege` |
+| `{{PRE}}` | Prefijo de los ids CSS y del script | 2–3 letras | `ds` |
+| `{{COLOR}}` | Color de acento: flecha de «Gira el móvil» y botón «Instalar» | `#rrggbb` | `#ff6fb5` |
 
 No reutilices `landrace_hunters`, `liga_barrios`, `kuboplay_launcher` ni `arcade`: ya existen en esa web y chocarían.
 
@@ -28,30 +32,135 @@ No reutilices `landrace_hunters`, `liga_barrios`, `kuboplay_launcher` ni `arcade
 
 **Lo fiable es exportar desde el proyecto**, no desde el APK.
 
-1. Versión: `godot --version`. Las **plantillas de exportación** tienen que ser de **esa misma versión exacta** (`Godot_v<versión>-stable_export_templates.tpz` de las versiones publicadas de `godotengine/godot` en GitHub, descomprimidas en `~/.local/share/godot/export_templates/<versión>.stable/`).
-2. Renderizador: en la web solo funciona **Compatibility** (WebGL 2). Si el proyecto usa Forward+ o Mobile, pon `rendering/renderer/rendering_method.web="gl_compatibility"` en `project.godot` (o el proyecto entero en Compatibility) y comprueba que se ve igual: sin luces volumétricas, SDFGI ni efectos de Forward+.
-3. Añade un preajuste **Web** en `export_presets.cfg` (junto al de Android, sin tocar el de Android):
-   - nombre `"Web"`, `platform="Web"`, `export_path="build/web/index.html"` (**el ejecutable se tiene que llamar `index`**: el plugin lee `game/index.html`);
-   - `variant/thread_support=false` → no necesita las cabeceras COOP/COEP, que en hosting compartido (IONOS) no se pueden garantizar. Con esto `Thread` no sirve: si el juego usa hilos, que no dependa de ellos;
-   - `html/canvas_resize_policy=2` (adaptable: el lienzo sigue a la ventana al girar o entrar en pantalla completa);
-   - `progressive_web_app/enabled=false` (el plugin pone su propio manifiesto);
-   - `vram_texture_compression/for_desktop=true` y `for_mobile=true` si el proyecto importa texturas con compresión VRAM (si no, en el móvil salen negras o no cargan). Si todo es pixel art «Lossless», no hace falta;
-   - `html/export_icon=false`; `html/head_include` vacío.
-4. Exporta: `godot --headless --export-release "Web" build/web/index.html`.
-5. De `build/web/` quédate con: `index.html`, `index.js`, `index.wasm`, `index.pck` y todos los `index.audio*.worklet.js`. Tira el resto (`*.service.worker.js`, `*.manifest.json`, `*.offline.html`, `*.icon.png`, `*.apple-touch-icon.png`, `*.import`).
-6. Comprueba en `index.html` que `GODOT_CONFIG` tiene `"ensureCrossOriginIsolationHeaders": false`, `"canvasResizePolicy": 2` y `"executable": "index"`, y que la etiqueta del viewport termina exactamente en `initial-scale=1.0">` (el plugin le añade `viewport-fit=cover` buscando esa cadena; si tu versión de Godot la escribe distinta, adapta el `str_replace` de `fullscreen()`).
+### Paso 1 · Versión y plantillas
 
-**Si solo hay APK y no hay proyecto** (último recurso): `assets/` del APK es el contenido ya importado del juego. Empaquétalo en `index.pck` con `PCKPacker` (`pck_start`, `add_file("res://<ruta>", <fichero>)` por cada fichero, `flush`) usando **la misma versión de Godot que la plantilla web** (un `.pck` de otra versión no arranca); saca `index.html/js/wasm/worklet` exportando a web un proyecto vacío de esa versión con las opciones de arriba, cambia su `index.pck` por el tuyo y corrige `fileSizes` en `GODOT_CONFIG` con el tamaño real del `.pck`. Las bibliotecas nativas (`lib/*.so`, GDExtension) no sirven en la web.
+1. Ejecuta `godot --version`. Por ejemplo, `4.3.stable.official.77dcf97d8` es la versión `4.3`; en una versión de parche sería `4.7.2`.
+2. Si la salida lleva `.mono`, el juego es C#/.NET y **Godot 4 no exporta a web con C#**. No sigas y díselo al usuario.
+3. Las plantillas de exportación tienen que ser de esa misma versión exacta: `Godot_v<versión>-stable_export_templates.tpz`, de las versiones publicadas de `godotengine/godot` en GitHub.
+4. El `.tpz` es un zip con todo dentro de `templates/`. Extrae solo lo necesario:
+   ```
+   mkdir -p ~/.local/share/godot/export_templates/<versión>.stable
+   unzip -j Godot_v<versión>-stable_export_templates.tpz 'templates/web_nothreads_*' 'templates/version.txt' -d ~/.local/share/godot/export_templates/<versión>.stable/
+   ```
+   La exportación sin hilos solo usa `web_nothreads_release.zip`.
+
+### Paso 2 · Renderizador
+
+En la web solo existe **Compatibility** (WebGL 2). Desde Godot 4.3 ya se usa ahí por defecto: `rendering/renderer/rendering_method.web` vale `gl_compatibility` sin tocar nada, aunque el proyecto vaya en Forward+ o Mobile en Android.
+
+No cambies el renderizador del proyecto. Comprueba en las capturas que se ve igual: Compatibility no tiene SDFGI, volumétricos ni algunos efectos de Forward+/Mobile.
+
+### Paso 3 · Preajuste Web
+
+Añade el preajuste en `export_presets.cfg`, junto al de Android y sin tocar ese.
+
+Ponle el número siguiente al último que ya haya. Si Android es `[preset.0]`, este es `[preset.1]`; si te saltas un número, Godot no lo lee.
+
+```
+[preset.1]
+name="Web"
+platform="Web"
+runnable=false
+dedicated_server=false
+custom_features=""
+export_filter="all_resources"
+include_filter=""
+exclude_filter="build/*"
+export_path="build/web/index.html"
+
+[preset.1.options]
+custom_template/debug=""
+custom_template/release=""
+variant/extensions_support=false
+variant/thread_support=false
+vram_texture_compression/for_desktop=true
+vram_texture_compression/for_mobile=false
+html/export_icon=false
+html/custom_html_shell=""
+html/head_include=""
+html/canvas_resize_policy=2
+html/focus_canvas_on_start=true
+html/experimental_virtual_keyboard=false
+progressive_web_app/enabled=false
+progressive_web_app/ensure_cross_origin_isolation_headers=false
+```
+
+Por qué está así:
+
+- **`index`:** el ejecutable se tiene que llamar `index`, porque el plugin lee `game/index.html`.
+- **`thread_support=false`:** así no hacen falta las cabeceras COOP/COEP, que en un hosting compartido como IONOS no se pueden garantizar. A cambio, `Thread` **no da error pero no hace nada**: `start()` devuelve OK, la función nunca se ejecuta e `is_alive()` se queda en true para siempre. Cualquier espera a un hilo se cuelga sin aviso. `WorkerThreadPool` sí funciona: ejecuta la tarea en el momento, en el mismo hilo.
+- **`canvas_resize_policy=2`:** lienzo adaptable; sigue a la ventana al girar el móvil o al entrar en pantalla completa.
+- **PWA apagada:** el plugin pone su propio manifiesto. `ensure_cross_origin_isolation_headers` vale `true` por defecto aunque la PWA esté apagada, así que hay que ponerlo a `false` aparte.
+- **`vram_texture_compression/for_mobile=true`:** ponlo si el proyecto importa texturas con compresión VRAM; si no, en el móvil salen negras o no cargan. Si todo es pixel art «Lossless», déjalo en `false`.
+
+### Paso 4 · Exportar
+
+Godot no crea la carpeta de destino; si no existe, la exportación falla:
+
+```
+mkdir -p <proyecto>/build/web && touch <proyecto>/build/.gdignore
+godot --headless --path <proyecto> --export-release "Web" build/web/index.html
+```
+
+El `.gdignore` evita que el editor importe lo exportado y lo meta en el `.pck` de la siguiente exportación.
+
+### Paso 5 · Qué ficheros quedarse
+
+De `build/web/` quédate con:
+
+- `index.html`
+- `index.js`
+- `index.wasm`
+- `index.pck`
+- **`index.png`**: es la imagen de la pantalla de carga. `index.html` la pide y, si falta, sale un 404 en la consola.
+- todos los `index.audio*.worklet.js`: en 4.3 solo `index.audio.worklet.js`; desde 4.4, también `index.audio.position.worklet.js`.
+
+Con las opciones de arriba no se genera nada más. Si aparece algo (`*.service.worker.js`, `*.manifest.json`, `*.offline.html`, `*.icon.png`, `*.apple-touch-icon.png`, `*.144x144.png`…), la PWA o el icono siguen activos: corrige el preajuste.
+
+### Paso 6 · Comprobar index.html
+
+- `GODOT_CONFIG` tiene `"ensureCrossOriginIsolationHeaders": false`, `"canvasResizePolicy": 2` y `"executable": "index"`.
+- La etiqueta del viewport termina exactamente en `initial-scale=1.0">`. El plugin le añade `viewport-fit=cover` buscando esa cadena; si tu versión de Godot la escribe distinta, adapta el `str_replace` de `fullscreen()`.
+- El `<title>` da igual, porque el plugin lo cambia al servir la página.
+
+### Si solo hay APK y no hay proyecto (último recurso)
+
+1. **Saca la versión de Godot del APK** y usa **esa** versión para todo (PCKPacker, plantilla web y proyecto vacío):
+   ```
+   unzip -p juego.apk 'lib/arm64-v8a/libgodot_android.so' | strings | grep -m1 -E '^[0-9]+\.[0-9]+(\.[0-9]+)?\.stable'
+   ```
+   Los ficheros de `assets/` los importó esa versión, y el formato del `.pck` cambia entre versiones (v2 hasta 4.4, v3 en 4.5, v4 en 4.7).
+2. **Empaqueta `assets/` en `index.pck`.** En 4.3/4.4, `assets/` trae los ficheros exportados con su ruta (`assets/.godot/imported/…`, `assets/project.binary`…). Usa `PCKPacker`: `pck_start("index.pck")`, `add_file("res://<ruta dentro de assets/>", <fichero>)` por cada uno y `flush()`.
+   - Deja fuera `assets/_cl_` y `assets/assets.sparsepck`.
+   - Si los nombres de `assets/` son hashes de 64 caracteres (exportado con «Encrypt directory»), no se puede: pide el proyecto.
+3. **Texturas:** las de compresión VRAM del APK solo vienen en ETC2/ASTC. En el móvil cargan, pero en muchos navegadores de ordenador no; dilo en la entrega.
+4. **Resto de ficheros:** saca `index.html`, `index.js`, `index.wasm`, `index.png` y el worklet exportando a web un proyecto vacío de esa misma versión con las opciones de arriba, y cambia su `index.pck` por el tuyo.
+5. Pon en `fileSizes` el tamaño real del `.pck`. Solo afecta a la barra de carga.
+6. Las bibliotecas nativas (`lib/*.so`, GDExtension) no sirven en la web.
 
 ### Lo que el código del juego tiene que respetar en la web
 
-- **Solo Android** (anuncios, Play Games, compras, plugins JNI): protégelo con `Engine.has_singleton("…")` o `OS.has_feature("android")`. La versión web va **sin anuncios**.
-- **Salir**: `get_tree().quit()` no cierra la pestaña; esconde el botón «Salir» si `OS.has_feature("web")`.
-- **Guardado**: `user://` funciona (se guarda en el navegador, por dominio). Cierra el fichero al guardar; no confíes en `NOTIFICATION_WM_CLOSE_REQUEST` para guardar.
-- **Sonido**: el navegador no deja sonar nada hasta el primer toque. Godot lo reanuda solo; no pongas audio imprescindible antes de que el jugador toque.
-- **Táctil**: los controles en pantalla del APK (TouchScreenButton, joystick propio) funcionan igual. Muéstralos con `DisplayServer.is_touchscreen_available()`; en el ordenador, teclado y ratón.
-- **Vibración**: `Input.vibrate_handheld(ms)` vibra en Android (navegador); en iPhone no vibra nada, que no rompa nada.
-- **Tamaño de pantalla**: estiramiento `canvas_items` o `viewport` con aspecto `expand` o `keep`; las pantallas van de 360×640 a 1920×1080 y el juego tiene que verse entero en todas.
+- **Solo Android:** anuncios, Play Games, compras y plugins JNI se protegen con `Engine.has_singleton("…")` u `OS.has_feature("android")`. La versión web va **sin anuncios**.
+- **Hilos:** si el juego usa `Thread`, en la web llama a la función directamente:
+  ```
+  if OS.has_feature("nothreads"):
+      _trabajo()
+  else:
+      hilo.start(_trabajo)
+  ```
+  Nunca esperes con `while hilo.is_alive()`.
+- **Salir:** `get_tree().quit()` no cierra la pestaña. Esconde el botón «Salir» si `OS.has_feature("web")`.
+- **Guardado:** `user://` funciona y va a IndexedDB del navegador.
+  - Es una sola base por dominio, compartida por todos los juegos Godot de esa web, y cada juego guarda en su carpeta según `application/config/name`. Comprueba que el nombre del proyecto (o `application/config/custom_user_dir_name`) no coincide con el de otro juego de la web, por ejemplo Landrace Hunters.
+  - Cierra el fichero al guardar (`close()`): Godot lo pasa a IndexedDB en el fotograma siguiente.
+  - Guarda en el momento, no en `NOTIFICATION_WM_CLOSE_REQUEST`, que en la web no llega al cerrar la pestaña.
+  - En modo privado puede no guardarse nada (`OS.is_userfs_persistent()` devuelve false).
+- **Sonido:**
+  - El navegador no deja sonar nada hasta el primer toque. Godot lo reanuda solo, pero no pongas audio imprescindible antes de que el jugador toque.
+  - En la web Godot reproduce el audio en modo **Sample** (`audio/general/default_playback_type.web`), y en ese modo **no se aplican los efectos de los buses** (`AudioEffect`: reverb, filtros, compresor…). Si el juego depende de ellos, grábalos en los propios ficheros de audio. Como último recurso, pon `audio/general/default_playback_type.web=0` (Stream), sabiendo que sin hilos puede dar retardo y chasquidos.
+- **Táctil:** los controles en pantalla del APK (TouchScreenButton, joystick propio) funcionan igual. Muéstralos con `DisplayServer.is_touchscreen_available()`; en el ordenador se juega con teclado y ratón.
+- **Vibración:** `Input.vibrate_handheld(ms)` vibra en Android, desde el navegador. En iPhone no vibra, y eso no debe romper nada.
+- **Tamaño de pantalla:** usa estiramiento `canvas_items` o `viewport` con aspecto `expand` o `keep`. Las pantallas van de 360×640 a 1920×1080 y el juego tiene que verse entero en todas.
 
 ## 3. Montar el plugin
 
@@ -60,47 +169,85 @@ No reutilices `landrace_hunters`, `liga_barrios`, `kuboplay_launcher` ni `arcade
   {{SLUG}}.php           ← apéndice A
   readme.txt             ← apéndice D
   game/
-    index.html  index.js  index.wasm  index.pck  index.audio*.worklet.js   ← de la exportación
+    index.html  index.js  index.wasm  index.pck  index.png  index.audio*.worklet.js   ← de la exportación
     {{PRE}}-fs.js        ← apéndice B
     .htaccess            ← apéndice C
     icon-192.png         ← icono 192×192 (res/mipmap-xxxhdpi/ del APK o el icono del proyecto)
-    icon-576.png         ← el mismo a 576×576 (pixel art: ampliación ×3 «vecino más cercano», nunca suavizada)
+    icon-576.png         ← el mismo a 576×576
     (licencias de las fuentes, p. ej. OFL-*.txt, si el juego usa fuentes con licencia OFL)
 ```
 
-1. Copia las plantillas y **sustituye todos los marcadores** (`{{TITULO}}`, `{{SLUG}}`, `{{ID}}`, `{{CLASE}}`, `{{PRE}}`, `{{COLOR}}`). Comprueba que no queda ninguno: `grep -rn "{{" {{SLUG}}/` → nada.
-2. Juego en vertical (no en horizontal): en el apéndice A cambia `'orientation' => 'landscape'` por `'portrait'`, la consulta del aviso `(orientation:portrait)` por `(orientation:landscape)` y el texto «Gira el móvil» sigue valiendo; en el apéndice B, `lock('landscape')` por `lock('portrait')`.
-3. Si el juego es para mayores o tiene temática delicada (alcohol, cannabis, apuestas, violencia fuerte): que el propio juego muestre su aviso de edad al arrancar, y **no** lo metas en el catálogo del arcade ni en páginas con AdSense.
-4. **Nunca** dentro del plugin: el almacén de claves de firma (`*.jks`, `*.keystore`), contraseñas, `.env`, tokens de API, el APK, ni el proyecto fuente.
+1. **Marcadores:** copia las plantillas y sustituye todos (`{{TITULO}}`, `{{SLUG}}`, `{{ID}}`, `{{CLASE}}`, `{{PRE}}`, `{{COLOR}}`). Comprueba solo los ficheros propios, porque el `index.js` de Godot trae `{{` en sus comentarios:
+   ```
+   grep -n "{{" {{SLUG}}/{{SLUG}}.php {{SLUG}}/readme.txt {{SLUG}}/game/{{PRE}}-fs.js {{SLUG}}/game/.htaccess
+   ```
+   No debe salir nada.
+2. **Icono de 576 px:**
+   - Si es pixel art, amplía ×3 con «vecino más cercano», nunca suavizado:
+     ```
+     python3 -c "from PIL import Image; Image.open('icon-192.png').resize((576,576), Image.NEAREST).save('icon-576.png')"
+     ```
+   - Si no es pixel art, usa `Image.LANCZOS` o, mejor, la imagen original a 576.
+3. **Juego en vertical** (no en horizontal): en el apéndice A cambia `'orientation' => 'landscape'` por `'portrait'` y `(orientation:portrait)` por `(orientation:landscape)` en el aviso de girar. En el apéndice B cambia `lock('landscape')` por `lock('portrait')`.
+4. **Temática para mayores o delicada** (alcohol, cannabis, apuestas, violencia fuerte): que el propio juego enseñe su aviso de edad al arrancar. **No** lo metas en el catálogo del arcade ni en páginas con AdSense.
+5. **Nunca** dentro del plugin: el almacén de claves de firma (`*.jks`, `*.keystore`), contraseñas, `.env`, tokens de API, el APK ni el proyecto fuente.
 
 ## 4. Comprobar antes de entregar
 
-Todas tienen que salir bien; lo que no se pueda comprobar, se dice en la entrega.
+Todas las comprobaciones tienen que salir bien. Lo que no se pueda comprobar se dice en la entrega.
 
-1. `php -l {{SLUG}}/{{SLUG}}.php` y `node --check {{SLUG}}/game/{{PRE}}-fs.js` sin errores.
-2. Sin restos: `grep -rniE "\{\{|landrace|lh-" {{SLUG}}/` → nada.
-3. Sin secretos: `find {{SLUG}} -iname "*.jks" -o -iname "*.keystore" -o -iname "*.apk" -o -iname ".env"` → nada; y busca en el texto `password|token|secret|api_key`.
-4. **El juego arranca en el navegador** (Godot web no funciona abriendo el fichero, necesita servidor): `python3 -m http.server 8000` dentro de `{{SLUG}}/game/` y Playwright (Chromium con `--use-gl=swiftshader --enable-unsafe-swiftshader` para tener WebGL) abriendo `http://127.0.0.1:8000/index.html`: hay `<canvas>`, **0 errores** en consola y la captura a los 8–10 s enseña el juego (no negro ni la barra de carga). Haz capturas a 844×390 y 1280×720.
-5. **En WordPress** (si puedes montar uno local: PHP + SQLite, o `wp-env`):
-   - activa el plugin, `GET /{{SLUG}}/` → 200 y el HTML lleva `<base href=".../wp-content/plugins/{{SLUG}}/game/">`, `<link rel="manifest"`, `id="{{PRE}}-rot"` y `{{PRE}}-fs.js?v=`;
-   - `GET /?{{ID}}=manifest` → 200, tipo `application/manifest+json`, JSON válido con `display: fullscreen`;
-   - Playwright como móvil (`390×844`, `hasTouch`, `isMobile`): el aviso «Gira el móvil» se ve; tras un toque se oculta y se llama a `requestFullscreen` con `{navigationUI:'hide'}` y a `screen.orientation.lock('landscape')` (intercéptalos con `addInitScript`); a `844×390` el juego llena la pantalla;
-   - que conviva con otros plugins: actívalo junto a otro que use el mismo patrón y comprueba que cada dirección sirve su juego.
+1. **Sintaxis:** `php -l {{SLUG}}/{{SLUG}}.php` y `node --check {{SLUG}}/game/{{PRE}}-fs.js`, sin errores.
+2. **Sin restos de la plantilla:**
+   ```
+   grep -rniIE "\{\{|landrace|lh-" --exclude=index.js --exclude=index.html {{SLUG}}/
+   ```
+   No debe salir nada. Se excluyen `index.js` e `index.html` porque son de Godot.
+3. **Sin secretos:**
+   - `find {{SLUG}} \( -iname "*.jks" -o -iname "*.keystore" -o -iname "*.apk" -o -iname ".env" \)` no debe encontrar nada.
+   - `grep -rniIE "password|token|secret|api_key" --exclude=index.js {{SLUG}}/` no debe sacar nada. Lo que aparezca en `index.js` o `index.wasm` es del motor de Godot (por ejemplo, el teclado virtual).
+4. **El juego arranca en el navegador.** Godot web no funciona abriendo el fichero; necesita un servidor.
+   - Arráncalo en segundo plano: `(cd {{SLUG}}/game && python3 -m http.server 8000 >/dev/null 2>&1 &)`.
+   - Abre `http://127.0.0.1:8000/index.html` con Playwright. Usa Chromium con `--use-gl=swiftshader --enable-unsafe-swiftshader` para tener WebGL.
+   - Tiene que haber un `<canvas>` y **0 errores** en la consola.
+   - Haz capturas a 844×390 y 1280×720 a los 8–10 s: deben enseñar el juego, no una pantalla negra ni la barra de carga.
+   - Para el servidor al acabar.
+5. **En WordPress**, si puedes montar uno local (PHP + SQLite, o `wp-env`), con Chromium con los mismos argumentos:
+   - Activa el plugin.
+   - **Página:** `GET /{{SLUG}}/` devuelve 200 y el HTML lleva `<base href=".../wp-content/plugins/{{SLUG}}/game/">`, `<link rel="manifest"`, `id="{{PRE}}-rot"` y `{{PRE}}-fs.js?v=`.
+   - **Manifiesto:** `GET /?{{ID}}=manifest` devuelve 200, tipo `application/manifest+json` y JSON válido con `display: fullscreen`.
+   - **Móvil en vertical** (`390×844`, `hasTouch`, `isMobile`): se ve el aviso «Gira el móvil». Intercepta `requestFullscreen` y `screen.orientation.lock` con `addInitScript`. Tras un toque, el aviso desaparece y hay **al menos una** llamada a `requestFullscreen({navigationUI:'hide'})` y a `lock('landscape')`. Un toque dispara pointerup, touchend y mousedown, así que en la simulación pueden salir varias.
+   - **Móvil en horizontal** (`844×390`): el juego llena la pantalla.
+   - **Aviso de instalar:**
+     - Con el agente de usuario de Android y lanzando a mano un `beforeinstallprompt` falso (con `prompt()` y `userChoice`), sale `#{{PRE}}-inst` con el botón «Instalar», y al tocarlo se llama a `prompt()`.
+     - Sin ese evento, a los 4 s sale la explicación del menú ⋮.
+     - Con el agente de usuario de iPhone sale la explicación de Compartir.
+     - En el ordenador no sale nada.
+   - **Convivencia:** actívalo junto a otro plugin que use el mismo patrón y comprueba que cada dirección sirve su propio juego.
+
    Si no puedes montar WordPress, dilo en la entrega como pendiente.
-6. El zip: `cd <padre> && zip -qr {{SLUG}}-1.0.0.zip {{SLUG}}` y `unzip -l` enseña `{{SLUG}}/{{SLUG}}.php` (no `{{SLUG}}.php` en la raíz). La versión es la misma en la cabecera del PHP, en `const VERSION`, en `readme.txt` y en el nombre del zip.
-7. Tamaño: el `.wasm` de Godot pesa ~35 MB sin comprimir y el zip queda en ~10 MB más lo que pese el `.pck`. Si el zip pasa de 30 MB no se puede enviar por aquí y puede chocar con el límite de subida del hosting: reduce el `.pck` (texturas, audio en Ogg Vorbis a menos calidad) antes de entregar.
+6. **El zip:** `cd <padre> && zip -qr {{SLUG}}-1.0.0.zip {{SLUG}}`.
+   - `unzip -l` tiene que enseñar `{{SLUG}}/{{SLUG}}.php`, no `{{SLUG}}.php` en la raíz.
+   - La versión tiene que ser la misma en la cabecera del PHP, en `const VERSION`, en `readme.txt` y en el nombre del zip.
+7. **Tamaño:** el `.wasm` de Godot pesa ~35 MB sin comprimir, y el zip queda en unos 8–10 MB más lo que pese el `.pck`. Si el zip pasa de 30 MB no se puede enviar por aquí y puede chocar con el límite de subida del hosting. En ese caso, reduce el `.pck` antes de entregar: texturas más pequeñas y audio en Ogg Vorbis a menos calidad.
 
 ## 5. Actualizaciones
 
-- Sube la versión en los **cuatro** sitios (cabecera, `const VERSION`, `readme.txt`, nombre del zip): así cambia el `?v=` del script y la ETag de la página.
-- Los ficheros del juego se guardan en el navegador según el `.htaccess` del apéndice C: el `.pck` se revalida en cada visita (barato, responde 304 si no cambió) y el motor (`.wasm`/`.js`) se guarda un día, porque solo cambia si cambias de versión de Godot. **Si cambias de versión de Godot**, cambia también el `max-age` del motor o los jugadores que vuelvan ese mismo día cargarán motor viejo con `.pck` nuevo y el juego no arrancará.
+- **Versión:** súbela en los **cuatro** sitios (cabecera, `const VERSION`, `readme.txt` y nombre del zip). Así cambian el `?v=` del script y la ETag de la página.
+- **Caché de página:** la página no entra en la caché de Kuboplay Shield (`DONOTCACHEPAGE`). Además, la primera visita tras subir una versión nueva vacía esa caché (`maybe_upgrade()` → `kp_shield_purge`), así que no se queda nadie con la página vieja.
+- **Caché del navegador:** con el `.htaccess` del apéndice C, el `.pck`, el `.wasm`, `index.js` y los worklets se revalidan en cada visita. Si no cambiaron, el servidor contesta 304 sin enviar nada; si cambiaron, se descargan. Así un motor viejo nunca se junta con un `.pck` nuevo, aunque cambies de versión de Godot.
+  - No pongas `max-age` al motor: un navegador que lo guarda con caducidad no vuelve a preguntar hasta que caduca, y cambiar la cabecera después ya no le llega.
+  - Se quita la ETag de esos ficheros porque Apache le añade «-gzip» al comprimir y entonces nunca contestaría 304. Se revalidan por fecha.
 
 ## 6. Mensaje de entrega al usuario (modelo)
 
-> **Instalar:** WordPress → Plugins → Añadir nuevo → Subir plugin → elige `{{SLUG}}-1.0.0.zip` → Instalar ahora → Activar. (Si ya estaba instalado: «Reemplazar actual con el subido».)
+> **Instalar:** WordPress → Plugins → Añadir nuevo → Subir plugin → elige `{{SLUG}}-1.0.0.zip` → Instalar ahora → Activar. Si ya estaba instalado: «Reemplazar actual con el subido».
+>
 > **Jugar:** `tudominio/{{SLUG}}/`. Si da «página no encontrada»: Ajustes → Enlaces permanentes → Guardar cambios.
-> **Pantalla completa:** en Android basta con tocar la pantalla. En iPhone: Compartir → «Añadir a pantalla de inicio» y abrirlo desde ese icono.
-> **En el menú «Elige juego»** (si tienes la Lanzadera de Kuboplay): Ajustes → Lanzadera → añade una ficha con el nombre, la dirección `/{{SLUG}}/` y un color. (Para que salga sola hay que pedirlo en la conversación del portal Kuboplay: la lanzadera solo detecta los juegos que conoce.)
+>
+> **Sin barras:** en Android basta con tocar la pantalla, y sale un botón «Instalar» para tenerlo como app. En iPhone: Compartir → «Añadir a pantalla de inicio», y abrirlo desde ese icono.
+>
+> **En el menú «Elige juego»** (si tienes la Lanzadera de Kuboplay): Ajustes → Lanzadera → añade una ficha con el nombre, la dirección `/{{SLUG}}/` y un color. Para que salga sola hay que pedirlo en la conversación del portal Kuboplay, porque la lanzadera solo detecta los juegos que conoce.
+>
 > **Ajustes del juego:** Ajustes → {{TITULO}} (dirección, título y pantalla completa).
 
 ---
@@ -168,6 +315,7 @@ final class {{CLASE}} {
 
 	public static function init() {
 		add_action( 'init', array( __CLASS__, 'rewrite' ) );
+		add_action( 'init', array( __CLASS__, 'maybe_upgrade' ), 20 );
 		add_filter( 'query_vars', array( __CLASS__, 'query_vars' ) );
 		add_action( 'template_redirect', array( __CLASS__, 'maybe_serve' ) );
 		add_shortcode( '{{ID}}', array( __CLASS__, 'shortcode' ) );
@@ -183,6 +331,19 @@ final class {{CLASE}} {
 		}
 	}
 
+	/**
+	 * Al subir una versión nueva («Reemplazar actual con el subido») no se ejecuta la activación.
+	 * La primera visita tras el cambio vacía la caché de página de Kuboplay Shield, si está,
+	 * para que nadie se quede con la página vieja guardada de antes.
+	 */
+	public static function maybe_upgrade() {
+		if ( get_option( self::OPTION . '_ver' ) === self::VERSION ) {
+			return;
+		}
+		update_option( self::OPTION . '_ver', self::VERSION, false );
+		do_action( 'kp_shield_purge' );
+	}
+
 	public static function query_vars( $vars ) {
 		$vars[] = self::QUERY_VAR;
 		return $vars;
@@ -195,7 +356,9 @@ final class {{CLASE}} {
 	}
 
 	public static function deactivate() {
-		flush_rewrite_rules();
+		// flush_rewrite_rules() volvería a guardar la regla, que ya se registró en init:
+		// se borran y WordPress las rehace en la siguiente visita, ya sin el plugin.
+		delete_option( 'rewrite_rules' );
 	}
 
 	/**
@@ -212,6 +375,11 @@ final class {{CLASE}} {
 		}
 		if ( 'manifest' === $q ) {
 			self::manifest();
+		}
+		// La página ya lleva su propia ETag y 304. Que ninguna caché de página (Kuboplay Shield)
+		// la guarde horas: al actualizar el plugin se seguiría sirviendo el HTML viejo.
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true );
 		}
 
 		$file = self::game_file();
@@ -276,7 +444,14 @@ final class {{CLASE}} {
 		$head .= '<style>#{{PRE}}-rot{position:fixed;inset:0;z-index:99;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;'
 			. 'background:#0b0f1e;color:#fff;font:600 20px/1.3 system-ui,sans-serif;text-align:center;padding:24px}'
 			. '#{{PRE}}-rot small{font-weight:400;font-size:15px;opacity:.8;max-width:300px}'
-			. '@media (orientation:portrait) and (pointer:coarse){#{{PRE}}-rot{display:flex}}#{{PRE}}-rot.off{display:none!important}</style>' . "\n";
+			. '@media (orientation:portrait) and (pointer:coarse){#{{PRE}}-rot{display:flex}}#{{PRE}}-rot.off{display:none!important}'
+			. '#{{PRE}}-inst{position:fixed;left:50%;bottom:calc(10px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:100;display:flex;align-items:center;gap:10px;'
+			. 'width:max-content;max-width:calc(100vw - 20px);box-sizing:border-box;padding:8px 8px 8px 14px;border-radius:14px;background:rgba(11,15,30,.94);'
+			. 'border:1px solid rgba(255,255,255,.18);box-shadow:0 6px 24px rgba(0,0,0,.5);color:#fff;font:14px/1.35 system-ui,sans-serif}'
+			. '@media (orientation:landscape){#{{PRE}}-inst{top:calc(8px + env(safe-area-inset-top));bottom:auto;max-width:min(640px,74vw)}}#{{PRE}}-inst p{margin:0}#{{PRE}}-inst svg{vertical-align:-3px;color:{{COLOR}}}#{{PRE}}-inst.off{display:none}'
+			. '#{{PRE}}-inst button{flex:none;min-height:44px;border:0;border-radius:10px;font:600 15px system-ui,sans-serif;cursor:pointer}'
+			. '#{{PRE}}-inst .{{PRE}}-go{padding:0 16px;background:{{COLOR}};color:#08130a}'
+			. '#{{PRE}}-inst .{{PRE}}-x{width:44px;background:transparent;color:#fff;font-size:24px;opacity:.75}</style>' . "\n";
 		$html  = preg_replace( '#</head>#i', $head . '</head>', $html, 1 );
 
 		$body  = '<div id="{{PRE}}-rot" role="dialog" aria-label="Gira el móvil">'
@@ -302,6 +477,8 @@ final class {{CLASE}} {
 			'scope'            => self::play_url(),
 			'display'          => 'fullscreen',
 			'orientation'      => 'landscape',
+			'id'               => self::play_url(),
+			'description'      => self::opt( 'title' ),
 			'background_color' => '#000000',
 			'theme_color'      => '#000000',
 			'icons'            => array(
@@ -435,8 +612,8 @@ final class {{CLASE}} {
 					<tr>
 						<th scope="row">Pantalla completa</th>
 						<td><label><input type="checkbox" name="<?php echo esc_attr( self::OPTION ); ?>[fs]" value="1" <?php checked( (int) self::opt( 'fs' ), 1 ); ?>>
-							Al tocar la pantalla, el juego ocupa toda la pantalla y se pone en horizontal</label>
-							<p class="description">En Android quita la barra del navegador. En iPhone no se puede desde la web: hay que usar Compartir → «Añadir a pantalla de inicio».</p></td>
+							Al tocar la pantalla, el juego ocupa toda la pantalla y se pone en horizontal; en el móvil, ofrece instalarlo como app</label>
+							<p class="description">En Android quita la barra del navegador y sale un botón «Instalar». En iPhone la web no puede quitar la barra: sale un aviso que explica Compartir → «Añadir a pantalla de inicio», y abierto desde ese icono va sin barras.</p></td>
 					</tr>
 				</table>
 				<?php submit_button(); ?>
@@ -472,7 +649,8 @@ register_deactivation_hook( __FILE__, array( '{{CLASE}}', 'deactivate' ) );
 			if (o && o.lock) o.lock('landscape').catch(function () {});
 		} catch (e) {}
 	}
-	function go() {
+	function go(e) {
+		if (e && e.target && e.target.closest && e.target.closest('#{{PRE}}-inst')) return;
 		hideRot();
 		if (app || !can || busy || isFS()) return;
 		if (!coarse && asked) return;
@@ -490,10 +668,52 @@ register_deactivation_hook( __FILE__, array( '{{CLASE}}', 'deactivate' ) );
 	var rot = d.getElementById('{{PRE}}-rot');
 	function hideRot() { if (rot) rot.classList.add('off'); }
 	if (rot && coarse && !app && !can) {
-		/* iPhone: no hay pantalla completa desde la web; se explica cómo tenerla. */
+		/* iPhone: no hay pantalla completa desde la web; el aviso de abajo explica cómo instalarlo. */
 		var t = rot.querySelector('small');
-		if (t) t.textContent = 'Para quitar la barra del navegador: Compartir → «Añadir a pantalla de inicio».';
+		if (t) t.textContent = 'Toca para jugar.';
 	}
+
+	/* Instalar como app: abierta desde el icono va sin barras desde el principio.
+	 * Android (Chrome) ofrece el botón Instalar con beforeinstallprompt; si el navegador no lo
+	 * ofrece, se explica el menú. iPhone no tiene botón posible: se explica Compartir. */
+	if (app || !coarse) return;
+	var KEY = '{{PRE}}-inst-off', ua = navigator.userAgent;
+	var ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+	var android = /Android/i.test(ua);
+	try { if (Date.now() - (+localStorage.getItem(KEY) || 0) < 7 * 864e5) return; } catch (e) {}
+	var ask = null, box = null, shown = false;
+	var SHARE = '<svg width="16" height="18" viewBox="0 0 16 18" aria-label="Compartir"><path d="M8 1v11M4 5l4-4 4 4M3 8H1.5v9h13V8H13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+	function close(save) {
+		if (box) box.classList.add('off');
+		if (save) { try { localStorage.setItem(KEY, String(Date.now())); } catch (e) {} }
+	}
+	function show(html, btn) {
+		if (shown) return;
+		shown = true;
+		box = d.createElement('div');
+		box.id = '{{PRE}}-inst';
+		box.setAttribute('role', 'dialog');
+		box.innerHTML = '<p>' + html + '</p>' + (btn ? '<button type="button" class="{{PRE}}-go">Instalar</button>' : '')
+			+ '<button type="button" class="{{PRE}}-x" aria-label="Cerrar">×</button>';
+		d.body.appendChild(box);
+		box.querySelector('.{{PRE}}-x').addEventListener('click', function () { close(true); go(); });
+		if (btn) box.querySelector('.{{PRE}}-go').addEventListener('click', function () {
+			if (!ask) return;
+			ask.prompt();
+			(ask.userChoice || Promise.resolve({})).then(function (c) { close(c && c.outcome === 'accepted'); if (!c || c.outcome !== 'accepted') go(); });
+			ask = null;
+		});
+	}
+	window.addEventListener('beforeinstallprompt', function (e) {
+		e.preventDefault();
+		ask = e;
+		show('<b>Juega sin barras:</b> instálalo como app.', true);
+	});
+	window.addEventListener('appinstalled', function () { close(true); });
+	setTimeout(function () {
+		if (ios) show('<b>Juega sin barras:</b> toca ' + SHARE + ' Compartir y luego «Añadir a pantalla de inicio».');
+		else if (android) show('<b>Juega sin barras:</b> menú ⋮ → «Instalar aplicación» o «Añadir a pantalla de inicio».');
+	}, ios ? 1500 : 4000);
 })();
 ```
 
@@ -506,16 +726,22 @@ register_deactivation_hook( __FILE__, array( '{{CLASE}}', 'deactivate' ) );
 	AddType application/octet-stream .pck
 </IfModule>
 <IfModule mod_deflate.c>
-	AddOutputFilterByType DEFLATE application/wasm application/javascript application/octet-stream text/html
+	<IfModule mod_filter.c>
+		AddOutputFilterByType DEFLATE application/wasm application/javascript application/octet-stream text/html
+	</IfModule>
 </IfModule>
 <IfModule mod_headers.c>
-	# El motor solo cambia con la versión de Godot: un día.
-	<FilesMatch "\.(wasm|js|png)$">
-		Header set Cache-Control "public, max-age=86400"
-	</FilesMatch>
-	# El contenido del juego cambia en cada versión: se revalida siempre (304 si no cambió).
-	<FilesMatch "\.pck$">
+	# Sin ETag: Apache le añade «-gzip» al comprimir y entonces nunca contesta 304.
+	# Sin ella se revalida por fecha (If-Modified-Since), que la compresión no toca.
+	Header unset ETag
+	# Motor y contenido se revalidan en cada visita: 304 si no cambiaron (barato),
+	# y nunca se mezcla un motor viejo con un .pck nuevo.
+	<FilesMatch "\.(wasm|pck)$|^index(\.audio.*\.worklet)?\.js$">
 		Header set Cache-Control "public, no-cache"
+	</FilesMatch>
+	# Iconos, imagen de carga y el script del plugin (lleva ?v=): un día.
+	<FilesMatch "\.png$|-fs\.js$">
+		Header set Cache-Control "public, max-age=86400"
 	</FilesMatch>
 </IfModule>
 ```
