@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Landrace Hunters
  * Description: Hospeda el juego «Landrace Hunters» (Godot 4.3, versión web) dentro de WordPress: dirección propia a pantalla completa y atajo [landrace_hunters] para incrustarlo en cualquier página. Todo se sirve desde el propio plugin.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: WOLFCADE
  * License: GPL-2.0-or-later
  * Text Domain: landrace-hunters
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class Landrace_Hunters {
 
-	const VERSION   = '1.0.0';
+	const VERSION   = '1.1.0';
 	const OPTION    = 'landrace_hunters';
 	const QUERY_VAR = 'landrace_hunters';
 
@@ -23,6 +23,7 @@ final class Landrace_Hunters {
 		return array(
 			'slug'  => 'landrace-hunters',
 			'title' => 'Landrace Hunters',
+			'fs'    => 1,
 		);
 	}
 
@@ -95,8 +96,12 @@ final class Landrace_Hunters {
 	 * para que esas rutas sigan valiendo aunque la página viva en /landrace-hunters/.
 	 */
 	public static function maybe_serve() {
-		if ( ! get_query_var( self::QUERY_VAR ) ) {
+		$q = get_query_var( self::QUERY_VAR );
+		if ( ! $q ) {
 			return;
+		}
+		if ( 'manifest' === $q ) {
+			self::manifest();
 		}
 
 		$file = self::game_file();
@@ -109,6 +114,9 @@ final class Landrace_Hunters {
 		$base = '<base href="' . esc_url( trailingslashit( self::game_url() ) ) . '">';
 		$html = preg_replace( '#(<meta\s+charset="utf-8">)#i', '$1' . "\n\t\t" . $base, $html, 1 );
 		$html = preg_replace( '#<title>[^<]*</title>#i', '<title>' . esc_html( self::opt( 'title' ) ) . '</title>', $html, 1 );
+		if ( self::opt( 'fs' ) ) {
+			$html = self::fullscreen( $html );
+		}
 
 		$etag = '"' . md5( $html . self::VERSION ) . '"';
 
@@ -128,6 +136,73 @@ final class Landrace_Hunters {
 
 		status_header( 200 );
 		echo $html; // phpcs:ignore WordPress.Security.EscapeOutput
+		exit;
+	}
+
+	/**
+	 * Pantalla completa sin barra del navegador.
+	 *
+	 * Ningún navegador deja quitar la barra sin que el jugador toque algo, así que lh-fs.js
+	 * pide la pantalla completa (y gira a horizontal) con el primer toque, clic o tecla.
+	 * Además la página se puede instalar («Añadir a pantalla de inicio»): abierta desde el
+	 * icono va sin barra desde el principio. Es la única vía en iPhone, que no tiene
+	 * pantalla completa para páginas web.
+	 */
+	private static function fullscreen( $html ) {
+		$title = esc_attr( self::opt( 'title' ) );
+		$icon  = esc_url( trailingslashit( self::game_url() ) . 'icon-192.png' );
+		$man   = esc_url( add_query_arg( self::QUERY_VAR, 'manifest', home_url( '/' ) ) );
+
+		$html = str_replace( 'initial-scale=1.0">', 'initial-scale=1.0, viewport-fit=cover">', $html );
+
+		$head  = "\t\t<meta name=\"theme-color\" content=\"#000000\">\n";
+		$head .= "\t\t<meta name=\"mobile-web-app-capable\" content=\"yes\">\n";
+		$head .= "\t\t<meta name=\"apple-mobile-web-app-capable\" content=\"yes\">\n";
+		$head .= "\t\t<meta name=\"apple-mobile-web-app-status-bar-style\" content=\"black-translucent\">\n";
+		$head .= "\t\t<meta name=\"apple-mobile-web-app-title\" content=\"{$title}\">\n";
+		$head .= "\t\t<link rel=\"manifest\" href=\"{$man}\">\n";
+		$head .= "\t\t<link rel=\"icon\" href=\"{$icon}\">\n";
+		$head .= "\t\t<link rel=\"apple-touch-icon\" href=\"{$icon}\">\n";
+		$head .= '<style>#lh-rot{position:fixed;inset:0;z-index:99;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;'
+			. 'background:#0b0f1e;color:#fff;font:600 20px/1.3 system-ui,sans-serif;text-align:center;padding:24px}'
+			. '#lh-rot small{font-weight:400;font-size:15px;opacity:.8;max-width:300px}'
+			. '@media (orientation:portrait) and (pointer:coarse){#lh-rot{display:flex}}#lh-rot.off{display:none!important}</style>' . "\n";
+		$html  = preg_replace( '#</head>#i', $head . '</head>', $html, 1 );
+
+		$body  = '<div id="lh-rot" role="dialog" aria-label="Gira el móvil">'
+			. '<svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true"><rect x="30" y="14" width="36" height="62" rx="7" fill="none" stroke="#fff" stroke-width="5"/>'
+			. '<path d="M14 58a34 34 0 0 0 34 26" fill="none" stroke="#4fae5a" stroke-width="5" stroke-linecap="round"/><path d="M40 78l9 6-6 9" fill="none" stroke="#4fae5a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+			. '<span>Gira el móvil</span><small>Toca para jugar a pantalla completa.</small></div>' . "\n";
+		$body .= '<script src="lh-fs.js?v=' . esc_attr( self::VERSION ) . '"></script>' . "\n";
+		$html  = preg_replace( '#</body>#i', $body . '</body>', $html, 1 );
+
+		return $html;
+	}
+
+	/** Manifiesto de la app instalable: abre a pantalla completa y en horizontal. */
+	private static function manifest() {
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true );
+		}
+		$url  = trailingslashit( self::game_url() );
+		$data = array(
+			'name'             => self::opt( 'title' ),
+			'short_name'       => self::opt( 'title' ),
+			'start_url'        => self::play_url(),
+			'scope'            => self::play_url(),
+			'display'          => 'fullscreen',
+			'orientation'      => 'landscape',
+			'background_color' => '#000000',
+			'theme_color'      => '#000000',
+			'icons'            => array(
+				array( 'src' => $url . 'icon-192.png', 'sizes' => '192x192', 'type' => 'image/png' ),
+				array( 'src' => $url . 'icon-576.png', 'sizes' => '576x576', 'type' => 'image/png', 'purpose' => 'any' ),
+			),
+		);
+		status_header( 200 );
+		header( 'Content-Type: application/manifest+json; charset=utf-8' );
+		header( 'Cache-Control: public, max-age=3600' );
+		echo wp_json_encode( $data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ); // phpcs:ignore WordPress.Security.EscapeOutput
 		exit;
 	}
 
@@ -196,6 +271,7 @@ final class Landrace_Hunters {
 		$out  = array(
 			'slug'  => $slug ? $slug : self::defaults()['slug'],
 			'title' => isset( $in['title'] ) ? sanitize_text_field( $in['title'] ) : $old['title'],
+			'fs'    => empty( $in['fs'] ) ? 0 : 1,
 		);
 		if ( $out['slug'] !== $old['slug'] ) {
 			// El slug nuevo necesita reglas nuevas; si no, la dirección da 404.
@@ -245,6 +321,12 @@ final class Landrace_Hunters {
 						<td><input id="lh-title" type="text" class="regular-text"
 								name="<?php echo esc_attr( self::OPTION ); ?>[title]"
 								value="<?php echo esc_attr( self::opt( 'title' ) ); ?>"></td>
+					</tr>
+					<tr>
+						<th scope="row">Pantalla completa</th>
+						<td><label><input type="checkbox" name="<?php echo esc_attr( self::OPTION ); ?>[fs]" value="1" <?php checked( (int) self::opt( 'fs' ), 1 ); ?>>
+							Al tocar la pantalla, el juego ocupa toda la pantalla y se pone en horizontal</label>
+							<p class="description">En Android quita la barra del navegador. En iPhone no se puede desde la web: hay que usar Compartir → «Añadir a pantalla de inicio».</p></td>
 					</tr>
 				</table>
 				<?php submit_button(); ?>
