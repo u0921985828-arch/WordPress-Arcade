@@ -1,4 +1,9 @@
 # Personajes del modo fiesta (Kuboplay) — prompts para Google Gemini
+
+## Sprites pixel-art ya generados
+Los 16 están dibujados **por código** (pixel art 16×16, paleta del proyecto) en `scripts/brand/fiesta_sprites.py`. Salen como PNG de 64×64 con fondo transparente en `wp-content/mu-plugins/arcade-core/assets/img/fiesta/<nombre>.png`. Regenerar: `python3 scripts/brand/fiesta_sprites.py`. Nombres: kubo, pila, nam, grulla, vacio, chispa, dado, prisma, seta, cohete, corona, robi, fantasmin, pio, moneda, mando.
+Los prompts de Gemini de abajo quedan como alternativa si algún día quieres versión ilustrada.
+
 16 personajes seleccionables (ficha estilo Monopoly / Wii Party) para el modo tele de 1 a 4 jugadores.
 Cada bloque es **autónomo**: copia uno entero y pégalo en Gemini. Ya lleva el estilo, el 1:1 y el fondo transparente dentro.
 Genera uno por uno. Si Gemini da fondo blanco en vez de transparente, recórtalo después (o pásame el PNG y lo recorto yo).
