@@ -48,7 +48,13 @@ def main():
     hoja.save(os.path.join(HERE, 'fiesta_sheet.png'), 'PNG')
     w, h = hoja.size
     hoja.resize((w * 8, h * 8), Image.Resampling.NEAREST).save(os.path.join(HERE, 'fiesta_sheet_preview.png'), 'PNG')
-    print('16 sprites 16x16 en', OUT, '· peor puntuacion', peor)
+    # preview individual x12 (un sprite por imagen), para revisar cada personaje suelto
+    prev = os.environ.get('FIESTA_PREVIEW_DIR', os.path.join(HERE, 'fiesta_preview'))
+    os.makedirs(prev, exist_ok=True)
+    for i, n in enumerate(ORDER):
+        imgs[n].resize((16 * 12, 16 * 12), Image.Resampling.NEAREST).save(
+            os.path.join(prev, '%02d_%s.png' % (i + 1, n)), 'PNG')
+    print('16 sprites 16x16 en', OUT, '· preview individual en', prev, '· peor puntuacion', peor)
 
 if __name__ == '__main__':
     main()
