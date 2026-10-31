@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Kuboplay Lanzadera
  * Description: Pone en la portada un menú de consola a pantalla completa para elegir juego (Kuboplay, Liga de Barrios…), con mando, teclado, ratón y dedo. Al desactivarlo la portada vuelve a ser la de antes.
- * Version: 1.2.0
+ * Version: 1.3.0
  * Author: Kuboplay
  * License: GPL-2.0-or-later
  * Text Domain: kuboplay-launcher
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class Kuboplay_Launcher {
 
-	const VERSION = '1.2.0';
+	const VERSION = '1.3.0';
 	const OPTION  = 'kplauncher';
 	const SLOTS   = 6;
 
@@ -29,6 +29,7 @@ final class Kuboplay_Launcher {
 				'page'    => 0,
 				'prev'    => array(),
 				'off'     => array(),
+				'solo'    => 1,
 			)
 		);
 	}
@@ -48,7 +49,7 @@ final class Kuboplay_Launcher {
 
 		foreach ( (array) $o['entries'] as $row ) {
 			$row = self::row( $row );
-			if ( ! $row['title'] || ! $row['url'] || self::is_self( $row['url'] ) ) {
+			if ( ! $row['title'] || ! $row['url'] || self::is_self( $row['url'] ) || ! self::installed( $row['key'] ) ) {
 				continue;
 			}
 			$e[]    = $row;
@@ -77,6 +78,15 @@ final class Kuboplay_Launcher {
 			(array) $row,
 			array( 'title' => '', 'sub' => '', 'url' => '', 'color' => '#6e62f5', 'art' => 'kubo', 'key' => '' )
 		);
+	}
+
+	/**
+	 * Una ficha guardada de un juego detectado cuyo plugin ya no está (se borró Kuboplay
+	 * o Liga de Barrios) llevaría a una página muerta: no sale. Las fichas a mano, sin clave, sí.
+	 */
+	public static function installed( $key ) {
+		$cls = array( 'arcade' => 'Arcade_Portal', 'liga' => 'Liga_Barrios', 'landrace' => 'Landrace_Hunters' );
+		return ! isset( $cls[ $key ] ) || class_exists( $cls[ $key ] );
 	}
 
 	/** Una ficha que lleva a la propia lanzadera no sirve de nada: se descarta. */
@@ -130,6 +140,8 @@ final class Kuboplay_Launcher {
 
 	public static function init() {
 		add_filter( 'template_include', array( __CLASS__, 'template' ), 100 );
+		add_action( 'template_redirect', array( __CLASS__, 'solo' ), 1 );
+		add_action( 'init', array( __CLASS__, 'maybe_upgrade' ), 20 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		add_filter( 'document_title_parts', array( __CLASS__, 'title' ) );
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
@@ -145,6 +157,43 @@ final class Kuboplay_Launcher {
 		}
 		$pid = (int) self::opts()['page'];
 		return $pid && is_page( $pid );
+	}
+
+	/**
+	 * Con un solo juego, un menú para elegir no tiene sentido: la portada abre ese juego.
+	 * Landrace Hunters se sirve en la propia portada (la dirección queda limpia, sin saltos);
+	 * cualquier otro juego, con una redirección a su dirección.
+	 */
+	public static function solo() {
+		if ( ! self::opts()['solo'] || ! self::is_launcher() ) {
+			return;
+		}
+		$e = self::entries();
+		if ( 1 !== count( $e ) ) {
+			return;
+		}
+		if ( 'landrace' === $e[0]['key'] && class_exists( 'Landrace_Hunters' ) && method_exists( 'Landrace_Hunters', 'maybe_serve' ) ) {
+			set_query_var( Landrace_Hunters::QUERY_VAR, 1 );
+			Landrace_Hunters::maybe_serve(); // Sirve la página del juego y termina.
+			return;
+		}
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true );
+		}
+		wp_redirect( $e[0]['url'], 302 ); // phpcs:ignore WordPress.Security.SafeRedirect -- dirección puesta por el administrador
+		exit;
+	}
+
+	/**
+	 * «Reemplazar actual con el subido» no ejecuta la activación: la primera visita tras el
+	 * cambio de versión vacía la caché de página (Kuboplay Shield), que guardaba la portada vieja.
+	 */
+	public static function maybe_upgrade() {
+		if ( get_option( self::OPTION . '_ver' ) === self::VERSION ) {
+			return;
+		}
+		update_option( self::OPTION . '_ver', self::VERSION, false );
+		do_action( 'kp_shield_purge' );
 	}
 
 	public static function template( $tpl ) {
@@ -317,6 +366,13 @@ final class Kuboplay_Launcher {
 		$o   = self::opts();
 		$out = $o;
 		$out['title'] = isset( $in['title'] ) ? sanitize_text_field( $in['title'] ) : '';
+		$out['solo']  = empty( $in['solo'] ) ? 0 : 1;
+		add_action(
+			'shutdown',
+			function () {
+				do_action( 'kp_shield_purge' ); // La portada cambia: fuera la copia guardada.
+			}
+		);
 
 		$rows = array();
 		$seen = array();
@@ -406,6 +462,12 @@ final class Kuboplay_Launcher {
 						<th scope="row"><label for="kp-title">Título del menú</label></th>
 						<td><input id="kp-title" type="text" class="regular-text" name="<?php echo esc_attr( self::OPTION ); ?>[title]"
 								value="<?php echo esc_attr( $o['title'] ); ?>" placeholder="<?php echo esc_attr( self::brand() ); ?>"></td>
+					</tr>
+					<tr>
+						<th scope="row">Un solo juego</th>
+						<td><label><input type="checkbox" name="<?php echo esc_attr( self::OPTION ); ?>[solo]" value="1" <?php checked( (int) $o['solo'], 1 ); ?>>
+							Si en el menú solo queda un juego, la portada abre ese juego directamente</label>
+							<p class="description">Ahora hay <?php echo (int) count( self::entries() ); ?> en el menú.<?php echo ( $o['solo'] && 1 === count( self::entries() ) ) ? ' La portada abre <strong>' . esc_html( self::entries()[0]['title'] ) . '</strong>.' : ''; ?></p></td>
 					</tr>
 				</table>
 				<h2>Juegos del menú</h2>

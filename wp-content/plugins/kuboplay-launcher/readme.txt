@@ -4,7 +4,7 @@ Tags: games, menu, launcher
 Requires at least: 5.6
 Tested up to: 6.8
 Requires PHP: 7.0
-Stable tag: 1.2.0
+Stable tag: 1.3.0
 License: GPLv2 or later
 
 Un menú de consola en la portada para elegir juego.
@@ -26,6 +26,12 @@ Se mueve con las flechas, el ratón, el dedo (deslizando) y el mando; Intro o A 
 3. Ajustes → Lanzadera para cambiar nombres, textos y colores.
 
 == Changelog ==
+
+= 1.3.0 =
+* Un solo juego: si en el menu solo queda un juego, la portada abre ese juego directamente
+  (Landrace Hunters se sirve en la propia portada). Se apaga en Ajustes → Lanzadera.
+* Las fichas de un juego cuyo plugin se ha borrado dejan de salir.
+* Al actualizar o guardar los ajustes se vacia la cache de pagina (Kuboplay Shield).
 
 = 1.2.0 =
 * Detecta Landrace Hunters y le pone su ficha con portada propia (brote en maceta).
