@@ -1,0 +1,82 @@
+[
+ {
+  "slug": "rubi",
+  "name": "Rubi",
+  "accent": "#e23b4e"
+ },
+ {
+  "slug": "cobalto",
+  "name": "Cobalto",
+  "accent": "#2f5bd0"
+ },
+ {
+  "slug": "lima",
+  "name": "Lima",
+  "accent": "#4caf3f"
+ },
+ {
+  "slug": "ambar",
+  "name": "Ámbar",
+  "accent": "#f2a03d"
+ },
+ {
+  "slug": "rosa",
+  "name": "Rosa",
+  "accent": "#e0557f"
+ },
+ {
+  "slug": "indigo",
+  "name": "Índigo",
+  "accent": "#6e62f5"
+ },
+ {
+  "slug": "carbon",
+  "name": "Carbón",
+  "accent": "#8891a8"
+ },
+ {
+  "slug": "menta",
+  "name": "Menta",
+  "accent": "#2fae8a"
+ },
+ {
+  "slug": "fuego",
+  "name": "Fuego",
+  "accent": "#e8572b"
+ },
+ {
+  "slug": "cielo",
+  "name": "Cielo",
+  "accent": "#5b8cff"
+ },
+ {
+  "slug": "oro",
+  "name": "Oro",
+  "accent": "#ffc94d"
+ },
+ {
+  "slug": "sombra",
+  "name": "Sombra",
+  "accent": "#5b5f78"
+ },
+ {
+  "slug": "coral",
+  "name": "Coral",
+  "accent": "#ff6fb5"
+ },
+ {
+  "slug": "jade",
+  "name": "Jade",
+  "accent": "#2f8f5b"
+ },
+ {
+  "slug": "lavanda",
+  "name": "Lavanda",
+  "accent": "#a097ff"
+ },
+ {
+  "slug": "acero",
+  "name": "Acero",
+  "accent": "#8891a8"
+ }
+]
