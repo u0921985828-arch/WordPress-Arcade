@@ -65,6 +65,28 @@ final class Arcade_Party {
 		return isset( self::catalog()[ $slug ] );
 	}
 
+	/** Personajes de fiesta (assets/img/chars/chars.json) con su URL absoluta. */
+	public static function chars() {
+		static $out = null;
+		if ( null === $out ) {
+			$out  = array();
+			$file = __DIR__ . '/assets/img/chars/chars.json';
+			$data = is_readable( $file ) ? json_decode( (string) file_get_contents( $file ), true ) : null; // phpcs:ignore
+			foreach ( ( is_array( $data ) ? $data : array() ) as $c ) {
+				if ( empty( $c['slug'] ) ) {
+					continue;
+				}
+				$out[] = array(
+					'slug'   => $c['slug'],
+					'name'   => $c['name'] ?? $c['slug'],
+					'accent' => $c['accent'] ?? '#6e62f5',
+					'url'    => add_query_arg( 'v', Arcade_Core::VERSION, plugins_url( 'assets/img/chars/' . $c['slug'] . '.png', __FILE__ ) ),
+				);
+			}
+		}
+		return $out;
+	}
+
 	/** Jugadores [mín, máx] si el juego es multijugador en la tele; null si no. */
 	public static function players( $slug ) {
 		$g = self::catalog()[ $slug ] ?? null;
@@ -225,6 +247,7 @@ final class Arcade_Party {
 			'colors' => self::COLORS,
 			'ice'    => self::ice(),
 			'relay'  => self::has_turn(),
+			'chars'  => self::chars(),
 			'v'      => $v,
 		);
 		$ads = 'tv' === $kind ? self::ads() : array( 'head' => '' );
@@ -523,7 +546,7 @@ final class Arcade_Party {
 			if ( ! $s ) {
 				continue;
 			}
-			$row = array( 'p' => $p, 'sid' => substr( md5( $s['tok'] ), 0, 8 ), 'oid' => (int) $s['oid'], 'name' => $s['name'], 'rl' => (string) ( $s['rl'] ?? '' ) );
+			$row = array( 'p' => $p, 'sid' => substr( md5( $s['tok'] ), 0, 8 ), 'oid' => (int) $s['oid'], 'name' => $s['name'], 'char' => (string) ( $s['char'] ?? '' ), 'rl' => (string) ( $s['rl'] ?? '' ) );
 			$ans = get_transient( 'arcade_pans_' . $code . '_' . $p );
 			if ( $s['oid'] && ! empty( $s['offer'] ) && ( ! is_array( $ans ) || (int) $ans['oid'] !== (int) $s['oid'] ) ) {
 				$row['offer'] = $s['offer'];
@@ -592,6 +615,7 @@ final class Arcade_Party {
 		$now  = time();
 		$tok  = (string) $req->get_param( 'tok' );
 		$name = mb_substr( sanitize_text_field( (string) $req->get_param( 'name' ) ), 0, 16 );
+		$char = substr( preg_replace( '/[^a-z0-9-]/', '', strtolower( (string) $req->get_param( 'char' ) ) ), 0, 24 );
 		$want = $req->get_param( 'p' );
 		$slots = array();
 		for ( $p = 0; $p < self::PADS; $p++ ) {
@@ -612,6 +636,9 @@ final class Arcade_Party {
 			$s['seen'] = microtime( true );
 			if ( '' !== $name ) {
 				$s['name'] = $name;
+			}
+			if ( '' !== $char ) {
+				$s['char'] = $char;
 			}
 			self::save_slot( $code, $seat, $s );
 			return self::out( array( 'p' => $seat, 'tok' => $tok, 'color' => self::COLORS[ $seat ], 'rtc' => (int) ( $room['rtc'] ?? 1 ), 'rly' => self::rly( $room ) ) );
@@ -639,7 +666,7 @@ final class Arcade_Party {
 		}
 		$tok = self::token();
 		delete_transient( 'arcade_pans_' . $code . '_' . $seat );
-		self::save_slot( $code, $seat, array( 'tok' => $tok, 'oid' => 0, 'offer' => '', 'name' => $name, 'seen' => microtime( true ) ) );
+		self::save_slot( $code, $seat, array( 'tok' => $tok, 'oid' => 0, 'offer' => '', 'name' => $name, 'char' => $char, 'seen' => microtime( true ) ) );
 		$chk = self::fresh_slot( $code, $seat ); // la escritura puede fallar (base de datos ocupada): se comprueba
 		self::unlock( $lock );
 		if ( ! $chk || $chk['tok'] !== $tok ) {

@@ -5,6 +5,9 @@
   'use strict';
   var C = window.PARTY || {};
   var COLORS = C.colors || ['#ff5a5f', '#3fb6ea', '#ffd166', '#5fbf45'];
+  var CHARS = C.chars || [];
+  function charUrl(slug) { for (var i = 0; i < CHARS.length; i++) { if (CHARS[i].slug === slug) return CHARS[i].url; } return ''; }
+  function charName(slug) { for (var i = 0; i < CHARS.length; i++) { if (CHARS[i].slug === slug) return CHARS[i].name; } return ''; }
   var KEYS = ['up', 'down', 'left', 'right', 'a', 'b'];
   var LOBBY_PAD = { d: '8', a: 'Elegir', b: 'Atrás' };
   var DEFAULT_PAD = { d: '8', a: 'A', b: 'B' };
@@ -429,7 +432,7 @@
 
   function playersMsg() {
     var list = [];
-    Object.keys(S.peers).forEach(function (p) { if (active(p)) list.push({ p: +p, color: COLORS[p], name: S.peers[p].name || 'J' + (+p + 1) }); });
+    Object.keys(S.peers).forEach(function (p) { if (active(p)) list.push({ p: +p, color: COLORS[p], name: S.peers[p].name || 'J' + (+p + 1), char: S.peers[p].char || '', avatar: charUrl(S.peers[p].char) }); });
     list.sort(function (a, b) { return a.p - b.p; });
     return { type: 'arcade:party', players: list, priv: true };
   }
@@ -655,8 +658,10 @@
     var h = '';
     for (var p = 0; p < 4; p++) {
       var peer = S.peers[p], on = active(p), lost = peer && peer.open && peer.lost, wait = peer && !peer.open;
+      var av = peer && peer.char ? charUrl(peer.char) : '';
       h += '<div class="pt-pl' + (on ? ' on' : lost ? ' lost' : wait ? ' wait' : '') + '" style="--pc:' + COLORS[p] + '">' +
-        '<span class="pt-av">' + ICO.pad + '</span><b>' + esc(peer && peer.name ? peer.name : 'J' + (p + 1)) + '</b><span>' +
+        '<span class="pt-av' + (av ? ' pt-av-char' : '') + '">' + (av ? '<img src="' + esc(av) + '" alt="" width="40" height="40">' : ICO.pad) + '</span>' +
+        '<b>' + esc(peer && peer.name ? peer.name : 'J' + (p + 1)) + '</b><span>' +
         (on ? netLabel(peer, p) : lost ? 'Sin señal' : wait ? 'Conectando…' : 'Libre') + '</span></div>';
     }
     ui.players.innerHTML = h;
@@ -776,7 +781,7 @@
     if (S.peers[p]) dropPeer(p); // nuevo offer (reconexión u otro móvil en la plaza)
     var pc;
     try { pc = new RTCPeerConnection({ iceServers: C.ice || [] }); } catch (e) { status('Este navegador no admite mandos (WebRTC).', true); return; }
-    var peer = S.peers[p] = { pc: pc, dc: null, oid: row.oid, sid: row.sid, open: false, lost: false, held: {}, seq: {}, seen: 0, name: row.name || '' };
+    var peer = S.peers[p] = { pc: pc, dc: null, oid: row.oid, sid: row.sid, open: false, lost: false, held: {}, seq: {}, seen: 0, name: row.name || '', char: row.char || '' };
     function gone() { if (S.peers[p] === peer) dropPeer(p, true); }
     renderPlayers();
     S.lastChange = Date.now();
@@ -814,7 +819,7 @@
         if (rly !== !!peer.rly || Math.abs(ms - (peer.ping || 0)) > 25) { peer.ping = ms; peer.rly = rly; if (!S.game) renderPlayers(); }
         send(p, { t: 'P', ts: d.ts });
       }
-      else if (d.t === 'hi' && d.name) { peer.name = String(d.name).slice(0, 16); post(playersMsg()); }
+      else if (d.t === 'hi') { if (d.name) peer.name = String(d.name).slice(0, 16); if (d.char) peer.char = String(d.char).slice(0, 24); post(playersMsg()); if (!S.game) renderPlayers(); }
       else if (d.t === 'pick' && S.game && !S.menu && !S.ad) post({ type: 'arcade:ppick', p: p, v: d.v });
       /* Trazo con el dedo en el móvil: llega en milésimas (enteros, menos bytes) y sale al juego en 0..1. */
       else if (d.t === 'dr' && S.game && !S.menu && !S.ad) post({ type: 'arcade:pdraw', p: p, x: (d.x | 0) / 1000, y: (d.y | 0) / 1000, d: d.d | 0 });
@@ -863,7 +868,7 @@
       send: function (str) { if (dc.readyState !== 'open') return; try { dc.q.push(JSON.parse(str)); } catch (e) { return; } if (dc.q.length > 200) dc.q.splice(0, dc.q.length - 200); relaySoon(0); },
       close: function () { dc.readyState = 'closed'; }
     };
-    var peer = S.peers[p] = { pc: { close: dc.close }, dc: dc, relay: true, rl: row.rl, a: 0, oid: row.oid, sid: row.sid, open: false, lost: false, held: {}, seq: {}, seen: 0, name: row.name || '' };
+    var peer = S.peers[p] = { pc: { close: dc.close }, dc: dc, relay: true, rl: row.rl, a: 0, oid: row.oid, sid: row.sid, open: false, lost: false, held: {}, seq: {}, seen: 0, name: row.name || '', char: row.char || '' };
     function gone() { if (S.peers[p] === peer) dropPeer(p, true); }
     wire(p, peer, dc, gone);
     S.lastChange = Date.now();

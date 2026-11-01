@@ -449,6 +449,23 @@ void main(){
        milisegundos y lo vibra este propio móvil. */
     const RUMMS = { tap: 26, press: 34, rel: 18, dir: 22, tick: 20, pick: 34, hit: 40, hurt: 60, big: 110, win: 55, lose: 130 };
     k.party = null;
+    /* Avatares de los personajes (modo tele): se precargan al recibir 'arcade:party' y se
+       exponen a los motores. k.pavatar(p)/k.pface(p) = <img> ya cargada del jugador p, o null. */
+    const AVIMG = {};
+    const loadAv = (u) => { if (!u) return null; let im = AVIMG[u]; if (!im) { im = AVIMG[u] = new Image(); im.decoding = 'async'; im.src = u; } return im; };
+    k.pavatar = (p) => { const q = k.party && k.party.find((x) => x.p === p); const u = q && q.avatar; const im = u && AVIMG[u]; return (im && im.complete && im.naturalWidth) ? im : null; };
+    k.pface = k.pavatar;
+    /* Dibuja la carita del jugador p centrada en (x,y) con radio r, recortada en círculo con
+       aro del color del jugador. Si no hay avatar, pinta un disco con la inicial. Para que un
+       motor marque de quién es cada entidad en la tele. Devuelve true si pintó un avatar. */
+    k.drawFace = (c, p, x, y, r, opt) => {
+      opt = opt || {}; const col = k.pcol(p), im = k.pavatar(p);
+      c.save(); c.beginPath(); c.arc(x, y, r, 0, 7);
+      if (im) { c.clip(); c.imageSmoothingEnabled = false; const s = (im.naturalWidth || 64), d = r * 2, oy = opt.top ? 0 : 0; c.drawImage(im, 0, oy, s, s, x - r, y - r, d, d); c.restore(); }
+      else { c.fillStyle = col; c.fill(); c.restore(); c.fillStyle = '#fff'; c.font = '900 ' + (r * 1.1 | 0) + 'px system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('J' + (p + 1), x, y + 1); }
+      if (opt.ring !== false) { c.save(); c.beginPath(); c.arc(x, y, r, 0, 7); c.lineWidth = opt.ring || Math.max(2, r * 0.14); c.strokeStyle = col; c.stroke(); c.restore(); }
+      return !!im;
+    };
     k.pad = (p) => PADS[p] || (PADS[p] = { held: new Set(), hit: new Set() });
     k.pcol = (p) => { const q = k.party && k.party.find((x) => x.p === p); return (q && q.color) || ['#ff5a5f', '#3fb6ea', '#ffd166', '#5fbf45'][p % 4]; };
     /* Multijugador común (oleada 1+). Sin tele: J1 = teclado/mando/táctil local y la CPU rellena el resto.
@@ -459,7 +476,7 @@ void main(){
     k.mpMax = (window.CFG && Array.isArray(CFG.mp) && CFG.mp[1]) || 1;
     k.privOK = false; k.onPick = null; k.onDraw = null;
     k.human = (p) => (k.party ? k.party.some((x) => x.p === p) : p === 0);
-    k.players = (n) => { const out = []; for (let p = 0; p < (n || k.mpMax); p++) { const q = k.party && k.party.find((x) => x.p === p), hu = k.human(p); out.push({ p, color: k.pcol(p), name: hu ? (q && q.name) || (k.party ? 'J' + (p + 1) : 'Tú') : 'CPU', cpu: !hu }); } /* con varias CPU se numeran para distinguirlas en el podio */ if (out.filter((s) => s.cpu).length > 1) { let i = 0; for (const s of out) if (s.cpu) s.name = 'CPU ' + ++i; } return out; };
+    k.players = (n) => { const out = []; for (let p = 0; p < (n || k.mpMax); p++) { const q = k.party && k.party.find((x) => x.p === p), hu = k.human(p); out.push({ p, color: k.pcol(p), name: hu ? (q && q.name) || (k.party ? 'J' + (p + 1) : 'Tú') : 'CPU', cpu: !hu, avatar: (q && q.avatar) || '' }); } /* con varias CPU se numeran para distinguirlas en el podio */ if (out.filter((s) => s.cpu).length > 1) { let i = 0; for (const s of out) if (s.cpu) s.name = 'CPU ' + ++i; } return out; };
     k.pheld = (p, key) => (k.party ? k.pad(p).held.has(key) : p === 0 && k.held.has(key));
     k.phit = (p, key) => (k.party ? k.pad(p).hit.has(key) : p === 0 && k.hit.has(key));
     k.pdir = (p) => ({ x: (k.pheld(p, 'right') ? 1 : 0) - (k.pheld(p, 'left') ? 1 : 0), y: (k.pheld(p, 'down') ? 1 : 0) - (k.pheld(p, 'up') ? 1 : 0) });
@@ -481,7 +498,8 @@ void main(){
       /* 1.28.1: si dos filas traen el mismo rótulo (varias CPU), se numeran por plaza. */
       const nm = (x) => { const n = raw(x); return r.filter((y) => raw(y) === n).length > 1 ? n + ' ' + (x.p + 1) : n; };
       const tie = r.length > 1 && r[1].score === top.score && !o.noTie;
-      const body = r.map((x, i) => `<span style="display:inline-block;min-width:1.4em;color:${k.pcol(x.p)}">${i + 1}.</span><b style="color:${k.pcol(x.p)}">${nm(x)}</b> · ${o.fmt ? o.fmt(x.score) : x.score}`).join('<br>');
+      const av = (x) => { const q = k.party && k.party.find((y) => y.p === x.p); return q && q.avatar ? `<img src="${q.avatar}" alt="" style="height:1.5em;width:1.5em;vertical-align:-0.35em;margin-right:0.25em;image-rendering:pixelated;border-radius:0.3em;background:${k.pcol(x.p)}22">` : ''; };
+      const body = r.map((x, i) => `<span style="display:inline-block;min-width:1.4em;color:${k.pcol(x.p)}">${i + 1}.</span>${av(x)}<b style="color:${k.pcol(x.p)}">${nm(x)}</b> · ${o.fmt ? o.fmt(x.score) : x.score}`).join('<br>');
       k.win(o.head || (tie ? '¡Empate!' : `¡Gana ${nm(top)}!`), tie ? '#ffd166' : k.pcol(top.p), `${body}<br>${o.go || 'Toca para la revancha'}`, top.score);
       /* 1.50: el podio se nota en la mano: quien gana recibe el patrón de victoria y los demás el
          de derrota. Cada mando por separado, así que no hay que mirar la tele para saber cómo acabó. */
@@ -490,7 +508,8 @@ void main(){
     const PK = { up: 1, down: 1, left: 1, right: 1, a: 1, b: 1 };
     addEventListener('message', (e) => { const d = e.data; if (!d || e.source !== parent || parent === window) return;
       if (d.type === 'arcade:party') {
-        const pl = Array.isArray(d.players) ? d.players.filter((x) => x && x.p >= 0 && x.p < 4).map((x) => ({ p: x.p | 0, color: String(x.color || ''), name: String(x.name || '').slice(0, 16) })).sort((a, b) => a.p - b.p) : [];
+        const pl = Array.isArray(d.players) ? d.players.filter((x) => x && x.p >= 0 && x.p < 4).map((x) => ({ p: x.p | 0, color: String(x.color || ''), name: String(x.name || '').slice(0, 16), char: String(x.char || ''), avatar: String(x.avatar || '') })).sort((a, b) => a.p - b.p) : [];
+        pl.forEach((x) => { if (x.avatar) loadAv(x.avatar); });
         const was = k.party ? k.party.map((x) => x.p).join() : '';
         k.party = pl.length ? pl : null;
         document.body.classList.toggle('party', !!k.party); if (k.party) ov.querySelectorAll('.go').forEach((g) => { if (!g.querySelector('.ka')) g.insertAdjacentHTML('afterbegin', '<span class="ka">A</span>'); });

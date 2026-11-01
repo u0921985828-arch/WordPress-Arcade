@@ -210,6 +210,7 @@ function bike(b, fr) {
     g.fillStyle = AL(OUT, 0.2); g.fillRect(-11, 2.6, 17, 2.4);
   });
   c.restore();
+  if (MP && b.pl !== undefined && b.alive && k.party && k.drawFace) k.drawFace(c, b.pl, k.clamp(x, 14, W - 14), k.clamp(y - 22, TOP + 14, H - 14), 12);
   if (MP) label(b.name, k.clamp(x, 22, W - 22), y < TOP + 40 ? y + 34 : y - 34, 17, b.pl !== undefined ? b.col : '#c9cbe0', 'center');
 }
 function hudTop() {

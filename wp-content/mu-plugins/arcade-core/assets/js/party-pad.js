@@ -28,6 +28,19 @@
     } catch (e) { /* nada */ }
     return v || 'j';
   }
+  /* Personaje elegido (slug). Se recuerda en este móvil y viaja a la tele en join y en 'hi'. */
+  var CHARS = (C.chars || []);
+  function myChar(v) {
+    try {
+      if (v === undefined) {
+        var s = localStorage.getItem('arcade:pad:char') || '';
+        return (CHARS.some(function (c) { return c.slug === s; })) ? s : '';
+      }
+      localStorage.setItem('arcade:pad:char', v);
+    } catch (e) { /* nada */ }
+    return v || '';
+  }
+  function charOf(slug) { for (var i = 0; i < CHARS.length; i++) { if (CHARS[i].slug === slug) return CHARS[i]; } return null; }
 
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
   function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
@@ -102,8 +115,10 @@
 
   var code = ((location.search.match(/[?&]c=([A-Za-z]{4})/) || [])[1] || '').toUpperCase();
   var S = { p: -1, tok: '', pc: null, dc: null, open: false, spec: LOBBY, title: 'Conectando…', gen: 0, held: {}, retry: 0,
-    seq: 0, padSeq: -1, rx: 0, rtt: [], priv: null, block: false, name: '', help: '', lob: 0 };
+    seq: 0, padSeq: -1, rx: 0, rtt: [], priv: null, block: false, name: '', help: '', lob: 0, char: '' };
   S.name = myName();
+  S.char = myChar();
+  if (!S.char && CHARS.length) { S.char = CHARS[Math.floor(Math.random() * CHARS.length)].slug; myChar(S.char); }
   var IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   var app = $('#pt-app');
 
@@ -131,15 +146,40 @@
     ui.over.classList.toggle('show', !!html);
   }
 
+  /* Selector de personaje: rejilla de caritas; la elegida queda marcada. */
+  function charPicker() {
+    if (!CHARS.length) return '';
+    return '<div class="pd-pick"><span class="pd-pick-t">Elige personaje</span><div class="pd-chars" data-chars>' +
+      CHARS.map(function (c) {
+        return '<button type="button" class="pd-char' + (c.slug === S.char ? ' on' : '') + '" data-char="' + esc(c.slug) +
+          '" title="' + esc(c.name) + '" aria-label="' + esc(c.name) + '" style="--ca:' + esc(c.accent) + '">' +
+          '<img src="' + esc(c.url) + '" alt="" width="32" height="32" loading="lazy"></button>';
+      }).join('') + '</div></div>';
+  }
+  function bindCharPicker() {
+    var box = $('[data-chars]');
+    if (!box) return;
+    box.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('.pd-char') : null;
+      if (!b) return;
+      S.char = myChar(b.getAttribute('data-char'));
+      Array.prototype.forEach.call(box.querySelectorAll('.pd-char'), function (x) { x.classList.toggle('on', x === b); });
+      hap('press');
+      if (S.open) send({ t: 'hi', name: S.name, char: S.char });
+    });
+  }
+
   function askCode(msg) {
     overlay('<svg class="pd-logo" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="8" fill="#6e62f5"/><path d="M12 10.5v11l9-5.5z" fill="#fff"/></svg>' +
       '<h1>Usa el móvil como mando</h1>' +
       (msg ? '<p class="bad">' + esc(msg) + '</p>' : '<p>Escribe el código que aparece en la tele o escanea su QR.</p>') +
       '<form data-form><input name="c" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" placeholder="ABCD" aria-label="Código de la sala" value="' + esc(code) + '"><button class="pd-btn" type="submit">Conectar</button></form>' +
       '<input class="pd-name" name="n" maxlength="12" autocomplete="off" spellcheck="false" placeholder="Tu nombre" aria-label="Tu nombre" value="' + esc(S.name) + '">' +
+      charPicker() +
       '<p class="pd-small">En la tele u ordenador abre <b>' + esc(C.host ? C.host + '/tele' : (C.brand || 'Kuboplay')) + '</b></p>' +
       (IOS && !navigator.standalone ? '<p class="pd-small">En iPhone: gira el móvil en horizontal. Para quitar las barras de Safari, Compartir → «Añadir a pantalla de inicio».</p>' : ''));
     var f = $('[data-form]'), inp = f.c, nm = $('.pd-name');
+    bindCharPicker();
     inp.addEventListener('input', function () { inp.value = inp.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4); });
     f.addEventListener('submit', function (e) {
       e.preventDefault();
@@ -169,7 +209,7 @@
     f.addEventListener('submit', function (e) {
       e.preventDefault();
       S.name = myName(f.n.value.trim().slice(0, 12));
-      send({ t: 'hi', name: S.name });
+      send({ t: 'hi', name: S.name, char: S.char });
       setMe(); overlay('');
     });
     setTimeout(function () { try { f.n.focus(); f.n.select(); } catch (er) { /* nada */ } }, 60);
@@ -521,7 +561,7 @@
     teardown();
     S.title = 'Conectando…'; setMe();
     overlay('<span class="pd-spin"></span><h1>Conectando con la tele…</h1><p>Sala <b>' + esc(code) + '</b></p>');
-    var body = { tok: S.tok, name: S.name };
+    var body = { tok: S.tok, name: S.name, char: S.char };
     if (S.p >= 0) body.p = S.p;
     api('/' + code + '/join', { method: 'POST', body: body }).then(function (r) {
       if (gen !== S.gen) return null;
@@ -589,7 +629,7 @@
       S.open = true; S.retry = 0; S.rx = Date.now(); S.padSeq = -1; S.block = false; S.netFail = S.tvFail = 0;
       document.body.classList.add('pd-live'); lockLand();
       overlay('');
-      send({ t: 'hi', name: S.name });
+      send({ t: 'hi', name: S.name, char: S.char });
       hap('join');
     };
     dc.onmessage = function (m) {
