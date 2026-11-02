@@ -9,7 +9,7 @@ return array(
 	'bowling-flick'      => 'Desliza hacia los bolos para lanzar: la dirección marca el rumbo y la curva final da efecto. Diez frames con puntuación oficial.',
 	'brick-breaker-dx'   => 'Mueve la pala con el dedo, el ratón o las flechas para devolver la bola y romper todos los ladrillos. Recoge las mejoras que caen.',
 	'checkers'           => 'Toca una ficha y después la casilla de destino. Captura saltando en diagonal (es obligatorio) y corona llegando al fondo.',
-	'color-sort'         => 'Toca un tubo para coger la bola de arriba y otro para soltarla sobre una del mismo color o en un tubo vacío. Deja cada tubo de un solo color.',
+	'color-sort'         => 'Toca un tubo para levantar la bola de arriba y otro para soltarla sobre su mismo color, sobre un comodín o en un tubo vacío. Deja cada tubo de un solo color: 20 estanterías con bolas tapadas, candados, tubos de un solo uso, comodines, vertidos contados y reloj.',
 	'crystal-labyrinth'  => 'Avanza y gira con las flechas o el mando táctil. Recoge los cristales y encuentra el portal antes de que se acabe el aceite del farol.',
 	'cube-roller'        => 'Haz rodar el bloque con las flechas o deslizando. Llévalo de pie hasta el agujero de salida sin caer por los bordes.',
 	'cut-and-drop'       => 'Toca para soltar cada bloque sobre la torre. La parte que sobresale se corta: apila con precisión para llegar más alto.',
