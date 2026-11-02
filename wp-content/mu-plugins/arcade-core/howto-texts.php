@@ -16,7 +16,7 @@ return array(
 	'darts-pro'          => 'Apunta arrastrando y suelta para lanzar. Partida de 501: baja a cero exacto y cierra con un doble o con la diana.',
 	'dice-poker'         => 'Tira los cinco dados, toca los que quieras guardar y vuelve a tirar hasta dos veces. Consigue la mejor jugada del póker de dados.',
 	'drone-flight'       => 'Mantén pulsado para subir y suelta para bajar. Guía el dron entre los obstáculos sin tocar las paredes.',
-	'flow-lines'         => 'Arrastra desde un punto hasta su pareja del mismo color. Une todas las parejas y llena el tablero sin cruzar caminos.',
+	'flow-lines'         => 'Arrastra desde un punto hasta su pareja del mismo color, sin cruzar tuberías, y llena todo el tablero. Son 20 tableros con una sola solución cada uno, que van sumando huecos, puentes, gemas de color, portales y señales de recta y codo; algunos llevan reloj. Deshacer y Reiniciar en un toque; cuantos menos trazos, más estrellas.',
 	'frog-crossing'      => 'Desliza o usa las flechas para saltar. Cruza la carretera y el río sobre troncos y tortugas hasta llegar a las casillas de la orilla.',
 	'hex-defense'        => 'Toca una casilla libre para construir torres y mejóralas con las monedas que ganas. Detén todas las oleadas antes de que lleguen a tu base.',
 	'hex-skirmish'       => 'Toca una unidad para ver dónde puede moverse o atacar y toca el destino. Derrota al ejército rival por turnos.',
