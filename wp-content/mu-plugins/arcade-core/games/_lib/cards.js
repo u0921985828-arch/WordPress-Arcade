@@ -7,11 +7,12 @@ let idleH = 0, tab, stock, waste, found, cells, hs, moves, score, sel, done, rem
 const CW = M === 'spider' ? 44 : M === 'freecell' ? 54 : M === 'tripeaks' ? 46 : 60, CH = Math.round(CW * 1.4), CR = Math.round(CW * 0.1), PAD = 7;
 const NC = M === 'spider' ? 10 : M === 'freecell' ? 8 : 7, GAP = (W - NC * CW) / (NC + 1), colX = (i) => GAP + i * (CW + GAP);
 const TOP = 58, TY = TOP + CH + 22, BOT = 632, BY = 640;
-/* ---------- Tabla de niveles: SOLO klondike-solitaire y freecell ----------
-   Los otros tres solitarios (spider, pyramid, tripeaks) no la cargan y se quedan exactamente igual. */
-const LVG = CFG.id === 'klondike-solitaire' ? 'K' : CFG.id === 'freecell' ? 'F' : null;
+/* ---------- Tabla de niveles por juego (src/eng/cardlv.js) ----------
+   K klondike-solitaire · F freecell · S spider-solitaire · P pyramid-solitaire · T tripeaks-solitaire.
+   Retos del día en DK/DF/DS/DP/DT. Todo lo nuevo de S/P/T va acotado por el modo. */
+const LVG = { 'klondike-solitaire': 'K', freecell: 'F', 'spider-solitaire': 'S', 'pyramid-solitaire': 'P', 'tripeaks-solitaire': 'T' }[CFG.id] || null;
 const LVT = LVG && typeof CARDLV !== 'undefined' ? CARDLV[LVG] : null;
-const DLY = LVT ? CARDLV[LVG === 'K' ? 'DK' : 'DF'] : null;
+const DLY = LVT ? CARDLV['D' + LVG] : null;
 const A52 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 let daily = false, LV = null, used = 0, chain = 0, chainT = 0, brief = 0;
 /* día local (el reto del día cambia a las 00:00 del jugador) */
@@ -22,8 +23,11 @@ const DFT = () => (k.dif === 0 ? 1.55 : k.dif === 2 ? 0.85 : 1.15);
 const DFM = () => (k.dif === 0 ? 14 : k.dif === 2 ? 0 : 6);
 const TM = () => Math.round((LV ? LV.tm : 60) * DFT());
 const PAR = () => (LV ? LV.par : 99) + DFM();
-const TLIM = () => TM() * 2;
-const MLIM = () => PAR() * 2 + 30;
+/* Spider dura mucho más y se juega con cartas tapadas: más holgura antes de perder. */
+const TLIM = () => TM() * (M === 'spider' ? 3 : 2);
+const MLIM = () => (M === 'spider' ? PAR() * 3 + 40 : PAR() * 2 + 30);
+/* vueltas al mazo en Pyramid: 2 (regla fija), o menos si el reto lo pide */
+const PREC = () => (LVT && LV && LV.rec != null ? Math.min(2, LV.rec) : 2);
 const CN = () => (LV && LV.nc ? LV.nc : 4);
 const RECL = () => (LV && LV.rec != null ? LV.rec : 1e9);
 const fCount = () => found.reduce((s, f) => s + f.length, 0);
@@ -52,12 +56,47 @@ function build() {
 function dealLV() {
   LV = curLV(); brief = daily ? 0 : 5;   /* cartel de escuela: qué enseña este nivel */
   const cards = []; for (let i = 0; i < LV.d.length; i++) { const v = A52.indexOf(LV.d[i]); cards.push({ r: (v % 13) + 1, s: (v / 13) | 0, up: M === 'freecell', id: uid++ }); }
+  if (M === 'spider') return dealSp(cards);
+  if (M === 'pyramid') return dealPy(cards);
+  if (M === 'tripeaks') return dealTp(cards);
   found = [[], [], [], []];
   for (let s = 0; s < 4; s++) for (let r = 1; r <= (LV.f[s] || 0); r++) found[s].push({ r, s, up: true, id: uid++ });
   tab = []; let i = 0;
   for (const n of LV.p) { const pile = cards.slice(i, i + n); i += n; if (M === 'klondike' && pile.length) pile[pile.length - 1].up = true; tab.push(pile); }
   while (tab.length < NC) tab.push([]);
   stock = M === 'klondike' ? cards.slice(i) : []; recycles = 0;
+}
+/* Spider: pilas LV.p (las LV.u de abajo boca arriba, 1 si no se dice) y el resto al mazo, que reparte
+   con stock.pop(). Las escaleras que faltan para tener 4 de ♠ y 4 de ♥ ya salen retiradas. */
+function dealSp(cards) {
+  const u = LV.u || 1; tab = []; let i = 0;
+  for (const n of LV.p) { const pile = cards.slice(i, i + n); i += n; pile.forEach((q, j) => (q.up = j >= n - u)); tab.push(pile); }
+  while (tab.length < NC) tab.push([]);
+  stock = cards.slice(i); comp = []; removed = 0;
+  const per = [0, 0]; cards.forEach((q) => per[q.s]++);
+  for (let s = 0; s < 2; s++) for (let q = 0; q < 4 - per[s] / 13; q++) { const run = []; for (let r = 13; r >= 1; r--) run.push({ r, s, up: true, id: uid++ }); comp.push(run); removed++; }
+}
+/* Pyramid: las LV.rw filas de arriba (7 si no se dice), fila a fila; el resto al mazo. */
+function dealPy(cards) {
+  const rw = LV.rw || 7; pyr = []; let q = 0;
+  for (let r = 0; r < 7; r++) { pyr.push([]); for (let j = 0; j <= r; j++) { const cd = r < rw ? cards[q++] : null; if (cd) cd.up = true; pyr[r].push(cd); } }
+  stock = cards.slice(q); waste = []; recycles = 0;
+}
+/* TriPeaks: LV.m marca qué huecos de las cimas (3·6·9·10, fila a fila) llevan carta; el resto al mazo
+   y la última del mazo abre el montón. LV.v = todas a la vista; si no, solo las libres. */
+function dealTp(cards) {
+  const m = LV.m || '1'.repeat(28); peaks = [3, 6, 9, 10].map((n) => Array(n).fill(null)); let q = 0, o = 0;
+  for (let r = 0; r < 4; r++) for (let j = 0; j < peaks[r].length; j++) if (m[o++] === '1') peaks[r][j] = cards[q++];
+  stock = cards.slice(q); waste = [stock.pop()]; waste[0].up = true;
+  peaks.forEach((row, r) => row.forEach((cd, j) => { if (cd) cd.up = !!LV.v || peakFree(r, j); }));
+}
+/* Lo que falta para ganar (barra del marcador y «casi» al perder) */
+function prog() {
+  if (M === 'spider') return [removed, 8, `${removed}/8 escaleras`];
+  if (M === 'pyramid' || M === 'tripeaks') { const g = M === 'pyramid' ? pyr : peaks; let t = 28, l = 0;
+    if (M === 'pyramid') t = LV && LV.rw ? (LV.rw * (LV.rw + 1)) / 2 : 28; else if (LV && LV.m) t = [...LV.m].filter((x) => x === '1').length;
+    g.forEach((row) => row.forEach((q) => q && l++)); return [t - l, t, `${t - l}/${t} ${M === 'pyramid' ? 'de la pirámide' : 'de las cimas'}`]; }
+  const fc = fCount(); return [fc, 52, `${fc}/52 a las bases`];
 }
 function snapshot() { hist.push(JSON.stringify({ tab, stock, waste, found, cells, pyr, peaks, removed, recycles, score, streak, comp, disc })); if (hist.length > 80) hist.shift(); hintR = null; }
 function undo() { if (!hist.length || auto || undoLeft <= 0) { if (hist.length && undoLeft <= 0) { k.float('Sin deshacer', W / 2, 600, '#ffe27a'); k.sfx('hurt'); } return; } undoLeft--; used = 1; const s = JSON.parse(hist.pop()); ({ tab, stock, waste, found, cells, pyr, peaks, removed, recycles, score, streak, comp, disc } = s); moves++; sel = null; stuckT = 0; hintR = null; k.sfx('click'); }
@@ -96,12 +135,27 @@ function doMove(stack, from, d) {
       k.burst(cx, cy, '#ffe27a', chain >= 3 ? 12 : 8, 90); k.sfx(chain >= 3 ? 'coin' : 'pop'); }
     else { score += 10; k.sfx('pop'); if (r) { k.float('+10', cx, cy, '#ffe27a'); k.burst(cx, cy, '#ffe27a', 8, 90); } } }
   else if (d.t === 'cell') { cells[d.i] = stack[0]; k.sfx('click'); }
-  else { tab[d.i].push(...stack); score += 5; k.sfx('click'); if (M === 'spider') checkRun(d.i); }
+  else { if (LVT && M === 'spider') spJoin(d.i, stack[0]); tab[d.i].push(...stack); score += 5; k.sfx('click'); if (M === 'spider') checkRun(d.i); }
   checkWin(); if (!done && !auto && autoOk()) { auto = true; autoT = 0.35; k.float('Autocompletar', W / 2, H / 2, '#ffe27a'); }
 }
 function tryMove(stack, from) { const d = findDest(stack, from); if (!d) return false; doMove(stack, from, d); return true; }
 function take(from, n) { if (from.t === 'tab') tab[from.i].splice(tab[from.i].length - n, n); else if (from.t === 'waste') waste.pop(); else if (from.t === 'cell') cells[from.i] = null; else if (from.t === 'found') found[from.i].pop(); flipTops(); moves++; }
-function checkRun(i) { const col = tab[i]; if (col.length < 13) return; const run = col.slice(-13); if (run[0].r === 13 && validRun(run)) { comp.push(col.splice(-13)); removed++; score += 100; k.sfx('coin'); const x = colX(i) + CW / 2; k.burst(x, TY + 60, '#ffe27a', 16, 150); k.float('+100', x, TY + 40, '#ffe27a'); flipTops(); } }
+function checkRun(i) { const col = tab[i]; if (col.length < 13) return; const run = col.slice(-13); if (run[0].r === 13 && validRun(run)) { comp.push(col.splice(-13)); removed++; score += 100; k.sfx('coin'); const x = colX(i) + CW / 2; k.burst(x, TY + 60, '#ffe27a', 16, 150); k.float('+100', x, TY + 40, '#ffe27a'); flipTops();
+  if (LVT) { k.reward(removed === 8 ? '¡Ocho escaleras!' : `¡Escalera! ${removed}/8`, run[0].s ? '#ff8fa8' : '#ffd166'); k.hitstop(0.06); k.punch(0.06); k.chime(); } } }
+/* ---- Gancho de los retos (solo con tabla de niveles) ---- */
+/* Spider: apilar sobre el mismo palo encadena notas; cambiar de palo corta la cadena. */
+function spJoin(i, b) { const t = tab[i][tab[i].length - 1]; if (!t || t.s !== b.s || t.r !== b.r + 1) { chain = 0; return; }
+  chain = chainT > 0 ? chain + 1 : 1; chainT = 6; if (chain === 1) k.chainReset(); k.chime(); const r = SL.tab[i], x = r ? r.x + CW / 2 : W / 2, y = (RC.get(t.id) || { y: TY }).y + 20;
+  if (chain >= 3) { k.combo(Math.min(5, chain), x, y); score += 5 * Math.min(5, chain); } }
+/* Pyramid: parejas seguidas sin robar suben la cadena (x5 como mucho). */
+function pyChain(cd) { chain = chainT > 0 ? chain + 1 : 1; chainT = 7; const mul = Math.min(5, chain), p = RC.get(cd.id), x = p ? p.x + CW / 2 : W / 2, y = p ? p.y : 300;
+  if (chain === 1) k.chainReset(); k.chime(); score += 5 * (mul - 1);
+  if (chain >= 3) { k.combo(mul, x, y - 10); k.hitstop(0.035); } else k.float(cd.r === 13 ? '+15' : '+25', x, y, '#ffe27a');
+  if (chain === 5) { k.reward('¡Cadena x5!', '#ffd166'); k.punch(0.04); } }
+/* TriPeaks: la racha ya puntúa; aquí suena, se ve y la cima se celebra. */
+function tpChain(cd, r) { if (streak === 1) k.chainReset(); k.chime(); const p = RC.get(cd.id), x = p ? p.x + CW / 2 : W / 2, y = p ? p.y : 200;
+  if (streak >= 3) { k.combo(streak, x, y - 12); if (streak % 5 === 0) { k.hitstop(0.04); k.reward(`¡Racha x${streak}!`, '#ffb0e0'); } }
+  if (r === 0) { k.reward('¡Cima!', '#ffd166'); k.punch(0.05); k.burst(x, y + CH / 2, '#ffd166', 18, 160); } }
 /* Autocompletar: todas las cartas se pueden subir en orden */
 function autoOk() { if (M === 'klondike') return !stock.length && !waste.length && tab.every((col) => col.every((q) => q.up)); if (M === 'freecell') return tab.every((col) => col.every((q, i) => !i || col[i - 1].r >= q.r)); return false; }
 function autoStep() {
@@ -125,14 +179,17 @@ function lvWin() {
   const falta = s === 3 ? '¡Bordado!' : s === 2 ? (moves > PAR() ? `Para 3★: acabar en ${PAR()} movimientos.` : 'Para 3★: sin deshacer ni pistas.') : `Para 2★: acabar en ${fmt(TM())}.`;
   k.levelDone(score, `${moves} movs (objetivo ${PAR()}) · ${fmt(time)} (objetivo ${fmt(TM())})<br>${falta}`, { stars: s });
 }
-function lvLose(t) { const q = 52 - fCount(); k.lose(CFG.id, score, t, `Te faltaban ${q} carta${q === 1 ? '' : 's'} para las bases`); }
+function lvLose(t) {
+  if (M === 'spider' || M === 'pyramid' || M === 'tripeaks') { const [d, n] = prog(), q = n - d, sp = M === 'spider';
+    return k.lose(CFG.id, score, t, `Te faltaba${q === 1 ? '' : 'n'} ${q} ${sp ? 'escalera' : 'carta'}${q === 1 ? '' : 's'}${sp ? '' : M === 'pyramid' ? ' de la pirámide' : ' de las cimas'}`); }
+  const q = 52 - fCount(); k.lose(CFG.id, score, t, `Te faltaban ${q} carta${q === 1 ? '' : 's'} para las bases`); }
 function checkWin() { if (done) return; if (M === 'spider' && removed === 8) win(); if ((M === 'klondike' || M === 'freecell') && found.every((f) => f.length === 13)) win(); if (M === 'pyramid' && pyr.every((r) => r.every((q) => !q))) win(); if (M === 'tripeaks' && peaks.every((r) => r.every((q) => !q))) win(); }
 function pyrFree(r, j) { if (!pyr[r][j]) return false; if (r === 6) return true; return !pyr[r + 1][j] && !pyr[r + 1][j + 1]; }
 function peakFree(r, j) { if (!peaks[r][j]) return false; if (r === 3) return true; const cov = r === 0 ? [2 * j, 2 * j + 1] : r === 1 ? [j + Math.floor(j / 2), j + Math.floor(j / 2) + 1] : [j, j + 1]; return cov.every((q) => !peaks[r + 1][q]); }
 /* Sin jugadas posibles en Pyramid / TriPeaks → fin de partida */
 function pyrPairs() { const fr = []; pyr.forEach((row, r) => row.forEach((q, j) => q && pyrFree(r, j) && fr.push(q))); if (waste.length) fr.push(waste[waste.length - 1]); const o = []; fr.forEach((a, i) => { if (a.r === 13) o.push([a]); for (let j = i + 1; j < fr.length; j++) if (a.r + fr[j].r === 13) o.push([a, fr[j]]); }); return o; }
 function peakPlays() { const top = waste[waste.length - 1], o = []; peaks.forEach((row, r) => row.forEach((q, j) => { if (q && peakFree(r, j)) { const d = Math.abs(q.r - top.r); if (d === 1 || d === 12) o.push(q); } })); return o; }
-function stuckCheck() { if (done) return; const st = M === 'pyramid' ? !stock.length && (recycles >= 2 || !waste.length) && !pyrPairs().length : M === 'tripeaks' ? !stock.length && !peakPlays().length : false; if (st) stuckT = 1.1; }
+function stuckCheck() { if (done) return; const st = M === 'pyramid' ? !stock.length && (recycles >= PREC() || !waste.length) && !pyrPairs().length : M === 'tripeaks' ? !stock.length && !peakPlays().length : false; if (st) stuckT = 1.1; }
 function reset() { score = 0; used = 0; build(); }
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
@@ -140,7 +197,7 @@ const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(
 const rc = (cd) => { const p = RC.get(cd.id); return p && { x: p.x, y: p.y, w: CW, h: CH }; };
 const slotR = (r) => r && { x: r.x, y: r.y, w: CW, h: CH };
 function findHint() {
-  if (M === 'pyramid') { const p = pyrPairs()[0]; if (p) return p.map(rc); return stock.length || (recycles < 2 && waste.length) ? [slotR(SL.stock)] : null; }
+  if (M === 'pyramid') { const p = pyrPairs()[0]; if (p) return p.map(rc); return stock.length || (recycles < PREC() && waste.length) ? [slotR(SL.stock)] : null; }
   if (M === 'tripeaks') { const p = peakPlays()[0]; if (p) return [rc(p), rc(waste[waste.length - 1]) || slotR(SL.waste)]; return stock.length ? [slotR(SL.stock)] : null; }
   const cands = []; if (waste.length) cands.push([[waste[waste.length - 1]], { t: 'waste' }]); cells.forEach((q, i) => q && cands.push([[q], { t: 'cell', i }]));
   tab.forEach((col, i) => col.forEach((q, idx) => { if (q.up && validRun(col.slice(idx))) cands.push([col.slice(idx), { t: 'tab', i, idx }]); }));
@@ -179,19 +236,20 @@ function act(h) {
       snapshot(); if (stock.length) { const cd = stock.pop(); cd.up = true; waste.push(cd); k.sfx('click'); } else if (waste.length) { stock = waste.reverse().map((q) => ({ ...q, up: false })); waste = []; recycles++; score = Math.max(0, score - 20); k.sfx('pop'); } moves++; }
     if (M === 'spider' && stock.length) { if (!tab.every((q) => q.length)) { k.float('Llena antes las columnas vacías', W / 2, 600, '#ffe27a'); navigator.vibrate && navigator.vibrate(20); return; }
       snapshot(); tab.forEach((col, i) => { const cd = stock.pop(); cd.up = true; col.push(cd); const a = AP.get(cd.id); if (a) a.d = i * 0.05; }); tab.forEach((_, i) => checkRun(i)); moves++; k.sfx('shoot'); }
-    if (M === 'pyramid') { if (stock.length) { snapshot(); const cd = stock.pop(); cd.up = true; waste.push(cd); moves++; k.sfx('click'); } else if (recycles < 2 && waste.length) { snapshot(); stock = waste.reverse(); stock.forEach((q) => (q.up = false)); waste = []; recycles++; moves++; k.sfx('pop'); } sel = null; stuckCheck(); }
-    if (M === 'tripeaks' && stock.length) { snapshot(); const cd = stock.pop(); cd.up = true; waste.push(cd); streak = 0; moves++; k.sfx('click'); stuckCheck(); }
+    if (M === 'pyramid') { if (stock.length) { snapshot(); const cd = stock.pop(); cd.up = true; waste.push(cd); moves++; k.sfx('click'); } else if (recycles < PREC() && waste.length) { snapshot(); stock = waste.reverse(); stock.forEach((q) => (q.up = false)); waste = []; recycles++; moves++; k.sfx('pop'); } else if (LVT && waste.length) { k.float('No quedan vueltas al mazo', W / 2, 600, '#ffe27a'); k.sfx('hurt'); } if (LVT) chain = 0; sel = null; stuckCheck(); }
+    if (M === 'tripeaks' && stock.length) { snapshot(); const cd = stock.pop(); cd.up = true; waste.push(cd); streak = 0; moves++; k.sfx('click'); if (LVT) k.chainReset(); stuckCheck(); }
     checkWin(); return; }
   if (M === 'pyramid') { const cd = h.a === 'pyr' ? pyr[h.r][h.j] : h.a === 'waste' ? waste[waste.length - 1] : null; if (!cd) { sel = null; return; } const ref = h.a === 'pyr' ? { r: h.r, j: h.j } : { w: 1 };
     const rm = (q) => { let x; if (q.w) x = waste.pop(); else { x = pyr[q.r][q.j]; pyr[q.r][q.j] = null; } disc.push(x); const p = RC.get(x.id); if (p) k.burst(p.x + CW / 2, p.y + CH / 2, '#ffe27a', 8, 100); };
     const same = sel && JSON.stringify(sel) === JSON.stringify(ref);
-    if (cd.r === 13) { snapshot(); rm(ref); score += 15; sel = null; moves++; k.sfx('coin'); }
-    else if (sel && !same) { const o = sel.w ? waste[waste.length - 1] : pyr[sel.r][sel.j]; if (o && o.r + cd.r === 13) { snapshot(); rm(sel); rm(ref); score += 25; moves++; k.sfx('coin'); const p = RC.get(cd.id); if (p) k.float('+25', p.x + CW / 2, p.y, '#ffe27a'); } else { sel = ref; k.sfx('click'); return; } sel = null; }
+    if (cd.r === 13) { snapshot(); rm(ref); score += 15; sel = null; moves++; k.sfx('coin'); if (LVT) pyChain(cd); }
+    else if (sel && !same) { const o = sel.w ? waste[waste.length - 1] : pyr[sel.r][sel.j]; if (o && o.r + cd.r === 13) { snapshot(); rm(sel); rm(ref); score += 25; moves++; k.sfx('coin'); const p = RC.get(cd.id); if (LVT) pyChain(cd); else if (p) k.float('+25', p.x + CW / 2, p.y, '#ffe27a'); } else { sel = ref; k.sfx('click'); return; } sel = null; }
     else { sel = same ? null : ref; k.sfx('click'); }
     checkWin(); stuckCheck(); return; }
   if (M === 'tripeaks') { if (h.a !== 'peak') return; const cd = peaks[h.r][h.j], top = waste[waste.length - 1]; const d = Math.abs(cd.r - top.r);
     if (d === 1 || d === 12) { snapshot(); peaks[h.r][h.j] = null; waste.push(cd); streak++; const pts = 10 * streak + (h.r === 0 ? 50 : 0); score += pts; const p = RC.get(cd.id); if (p) k.float(h.r === 0 ? `Cima +${pts}` : `+${pts}`, p.x + CW / 2, p.y, streak > 3 ? '#ffb0e0' : '#ffe27a');
-      peaks.forEach((row, r) => row.forEach((q, j) => { if (q && peakFree(r, j)) q.up = true; })); moves++; k.sfx(streak > 3 ? 'coin' : 'pop'); checkWin(); stuckCheck(); }
+      peaks.forEach((row, r) => row.forEach((q, j) => { if (q && peakFree(r, j)) q.up = true; })); moves++; k.sfx(streak > 3 ? 'coin' : 'pop');
+      if (LVT) tpChain(cd, h.r); checkWin(); stuckCheck(); }
     else navigator.vibrate && navigator.vibrate(20);
     return; }
   // Klondike / Spider / FreeCell: movimiento automático al mejor destino
@@ -633,14 +691,14 @@ function gauge(x, y, w, h, f, col) {
 }
 /* Meta siempre visible: nombre del nivel, cartas que faltan, movimientos frente al objetivo y reloj */
 function hudLV(now) {
-  const fc = fCount(), tl = TLIM(), ap = time > TM();
+  const [pd, pt, ptx] = prog(), tl = TLIM(), ap = time > TM();
   /* Los botones de pausa/sonido del reproductor caen en el centro de arriba (x 190..290):
      la columna izquierda se queda en 172 px y la derecha alineada a la derecha. */
   labelFit(daily ? 'Reto del día' : `${k.lv}. ${LV.n}`, 12, 4, 14, daily ? '#ffd166' : '#ffe27a', 172);
   label(`${score}`, W - 12, 3, 17, '#fff', 'right');
-  gauge(12, 24, 170, 8, fc / 52, fc === 52 ? '#7cf7a0' : '#6ee7a8');
+  gauge(12, 24, 170, 8, pd / pt, pd === pt ? '#7cf7a0' : '#6ee7a8');
   if (chain > 1) { const sc = 1 + 0.06 * Math.sin(now / 90); c.save(); c.translate(12, 41); c.scale(sc, sc); labelFit(`Cadena x${Math.min(5, chain)}`, 0, -8, 13, chain >= 3 ? '#ffb0e0' : '#ffe27a', 170); c.restore(); }
-  else labelFit(`${fc}/52 a las bases`, 12, 36, 11, '#cfe9d8', 170);
+  else labelFit(ptx, 12, 36, 11, '#cfe9d8', 170);
   const mc = moves > PAR() ? '#ffb0a0' : '#cfe9d8';
   label(`${moves}/${PAR()} movs`, W - 12, 24, 12, mc, 'right');
   const tc = time > tl * 0.85 ? (Math.floor(now / 250) % 2 ? '#ff8f7a' : '#ffd0c4') : ap ? '#ffb0a0' : '#cfe9d8';
@@ -665,7 +723,7 @@ function draw() {
   const now = performance.now(), dt = Math.min(0.05, (now - (lastT || now)) / 1000); lastT = now;
   c.drawImage(FELT, 0, 0, W, H); layout();
   // huecos
-  if (SL.stock) slot(SL.stock, M === 'klondike' ? 'redo' : M === 'pyramid' ? (recycles < 2 ? 'redo' : 'x') : '');
+  if (SL.stock) slot(SL.stock, M === 'klondike' ? 'redo' : M === 'pyramid' ? (recycles < PREC() ? 'redo' : 'x') : '');
   if (SL.waste) slot(SL.waste); if (SL.disc) slot(SL.disc); SL.found.forEach((r) => slot(r, 'A')); SL.cells.forEach((r, i) => slot(r, i < CN() ? 'cell' : 'lock')); SL.tab.forEach((r) => slot(r, M === 'klondike' ? 'K' : ''));
   if (M === 'spider' && !comp.length) slot({ x: colX(0), y: TOP }, 'K');
   // cartas: las que vuelan se pintan encima
@@ -683,10 +741,10 @@ function draw() {
   // HUD
   if (LVT) hudLV(now);
   else { label(CFG.title, 12, 12, 15, '#ffe27a'); label(`${score} pts`, W - 12, 8, 18, '#fff', 'right'); label(`${moves} movs · ${fmt(time || 0)}`, W - 12, 31, 12, '#cfe9d8', 'right'); }
-  if (M === 'spider') { label(`${removed}/8 escaleras`, W / 2 - 6, TOP + CH / 2 - 8, 14, '#fff', 'center'); label(`${stock.length / 10} repartos`, colX(9) + CW / 2 - 14, TOP + CH + 3, 11, '#cfe9d8', 'center'); }
+  if (M === 'spider') { if (!LVT) label(`${removed}/8 escaleras`, W / 2 - 6, TOP + CH / 2 - 8, 14, '#fff', 'center'); label(`${stock.length / 10} repartos`, colX(9) + CW / 2 - 14, TOP + CH + 3, 11, '#cfe9d8', 'center'); }
   if (M === 'klondike' && stock.length) label(String(stock.length), colX(0) + CW / 2, TOP + CH + 3, 11, '#cfe9d8', 'center');
   if (LVT && M === 'klondike') { const vl = Math.max(0, RECL() - recycles); label(vl ? `${vl} vuelta${vl === 1 ? '' : 's'}` : 'Sin vueltas', colX(1) + CW / 2, TOP + CH + 3, 11, vl ? '#cfe9d8' : '#ffb0a0', 'center'); }
-  if (M === 'pyramid') { label(`Mazo ${stock.length} · Reciclados ${recycles}/2`, 70 + CW / 2, 468 + CH + 6, 12, '#cfe9d8', 'left'); label('Parejas que sumen 13 · la K sola', W / 2, 598, 13, '#fff', 'center'); label('A=1  J=11  Q=12  K=13', 350 + CW / 2, 468 + CH + 6, 11, '#cfe9d8', 'center'); }
+  if (M === 'pyramid') { label(`Mazo ${stock.length} · Reciclados ${recycles}/${PREC()}`, 70 + CW / 2, 468 + CH + 6, 12, '#cfe9d8', 'left'); label('Parejas que sumen 13 · la K sola', W / 2, 598, 13, '#fff', 'center'); label('A=1  J=11  Q=12  K=13', 350 + CW / 2, 468 + CH + 6, 11, '#cfe9d8', 'center'); }
   if (M === 'tripeaks') { label(`${stock.length}`, 130 + CW / 2, 400 + CH + 6, 13, '#cfe9d8', 'center'); label('Una arriba o abajo · K y A enlazan', W / 2, 598, 13, '#fff', 'center');
     if (streak > 1) { const s = 1 + 0.08 * Math.sin(now / 90); c.save(); c.translate(W / 2, 520); c.scale(s, s); label(`Racha x${streak}`, 0, -12, 24, streak > 4 ? '#ffb0e0' : '#ffe27a', 'center'); c.restore(); } }
   if (auto) label('Autocompletando…', W / 2, BY - 26, 14, '#ffe27a', 'center');
@@ -719,7 +777,7 @@ k.run((dt) => {
   if (brief > 0) brief = moves ? Math.min(brief, 0.9) - dt : brief - dt;
   /* Presión: reloj y tope de movimientos por nivel (holgados, pero el reparto hay que resolverlo) */
   if (LVT && !auto) { if (time > TLIM()) return lvLose('Se acabó el tiempo'); if (moves > MLIM()) return lvLose('Demasiados movimientos'); }
-  if (stuckT > 0 && (stuckT -= dt) <= 0) { k.lose(CFG.id, score, 'Sin movimientos', `${moves} movimiento${moves === 1 ? "" : "s"}`); return; }
+  if (stuckT > 0 && (stuckT -= dt) <= 0) { if (LVT) return lvLose('Sin movimientos'); k.lose(CFG.id, score, 'Sin movimientos', `${moves} movimiento${moves === 1 ? "" : "s"}`); return; }
   if (auto) { autoT -= dt; if (autoT <= 0) { autoT = 0.09; if (!autoStep()) auto = false; } return; }
   /* 1.23: más fácil — pista automática tras 15 s sin tocar */
   if (k.ptr.down || k.held.size) idleH = 0; else if ((idleH += dt) > IDLEH() && !hintR && !stuckT) { idleH = -30; const h = findHint(); if (h && h[0]) { hintR = h.filter(Boolean); hintT = HINTT(); } }

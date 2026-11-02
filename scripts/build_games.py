@@ -73,10 +73,10 @@ G = {
  'hero-brawl': ('topdown', dict(mode='brawl', help='Muévete y golpea con A o tocando; también golpeas solo al acercarte. Aguanta las oleadas y elige mejoras. Jefe cada 5 oleadas.')),
  # ---------- Estrategia y cartas ----------
  'klondike-solitaire': ('cards', dict(mode='klondike', help='Toca una carta para moverla sola al mejor sitio. Toca el mazo para robar. Sube todo a las bases.')),
- 'spider-solitaire': ('cards', dict(mode='spider', help='Spider de 2 palos (♠ ♥). Toca una carta para moverla; las escaleras del mismo palo se mueven juntas. Completa de K a A del mismo palo para retirarla. Toca el mazo para repartir una carta a cada columna.')),
+ 'spider-solitaire': ('cards', dict(mode='spider', help='Spider de 2 palos (♠ ♥). Toca una carta para moverla; las escaleras del mismo palo se mueven juntas. Completa de K a A del mismo palo para retirarla. Toca el mazo para repartir una carta a cada columna. 20 retos con reparto fijo y reto del día.')),
  'freecell': ('cards', dict(mode='freecell', help='Toca una carta para moverla sola: a la base, a otra columna o a una celda libre.')),
- 'pyramid-solitaire': ('cards', dict(mode='pyramid', help='Toca dos cartas libres que sumen 13 para retirarlas (la K sola). Toca el mazo para robar.')),
- 'tripeaks-solitaire': ('cards', dict(mode='tripeaks', help='Toca cartas libres una por encima o por debajo de la del montón. Encadena rachas.')),
+ 'pyramid-solitaire': ('cards', dict(mode='pyramid', help='Toca dos cartas libres que sumen 13 para retirarlas (la K sola). Toca el mazo para robar. 20 retos con reparto fijo y reto del día.')),
+ 'tripeaks-solitaire': ('cards', dict(mode='tripeaks', help='Toca cartas libres una por encima o por debajo de la del montón; K y A enlazan. Encadena rachas. 20 retos con reparto fijo y reto del día.')),
  'mahjong-solitaire': ('mahjong', dict(help='Empareja dos fichas iguales que estén libres: sin nada encima y con la izquierda o la derecha despejada. La dorada es comodín, la helada necesita parejas al lado y la del reloj te quita segundos si llega a cero. Encadena parejas seguidas para multiplicar.')),
  'tower-guard': ('td', dict(mode='path')), 'maze-defense': ('td', dict(mode='maze')), 'hex-defense': ('td', dict(mode='hex')),
  'micro-tactics': ('tactics', dict()), 'hex-skirmish': ('tactics', dict(hex=True)),

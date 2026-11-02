@@ -9,6 +9,14 @@
  *   nc celdas utilizables en freecell (las demás salen con candado)
  *   rec vueltas al mazo permitidas en klondike
  *   tm  segundos objetivo (2ª estrella)
+ * Spider (S), Pyramid (P) y TriPeaks (T), con sus retos del día DS/DP/DT, los comprueba
+ * scripts/check_cardlv.js (repartiendo como dealLV() y resolviendo con las reglas del motor):
+ *   S  p pilas (máx. 10), u cartas boca arriba al pie de cada pila (1 si no se dice), el resto al
+ *      mazo (múltiplo de 10); solo ♠ y ♥ (A..Z), 4 copias de cada carta contando las escaleras
+ *      que faltan, que salen ya retiradas. min = mejor ruta conocida.
+ *   P  rw filas de pirámide (7 si no se dice), rec vueltas al mazo (≤ 2). min = óptimo (anchura).
+ *   T  m máscara de 28 huecos de las cimas (3·6·9·10; todas si no se dice), v = todo a la vista;
+ *      la última del mazo abre el montón. min = óptimo (anchura).
  * Generado por scripts del scratchpad; no se toca a mano salvo los nombres y los textos. */
 const CARDLV = {
  K: [
@@ -98,6 +106,138 @@ const CARDLV = {
   {n:'Reto 18',f:[0,0,0,0],p:[7,7,7,7,6,6,6,6],nc:4,par:96,tm:231,min:92,d:'twUGuYmAxavcTfnkHjbLzDMpyEPKNrhoWQgiJlqZIsVBCOSFdXeR'},
   {n:'Reto 19',f:[0,0,0,0],p:[7,7,7,7,6,6,6,6],nc:4,par:87,tm:211,min:83,d:'kiojdOpMACzSrIQhfNTRewmBWEngZVXvyuJLbaKGYUFqcxDPsltH'},
   {n:'Reto 20',f:[0,0,0,0],p:[7,7,7,7,6,6,6,6],nc:4,par:101,tm:242,min:97,d:'OmMAJyXuzfSwFHhrqPYjKpobBVaxedcClsDgGWUiQNkvREnITtZL'}
+ ],
+ S: [
+  {n:'Una escalera',e:'Junta de K a A del mismo palo: la escalera se retira sola.',p:[2,2,2,2,2,1,1,1,0,0],u:99,par:19,tm:61,min:12,d:'AKHCIDMEJBLFG'},
+  {n:'Escaleras que viajan',e:'Las cartas seguidas del mismo palo se mueven juntas.',p:[3,3,3,3,3,3,2,2,2,2],u:99,par:33,tm:90,min:23,d:'FCEEHFDLJBBMIHGGKDIKCLMAAJ'},
+  {n:'El hueco',e:'En una columna vacía cabe cualquier carta.',p:[5,5,4,4,4,4,0,0,0,0],u:99,par:37,tm:98,min:26,d:'BEIGFAKMMLDAHJKCEFJDHLIBCG'},
+  {n:'Cartas tapadas',e:'Mueve la de encima para destapar la de abajo.',p:[3,3,3,3,3,3,2,2,2,2],par:34,tm:92,min:24,d:'KJKAEIMEBMBGJDLGLIDHCAHFFC'},
+  {n:'El mazo reparte',e:'El mazo da una carta a cada columna; sin huecos.',p:[2,2,2,2,2,2,1,1,1,1],par:38,tm:100,min:27,d:'HFAFDMILGCACBDKKJIBLGEJEHM'},
+  {n:'Dos palos',e:'Distinto palo se apila, pero no se mueve junto.',p:[3,3,3,3,3,3,2,2,2,2],u:99,par:38,tm:100,min:27,d:'OQUHDRYKSGIFCPMWBTZAXNELJV'},
+  {n:'Ordena por palo',e:'Pon cada carta sobre su mismo palo si puedes.',p:[2,2,2,2,2,2,1,1,1,1],par:64,tm:155,min:48,d:'TWPCODNEFVUGXQLKARMHJBIZYS'},
+  {n:'Tres escaleras',e:'Treinta y nueve cartas y un reparto en el mazo.',p:[3,3,3,3,3,3,3,3,3,2],par:58,tm:142,min:43,d:'GHBBLKAUMMXOFCTLRISDPECWHQFNGKEZDJAVYIJ'},
+  {n:'Dos repartos',e:'Guarda huecos antes de repartir... y llénalos.',p:[2,2,2,2,2,2,2,2,2,1],par:78,tm:183,min:59,d:'LDJAEMKLCTSVGZYIDQXOEICRJBFKNUPMAFBHWGH'},
+  {n:'Medio mazo',e:'Cuatro escaleras: dos de cada palo.',p:[4,4,4,4,3,3,3,3,2,2],par:87,tm:202,min:66,d:'IEFNOSXDAKWMFUIZARDREHWLJNBHSKTQYUTCCVPGQLJOPVYGXBZM'},
+  {n:'Columnas hondas',e:'Pocas columnas y muy altas: abre un hueco pronto.',p:[8,8,8,8,0,0,0,0,0,0],par:95,tm:220,min:73,d:'ALBIWVNXCGYULRPHYJANTTOKUXHZKZSVBPMOGEFSEQMQWJFDRCDI'},
+  {n:'Cinco escaleras',e:'Sesenta y cinco cartas y tres repartos.',p:[4,4,4,4,4,3,3,3,3,3],par:119,tm:269,min:92,d:'FIAXJEYLSRUCTAHZGMEAIDOXMZHBPLUIVDCJQKYLSEFOGQNDWGWKKVPMCBHRNFJTB'},
+  {n:'Dos repartos justos',e:'Más cartas tapadas y menos mazo.',p:[5,5,5,5,5,5,5,5,5,0],par:108,tm:246,min:83,d:'BBVALKIIDIUAOLOBZAHGQHXWCWSDVFCRGEJMNMRHNTSUPGCYDMKJTXFEKLPJZQFYE'},
+  {n:'Seis escaleras',e:'Setenta y ocho cartas: tres de cada palo.',p:[5,5,5,5,5,5,4,4,4,6],par:138,tm:308,min:107,d:'XVOWOPCRTERJRIJDLBGPQXVAKMLMNCDZYUQPZHSBSSFAFLYTECBWUVHQGENHNJOAIUWKKDXFZYMIGT'},
+  {n:'Cuatro repartos',e:'Mazo largo: no repartas con el tablero revuelto.',p:[4,4,4,4,4,4,4,4,3,3],par:123,tm:277,min:95,d:'RQIPERNADTKGTEYLFCWJGVPPSCOTXVXDURDHGHBJKLMFVUMUQHKJOQSBMXNZONAFZYLBYASECWIIZW'},
+  {n:'Siete escaleras',e:'Solo falta una para la baraja entera.',p:[6,6,5,5,5,5,5,5,5,4],par:159,tm:352,min:124,d:'GLHWAAZLMSUNOFFBBOKLKJQLFIZCFKVUGYXCTRQTWSDHNPVITXDRVDGMWMZXEJREEEKBYABPIYPISOMNHCDQUJGHCJA'},
+  {n:'Con el reloj',e:'Siete escaleras y el reloj más corto.',p:[6,6,5,5,5,5,5,5,5,4],par:172,tm:275,min:134,d:'FJWXUHOWSQDFNTTRJRBLPHVDCNGUYIQISCLPBGGVKYUAMOPJBCIOKMCHSGMAEBZIKHQEWXKNJXDALMLREFZAEDZTVYF'},
+  {n:'Reparto completo',e:'El Spider de 2 palos: 104 cartas.',p:[6,6,6,6,5,5,5,5,5,5],par:164,tm:363,min:128,d:'QWGMARYJHIDGUTIWPZLFSTUFRDQRXLYXXMSBAXVTSHZUCEEQPNMDPPCLMKBGWOLRUYHTQOIKJCEHDSOYNFWKCKAJZOJENBVANGZVBVFI'},
+  {n:'Sin atajos',e:'Baraja entera y un reparto revuelto.',p:[6,6,6,6,5,5,5,5,5,5],par:185,tm:407,min:145,d:'HUSTGONWINZVPVDANTSRZGCWHCLYROJKDLFYXMRJKBOZFSWQRSNHOXMLDIMUIYKEQVPZJFMEJBWYLCTGPUEIATQXKAQEBAGUPDVFXBCH'},
+  {n:'El reparto del final',e:'Ocho escaleras, cinco repartos. El de verdad.',p:[6,6,6,6,5,5,5,5,5,5],par:158,tm:254,min:123,d:'JTGFVOAXMKLXOUSPCFPNFCJZNZWDDMETYJUIWMCLQQYAAVEQLSKCJYODBLWNBKHPZXAQPSHSURWGIGNRMDHKEBZVEGTFHRBVYURIIOXT'}
+ ],
+ DS: [
+  {n:'Reto 1',p:[6,6,6,6,5,5,5,5,5,5],par:169,tm:373,min:132,d:'YJXKWLHJKUDYSFPVTEONCGZQHBRAGXEGZGECQOBNIFDWZSNJHHLXBWOIRTCAPLPQMIRKKTMIVLWEPZJOASFVMUMNQDUXUYSYTABVFCDR'},
+  {n:'Reto 2',p:[6,6,6,6,5,5,5,5,5,5],par:169,tm:373,min:132,d:'JFMWPXKBWBRLNEQCEQJILXDBLUTDSXGTAUNFQLPTEGMUEKCRXQCMZDHVORKHMGZDOPBJFIYAHNIFSYJYSKSIYAWZUHOGZVTWOACVVNPR'},
+  {n:'Reto 3',p:[6,6,6,6,5,5,5,5,5,5],par:165,tm:365,min:129,d:'QSJDBXPTOLIXUANUWHJMDREQSBANXEALNYREGBCXZPURKDWHKEGNTFCQORFKVIJYTMLOSVFADBOYUZYHVIWTKIZMZFCJHLPCVGGSWPMQ'},
+  {n:'Reto 4',p:[6,6,6,6,5,5,5,5,5,5],par:165,tm:365,min:129,d:'IXJOFWPABVPBQJZEEXEYNORWFXNMTUZIIDCVOZPOLGKYDUTBKILQHLRGTASFDKWVQMSENTMDJJCGBHXFZSCYPYWACLGUVARNHUMHRSKQ'},
+  {n:'Reto 5',p:[6,6,6,6,5,5,5,5,5,5],par:194,tm:425,min:152,d:'QRUFTDTGTSZJMCWLRGEDUEQCBOGBVAZNNFLSFXKESNMFHVBPYMHWYYHCZXXWSOQVQTYWJPHUJMVPCIROIEZIDAJOXNGKBLPIADLUKKRA'},
+  {n:'Reto 6',p:[6,6,6,6,5,5,5,5,5,5],par:170,tm:376,min:133,d:'CYVDABQYHKHTGEAJRMIAPSIURGKVWLWTSHEFKCUVXTYNZMZIUOTZJFNJBFMBWPKCGQOOOYRHNIGBDSRXLNLEJLDPZDCVUPFXQXQWSEAM'},
+  {n:'Reto 7',p:[6,6,6,6,5,5,5,5,5,5],par:162,tm:358,min:126,d:'WWMMUGLETFGJUIRUTAIJZRFPKSYYWVCGDHHQXALKWPCSNNXOYATRYICVDLBVMGMZQBRPQALSHBOXOSDEZNPXKVFTEZUFCODNIQJHBEKJ'},
+  {n:'Reto 8',p:[6,6,6,6,5,5,5,5,5,5],par:175,tm:386,min:137,d:'UPWGPHDNFSTYYSZDRJMLWRSBKQGHHUVVOMSITWJLGVNIYEUCXJOCFNAIQDFWRETOKLZCOHMRGKUNQBMDEEAXZJCAPKAXLVQPBTBIYZFX'},
+  {n:'Reto 9',p:[6,6,6,6,5,5,5,5,5,5],par:168,tm:371,min:131,d:'WFEBWJFASABUNOZLEIFXMOGHHKXSPKGOCLKSCCPVFSNCPGZTMJENXDJMYOEGADDAQRYPUJUZWIMQIVZHVDWVKIHLRRYBNQBTXQURYLTT'},
+  {n:'Reto 10',p:[6,6,6,6,5,5,5,5,5,5],par:193,tm:423,min:151,d:'GVWDXYDFVJSOXONICAEHPSSTFDWYQAOHMEFWQWQYRUNARXKXETMCGLZBPINYGBZZCUBTPOKJNKAMZIULHRJFJCVTMVLQPSGBUHKERDIL'},
+  {n:'Reto 11',p:[6,6,6,6,5,5,5,5,5,5],par:164,tm:363,min:128,d:'EHKTITPBYLXGZOKEUOZTUHYRTFIJWFSSSRVINGJXCAWAMQKDPPGGBSRUKVVDNOFZEAQLXDMMPDJLZQNCEVIUAXJOCWQCRFMBLNBYYWHH'},
+  {n:'Reto 12',p:[6,6,6,6,5,5,5,5,5,5],par:178,tm:391,min:139,d:'WPJVEVITOJGAMECPGTDDSEIYNGKZOXZRMFVJEKOAIDXBKUBCFFNPAXLWSTHBLVKZJTNFLHZSRLNORPYRQHQWAMIBYQUYQMGWUCCSDHUX'},
+  {n:'Reto 13',p:[6,6,6,6,5,5,5,5,5,5],par:184,tm:404,min:144,d:'RJLUOMCTWYHHUSWDTHCYNAMYKNIFRVJBKLPLGWDJHDOTVGMRQJZVQUFXKXIWDFQZVGCXZLPUEBBSNMSSOXBAAPFQKIZOYAGERENTIPCE'},
+  {n:'Reto 14',p:[6,6,6,6,5,5,5,5,5,5],par:170,tm:376,min:133,d:'ATYFHAQGXVVSCMGWWJINDJLXZPOVQISMBKYTIAMNMNLUWUHIEPGKJCHLAGDYFZRTQEJKPUWSTFBOEQRFCZLOEXNSBZRXKPCVDBYHORUD'},
+  {n:'Reto 15',p:[6,6,6,6,5,5,5,5,5,5],par:164,tm:363,min:128,d:'OWRRHQGLMKWUQLFZAEODSXQXLXMNVYRAYTBGCPEPUTPSNDIMKPZZIYFHWQUCNBMSZYCJLDFNDJSBKOTEWOITVCBRIHAKJVAVJXHFGEUG'},
+  {n:'Reto 16',p:[6,6,6,6,5,5,5,5,5,5],par:179,tm:394,min:140,d:'XNRDUCYHBHYVPMCWVKGYQFSPQHGAWICIUBVADTBJROVEELPLOFIKTIMWUNRXZYCEGMQSLONZJLZXQZRDEJSGNTWFUBAJXFTKMKHDPSAO'},
+  {n:'Reto 17',p:[6,6,6,6,5,5,5,5,5,5],par:145,tm:324,min:113,d:'STUNQCWBZVOXOCCALYIFXBOZMNEITBXDHMSUNJKGUPAOSCJKVYGPQRZKIGADEWRYLTKQRFHEMYQEBMHSTFFJAVILWLPRGDJXPUHDZVWN'},
+  {n:'Reto 18',p:[6,6,6,6,5,5,5,5,5,5],par:163,tm:360,min:127,d:'AOHUZQFRSORTJJJKURXIAQKGHIOGVBZWIPKYSHUNTBPWXMHGGUEFTELLALRKCQXNCZOMYIVDVDVLSMPTWYFWDBCPBESYNDNXJEZQCAFM'},
+  {n:'Reto 19',p:[6,6,6,6,5,5,5,5,5,5],par:173,tm:381,min:135,d:'THBPPLZVZZMTSFWDUNJRDYKYQIYMVUSGUNBPTKNEKIJOCOCDGVFAPXGELEWBZWOHSYHMAOFXMCURWIRCDSTHQEXQBIKJQAVLJXFRAGNL'},
+  {n:'Reto 20',p:[6,6,6,6,5,5,5,5,5,5],par:187,tm:410,min:146,d:'JIXNGROXUJFVZIXPWGADZNTHBUDALUWPNLPFIEBVQSKMDXOHBZBMVWHJCCTLJTARQSYESZCAFYYHEOOMVRGRYFSDMPLCGIQENTQUWKKK'}
+ ],
+ T: [
+  {n:'Una arriba o abajo',e:'Juega una carta que sea uno más o uno menos que la del montón.',m:'0000000000000000001111111111',v:1,par:19,tm:41,min:17,d:'EpHtlvzWTbZOkKuRSFm'},
+  {n:'La K y el A se dan la mano',e:'Después de la K viene el A, y al revés.',m:'1001100001110000001111000000',v:1,par:20,tm:42,min:18,d:'LaMgdmOVInYfeFcDhHb'},
+  {n:'Encadena la racha',e:'Cada carta seguida sin robar suma más puntos.',m:'0000000001111111111111111111',v:1,par:26,tm:51,min:24,d:'oGcrmeXFlwVQqjfEWkPDMINBduizTa'},
+  {n:'Corona la cima',e:'La carta de arriba de cada pico da premio.',m:'1101111001111110001111111000',v:1,par:33,tm:60,min:30,d:'TLMQaoFGKeZnAPucgIyHxVdvjUmDJbO'},
+  {n:'Cartas boca abajo',e:'Las tapadas se dan la vuelta al quedar libres.',m:'1101111001111110001111111000',par:32,tm:59,min:29,d:'OKhqHYTWUpmgrCVbDFwXlGBfyekoMvt'},
+  {n:'Tres cimas',e:'El tablero entero, todo a la vista.',v:1,par:46,tm:78,min:42,d:'alQtAUxKMjTEBskzeFGDLcYpVwhqZPnyvIdfoWgiNRrH'},
+  {n:'Elige el camino',e:'Dos cartas valen: una abre más camino que la otra.',v:1,par:45,tm:77,min:41,d:'ShGjplrxYntEUOvNWMuFKmsidIHbowDyzPcJXVBQfeaA'},
+  {n:'Tres cimas a ciegas',e:'Ahora casi todo empieza boca abajo.',par:46,tm:78,min:42,d:'lTXyFKPYdjShxtfNQvBAerDqiocWguLCkMIpHnwGOUJVasbm'},
+  {n:'Mazo corto',e:'Solo catorce cartas para robar: no las gastes.',v:1,par:44,tm:75,min:40,d:'HzYCaykMgVsuRWLljGnoADEhKcXJBmidrSNZvTefFQ'},
+  {n:'Reparto completo',e:'TriPeaks clásico: 28 en las cimas, 24 en el mazo.',par:48,tm:81,min:44,d:'ECQKmsURAjtiPvzorSnGeWdZbFyYHLgOMpIcxXaVulBhDTwkfJNq'},
+  {n:'Guarda la racha',e:'Mira qué carta dejas arriba antes de jugar.',par:46,tm:78,min:42,d:'btGigIWrNyxLdwRcKSlpYXZCnsBHPVkaeojmDUzvMuhFTqOAEQfJ'},
+  {n:'Valle hondo',e:'Abajo hay diecinueve: limpia el valle sin robar de más.',m:'0000000001111111111111111111',par:32,tm:59,min:29,d:'eBKjJRGtEyQvmlPxgSibUszwLdnuCYN'},
+  {n:'Dieciocho robos',e:'Mazo más corto y cartas tapadas.',par:46,tm:78,min:42,d:'OzSIFvyEMeNRKCaBYoZVLbHtwQjnJTkpWxrlXsqDhPGcim'},
+  {n:'Cuestión de orden',e:'Lo fácil te deja sin salida.',v:1,par:41,tm:71,min:37,d:'abUlqKQsRIWFjxDvCEtMyLepdZHSAcOuJoTigfVmknG'},
+  {n:'Con prisa',e:'El reloj de la segunda estrella aprieta.',par:45,tm:65,min:41,d:'mKFEpbYVDZjtgnsrvxyMPwUQRfcdSBzXLhaTAOIHuiWNkleoqC'},
+  {n:'Dos cimas tapadas',e:'Dos picos, pocas cartas y todo boca abajo.',m:'1101111001111110001111111000',par:30,tm:56,min:27,d:'arOIFlJhbeAyxdQZuPmqpMNiYvRg'},
+  {n:'Trece robos',e:'Trece cartas en el mazo, todo a la vista.',v:1,par:44,tm:75,min:40,d:'RqLWpecGbYAXyvzJHwonBijDtFuUfZVQMOxlaTNCh'},
+  {n:'A ciegas y con prisa',e:'Boca abajo y el reloj corto.',par:40,tm:58,min:36,d:'LhKlBoZHMNcpOdSPGUyTEirWAwnVeCbQJRXxtIYgkauvqfzm'},
+  {n:'Doce robos',e:'Doce cartas en el mazo: cada una cuenta.',v:1,par:43,tm:74,min:39,d:'NJbdUOztPZchlAQjSFCIuvYgMXErknqxpTRHWVes'},
+  {n:'La cumbre',e:'El reparto final: mazo corto y nada regalado.',v:1,par:42,tm:60,min:38,d:'XNcEHWOAFIQRriPoqaBJSUVwpskLjGKhubfyvTZ'}
+ ],
+ DT: [
+  {n:'Reto 1',par:42,tm:72,min:38,d:'weJKHOyTfGxjMIZzdAFRPYomuCnXDvWsrbgaphlNiEStBLqcVUk'},
+  {n:'Reto 2',par:45,tm:77,min:41,d:'euMnSfOUWtCkhlYzTdFLxQqKAiGwbBRagZEyprNVvjDcHIsmoXP'},
+  {n:'Reto 3',par:51,tm:84,min:46,d:'qZafJGexduRHMKcghpWSFjPAyXODlrionIkQLNVTBzYEbUvsmwt'},
+  {n:'Reto 4',par:45,tm:77,min:41,d:'UmIndTaQqVBycxlGHrOtJSZzkDsARWoguPpwfjXeFbKENCLihMY'},
+  {n:'Reto 5',par:45,tm:77,min:41,d:'hqOKINVZmuHgCMQBWTpGyYktfAbsUPJreljwiRXLFaSvxnzdcED'},
+  {n:'Reto 6',par:43,tm:74,min:39,d:'AgRwpkfKaUQEtVPZdYmlvrTMNnbeBsLiXxyIJHcOGjuDqCoFWSz'},
+  {n:'Reto 7',par:48,tm:81,min:44,d:'cWyivbIPDxskzplrFoHTejtYnfCSRKJdBXmuwGOhqQZUANVLEgM'},
+  {n:'Reto 8',par:50,tm:83,min:45,d:'rChacWSEwFKVnjpRDJgQsHkLXmlMoUbYPGNOvdIeyftiABzZxuq'},
+  {n:'Reto 9',par:45,tm:77,min:41,d:'NgWhEKJZPSqYBiksfveFGAazjRcItunTwbrlMmCOUyHpdDoXQxV'},
+  {n:'Reto 10',par:47,tm:80,min:43,d:'cbKTQNakrZsVoCpudnqlgRYLemUODPiHxFXWwSItGyvJMhfzBjA'},
+  {n:'Reto 11',par:46,tm:78,min:42,d:'gcSRNidvBLYCtFJIVaEzhPOMHjKprobqkwTfUWZAmunGsDlyXQe'},
+  {n:'Reto 12',par:50,tm:83,min:45,d:'cpDjauGrHMLnRgfTZWKAviOElUIQxCbszdNXhwtBYmoPVySkFeJ'},
+  {n:'Reto 13',par:45,tm:77,min:41,d:'rNdOEhatlIGADiuPRbVHpxcKSTeJYMXFULzogfZwWCnkqyQBvsm'},
+  {n:'Reto 14',par:42,tm:72,min:38,d:'oMgfmpNErVLOlvxTsbCiuUHXhQDKGwtzJSPdWZynqYFABkaejIR'},
+  {n:'Reto 15',par:46,tm:78,min:42,d:'FpOgPMZuCnqGIjdNtTbLhKSJmycaisHfeDkYUoxQBREwAlrzXWv'},
+  {n:'Reto 16',par:47,tm:80,min:43,d:'nWltjKfseBUvhNdixqHzcrGXwuQMLJgCkEboIyVSmYpPRTFADZa'},
+  {n:'Reto 17',par:42,tm:72,min:38,d:'EWXfDNlGZVOkCIuBeAwzPodbvTMhpRLaKqYcgSmUJQsxtyjrniF'},
+  {n:'Reto 18',par:43,tm:74,min:39,d:'IeXnWRqNJFgMdZsoabiGkpDPyutYfHOvQESKxcLlBrmCwThVzUj'},
+  {n:'Reto 19',par:50,tm:83,min:45,d:'QfCjwMzVmoRUhJXADNncZKLrasHlPdgiEeTIFuWSvBypqbYxkGO'},
+  {n:'Reto 20',par:43,tm:74,min:39,d:'fiAIbJPeDvdrScEpHNhYTtQFOZKqlRjUakxnGMCzBLwyWgouXVs'}
+ ],
+ P: [
+  {n:'Suman 13',e:'Dos cartas libres que sumen 13 se van juntas.',rw:3,rec:0,par:6,tm:22,min:4,d:'MHmALr'},
+  {n:'El rey se va solo',e:'La K vale 13: tócala y se retira sola.',rw:4,rec:0,par:8,tm:25,min:6,d:'zLNmDSiTeU'},
+  {n:'Libera las de arriba',e:'Una carta queda libre cuando no tiene nada encima.',rw:4,rec:0,par:8,tm:25,min:6,d:'MnYIDiZPWq'},
+  {n:'Asoma el mazo',e:'Roba: la carta del descarte también hace pareja.',rw:5,rec:0,par:18,tm:42,min:16,d:'OeMGJBkoxZcdiuYmKSrHn'},
+  {n:'Roba con cabeza',e:'Solo cuenta la de arriba del descarte: no la entierres.',rw:5,rec:0,par:24,tm:51,min:21,d:'qgEkvFVeaCRfwBLdUTDuPJhI'},
+  {n:'Otra vuelta',e:'Al acabarse el mazo se le da la vuelta (una vez).',rw:5,rec:1,par:26,tm:54,min:23,d:'mgVozKdDLPsGCvnQIejMhwTSf'},
+  {n:'La pareja equivocada',e:'Hay parejas que te dejan sin salida: elige bien.',rw:5,rec:1,par:26,tm:54,min:23,d:'mIqBaXoEiVHSkUtRdODgxfKyb'},
+  {n:'Seis pisos',e:'Veintiuna cartas: abre camino por los lados.',rw:6,rec:1,par:39,tm:75,min:35,d:'JWlInaALmYybtECNseSRzOpMhXkuHgDwc'},
+  {n:'Dos vueltas',e:'Ya hay dos vueltas al mazo, como en el clásico.',rw:6,rec:2,par:57,tm:102,min:51,d:'ItyXfniemVKsQAqHzRdvguoDjBNTZpclJFELU'},
+  {n:'La pirámide entera',e:'Siete pisos y el mazo a medias.',rw:7,rec:2,par:46,tm:85,min:41,d:'nsNaQzGfXgCcSIleMEJvZtHAuLVTDoidhpWRqYmFyUjr'},
+  {n:'Mazo largo',e:'Veinticuatro cartas en el mazo: mira lo que viene.',rw:7,rec:2,par:80,tm:136,min:71,d:'zgikGLwOPlSdEytxquBVFQhMsICaDcrnbTHKjYXmAZUeRfoWpJvN'},
+  {n:'Reparto completo',e:'La baraja entera: el Pyramid de siempre.',rw:7,rec:2,par:62,tm:109,min:55,d:'pUofCLdcwzsIvMmFQbAikYVnWuKqgharjyJSHDltTNGxXeOPEBRZ'},
+  {n:'Una sola vuelta',e:'Solo una vuelta al mazo: cada robo cuenta.',rw:7,rec:1,par:68,tm:119,min:61,d:'TurXodPxzKRmZNAGUMQayBDHSntcvswCWkpYLOjVJlqhgEfIFbie'},
+  {n:'Cuestión de orden',e:'Ir a lo fácil te encierra: piensa la pareja.',rw:7,rec:1,par:53,tm:95,min:47,d:'qLcHpfyiIhVsBFMbgoJejSmYNExKWltURZDAnrTQPwOvduCXkGaz'},
+  {n:'Con prisa',e:'El reloj de la segunda estrella aprieta.',rw:7,rec:2,par:59,tm:82,min:53,d:'lgDyfBiHwMSPEpsWzTbJvIQqGrYatXndURCojVOmAxKLceZuFkhN'},
+  {n:'Reyes al fondo',e:'Las K esperan abajo: no te fíes de ellas.',rw:7,rec:2,par:75,tm:129,min:67,d:'KmkhJfspFYBidVDLqlGUMNIQAtPZaXTcCExnurvgoeHbWSOzRyjw'},
+  {n:'Una vuelta, otra vez',e:'Una vuelta al mazo y el orden importa.',rw:7,rec:1,par:67,tm:117,min:60,d:'bfeIYTpqNyQdkMPWCLzZDGmKhAaSgFrBUXnxVJsRtHEuvoliwjcO'},
+  {n:'Sin reciclar',e:'El mazo no vuelve: una sola pasada.',rw:7,rec:0,par:54,tm:97,min:48,d:'ZvbkzqHKpClxdATfLQFReomJOhrSDYEajiwUGtgMNBXVuIcysnPW'},
+  {n:'Sin red',e:'Una pasada y parejas que se cruzan.',rw:7,rec:0,par:46,tm:85,min:41,d:'WTlNOhrEzBnFeqKikPIbjmaZSGMDpYHdcUfRJXvCtQVxsLwygouA'},
+  {n:'La gran pirámide',e:'El reparto final: una vuelta y nada regalado.',rw:7,rec:1,par:65,tm:89,min:58,d:'nUpoZhuzjqmkELJCidVYaIbNTWDOQeAxHsXyFKPvlrBfwMGRtSgc'}
+ ],
+ DP: [
+  {n:'Reto 1',rw:7,rec:2,par:73,tm:126,min:65,d:'ykboDSVHhElQPURdInOXuACKpraZMLGFtqJxfBwcmTzYWeijvsgN'},
+  {n:'Reto 2',rw:7,rec:2,par:63,tm:110,min:56,d:'yaSPjlDoKxCmFuLUdbhiQAgqzXkNcOfGvMptYHJTZsReVIEnwrWB'},
+  {n:'Reto 3',rw:7,rec:2,par:82,tm:139,min:73,d:'OwINCukVohmerDcUFlEtxSMLRniAGZHWKjTqfPydpsgQvbzBaJXY'},
+  {n:'Reto 4',rw:7,rec:2,par:46,tm:85,min:41,d:'MQFwgCsdahSbctyYNkIOvuArpBUHKWoieTxqGjmfPlLRzZDEVXJn'},
+  {n:'Reto 5',rw:7,rec:2,par:81,tm:137,min:72,d:'PHTqJvyBWNQmteDzorfaAdiVwYMhpFLngkIORZlbEGSxsjcuKUXC'},
+  {n:'Reto 6',rw:7,rec:2,par:81,tm:137,min:72,d:'BiTUuPkntzwMSsIWZabxyjRElKCpHJOqVoGfmvXhrcgLAYQNFDde'},
+  {n:'Reto 7',rw:7,rec:2,par:56,tm:100,min:50,d:'MYltKGihkzPRdWUxHFXeVImoaDABCNcgubQrJsLwSZjTpEqOvfyn'},
+  {n:'Reto 8',rw:7,rec:2,par:55,tm:98,min:49,d:'eGRqNYFDMrlJKkSOwcoPWLTHXdjavuyhpVzEfxgtCibnZIAsBUmQ'},
+  {n:'Reto 9',rw:7,rec:2,par:60,tm:107,min:54,d:'MeGlTXdmkrjAUuSLNWKzCwnpZbDsJBcqFhyfHiOaYEtgoRVIQvPx'},
+  {n:'Reto 10',rw:7,rec:2,par:72,tm:124,min:64,d:'moPzhrCjgcLlDQJeRsvMykuZfdEUFNpSnHwabBTXqOiAGKVtYWIx'},
+  {n:'Reto 11',rw:7,rec:2,par:58,tm:103,min:52,d:'fEoMhUHiyNpcSdKFkDVZgJmsXtRWjwarlGnLuAOYqCvPTQzbBIxe'},
+  {n:'Reto 12',rw:7,rec:2,par:71,tm:122,min:63,d:'oeCwAGUEIyxuZKsTivJcVhkmPMtDHdnXFaSjWOBNpzqLfbYrlQgR'},
+  {n:'Reto 13',rw:7,rec:2,par:55,tm:98,min:49,d:'fAzuDyalmBkISqdregsFRhvGoQPTbNxUKLCWViOZjMpYtXHJcnwE'},
+  {n:'Reto 14',rw:7,rec:2,par:58,tm:103,min:52,d:'eFLaSvDqMKplhWzYrwVdgQCAfnoPmGRJcbjEktHiyOXxIuUBTsNZ'},
+  {n:'Reto 15',rw:7,rec:2,par:59,tm:105,min:53,d:'UNyLtZukoBEDCTaJXYFwpQsiKSgIMdvfbGOHxPjAVnRmrWehczlq'},
+  {n:'Reto 16',rw:7,rec:2,par:66,tm:115,min:59,d:'kQdoHJngSOlIfGtDcmhsFZLWKVNyrAxaueBpXjRTbiMwYqvPzUCE'},
+  {n:'Reto 17',rw:7,rec:2,par:55,tm:98,min:49,d:'mAhpJdsiIFYxgeSqTrXKOvMnfVwajNDtCbzRoQUZluyPGHcLWkBE'},
+  {n:'Reto 18',rw:7,rec:2,par:57,tm:102,min:51,d:'zCATEFvlXqpkOHuUIWPfQmRrLhSVaxyMwnNDKbJcgdZYjBGioets'},
+  {n:'Reto 19',rw:7,rec:2,par:58,tm:103,min:52,d:'ZkmJCTgSxNjBsdlafcRAEYIeHpWrbtvMnGQhoUDFVXyLiPwuOzKq'},
+  {n:'Reto 20',rw:7,rec:2,par:75,tm:129,min:67,d:'EzbaZehucvArULCKgYSJimqWDtQNyPwkpBnMVOdTFfXlIsRxHGoj'}
  ]
 };
 if (typeof module !== 'undefined') module.exports = CARDLV;
