@@ -37,6 +37,7 @@ return array(
 	'nonogram-daily'     => 'Usa los números de filas y columnas para descubrir qué casillas se pintan. Toca para rellenar y marca con X las que van vacías.',
 	'penalty-flick'      => 'Desliza hacia la portería para chutar; curva el gesto para dar efecto. Engaña al portero y marca todos los penaltis que puedas.',
 	'ping-pong-reflex'   => 'Mueve la pala para devolver la bola. Partidas a 11 puntos con 2 de diferencia y saque alterno.',
+	'pipe-connect'       => 'Toca una pieza para girarla (mantén pulsado para girarla al revés) hasta que ninguna boca quede al aire y cada red tenga su fuente. Son 20 tableros con una sola solución cada uno, que van sumando piezas atornilladas, rocas, varias fuentes de colores, casas que piden su color, puentes, agua que avanza con reloj y válvulas que la frenan. Con pocos giros y sin pistas, tres estrellas.',
 	'pixel-picross-xl'   => 'Deduce con las pistas numéricas qué casillas se rellenan para revelar el dibujo oculto. Tableros grandes para expertos.',
 	'planet-hopper'      => 'Toca para saltar de un planeta al siguiente aprovechando su gravedad. No te pierdas en el espacio.',
 	'pool-break'         => 'Arrastra para apuntar con la bola fantasma y elige la fuerza. Mete tus bolas y termina con la negra.',

@@ -420,7 +420,7 @@ final class Arcade_Core {
 
 	/** Juegos que ya eligen lienzo vertical u horizontal según la pantalla: sin forzar orientación. */
 	private static function adaptive_games() {
-		foreach ( array( 'lunar-lander', 'tower-guard', 'maze-defense', 'hex-defense', 'micro-tactics', 'hex-skirmish', 'serpent-grid', 'neon-paddle', 'rock-belt', 'flow-lines', 'color-sort' ) as $slug ) {
+		foreach ( array( 'lunar-lander', 'tower-guard', 'maze-defense', 'hex-defense', 'micro-tactics', 'hex-skirmish', 'serpent-grid', 'neon-paddle', 'rock-belt', 'flow-lines', 'color-sort', 'pipe-connect' ) as $slug ) {
 			$p = get_page_by_path( $slug, OBJECT, 'game' );
 			if ( $p && ( 'fill' !== get_post_meta( $p->ID, '_game_aspect_ratio', true ) || 'auto' !== get_post_meta( $p->ID, '_game_orientation', true ) ) ) {
 				update_post_meta( $p->ID, '_game_orientation', 'auto' );
