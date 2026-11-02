@@ -3,18 +3,17 @@
  *   'arcoiris' (Burbujas Arcoíris): lanzador sobre rejilla hexagonal, rebote en las paredes, racimos de 3+ que estallan,
  *                                   burbujas sueltas que caen y techo que baja cada varios disparos.
  *   'fruta'    (Fusión de Frutas):  gravedad hacia abajo en un tarro; dos frutas iguales se funden en la siguiente.
- *   'solar'    (Fusión Solar):      lo mismo con gravedad radial hacia el sol dentro de un anillo orbital.
- * Física de fusión: pasos fijos de 1/120 s, corrección posicional con relajación e impulsos amortiguados, velocidad
- * limitada y posición recortada dentro del recipiente en cada paso → ningún cuerpo puede salirse ni ganar energía. */
+ *                                   20 niveles a mano (frutlv.js) + modo libre; algunos niveles usan gravedad central.
+ * Física de fusión: vive en la zona pura FU de frutlv.js (pasos fijos de 1/120 s, corrección posicional con relajación,
+ * impulsos amortiguados, velocidad limitada y posición recortada en cada paso → nada se sale ni gana energía). */
 const OUT = ART.OUT, TAU = 6.2832, MODE = CFG.mode || 'arcoiris', ID = CFG.id || 'burbujas';
 /* Niveles a mano: solo Burbujas Arcoíris (burblv.js). Los dos juegos de fusión no los miran. */
 const HAND = (MODE === 'arcoiris' && typeof BURBLV !== 'undefined' && BURBLV[ID]) || null;
 const W = 360, H = 640;
-/* Solo Burbujas Arcoíris usa lienzo fluido: llena la pantalla y la columna de juego (360×640)
-   se centra dentro, así la dificultad es idéntica en todos los tamaños. Los dos juegos de fusión
-   siguen en la caja centrada de siempre. */
+/* Lienzo fluido en Burbujas Arcoíris y Fusión de Frutas: llena la pantalla y la columna de juego
+   (360×640) se centra dentro, así la dificultad es idéntica en todos los tamaños. */
 const k = Kit({ w: W, h: H, title: CFG.title, bg: MODE === 'solar' ? '#0c0a1f' : MODE === 'fruta' ? '#241a3d' : '#1b1436',
-  fluid: MODE === 'arcoiris' ? { min: 0.42, max: 2.7 } : false }), c = k.ctx;
+  fluid: (MODE === 'arcoiris' || ID === 'fusion-de-frutas') ? { min: 0.42, max: 2.7 } : false }), c = k.ctx;
 /* ---------- R5 §8 «pieza única» + cartoon de estudio (helpers locales) ----------
    uni(): contornea TODAS las partes y luego las rellena → solo sobrevive la silueta exterior.
    celp(): 3 tonos de borde duro (cel shading) recortados a la silueta, sin degradados.
@@ -1114,240 +1113,497 @@ function arcoiris() {
   k.run(update, draw);
 }
 
-/* ===================================================================== Fusión (frutas / solar) ===== */
+/* ===================================================================== Fusión de Frutas ===== */
+/* La física y las reglas viven en la zona pura FU de frutlv.js (la misma que juega
+   scripts/check_frutlv.js); aquí solo se dibuja, se anima y se lleva el marcador.
+   Fusión de Frutas tiene 20 niveles a mano (FRUTLV) y un modo libre infinito en el menú. */
 function fusion() {
-  const SOLAR = MODE === 'solar';
-  const BOX = { l: 32, r: W - 32, top: 168, bot: H - 34 };
-  const CEN = { x: W / 2, y: 348, R: 166, sun: 30 };
-  const G0 = 1500, GS = 900;                         // gravedad recta / radial
-  const SUB = 1 / 120, MAXV = 900, ITER = 8;
+  const HF = (typeof FRUTLV !== 'undefined' && FRUTLV[ID]) || null;
+  const BOX = FU.BOX, CEN = FU.CEN, NAMES = FU.NAMES, SUB = FU.SUB;
   const FRUIT = [
-    { n: 'Cereza', r: 12, c: '#ff5470', d: 'stem' }, { n: 'Fresa', r: 16, c: '#ff3f6e', d: 'seeds' },
-    { n: 'Uva', r: 21, c: '#a097ff', d: 'stem' }, { n: 'Mandarina', r: 26, c: '#ff9a3d', d: 'wedge' },
-    { n: 'Naranja', r: 32, c: '#ff7a1f', d: 'wedge' }, { n: 'Kiwi', r: 39, c: '#a8cf3f', d: 'seeds' },
-    { n: 'Manzana', r: 47, c: '#ff4d5e', d: 'stem' }, { n: 'Pomelo', r: 56, c: '#ff6fb5', d: 'wedge' },
-    { n: 'Melocotón', r: 66, c: '#ffb36b', d: 'stem' }, { n: 'Melón', r: 77, c: '#d6e86a', d: 'stripe' },
-    { n: 'Sandía', r: 89, c: '#5bbd63', d: 'stripe' },
+    { r: 12, c: '#ff5470', d: 'stem' }, { r: 16, c: '#ff3f6e', d: 'seeds' }, { r: 21, c: '#a097ff', d: 'stem' },
+    { r: 26, c: '#ff9a3d', d: 'wedge' }, { r: 32, c: '#ff7a1f', d: 'wedge' }, { r: 39, c: '#a8cf3f', d: 'seeds' },
+    { r: 47, c: '#ff4d5e', d: 'stem' }, { r: 56, c: '#ff6fb5', d: 'wedge' }, { r: 66, c: '#ffb36b', d: 'stem' },
+    { r: 77, c: '#d6e86a', d: 'stripe' }, { r: 89, c: '#5bbd63', d: 'stripe' },
   ];
-  const PLAN = [
-    { n: 'Polvo', r: 10, c: '#b9b4d6', d: 'rock' }, { n: 'Asteroide', r: 13, c: '#8f89b5', d: 'rock' },
-    { n: 'Luna', r: 17, c: '#dfe2f2', d: 'rock' }, { n: 'Mercurio', r: 21, c: '#c08a5a', d: 'rock' },
-    { n: 'Marte', r: 26, c: '#e0674a', d: 'rock' }, { n: 'Tierra', r: 32, c: '#5b8cff', d: 'earth' },
-    { n: 'Neptuno', r: 39, c: '#5fc7ff', d: 'bands' }, { n: 'Júpiter', r: 47, c: '#ffc94d', d: 'bands' },
-    { n: 'Saturno', r: 56, c: '#ffd9a0', d: 'ring' }, { n: 'Enana roja', r: 66, c: '#ff7a59', d: 'star' },
-    { n: 'Estrella', r: 78, c: '#fff1a8', d: 'star' },
-  ];
-  const T = SOLAR ? PLAN : FRUIT;
-  /* Dificultad: cuántos tamaños distintos pueden salir (menos variedad = más fácil fusionar). */
-  const MS = () => k.clamp((SOLAR ? 3 : 4) + (k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0), 2, T.length - 2);
-  let B, score, best5, aim, cur, next, cool, over, danger, t, seq, spr = [];
+  const D3 = (v, def) => (Array.isArray(v) ? v[k.dif] : (v == null ? def : v));
+  let free = !HF, wantFree = false, addFree = () => {};
+  let S = null, LV = null, M = null, seq = [], used = 0, aim = W / 2, cool = 0, over = 0, won = 0, wonT = 0, t = 0, acc = 0;
+  let secT = 0, undoLeft = 0, undoUsed = 0, snap = null, stars = 0, outT = 0, tip = '', tipT = 0, cur = 0, nxt = 0;
+  let flo = [], flashT = 0, flashC = '#fff', bonus = 0, best0 = 0, jarCv = null, goalShown = 0, warnT = 0;
+  let OX = 0, OY = 0, SIDE = 0, UP = 0;
+  function relayout() { OX = Math.round(k.ox); OY = Math.round(k.oy); const m = (k.W - W) / 2; SIDE = m >= 148 ? Math.min(206, m - 10) : 0; UP = Math.round(Math.min(30, Math.max(0, (k.H - H) / 2 - 6))); }
+  k.onSize = relayout; relayout();
+  function fl(txt, x, y, col, s) { if (flo.length < 40) flo.push({ txt: String(txt), x: x + OX, y: y + OY, col: col || '#fff', t: 0.95, s: s || 18 }); }
+  function flash(col, dur) { flashC = col; flashT = dur || 0.2; }
 
-  for (let i = 0; i < T.length; i++) spr.push(sprite(i));
-  function sprite(i) {
-    const o = T[i], r = o.r, S = r * 2 + 10;
-    return off(S, S, (g) => {
-      g.translate(S / 2, S / 2);
-      if (o.d === 'ring') { g.save(); g.rotate(-0.35); g.beginPath(); g.ellipse(0, 0, r * 1.5, r * 0.42, 0, 0, TAU); g.lineWidth = r * 0.22; g.strokeStyle = ART.dark('#ffd9a0', 0.25); g.stroke(); g.restore(); }
+  /* ---------- sprites (cacheados; pieza única R5 §8: cuerpo + rabito + hoja = una silueta) ---------- */
+  const spr = [[], []];
+  function fruitSprite(i, worried) {
+    const o = FRUIT[i], r = o.r, S0 = Math.ceil(r * 2.6 + 10);
+    return off(S0, S0, (g) => {
+      g.translate(S0 / 2, S0 / 2);
       contact(g, 0, r * 0.9, r * 0.8, r * 0.2, 0.26);
-      const bparts = [[(h) => { h.moveTo(r, 0); h.arc(0, 0, r, 0, TAU); }, o.c]];
-      uni(g, bparts, 1.6);
-      celp(g, bparts, o.c, r * 0.4, r * 0.4);
+      const body = [(h) => { h.moveTo(r, 0); h.arc(0, 0, r, 0, TAU); }, o.c];
+      const parts = [body];
+      if (o.d === 'stem') {
+        const sw = Math.max(1.6, r * 0.07);
+        parts.push([(h) => { h.moveTo(-sw, -r + 3); h.lineTo(r * 0.1 - sw, -r * 1.24); h.lineTo(r * 0.1 + sw, -r * 1.26); h.lineTo(sw, -r + 3); h.closePath(); }, '#7a4a2a']);
+        parts.push([(h) => { h.ellipse(r * 0.34, -r * 1.14, r * 0.28, r * 0.13, -0.45, 0, TAU); }, '#5ccf5a']);
+      } else if (o.d === 'wedge' || o.d === 'seeds') {
+        parts.push([(h) => { h.ellipse(r * 0.12, -r * 0.98, r * 0.22, r * 0.1, -0.3, 0, TAU); }, '#5ccf5a']);
+      }
+      uni(g, parts, 1.6);
+      celp(g, [body], o.c, r * 0.4, r * 0.4);
       g.save(); g.beginPath(); g.arc(0, 0, r - 1, 0, TAU); g.clip();
-      const D = ART.dark(o.c, 0.34), L = ART.lite(o.c, 0.4);
+      const D = ART.dark(o.c, 0.34);
       if (o.d === 'stripe') { g.strokeStyle = D; g.lineWidth = r * 0.17; for (let j = -3; j <= 3; j++) { g.beginPath(); g.moveTo(j * r * 0.42, -r); g.quadraticCurveTo(j * r * 0.55, 0, j * r * 0.42, r); g.stroke(); } }
-      else if (o.d === 'seeds') { g.fillStyle = D; for (let j = 0; j < 9; j++) { const a = j * 0.7, rr = r * (0.3 + (j % 3) * 0.22); g.beginPath(); g.ellipse(Math.cos(a) * rr, Math.sin(a) * rr, r * 0.07 + 1, r * 0.11 + 1.4, a, 0, TAU); g.fill(); } }
-      else if (o.d === 'wedge') { g.strokeStyle = ART.alpha('#ffffff', 0.35); g.lineWidth = 2; for (let j = 0; j < 6; j++) { g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(j * 1.05) * r, Math.sin(j * 1.05) * r); g.stroke(); } }
-      else if (o.d === 'bands') { g.fillStyle = ART.alpha(D, 0.55); for (let j = -2; j <= 2; j++) { g.beginPath(); g.ellipse(0, j * r * 0.42, r, r * 0.13, 0, 0, TAU); g.fill(); } }
-      else if (o.d === 'earth') { g.fillStyle = '#a8cf3f'; g.beginPath(); g.ellipse(-r * 0.25, -r * 0.1, r * 0.42, r * 0.3, 0.4, 0, TAU); g.fill(); g.beginPath(); g.ellipse(r * 0.35, r * 0.35, r * 0.3, r * 0.22, -0.3, 0, TAU); g.fill(); }
-      else if (o.d === 'rock') { g.fillStyle = ART.alpha(D, 0.7); for (let j = 0; j < 5; j++) { const a = j * 1.4, rr = r * 0.55; g.beginPath(); g.arc(Math.cos(a) * rr, Math.sin(a) * rr, r * (0.1 + R2(i * 7 + j) * 0.12), 0, TAU); g.fill(); } }
-      else if (o.d === 'star') { g.fillStyle = ART.alpha(L, 0.8); for (let j = 0; j < 7; j++) { const a = j * 0.9; g.beginPath(); g.arc(Math.cos(a) * r * 0.5, Math.sin(a) * r * 0.5, r * 0.16, 0, TAU); g.fill(); } }
+      else if (o.d === 'seeds') { g.fillStyle = D; for (let j = 0; j < 9; j++) { const a = j * 0.7, rr = r * (0.3 + (j % 3) * 0.22); g.beginPath(); g.ellipse(Math.cos(a) * rr, Math.sin(a) * rr, r * 0.06 + 0.8, r * 0.1 + 1.2, a, 0, TAU); g.fill(); } }
+      else if (o.d === 'wedge') { g.fillStyle = ART.dark(o.c, 0.12); for (let j = 0; j < 14; j++) { const a = j * 2.4, rr = r * (0.25 + R2(j + i * 3) * 0.6); g.beginPath(); g.arc(Math.cos(a) * rr, Math.sin(a) * rr, Math.max(0.8, r * 0.045), 0, TAU); g.fill(); } }
       g.restore();
+      for (let j = 2; j < parts.length; j++) { g.fillStyle = ART.dark('#5ccf5a', 0.28); g.beginPath(); g.ellipse(r * (o.d === 'stem' ? 0.38 : 0.15), -r * (o.d === 'stem' ? 1.1 : 0.96), r * 0.16, r * 0.04, -0.4, 0, TAU); g.fill(); }
       spec(g, -r * 0.33, -r * 0.4, r * 0.28, r * 0.17, -0.6, 0.62);
-      if (!SOLAR && (o.d === 'stem')) { g.strokeStyle = '#7a4a2a'; g.lineWidth = Math.max(2, r * 0.09); g.lineCap = 'round'; g.beginPath(); g.moveTo(0, -r + 2); g.lineTo(r * 0.12, -r - r * 0.22); g.stroke(); g.beginPath(); g.ellipse(r * 0.3, -r - r * 0.16, r * 0.26, r * 0.12, -0.45, 0, TAU); ART.fillOut(g, '#5ccf5a', 1.8); }
-      // carita amable en las piezas grandes
-      if (r >= 26) {
-        const ey = r * 0.1;
-        for (const s of [-1, 1]) { g.fillStyle = '#fff'; g.beginPath(); g.arc(s * r * 0.3, ey, r * 0.13, 0, TAU); g.fill(); g.fillStyle = OUT; g.beginPath(); g.arc(s * r * 0.3 + r * 0.04, ey, r * 0.07, 0, TAU); g.fill(); }
-        g.strokeStyle = OUT; g.lineWidth = Math.max(1.8, r * 0.05); g.lineCap = 'round'; g.beginPath(); g.arc(0, ey + r * 0.12, r * 0.22, 0.5, 2.64); g.stroke();
+      // cara: párpado recto, ceja y boca; preocupada cuando el tarro está a punto de rebosar
+      if (r >= 16) {
+        const ey = r * 0.08, er = Math.max(2.2, r * 0.13);
+        for (const s of [-1, 1]) {
+          g.fillStyle = '#fff'; g.beginPath(); g.arc(s * r * 0.3, ey, er, 0, TAU); g.fill();
+          g.fillStyle = OUT; g.beginPath(); g.arc(s * r * 0.3 + er * 0.25, ey + (worried ? -er * 0.2 : er * 0.15), er * 0.55, 0, TAU); g.fill();
+          g.fillStyle = o.c; g.fillRect(s * r * 0.3 - er - 1, ey - er - 1, er * 2 + 2, er * (worried ? 0.55 : 0.75));
+          g.strokeStyle = OUT; g.lineWidth = Math.max(1.2, r * 0.05); g.lineCap = 'round'; g.beginPath();
+          if (worried) { g.moveTo(s * r * 0.15, ey - er * 1.25); g.lineTo(s * r * 0.45, ey - er * 1.7); }
+          else { g.moveTo(s * r * 0.17, ey - er * 1.3); g.lineTo(s * r * 0.43, ey - er * 1.3); }
+          g.stroke();
+        }
+        g.strokeStyle = OUT; g.lineWidth = Math.max(1.3, r * 0.05); g.lineCap = 'round'; g.beginPath();
+        if (worried) { g.ellipse(0, ey + r * 0.33, r * 0.1, r * 0.08, 0, 0, TAU); g.fillStyle = OUT; g.fill(); }
+        else { g.arc(0, ey + r * 0.12, r * 0.2, 0.5, 2.64); g.stroke(); }
       }
     });
   }
-  const bg = off(W, H, (g) => {
-    const gr = g.createLinearGradient(0, 0, 0, H);
-    if (SOLAR) { gr.addColorStop(0, '#191140'); gr.addColorStop(1, '#070515'); } else { gr.addColorStop(0, '#3a2b63'); gr.addColorStop(1, '#1a1230'); }
-    g.fillStyle = gr; g.fillRect(0, 0, W, H);
-    if (SOLAR) { g.fillStyle = 'rgba(255,255,255,.7)'; for (let i = 0; i < 70; i++) { const s = R2(i) * 1.6 + 0.4; g.globalAlpha = 0.3 + R2(i + 5) * 0.6; g.beginPath(); g.arc(R2(i + 11) * W, R2(i + 23) * H, s, 0, TAU); g.fill(); } g.globalAlpha = 1; }
-    else { g.fillStyle = 'rgba(255,255,255,.04)'; for (let i = 0; i < 26; i++) { g.beginPath(); g.arc(R2(i) * W, R2(i + 3) * H, 8 + R2(i + 9) * 22, 0, TAU); g.fill(); } }
+  const sprOf = (i, w) => spr[w][i] || (spr[w][i] = fruitSprite(i, w));
+  for (let i = 0; i < FRUIT.length; i++) sprOf(i, 0);
+  const iceSpr = [];
+  const iceOf = (i) => iceSpr[i] || (iceSpr[i] = (() => {
+    const r = FRUIT[i].r + 6, S0 = Math.ceil(r * 2 + 12);
+    return off(S0, S0, (g) => {
+      g.translate(S0 / 2, S0 / 2);
+      const parts = [[(h) => ART.rr(h, -r, -r, r * 2, r * 2, r * 0.35), 'rgba(190,232,255,.5)']];
+      g.lineJoin = 'round'; g.lineWidth = 3; g.strokeStyle = OUT; g.beginPath(); parts[0][0](g); g.stroke();
+      g.fillStyle = parts[0][1]; g.beginPath(); parts[0][0](g); g.fill();
+      g.lineWidth = 2; g.strokeStyle = 'rgba(235,250,255,.9)'; g.beginPath(); ART.rr(g, -r + 3, -r + 3, r * 2 - 6, r * 2 - 6, r * 0.3); g.stroke();
+      g.fillStyle = 'rgba(255,255,255,.55)';
+      g.beginPath(); g.moveTo(-r * 0.7, -r * 0.2); g.lineTo(-r * 0.2, -r * 0.75); g.lineTo(0, -r * 0.55); g.lineTo(-r * 0.5, 0); g.closePath(); g.fill();
+      g.beginPath(); g.moveTo(r * 0.3, r * 0.3); g.lineTo(r * 0.7, -r * 0.05); g.lineTo(r * 0.6, r * 0.45); g.closePath(); g.fill();
+    });
+  })());
+  const SPS = Math.ceil(FU.SR * 2 + 12);
+  const stoneSpr = off(SPS, SPS, (g) => {
+    g.translate(SPS / 2, SPS / 2); const R0 = FU.SR;
+    contact(g, 0, R0 * 0.9, R0 * 0.8, R0 * 0.2, 0.3);
+    const parts = [[(h) => { h.moveTo(R0, 0); for (let i = 1; i <= 9; i++) { const a = i * TAU / 9, rr = R0 * (0.86 + 0.14 * ((i * 5) % 3) / 2); h.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } h.closePath(); }, '#8f89b5']];
+    uni(g, parts, 1.6); celp(g, parts, '#8f89b5', R0 * 0.4, R0 * 0.4);
+    g.strokeStyle = 'rgba(30,22,60,.5)'; g.lineWidth = 1.8; g.lineCap = 'round'; g.beginPath(); g.moveTo(-R0 * 0.45, -R0 * 0.1); g.lineTo(0, R0 * 0.25); g.lineTo(R0 * 0.4, -R0 * 0.1); g.stroke();
+    spec(g, -R0 * 0.32, -R0 * 0.42, R0 * 0.24, R0 * 0.14, -0.6, 0.45);
   });
-
-  function reset() {
-    B = []; score = 0; over = 0; danger = 0; t = 0; cool = 0; seq = 0;
-    aim = SOLAR ? -1.5708 : W / 2;
-    cur = k.ri(0, MS() - 1); next = k.ri(0, MS() - 1);
-  }
-  function add(tier, x, y, vx, vy) { const b = { t: tier, r: T[tier].r, x, y, vx: vx || 0, vy: vy || 0, age: 0, pop: 0, id: ++seq }; B.push(b); return b; }
-  function drop() {
-    if (cool > 0 || over) return;
-    if (SOLAR) { const r = CEN.R - T[cur].r - 2; add(cur, CEN.x + Math.cos(aim) * r, CEN.y + Math.sin(aim) * r, -Math.cos(aim) * 60, -Math.sin(aim) * 60); }
-    else add(cur, k.clamp(aim, BOX.l + T[cur].r + 1, BOX.r - T[cur].r - 1), BOX.top - 26, 0, 40);
-    cur = next; next = k.ri(0, MS() - 1); cool = 0.45; k.sfx('pop');
-  }
-  /* ---------- física: pasos fijos, impulsos amortiguados y recorte dentro del recipiente ---------- */
-  function clampIn(b) {
-    if (SOLAR) {
-      const dx = b.x - CEN.x, dy = b.y - CEN.y; let d = Math.hypot(dx, dy);
-      if (d < 1e-4) { b.x += 0.1; d = 0.1; }
-      const nx = dx / d, ny = dy / d, out = CEN.R - b.r, inn = CEN.sun + b.r;
-      if (d > out) { b.x = CEN.x + nx * out; b.y = CEN.y + ny * out; const vn = b.vx * nx + b.vy * ny; if (vn > 0) { b.vx -= vn * 1.35 * nx; b.vy -= vn * 1.35 * ny; } }
-      else if (d < inn) { b.x = CEN.x + nx * inn; b.y = CEN.y + ny * inn; const vn = b.vx * nx + b.vy * ny; if (vn < 0) { b.vx -= vn * 1.35 * nx; b.vy -= vn * 1.35 * ny; } }
-    } else {
-      if (b.x < BOX.l + b.r) { b.x = BOX.l + b.r; if (b.vx < 0) b.vx *= -0.25; }
-      if (b.x > BOX.r - b.r) { b.x = BOX.r - b.r; if (b.vx > 0) b.vx *= -0.25; }
-      if (b.y > BOX.bot - b.r) { b.y = BOX.bot - b.r; if (b.vy > 0) b.vy *= -0.18; b.vx *= 0.9; }
-      if (b.y < -200) b.y = -200;
-    }
-    const sp = Math.hypot(b.vx, b.vy);
-    if (sp > MAXV) { b.vx *= MAXV / sp; b.vy *= MAXV / sp; }
-    if (!isFinite(b.x) || !isFinite(b.y)) { b.x = SOLAR ? CEN.x : (BOX.l + BOX.r) / 2; b.y = SOLAR ? CEN.y - CEN.sun - b.r - 1 : BOX.bot - b.r; b.vx = b.vy = 0; }
-  }
-  function merges() {
-    for (let i = 0; i < B.length; i++) for (let j = i + 1; j < B.length; j++) {
-      const a = B[i], b = B[j];
-      if (a.t !== b.t || a.t >= T.length - 1 || a.dead || b.dead || a.age < 0.08 || b.age < 0.08) continue;
-      const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
-      if (d > a.r + b.r + 0.6) continue;                 // fusiona al tocarse: el solver deja las piezas justo en contacto
-      a.dead = b.dead = true;
-      const nt = a.t + 1, n = add(nt, (a.x + b.x) / 2, (a.y + b.y) / 2, (a.vx + b.vx) / 2, (a.vy + b.vy) / 2);
-      clampIn(n); n.pop = 1; const pts = (nt + 1) * (nt + 2) / 2; score += pts;
-      k.burst(n.x, n.y, T[nt].c, 12, 150); k.float('+' + pts, n.x, n.y - n.r - 8, '#ffd166');
-      k.sfx(nt >= 7 ? 'win' : 'coin'); if (nt >= 6) k.shake(3);
-      if (nt === T.length - 1) { k.confetti(T[nt].c, 40); k.flash('rgba(255,255,255,.25)'); }
-    }
-    if (B.some((b) => b.dead)) B = B.filter((b) => !b.dead);
-  }
-  function step(dt) {
-    for (const b of B) {
-      b.age += dt;
-      if (SOLAR) { const dx = CEN.x - b.x, dy = CEN.y - b.y, d = Math.hypot(dx, dy) || 1; b.vx += dx / d * GS * dt; b.vy += dy / d * GS * dt; }
-      else b.vy += G0 * dt;
-      const dg = Math.pow(0.999, dt * 60); b.vx *= dg; b.vy *= dg;
-      b.x += b.vx * dt; b.y += b.vy * dt;
-      clampIn(b);
-    }
-    for (let it = 0; it < ITER; it++) {
-      for (let i = 0; i < B.length; i++) for (let j = i + 1; j < B.length; j++) {
-        const a = B[i], b = B[j], dx = b.x - a.x, dy = b.y - a.y;
-        let d = Math.hypot(dx, dy); const sum = a.r + b.r;
-        if (d >= sum || d < 1e-6) { if (d < 1e-6) { b.x += 0.3; b.y -= 0.3; } continue; }
-        const nx = dx / d, ny = dy / d, ov = sum - d;
-        const ma = a.r * a.r, mb = b.r * b.r, tot = ma + mb;
-        const corr = Math.max(0, ov - 0.05) * 0.85;
-        a.x -= nx * corr * (mb / tot); a.y -= ny * corr * (mb / tot);
-        b.x += nx * corr * (ma / tot); b.y += ny * corr * (ma / tot);
-        if (it === 0) {           // impulso normal con restitución baja y rozamiento tangencial
-          const rvx = b.vx - a.vx, rvy = b.vy - a.vy, vn = rvx * nx + rvy * ny;
-          if (vn < 0) {
-            const jn = -(1 + 0.08) * vn / (1 / ma + 1 / mb);
-            a.vx -= jn * nx / ma; a.vy -= jn * ny / ma; b.vx += jn * nx / mb; b.vy += jn * ny / mb;
-            const tx = -ny, ty = nx, vt = (b.vx - a.vx) * tx + (b.vy - a.vy) * ty, jt = -vt * 0.22 / (1 / ma + 1 / mb);
-            a.vx -= jt * tx / ma; a.vy -= jt * ty / ma; b.vx += jt * tx / mb; b.vy += jt * ty / mb;
-          }
+  const BPS = Math.ceil(FU.BR * 2 + 22);
+  const bombSpr = off(BPS, BPS, (g) => {
+    g.translate(BPS / 2, BPS / 2 + 3); const R0 = FU.BR;
+    contact(g, 0, R0 * 0.9, R0 * 0.8, R0 * 0.2, 0.3);
+    const parts = [
+      [(h) => { h.moveTo(-3, -R0 * 0.85); h.lineTo(-3, -R0 * 1.2); h.lineTo(3, -R0 * 1.2); h.lineTo(3, -R0 * 0.85); h.closePath(); }, '#5a4d8a'],
+      [(h) => { h.moveTo(R0, 0); h.arc(0, 0, R0, 0, TAU); }, '#3b3163'],
+    ];
+    uni(g, parts, 1.6); celp(g, [parts[1]], '#3b3163', R0 * 0.4, R0 * 0.4);
+    g.strokeStyle = '#c99a5a'; g.lineWidth = 2; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, -R0 * 1.2); g.quadraticCurveTo(R0 * 0.4, -R0 * 1.6, R0 * 0.7, -R0 * 1.35); g.stroke();
+    g.fillStyle = '#ffd166'; g.beginPath(); for (let i = 0; i < 8; i++) { const a = -1.5708 + i * TAU / 8, rr = i % 2 ? R0 * 0.18 : R0 * 0.48; g[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rr, Math.sin(a) * rr + 1); } g.closePath(); g.fill();
+    spec(g, -R0 * 0.36, -R0 * 0.42, R0 * 0.24, R0 * 0.14, -0.6, 0.5);
+  });
+  /* ---------- decorado ---------- */
+  const sky = off(180, 320, (g) => {
+    const gr = g.createLinearGradient(0, 0, 0, 320); gr.addColorStop(0, '#3a2b63'); gr.addColorStop(0.6, '#261c45'); gr.addColorStop(1, '#16102c');
+    g.fillStyle = gr; g.fillRect(0, 0, 180, 320);
+    g.fillStyle = 'rgba(255,255,255,.035)';
+    for (let i = 0; i < 26; i++) { g.beginPath(); g.arc(R2(i) * 180, R2(i + 3) * 320, 4 + R2(i + 9) * 11, 0, TAU); g.fill(); }
+  });
+  /* Hojitas que flotan (fondo vivo, §B9): desaturadas para no competir con la fruta. */
+  const amb = []; for (let i = 0; i < 10; i++) amb.push({ x: R2(i + 40) * 400, y: R2(i + 45) * 700, v: 10 + R2(i + 50) * 16, s: 4 + R2(i + 55) * 6, a: R2(i + 60) * TAU, w: 0.6 + R2(i + 65) });
+  /* Tarro horneado por nivel: cristal, forma, clavijas y repisas; o el plato del Exprimidor. */
+  function bakeJar() {
+    jarCv = off(W, H, (g) => {
+      if (S.orb) {
+        g.beginPath(); g.arc(CEN.x, CEN.y, CEN.R + 8, 0, TAU); g.fillStyle = 'rgba(12,8,28,.4)'; g.fill();
+        g.lineWidth = 9; g.strokeStyle = 'rgba(160,151,255,.42)'; g.stroke();
+        g.beginPath(); g.arc(CEN.x, CEN.y, CEN.R + 2, 0, TAU); g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.18)'; g.stroke();
+        for (let i = 0; i < 24; i++) { const a = i * TAU / 24; g.beginPath(); g.arc(CEN.x + Math.cos(a) * (CEN.R - 20), CEN.y + Math.sin(a) * (CEN.R - 20), 1.6, 0, TAU); g.fillStyle = 'rgba(255,255,255,.08)'; g.fill(); }
+        // el exprimidor: cúpula estriada de una pieza (R5 §8), separaciones por tono
+        const sr = CEN.sun, base = '#ffd23d';
+        g.fillStyle = 'rgba(255,210,61,.12)'; g.beginPath(); g.arc(CEN.x, CEN.y, sr * 1.9, 0, TAU); g.fill();
+        g.save(); g.translate(CEN.x, CEN.y);
+        const parts = [[(h) => { h.moveTo(sr, 0); for (let i = 1; i <= 24; i++) { const a = i * TAU / 24, rr = i % 2 ? sr * 0.9 : sr; h.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } h.closePath(); }, base]];
+        uni(g, parts, 1.8); celp(g, parts, base, sr * 0.4, sr * 0.4);
+        g.strokeStyle = ART.dark(base, 0.3); g.lineWidth = 1.4; for (let i = 0; i < 8; i++) { const a = i * TAU / 8; g.beginPath(); g.moveTo(Math.cos(a) * sr * 0.3, Math.sin(a) * sr * 0.3); g.lineTo(Math.cos(a) * sr * 0.85, Math.sin(a) * sr * 0.85); g.stroke(); }
+        spec(g, -sr * 0.3, -sr * 0.35, sr * 0.22, sr * 0.13, -0.6, 0.6);
+        g.restore();
+      } else {
+        g.fillStyle = 'rgba(12,8,28,.38)'; ART.rr(g, BOX.l - 10, S.line - 6, BOX.r - BOX.l + 20, BOX.bot - S.line + 16, 22); g.fill();
+        ART.rr(g, BOX.l - 10, S.line - 6, BOX.r - BOX.l + 20, BOX.bot - S.line + 16, 22); g.lineWidth = 8; g.strokeStyle = 'rgba(160,151,255,.42)'; g.stroke();
+        g.fillStyle = 'rgba(255,255,255,.07)'; ART.rr(g, BOX.l - 3, S.line + 8, 6, BOX.bot - S.line - 16, 3); g.fill();
+        g.fillStyle = 'rgba(255,255,255,.04)'; ART.rr(g, BOX.r - 6, S.line + 40, 4, BOX.bot - S.line - 80, 2); g.fill();
+      }
+      // repisas y formas del tarro: tablón de una pieza; clavijas: tetón de madera
+      for (const s of S.segs) {
+        const peg = s[0] === s[2] && s[1] === s[3];
+        if (peg) {
+          const parts = [[(h) => { h.moveTo(s[0] + s[4], s[1]); h.arc(s[0], s[1], s[4], 0, TAU); }, '#c98b52']];
+          uni(g, parts, 1.5); celp(g, parts, '#c98b52', s[4] * 0.45, s[4] * 0.45);
+          spec(g, s[0] - s[4] * 0.3, s[1] - s[4] * 0.35, s[4] * 0.3, s[4] * 0.18, -0.6, 0.55);
+        } else {
+          g.lineCap = 'round'; g.lineWidth = s[4] * 2 + 3.4; g.strokeStyle = OUT; g.beginPath(); g.moveTo(s[0], s[1]); g.lineTo(s[2], s[3]); g.stroke();
+          g.lineWidth = s[4] * 2; g.strokeStyle = '#b97a45'; g.stroke();
+          g.lineWidth = Math.max(1.5, s[4] * 0.7); g.strokeStyle = ART.lite('#b97a45', 0.25); g.beginPath(); g.moveTo(s[0], s[1] - s[4] * 0.4); g.lineTo(s[2], s[3] - s[4] * 0.4); g.stroke();
         }
       }
-      for (const b of B) clampIn(b);
-    }
-    merges();
+    });
   }
-  function outside(b) {
-    if (SOLAR) return Math.hypot(b.x - CEN.x, b.y - CEN.y) + b.r > CEN.R + 1.5;
-    return b.x - b.r < BOX.l - 1.5 || b.x + b.r > BOX.r + 1.5 || b.y + b.r > BOX.bot + 1.5;
+  /* ---------- partida ---------- */
+  function common() {
+    over = 0; won = 0; wonT = 0; t = 0; acc = 0; cool = 0.3; flo = []; flashT = 0; outT = 0; used = 0; bonus = 0; snap = null; undoUsed = 0;
+    stars = 0; goalShown = 0; warnT = 0; k.chainReset();
   }
-  function peril() {
-    // pieza quieta rozando el borde de salida (aro exterior o boca del tarro)
-    for (const b of B) {
-      if (b.age < 1.2 || Math.hypot(b.vx, b.vy) > 45) continue;
-      if (SOLAR) { if (Math.hypot(b.x - CEN.x, b.y - CEN.y) + b.r > CEN.R - 6) return true; }
-      else if (b.y - b.r < BOX.top + 4) return true;
+  function freeReset() {
+    LV = null; M = null; free = true; common();
+    S = FU.world({ orb: MODE === 'solar' }, k.dif); S.tol = 2.2;
+    const ms = k.clamp(4 + (k.dif === 0 ? -1 : k.dif === 2 ? 1 : 0), 2, FRUIT.length - 2);
+    seq = { ms }; cur = k.ri(0, ms - 1); nxt = k.ri(0, ms - 1);
+    aim = S.orb ? -1.5708 : W / 2; secT = 0; undoLeft = 0; tip = ''; tipT = 0;
+    best0 = k.best(ID, 0); bakeJar();
+  }
+  function loadLevel(i) {
+    LV = HF[k.clamp(i | 0, 1, HF.length) - 1]; free = false; common();
+    M = FU.margins(LV, k.dif);
+    S = FU.load(LV, k.dif);
+    seq = FU.seqOf(LV, M.n); cur = seq[0]; nxt = seq[1];
+    aim = S.orb ? -1.5708 : W / 2; secT = M.sec; undoLeft = M.undo;
+    tip = LV.tip || ''; tipT = tip ? 5 : 0; bakeJar();
+  }
+  function reset() { if (HF && !free) loadLevel(k.lv); else freeReset(); }
+  const left = () => (M ? M.n - used : 0);
+  function drop() {
+    if (cool > 0 || over || won || k.st !== 'play') return;
+    if (M && used >= M.n) return;
+    if (M) snap = { S: FU.clone(S), used, secT };
+    const b = FU.drop(S, cur, aim); b.pop = 0.6;
+    used++; cool = 0.45; k.sfx('pop');
+    if (M) { cur = used < M.n ? seq[used] : -9; nxt = used + 1 < M.n ? seq[used + 1] : -9; }
+    else { cur = nxt; nxt = k.ri(0, seq.ms - 1); }
+  }
+  function undo() {
+    if (!M || !snap || undoLeft <= 0 || over || won || k.st !== 'play') return;
+    S = snap.S; used = snap.used; snap = null; undoLeft--; undoUsed = 1;
+    cur = seq[used]; nxt = used + 1 < M.n ? seq[used + 1] : -9; cool = 0.3; outT = 0;
+    k.sfx('click'); fl('Deshecho', W / 2, S.line - 60, '#a097ff', 18); flash('rgba(160,151,255,.18)', 0.18);
+  }
+  const have = () => (LV ? FU.have(S, LV) : 0);
+  /* Fruta más grande que hay ahora en el tarro (las heladas no cuentan): la meta del «consigue». */
+  function biggest() { let m = Math.max(0, S.top); for (const b of S.b) if (b.t > m && !b.fz) m = b.t; return m; }
+  const done = () => (LV ? FU.done(S, LV, k.dif) : false);
+  function starsNow() { if (!M || used > M.par2) return 1; return (used <= M.par3 && !undoUsed && !S.warned) ? 3 : 2; }
+  function starHint() {
+    if (used > M.par2) return 'A por la siguiente';
+    if (S.warned) return '3★: sin que rebose';
+    if (undoUsed) return '3★: sin deshacer';
+    if (used > M.par3) return `2★ hasta ${M.par2} frutas`;
+    return `3★ hasta ${M.par3} frutas`;
+  }
+  function goalText() {
+    if (!LV) return '';
+    const g = LV.goal;
+    if (g === 'reach') return 'Consigue: ' + NAMES[LV.tier];
+    if (g === 'make') return `Haz ${M.need} · ${NAMES[LV.tier]}`;
+    if (g === 'score') return `Suma ${M.need} puntos`;
+    if (g === 'thaw') return 'Libera las congeladas';
+    if (g === 'stones') return `Rompe ${M.need} piedras`;
+    return '';
+  }
+  function missText() {
+    if (!LV) return '';
+    const g = LV.goal, m = Math.max(0, M.need - have());
+    if (g === 'reach') { const tp = Math.max(S.top, ...S.b.filter((b) => b.t >= 0).map((b) => b.t), 0); return `Llegaste a ${NAMES[tp]}: te faltaba${LV.tier - tp === 1 ? '' : 'n'} ${LV.tier - tp} paso${LV.tier - tp === 1 ? '' : 's'}`; }
+    if (g === 'make') return `Te faltaba${m === 1 ? '' : 'n'} ${m} · ${NAMES[LV.tier]}`;
+    if (g === 'score') return `Te faltaron ${m} puntos`;
+    if (g === 'thaw') return `Quedaba${m === 1 ? '' : 'n'} ${m} congelada${m === 1 ? '' : 's'}`;
+    if (g === 'stones') return `Te faltaba${m === 1 ? '' : 'n'} ${m} piedra${m === 1 ? '' : 's'}`;
+    return '';
+  }
+  /* ---------- efectos de los partes de FU (§B7, §B8) ---------- */
+  function fx() {
+    for (const e of S.ev) {
+      if (e.k === 'merge') {
+        const col = FRUIT[e.t].c;
+        k.burst(e.x + OX, e.y + OY, col, 8 + e.t * 2, 120 + e.t * 12);
+        fl('+' + e.pts, e.x, e.y - FRUIT[e.t].r - 10, e.mult > 1 ? '#ffd166' : '#fff', 16 + Math.min(8, e.t));
+        k.chime(Math.min(10, e.chain - 1));
+        if (e.chain >= 2) fl('x' + e.mult + ' cadena', e.x + 30, e.y - FRUIT[e.t].r - 32, e.mult >= 3 ? '#ff5fa2' : '#7cf7a0', 14);
+        k.sfx(e.t >= 7 ? 'win' : 'coin');
+        if (e.t >= 5) k.hitstop(0.035 + Math.min(0.05, (e.t - 5) * 0.012));
+        if (e.t >= 6) { k.punch(0.04 + Math.min(0.08, (e.t - 6) * 0.015)); k.shake(2 + e.t - 6); }
+        if (e.first && e.t >= 4 && !(LV && LV.goal === 'reach' && e.t >= LV.tier)) k.reward('¡' + NAMES[e.t].toUpperCase() + '!', col);
+        if (e.t === FRUIT.length - 1) { k.confetti(col, 60); flash('rgba(255,255,255,.3)', 0.25); }
+      } else if (e.k === 'thaw') {
+        k.burst(e.x + OX, e.y + OY, '#cfeeff', 14, 160); k.sfx('pop'); fl('¡Libre!', e.x, e.y - 30, '#9fe6ff', 17);
+        if (LV && LV.goal === 'thaw') k.reward(`¡LIBRE ${S.thawed}/${M.need}!`, '#9fe6ff');
+      } else if (e.k === 'stone') {
+        k.burst(e.x + OX, e.y + OY, '#b9b4d6', 16, 200); fl('+40', e.x, e.y - 24, '#ffd166', 16);
+        if (LV && LV.goal === 'stones') k.reward(`¡PIEDRA ${S.broke}/${M.need}!`, '#d6d2ef');
+      } else if (e.k === 'boom') {
+        k.burst(e.x + OX, e.y + OY, '#ff9a3d', 26, 260); k.burst(e.x + OX, e.y + OY, '#ffd166', 14, 160);
+        k.sfx('explode'); k.shake(7); k.punch(0.07); k.hitstop(0.06); flash('rgba(255,180,90,.25)', 0.2);
+      } else if (e.k === 'zap') {
+        k.burst(e.x + OX, e.y + OY, FRUIT[e.t].c, 8, 140);
+      }
     }
-    return false;
+    S.ev.length = 0;
+  }
+  function startWin() {
+    won = 1; wonT = 0; stars = starsNow();
+    bonus = Math.max(0, left()) * 50;
+    k.sfx('win'); k.reward('¡OBJETIVO!', '#7cf7a0'); flash('rgba(160,255,190,.22)', 0.25); k.confetti(null, 50);
+  }
+  let overTitle = '';
+  function lose(title) {
+    if (over) return; over = 0.001; overTitle = title; k.sfx('lose'); k.shake(7); flash('rgba(255,90,140,.3)', 0.3);
   }
   function update(dt) {
     t += dt;
-    for (const b of B) b.pop = Math.max(0, b.pop - dt * 4);
+    for (const b of S.b) if (b.pop > 0) b.pop = Math.max(0, b.pop - dt * 4);
+    for (let i = flo.length - 1; i >= 0; i--) { const f = flo[i]; f.t -= dt; f.y -= 36 * dt; if (f.t <= 0) { flo[i] = flo[flo.length - 1]; flo.pop(); } }
+    flashT = Math.max(0, flashT - dt); tipT = Math.max(0, tipT - dt);
     if (!k.gate(reset)) return;
     cool = Math.max(0, cool - dt);
-    if (over) { over += dt; if (over > 1.1) k.lose(ID, score, SOLAR ? 'El anillo se llenó' : 'El tarro rebosa', `Mayor: ${T[Math.max(0, ...B.map((b) => b.t))].n}`); return; }
-    // control: dedo/ratón coloca la pieza (ángulo en el modo solar), cruceta y flechas la mueven
-    const p = k.ptr;
-    if (SOLAR) {
-      if (p.down || p.hit) aim = Math.atan2(p.y - CEN.y, p.x - CEN.x);
-      const d = (k.held.has('right') ? 1 : 0) - (k.held.has('left') ? 1 : 0); if (d) aim += d * 1.6 * dt;
-    } else {
-      if (p.down || p.hit) aim = p.x;
-      const d = (k.held.has('right') ? 1 : 0) - (k.held.has('left') ? 1 : 0); if (d) aim = k.clamp(aim + d * 260 * dt, BOX.l, BOX.r);
+    if (over) {
+      over += dt;
+      if (over > 1.2) {
+        if (free) k.lose(ID, S.score, S.orb ? 'El plato se llenó' : 'El tarro rebosa', `Mayor: ${NAMES[Math.max(0, S.top, ...S.b.filter((b) => b.t >= 0).map((b) => b.t))]}`);
+        else k.lose(ID, S.score, overTitle, `${missText()} · nivel ${k.lv}/${HF.length}`);
+      }
+      return;
     }
-    if (p.up || k.hit.has('a') || k.hit.has('down') || k.hit.has('up')) drop();
-    let n = 0; for (let acc = dt; acc > 0 && n < 5; acc -= SUB, n++) step(Math.min(SUB, acc));
-    if (t > 5 && peril()) { danger += dt; if (danger > 2.2) { over = 0.001; k.sfx('hurt'); k.shake(7); } } else danger = Math.max(0, danger - dt * 1.5);
+    /* física a paso fijo: la misma que juega el verificador */
+    acc = Math.min(acc + dt, SUB * 6);
+    let n = 0; while (acc >= SUB && n < 6) { FU.step(S, SUB); acc -= SUB; n++; }
+    fx();
+    if (won) {
+      wonT += dt;
+      if (wonT > 1.1 && bonus) { S.score += bonus; fl('Frutas sobrantes +' + bonus, W / 2, S.line + 40, '#ffd166', 20); k.sfx('coin'); bonus = 0; }
+      if (wonT > 1.9 && won === 1) {
+        won = 2; k.best(ID, S.score);
+        const need3 = stars < 3 ? (used > M.par3 ? ` · ★★★ con ${M.par3} frutas` : undoUsed ? ' · ★★★ sin deshacer' : ' · ★★★ sin que rebose') : '';
+        k.levelDone(S.score, `${goalText()} · ${S.score} puntos · ${used} fruta${used === 1 ? '' : 's'}${need3}`, { stars });
+      }
+      return;
+    }
+    if (S.over) { lose(free ? 'El tarro rebosa' : (S.orb ? 'El plato se llenó' : 'El tarro rebosa')); return; }
+    if (!free && done()) { startWin(); return; }
+    if (S.danger > 0.6 && warnT <= 0) { warnT = 1.2; k.sfx('hurt'); }
+    warnT -= dt;
+    // control: dedo/ratón colocan la fruta (ángulo en el Exprimidor); cruceta y flechas la mueven
+    const p = k.ptr, px = p.x - OX, py = p.y - OY;
+    const startUndo = !!(M && M.undo > 0 && Math.hypot(p.sx - ubx, p.sy - uby) < 26);
+    if ((p.down || p.hit) && !startUndo) { if (S.orb) aim = Math.atan2(py - CEN.y, px - CEN.x); else aim = px; }
+    const d = (k.held.has('right') ? 1 : 0) - (k.held.has('left') ? 1 : 0);
+    if (d) { if (S.orb) aim += d * 1.8 * dt; else aim = k.clamp(aim + d * 280 * dt, BOX.l, BOX.r); }
+    if (p.up && startUndo) undo();
+    else if (p.up || k.hit.has('a') || k.hit.has('down') || k.hit.has('up')) drop();
+    if (k.hit.has('b')) undo();
+    if (M && M.sec) { secT -= dt; if (secT <= 0) { secT = 0; lose('Se acabó el tiempo'); return; } }
+    if (M && used >= M.n) {
+      outT += dt;
+      if (outT > 4 || (outT > 1.5 && FU.calm(S))) lose('Sin frutas');
+    }
   }
-  function drawBody(b) {
-    const S = (b.r * 2 + 10) * (1 + b.pop * 0.22);
-    c.save(); c.translate(b.x, b.y);
-    if (SOLAR) c.rotate(Math.atan2(b.y - CEN.y, b.x - CEN.x) + 1.5708);
-    c.drawImage(spr[b.t], -S / 2, -S / 2, S, S); c.restore();
+  /* ---------- dibujo ---------- */
+  let ubx = -999, uby = -999;                 // centro del botón deshacer (pantalla), lo fija hud()
+  function drawBody(b, worried) {
+    let sp;
+    if (b.t === FU.STONE) sp = stoneSpr; else if (b.t === FU.BOMB) sp = bombSpr; else sp = sprOf(b.t, worried ? 1 : 0);
+    const pp = b.pop || 0, sc = pp > 0 ? 1 - 0.4 * pp + 0.18 * Math.sin((1 - pp) * Math.PI) : 1, s = sp.width / 2 * sc;
+    if (S.orb) { c.save(); c.translate(b.x, b.y); c.rotate(Math.atan2(b.y - CEN.y, b.x - CEN.x) + 1.5708); c.drawImage(sp, -s / 2, -s / 2, s, s); c.restore(); }
+    else c.drawImage(sp, b.x - s / 2, b.y - s / 2, s, s);
+    if (b.fz) { const ic = iceOf(b.t), w2 = ic.width / 2; c.drawImage(ic, b.x - w2 / 2, b.y - w2 / 2, w2, w2); }
+    if (b.t === FU.BOMB && b.fuse >= 0) {
+      const f = 0.5 + 0.5 * Math.sin(t * 40);
+      c.fillStyle = f > 0.5 ? '#fff6c2' : '#ff9a3d'; c.beginPath(); c.arc(b.x + FU.BR * 0.7, b.y - FU.BR * 1.1, 3 + f * 2, 0, TAU); c.fill();
+      c.globalAlpha = 0.3; c.strokeStyle = '#ff9a3d'; c.lineWidth = 2; c.beginPath(); c.arc(b.x, b.y, Math.max(1, FU.XR * (1 - b.fuse / 0.45)), 0, TAU); c.stroke(); c.globalAlpha = 1;
+    }
+  }
+  function bar(x, y, w2, h2, v, col) {
+    ART.rr(c, x, y, w2, h2, h2 / 2); c.fillStyle = 'rgba(12,8,28,.55)'; c.fill(); c.lineWidth = 2; c.strokeStyle = 'rgba(255,255,255,.18)'; c.stroke();
+    const ww = Math.max(0, Math.min(1, v)) * (w2 - 4);
+    if (ww > 1) { ART.rr(c, x + 2, y + 2, ww, h2 - 4, (h2 - 4) / 2); c.fillStyle = col; c.fill(); }
+  }
+  function starRow(x, y, n, s) {
+    for (let i = 0; i < 3; i++) {
+      c.beginPath();
+      for (let q = 0; q < 10; q++) { const a = -1.5708 + q * TAU / 10, rr = q % 2 ? s * 0.42 : s; c[q ? 'lineTo' : 'moveTo'](x + i * s * 2.4 + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+      c.closePath(); c.lineWidth = 2.2; c.lineJoin = 'round'; c.strokeStyle = OUT; c.stroke();
+      c.fillStyle = i < n ? '#ffd166' : 'rgba(255,255,255,.16)'; c.fill();
+    }
+  }
+  function panel(x, y, w2, h2) { ART.rr(c, x, y, w2, h2, 14); c.fillStyle = 'rgba(16,11,38,.72)'; c.fill(); c.lineWidth = 2; c.strokeStyle = 'rgba(160,151,255,.28)'; c.stroke(); }
+  function miniFruit(code, x, y, rmax) {
+    if (code === -9) return;
+    if (code === FU.STONE) { const s = Math.min(SPS, rmax * 2.6); c.drawImage(stoneSpr, x - s / 2, y - s / 2, s, s); return; }
+    if (code === FU.BOMB) { const s = Math.min(BPS, rmax * 2.9); c.drawImage(bombSpr, x - s / 2, y - s / 2, s, s); return; }
+    const sp = sprOf(code, 0), r = FRUIT[code].r, sc = Math.min(1, rmax / r), s = sp.width / 2 * sc;
+    c.drawImage(sp, x - s / 2, y - s / 2, s, s);
+  }
+  function undoBtn(x, y) {
+    if (!M || !M.undo) return;
+    ubx = x; uby = y;
+    const on = undoLeft > 0 && snap && !won && !over;
+    c.beginPath(); c.arc(x, y, 18, 0, TAU); c.fillStyle = on ? 'rgba(70,58,196,.92)' : 'rgba(60,50,110,.5)'; c.fill(); c.lineWidth = 2; c.strokeStyle = OUT; c.stroke();
+    c.globalAlpha = on ? 1 : 0.45;
+    c.lineWidth = 2.6; c.lineCap = 'round'; c.strokeStyle = '#fff'; c.beginPath(); c.arc(x + 1, y + 1, 7, -2.4, 1.6); c.stroke();
+    c.beginPath(); c.moveTo(x - 9, y - 9); c.lineTo(x - 4.5, y - 1.5); c.lineTo(x - 11.5, y - 1); c.closePath(); c.fillStyle = '#fff'; c.fill();
+    c.globalAlpha = 1;
+    label(String(undoLeft), x + 13, y + 6, 11, undoLeft ? '#ffd166' : 'rgba(255,255,255,.5)', 'center');
+  }
+  function hud() {
+    if (free) {
+      const HY = OY - UP;
+      label(String(S.score), OX + 14, HY + 8, 26, '#fff');
+      label('Récord ' + Math.max(best0, S.score), OX + 14, HY + 38, 11, 'rgba(255,255,255,.65)');
+      if (S.mult > 1) label('Cadena x' + S.mult, OX + 14, HY + 56, 13, '#ffd166');
+      miniFruit(nxt, OX + W - 34, HY + 30, 18);
+      label('Siguiente', OX + W - 34, HY + 54, 10, 'rgba(255,255,255,.65)', 'center');
+      return;
+    }
+    const st = starsNow(), hv = Math.min(have(), M.need), tt = M.need, reach = LV.goal === 'reach';
+    const frac = reach ? (hv ? 1 : biggest() / LV.tier) : tt ? hv / tt : 0;
+    const prog = reach ? (hv ? '¡Hecho!' : 'Mayor: ' + NAMES[biggest()]) : `${hv} de ${tt}`;
+    const lowF = left() <= 5, lowT = M.sec && secT <= 10;
+    if (SIDE) {
+      const lw = SIDE - 8, lx = k.ex(10), rx = k.ex2(10 + lw);
+      panel(lx, k.ey(14), lw, 156);
+      label(`Nivel ${k.lv}/${HF.length}`, lx + 14, k.ey(28), 20, '#fff');
+      label(goalText(), lx + 14, k.ey(54), 14, '#a8cf3f');
+      bar(lx + 14, k.ey(78), lw - 28, 13, frac, '#a8cf3f');
+      label(prog, lx + 14, k.ey(95), 13, 'rgba(255,255,255,.8)');
+      starRow(lx + 24, k.ey(128), st, 10);
+      label(starHint(), lx + 14, k.ey(144), 12, st < 3 ? 'rgba(255,255,255,.65)' : '#ffd166');
+      panel(rx, k.ey(14), lw, 156);
+      label(String(left()), rx + 14, k.ey(26), 30, lowF ? '#ff6fb5' : '#fff');
+      label('frutas', rx + 14 + c.measureText(String(left())).width + 8, k.ey(42), 13, 'rgba(255,255,255,.7)');
+      label(`Usadas ${used} · ★★ ${M.par2}`, rx + 14, k.ey(64), 12, used <= M.par3 ? '#7cf7a0' : used <= M.par2 ? '#ffd166' : 'rgba(255,255,255,.55)');
+      label(`${S.score} puntos`, rx + 14, k.ey(84), 15, '#fff');
+      if (S.mult > 1) label(`Cadena x${S.mult}`, rx + 14, k.ey(106), 15, S.mult >= 3 ? '#ff5fa2' : '#ffd166');
+      if (M.sec) { label('Reloj ' + Math.ceil(secT) + ' s', rx + 14, k.ey(128), 14, lowT ? '#ff6fb5' : 'rgba(255,255,255,.8)'); bar(rx + 14, k.ey(147), lw - 28, 9, secT / M.sec, lowT ? '#ff6fb5' : '#a097ff'); }
+      miniFruit(nxt, rx + lw - 30, k.ey(46), 18);
+      label('Siguiente', rx + lw - 30, k.ey(68), 10, 'rgba(255,255,255,.65)', 'center');
+      if (M.undo) undoBtn(rx + lw - 30, k.ey(112));
+      return;
+    }
+    /* Pantalla estrecha: el marcador va en la franja de arriba (la boca del tarro está en y=168).
+       El centro de la primera fila queda libre para el botón de pausa del reproductor. */
+    const HY = OY - UP;
+    label(`Nivel ${k.lv}/${HF.length}`, OX + 12, HY + 4, 16, '#fff');
+    starRow(OX + 20, HY + 34, st, 7);
+    label(starHint(), OX + 72, HY + 28, 11, st < 3 ? 'rgba(255,255,255,.62)' : '#ffd166');
+    label(goalText(), OX + 12, HY + 46, 13, '#a8cf3f');
+    bar(OX + 12, HY + 66, 120, 11, frac, '#a8cf3f');
+    label(reach ? prog.replace('Mayor: ', '') : `${hv}/${tt}`, OX + 138, HY + 64, 12, 'rgba(255,255,255,.85)');
+    label(`${left()} fruta${left() === 1 ? '' : 's'}`, OX + 12, HY + 82, 13, lowF ? '#ff6fb5' : '#fff');
+    label(`${S.score}`, OX + 92, HY + 83, 12, 'rgba(255,255,255,.72)');
+    if (S.mult > 1) label(`x${S.mult}`, OX + 150, HY + 83, 12, '#ffd166');
+    if (M.sec) label(Math.ceil(secT) + ' s', OX + W - 132, HY + 6, 16, lowT ? '#ff6fb5' : 'rgba(255,255,255,.85)', 'right');
+    miniFruit(nxt, OX + W - 34, HY + 30, 18);
+    label('Siguiente', OX + W - 34, HY + 54, 10, 'rgba(255,255,255,.65)', 'center');
+    if (M.undo) undoBtn(OX + W - 92, HY + 32);
+  }
+  function wrapTip(s, maxW, size) {
+    c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`;
+    const words = s.split(' '), out = []; let line = '';
+    for (const w of words) { const q = line ? line + ' ' + w : w; if (c.measureText(q).width > maxW && line) { out.push(line); line = w; } else line = q; }
+    if (line) out.push(line);
+    return out;
   }
   function draw() {
-    c.drawImage(bg, 0, 0, W, H);
-    if (SOLAR) {
-      c.beginPath(); c.arc(CEN.x, CEN.y, CEN.R, 0, TAU); c.lineWidth = 6; c.strokeStyle = danger > 0.6 ? '#ff6fb5' : 'rgba(160,151,255,.5)'; c.stroke();
-      c.beginPath(); c.arc(CEN.x, CEN.y, CEN.R - 4, 0, TAU); c.fillStyle = 'rgba(110,98,245,.07)'; c.fill();
-      const gr = c.createRadialGradient(CEN.x, CEN.y, 4, CEN.x, CEN.y, CEN.sun * 2.2);
-      gr.addColorStop(0, '#fff6c2'); gr.addColorStop(0.4, '#ffc94d'); gr.addColorStop(1, 'rgba(255,201,77,0)');
-      c.fillStyle = gr; c.beginPath(); c.arc(CEN.x, CEN.y, CEN.sun * 2.2, 0, TAU); c.fill();
-      c.beginPath(); c.arc(CEN.x, CEN.y, CEN.sun, 0, TAU); ART.fillOut(c, '#ffd23d', 2.6);
-      for (const s of [-1, 1]) { c.beginPath(); c.arc(CEN.x + s * 9, CEN.y - 3, 3, 0, TAU); c.fillStyle = OUT; c.fill(); }
-      c.strokeStyle = OUT; c.lineWidth = 2.4; c.lineCap = 'round'; c.beginPath(); c.arc(CEN.x, CEN.y + 2, 7, 0.5, 2.64); c.stroke();
+    c.drawImage(sky, 0, 0, k.W, k.H);
+    for (const a of amb) {
+      a.y += a.v * 0.016; a.a += 0.016 * a.w; if (a.y > k.H + 10) { a.y = -10; a.x = Math.random() * k.W; }
+      if (a.x > k.W) a.x = Math.random() * k.W;
+      c.save(); c.translate(a.x + Math.sin(a.a) * 10, a.y); c.rotate(a.a); c.globalAlpha = 0.1; c.fillStyle = '#a8cf3f';
+      c.beginPath(); c.ellipse(0, 0, a.s, a.s * 0.45, 0, 0, TAU); c.fill(); c.restore();
+    }
+    c.globalAlpha = 1;
+    c.save(); c.translate(OX, OY);
+    c.drawImage(jarCv, 0, 0, W, H);
+    const dg = S.danger > 0.6 && !over && !won;
+    // línea de peligro (boca del tarro) o borde del plato
+    if (S.orb) {
+      if (dg) { c.beginPath(); c.arc(CEN.x, CEN.y, CEN.R + 2, 0, TAU); c.lineWidth = 5; c.strokeStyle = `rgba(255,90,140,${0.6 + 0.3 * Math.sin(t * 10)})`; c.stroke(); }
     } else {
-      ART.rr(c, BOX.l - 10, BOX.top - 6, BOX.r - BOX.l + 20, BOX.bot - BOX.top + 16, 22);
-      c.lineWidth = 8; c.strokeStyle = 'rgba(160,151,255,.4)'; c.stroke();
-      c.fillStyle = 'rgba(255,255,255,.04)'; c.fill();
-      c.save(); c.setLineDash([9, 8]); c.lineWidth = 3; c.strokeStyle = danger > 0.6 ? '#ff6fb5' : 'rgba(255,255,255,.35)';
-      c.beginPath(); c.moveTo(BOX.l - 6, BOX.top); c.lineTo(BOX.r + 6, BOX.top); c.stroke(); c.restore();
+      c.save(); c.setLineDash([9, 8]); c.lineDashOffset = -t * 16; c.lineWidth = 3;
+      c.strokeStyle = dg ? `rgba(255,90,140,${0.65 + 0.3 * Math.sin(t * 10)})` : 'rgba(255,255,255,.35)';
+      c.beginPath(); c.moveTo(BOX.l - 6, S.line); c.lineTo(BOX.r + 6, S.line); c.stroke(); c.restore();
     }
-    for (const b of B) drawBody(b);
-    // pieza en espera
-    if (!over && k.st === 'play') {
-      const r = T[cur].r;
-      if (SOLAR) { const d = CEN.R + 22, x = CEN.x + Math.cos(aim) * d, y = CEN.y + Math.sin(aim) * d; drawBody({ x, y, r, t: cur, pop: 0 });
-        c.strokeStyle = 'rgba(255,255,255,.25)'; c.lineWidth = 2; c.setLineDash([5, 8]); c.beginPath(); c.moveTo(x, y); c.lineTo(CEN.x, CEN.y); c.stroke(); c.setLineDash([]); }
-      else { const x = k.clamp(aim, BOX.l + r, BOX.r - r); drawBody({ x, y: BOX.top - 26, r, t: cur, pop: 0 });
-        c.strokeStyle = 'rgba(255,255,255,.22)'; c.lineWidth = 2; c.setLineDash([5, 8]); c.beginPath(); c.moveTo(x, BOX.top - 26 + r); c.lineTo(x, BOX.bot); c.stroke(); c.setLineDash([]); }
+    const worried = S.danger > 0.35;
+    // guía y fruta en la mano
+    if (!over && !won && k.st === 'play' && cur !== -9) {
+      const sp = FU.spawnAt(S, cur, aim), r = FU.radOf(cur);
+      c.save(); c.setLineDash([5, 8]); c.lineDashOffset = -t * 30; c.lineWidth = 2; c.strokeStyle = 'rgba(255,255,255,.26)'; c.beginPath();
+      if (S.orb) { c.moveTo(sp.x, sp.y); c.lineTo(CEN.x, CEN.y); } else { c.moveTo(sp.x, sp.y + r); c.lineTo(sp.x, BOX.bot); }
+      c.stroke(); c.restore();
+      if (S.orb) { const d2 = CEN.R + 24, x = CEN.x + Math.cos(aim) * d2, y = CEN.y + Math.sin(aim) * d2; drawBody({ x, y, t: cur, pop: 0, r }, false); }
+      else { c.globalAlpha = cool > 0 ? 0.55 : 1; drawBody({ x: sp.x, y: sp.y - (cool > 0 ? cool * 20 : 0), t: cur, pop: 0, r }, false); c.globalAlpha = 1; }
     }
-    // marcador
-    label(String(score), 14, 10, 26, '#fff');
-    label('Récord ' + Math.max(k.best(ID, 0), score), 14, 40, 11, 'rgba(255,255,255,.65)');
-    const nr = Math.min(20, T[next].r), S = (T[next].r * 2 + 10) * nr / T[next].r;
-    c.drawImage(spr[next], W - 30 - S / 2, 24 - S / 2 + 6, S, S);
-    label('Siguiente', W - 30, 44, 10, 'rgba(255,255,255,.65)', 'center');
-    if (danger > 0.6 && !over) { c.globalAlpha = 0.5 + 0.5 * Math.sin(t * 12); label('¡Cuidado!', W / 2, SOLAR ? 108 : BOX.top - 52, 18, '#ff6fb5', 'center'); c.globalAlpha = 1; }
+    for (const b of S.b) drawBody(b, worried && b.t >= 0);
+    if (dg) { c.globalAlpha = 0.5 + 0.5 * Math.sin(t * 12); label('¡Cuidado!', W / 2, S.orb ? CEN.y - CEN.R - 46 : S.line + 12, 18, '#ff6fb5', 'center'); c.globalAlpha = 1; }
+    c.restore();
+    hud();
+    if (tipT > 0 && tip) {
+      c.globalAlpha = Math.min(1, tipT);
+      const lines = wrapTip(tip, W - 56, 13), bw = W - 40, bx = OX + 20, by = OY + (S.orb ? BOX.bot - 22 - lines.length * 17 : S.line + 14);
+      c.fillStyle = 'rgba(20,14,44,.86)'; ART.rr(c, bx, by, bw, lines.length * 17 + 16, 12); c.fill();
+      c.lineWidth = 2; c.strokeStyle = 'rgba(160,151,255,.35)'; c.stroke();
+      for (let i = 0; i < lines.length; i++) label(lines[i], OX + W / 2, by + 8 + i * 17, 13, '#e8e4ff', 'center');
+      c.globalAlpha = 1;
+    }
+    for (const f of flo) { c.globalAlpha = Math.min(1, f.t / 0.3); label(f.txt, f.x, f.y, f.s, f.col, 'center'); }
+    c.globalAlpha = 1;
+    if (flashT > 0) { c.globalAlpha = flashT * 3; c.fillStyle = flashC; c.fillRect(0, 0, k.W, k.H); c.globalAlpha = 1; }
   }
-  /* pruebas: simulación sin dibujar (window.__fu.sim(n) devuelve cuántos cuerpos se salieron) */
+  /* pruebas */
   window.__fu = {
-    get B() { return B; }, get score() { return score; }, T, BOX, CEN, SOLAR, drop, get ms() { return MS(); },
-    sim(n, every) {
-      let bad = 0;
-      for (let i = 0; i < n; i++) {
-        if (every && i % every === 0) { cool = 0; aim = SOLAR ? Math.random() * TAU : k.rnd(BOX.l + 20, BOX.r - 20); drop(); }
-        step(SUB);
-        for (const b of B) if (outside(b)) bad++;
-      }
-      return bad;
-    },
+    get S() { return S; }, get B() { return S.b; }, get score() { return S.score; }, get lv() { return LV; }, get used() { return used; },
+    get won() { return won; }, get over() { return over; }, get free() { return free; }, get stars() { return stars; }, get M() { return M; },
+    get cur() { return cur; }, drop: () => { cool = 0; drop(); }, undo, aim: (v) => { aim = v; }, BOX, CEN,
+    sim(n, every) { let bad = 0; for (let i = 0; i < n; i++) { if (every && i % every === 0) { cool = 0; aim = S.orb ? Math.random() * TAU : k.rnd(BOX.l + 20, BOX.r - 20); drop(); } FU.step(S, SUB); S.ev.length = 0; } return bad; },
   };
   k.onDif = () => { if (k.st !== 'play') reset(); };
+  if (HF) {
+    k.levels(HF.length);
+    k.onLevel = () => { if (wantFree) { free = true; wantFree = false; } else free = false; reset(); };
+    /* Botón «Modo libre» en el menú del kit (el kit ignora los data-m que no conoce). */
+    const ov = document.getElementById('ov');
+    addFree = () => {
+      if (!ov || k.st !== 'ready' || k.paused) return;
+      const m = ov.querySelector('.card .menu'); if (!m || !m.querySelector('[data-m="play"]') || m.querySelector('[data-m="free"]')) return;
+      const b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-m', 'free'); b.textContent = 'Modo libre'; m.appendChild(b);
+    };
+    if (ov) {
+      new MutationObserver(addFree).observe(ov, { childList: true, subtree: true });
+      ov.addEventListener('pointerdown', (e) => { const tg = e.target && e.target.closest && e.target.closest('[data-m="free"]'); if (!tg) return; wantFree = true; k.goLevel(k.lv); });
+      /* «Reintentar» tras perder en el modo libre: se queda en el modo libre (fase de captura,
+         antes de que el kit lo mande al nivel). */
+      ov.addEventListener('pointerdown', (e) => { const tg = e.target && e.target.closest && e.target.closest('[data-m="play"]'); if (tg && free && k.st === 'over') wantFree = true; }, true);
+    }
+  }
   reset();
-  k.show(CFG.title || (SOLAR ? 'Fusión Solar' : 'Fusión de Frutas'),
-    SOLAR ? 'Gira alrededor del anillo y suelta planetas hacia el sol. Dos iguales se funden en el siguiente. Si el montón toca el anillo, se acabó.<br>Toca para jugar'
-      : 'Mueve la fruta y suéltala en el tarro. Dos frutas iguales se funden en la siguiente, más grande. Si el montón rebosa por la boca, se acabó.<br>Toca para jugar');
+  k.show(CFG.title || 'Fusión de Frutas', HF
+    ? 'Veinte tarros escritos a mano. Suelta la fruta y junta dos iguales para hacer la siguiente. Encargos, clavijas, piedras, tarros con forma, fruta congelada, bombas, reloj, el Exprimidor y, al final, la Gran Sandía. Cada nivel tiene sus frutas contadas y sus tres estrellas.'
+    : 'Mueve la fruta y suéltala en el tarro. Dos frutas iguales se funden en la siguiente, más grande. Si el montón rebosa por la boca, se acabó.<br>Toca para jugar');
+  addFree();
   k.run(update, draw);
 }

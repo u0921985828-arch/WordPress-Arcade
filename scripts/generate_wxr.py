@@ -82,7 +82,7 @@ CATALOG = {
         ("Lights Out", ["toggle-grid", "logic", "vector"], "canvas", "auto", "1:1", "TM"),
         ("Pipe Connect", ["pipes", "rotation", "vector"], "canvas", "portrait", "1:1", "TM"),
         ("Slide 15", ["sliding-puzzle", "classic", "vector"], "canvas", "auto", "1:1", "TKM"),
-        ("Flow Lines", ["path-drawing", "logic", "vector"], "canvas", "portrait", "1:1", "TM"),
+        ("Flow Lines", ["path-drawing", "logic", "vector"], "canvas", "auto", "fill", "TM"),
         ("Color Sort", ["sorting", "relaxing", "vector"], "construct", "auto", "fill", "TM"),
         ("Laser Mirrors", ["optics", "rotation", "vector"], "canvas", "auto", "1:1", "TM"),
         ("Tangram Studio", ["tangram", "shapes", "vector"], "canvas", "auto", "1:1", "TM"),
