@@ -143,7 +143,18 @@ def main():
                            inputs=[x for x, c in (('touch', 'T'), ('keyboard', 'K'), ('mouse', 'M'), ('gamepad', 'G')) if c in g['inputs']],
                            help=g['cfg']['help'], desc=g['desc'], tips=g.get('tips', []), players=g.get('players', ''),
                            mp=list(g['mp']) if g.get('mp') else None, wave=g['wave']))
-    missing = [s for s in titles if s not in G and s not in STANDALONE]
+    # Triaje (games/retired.json): los retirados no se generan, su carpeta se borra y salen de todos los
+    # índices; los de «hold» se siguen generando (se van a rehacer) pero no salen en el lobby de la tele.
+    tri = json.loads((GAMES_DIR / 'retired.json').read_text(encoding='utf-8'))
+    RET, HOLD = set(tri['retired']), set(tri['hold'])
+    bad = [t for t in tri['retired'].values() if t in RET or t not in titles]
+    if bad: sys.exit(f'retired.json: destino retirado o inexistente: {bad}')
+    for s in RET:
+        titles.pop(s, None); G.pop(s, None); PAD.pop(s, None); MP.pop(s, None)
+        if (GAMES_DIR / s).is_dir(): shutil.rmtree(GAMES_DIR / s)
+    newcat = [d for d in newcat if d['slug'] not in RET]
+    standalone = [s for s in STANDALONE if s not in RET]
+    missing = [s for s in titles if s not in G and s not in standalone]
     extra = [s for s in G if s not in titles]
     if set(MP) - set(PAD): sys.exit(f'MP sin PAD: {set(MP) - set(PAD)}')
     if set(PAD) - set(G): sys.exit(f'PAD sin juego: {set(PAD) - set(G)}')
@@ -166,7 +177,7 @@ def main():
     for slug, (eng, cfg) in G.items():
         ev = hashlib.md5((ENG_DIR / f'{eng}.js').read_bytes()).hexdigest()[:8]
         dep[slug] = ['_lib/kit.js?v=32'] + [f'_lib/{d}.js?v={dv(d)}' for d in deps_of(eng)] + [f'_lib/{eng}.js?v={ev}']
-    for slug in STANDALONE:
+    for slug in standalone:
         f = GAMES_DIR / slug / 'index.html'
         if f.exists(): dep[slug] = [m.replace('../', '') for m in re.findall(r'<script src="([^"]+)"', f.read_text(encoding='utf-8'))]
     (GAMES_DIR / 'deps.json').write_text(json.dumps(dep, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
@@ -176,13 +187,13 @@ def main():
     pls = {d['slug']: d['players'] for d in newcat if d.get('players')}
     party = [dict(slug=s, title=titles[s], g=genre[s], orient=inp[s][0], keys=any(c in inp[s][1] for c in 'KG') or s in MP, mp=list(MP[s]) if s in MP else None, pad=PAD.get(s),
                   help=(G[s][1].get('help') or '') if s in G else '', tips=tips.get(s, [])[:2], pl=pls.get(s, ''))
-             for s in sorted(titles, key=lambda x: titles[x].lower())]
+             for s in sorted(titles, key=lambda x: titles[x].lower()) if s not in HOLD]
     # El lobby de /tele/ precarga el runtime común: se le dan aquí las URL con su versión real
     # (antes iban escritas a mano en party-tv.js y se quedaron en v=18/v=9, así que no servían de nada).
     libs = ['_lib/kit.js?v=32', f'_lib/art.js?v={dv("art")}']
     (GAMES_DIR / 'party.json').write_text(json.dumps(dict(games=party, lib=libs), ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     (GAMES_DIR / 'catalog.json').write_text(json.dumps(dict(games=newcat), ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     total = len([p for p in GAMES_DIR.iterdir() if (p / 'index.html').exists()])
-    print(f'{len(new)} nuevos del catálogo ampliado; {len(G)} juegos generados + {len(STANDALONE)} independientes = {total} carpetas; {len(engines)} motores')
+    print(f'{len(new)} nuevos del catálogo ampliado; {len(G)} juegos generados + {len(standalone)} independientes = {total} carpetas; {len(engines)} motores')
 
 if __name__ == '__main__': main()

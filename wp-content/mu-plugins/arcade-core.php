@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Arcade Core
  * Description: CPT "game", taxonomías, meta de juego y reproductor lazy para el portal arcade.
- * Version:     1.52.0
+ * Version:     1.53.0
  * Author:      Arcade Team
  *
  * Instalar: copiar este archivo + la carpeta /arcade-core/ en wp-content/mu-plugins/.
@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
 
 final class Arcade_Core {
 
-	const VERSION      = '1.52.0';
+	const VERSION      = '1.53.0';
 	const ORIENTATIONS = array( 'portrait', 'landscape', 'auto' );
 	const RATIOS       = array( '16:9', '4:3', '1:1', 'fill' );
 	const ENGINES      = array( 'canvas', 'phaser', 'threejs', 'godot_web', 'construct' );
@@ -41,6 +41,7 @@ final class Arcade_Core {
 		add_action( 'init', array( __CLASS__, 'register_types' ), 5 );
 		add_action( 'init', array( __CLASS__, 'register_meta' ), 6 );
 		add_action( 'init', array( __CLASS__, 'maybe_upgrade' ), 20 );
+		add_action( 'template_redirect', array( __CLASS__, 'redirect_retired' ), 1 );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'enqueue' ) );
 		add_filter( 'script_loader_tag', array( __CLASS__, 'module_tag' ), 10, 2 );
 		add_filter( 'the_content', array( __CLASS__, 'inject_player' ), 5 );
@@ -204,12 +205,92 @@ final class Arcade_Core {
 		self::ensure_home_page();
 		self::adaptive_games();
 		self::sync_catalog();
+		self::retire_games();
 		self::seed_plays();
 		self::publish_pending();
 		delete_transient( 'arcade_index' );
 		flush_rewrite_rules( false );
 		update_option( 'arcade_core_version', self::VERSION, false );
 		$wpdb->delete( $wpdb->options, array( 'option_name' => 'arcade_core_upgrading' ) );
+	}
+
+	/**
+	 * Triaje del catálogo (games/retired.json, ver docs/TRIAJE-JUEGOS.md):
+	 * 'retired' => slug => destino: juegos desechados; se borran y su dirección redirige (301) al destino.
+	 * 'hold'    => slugs: juegos que se van a rehacer; quedan en borrador hasta que salgan de la lista.
+	 */
+	public static function triage() {
+		static $t = null;
+		if ( null === $t ) {
+			$f = __DIR__ . '/' . self::sub() . 'games/retired.json';
+			$t = file_exists( $f ) ? (array) json_decode( (string) file_get_contents( $f ), true ) : array(); // phpcs:ignore
+			$t = array(
+				'retired' => isset( $t['retired'] ) && is_array( $t['retired'] ) ? $t['retired'] : array(),
+				'hold'    => isset( $t['hold'] ) && is_array( $t['hold'] ) ? array_values( $t['hold'] ) : array(),
+			);
+		}
+		return $t;
+	}
+
+	/** Aplica el triaje: borra los retirados, despublica los de rehacer y vuelve a publicar los que ya no lo están. */
+	public static function retire_games() {
+		$t   = self::triage();
+		$own = static function ( $p ) {
+			return $p && 'game' === $p->post_type && '' === (string) get_post_meta( $p->ID, '_game_source', true );
+		};
+		foreach ( array_keys( $t['retired'] ) as $slug ) {
+			$p = get_page_by_path( sanitize_title( $slug ), OBJECT, 'game' );
+			if ( $own( $p ) ) {
+				wp_delete_post( $p->ID, true );
+			}
+		}
+		foreach ( $t['hold'] as $slug ) {
+			$p = get_page_by_path( sanitize_title( $slug ), OBJECT, 'game' );
+			if ( $own( $p ) && 'publish' === $p->post_status ) {
+				wp_update_post( array( 'ID' => $p->ID, 'post_status' => 'draft' ) );
+				update_post_meta( $p->ID, '_arcade_hold', '1' );
+			}
+		}
+		$held = get_posts( array(
+			'post_type'        => 'game',
+			'post_status'      => 'draft',
+			'numberposts'      => -1,
+			'meta_key'         => '_arcade_hold', // phpcs:ignore
+			'suppress_filters' => true,
+		) );
+		foreach ( $held as $p ) {
+			if ( ! in_array( $p->post_name, $t['hold'], true ) ) {
+				wp_update_post( array( 'ID' => $p->ID, 'post_status' => 'publish' ) );
+				delete_post_meta( $p->ID, '_arcade_hold' );
+			}
+		}
+	}
+
+	/** La ficha de un juego borrado redirige (301) al que lo sustituye; la de uno en obras, a la portada (302). */
+	public static function redirect_retired() {
+		if ( ! is_404() ) {
+			return;
+		}
+		$slug = (string) get_query_var( 'game' );
+		if ( '' === $slug && 'game' === get_query_var( 'post_type' ) ) {
+			$slug = (string) get_query_var( 'name' );
+		}
+		$slug = sanitize_title( $slug );
+		if ( '' === $slug ) {
+			return;
+		}
+		$t = self::triage();
+		if ( isset( $t['retired'][ $slug ] ) ) {
+			$to = get_page_by_path( sanitize_title( $t['retired'][ $slug ] ), OBJECT, 'game' );
+			if ( $to && 'publish' === $to->post_status ) {
+				wp_safe_redirect( get_permalink( $to ), 301 );
+				exit;
+			}
+		}
+		if ( isset( $t['retired'][ $slug ] ) || in_array( $slug, $t['hold'], true ) ) {
+			wp_safe_redirect( class_exists( 'Arcade_Portal' ) && method_exists( 'Arcade_Portal', 'home' ) ? Arcade_Portal::home() : home_url( '/' ), 302 );
+			exit;
+		}
 	}
 
 	/**
@@ -271,7 +352,7 @@ final class Arcade_Core {
 		$base  = time();
 		foreach ( $data['games'] as $g ) {
 			$slug = sanitize_title( $g['slug'] ?? '' );
-			if ( '' === $slug || get_page_by_path( $slug, OBJECT, 'game' ) ) {
+			if ( '' === $slug || in_array( $slug, self::triage()['hold'], true ) || get_page_by_path( $slug, OBJECT, 'game' ) ) {
 				continue;
 			}
 			$when = $count < $pace['now'] ? $base : $base + ( 1 + intdiv( $count - $pace['now'], max( 1, $pace['per'] ) ) ) * $pace['every_days'] * DAY_IN_SECONDS;

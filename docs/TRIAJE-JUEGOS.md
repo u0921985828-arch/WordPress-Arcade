@@ -1,6 +1,6 @@
 # Triaje del catálogo: qué se queda, qué se rehace y qué se quita
 
-Revisión de los **278 juegos** propios (1.52.0). Es una propuesta: no se ha borrado ni despublicado nada.
+Revisión de los **278 juegos** propios (1.52.0). **Aplicado en 1.53.0**: los de «quitar» se borran (con redirección 301) y los de «rehacer» pasan a borrador hasta rehacerlos. Lista en `games/retired.json`.
 
 ## Resumen
 
