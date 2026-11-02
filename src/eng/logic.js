@@ -16,7 +16,20 @@ const lvOf = () => HAND[k.clamp(level || 1, 1, LVN) - 1];
 const SH = (M === 'sudoku' && typeof SUDLV !== 'undefined' && SUDLV[CFG.id]) || null;
 const SLVN = SH ? SH.length : 0;
 const sOf = () => SH[k.clamp(level || 1, 1, SLVN) - 1];
-const SDIFT = [1.5, 1, 0.8]; /* el tiempo objetivo se estira en fácil y se aprieta en difícil */
+const SDIFT = [1.5, 1, 0.8];
+/* ---------- Plan Friv: pipe-connect con 20 tableros a mano (tabla PIPELV) ----------
+   PH solo existe en el modo 'pipes' del slug que tenga tabla; el modo de tuberías al azar de
+   siempre y el resto de modos no ven nada de esto. Reglas compartidas con el verificador. */
+const PH = (M === 'pipes' && typeof PIPELV !== 'undefined' && PIPELV[CFG.id]) || null;
+const PR = PH ? PIPELV.rules : null;
+const WCOL = ['#2f9bf0', '#ff5f7a', '#3fcf6e'], WLITE = ['#bfe6ff', '#ffc4cf', '#c4f5d3'], WNAME = ['azul', 'roja', 'verde'];
+let PB = null, pm = null, pra = null, pev = null, PS = null, pwet = null, pTaps = 0, pHints = 0, pUsed = 0, pHintSet = null;
+let pPhase = 0, pNext = 0, pWT = 0, pWS = 0, pVH = 0, pDrips = [], pFail = null, pFed = null, pChain = 0, pChainT = 0;
+let pWide = false, pTop = 58, pBan = 0, pBarY = 0, pPanX = 0, pPanW = 0, pPress = -1, pPressT = 0, pLong = false, pMsg = null, pVAng = null, pWin = 0, pDist = null, pBoardCv = null, pBgCv = null;
+const pLv = () => PH[k.clamp(level || 1, 1, PH.length) - 1];
+const pShut = (i) => !PS.open[i];
+const pGoals = () => PR.goals(PB, k.dif);
+const pSpr = {}; /* el tiempo objetivo se estira en fácil y se aprieta en difícil */
 const medKey = () => 'med:' + CFG.id + (k.dif === 0 ? '@f' : k.dif === 2 ? '@d' : '');
 function medRead() { try { const v = JSON.parse(localStorage.getItem(medKey()) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
 function medSave(i) { const v = medRead(); v[i] = 1; try { localStorage.setItem(medKey(), JSON.stringify(v)); } catch (e) { /* sin almacenamiento */ } }
@@ -56,6 +69,7 @@ function sudokuGen() { const b = Array(81).fill(0); const ok = (i, v) => { const
   const fillB = (i) => { if (i === 81) return true; for (const v of k.shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9])) if (ok(i, v)) { b[i] = v; if (fillB(i + 1)) return true; b[i] = 0; } return false; }; fillB(0); return b; }
 function build() {
   done = false; t = 0; sel = null; first = true; flagMode = false; moves = 0; boom = null; doneT = 0; fx = []; longDone = false;
+  if (PH) return buildPipe();
   shield = M === 'mines' ? (k.D.life | 0) : 0;
   if (M === 'sudoku' && SH) buildSud();
   else if (M === 'sudoku') { SN = 9; BW = 3; BH = 3; N = 9; S = 48; OY = 90; sol = sudokuGen(); const holes = Math.min(54, 28 + (level - 1) * 2) + (k.dif === 0 ? -6 : k.dif === 2 ? 6 : 0); /* 1.23: nivel 1: 28 huecos → 54 en el nivel 14 */ g = [...sol]; k.shuffle([...Array(81).keys()]).slice(0, holes).forEach((i) => (g[i] = 0)); given = g.map((v) => v > 0); calcConf(); }
@@ -221,12 +235,14 @@ function unitReward(n2) {
 }
 /* Dificultad: dos minas menos en fácil y dos más en difícil. */
 function nMines() { if (HAND) return lvOf().m; return 7 + (k.dif === 0 ? -2 : k.dif === 2 ? 2 : 0) + Math.min(10, (level || 1) - 1); } /* 1.23: 7 minas en el nivel 1 → 17 en el 11 */
-function reset() { if (SH) { level = k.lv; score = 0; lost = false; build(); return; } if (HAND) { level = k.lv; score = 0; lost = false; build(); return; } if (level === undefined || lost) { level = 1; score = 0; lost = false; } build(); }
+function reset() { if (PH) { level = k.lv; score = 0; lost = false; build(); return; } if (SH) { level = k.lv; score = 0; lost = false; build(); return; } if (HAND) { level = k.lv; score = 0; lost = false; build(); return; } if (level === undefined || lost) { level = 1; score = 0; lost = false; } build(); }
 addEventListener('keydown', (e) => { if (M !== 'sudoku') return; const m = /^(Digit|Numpad)([0-9])$/.exec(e.code); if (m) keyNum = +m[2]; else if (e.code === 'Backspace' || e.code === 'Delete') keyNum = 0; });
-k.onDif = () => { if (k.st !== 'play') { if (HAND || SH) level = k.lv; build(); } };
+k.onDif = () => { if (k.st !== 'play') { if (HAND || SH || PH) level = k.lv; build(); } };
 level = undefined;
 if (HAND) { level = k.levels(LVN, { start: (i) => { level = i; score = 0; lost = false; build(); } }); }
 if (SH) { level = k.levels(SLVN, { start: (i) => { level = i; score = 0; lost = false; build(); } }); }
+if (PH) { level = k.levels(PH.length, { start: (i) => { level = i; score = 0; lost = false; build(); } }); k.onSize = () => { if (PB) layoutP(); };
+  CFG.help = 'Toca una pieza para girarla (mant\u00e9n pulsado para girarla al rev\u00e9s). Resuelto: ninguna boca al aire y cada red con su fuente. Cada casa pide agua de su color; los puentes cruzan dos tuber\u00edas sin mezclarlas; las piezas con tornillos no giran. Con reloj, el agua sale sola y avanza: lo mojado ya no gira y una boca al aire es una fuga. Las v\u00e1lvulas frenan el agua: t\u00f3calas para abrirlas antes de que revienten. Con mando: flechas, A gira, B gira al rev\u00e9s. Pocos giros y sin pistas: tres estrellas.'; }
 if (SH) CFG.help = 'Rellena el tablero: cada fila, cada columna y cada caja llevan todos los n\u00fameros una sola vez. Toca una casilla y pulsa un n\u00famero. \u00abNotas\u00bb apunta candidatos, \u00abDeshacer\u00bb retira la \u00faltima jugada, \u00abComprobar\u00bb marca los fallos y \u00abPista\u00bb rellena una casilla. Con mando: flechas mueven, A cambia el n\u00famero y B borra. Tres estrellas: dentro del tiempo, sin ayudas y sin fallos.';
 reset(); k.show(CFG.title, CFG.help);
 /* Nivel superado: medalla si se baja del tiempo objetivo (en fácil y normal vale también
@@ -277,6 +293,7 @@ function slideTo(tx, ty) {
 
 k.run((dt) => {
   if (!k.gate(reset)) { keyNum = null; return; }
+  if (PH) return updPipe(dt);
   for (const f of fx) f.t -= dt; fx = fx.filter((f) => f.t > 0); for (let i = 0; i < anim.length; i++) if (anim[i] > 0) anim[i] = Math.max(0, anim[i] - dt * 5);
   if (M === 'lights') glow = glow.map((v, i) => v + k.clamp((g[i] ? 1 : 0) - v, -dt * 7, dt * 7));
   if (M === 'pipes') for (const q of g) q.ra += k.clamp(-q.ra, -dt * 14, dt * 14);
@@ -567,7 +584,330 @@ function drawSlide() {
     num(v, X + sz / 2, Y + sz / 2 + 1, 40, 'rgba(255,240,210,.8)'); num(v, X + sz / 2, Y + sz / 2 - 1, 40, '#5a3418'); }
   if (done) { c.globalAlpha = Math.min(0.5, doneT) * (0.6 + Math.sin(doneT * 8) * 0.4); c.fillStyle = '#fff6c8'; ART.rr(c, OX, OY, N * S, N * S, 10); c.fill(); c.globalAlpha = 1; }
 }
+/* =====================================================================================
+   PIPE-CONNECT a la vara (PH): 20 tableros de PIPELV, reglas en PIPELV.rules.
+   Todo lo de aquí abajo solo se ejecuta si PH existe (CFG.id con tabla y modo 'pipes').
+   ===================================================================================== */
+function buildPipe() {
+  const L = pLv(); PB = PR.parse(L); pm = PR.start(PB); pra = new Float32Array(PB.n); pVAng = new Float32Array(PB.n);
+  pTaps = 0; pUsed = 0; pHints = PR.HN[k.dif]; pHintSet = new Set(); pFed = new Set(); pChain = 0; pChainT = 0; pDrips = []; pFail = null; pWin = 0; pMsg = null; pPress = -1;
+  const ts = PR.TS[k.dif]; pWT = L.w ? L.w[0] * ts : 0; pWS = L.w ? L.w[1] * ts : 0; pVH = (L.vh || 0) * ts;
+  PS = PR.wetStart(PB); pwet = new Float32Array(PB.n * 2).fill(-1); pPhase = L.w ? 1 : 0; pNext = pWT;
+  /* distancia (en la solución) a la fuente: la pista arregla primero lo más cercano */
+  pDist = new Array(PB.n).fill(1e9); const q = []; for (const s of PB.src) { pDist[s] = 0; q.push(s); }
+  while (q.length) { const i = q.shift(); for (let d = 0; d < 4; d++) if (PB.sol[i] & (1 << d)) { const j = PR.nb(PB, i, d); if (j >= 0 && pDist[j] > pDist[i] + 1) { pDist[j] = pDist[i] + 1; q.push(j); } } }
+  pev = pEval(); cur = [PB.src[0] % PB.w, Math.floor(PB.src[0] / PB.w)]; kb = false;
+  anim = new Array(PB.n).fill(0); N = Math.max(PB.w, PB.h);
+  banner = { a: 0 }; layoutP();
+}
+function pEval() { return PR.evalB(PB, pm, pPhase ? pShut : null); }
+/* ---------- disposición (lienzo fluido) ---------- */
+function layoutP() {
+  if (!PB) return;
+  pWide = k.W >= k.H * 1.18; pTop = 58;
+  if (pWide) {
+    pPanW = Math.round(k.clamp(k.W * 0.3, 190, 290)); pPanX = Math.round(k.ex2(14) - pPanW);
+    const aw = pPanX - 30, ah = k.H - pTop - 18;
+    S = Math.floor(Math.min(aw / PB.w, ah / PB.h, 96));
+    OX = Math.round(16 + (aw - S * PB.w) / 2); OY = Math.round(pTop + (ah - S * PB.h) / 2);
+  } else {
+    pBan = 44; const bot = 58;
+    const aw = k.W - 24, ah = k.H - pTop - pBan - bot - 22;
+    S = Math.floor(Math.min(aw / PB.w, ah / PB.h, 96));
+    OX = Math.round((k.W - S * PB.w) / 2); OY = Math.round(pTop + pBan + 8 + (ah - S * PB.h) / 2);
+    pBarY = Math.round(k.H - bot - 4);
+  }
+  pBoardCv = null; pBgCv = null; for (const key in pSpr) delete pSpr[key];
+}
+/* ---------- acciones ---------- */
+function pCountWet(ev) { let n = 0; for (let v = 0; v < ev.col.length; v++) if (ev.col[v] >= 0) n++; return n; }
+function pRotate(i, back) {
+  if (done || i < 0) return;
+  const X = OX + (i % PB.w + 0.5) * S, Y = OY + (Math.floor(i / PB.w) + 0.5) * S;
+  if (PB.valve[i]) { pValve(i); return; }
+  if (PB.rock[i]) return;
+  if (PB.fixed[i] || pHintSet.has(i)) { k.sfx('hit'); anim[i] = 1; k.float(PB.cross[i] ? 'Puente' : 'Atornillada', X, Y - S * 0.4, '#cfd6ff'); return; }
+  if (pPhase && PR.wetCell(PS, i)) { k.sfx('hit'); anim[i] = 1; k.float('Ya lleva agua', X, Y - S * 0.4, '#bfe6ff'); return; }
+  const before = pCountWet(pev);
+  pm[i] = back ? ((pm[i] >> 1) | ((pm[i] & 1) << 3)) & 15 : PR.rot(pm[i]);
+  pra[i] += back ? Math.PI / 2 : -Math.PI / 2; pTaps++; k.sfx('click');
+  pev = pEval(); const after = pCountWet(pev);
+  if (after > before) {
+    pChain++; pChainT = 2.5; k.chime && k.chime(Math.min(7, pChain - 1)); k.burst(X, Y, '#bfe6ff', 6, 90);
+    if (pChain >= 3) k.combo && k.combo(pChain, X, Y - S * 0.5);
+  } else if (after < before) { pChain = 0; k.chainReset && k.chainReset(); }
+  pAfter();
+}
+/* lo que pasa tras cualquier cambio: casas con agua, mezclas, victoria */
+function pAfter() {
+  for (let i = 0; i < PB.n; i++) if (PB.house[i] && pev.col[2 * i] === PB.col[i] && !pFed.has(i)) {
+    pFed.add(i); const X = OX + (i % PB.w + 0.5) * S, Y = OY + (Math.floor(i / PB.w) + 0.5) * S;
+    k.reward('¡Casa con agua!', WCOL[PB.col[i]]); k.punch(0.05); k.hitstop(0.05); k.sfx('coin'); k.burst(X, Y, WCOL[PB.col[i]], 16, 140); anim[i] = 1;
+  }
+  let mixed = false; for (let v = 0; v < pev.col.length; v++) if (pev.col[v] === -2) { mixed = true; break; }
+  if (mixed && !pPhase) pMsg = ['¡Se mezclan dos colores!', '#ffb4c8', 1.6];
+  if (pev.ok && (!pPhase || PB.valve.every((v, i) => !v || PS.open[i]))) pSolved();
+}
+function pValve(i) {
+  const X = OX + (i % PB.w + 0.5) * S, Y = OY + (Math.floor(i / PB.w) + 0.5) * S;
+  if (!pPhase) { k.sfx('hit'); return; }
+  if (PS.open[i]) { k.sfx('hit'); k.float('Ya está abierta', X, Y - S * 0.4, '#c4f5d3'); return; }
+  PS.open[i] = 1; PS.hold[i] = 0; k.sfx('pop'); k.punch(0.04); k.burst(X, Y, '#7cf7a0', 10, 110); k.float('¡Abierta!', X, Y - S * 0.4, '#7cf7a0');
+  pev = pEval(); pAfter();
+}
+function pHint() {
+  if (done || pHints <= 0 || k.st !== 'play') { k.sfx('hurt'); return; }
+  let best = -1;
+  for (let i = 0; i < PB.n; i++) { if (PB.fixed[i] || pHintSet.has(i) || pm[i] === PB.sol[i] || (pPhase && PR.wetCell(PS, i))) continue; if (best < 0 || pDist[i] < pDist[best]) best = i; }
+  if (best < 0) {
+    /* todo bien girado: solo faltan válvulas por abrir */
+    for (let i = 0; i < PB.n; i++) if (PB.valve[i] && !PS.open[i]) { pMsg = ['Abre la válvula', '#7cf7a0', 2]; return; }
+    k.sfx('hurt'); return;
+  }
+  pHints--; pUsed++; pm[best] = PB.sol[best]; pra[best] = 0; pHintSet.add(best); anim[best] = 1; pBoardCv = null;
+  const X = OX + (best % PB.w + 0.5) * S, Y = OY + (Math.floor(best / PB.w) + 0.5) * S;
+  k.sfx('pop'); k.float('Pista', X, Y - S * 0.45, '#ffd23d'); k.burst(X, Y, '#ffd23d', 10, 100);
+  pev = pEval(); pAfter();
+}
+function pSolved() {
+  if (done) return; done = true; doneT = 0; pWin = 1;
+  /* el agua termina de llenar lo que quedaba seco: se ve correr */
+  const col = PR.evalB(PB, pm, null).col; for (let v = 0; v < col.length; v++) if (col[v] >= 0 && pwet[v] < 0) { PS.wet[v] = col[v]; pwet[v] = clk + pDist[v >> 1] * 0.05; }
+  pPhase = pPhase ? 2 : 0;
+  k.sfx('win'); k.confetti(); k.punch(0.08); k.hitstop(0.06);
+  later(pDone, 1300);
+}
+function pDone() {
+  const G = pGoals(), stars = pTaps <= G.s3 && !pUsed ? 3 : pTaps <= G.s2 ? 2 : 1;
+  score = Math.max(100, 1000 + (G.s2 - pTaps) * 25 + (pLv().w ? 300 : 0)) * (stars === 3 ? 2 : 1); k.best(CFG.id, score);
+  let falta = '';
+  if (stars === 1) falta = `Para 2★: ${G.s2} giros o menos.`;
+  else if (stars === 2) falta = 'Para 3★: ' + [pTaps > G.s3 ? `${G.s3} giros o menos` : '', pUsed ? 'sin pistas' : ''].filter(Boolean).join(' y ') + '.';
+  k.levelDone(score, `${pLv().n} · Giros ${pTaps} (mínimo ${G.min}) · 2★ ≤ ${G.s2} · 3★ ≤ ${G.s3} sin pistas${pUsed ? ' · Pistas ' + pUsed : ''}${falta ? '<br><b>' + falta + '</b>' : ''}`, { stars });
+}
+function pLose(why, i) {
+  if (done) return; done = true; lost = true; pFail = { i, t: 0 };
+  const X = OX + (i % PB.w + 0.5) * S, Y = OY + (Math.floor(i / PB.w) + 0.5) * S;
+  k.sfx('explode'); k.shake(9); k.hitstop(0.08); k.flash('rgba(120,190,255,.45)'); k.burst(X, Y, '#2f9bf0', 30, 240);
+  let bad = 0; for (let j = 0; j < PB.n; j++) if (!PB.rock[j] && pm[j] !== PB.sol[j]) bad++;
+  const head = { atasco: '¡Agua encerrada!', fuga: '¡Fuga!', mezcla: '¡Se mezclan!', casa: '¡Casa equivocada!', valvula: '¡Revienta la válvula!' }[why];
+  const det = { atasco: 'El agua se cerró en un circuito y ya no puede llegar al resto.', fuga: 'El agua llegó a una boca sin tubo.', mezcla: 'Dos colores se tocaron.', casa: 'Esa casa pedía otro color.', valvula: 'La válvula aguantó el agua demasiado tiempo.' }[why];
+  later(() => k.lose(CFG.id, score, head, `${det}<br>Nivel ${level}/${PH.length} · te faltaban ${bad} pieza${bad === 1 ? '' : 's'} por colocar`), 1300);
+}
+/* ---------- bucle ---------- */
+function updPipe(dt) {
+  clk += dt; for (let i = 0; i < anim.length; i++) if (anim[i] > 0) anim[i] = Math.max(0, anim[i] - dt * 5);
+  for (let i = 0; i < PB.n; i++) if (pra[i]) pra[i] += k.clamp(-pra[i], -dt * 14, dt * 14);
+  for (let i = 0; i < PB.n; i++) if (PB.valve[i]) pVAng[i] += ((PS.open[i] ? 1.6 : 0) - pVAng[i]) * Math.min(1, dt * 10);
+  if (banner) banner.a = Math.min(1, banner.a + dt * 3);
+  if (pMsg) { pMsg[2] -= dt; if (pMsg[2] <= 0) pMsg = null; }
+  if (pChainT > 0) { pChainT -= dt; if (pChainT <= 0) { pChain = 0; k.chainReset && k.chainReset(); } }
+  if (pFail) pFail.t += dt;
+  if (done) { doneT += dt; return; }
+  t += dt;
+  /* agua con reloj */
+  if (pPhase === 1 && t >= pWT) {
+    pPhase = 2; PR.release(PB, PS); for (const s of PB.src) pwet[2 * s] = clk; k.sfx('start'); k.reward('¡Sale el agua!', '#2f9bf0'); pev = pEval();
+  }
+  if (pPhase === 2) {
+    if (t >= pNext) {
+      pNext += pWS;
+      const r = PR.step(PB, pm, PS);
+      for (const u of r.fresh) { pwet[u] = clk; const i = u >> 1; anim[i] = Math.max(anim[i], 0.5); if (PB.house[i]) k.sfx('coin'); }
+      if (r.fresh.length) k.sfx('pop');
+      pDrips = r.drips; if (r.drips.length) k.sfx('tick');
+      if (r.fail) return pLose(r.fail.why, r.fail.i);
+      pev = pEval(); pAfter(); if (done) return;
+    }
+    for (let i = 0; i < PB.n; i++) if (PB.valve[i] && !PS.open[i] && PS.wet[2 * i] >= 0) { PS.hold[i] += dt; if (PS.hold[i] >= pVH) return pLose('valvula', i); }
+  }
+  /* entrada: toque = girar a la derecha; mantener = al revés */
+  const cx = Math.floor((k.ptr.x - OX) / S), cy = Math.floor((k.ptr.y - OY) / S), on = cx >= 0 && cy >= 0 && cx < PB.w && cy < PB.h;
+  if (k.ptr.hit) { kb = false; pPress = on ? cy * PB.w + cx : -2; pPressT = 0; pLong = false; if (!on && pHintHit()) { pPress = -3; pHint(); } }
+  if (k.ptr.down && pPress >= 0 && !pLong && Math.hypot(k.ptr.x - k.ptr.sx, k.ptr.y - k.ptr.sy) < 14) { pPressT += dt; if (pPressT > 0.4) { pLong = true; pRotate(pPress, true); navigator.vibrate && navigator.vibrate(15); } }
+  if (k.ptr.up && pPress >= 0 && !pLong && on && cy * PB.w + cx === pPress) pRotate(pPress, false);
+  if (k.ptr.up) pPress = -1;
+  const kd = ['up', 'down', 'left', 'right'].find((d) => k.hit.has(d));
+  if (kd) { kb = true; const d = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[kd]; cur = [k.clamp(cur[0] + d[0], 0, PB.w - 1), k.clamp(cur[1] + d[1], 0, PB.h - 1)]; k.sfx('click'); }
+  if (k.hit.has('a')) { kb = true; pRotate(cur[1] * PB.w + cur[0], false); }
+  if (k.hit.has('b')) { kb = true; pRotate(cur[1] * PB.w + cur[0], true); }
+}
+/* botón de pista: abajo en vertical, en el panel en apaisado */
+function pHintRect() { return pWide ? [pPanX, k.H - 70, pPanW, 50] : [k.W - 16 - Math.min(150, k.W * 0.38), pBarY + 4, Math.min(150, k.W * 0.38), 46]; }
+function pHintHit() { const [x, y, w, h] = pHintRect(); return k.ptr.x >= x && k.ptr.x <= x + w && k.ptr.y >= y && k.ptr.y <= y + h; }
+
+/* ---------- dibujo ---------- */
+function pSprite(key, w, h, fn) {
+  let q = pSpr[key]; if (q) return q;
+  q = document.createElement('canvas'); q.width = Math.ceil(w * CDPR); q.height = Math.ceil(h * CDPR);
+  const g2 = q.getContext('2d'); g2.scale(CDPR, CDPR); fn(g2); pSpr[key] = q; return q;
+}
+/* fondo: degradado y burbujas horneadas a resolución real */
+function pBg() {
+  if (pBgCv) return pBgCv;
+  const cv = document.createElement('canvas'); cv.width = Math.ceil(k.W * CDPR); cv.height = Math.ceil(k.H * CDPR);
+  const q = cv.getContext('2d'); q.scale(CDPR, CDPR);
+  const gr = q.createLinearGradient(0, 0, 0, k.H); gr.addColorStop(0, '#243a56'); gr.addColorStop(1, '#0d1828'); q.fillStyle = gr; q.fillRect(0, 0, k.W, k.H);
+  q.strokeStyle = 'rgba(160,200,255,.05)'; q.lineWidth = 10; for (let i = 0; i < 9; i++) { q.beginPath(); const y = rnd(i + 3) * k.H; q.moveTo(-20, y); q.bezierCurveTo(k.W * 0.3, y - 60, k.W * 0.6, y + 80, k.W + 20, y + 10); q.stroke(); }
+  /* placa del tablero con sombra, casillas, rocas y tornillos (lo que no se mueve) */
+  const bw = PB.w * S, bh = PB.h * S, pad = 10;
+  q.fillStyle = 'rgba(0,0,0,.35)'; ART.rr(q, OX - pad, OY - pad + 8, bw + pad * 2, bh + pad * 2, 16); q.fill();
+  ART.rr(q, OX - pad, OY - pad, bw + pad * 2, bh + pad * 2, 16); ART.fillOut(q, '#40506e', 3);
+  q.fillStyle = 'rgba(255,255,255,.16)'; ART.rr(q, OX - pad + 8, OY - pad + 3, bw + pad * 2 - 16, 4, 2); q.fill();
+  for (let i = 0; i < PB.n; i++) {
+    const X = OX + (i % PB.w) * S, Y = OY + Math.floor(i / PB.w) * S;
+    if (PB.rock[i]) { q.fillStyle = '#2a3346'; ART.rr(q, X + 1.5, Y + 1.5, S - 3, S - 3, 6); q.fill(); pRock(q, X + S / 2, Y + S / 2, S); continue; }
+    ART.rr(q, X + 1.5, Y + 1.5, S - 3, S - 3, 6); q.fillStyle = (i % PB.w + Math.floor(i / PB.w)) % 2 ? '#2d3d5b' : '#2a3855'; q.fill();
+    q.fillStyle = 'rgba(255,255,255,.06)'; q.fillRect(X + 4, Y + 3, S - 8, 2);
+    if (PB.fixed[i] && !PB.cross[i] && !PB.valve[i]) { /* placa atornillada: más oscura con cuatro tornillos */
+      ART.rr(q, X + 3, Y + 3, S - 6, S - 6, 6); q.fillStyle = '#1f2a40'; q.fill();
+      for (const [a, b] of [[7, 7], [S - 7, 7], [7, S - 7], [S - 7, S - 7]]) { q.beginPath(); q.arc(X + a, Y + b, Math.max(2, S * 0.05), 0, R2); ART.fillOut(q, '#b9c2d8', 1); q.strokeStyle = '#5a6278'; q.lineWidth = 1; q.beginPath(); q.moveTo(X + a - 2, Y + b); q.lineTo(X + a + 2, Y + b); q.stroke(); }
+    }
+  }
+  pBgCv = cv; return cv;
+}
+function pRock(q, x, y, s) {
+  const r = s * 0.36, parts = [[(h) => { h.moveTo(x - r, y + r * 0.6); h.quadraticCurveTo(x - r * 1.05, y - r * 0.3, x - r * 0.35, y - r * 0.75); h.quadraticCurveTo(x + r * 0.3, y - r * 1.05, x + r * 0.8, y - r * 0.35); h.quadraticCurveTo(x + r * 1.1, y + r * 0.3, x + r * 0.85, y + r * 0.65); h.closePath(); }, '#7d7f93']];
+  contact(q, x, y + r * 0.7, r * 1.05, r * 0.22, 0.35); uni(q, parts, 1.5); celp(q, parts, '#7d7f93', r * 0.12, r * 0.12); spec(q, x - r * 0.3, y - r * 0.45, r * 0.18, r * 0.09, -0.4, 0.45);
+}
+/* casa: pieza única (tejado + fachada), un sprite por color y estado */
+function pHouse(col, fed) {
+  const s = S;
+  return pSprite('h' + col + fed + s, s, s, (g2) => {
+    const x = s / 2, y = s / 2 + s * 0.04, w = s * 0.5, h = s * 0.34;
+    const parts = [[(h2) => ART.rr(h2, x - w * 0.42, y - h * 0.15, w * 0.84, h * 0.95, 3), '#efe6d2'],
+      [(h2) => { h2.moveTo(x - w * 0.6, y - h * 0.1); h2.lineTo(x, y - h * 0.95); h2.lineTo(x + w * 0.6, y - h * 0.1); h2.closePath(); }, WCOL[col]]];
+    contact(g2, x, y + h * 0.82, w * 0.5, h * 0.12, 0.35); uni(g2, parts, 1.4); celm(g2, parts, 1.2, 1.2);
+    g2.fillStyle = fed ? '#ffe17a' : '#3b4568'; ART.rr(g2, x - w * 0.14, y + h * 0.12, w * 0.28, h * 0.3, 2); g2.fill();
+    if (fed) { g2.fillStyle = 'rgba(255,240,170,.5)'; g2.beginPath(); g2.arc(x, y + h * 0.27, w * 0.3, 0, R2); g2.fill(); }
+  });
+}
+/* fuente: depósito de una pieza con el color de su agua */
+function pSource(col) {
+  const s = S;
+  return pSprite('s' + col + s, s, s, (g2) => {
+    const x = s / 2, y = s / 2, r = s * 0.3;
+    const parts = [[(h2) => ART.rr(h2, x - r, y - r, r * 2, r * 2, r * 0.35), '#ffd23d']];
+    contact(g2, x, y + r * 1.02, r * 0.95, r * 0.2, 0.35); uni(g2, parts, 1.6); celp(g2, parts, '#ffd23d', r * 0.18, r * 0.18);
+    g2.fillStyle = WCOL[col]; ART.rr(g2, x - r * 0.68, y - r * 0.68, r * 1.36, r * 1.36, r * 0.25); g2.fill();
+    spec(g2, x - r * 0.45, y - r * 0.62, r * 0.28, r * 0.1, -0.4, 0.6);
+  });
+}
+function pNodeCol(v) {
+  if (pPhase === 2) { const c2 = PS.wet[v]; return c2 >= 0 ? c2 : -1; }
+  if (pPhase === 1) return -1;
+  return pev.col[v];
+}
+function pTile(i) {
+  const x = i % PB.w, y = Math.floor(i / PB.w), cx = OX + (x + 0.5) * S, cy = OY + (y + 0.5) * S, m = pm[i], L = S / 2;
+  const a = anim[i] || 0, sc = 1 + a * 0.08;
+  c.save(); c.translate(cx, cy); if (sc !== 1) c.scale(sc, sc); c.rotate(pra[i]);
+  const groups = PB.cross[i] ? [[0, 2], [1, 3]] : [[0, 1, 2, 3].filter((d) => m & (1 << d))];
+  for (const gd of groups) {
+    const dirs = gd.filter((d) => m & (1 << d)); if (!dirs.length) continue;
+    const v = PR.node(PB, i, dirs[0]), wc = pNodeCol(v), dryCon = pPhase === 1 && pev.col[v] >= 0 ? pev.col[v] : -1;
+    const path = () => { c.beginPath(); if (PB.cross[i]) { const d0 = PR.DX[dirs[0]], e0 = PR.DY[dirs[0]]; c.moveTo(-d0 * L, -e0 * L); c.lineTo(d0 * L, e0 * L); } else for (const d of dirs) { c.moveTo(0, 0); c.lineTo(PR.DX[d] * L, PR.DY[d] * L); } };
+    c.lineCap = 'butt'; path(); c.strokeStyle = OUT; c.lineWidth = S * 0.36; c.stroke();
+    if (!PB.cross[i]) { c.beginPath(); c.arc(0, 0, S * 0.18, 0, R2); c.fillStyle = OUT; c.fill(); }
+    let pipe = '#8b93ad'; if (wc === -2) pipe = (clk * 4 | 0) % 2 ? '#b061ff' : '#7c3fd0'; else if (wc >= 0) pipe = WCOL[wc]; else if (dryCon >= 0) pipe = '#9fb0cf';
+    /* agua que entra: el grosor crece durante el paso */
+    const wt0 = v < pwet.length ? pwet[v] : -1, grow = pPhase === 2 && wc >= 0 && wt0 >= 0 ? k.clamp((clk - wt0) / Math.max(0.2, pWS * 0.6), 0, 1) : 1;
+    path(); c.strokeStyle = '#8b93ad'; c.lineWidth = S * 0.24; c.stroke();
+    if (grow > 0 && pipe !== '#8b93ad') { path(); c.strokeStyle = pipe; c.lineWidth = S * 0.24 * (0.35 + 0.65 * grow); c.stroke(); }
+    if (wc >= 0) { path(); c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = S * 0.06; c.setLineDash([S * 0.12, S * 0.18]); c.lineDashOffset = -clk * S * 0.8; c.stroke(); c.setLineDash([]); }
+    else { path(); c.strokeStyle = 'rgba(255,255,255,.28)'; c.lineWidth = S * 0.05; c.stroke(); }
+    if (!PB.cross[i]) { c.beginPath(); c.arc(0, 0, S * 0.12, 0, R2); c.fillStyle = pipe; c.fill(); }
+    if (PB.cross[i] && gd[0] === 0) { /* el puente: sombra del tubo de arriba sobre el de abajo */ c.fillStyle = 'rgba(8,12,30,.45)'; c.fillRect(-S * 0.3, -S * 0.25, S * 0.6, S * 0.5); }
+  }
+  if (PB.cross[i]) { /* barandillas del puente */
+    c.fillStyle = '#c9d2e6'; for (const sx of [-1, 1]) { ART.rr(c, sx * S * 0.27 - S * 0.04, -S * 0.2, S * 0.08, S * 0.4, 2); c.fill(); c.strokeStyle = OUT; c.lineWidth = 1.5; c.stroke(); }
+  }
+  c.restore();
+}
+function pValveDraw(i) {
+  const cx = OX + (i % PB.w + 0.5) * S, cy = OY + (Math.floor(i / PB.w) + 0.5) * S, r = S * 0.24, open = PS.open[i];
+  if (pPhase && !open && PS.hold[i] > 0) { const f = PS.hold[i] / pVH; c.strokeStyle = f > 0.66 ? ((clk * 8 | 0) % 2 ? '#ff4d5e' : '#ffd23d') : '#ffd23d'; c.lineWidth = 4; c.lineCap = 'round'; c.beginPath(); c.arc(cx, cy, r * 1.6, -Math.PI / 2, -Math.PI / 2 + R2 * f); c.stroke(); }
+  c.save(); c.translate(cx, cy); c.rotate(pVAng[i]);
+  const col = open ? '#3fcf6e' : '#ff5a5a';
+  c.strokeStyle = OUT; c.lineWidth = r * 0.55; c.lineCap = 'round'; c.beginPath(); for (let a = 0; a < 4; a++) { c.moveTo(0, 0); c.lineTo(Math.cos(a * Math.PI / 2) * r, Math.sin(a * Math.PI / 2) * r); } c.stroke();
+  c.beginPath(); c.arc(0, 0, r, 0, R2); c.lineWidth = r * 0.5; c.stroke();
+  c.strokeStyle = col; c.lineWidth = r * 0.3; c.beginPath(); c.arc(0, 0, r, 0, R2); c.stroke();
+  c.beginPath(); for (let a = 0; a < 4; a++) { c.moveTo(0, 0); c.lineTo(Math.cos(a * Math.PI / 2) * r, Math.sin(a * Math.PI / 2) * r); } c.lineWidth = r * 0.28; c.stroke();
+  c.beginPath(); c.arc(0, 0, r * 0.28, 0, R2); ART.fillOut(c, col, 1.5);
+  c.restore();
+}
+function drawPipeLv() {
+  c.drawImage(pBg(), 0, 0, k.W, k.H);
+  /* fondo vivo: burbujas que suben despacio */
+  c.fillStyle = 'rgba(150,200,255,.07)'; for (let b = 0; b < 10; b++) { const x = rnd(b + 40) * k.W, y = k.H - ((clk * (10 + rnd(b) * 14) + rnd(b + 9) * k.H) % (k.H + 40)); c.beginPath(); c.arc(x + Math.sin(clk + b) * 6, y, 4 + rnd(b + 7) * 9, 0, R2); c.fill(); }
+  for (let i = 0; i < PB.n; i++) if (!PB.rock[i]) pTile(i);
+  for (let i = 0; i < PB.n; i++) {
+    const X = OX + (i % PB.w) * S, Y = OY + Math.floor(i / PB.w) * S, a = anim[i] || 0;
+    if (PB.src.indexOf(i) >= 0) { const sp = pSource(PB.col[i]); c.drawImage(sp, X, Y, S, S); if (pPhase === 1) { const f = k.clamp(t / pWT, 0, 1); c.strokeStyle = '#fff'; c.lineWidth = 3; c.beginPath(); c.arc(X + S / 2, Y + S / 2, S * 0.42, -Math.PI / 2, -Math.PI / 2 + R2 * f); c.stroke(); } }
+    else if (PB.house[i]) { const fed = pev.col[2 * i] === PB.col[i] && (pPhase !== 1) ? 1 : 0; const sp = pHouse(PB.col[i], (pPhase === 2 ? PS.wet[2 * i] === PB.col[i] : fed) ? 1 : 0); const b = 1 + a * 0.18; c.drawImage(sp, X + S / 2 - S * b / 2, Y + S / 2 - S * b / 2 - a * 4, S * b, S * b); }
+    else if (PB.valve[i]) pValveDraw(i);
+    if (pHintSet.has(i)) { c.strokeStyle = '#ffd23d'; c.lineWidth = 2.5; ART.rr(c, X + 3, Y + 3, S - 6, S - 6, 6); c.stroke(); }
+  }
+  /* gotas: boca mojada que da al vacío — aviso de fuga en el siguiente paso */
+  if (pPhase === 2 && !done) for (const [i, d] of pDrips) {
+    const X = OX + (i % PB.w + 0.5 + PR.DX[d] * 0.5) * S, Y = OY + (Math.floor(i / PB.w) + 0.5 + PR.DY[d] * 0.5) * S, ph = (clk * 2.5) % 1;
+    c.fillStyle = '#ff4d5e'; c.globalAlpha = 0.5 + 0.5 * Math.sin(clk * 14); c.beginPath(); c.arc(X, Y, S * 0.16, 0, R2); c.fill(); c.globalAlpha = 1;
+    c.fillStyle = '#7cc8ff'; c.beginPath(); c.arc(X + PR.DX[d] * ph * S * 0.3, Y + PR.DY[d] * ph * S * 0.3 + ph * 6, 3.5, 0, R2); c.fill();
+  }
+  if (pFail && pFail.t < 0.8) { const X = OX + (pFail.i % PB.w + 0.5) * S, Y = OY + (Math.floor(pFail.i / PB.w) + 0.5) * S; c.globalAlpha = 1 - pFail.t / 0.8; c.fillStyle = '#7cc8ff'; c.beginPath(); c.arc(X, Y, S * 0.3 + pFail.t * S * 1.5, 0, R2); c.fill(); c.globalAlpha = 1; }
+  if (kb && !done) { c.strokeStyle = '#fff'; c.lineWidth = 3; c.setLineDash([8, 5]); c.lineDashOffset = -clk * 20; ART.rr(c, OX + cur[0] * S + 2, OY + cur[1] * S + 2, S - 4, S - 4, 8); c.stroke(); c.setLineDash([]); }
+  if (pPress >= 0 && k.ptr.down && !pLong && pPressT > 0.1) { c.strokeStyle = '#fff'; c.lineWidth = 4; c.lineCap = 'round'; c.beginPath(); c.arc(k.ptr.x, k.ptr.y - 40, 13, -Math.PI / 2, -Math.PI / 2 + R2 * Math.min(1, pPressT / 0.4)); c.stroke(); }
+  pHud();
+  if (pWin && doneT > 0.05) { const p = Math.min(1, doneT * 3), sc = 0.7 + p * 0.3; c.save(); c.globalAlpha = p; c.translate(OX + PB.w * S / 2, OY + PB.h * S / 2); c.scale(sc, sc); ART.rr(c, -140, -32, 280, 64, 20); ART.fillOut(c, 'rgba(20,34,60,.92)', 3); label(level === PH.length ? '¡La Gran Fuente!' : '¡Todo con agua!', 0, -16, 28, '#7cf7a0', 'center'); c.restore(); }
+}
+function pFit(s, size, maxw) { c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; while (size > 10 && c.measureText(s).width > maxw) { size--; c.font = `800 ${size}px ui-rounded,"Trebuchet MS",system-ui,sans-serif`; } return size; }
+function pHud() {
+  const L = pLv(), G = pGoals(), Lx = k.ex(16), Rx = k.ex2(16), narrow = k.W < 420;
+  const midL = !k.extHud && !k.party ? k.W / 2 - 58 : Rx - 120; /* sin reproductor, la pausa y el sonido del kit van arriba en el centro */
+  label(`NIVEL ${level}/${PH.length}`, Lx, 9, 12, '#9fb3d8');
+  label(L.n, Lx, 26, pFit(L.n, narrow ? 17 : 20, Math.max(80, midL - Lx - 6)), '#ffd23d');
+  const gcol = pTaps <= G.s3 && !pUsed ? '#ffd166' : pTaps <= G.s2 ? '#fff' : '#ff9aa8';
+  const gt = `${pTaps}/${pTaps <= G.s3 && !pUsed ? G.s3 : G.s2}`;
+  label('GIROS', Rx, 9, 12, '#9fb3d8', 'right'); label(gt, Rx, 25, 22, gcol, 'right');
+  /* estado del agua y meta visible */
+  let nodes = 0, wet = 0; for (let i = 0; i < PB.n; i++) { if (PB.rock[i]) continue; const vs = PB.cross[i] ? [2 * i, 2 * i + 1] : [2 * i]; for (const v of vs) { nodes++; if (pev.col[v] >= 0) wet++; } }
+  const houses = PB.house.filter(Boolean).length, fed = PB.house.reduce((a, h, i) => a + (h && pev.col[2 * i] === PB.col[i] ? 1 : 0), 0);
+  let water = '';
+  if (pPhase === 1) water = `El agua sale en ${Math.max(0, Math.ceil(pWT - t))} s`;
+  else if (pPhase === 2 && !done) water = 'El agua avanza';
+  const pct = wet / nodes;
+  const idea = pMsg ? pMsg[0] : L.i, ideaCol = pMsg ? pMsg[1] : '#e6eeff';
+  if (pWide) {
+    const x = pPanX, w = pPanW; let y = pTop + 4;
+    const lines = wrap(idea, 13, w - 24).slice(0, 6);
+    ART.rr(c, x, y, w, Math.min(k.H - y - 84, 18 + lines.length * 17 + 10 + 30 + (houses ? 22 : 0) + (pLv().w ? 22 : 0) + 26), 14); ART.fillOut(c, 'rgba(18,30,52,.85)', 2.5); c.globalAlpha = 0.4 + 0.6 * (banner ? banner.a : 1);
+    for (let j = 0; j < lines.length; j++) label(lines[j], x + 12, y + 12 + j * 17, 13, ideaCol); c.globalAlpha = 1;
+    y += 18 + lines.length * 17 + 10;
+    y = pMeter(x + 12, y, w - 24, pct, `${pLv().w ? 'Conectado' : 'Con agua'} ${Math.round(pct * 100)} %`) + 10;
+    if (houses) { label(`Casas ${fed}/${houses}`, x + 12, y, 14, fed === houses ? '#7cf7a0' : '#cfd6ff'); y += 22; }
+    if (water) { label(water, x + 12, y, 15, pPhase === 1 && pWT - t < 6 ? '#ffb4a0' : '#7cc8ff'); y += 22; }
+    label(`2★ ≤ ${G.s2} · 3★ ≤ ${G.s3}`, x + 12, y, 12.5, '#9fb3d8');
+  } else {
+    const y = pTop - 2, lines = wrap(idea, 12.5, k.W - 32).slice(0, 2);
+    c.globalAlpha = 0.4 + 0.6 * (banner ? banner.a : 1);
+    for (let j = 0; j < lines.length; j++) label(lines[j], k.W / 2, y + j * 16, 12.5, ideaCol, 'center'); c.globalAlpha = 1;
+    const by = pBarY, hw = pHintRect()[2], mw = k.W - 32 - hw - 12;
+    let st = `${pLv().w ? 'Conectado' : 'Con agua'} ${Math.round(pct * 100)} %` + (houses ? ` · Casas ${fed}/${houses}` : '');
+    pMeter(16, by + 4, mw, pct, st);
+    if (water) label(water, 16, by + 30, pFit(water, 14, mw), pPhase === 1 && pWT - t < 6 ? '#ffb4a0' : '#7cc8ff');
+  }
+  const [hx, hy, hw, hh] = pHintRect(), dn = k.ptr.down && pPress === -3;
+  const yy = key3d(hx, hy, hw, hh - 4, pHints > 0 ? '#3f8f52' : '#4a4a5e', dn);
+  label(pHints > 0 ? `Pista ${pHints}` : 'Sin pistas', hx + hw / 2, yy + (hh - 4) / 2 - 8, 15, pHints > 0 ? '#fff' : '#b9bdd6', 'center');
+}
+function pMeter(x, y, w, f, txt) {
+  label(txt, x, y, pFit(txt, 13, w), f >= 1 ? '#7cf7a0' : '#cfd6ff');
+  ART.rr(c, x, y + 18, w, 8, 4); c.fillStyle = 'rgba(0,0,0,.45)'; c.fill();
+  if (f > 0) { ART.rr(c, x, y + 18, Math.max(8, w * f), 8, 4); c.fillStyle = f >= 1 ? '#7cf7a0' : '#2f9bf0'; c.fill(); }
+  return y + 30;
+}
 const _draw = () => {
+  if (PH) return drawPipeLv();
   if (!bgCv || bgCv.n !== N * 1000 + S * 10 + (OY % 10)) { bgCv = renderBg(); bgCv.n = N * 1000 + S * 10 + (OY % 10); }
   c.drawImage(bgCv, 0, 0, W, H); hud();
   if (M === 'sudoku') drawSudoku(); if (M === 'mines') drawMines(); if (M === 'lights') drawLights(); if (M === 'pipes') drawPipes(); if (M === 'slide') drawSlide();

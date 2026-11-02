@@ -80,7 +80,7 @@ CATALOG = {
         ("Sudoku Zen", ["sudoku", "numbers", "vector"], "canvas", "portrait", "1:1", "TKM"),
         ("Mine Sweep", ["minesweeper", "deduction", "pixel-art"], "canvas", "auto", "1:1", "TM"),
         ("Lights Out", ["toggle-grid", "logic", "vector"], "canvas", "auto", "1:1", "TM"),
-        ("Pipe Connect", ["pipes", "rotation", "vector"], "canvas", "portrait", "1:1", "TM"),
+        ("Pipe Connect", ["pipes", "rotation", "vector"], "canvas", "auto", "fill", "TKMG"),
         ("Slide 15", ["sliding-puzzle", "classic", "vector"], "canvas", "auto", "1:1", "TKM"),
         ("Flow Lines", ["path-drawing", "logic", "vector"], "canvas", "auto", "fill", "TM"),
         ("Color Sort", ["sorting", "relaxing", "vector"], "construct", "auto", "fill", "TM"),
